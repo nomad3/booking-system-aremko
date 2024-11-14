@@ -1,0 +1,18 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<h1>Detalle de Compra #{{ detalle.id }}</h1>
+
+<p><strong>Fecha de Compra:</strong> {{ detalle.compra.fecha_compra }}</p>
+<p><strong>Proveedor:</strong> {{ detalle.compra.proveedor.nombre }}</p>
+<p><strong>Método de Pago:</strong> {{ detalle.compra.get_metodo_pago_display }}</p>
+<p><strong>Número de Documento:</strong> {{ detalle.compra.numero_documento }}</p>
+<p><strong>Producto:</strong> {{ detalle.producto.nombre }}</p>
+<p><strong>Cantidad:</strong> {{ detalle.cantidad }}</p>
+<p><strong>Valor del Producto:</strong> {{ detalle.precio_unitario }} CLP</p>
+<p><strong>Total:</strong> {{ detalle.cantidad|multiply:detalle.precio_unitario }} CLP</p>
+<p><strong>Descripción:</strong> {{ detalle.descripcion }}</p>
+
+<a href="{% url 'detalle_compra_list' %}">Volver a la Lista de Detalles de Compra</a>
+{% endblock %}
