@@ -78,20 +78,19 @@ class Compra(models.Model):
     numero_documento = models.CharField(max_length=100, null=True, blank=True)
     total = models.DecimalField(max_digits=10, decimal_places=0, default=0)
 
+
     def __str__(self):
         return f"Compra #{self.id} - {self.proveedor}"
 
     def calcular_total(self):
-        # Sumar el total de todos los DetalleCompra asociados
         total_detalles = self.detalles.aggregate(
-            total=Sum(F('precio_unitario') * F('cantidad'))
+            total=Sum(F('precio_unitario') * F('cantidad'), output_field=models.DecimalField())
         )['total'] or 0
         self.total = total_detalles
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        self.calcular_total()
-        Compra.objects.filter(pk=self.pk).update(total=self.total)
+        # No llamamos a calcular_total aquí para evitar recursión
 
 class GiftCard(models.Model):
     ESTADO_CHOICES = [

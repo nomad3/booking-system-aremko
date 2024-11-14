@@ -2,7 +2,7 @@ from django.db.models.signals import post_save, post_delete, m2m_changed, pre_sa
 from django.dispatch import receiver
 from django.utils import timezone
 from django.db import transaction
-from .models import VentaReserva, Cliente, ReservaProducto, ReservaServicio, Pago, MovimientoCliente
+from .models import VentaReserva, Cliente, ReservaProducto, ReservaServicio, Pago, MovimientoCliente, DetalleCompra
 from django.contrib.auth.models import User  # Importa el modelo de usuario
 from .middleware import get_current_user  # Importa el middleware
 
@@ -232,3 +232,13 @@ def restaurar_inventario_al_eliminar_producto(sender, instance, **kwargs):
     with transaction.atomic():
         instance.producto.cantidad_disponible += instance.cantidad
         instance.producto.save()
+
+@receiver(post_save, sender=DetalleCompra)
+@receiver(post_delete, sender=DetalleCompra)
+def update_compra_total(sender, instance, **kwargs):
+    compra = instance.compra
+    if compra:
+        total_detalles = compra.detalles.aggregate(
+            total=Sum(F('precio_unitario') * F('cantidad'), output_field=models.DecimalField())
+        )['total'] or 0
+        Compra.objects.filter(pk=compra.pk).update(total=total_detalles)

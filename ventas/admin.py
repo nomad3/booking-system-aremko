@@ -192,16 +192,6 @@ class CompraAdmin(admin.ModelAdmin):
     autocomplete_fields = ['proveedor']
     list_select_related = ('proveedor',)
 
-    def save_model(self, request, obj, form, change):
-        # Guarda el objeto padre sin calcular el total aún
-        super().save_model(request, obj, form, change)
-
-    def save_related(self, request, form, formsets, change):
-        # Guarda los inlines (detalles de compra)
-        super().save_related(request, form, formsets, change)
-        # Ahora que los detalles están guardados, calcula el total
-        form.instance.calcular_total()
-
 @admin.register(GiftCard)
 class GiftCardAdmin(admin.ModelAdmin):
     list_display = ('codigo', 'cliente_comprador', 'cliente_destinatario', 'monto_inicial', 'monto_disponible', 'fecha_emision', 'fecha_vencimiento', 'estado')
