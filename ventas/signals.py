@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.db import transaction
 from django.db import models
 from django.db.models import Sum, F, DecimalField 
-from .models import VentaReserva, Cliente, ReservaProducto, ReservaServicio, Pago, MovimientoCliente, DetalleCompra
+from .models import VentaReserva, Cliente, ReservaProducto, ReservaServicio, Pago, MovimientoCliente, DetalleCompra, Compra
 from django.contrib.auth.models import User  # Importa el modelo de usuario
 from .middleware import get_current_user  # Importa el middleware
 
