@@ -1,0 +1,26 @@
+# docker-compose.yml
+
+version: '3.8'
+
+services:
+  web:
+    build: .
+    command: gunicorn aremko_project.wsgi:application --bind 0.0.0.0:${PORT}
+    ports:
+      - "8000:8000"  # Para desarrollo local
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: aremko_db
+      POSTGRES_USER: aremko_user
+      POSTGRES_PASSWORD: aremko_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+volumes:
+  postgres_data:

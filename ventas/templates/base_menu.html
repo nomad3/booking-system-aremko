@@ -1,0 +1,25 @@
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">Gestión de Ventas</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'inicio_sistema' %}">Inicio</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'caja_diaria' %}">Cuadre de Caja</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'auditoria_movimientos' %}">Auditoría</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'servicios_vendidos' %}">Servicios Vendidos</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  

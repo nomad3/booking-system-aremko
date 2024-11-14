@@ -1,0 +1,8 @@
+# Virtual Environment
+venv/
+
+# Archivos de configuración de Django
+*.pyc
+__pycache__/
+.env
+.env

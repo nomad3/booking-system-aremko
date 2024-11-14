@@ -1,0 +1,141 @@
+<!-- ventas/templates/ventas/caja_diaria.html -->
+{% extends "admin/base_site.html" %}
+
+{% load ventas_extras %}
+
+{% block content %}
+{% include 'base_menu.html' %}
+
+<h1>Caja Diaria</h1>
+
+<!-- Formulario de Filtro por Rango de Fechas, Usuario y Método de Pago -->
+<form method="get" class="form-inline mb-4">
+    <!-- Filtro de Fecha Inicio -->
+    <div class="form-group mr-2">
+        <label for="fecha_inicio" class="mr-2">Fecha Inicio:</label>
+        <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control">
+    </div>
+    
+    <!-- Filtro de Fecha Fin -->
+    <div class="form-group mr-2">
+        <label for="fecha_fin" class="mr-2">Fecha Fin:</label>
+        <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}" class="form-control">
+    </div>
+    
+    <!-- Filtro de Usuario -->
+    <div class="form-group mr-2">
+        <label for="usuario" class="mr-2">Usuario:</label>
+        <select id="usuario" name="usuario" class="form-control">
+            <option value="">-- Todos los Usuarios --</option>
+            {% for usuario in usuarios %}
+                <option value="{{ usuario.id }}" {% if usuario.id|stringformat:"s" == usuario_id %}selected{% endif %}>{{ usuario.username }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <!-- Filtro de Método de Pago -->
+    <div class="form-group mr-2">
+        <label for="metodo_pago" class="mr-2">Método de Pago:</label>
+        <select id="metodo_pago" name="metodo_pago" class="form-control">
+            <option value="">-- Todos los Métodos --</option>
+            {% for codigo, nombre in METODOS_PAGO %}
+                <option value="{{ codigo }}" {% if codigo == metodo_pago %}selected{% endif %}>{{ nombre }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- Botón de Filtrar -->
+    <button type="submit" class="btn btn-primary">Filtrar</button>
+</form>
+
+<!-- Desglose de Pagos por Método de Pago -->
+<h2>Pagos por Método de Pago</h2>
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Método de Pago</th>
+            <th>Total Monto</th>
+            <th>Cantidad de Transacciones</th> <!-- Nueva Columna -->
+        </tr>
+    </thead>
+    <tbody>
+        {% for pago in pagos_grouped %}
+        <tr>
+            <td>{{ pago.metodo_pago }}</td>
+            <td>{{ pago.total_monto|formato_clp }}</td> <!-- Aplicar formato CLP -->
+            <td>{{ pago.cantidad_transacciones }}</td> <!-- Mostrar el Conteo -->
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="3">No hay pagos en este rango de fechas.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- Pagos -->
+<h2>Pagos</h2>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Venta</th>
+            <th>Fecha Pago</th>
+            <th>Monto</th>
+            <th>Método de Pago</th> <!-- Nueva Columna -->
+        </tr>
+    </thead>
+    <tbody>
+        {% for pago in pagos %}
+        <tr>
+            <td>{{ pago.id }}</td>
+            <td>{{ pago.venta_reserva }}</td>
+            <td>{{ pago.fecha_pago|date:"Y-m-d" }}</td>
+            <td>{{ pago.monto|formato_clp }}</td> <!-- Aplicar formato CLP -->
+            <td>{{ pago.metodo_pago }}</td> <!-- Mostrar Método de Pago -->
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5">No hay pagos en este rango de fechas.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p><strong>Total Pagos:</strong> {{ total_pagos|formato_clp }}</p> <!-- Aplicar formato CLP -->
+
+<!-- (Opcional) Gráfico de Pagos por Método de Pago -->
+<h2>Gráfico de Pagos por Método de Pago</h2>
+<canvas id="pagosChart" width="400" height="200"></canvas>
+
+<!-- Incluir Chart.js desde CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    var ctx = document.getElementById('pagosChart').getContext('2d');
+    var pagosChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [{% for pago in pagos_grouped %}'{{ pago.metodo_pago }}',{% endfor %}],
+            datasets: [{
+                label: 'Total Monto',
+                data: [{% for pago in pagos_grouped %}{{ pago.total_monto }},{% endfor %}],
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }, {
+                label: 'Cantidad de Transacciones',
+                data: [{% for pago in pagos_grouped %}{{ pago.cantidad_transacciones }},{% endfor %}],
+                backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                borderColor: 'rgba(255,99,132,1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

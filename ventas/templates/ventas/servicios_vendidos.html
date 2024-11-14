@@ -1,0 +1,80 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+
+{% include 'base_menu.html' %}
+
+<div class="container" style="text-align: center; margin-top: 50px;">
+    <h1>Servicios Vendidos</h1>
+
+    <!-- Formulario de búsqueda y filtros -->
+    <form method="GET" action="" class="form-inline mb-4">
+        <div class="form-group mx-sm-3 mb-2">
+            <label for="fecha_inicio" class="sr-only">Fecha Inicio</label>
+            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio|date:'Y-m-d' }}" class="form-control" placeholder="Fecha Inicio" required>
+        </div>
+        <div class="form-group mx-sm-3 mb-2">
+            <label for="fecha_fin" class="sr-only">Fecha Fin</label>
+            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin|date:'Y-m-d' }}" class="form-control" placeholder="Fecha Fin" required>
+        </div>
+        <div class="form-group mx-sm-3 mb-2">
+            <label for="categoria" class="sr-only">Categoría</label>
+            <select id="categoria" name="categoria" class="form-control">
+                <option value="">Todas las categorías</option>
+                {% for categoria in categorias %}
+                    <option value="{{ categoria.id }}" {% if categoria_id == categoria.id %}selected{% endif %}>{{ categoria.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group mx-sm-3 mb-2">
+            <label for="venta_reserva_id" class="sr-only">ID Venta/Reserva</label>
+            <input type="text" id="venta_reserva_id" name="venta_reserva_id" value="{{ venta_reserva_id }}" class="form-control" placeholder="ID Venta/Reserva">
+        </div>
+        <button type="submit" class="btn btn-primary mb-2">Buscar</button>
+    </form>
+
+    <!-- Mostrar el monto total vendido -->
+    <div class="alert alert-info">
+        <strong>Total Monto Vendido: ${{ total_monto_vendido|floatformat:0 }}</strong>
+    </div>
+
+    <!-- Tabla de servicios vendidos -->
+    <table class="table table-striped table-bordered">
+        <thead>
+            <tr>
+                <th>ID Venta/Reserva</th>
+                <th>Cliente</th>
+                <th>Categoría del Servicio</th>
+                <th>Servicio</th>
+                <th>Fecha de Agendamiento</th>
+                <th>Hora de Agendamiento</th>
+                <th>Cantidad de Personas</th>
+                <th>Monto Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for servicio in servicios %}
+            <tr>
+                <td>
+                    <a href="{% url 'admin:ventas_ventareserva_change' servicio.venta_reserva_id %}">
+                        {{ servicio.venta_reserva_id }}
+                    </a>
+                </td>
+                <td>{{ servicio.cliente_nombre }}</td>
+                <td>{{ servicio.categoria_servicio }}</td>
+                <td>{{ servicio.servicio_nombre }}</td>
+                <td>{{ servicio.fecha_agendamiento }}</td>
+                <td>{{ servicio.hora_agendamiento }}</td>
+                <td>{{ servicio.cantidad_personas }}</td>
+                <td>${{ servicio.total_monto|floatformat:0 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8">No se encontraron servicios vendidos.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

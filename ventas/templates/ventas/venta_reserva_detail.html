@@ -1,0 +1,45 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>Detalle de Venta/Reserva #{{ venta.id }}</h1>
+
+<p><strong>Cliente:</strong> {{ venta.cliente.nombre }}</p>
+<p><strong>Fecha Reserva:</strong> {{ venta.fecha_reserva|date:"Y-m-d H:i" }}</p>
+<p><strong>Estado de Pago:</strong> {{ venta.estado_pago }}</p>
+<p><strong>Total:</strong> {{ venta.total }} CLP</p>
+<p><strong>Pagado:</strong> {{ venta.pagado }} CLP</p>
+<p><strong>Saldo Pendiente:</strong> {{ venta.saldo_pendiente }} CLP</p>
+
+<h2>Servicios</h2>
+<ul>
+    {% for reserva_servicio in venta.reservaservicios.all %}
+        <li>
+            {{ reserva_servicio.servicio.nombre }} (x{{ reserva_servicio.cantidad_personas }}) -
+            Fecha: {{ reserva_servicio.fecha_agendamiento|date:"Y-m-d H:i" }}
+        </li>
+    {% empty %}
+        <li>No hay servicios</li>
+    {% endfor %}
+</ul>
+
+<h2>Productos</h2>
+<ul>
+    {% for reserva_producto in venta.reservaproductos.all %}
+        <li>{{ reserva_producto.producto.nombre }} (x{{ reserva_producto.cantidad }})</li>
+    {% empty %}
+        <li>No hay productos</li>
+    {% endfor %}
+</ul>
+
+<h2>Pagos</h2>
+<ul>
+    {% for pago in venta.pagos.all %}
+        <li>{{ pago.monto }} CLP - {{ pago.metodo_pago }} - {{ pago.fecha_pago|date:"Y-m-d H:i" }}</li>
+    {% empty %}
+        <li>No hay pagos</li>
+    {% endfor %}
+</ul>
+
+<a href="{% url 'venta_reserva_list' %}">Volver a la lista</a>
+
+{% endblock %}

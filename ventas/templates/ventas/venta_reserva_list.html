@@ -1,0 +1,85 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<h1>Ventas y Reservas</h1>
+
+<form method="get">
+    <label for="categoria_servicio">Categoría de Servicio:</label>
+    <select name="categoria_servicio" id="categoria_servicio">
+        <option value="">Todas</option>
+        {% for categoria in categorias_servicio %}
+            <option value="{{ categoria.id }}" {% if categoria.id|stringformat:"s" == categoria_servicio_id %}selected{% endif %}>{{ categoria.nombre }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="servicio">Servicio:</label>
+    <select name="servicio" id="servicio">
+        <option value="">Todos</option>
+        {% for servicio in servicios %}
+            <option value="{{ servicio.id }}" {% if servicio.id|stringformat:"s" == servicio_id %}selected{% endif %}>{{ servicio.nombre }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="fecha_inicio">Fecha Inicio:</label>
+    <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}">
+
+    <label for="fecha_fin">Fecha Fin:</label>
+    <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}">
+
+    <button type="submit">Filtrar</button>
+</form>
+
+<p><strong>Total en el rango de fechas:</strong> {{ total_en_rango }} CLP</p>
+
+<table border="1" cellpadding="5" cellspacing="0">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Cliente</th>
+            <th>Fecha Reserva</th>
+            <th>Estado</th>
+            <th>Servicios y Cantidades</th>
+            <th>Productos y Cantidades</th>
+            <th>Total Servicios</th>
+            <th>Total Productos</th>
+            <th>Total</th>
+            <th>Pagado</th>
+            <th>Saldo Pendiente</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for venta in venta_reservas %}
+            <tr>
+                <td><a href="{% url 'venta_reserva_detail' venta.id %}">{{ venta.id }}</a></td>
+                <td>{{ venta.cliente.nombre }}</td>
+                <td>{{ venta.fecha_reserva|date:"Y-m-d H:i" }}</td>
+                <td>{{ venta.estado }}</td>
+                <td>
+                    {% for reserva_servicio in venta.reservaservicios.all %}
+                        {{ reserva_servicio.servicio.nombre }} (x{{ reserva_servicio.cantidad_personas }})<br>
+                    {% empty %}
+                        No hay servicios
+                    {% endfor %}
+                </td>
+                <td>
+                    {% for reserva_producto in venta.reservaproductos.all %}
+                        {{ reserva_producto.producto.nombre }} (x{{ reserva_producto.cantidad }})<br>
+                    {% empty %}
+                        No hay productos
+                    {% endfor %}
+                </td>
+                <td>{{ venta.total_servicios }} CLP</td>
+                <td>{{ venta.total_productos }} CLP</td>
+                <td>{{ venta.total }} CLP</td>
+                <td>{{ venta.pagado }} CLP</td>
+                <td>{{ venta.saldo_pendiente }} CLP</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="11">No hay ventas/reservas que coincidan con los filtros.</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
