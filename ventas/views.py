@@ -1,7 +1,7 @@
 
 from rest_framework import viewsets
 from rest_framework.response import Response
-from django.db.models import Sum, Q, Count
+from django.db.models import Sum, Q, Count, F
 from django.contrib.auth.decorators import user_passes_test
 import csv
 from django.http import HttpResponse
