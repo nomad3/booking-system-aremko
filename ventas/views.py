@@ -31,6 +31,83 @@ from .serializers import (
     VentaReservaSerializer
 )
 
+
+def detalle_compra_list(request):
+    # Obtener la fecha actual
+    today = timezone.localdate()
+
+    # Obtener filtros de los parámetros GET
+    proveedor_id = request.GET.get('proveedor')
+    producto_id = request.GET.get('producto')
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+
+    # Establecer fechas por defecto si no se proporcionan
+    if not fecha_inicio:
+        fecha_inicio = today.strftime('%Y-%m-%d')
+    if not fecha_fin:
+        fecha_fin = today.strftime('%Y-%m-%d')
+
+    # Convertir cadenas de fecha a objetos date
+    try:
+        fecha_inicio_parsed = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+    except ValueError:
+        fecha_inicio_parsed = today
+
+    try:
+        fecha_fin_parsed = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+    except ValueError:
+        fecha_fin_parsed = today
+
+    # Filtrar DetalleCompra por rango de fechas a través de Compra
+    detalles = DetalleCompra.objects.filter(
+        compra__fecha_compra__range=(fecha_inicio_parsed, fecha_fin_parsed)
+    ).select_related('compra__proveedor', 'producto')
+
+    # Aplicar filtro por proveedor si se proporciona
+    if proveedor_id and proveedor_id.isdigit():
+        detalles = detalles.filter(compra__proveedor_id=int(proveedor_id))
+
+    # Aplicar filtro por producto si se proporciona
+    if producto_id and producto_id.isdigit():
+        detalles = detalles.filter(producto_id=int(producto_id))
+
+    # Eliminar duplicados si los filtros causan joins múltiples
+    detalles = detalles.distinct()
+
+    # Calcular el total en el rango de fechas
+    total_en_rango = detalles.aggregate(
+        total=Sum(F('cantidad') * F('precio_unitario'), output_field=models.DecimalField())
+    )['total'] or 0
+
+    # Obtener todos los proveedores y productos para los filtros
+    proveedores = Proveedor.objects.all()
+    productos = Producto.objects.all()
+
+    context = {
+        'detalles_compras': detalles,
+        'proveedores': proveedores,
+        'productos': productos,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'proveedor_id': proveedor_id,
+        'producto_id': producto_id,
+        'total_en_rango': total_en_rango,
+    }
+
+    return render(request, 'ventas/detalle_compra_list.html', context)
+
+def detalle_compra_detail(request, pk):
+    detalle = get_object_or_404(DetalleCompra, pk=pk)
+    compra = detalle.compra
+
+    context = {
+        'detalle': detalle,
+        'compra': compra,
+    }
+
+    return render(request, 'ventas/detalle_compra_detail.html', context)
+
 def compra_list(request):
     # Obtener la fecha actual
     today = timezone.localdate()
