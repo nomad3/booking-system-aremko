@@ -1,0 +1,42 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<h1>Detalle de Compra #{{ compra.id }}</h1>
+
+<p><strong>Fecha de Compra:</strong> {{ compra.fecha_compra }}</p>
+<p><strong>Proveedor:</strong> {{ compra.proveedor.nombre }}</p>
+<p><strong>Método de Pago:</strong> {{ compra.get_metodo_pago_display }}</p>
+<p><strong>Número de Documento:</strong> {{ compra.numero_documento }}</p>
+<p><strong>Total de la Compra:</strong> {{ compra.total }} CLP</p>
+
+<h2>Detalles de Compra</h2>
+<table border="1" cellpadding="5" cellspacing="0" style="width: 100%;">
+    <thead>
+        <tr>
+            <th>Producto</th>
+            <th>Cantidad</th>
+            <th>Valor de Compra</th>
+            <th>Total</th>
+            <th>Descripción</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for detalle in detalles %}
+            <tr>
+                <td>{{ detalle.producto.nombre }}</td>
+                <td>{{ detalle.cantidad }}</td>
+                <td>{{ detalle.precio_unitario }} CLP</td>
+                <td>{{ detalle.total_compra_item }} CLP</td>
+                <td>{{ detalle.descripcion }}</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="5">No hay detalles de compra asociados.</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<a href="{% url 'compra_list' %}">Volver a la Lista de Compras</a>
+{% endblock %}

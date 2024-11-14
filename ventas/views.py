@@ -1,7 +1,7 @@
 
 from rest_framework import viewsets
 from rest_framework.response import Response
-from django.db.models import Sum, Q, Count
+from django.db.models import Sum, Q, Count, F
 from django.contrib.auth.decorators import user_passes_test
 import csv
 from django.http import HttpResponse
@@ -9,10 +9,11 @@ from django.shortcuts import render, get_object_or_404
 from datetime import datetime, timedelta
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Cliente, Pago, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente  
+from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Cliente, Pago, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra 
 from .utils import verificar_disponibilidad
 from django.utils.timezone import make_aware
 from django.utils.dateparse import parse_date
+from django.db import models
 from django.db.models import Q, Sum
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
@@ -30,6 +31,136 @@ from .serializers import (
     CategoriaServicioSerializer,
     VentaReservaSerializer
 )
+
+
+def detalle_compra_list(request):
+    # Obtener filtros de los parámetros GET
+    proveedor_id = request.GET.get('proveedor')
+    producto_id = request.GET.get('producto')
+    # Temporariamente eliminar los filtros de fecha
+    # fecha_inicio = request.GET.get('fecha_inicio')
+    # fecha_fin = request.GET.get('fecha_fin')
+
+    # Filtrar DetalleCompra sin fechas
+    detalles = DetalleCompra.objects.all().select_related('compra__proveedor', 'producto')
+
+    # Aplicar filtro por proveedor si se proporciona
+    if proveedor_id and proveedor_id.isdigit():
+        detalles = detalles.filter(compra__proveedor_id=int(proveedor_id))
+
+    # Aplicar filtro por producto si se proporciona
+    if producto_id and producto_id.isdigit():
+        detalles = detalles.filter(producto_id=int(producto_id))
+
+    # Eliminar duplicados si los filtros causan joins múltiples
+    detalles = detalles.distinct()
+
+    # Calcular el total en el rango de fechas (ahora es el total general)
+    total_en_rango = detalles.aggregate(
+        total=Sum(F('cantidad') * F('precio_unitario'), output_field=models.DecimalField())
+    )['total'] or 0
+
+    # Obtener todos los proveedores y productos para los filtros
+    proveedores = Proveedor.objects.all()
+    productos = Producto.objects.all()
+
+    context = {
+        'detalles_compras': detalles,
+        'proveedores': proveedores,
+        'productos': productos,
+        # 'fecha_inicio': fecha_inicio,
+        # 'fecha_fin': fecha_fin,
+        'proveedor_id': proveedor_id,
+        'producto_id': producto_id,
+        'total_en_rango': total_en_rango,
+    }
+
+    return render(request, 'ventas/detalle_compra_list.html', context)
+
+def detalle_compra_detail(request, pk):
+    detalle = get_object_or_404(DetalleCompra, pk=pk)
+    compra = detalle.compra
+
+    context = {
+        'detalle': detalle,
+        'compra': compra,
+    }
+
+    return render(request, 'ventas/detalle_compra_detail.html', context)
+
+def compra_list(request):
+    # Obtener la fecha actual
+    today = timezone.localdate()
+
+    # Obtener filtros de los parámetros GET
+    proveedor_id = request.GET.get('proveedor')
+    producto_id = request.GET.get('producto')
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+
+    # Establecer fechas por defecto si no se proporcionan
+    if not fecha_inicio:
+        fecha_inicio = today.strftime('%Y-%m-%d')
+    if not fecha_fin:
+        fecha_fin = today.strftime('%Y-%m-%d')
+
+    # Convertir cadenas de fecha a objetos datetime
+    try:
+        fecha_inicio_parsed = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+    except ValueError:
+        fecha_inicio_parsed = today
+
+    try:
+        fecha_fin_parsed = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+    except ValueError:
+        fecha_fin_parsed = today
+
+    # Filtrar Compras por rango de fechas
+    compras = Compra.objects.filter(
+        fecha_compra__range=(fecha_inicio_parsed, fecha_fin_parsed)
+    ).select_related('proveedor').prefetch_related('detalles__producto')
+
+    # Aplicar filtro por proveedor si se proporciona
+    if proveedor_id and proveedor_id.isdigit():
+        compras = compras.filter(proveedor_id=int(proveedor_id))
+
+    # Aplicar filtro por producto si se proporciona
+    if producto_id and producto_id.isdigit():
+        compras = compras.filter(detalles__producto_id=int(producto_id))
+
+    # Eliminar duplicados si los filtros causan joins múltiples
+    compras = compras.distinct()
+
+    # Calcular el total en el rango de fechas
+    total_en_rango = compras.aggregate(total=Sum('total'))['total'] or 0
+
+    # Obtener todos los proveedores y productos para los filtros
+    proveedores = Proveedor.objects.all()
+    productos = Producto.objects.all()
+
+    context = {
+        'compras': compras,
+        'proveedores': proveedores,
+        'productos': productos,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'proveedor_id': proveedor_id,
+        'producto_id': producto_id,
+        'total_en_rango': total_en_rango,
+    }
+
+    return render(request, 'ventas/compra_list.html', context)
+
+def compra_detail(request, pk):
+    compra = get_object_or_404(Compra, pk=pk)
+    detalles = compra.detalles.select_related('producto')
+
+    context = {
+        'compra': compra,
+        'detalles': detalles,
+    }
+
+    return render(request, 'ventas/compra_detail.html', context)
 
 def venta_reserva_list(request):
     # Get current date

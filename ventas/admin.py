@@ -178,7 +178,7 @@ class DetalleCompraInline(admin.TabularInline):
     extra = 1
     autocomplete_fields = ['producto']
     fields = ['producto', 'descripcion', 'cantidad', 'precio_unitario']
-    readonly_fields = ['producto']
+    # readonly_fields = ['producto']  # Elimina o comenta esta línea
     show_change_link = False
 
 @admin.register(Compra)
@@ -192,16 +192,6 @@ class CompraAdmin(admin.ModelAdmin):
     autocomplete_fields = ['proveedor']
     list_select_related = ('proveedor',)
 
-    def save_model(self, request, obj, form, change):
-        # Guarda el objeto padre sin calcular el total aún
-        super().save_model(request, obj, form, change)
-
-    def save_related(self, request, form, formsets, change):
-        # Guarda los inlines (detalles de compra)
-        super().save_related(request, form, formsets, change)
-        # Ahora que los detalles están guardados, calcula el total
-        form.instance.calcular_total()
-
 @admin.register(GiftCard)
 class GiftCardAdmin(admin.ModelAdmin):
     list_display = ('codigo', 'cliente_comprador', 'cliente_destinatario', 'monto_inicial', 'monto_disponible', 'fecha_emision', 'fecha_vencimiento', 'estado')
@@ -212,11 +202,13 @@ class GiftCardAdmin(admin.ModelAdmin):
 
 class CategoriaProductoAdmin(admin.ModelAdmin):
     list_display = ('nombre',)
+    search_fields = ('nombre',)  # Añadir search_fields
 
 class ProductoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'precio_base', 'cantidad_disponible')
-    search_fields = ('nombre',)
-    list_filter = ('categoria',)  # Si tienes categorías
+    list_display = ('nombre', 'precio_base', 'cantidad_disponible', 'proveedor', 'categoria')
+    search_fields = ('nombre', 'categoria__nombre')
+    list_filter = ('categoria', 'proveedor')
+    autocomplete_fields = ['proveedor', 'categoria'] 
 
 class ClienteAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'email', 'telefono')

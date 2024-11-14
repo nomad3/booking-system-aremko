@@ -1,0 +1,65 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<h1>Lista de Compras</h1>
+
+<form method="get" style="margin-bottom: 20px;">
+    <label for="proveedor">Proveedor:</label>
+    <select name="proveedor" id="proveedor">
+        <option value="">Todos</option>
+        {% for proveedor in proveedores %}
+            <option value="{{ proveedor.id }}" {% if proveedor.id|stringformat:"s" == proveedor_id %}selected{% endif %}>{{ proveedor.nombre }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="producto">Producto:</label>
+    <select name="producto" id="producto">
+        <option value="">Todos</option>
+        {% for producto in productos %}
+            <option value="{{ producto.id }}" {% if producto.id|stringformat:"s" == producto_id %}selected{% endif %}>{{ producto.nombre }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="fecha_inicio">Fecha Inicio:</label>
+    <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}">
+
+    <label for="fecha_fin">Fecha Fin:</label>
+    <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}">
+
+    <button type="submit">Filtrar</button>
+</form>
+
+<p><strong>Total en el rango de fechas:</strong> {{ total_en_rango }} CLP</p>
+
+<table border="1" cellpadding="5" cellspacing="0" style="width: 100%;">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Fecha Compra</th>
+            <th>Proveedor</th>
+            <th>Método de Pago</th>
+            <th>Número de Documento</th>
+            <th>Total</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for compra in compras %}
+            <tr>
+                <td>{{ compra.id }}</td>
+                <td>{{ compra.fecha_compra }}</td>
+                <td>{{ compra.proveedor.nombre }}</td>
+                <td>{{ compra.get_metodo_pago_display }}</td>
+                <td>{{ compra.numero_documento }}</td>
+                <td>{{ compra.total }}</td>
+                <td><a href="{% url 'compra_detail' compra.id %}">Ver Detalles</a></td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="7">No hay compras que coincidan con los filtros.</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

@@ -22,6 +22,35 @@ class Proveedor(models.Model):
         return self.nombre
 
 
+class CategoriaProducto(models.Model):
+    nombre = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.nombre
+
+class Producto(models.Model):
+    nombre = models.CharField(max_length=100)
+    precio_base = models.DecimalField(max_digits=10, decimal_places=0)
+    cantidad_disponible = models.PositiveIntegerField()
+    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True)
+    categoria = models.ForeignKey(CategoriaProducto, on_delete=models.SET_NULL, null=True)
+
+    def __str__(self):
+        return self.nombre
+
+    def reducir_inventario(self, cantidad):
+        if self.cantidad_disponible >= cantidad:
+            self.cantidad_disponible -= cantidad
+            self.save()
+        else:
+            raise ValueError('No hay suficiente inventario disponible.')
+
+    def incrementar_inventario(self, cantidad):
+        self.cantidad_disponible += cantidad
+        if self.cantidad_disponible < 0:
+            raise ValueError('El inventario no puede ser negativo.')
+        self.save()
+
 class Compra(models.Model):
     METODOS_PAGO = [
         ('tarjeta', 'Tarjeta de Crédito/Débito'),
@@ -49,12 +78,19 @@ class Compra(models.Model):
     numero_documento = models.CharField(max_length=100, null=True, blank=True)
     total = models.DecimalField(max_digits=10, decimal_places=0, default=0)
 
+
     def __str__(self):
         return f"Compra #{self.id} - {self.proveedor}"
 
+    def calcular_total(self):
+        total_detalles = self.detalles.aggregate(
+            total=Sum(F('precio_unitario') * F('cantidad'), output_field=models.DecimalField())
+        )['total'] or 0
+        self.total = total_detalles
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        self.calcular_total()
+        # No llamamos a calcular_total aquí para evitar recursión
 
 class GiftCard(models.Model):
     ESTADO_CHOICES = [
@@ -100,7 +136,7 @@ class GiftCard(models.Model):
 
 class DetalleCompra(models.Model):
     compra = models.ForeignKey(Compra, on_delete=models.CASCADE, related_name='detalles')
-    producto = models.ForeignKey('Producto', on_delete=models.SET_NULL, null=True, blank=True)
+    producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True)
     descripcion = models.CharField(max_length=255)
     cantidad = models.PositiveIntegerField()
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=0)
@@ -127,35 +163,6 @@ class DetalleCompra(models.Model):
         if self.producto:
             self.producto.incrementar_inventario(-self.cantidad)
         super().delete(*args, **kwargs)
-
-class CategoriaProducto(models.Model):
-    nombre = models.CharField(max_length=100)
-
-    def __str__(self):
-        return self.nombre
-
-class Producto(models.Model):
-    nombre = models.CharField(max_length=100)
-    precio_base = models.DecimalField(max_digits=10, decimal_places=0)
-    cantidad_disponible = models.PositiveIntegerField()
-    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True)
-    categoria = models.ForeignKey(CategoriaProducto, on_delete=models.SET_NULL, null=True)
-
-    def __str__(self):
-        return self.nombre
-
-    def reducir_inventario(self, cantidad):
-        if self.cantidad_disponible >= cantidad:
-            self.cantidad_disponible -= cantidad
-            self.save()
-        else:
-            raise ValueError('No hay suficiente inventario disponible.')
-
-    def incrementar_inventario(self, cantidad):
-        self.cantidad_disponible += cantidad
-        if self.cantidad_disponible < 0:
-            raise ValueError('El inventario no puede ser negativo.')
-        self.save()
 
 class CategoriaServicio(models.Model):
     nombre = models.CharField(max_length=100)
