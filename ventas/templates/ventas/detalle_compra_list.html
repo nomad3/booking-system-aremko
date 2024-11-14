@@ -30,7 +30,7 @@
     <button type="submit">Filtrar</button>
 </form>
 
-<p><strong>Total en el rango de fechas:</strong> {{ total_en_rango }} CLP</p>
+<p><strong>Total en el rango de fechas:</strong> {{ total_en_rango }}</p>
 
 <table border="1" cellpadding="5" cellspacing="0" style="width: 100%;">
     <thead>
@@ -55,8 +55,8 @@
                 <td>{{ detalle.compra.proveedor.nombre }}</td>
                 <td>{{ detalle.producto.nombre }}</td>
                 <td>{{ detalle.cantidad }}</td>
-                <td>{{ detalle.precio_unitario }} CLP</td>
-                <td>{{ detalle.cantidad|multiply:detalle.precio_unitario }} CLP</td>
+                <td>{{ detalle.precio_unitario }}</td>
+                <td>{{ detalle.cantidad|multiply:detalle.precio_unitario }}</td>
                 <td>{{ detalle.descripcion }}</td>
                 <td>{{ detalle.compra.get_metodo_pago_display }}</td>
                 <td><a href="{% url 'detalle_compra_detail' detalle.id %}">Ver Detalle</a></td>
