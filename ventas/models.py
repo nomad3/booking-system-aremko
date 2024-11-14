@@ -81,6 +81,14 @@ class Compra(models.Model):
     def __str__(self):
         return f"Compra #{self.id} - {self.proveedor}"
 
+    def calcular_total(self):
+        # Sumar el total de todos los DetalleCompra asociados
+        total_detalles = self.detalles.aggregate(
+            total=Sum(F('precio_unitario') * F('cantidad'))
+        )['total'] or 0
+        self.total = total_detalles
+        self.save()
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         self.calcular_total()
