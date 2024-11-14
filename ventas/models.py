@@ -87,11 +87,11 @@ class Compra(models.Model):
             total=Sum(F('precio_unitario') * F('cantidad'))
         )['total'] or 0
         self.total = total_detalles
-        self.save()
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         self.calcular_total()
+        Compra.objects.filter(pk=self.pk).update(total=self.total)
 
 class GiftCard(models.Model):
     ESTADO_CHOICES = [
