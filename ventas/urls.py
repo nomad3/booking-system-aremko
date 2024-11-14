@@ -21,4 +21,6 @@ urlpatterns = [
     path('', include(router.urls)),  # Mantener las rutas del router
     path('venta_reservas/', views.venta_reserva_list, name='venta_reserva_list'),
     path('venta_reservas/<int:pk>/', views.venta_reserva_detail, name='venta_reserva_detail'),
+    path('compras/', views.compra_list, name='compra_list'),
+    path('compras/<int:pk>/', views.compra_detail, name='compra_detail'),
 ]
