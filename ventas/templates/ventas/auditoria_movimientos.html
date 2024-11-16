@@ -63,5 +63,24 @@
             {% endfor %}
         </tbody>
     </table>
+
+    <!-- Paginación -->
+    <div class="pagination">
+        <span class="step-links">
+            {% if movimientos.has_previous %}
+                <a href="?{{ request.GET.urlencode }}&page=1">&laquo; primera</a>
+                <a href="?{{ request.GET.urlencode }}&page={{ movimientos.previous_page_number }}">anterior</a>
+            {% endif %}
+
+            <span class="current">
+                Página {{ movimientos.number }} de {{ movimientos.paginator.num_pages }}
+            </span>
+
+            {% if movimientos.has_next %}
+                <a href="?{{ request.GET.urlencode }}&page={{ movimientos.next_page_number }}">siguiente</a>
+                <a href="?{{ request.GET.urlencode }}&page={{ movimientos.paginator.num_pages }}">última &raquo;</a>
+            {% endif %}
+        </span>
+    </div>
   </div>
 {% endblock %}

@@ -15,6 +15,7 @@ from django.utils.dateparse import parse_date
 from django.db import models
 from django.db.models import Q, Sum
 from django.db import transaction
+from django.core.paginator import Paginator
 from rest_framework.exceptions import ValidationError
 from django.contrib.auth.models import User
 from .serializers import (
@@ -536,52 +537,43 @@ def inicio_sistema_view(request):
 def es_administrador(user):
     return user.is_superuser
 
-@user_passes_test(es_administrador)  # Restringir el acceso a administradores
-def auditoria_movimientos_view(request):
-    # Obtener los parámetros del filtro
+def auditoria_movimientos(request):
+    # Obtener parámetros de filtro
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin = request.GET.get('fecha_fin')
-    cliente_id = request.GET.get('cliente')
     tipo_movimiento = request.GET.get('tipo_movimiento')
-    usuario_username = request.GET.get('usuario')  # Cambiar a username en lugar de id
-
-    # Obtener todos los movimientos, pre-cargando datos del cliente y usuario
-    movimientos = MovimientoCliente.objects.select_related('cliente', 'usuario').all()
-
-    # Filtrar por cliente si se proporciona
-    if cliente_id:
-        movimientos = movimientos.filter(cliente_id=cliente_id)
-
-    # Filtrar por rango de fechas si se proporciona
+    usuario_username = request.GET.get('usuario')
+    
+    # Query base
+    movimientos = MovimientoCliente.objects.all().order_by('-fecha_movimiento')
+    
+    # Aplicar filtros
     if fecha_inicio:
-        fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d')
-        movimientos = movimientos.filter(fecha_movimiento__gte=fecha_inicio)
+        movimientos = movimientos.filter(fecha_movimiento__date__gte=fecha_inicio)
     if fecha_fin:
-        fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d') + timedelta(days=1) - timedelta(seconds=1)
-        movimientos = movimientos.filter(fecha_movimiento__lte=fecha_fin)
-
-    # Filtrar por tipo de movimiento si se proporciona
-    if tipo_movimiento and tipo_movimiento != 'None':
-        movimientos = movimientos.filter(tipo_movimiento=tipo_movimiento)
-
-    # Filtrar por usuario si se proporciona
-    if usuario_username and usuario_username != 'None':
+        movimientos = movimientos.filter(fecha_movimiento__date__lte=fecha_fin)
+    if tipo_movimiento:
+        movimientos = movimientos.filter(tipo_movimiento__icontains=tipo_movimiento)
+    if usuario_username:
         movimientos = movimientos.filter(usuario__username=usuario_username)
-
-    # Obtener todos los usuarios para la lista desplegable
-    usuarios = User.objects.all()
-
-    # Pasar los movimientos al contexto de la plantilla
+    
+    # Paginación
+    paginator = Paginator(movimientos, 25)  # 25 movimientos por página
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Obtener lista de usuarios para el filtro
+    usuarios = User.objects.all().order_by('username')
+    
     context = {
-        'movimientos': movimientos,
+        'movimientos': page_obj,
+        'usuarios': usuarios,
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
-        'cliente_id': cliente_id,
-        'tipo_movimiento': tipo_movimiento if tipo_movimiento != 'None' else '',
-        'usuario_username': usuario_username if usuario_username != 'None' else '',
-        'usuarios': usuarios,  # Enviar los usuarios al contexto para la lista desplegable
+        'tipo_movimiento': tipo_movimiento,
+        'usuario_username': usuario_username,
     }
-
+    
     return render(request, 'ventas/auditoria_movimientos.html', context)
 
 @user_passes_test(es_administrador)  # Restringir el acceso a administradores
