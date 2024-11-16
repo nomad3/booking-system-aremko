@@ -25,4 +25,5 @@ urlpatterns = [
     path('compras/<int:pk>/', views.compra_detail, name='compra_detail'),
     path('detalles-compras/', views.detalle_compra_list, name='detalle_compra_list'),  # Nueva ruta
     path('detalles-compras/<int:pk>/', views.detalle_compra_detail, name='detalle_compra_detail'),  # Opcional: detalle específico
+    path('productos-vendidos/', views.productos_vendidos, name='productos_vendidos'),
 ]
