@@ -16,17 +16,22 @@
             <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin|date:'Y-m-d' }}" class="form-control" placeholder="Fecha Fin" required>
         </div>
         <div class="form-group mx-sm-3 mb-2">
-            <label for="categoria" class="sr-only">Categoría</label>
-            <select id="categoria" name="categoria" class="form-control">
-                <option value="">Todas las categorías</option>
-                {% for categoria in categorias %}
-                    <option value="{{ categoria.id }}" {% if categoria_id == categoria.id %}selected{% endif %}>{{ categoria.nombre }}</option>
+            <label for="proveedor" class="sr-only">Proveedor</label>
+            <select id="proveedor" name="proveedor" class="form-control">
+                <option value="">Todos los proveedores</option>
+                {% for proveedor in proveedores %}
+                    <option value="{{ proveedor.id }}" {% if proveedor_id == proveedor.id %}selected{% endif %}>{{ proveedor.nombre }}</option>
                 {% endfor %}
             </select>
         </div>
         <div class="form-group mx-sm-3 mb-2">
-            <label for="venta_reserva_id" class="sr-only">ID Venta/Reserva</label>
-            <input type="text" id="venta_reserva_id" name="venta_reserva_id" value="{{ venta_reserva_id }}" class="form-control" placeholder="ID Venta/Reserva">
+            <label for="producto" class="sr-only">Producto</label>
+            <select id="producto" name="producto" class="form-control">
+                <option value="">Todos los productos</option>
+                {% for producto in productos %}
+                    <option value="{{ producto.id }}" {% if producto_id == producto.id %}selected{% endif %}>{{ producto.nombre }}</option>
+                {% endfor %}
+            </select>
         </div>
         <button type="submit" class="btn btn-primary mb-2">Buscar</button>
     </form>

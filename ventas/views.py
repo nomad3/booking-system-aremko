@@ -752,20 +752,23 @@ def caja_diaria_recepcionistas_view(request):
 
 @login_required
 def productos_vendidos(request):
+    # Obtener fechas del request
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin = request.GET.get('fecha_fin')
-    categoria_id = request.GET.get('categoria')
-    venta_reserva_id = request.GET.get('venta_reserva_id')
+    proveedor_id = request.GET.get('proveedor')
+    producto_id = request.GET.get('producto')
 
+    # Establecer fechas por defecto si no se proporcionan
     if not fecha_inicio or not fecha_fin:
         fecha_actual = timezone.now().date()
         fecha_inicio = fecha_actual
         fecha_fin = fecha_actual
     else:
-        fecha_inicio = parse_date(fecha_inicio)
-        fecha_fin = parse_date(fecha_fin)
+        fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+        fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
 
-    productos = ReservaProducto.objects.select_related(
+    # Construir la consulta base
+    productos_query = ReservaProducto.objects.select_related(
         'venta_reserva',
         'venta_reserva__cliente',
         'producto',
@@ -774,31 +777,34 @@ def productos_vendidos(request):
         venta_reserva__fecha_reserva__date__range=[fecha_inicio, fecha_fin]
     )
 
-    if categoria_id:
-        productos = productos.filter(producto__categoria_id=categoria_id)
+    # Aplicar filtros adicionales solo si se proporcionan valores válidos
+    if proveedor_id and proveedor_id.isdigit():
+        productos_query = productos_query.filter(producto__proveedor_id=int(proveedor_id))
     
-    if venta_reserva_id:
-        productos = productos.filter(venta_reserva_id=venta_reserva_id)
+    if producto_id and producto_id.isdigit():
+        productos_query = productos_query.filter(producto_id=int(producto_id))
 
-    productos = productos.annotate(
-        total_monto=F('cantidad') * F('producto__precio_base')
-    ).values(
+    # Obtener los resultados
+    productos = productos_query.values(
         'venta_reserva_id',
         'venta_reserva__cliente__nombre',
         'producto__categoria__nombre',
         'producto__nombre',
         'cantidad',
         'producto__precio_base',
-        'total_monto'
+    ).annotate(
+        total_monto=F('cantidad') * F('producto__precio_base')
     )
 
+    # Preparar el contexto
     context = {
         'productos': productos,
-        'categorias': CategoriaProducto.objects.all(),
+        'proveedores': Proveedor.objects.all().order_by('nombre'),
+        'productos': Producto.objects.all().order_by('nombre'),
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
-        'categoria_id': int(categoria_id) if categoria_id else None,
-        'venta_reserva_id': venta_reserva_id
+        'proveedor_id': int(proveedor_id) if proveedor_id and proveedor_id.isdigit() else None,
+        'producto_id': int(producto_id) if producto_id and producto_id.isdigit() else None,
     }
 
     return render(request, 'ventas/productos_vendidos.html', context)
