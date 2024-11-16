@@ -3,6 +3,7 @@ from django.forms import DateTimeInput, Select
 from .models import ReservaProducto, Pago
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from datetime import datetime
 
 class ReservaProductoForm(forms.ModelForm):
     class Meta:
@@ -44,13 +45,40 @@ class ReservaProductoForm(forms.ModelForm):
                 ]
 
 class PagoInlineForm(forms.ModelForm):
+    fecha_pago = forms.DateTimeField(
+        widget=DateTimeInput(
+            attrs={'type': 'datetime-local'},
+            format='%Y-%m-%dT%H:%M'
+        ),
+        input_formats=['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S'],
+        required=True
+    )
+
     class Meta:
         model = Pago
         exclude = ['usuario']
         widgets = {
-            'fecha_pago': DateTimeInput(attrs={'type': 'datetime-local'}),
-            'giftcard': Select(attrs={'class': 'select2'}),
+            'giftcard': Select(attrs={'class': 'select2'})
         }
+
+    def clean_fecha_pago(self):
+        fecha_pago = self.cleaned_data.get('fecha_pago')
+        if isinstance(fecha_pago, str):
+            try:
+                # Si es string, convertir a datetime
+                fecha_pago = datetime.strptime(fecha_pago, '%Y-%m-%dT%H:%M')
+            except ValueError:
+                try:
+                    # Intentar con otro formato si el primero falla
+                    fecha_pago = datetime.strptime(fecha_pago, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    raise forms.ValidationError('Formato de fecha inválido')
+        
+        # Asegurarse de que la fecha tenga timezone
+        if timezone.is_naive(fecha_pago):
+            fecha_pago = timezone.make_aware(fecha_pago)
+        
+        return fecha_pago
 
     def clean(self):
         cleaned_data = super().clean()
