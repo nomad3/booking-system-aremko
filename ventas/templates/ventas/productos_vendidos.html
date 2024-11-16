@@ -53,8 +53,8 @@
             {% for producto in productos %}
             <tr>
                 <td>
-                    {% if producto.venta_reserva_id and producto.venta_reserva_id != '' %}
-                        <a href="{% url 'admin:ventas_ventareserva_change' producto.venta_reserva_id %}">
+                    {% if producto.venta_reserva_id %}
+                        <a href="{% url 'venta_reserva_detail' producto.venta_reserva_id %}">
                             {{ producto.venta_reserva_id }}
                         </a>
                     {% else %}
