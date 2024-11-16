@@ -795,7 +795,9 @@ def productos_vendidos(request):
         'producto__precio_base'
     ).annotate(
         total_monto=F('cantidad') * F('producto__precio_base')
-    ).exclude(venta_reserva_id__isnull=True)  # Excluir registros sin venta_reserva_id
+    ).exclude(
+        venta_reserva_id__isnull=True
+    ).order_by('-venta_reserva__fecha_reserva')  # Ordenar por fecha de reserva descendente
 
     context = {
         'productos': productos,
