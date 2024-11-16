@@ -28,7 +28,9 @@
         <select id="usuario" name="usuario" class="form-control">
             <option value="">-- Todos los Usuarios --</option>
             {% for usuario in usuarios %}
-                <option value="{{ usuario.id }}" {% if usuario.id|stringformat:"s" == usuario_id %}selected{% endif %}>{{ usuario.username }}</option>
+                <option value="{{ usuario.id }}" {% if usuario.id|stringformat:"s" == usuario_id %}selected{% endif %}>
+                    {{ usuario.username }}
+                </option>
             {% endfor %}
         </select>
     </div>
