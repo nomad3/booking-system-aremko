@@ -784,6 +784,12 @@ def productos_vendidos(request):
     if producto_id and producto_id.strip():
         productos_query = productos_query.filter(producto_id=producto_id)
 
+    # Calcular totales
+    totales = productos_query.aggregate(
+        total_cantidad_productos=Sum('cantidad'),
+        total_monto_periodo=Sum(F('cantidad') * F('producto__precio_base'))
+    )
+
     # Obtener los resultados
     productos = productos_query.values(
         'venta_reserva_id',
@@ -804,11 +810,13 @@ def productos_vendidos(request):
     context = {
         'productos': productos,
         'proveedores': todos_proveedores,
-        'productos_lista': todos_productos,  # Cambiado el nombre para evitar conflicto
+        'productos_lista': todos_productos,
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
         'proveedor_id': proveedor_id if proveedor_id else '',
         'producto_id': producto_id if producto_id else '',
+        'total_cantidad_productos': totales['total_cantidad_productos'] or 0,
+        'total_monto_periodo': totales['total_monto_periodo'] or 0,
     }
 
     return render(request, 'ventas/productos_vendidos.html', context)
