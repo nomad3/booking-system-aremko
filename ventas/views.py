@@ -749,3 +749,61 @@ def caja_diaria_recepcionistas_view(request):
     }
 
     return render(request, 'ventas/caja_diaria_recepcionistas.html', context)
+
+@login_required
+def productos_vendidos(request):
+    # Obtener fechas del request
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+    categoria_id = request.GET.get('categoria')
+    venta_reserva_id = request.GET.get('venta_reserva_id')
+
+    # Si no hay fechas, usar fecha actual
+    if not fecha_inicio or not fecha_fin:
+        fecha_actual = timezone.now().date()
+        fecha_inicio = fecha_actual
+        fecha_fin = fecha_actual
+    else:
+        fecha_inicio = parse_date(fecha_inicio)
+        fecha_fin = parse_date(fecha_fin)
+
+    # Query base
+    productos = ReservaProducto.objects.select_related(
+        'venta_reserva',
+        'producto',
+        'producto__categoria',
+        'venta_reserva__cliente'
+    ).filter(
+        venta_reserva__fecha_reserva__date__range=[fecha_inicio, fecha_fin]
+    )
+
+    # Aplicar filtros adicionales
+    if categoria_id:
+        productos = productos.filter(producto__categoria_id=categoria_id)
+    
+    if venta_reserva_id:
+        productos = productos.filter(venta_reserva_id=venta_reserva_id)
+
+    # Anotar los datos necesarios
+    productos = productos.annotate(
+        total_monto=F('cantidad') * F('precio_unitario')
+    ).values(
+        'venta_reserva_id',
+        'venta_reserva__cliente__nombre',
+        'producto__categoria__nombre',
+        'producto__nombre',
+        'cantidad',
+        'precio_unitario',
+        'total_monto'
+    )
+
+    context = {
+        'productos': productos,
+        'categorias': CategoriaProducto.objects.all(),
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'categoria_id': int(categoria_id) if categoria_id else None,
+        'venta_reserva_id': venta_reserva_id
+    }
+
+    return render(request, 'ventas/productos_vendidos.html', context)
