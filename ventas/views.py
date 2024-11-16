@@ -774,7 +774,8 @@ def productos_vendidos(request):
         'producto',
         'producto__categoria'
     ).filter(
-        venta_reserva__fecha_reserva__date__range=[fecha_inicio, fecha_fin]
+        venta_reserva__fecha_reserva__date__range=[fecha_inicio, fecha_fin],
+        venta_reserva__isnull=False  # Asegurarse de que venta_reserva no sea null
     )
 
     # Aplicar filtros adicionales solo si se proporcionan valores válidos
@@ -791,12 +792,11 @@ def productos_vendidos(request):
         'producto__categoria__nombre',
         'producto__nombre',
         'cantidad',
-        'producto__precio_base',
+        'producto__precio_base'
     ).annotate(
         total_monto=F('cantidad') * F('producto__precio_base')
-    )
+    ).exclude(venta_reserva_id__isnull=True)  # Excluir registros sin venta_reserva_id
 
-    # Preparar el contexto
     context = {
         'productos': productos,
         'proveedores': Proveedor.objects.all().order_by('nombre'),
