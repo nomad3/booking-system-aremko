@@ -1,4 +1,3 @@
-
 from rest_framework import viewsets
 from rest_framework.response import Response
 from django.db.models import Sum, Q, Count, F
@@ -97,12 +96,21 @@ def detalle_compra_list(request):
     return render(request, 'ventas/detalle_compra_list.html', context)
 
 def detalle_compra_detail(request, pk):
-    detalle = get_object_or_404(DetalleCompra, pk=pk)
+    # Obtener el detalle de compra específico
+    detalle = get_object_or_404(DetalleCompra.objects.select_related(
+        'compra',
+        'compra__proveedor',
+        'producto'
+    ), pk=pk)
+    
+    # Obtener la compra asociada y todos sus detalles
     compra = detalle.compra
+    todos_los_detalles = compra.detalles.select_related('producto').all()
 
     context = {
-        'detalle': detalle,
+        'detalle_actual': detalle,
         'compra': compra,
+        'detalles': todos_los_detalles,
     }
 
     return render(request, 'ventas/detalle_compra_detail.html', context)
