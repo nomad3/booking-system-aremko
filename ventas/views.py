@@ -774,16 +774,15 @@ def productos_vendidos(request):
         'producto',
         'producto__categoria'
     ).filter(
-        venta_reserva__fecha_reserva__date__range=[fecha_inicio, fecha_fin],
-        venta_reserva__isnull=False  # Asegurarse de que venta_reserva no sea null
+        venta_reserva__fecha_reserva__date__range=[fecha_inicio, fecha_fin]
     )
 
     # Aplicar filtros adicionales solo si se proporcionan valores válidos
-    if proveedor_id and proveedor_id.isdigit():
-        productos_query = productos_query.filter(producto__proveedor_id=int(proveedor_id))
+    if proveedor_id and proveedor_id.strip():
+        productos_query = productos_query.filter(producto__proveedor_id=proveedor_id)
     
-    if producto_id and producto_id.isdigit():
-        productos_query = productos_query.filter(producto_id=int(producto_id))
+    if producto_id and producto_id.strip():
+        productos_query = productos_query.filter(producto_id=producto_id)
 
     # Obtener los resultados
     productos = productos_query.values(
@@ -795,18 +794,20 @@ def productos_vendidos(request):
         'producto__precio_base'
     ).annotate(
         total_monto=F('cantidad') * F('producto__precio_base')
-    ).exclude(
-        Q(venta_reserva_id__isnull=True) | Q(venta_reserva_id='')
     ).order_by('-venta_reserva__fecha_reserva')
+
+    # Obtener listas para los filtros
+    todos_proveedores = Proveedor.objects.all().order_by('nombre')
+    todos_productos = Producto.objects.all().order_by('nombre')
 
     context = {
         'productos': productos,
-        'proveedores': Proveedor.objects.all().order_by('nombre'),
-        'productos': Producto.objects.all().order_by('nombre'),
+        'proveedores': todos_proveedores,
+        'productos_lista': todos_productos,  # Cambiado el nombre para evitar conflicto
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
-        'proveedor_id': int(proveedor_id) if proveedor_id and proveedor_id.isdigit() else None,
-        'producto_id': int(producto_id) if producto_id and producto_id.isdigit() else None,
+        'proveedor_id': proveedor_id if proveedor_id else '',
+        'producto_id': producto_id if producto_id else '',
     }
 
     return render(request, 'ventas/productos_vendidos.html', context)

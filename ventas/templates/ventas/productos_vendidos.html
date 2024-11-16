@@ -28,8 +28,8 @@
             <label for="producto" class="sr-only">Producto</label>
             <select id="producto" name="producto" class="form-control">
                 <option value="">Todos los productos</option>
-                {% for producto in productos %}
-                    <option value="{{ producto.id }}" {% if producto_id == producto.id %}selected{% endif %}>{{ producto.nombre }}</option>
+                {% for producto in productos_lista %}
+                    <option value="{{ producto.id }}" {% if producto_id == producto.id|stringformat:"s" %}selected{% endif %}>{{ producto.nombre }}</option>
                 {% endfor %}
             </select>
         </div>
