@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load static %}
+{% load static custom_tags %}
 
 {% block content %}
 <div class="container mt-4">
@@ -65,8 +65,8 @@
                 <td>{{ producto.producto__categoria__nombre }}</td>
                 <td>{{ producto.producto__nombre }}</td>
                 <td>{{ producto.cantidad }}</td>
-                <td>${{ producto.precio_unitario|floatformat:0 }}</td>
-                <td>${{ producto.total_monto|floatformat:0 }}</td>
+                <td>${{ producto.producto__precio_base|floatformat:0 }}</td>
+                <td>${{ producto.cantidad|multiply:producto.producto__precio_base|floatformat:0 }}</td>
             </tr>
             {% empty %}
             <tr>
