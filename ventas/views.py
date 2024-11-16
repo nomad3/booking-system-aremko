@@ -781,14 +781,14 @@ def productos_vendidos(request):
         productos = productos.filter(venta_reserva_id=venta_reserva_id)
 
     productos = productos.annotate(
-        total_monto=F('cantidad') * F('producto__precio_venta')
+        total_monto=F('cantidad') * F('producto__precio_base')
     ).values(
         'venta_reserva_id',
         'venta_reserva__cliente__nombre',
         'producto__categoria__nombre',
         'producto__nombre',
         'cantidad',
-        'producto__precio_venta',
+        'producto__precio_base',
         'total_monto'
     )
 
