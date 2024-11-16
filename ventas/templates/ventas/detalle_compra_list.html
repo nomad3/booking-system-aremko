@@ -59,7 +59,7 @@
                 <td>{{ detalle.cantidad|multiply:detalle.precio_unitario }}</td>
                 <td>{{ detalle.descripcion }}</td>
                 <td>{{ detalle.compra.get_metodo_pago_display }}</td>
-                <td><a href="{% url 'detalle_compra_detail' detalle.id %}">Ver Detalle</a></td>
+                <td><a href="{% url 'admin:ventas_compra_change' detalle.compra.id %}">Ver en Admin</a></td>
             </tr>
         {% empty %}
             <tr>
