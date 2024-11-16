@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load static custom_tags %}
+{% load static custom_tags ventas_extras %}
 
 {% block content %}
 <div class="container mt-4">
@@ -42,7 +42,8 @@
             <tr>
                 <th>ID Venta/Reserva</th>
                 <th>Cliente</th>
-                <th>Categoría del Producto</th>
+                <th>Fecha Venta</th>
+                <th>Proveedor</th>
                 <th>Producto</th>
                 <th>Cantidad</th>
                 <th>Precio Unitario</th>
@@ -62,15 +63,16 @@
                     {% endif %}
                 </td>
                 <td>{{ producto.venta_reserva__cliente__nombre }}</td>
-                <td>{{ producto.producto__categoria__nombre }}</td>
+                <td>{{ producto.venta_reserva__fecha_reserva|date:"Y-m-d H:i" }}</td>
+                <td>{{ producto.producto__proveedor__nombre }}</td>
                 <td>{{ producto.producto__nombre }}</td>
                 <td>{{ producto.cantidad }}</td>
-                <td>${{ producto.producto__precio_base|floatformat:0 }}</td>
-                <td>${{ producto.cantidad|multiply:producto.producto__precio_base|floatformat:0 }}</td>
+                <td>{{ producto.producto__precio_base|formato_clp }}</td>
+                <td>{{ producto.cantidad|multiply:producto.producto__precio_base|formato_clp }}</td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="7">No se encontraron productos vendidos.</td>
+                <td colspan="8">No se encontraron productos vendidos.</td>
             </tr>
             {% endfor %}
         </tbody>

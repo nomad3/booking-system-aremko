@@ -788,7 +788,8 @@ def productos_vendidos(request):
     productos = productos_query.values(
         'venta_reserva_id',
         'venta_reserva__cliente__nombre',
-        'producto__categoria__nombre',
+        'venta_reserva__fecha_reserva',
+        'producto__proveedor__nombre',
         'producto__nombre',
         'cantidad',
         'producto__precio_base'
