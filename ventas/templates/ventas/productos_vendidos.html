@@ -53,9 +53,13 @@
             {% for producto in productos %}
             <tr>
                 <td>
-                    <a href="{% url 'admin:ventas_ventareserva_change' producto.venta_reserva_id %}">
-                        {{ producto.venta_reserva_id }}
-                    </a>
+                    {% if producto.venta_reserva_id and producto.venta_reserva_id != '' %}
+                        <a href="{% url 'admin:ventas_ventareserva_change' producto.venta_reserva_id %}">
+                            {{ producto.venta_reserva_id }}
+                        </a>
+                    {% else %}
+                        Sin ID
+                    {% endif %}
                 </td>
                 <td>{{ producto.venta_reserva__cliente__nombre }}</td>
                 <td>{{ producto.producto__categoria__nombre }}</td>
