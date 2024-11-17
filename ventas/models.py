@@ -1,7 +1,7 @@
+
 from datetime import timedelta
 from django.contrib.auth.models import User
 from django.db import models
-from django.contrib.admin.sites import site
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
@@ -342,26 +342,13 @@ class Pago(models.Model):
     fecha_pago = models.DateTimeField(default=timezone.now)
     monto = models.DecimalField(max_digits=10, decimal_places=0)
     metodo_pago = models.CharField(max_length=100, choices=METODOS_PAGO)
-    usuario = models.ForeignKey(
-        User, 
-        null=True, 
-        blank=True, 
-        on_delete=models.SET_NULL, 
-        related_name='pagos',
-        editable=False  # Hacemos el campo no editable
-    )
+    usuario = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='pagos')  # Permitir nulos
     giftcard = models.ForeignKey(GiftCard, null=True, blank=True, on_delete=models.SET_NULL)
 
     def __str__(self):
         return f"Pago de {self.monto} para {self.venta_reserva}"
 
     def save(self, *args, **kwargs):
-        if not self.usuario:
-            from threading import current_thread
-            request = getattr(current_thread(), 'request', None)
-            if request and request.user and request.user.is_authenticated:
-                self.usuario = request.user
-        
         with transaction.atomic():
             # Validaciones y lógica para gift cards
             if self.metodo_pago == 'giftcard':

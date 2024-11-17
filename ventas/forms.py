@@ -1,5 +1,4 @@
 from django import forms
-from django.forms import DateTimeInput, Select
 from .models import ReservaProducto, Pago
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -46,11 +45,7 @@ class ReservaProductoForm(forms.ModelForm):
 class PagoInlineForm(forms.ModelForm):
     class Meta:
         model = Pago
-        exclude = ['usuario']
-        widgets = {
-            'fecha_pago': DateTimeInput(attrs={'type': 'datetime-local'}),
-            'giftcard': Select(attrs={'class': 'select2'}),
-        }
+        fields = ['fecha_pago', 'monto', 'metodo_pago', 'giftcard', 'usuario']
 
     def clean(self):
         cleaned_data = super().clean()
