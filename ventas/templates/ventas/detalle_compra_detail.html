@@ -1,18 +1,46 @@
 {% extends "admin/base_site.html" %}
-{% load static %}
+{% load static custom_tags %}
 
 {% block content %}
-<h1>Detalle de Compra #{{ detalle.id }}</h1>
+<h1>Detalle de Compra #{{ compra.id }}</h1>
 
-<p><strong>Fecha de Compra:</strong> {{ detalle.compra.fecha_compra }}</p>
-<p><strong>Proveedor:</strong> {{ detalle.compra.proveedor.nombre }}</p>
-<p><strong>Método de Pago:</strong> {{ detalle.compra.get_metodo_pago_display }}</p>
-<p><strong>Número de Documento:</strong> {{ detalle.compra.numero_documento }}</p>
-<p><strong>Producto:</strong> {{ detalle.producto.nombre }}</p>
-<p><strong>Cantidad:</strong> {{ detalle.cantidad }}</p>
-<p><strong>Valor del Producto:</strong> {{ detalle.precio_unitario }} CLP</p>
-<p><strong>Total:</strong> {{ detalle.cantidad|multiply:detalle.precio_unitario }} CLP</p>
-<p><strong>Descripción:</strong> {{ detalle.descripcion }}</p>
+<div class="info-compra">
+    <h2>Información de la Compra</h2>
+    <p><strong>Fecha de Compra:</strong> {{ compra.fecha_compra }}</p>
+    <p><strong>Proveedor:</strong> {{ compra.proveedor.nombre }}</p>
+    <p><strong>Método de Pago:</strong> {{ compra.get_metodo_pago_display }}</p>
+    <p><strong>Número de Documento:</strong> {{ compra.numero_documento }}</p>
+    <p><strong>Total de la Compra:</strong> {{ compra.total }} CLP</p>
+</div>
 
-<a href="{% url 'detalle_compra_list' %}">Volver a la Lista de Detalles de Compra</a>
+<div class="detalles-compra">
+    <h2>Detalles de la Compra</h2>
+    <table border="1" cellpadding="5" cellspacing="0" style="width: 100%;">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Valor Unitario</th>
+                <th>Total</th>
+                <th>Descripción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for detalle in detalles %}
+                <tr {% if detalle.id == detalle_actual.id %}style="background-color: #e8f4f8;"{% endif %}>
+                    <td>{{ detalle.producto.nombre }}</td>
+                    <td>{{ detalle.cantidad }}</td>
+                    <td>{{ detalle.precio_unitario }} CLP</td>
+                    <td>{{ detalle.cantidad|multiply:detalle.precio_unitario }} CLP</td>
+                    <td>{{ detalle.descripcion }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="botones-navegacion" style="margin-top: 20px;">
+    <a href="{% url 'detalle_compra_list' %}" class="btn">Volver a la Lista de Detalles</a>
+    <a href="{% url 'compra_list' %}" class="btn">Ir a Lista de Compras</a>
+</div>
 {% endblock %}

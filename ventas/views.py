@@ -1,4 +1,3 @@
-
 from rest_framework import viewsets
 from rest_framework.response import Response
 from django.db.models import Sum, Q, Count, F
@@ -34,15 +33,38 @@ from .serializers import (
 
 
 def detalle_compra_list(request):
+    # Obtener la fecha actual
+    today = timezone.localdate()
+
     # Obtener filtros de los parámetros GET
     proveedor_id = request.GET.get('proveedor')
     producto_id = request.GET.get('producto')
-    # Temporariamente eliminar los filtros de fecha
-    # fecha_inicio = request.GET.get('fecha_inicio')
-    # fecha_fin = request.GET.get('fecha_fin')
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
 
-    # Filtrar DetalleCompra sin fechas
-    detalles = DetalleCompra.objects.all().select_related('compra__proveedor', 'producto')
+    # Establecer fechas por defecto si no se proporcionan
+    if not fecha_inicio:
+        fecha_inicio = today.strftime('%Y-%m-%d')
+    if not fecha_fin:
+        fecha_fin = today.strftime('%Y-%m-%d')
+
+    # Convertir cadenas de fecha a objetos date
+    try:
+        fecha_inicio_obj = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+    except ValueError:
+        fecha_inicio_obj = today
+
+    try:
+        fecha_fin_obj = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+    except ValueError:
+        fecha_fin_obj = today
+
+    # Filtrar DetalleCompra con todos los filtros
+    detalles = DetalleCompra.objects.select_related(
+        'compra__proveedor', 'producto'
+    ).filter(
+        compra__fecha_compra__range=[fecha_inicio_obj, fecha_fin_obj]
+    )
 
     # Aplicar filtro por proveedor si se proporciona
     if proveedor_id and proveedor_id.isdigit():
@@ -55,21 +77,17 @@ def detalle_compra_list(request):
     # Eliminar duplicados si los filtros causan joins múltiples
     detalles = detalles.distinct()
 
-    # Calcular el total en el rango de fechas (ahora es el total general)
+    # Calcular el total en el rango de fechas
     total_en_rango = detalles.aggregate(
         total=Sum(F('cantidad') * F('precio_unitario'), output_field=models.DecimalField())
     )['total'] or 0
 
-    # Obtener todos los proveedores y productos para los filtros
-    proveedores = Proveedor.objects.all()
-    productos = Producto.objects.all()
-
     context = {
         'detalles_compras': detalles,
-        'proveedores': proveedores,
-        'productos': productos,
-        # 'fecha_inicio': fecha_inicio,
-        # 'fecha_fin': fecha_fin,
+        'proveedores': Proveedor.objects.all(),
+        'productos': Producto.objects.all(),
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
         'proveedor_id': proveedor_id,
         'producto_id': producto_id,
         'total_en_rango': total_en_rango,
@@ -78,12 +96,21 @@ def detalle_compra_list(request):
     return render(request, 'ventas/detalle_compra_list.html', context)
 
 def detalle_compra_detail(request, pk):
-    detalle = get_object_or_404(DetalleCompra, pk=pk)
+    # Obtener el detalle de compra específico
+    detalle = get_object_or_404(DetalleCompra.objects.select_related(
+        'compra',
+        'compra__proveedor',
+        'producto'
+    ), pk=pk)
+    
+    # Obtener la compra asociada y todos sus detalles
     compra = detalle.compra
+    todos_los_detalles = compra.detalles.select_related('producto').all()
 
     context = {
-        'detalle': detalle,
+        'detalle_actual': detalle,
         'compra': compra,
+        'detalles': todos_los_detalles,
     }
 
     return render(request, 'ventas/detalle_compra_detail.html', context)
@@ -722,3 +749,74 @@ def caja_diaria_recepcionistas_view(request):
     }
 
     return render(request, 'ventas/caja_diaria_recepcionistas.html', context)
+
+@login_required
+def productos_vendidos(request):
+    # Obtener fechas del request
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+    proveedor_id = request.GET.get('proveedor')
+    producto_id = request.GET.get('producto')
+
+    # Establecer fechas por defecto si no se proporcionan
+    if not fecha_inicio or not fecha_fin:
+        fecha_actual = timezone.now().date()
+        fecha_inicio = fecha_actual
+        fecha_fin = fecha_actual
+    else:
+        fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+        fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+
+    # Construir la consulta base
+    productos_query = ReservaProducto.objects.select_related(
+        'venta_reserva',
+        'venta_reserva__cliente',
+        'producto',
+        'producto__categoria'
+    ).filter(
+        venta_reserva__fecha_reserva__date__range=[fecha_inicio, fecha_fin]
+    )
+
+    # Aplicar filtros adicionales solo si se proporcionan valores válidos
+    if proveedor_id and proveedor_id.strip():
+        productos_query = productos_query.filter(producto__proveedor_id=proveedor_id)
+    
+    if producto_id and producto_id.strip():
+        productos_query = productos_query.filter(producto_id=producto_id)
+
+    # Calcular totales
+    totales = productos_query.aggregate(
+        total_cantidad_productos=Sum('cantidad'),
+        total_monto_periodo=Sum(F('cantidad') * F('producto__precio_base'))
+    )
+
+    # Obtener los resultados
+    productos = productos_query.values(
+        'venta_reserva_id',
+        'venta_reserva__cliente__nombre',
+        'venta_reserva__fecha_reserva',
+        'producto__proveedor__nombre',
+        'producto__nombre',
+        'cantidad',
+        'producto__precio_base'
+    ).annotate(
+        total_monto=F('cantidad') * F('producto__precio_base')
+    ).order_by('-venta_reserva__fecha_reserva')
+
+    # Obtener listas para los filtros
+    todos_proveedores = Proveedor.objects.all().order_by('nombre')
+    todos_productos = Producto.objects.all().order_by('nombre')
+
+    context = {
+        'productos': productos,
+        'proveedores': todos_proveedores,
+        'productos_lista': todos_productos,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'proveedor_id': proveedor_id if proveedor_id else '',
+        'producto_id': producto_id if producto_id else '',
+        'total_cantidad_productos': totales['total_cantidad_productos'] or 0,
+        'total_monto_periodo': totales['total_monto_periodo'] or 0,
+    }
+
+    return render(request, 'ventas/productos_vendidos.html', context)
