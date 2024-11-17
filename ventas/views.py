@@ -537,7 +537,6 @@ def inicio_sistema_view(request):
 def es_administrador(user):
     return user.is_superuser
 
-@login_required
 def auditoria_movimientos(request):
     # Obtener parámetros de filtro
     fecha_inicio = request.GET.get('fecha_inicio')
@@ -579,47 +578,88 @@ def auditoria_movimientos(request):
 
 @user_passes_test(es_administrador)  # Restringir el acceso a administradores
 def caja_diaria_view(request):
-    # Obtener parámetros de filtro
+    # Obtener rango de fechas desde los parámetros GET
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin = request.GET.get('fecha_fin')
+    metodo_pago = request.GET.get('metodo_pago')  # Nuevo filtro
+
+    # Establecer fechas por defecto (hoy) si no se proporcionan
+    today = timezone.localdate()
+    if not fecha_inicio:
+        fecha_inicio = today.strftime('%Y-%m-%d')
+    if not fecha_fin:
+        fecha_fin = today.strftime('%Y-%m-%d')
+
+    # Parsear las cadenas de fecha a objetos date
+    try:
+        fecha_inicio_parsed = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+        fecha_fin_parsed = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+    except ValueError:
+        # Manejar errores de formato de fecha
+        fecha_inicio_parsed = today
+        fecha_fin_parsed = today
+
+    # Validar que fecha_inicio no es posterior a fecha_fin
+    if fecha_inicio_parsed > fecha_fin_parsed:
+        fecha_inicio_parsed, fecha_fin_parsed = fecha_fin_parsed, fecha_inicio_parsed
+        fecha_inicio, fecha_fin = fecha_fin, fecha_inicio
+
+    # Ajustar fecha_fin para incluir todo el día
+    fecha_fin_parsed_datetime = timezone.make_aware(datetime.combine(fecha_fin_parsed, datetime.min.time())) + timedelta(days=1)
+
+    # Obtener el usuario seleccionado del parámetro GET
     usuario_id = request.GET.get('usuario')
-    metodo_pago = request.GET.get('metodo_pago')
 
-    # Query base
-    pagos = Pago.objects.all().order_by('-fecha_pago')
+    # Obtener todos los usuarios para el filtro
+    usuarios = User.objects.all()
 
-    # Aplicar filtros
-    if fecha_inicio:
-        pagos = pagos.filter(fecha_pago__date__gte=fecha_inicio)
-    if fecha_fin:
-        pagos = pagos.filter(fecha_pago__date__lte=fecha_fin)
+    # Filtrar Pago basado en fecha_pago
+    pagos = Pago.objects.filter(
+        fecha_pago__range=(fecha_inicio_parsed, fecha_fin_parsed_datetime)
+    )
+
+    # Filtrar los pagos por usuario si se ha seleccionado uno
     if usuario_id:
         pagos = pagos.filter(usuario_id=usuario_id)
+    else:
+        usuario_id = ''
+
+    # Filtrar por método de pago si se ha seleccionado uno
     if metodo_pago:
         pagos = pagos.filter(metodo_pago=metodo_pago)
+    else:
+        metodo_pago = ''
 
-    # Agrupar pagos por método de pago
+    # Filtrar VentaReserva basado en ReservaServicio.fecha_agendamiento
+    ventas = VentaReserva.objects.filter(
+        reservaservicios__fecha_agendamiento__range=(fecha_inicio_parsed, fecha_fin_parsed_datetime)
+    ).distinct()
+
+    # Calcular totales
+    total_ventas = ventas.aggregate(total=Sum('total'))['total'] or 0
+    total_pagos = pagos.aggregate(total=Sum('monto'))['total'] or 0
+
+    # Agrupar pagos por método de pago y contar transacciones
     pagos_grouped = pagos.values('metodo_pago').annotate(
         total_monto=Sum('monto'),
         cantidad_transacciones=Count('id')
     ).order_by('metodo_pago')
 
-    # Calcular total de pagos
-    total_pagos = pagos.aggregate(total=Sum('monto'))['total'] or 0
-
-    # Obtener lista de usuarios para el filtro
-    usuarios = User.objects.all().order_by('username')
+    # Obtener los métodos de pago para el filtro
+    METODOS_PAGO = Pago.METODOS_PAGO
 
     context = {
+        'ventas': ventas,
         'pagos': pagos,
-        'pagos_grouped': pagos_grouped,
+        'total_ventas': total_ventas,
         'total_pagos': total_pagos,
-        'usuarios': usuarios,
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
+        'pagos_grouped': pagos_grouped,
+        'usuarios': usuarios,
         'usuario_id': usuario_id,
-        'metodo_pago': metodo_pago,
-        'METODOS_PAGO': METODOS_PAGO,
+        'metodo_pago': metodo_pago,  # Añadir al contexto
+        'METODOS_PAGO': METODOS_PAGO,  # Añadir al contexto
     }
 
     return render(request, 'ventas/caja_diaria.html', context)
