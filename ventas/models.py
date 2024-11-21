@@ -70,6 +70,9 @@ class Compra(models.Model):
         ('andesalda', 'andes alda'),
         ('mercadopagoaremko', 'mercadopago aremko'),
         ('scotiabankalda', 'scotiabank alda'),
+        ('copecjorge', 'copec jorge'),
+        ('copecalda', 'copec alda'),
+        ('copecmartin', 'copec martin'),
     ]
 
     fecha_compra = models.DateField(default=timezone.now)
