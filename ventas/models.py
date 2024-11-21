@@ -339,6 +339,9 @@ class Pago(models.Model):
         ('andesalda', 'andes alda'),
         ('mercadopagoaremko', 'mercadopago aremko'),
         ('scotiabankalda', 'scotiabank alda'),
+        ('copecjorge', 'copec jorge'),
+        ('copecalda', 'copec alda'),
+        ('copecmartin', 'copec martin'),
     ]
 
     venta_reserva = models.ForeignKey(VentaReserva, related_name='pagos', on_delete=models.CASCADE)
