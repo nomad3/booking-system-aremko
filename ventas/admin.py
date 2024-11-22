@@ -66,20 +66,19 @@ class VentaReservaAdmin(admin.ModelAdmin):
     list_per_page = 50  
     autocomplete_fields = ['cliente']
     list_display = (
-        'id', 'cliente', 'fecha_reserva', 'estado_pago', 
+        'id', 'cliente_info', 'fecha_reserva', 'estado_pago', 
         'estado_reserva', 'servicios_y_cantidades', 
         'productos_y_cantidades', 'total_servicios', 
         'total_productos', 'total', 'pagado', 'saldo_pendiente'
     )
+    list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
+    search_fields = ('id', 'cliente__nombre', 'cliente__email', 'cliente__telefono')
+    inlines = [ReservaServicioInline, ReservaProductoInline, PagoInline]
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
         'productos_y_cantidades', 'servicios_y_cantidades',
         'total_productos', 'total_servicios'
     )
-    inlines = [ReservaProductoInline, ReservaServicioInline, PagoInline]
-    list_filter = ()  # Quita el filtro por defecto
-    search_fields = ('cliente__nombre', 'cliente__email', 'cliente__telefono')
-    list_per_page = 20  # Paginación
     fieldsets = (
         (None, {
             'fields': (
@@ -167,6 +166,10 @@ class VentaReservaAdmin(admin.ModelAdmin):
             'reservaservicios__servicio',
         ).select_related('cliente')
         return queryset
+
+    def cliente_info(self, obj):
+        return f"{obj.cliente.nombre} - {obj.cliente.telefono}"
+    cliente_info.short_description = 'Cliente'
 
 @admin.register(Proveedor)
 class ProveedorAdmin(admin.ModelAdmin):
