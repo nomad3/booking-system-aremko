@@ -173,7 +173,9 @@ class VentaReservaAdmin(admin.ModelAdmin):
     cliente_info.admin_order_field = 'cliente__nombre'
 
     def fecha_reserva_corta(self, obj):
-        return obj.fecha_reserva.strftime('%Y-%m-%d')
+        if obj.fecha_reserva:
+            return obj.fecha_reserva.strftime('%Y-%m-%d')
+        return '-'
     fecha_reserva_corta.short_description = 'Fecha'
     fecha_reserva_corta.admin_order_field = 'fecha_reserva'
 
