@@ -1,0 +1,13 @@
+/* Estilo para la columna de cliente */
+.column-cliente_info {
+    width: 300px !important;  /* Ajusta este valor según necesites */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Estilo para la columna de fecha */
+.column-fecha_reserva_corta {
+    width: 100px !important;  /* Ajusta este valor según necesites */
+    white-space: nowrap;
+} 
