@@ -66,7 +66,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
     list_per_page = 50  
     autocomplete_fields = ['cliente']
     list_display = (
-        'id', 'cliente_info', 'fecha_reserva', 'estado_pago', 
+        'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago', 
         'estado_reserva', 'servicios_y_cantidades', 
         'productos_y_cantidades', 'total_servicios', 
         'total_productos', 'total', 'pagado', 'saldo_pendiente'
@@ -170,6 +170,17 @@ class VentaReservaAdmin(admin.ModelAdmin):
     def cliente_info(self, obj):
         return f"{obj.cliente.nombre} - {obj.cliente.telefono}"
     cliente_info.short_description = 'Cliente'
+    cliente_info.admin_order_field = 'cliente__nombre'
+
+    def fecha_reserva_corta(self, obj):
+        return obj.fecha_reserva.strftime('%Y-%m-%d')
+    fecha_reserva_corta.short_description = 'Fecha'
+    fecha_reserva_corta.admin_order_field = 'fecha_reserva'
+
+    class Media:
+        css = {
+            'all': ('admin/css/custom.css',)
+        }
 
 @admin.register(Proveedor)
 class ProveedorAdmin(admin.ModelAdmin):
