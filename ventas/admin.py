@@ -24,6 +24,8 @@ class ReservaServicioInlineForm(forms.ModelForm):
         widgets = {
             'fecha_agendamiento': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
             'servicio': Select(attrs={'class': 'form-control'}),
+            'precio_unitario': forms.NumberInput(attrs={'readonly': True}),
+            'valor_total': forms.NumberInput(attrs={'readonly': True}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -71,6 +73,8 @@ class ReservaProductoInlineForm(forms.ModelForm):
         fields = ['producto', 'cantidad', 'precio_base', 'valor_total']
         widgets = {
             'producto': PrecioSelect(choices=[], attribute={}),
+            'precio_base': forms.NumberInput(attrs={'readonly': True}),
+            'valor_total': forms.NumberInput(attrs={'readonly': True}),
         }
 
     def __init__(self, *args, **kwargs):
