@@ -42,9 +42,19 @@ class ReservaServicioInline(admin.TabularInline):
     form = ReservaServicioInlineForm
     extra = 1
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "servicio":
+            kwargs["queryset"] = Servicio.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
     extra = 1
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "producto":
+            kwargs["queryset"] = Producto.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 class PagoInline(admin.TabularInline):
     model = Pago
