@@ -64,6 +64,27 @@ class ReservaServicioInline(admin.TabularInline):
     class Media:
         js = ('admin/js/reserva_servicio_inline.js',)  # Asegúrate de tener el archivo JS correcto
 
+# Primero definimos el formulario
+class ReservaProductoInlineForm(forms.ModelForm):
+    class Meta:
+        model = ReservaProducto
+        fields = ['producto', 'cantidad', 'precio_base', 'valor_total']
+        widgets = {
+            'producto': PrecioSelect(choices=[], attribute={}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        productos = Producto.objects.order_by('nombre')
+        choices = [(producto.id, producto.nombre) for producto in productos]
+        precios = {str(producto.id): {'precio-base': producto.precio_base} for producto in productos}
+        self.fields['producto'].choices = choices
+        self.fields['producto'].widget = PrecioSelect(choices=choices, attribute=precios)
+        # Marcar los campos precio_base y valor_total como de solo lectura
+        self.fields['precio_base'].widget.attrs['readonly'] = True
+        self.fields['valor_total'].widget.attrs['readonly'] = True
+
+# Luego definimos el inline que usa el formulario
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
     form = ReservaProductoInlineForm
@@ -78,7 +99,7 @@ class ReservaProductoInline(admin.TabularInline):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     class Media:
-        js = ('admin/js/reserva_producto_inline.js',)  # Asegúrate de tener este archivo JS
+        js = ('admin/js/reserva_producto_inline.js',)
 
 class PagoInline(admin.TabularInline):
     model = Pago
@@ -295,22 +316,3 @@ admin.site.register(VentaReserva, VentaReservaAdmin)
 admin.site.register(Cliente, ClienteAdmin)
 admin.site.register(Servicio, ServicioAdmin)
 admin.site.register(CategoriaServicio)
-
-class ReservaProductoInlineForm(forms.ModelForm):
-    class Meta:
-        model = ReservaProducto
-        fields = ['producto', 'cantidad', 'precio_base', 'valor_total']
-        widgets = {
-            'producto': PrecioSelect(choices=[], attribute={}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        productos = Producto.objects.order_by('nombre')
-        choices = [(producto.id, producto.nombre) for producto in productos]
-        precios = {str(producto.id): {'precio-base': producto.precio_base} for producto in productos}
-        self.fields['producto'].choices = choices
-        self.fields['producto'].widget = PrecioSelect(choices=choices, attribute=precios)
-        # Marcar los campos precio_base y valor_total como de solo lectura
-        self.fields['precio_base'].widget.attrs['readonly'] = True
-        self.fields['valor_total'].widget.attrs['readonly'] = True
