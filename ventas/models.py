@@ -1,4 +1,3 @@
-
 from datetime import timedelta
 from django.contrib.auth.models import User
 from django.db import models
@@ -193,7 +192,7 @@ class Cliente(models.Model):
     ciudad = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.nombre} - {self.email}"
+        return f"{self.nombre} - {self.telefono}"
 
 class VentaReserva(models.Model):
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE)

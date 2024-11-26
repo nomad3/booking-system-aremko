@@ -82,7 +82,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         'total_productos', 'total', 'pagado', 'saldo_pendiente'
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
-    search_fields = ('id', 'cliente__nombre', 'cliente__email', 'cliente__telefono')
+    search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
     inlines = [ReservaServicioInline, ReservaProductoInline, PagoInline]
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
@@ -237,8 +237,8 @@ class ProductoAdmin(admin.ModelAdmin):
     autocomplete_fields = ['proveedor', 'categoria'] 
 
 class ClienteAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'email', 'telefono')
-    search_fields = ('nombre', 'email', 'telefono')  # Eliminar 'apellido'
+    search_fields = ('nombre', 'telefono', 'email')  # Campos por los que se puede buscar
+    list_display = ('nombre', 'telefono', 'email')  # Campos que se mostrarán en la lista
 
 class ServicioAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'precio_base', 'duracion', 'categoria', 'proveedor')
