@@ -6,7 +6,7 @@ from django.db import transaction
 from django.db import models
 from django.db.models import Sum, F, DecimalField 
 from .models import VentaReserva, Cliente, ReservaProducto, ReservaServicio, Pago, MovimientoCliente, DetalleCompra, Compra
-from django.contrib.auth.models import User  # Importa el modelo de usuario
+from django.contrib.auth.models import User, AnonymousUser  # Importa el modelo de usuario
 from .middleware import get_current_user  # Importa el middleware
 
 # Movimientos y auditoría
@@ -42,16 +42,27 @@ def registrar_movimiento_eliminacion_venta(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Cliente)
 def registrar_movimiento_cliente(sender, instance, created, **kwargs):
-    usuario = get_current_user()
-    descripcion = f"Se ha {'creado' if created else 'actualizado'} el cliente: {instance.nombre}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance,
-        tipo_movimiento='Creación de Cliente' if created else 'Actualización de Cliente',
-        descripcion=descripcion,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+    if created:
+        # Get current user from request or use system user as fallback
+        current_user = getattr(instance, '_current_user', None)
+        
+        # If no user or anonymous user, use system user
+        if not current_user or isinstance(current_user, AnonymousUser):
+            current_user, _ = User.objects.get_or_create(
+                username='system',
+                defaults={
+                    'is_active': True,
+                    'is_staff': True,
+                    'email': 'system@example.com'
+                }
+            )
+
+        MovimientoCliente.objects.create(
+            cliente=instance,
+            tipo_movimiento='creacion',
+            usuario=current_user,
+            comentarios='Cliente creado automáticamente'
+        )
 
 @receiver(post_delete, sender=Cliente)
 def registrar_movimiento_eliminacion_cliente(sender, instance, **kwargs):
