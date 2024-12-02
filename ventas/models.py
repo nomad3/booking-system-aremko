@@ -384,10 +384,16 @@ class Pago(models.Model):
 
 class MovimientoCliente(models.Model):
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE)
-    tipo_movimiento = models.CharField(max_length=100)
-    descripcion = models.TextField()
-    fecha_movimiento = models.DateTimeField(auto_now_add=True)
-    usuario = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)
+    tipo_movimiento = models.CharField(max_length=50)
+    usuario = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL,  # Changed from CASCADE
+        null=True,  # Allow null
+        blank=True  # Allow blank
+    )
+    comentarios = models.TextField(blank=True)
+    venta_reserva = models.ForeignKey(VentaReserva, on_delete=models.CASCADE)
+    fecha = models.DateTimeField(auto_now_add=True)
 
 class ReservaProducto(models.Model):
     venta_reserva = models.ForeignKey(VentaReserva, on_delete=models.CASCADE, related_name='reservaproductos')
