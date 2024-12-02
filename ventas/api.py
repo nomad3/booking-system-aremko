@@ -5,7 +5,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.db import transaction
 from django.contrib.auth.models import User
-from .models import VentaReserva, Cliente, Servicio, Producto, ReservaServicio, ReservaProducto
+from .models import VentaReserva, Cliente, Servicio, Producto, ReservaServicio, ReservaProducto, MovimientoCliente
 
 @csrf_exempt
 @api_view(['POST'])
@@ -69,6 +69,15 @@ def create_prebooking(request):
                     cantidad=1,
                     precio_unitario=0
                 )
+
+            # Create MovimientoCliente with system user
+            MovimientoCliente.objects.create(
+                cliente=cliente,
+                tipo_movimiento='pre_reserva',
+                usuario=system_user,
+                comentarios=f"Pre-reserva automática - {data.get('comentarios', '')}",
+                venta_reserva=venta_reserva
+            )
 
             return Response({
                 'status': 'success',
