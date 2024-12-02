@@ -10,6 +10,8 @@ from .models import VentaReserva, Cliente, Servicio, Producto, ReservaServicio, 
 from decimal import Decimal
 import traceback
 import logging
+from datetime import datetime
+from django.utils.dateparse import parse_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +31,15 @@ def create_prebooking(request):
             )
             logger.info(f"Cliente {'created' if created else 'found'}: {cliente}")
 
+            # Parse fecha_reserva
+            fecha_reserva = parse_datetime(data['fecha_reserva'])
+            if not fecha_reserva:
+                raise ValueError("Invalid fecha_reserva format")
+
             # Create VentaReserva
             venta_reserva = VentaReserva.objects.create(
                 cliente=cliente,
-                fecha_reserva=data['fecha_reserva'],
+                fecha_reserva=fecha_reserva,
                 estado_reserva='pendiente',
                 estado_pago='pendiente',
                 comentarios=data.get('comentarios', '')
@@ -42,9 +49,14 @@ def create_prebooking(request):
             # Add services
             for servicio_data in data['servicios']:
                 servicio = Servicio.objects.get(id=servicio_data['servicio_id'])
+                # Parse fecha_agendamiento
+                fecha_agendamiento = parse_datetime(servicio_data['fecha_agendamiento'])
+                if not fecha_agendamiento:
+                    raise ValueError(f"Invalid fecha_agendamiento format for service {servicio.id}")
+                
                 venta_reserva.agregar_servicio(
                     servicio=servicio,
-                    fecha_agendamiento=servicio_data['fecha_agendamiento'],
+                    fecha_agendamiento=fecha_agendamiento,
                     cantidad_personas=servicio_data.get('cantidad_personas', 1)
                 )
                 logger.info(f"Added service: {servicio}")
@@ -84,6 +96,12 @@ def create_prebooking(request):
             logger.info(f"Returning success response: {response_data}")
             return Response(response_data, status=status.HTTP_201_CREATED)
 
+    except ValueError as e:
+        return Response({
+            'status': 'error',
+            'message': str(e),
+            'type': 'ValueError'
+        }, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         error_message = f"Error in create_prebooking: {str(e)}"
         logger.error(error_message)
