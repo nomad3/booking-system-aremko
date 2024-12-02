@@ -12,26 +12,36 @@ from django.contrib.auth import get_user_model
 
 # Movimientos y auditoría
 
+def get_or_create_system_user():
+    """Helper function to get or create the system user"""
+    return User.objects.get_or_create(
+        username='system',
+        defaults={
+            'is_active': True,
+            'is_staff': True,
+            'email': 'system@example.com',
+            'first_name': 'System',
+            'last_name': 'User'
+        }
+    )[0]
+
 @receiver(post_save, sender=VentaReserva)
 def registrar_movimiento_venta(sender, instance, created, **kwargs):
     if created:
-        # Get or create system user for automated actions
-        system_user, _ = User.objects.get_or_create(
-            username='system',
-            defaults={
-                'is_active': True,
-                'is_staff': True,
-                'email': 'system@example.com'
-            }
-        )
-
-        MovimientoCliente.objects.create(
-            cliente=instance.cliente,
-            tipo_movimiento='pre_reserva',
-            usuario=system_user,  # Use system user instead of request.user
-            comentarios=f"Pre-reserva automática - {instance.comentarios or ''}",
-            venta_reserva=instance
-        )
+        try:
+            with transaction.atomic():
+                system_user = get_or_create_system_user()
+                
+                MovimientoCliente.objects.create(
+                    cliente=instance.cliente,
+                    tipo_movimiento='pre_reserva',
+                    usuario=system_user,
+                    fecha_movimiento=timezone.now(),
+                    comentarios=f"Pre-reserva automática - {instance.comentarios or ''}",
+                    venta_reserva=instance
+                )
+        except Exception as e:
+            print(f"Error in registrar_movimiento_venta: {e}")
 
 @receiver(post_delete, sender=VentaReserva)
 def registrar_movimiento_eliminacion_venta(sender, instance, **kwargs):
@@ -51,21 +61,19 @@ def registrar_movimiento_eliminacion_venta(sender, instance, **kwargs):
 @receiver(post_save, sender=Cliente)
 def registrar_movimiento_cliente(sender, instance, created, **kwargs):
     if created:
-        system_user, _ = User.objects.get_or_create(
-            username='system',
-            defaults={
-                'is_active': True,
-                'is_staff': True,
-                'email': 'system@example.com'
-            }
-        )
-
-        MovimientoCliente.objects.create(
-            cliente=instance,
-            tipo_movimiento='creacion',
-            usuario=system_user,
-            comentarios='Cliente creado automáticamente'
-        )
+        try:
+            with transaction.atomic():
+                system_user = get_or_create_system_user()
+                
+                MovimientoCliente.objects.create(
+                    cliente=instance,
+                    tipo_movimiento='creacion',
+                    usuario=system_user,
+                    fecha_movimiento=timezone.now(),
+                    comentarios='Cliente creado automáticamente'
+                )
+        except Exception as e:
+            print(f"Error in registrar_movimiento_cliente: {e}")
 
 @receiver(post_delete, sender=Cliente)
 def registrar_movimiento_eliminacion_cliente(sender, instance, **kwargs):
