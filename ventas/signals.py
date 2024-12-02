@@ -14,17 +14,24 @@ from django.contrib.auth import get_user_model
 
 @receiver(post_save, sender=VentaReserva)
 def registrar_movimiento_venta(sender, instance, created, **kwargs):
-    usuario = get_current_user()
-    tipo = 'Creación de Venta/Reserva' if created else 'Actualización de Venta/Reserva'
-    descripcion = f"Se ha {'creado' if created else 'actualizado'} la venta/reserva con ID {instance.id} para el cliente {instance.cliente.nombre}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance.cliente,
-        tipo_movimiento=tipo,
-        descripcion=descripcion,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+    if created:
+        # Get or create system user for automated actions
+        system_user, _ = User.objects.get_or_create(
+            username='system',
+            defaults={
+                'is_active': True,
+                'is_staff': True,
+                'email': 'system@example.com'
+            }
+        )
+
+        MovimientoCliente.objects.create(
+            cliente=instance.cliente,
+            tipo_movimiento='pre_reserva',
+            usuario=system_user,  # Use system user instead of request.user
+            comentarios=f"Pre-reserva automática - {instance.comentarios or ''}",
+            venta_reserva=instance
+        )
 
 @receiver(post_delete, sender=VentaReserva)
 def registrar_movimiento_eliminacion_venta(sender, instance, **kwargs):
@@ -44,26 +51,21 @@ def registrar_movimiento_eliminacion_venta(sender, instance, **kwargs):
 @receiver(post_save, sender=Cliente)
 def registrar_movimiento_cliente(sender, instance, created, **kwargs):
     if created:
-        try:
-            # Get system user first
-            system_user = User.objects.get_or_create(
-                username='system',
-                defaults={
-                    'is_active': True,
-                    'is_staff': True,
-                    'email': 'system@example.com'
-                }
-            )[0]  # Get the user object from the tuple
+        system_user, _ = User.objects.get_or_create(
+            username='system',
+            defaults={
+                'is_active': True,
+                'is_staff': True,
+                'email': 'system@example.com'
+            }
+        )
 
-            MovimientoCliente.objects.create(
-                cliente=instance,
-                tipo_movimiento='creacion',
-                usuario=system_user,  # Always use system_user for now
-                comentarios='Cliente creado automáticamente'
-            )
-        except Exception as e:
-            print(f"Error creating MovimientoCliente: {str(e)}")
-            # Optionally log the error
+        MovimientoCliente.objects.create(
+            cliente=instance,
+            tipo_movimiento='creacion',
+            usuario=system_user,
+            comentarios='Cliente creado automáticamente'
+        )
 
 @receiver(post_delete, sender=Cliente)
 def registrar_movimiento_eliminacion_cliente(sender, instance, **kwargs):
