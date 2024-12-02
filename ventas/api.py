@@ -8,6 +8,10 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from .models import VentaReserva, Cliente, Servicio, Producto, ReservaServicio, ReservaProducto, MovimientoCliente
 from decimal import Decimal
+import traceback
+import logging
+
+logger = logging.getLogger(__name__)
 
 @csrf_exempt
 @api_view(['POST'])
@@ -16,12 +20,14 @@ def create_prebooking(request):
     try:
         with transaction.atomic():
             data = request.data
+            logger.info(f"Received prebooking request with data: {data}")
             
             # Get or create cliente
             cliente, created = Cliente.objects.get_or_create(
                 telefono=data['telefono'],
                 defaults={'nombre': data['nombre_cliente']}
             )
+            logger.info(f"Cliente {'created' if created else 'found'}: {cliente}")
 
             # Create VentaReserva
             venta_reserva = VentaReserva.objects.create(
@@ -31,6 +37,7 @@ def create_prebooking(request):
                 estado_pago='pendiente',
                 comentarios=data.get('comentarios', '')
             )
+            logger.info(f"VentaReserva created: {venta_reserva}")
 
             # Add services
             for servicio_data in data['servicios']:
@@ -40,22 +47,24 @@ def create_prebooking(request):
                     fecha_agendamiento=servicio_data['fecha_agendamiento'],
                     cantidad_personas=servicio_data.get('cantidad_personas', 1)
                 )
+                logger.info(f"Added service: {servicio}")
 
             # Calculate initial total before discount
             venta_reserva.calcular_total()
+            logger.info(f"Initial total calculated: {venta_reserva.total}")
 
             # Handle discount if provided
+            discount_amount = Decimal('0')
             if data.get('discount_code'):
-                # Here you might want to validate the discount code
-                # and calculate the discount amount based on your business rules
                 if data['discount_code'] == 'AREMKO15':
-                    discount_amount = venta_reserva.total * Decimal('0.15')  # 15% discount
+                    discount_amount = venta_reserva.total * Decimal('0.15')
                     venta_reserva.registrar_pago(
                         monto=discount_amount,
                         metodo_pago='descuento'
                     )
+                    logger.info(f"Applied discount: {discount_amount}")
 
-            # Create MovimientoCliente for the pre-booking
+            # Create MovimientoCliente
             MovimientoCliente.objects.create(
                 cliente=cliente,
                 tipo_movimiento='pre_reserva',
@@ -63,21 +72,22 @@ def create_prebooking(request):
                 comentarios=f"Pre-reserva automática - {data.get('comentarios', '')}",
                 venta_reserva=venta_reserva
             )
+            logger.info("Created MovimientoCliente")
 
-            return Response({
+            response_data = {
                 'status': 'success',
                 'message': 'Pre-booking created successfully',
                 'venta_reserva_id': venta_reserva.id,
                 'total': float(venta_reserva.total),
-                'discount_applied': float(discount_amount) if data.get('discount_code') else 0
-            }, status=status.HTTP_201_CREATED)
+                'discount_applied': float(discount_amount)
+            }
+            logger.info(f"Returning success response: {response_data}")
+            return Response(response_data, status=status.HTTP_201_CREATED)
 
-    except Servicio.DoesNotExist:
-        return Response({
-            'status': 'error',
-            'message': 'Invalid service ID'
-        }, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
+        error_message = f"Error in create_prebooking: {str(e)}"
+        logger.error(error_message)
+        logger.error(traceback.format_exc())
         return Response({
             'status': 'error',
             'message': str(e),
