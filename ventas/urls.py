@@ -27,5 +27,5 @@ urlpatterns = [
     path('detalles-compras/', views.detalle_compra_list, name='detalle_compra_list'),  # Nueva ruta
     path('detalles-compras/<int:pk>/', views.detalle_compra_detail, name='detalle_compra_detail'),  # Opcional: detalle específico
     path('productos-vendidos/', views.productos_vendidos, name='productos_vendidos'),
-    path('prebooking/', api.create_prebooking, name='create_prebooking'),
+    path('ventas/prebooking/', api.create_prebooking, name='create_prebooking'),
 ]
