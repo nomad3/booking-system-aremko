@@ -387,12 +387,17 @@ class MovimientoCliente(models.Model):
     tipo_movimiento = models.CharField(max_length=50)
     usuario = models.ForeignKey(
         User, 
-        on_delete=models.SET_NULL,  # Changed from CASCADE
-        null=True,  # Allow null
-        blank=True  # Allow blank
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
     )
-    comentarios = models.TextField(blank=True)  # Keep as comentarios
-    venta_reserva = models.ForeignKey(VentaReserva, on_delete=models.CASCADE)
+    comentarios = models.TextField(blank=True)
+    venta_reserva = models.ForeignKey(
+        'VentaReserva',
+        on_delete=models.CASCADE,
+        null=True,  # Temporarily allow null
+        blank=True
+    )
     fecha_movimiento = models.DateTimeField(auto_now_add=True)
 
     class Meta:
