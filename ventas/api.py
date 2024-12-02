@@ -15,29 +15,30 @@ def create_prebooking(request):
         with transaction.atomic():
             data = request.data
             
+            # First, ensure system user exists
+            system_user = User.objects.filter(username='system').first()
+            if not system_user:
+                system_user = User.objects.create_user(
+                    username='system',
+                    email='system@example.com',
+                    password='secure_password_here'  # Change this in production
+                )
+                system_user.is_staff = True
+                system_user.save()
+
             # Get or create cliente
             cliente, created = Cliente.objects.get_or_create(
                 telefono=data['telefono'],
                 defaults={'nombre': data['nombre_cliente']}
             )
 
-            # Get system user
-            system_user, _ = User.objects.get_or_create(
-                username='system',
-                defaults={
-                    'is_active': True,
-                    'is_staff': True,
-                    'email': 'system@example.com'
-                }
-            )
-
-            # Create VentaReserva
+            # Create VentaReserva with explicit system user
             venta_reserva = VentaReserva.objects.create(
                 cliente=cliente,
                 fecha_reserva=data['fecha_reserva'],
                 estado='pre_reserva',
                 comentarios=data.get('comentarios', ''),
-                usuario=system_user
+                usuario_id=system_user.id  # Use ID directly
             )
 
             # Add services
@@ -52,7 +53,6 @@ def create_prebooking(request):
 
             # Add discount code as product if provided
             if data.get('discount_code'):
-                # Get or create discount product
                 discount_product, _ = Producto.objects.get_or_create(
                     codigo=data['discount_code'],
                     defaults={
@@ -62,7 +62,6 @@ def create_prebooking(request):
                     }
                 )
                 
-                # Create ReservaProducto for discount
                 ReservaProducto.objects.create(
                     venta_reserva=venta_reserva,
                     producto=discount_product,
@@ -70,11 +69,11 @@ def create_prebooking(request):
                     precio_unitario=0
                 )
 
-            # Create MovimientoCliente with system user
+            # Create MovimientoCliente with explicit system user
             MovimientoCliente.objects.create(
                 cliente=cliente,
                 tipo_movimiento='pre_reserva',
-                usuario=system_user,
+                usuario_id=system_user.id,  # Use ID directly
                 comentarios=f"Pre-reserva automática - {data.get('comentarios', '')}",
                 venta_reserva=venta_reserva
             )
@@ -82,7 +81,8 @@ def create_prebooking(request):
             return Response({
                 'status': 'success',
                 'message': 'Pre-booking created successfully',
-                'venta_reserva_id': venta_reserva.id
+                'venta_reserva_id': venta_reserva.id,
+                'system_user_id': system_user.id  # Include this for debugging
             }, status=status.HTTP_201_CREATED)
 
     except Servicio.DoesNotExist:
@@ -91,7 +91,9 @@ def create_prebooking(request):
             'message': 'Invalid service ID'
         }, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
+        import traceback
         return Response({
             'status': 'error',
-            'message': str(e)
+            'message': str(e),
+            'traceback': traceback.format_exc()  # Include traceback for debugging
         }, status=status.HTTP_400_BAD_REQUEST) 
