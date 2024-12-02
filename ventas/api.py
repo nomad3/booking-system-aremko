@@ -1,7 +1,8 @@
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db import transaction
 from django.contrib.auth.models import User
@@ -17,7 +18,8 @@ logger = logging.getLogger(__name__)
 
 @csrf_exempt
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
 def create_prebooking(request):
     try:
         with transaction.atomic():
@@ -25,28 +27,19 @@ def create_prebooking(request):
             logger.info(f"Received prebooking request with data: {data}")
             
             # Get or create cliente
-            cliente = Cliente(
+            cliente, created = Cliente.objects.get_or_create(
                 telefono=data['telefono'],
-                nombre=data['nombre_cliente']
+                defaults={'nombre': data['nombre_cliente']}
             )
-            cliente._current_user = request.user  # Attach user to instance
-            cliente.save()
 
-            # Parse fecha_reserva
-            fecha_reserva = parse_datetime(data['fecha_reserva'])
-            if not fecha_reserva:
-                raise ValueError("Invalid fecha_reserva format")
-
-            # Create VentaReserva
-            venta_reserva = VentaReserva(
+            # Create VentaReserva with the authenticated user
+            venta_reserva = VentaReserva.objects.create(
                 cliente=cliente,
-                fecha_reserva=fecha_reserva,
+                fecha_reserva=parse_datetime(data['fecha_reserva']),
                 estado_reserva='pendiente',
                 estado_pago='pendiente',
                 comentarios=data.get('comentarios', '')
             )
-            venta_reserva._current_user = request.user  # Attach user to instance
-            venta_reserva.save()
             logger.info(f"VentaReserva created: {venta_reserva}")
 
             # Add services

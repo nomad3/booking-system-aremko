@@ -31,17 +31,10 @@ def registrar_movimiento_venta(sender, instance, created, **kwargs):
     if created:
         try:
             with transaction.atomic():
-                # Get current user from instance or use system user
-                current_user = getattr(instance, '_current_user', None)
-                
-                # If no user or anonymous user, use system user
-                if not current_user or isinstance(current_user, AnonymousUser):
-                    current_user = get_or_create_system_user()
-                
                 MovimientoCliente.objects.create(
                     cliente=instance.cliente,
                     tipo_movimiento='pre_reserva',
-                    usuario=current_user,
+                    usuario=instance.usuario if hasattr(instance, 'usuario') else None,
                     fecha_movimiento=timezone.now(),
                     comentarios=f"Pre-reserva automática - {instance.comentarios or ''}",
                     venta_reserva=instance
