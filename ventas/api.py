@@ -1,3 +1,4 @@
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -5,6 +6,7 @@ from .models import VentaReserva, Cliente, Servicio, ReservaServicio, Producto, 
 from django.utils import timezone
 from django.db import transaction
 
+@csrf_exempt
 @api_view(['POST'])
 def create_prebooking(request):
     try:

@@ -10,3 +10,4 @@ gunicorn
 openai
 dj-database-url>=0.5.0
 whitenoise
+django-cors-headers
