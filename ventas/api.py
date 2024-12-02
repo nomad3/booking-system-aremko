@@ -18,13 +18,10 @@ def create_prebooking(request):
             current_time = timezone.now()
             
             # Get or create cliente
-            cliente = Cliente(
+            cliente, created = Cliente.objects.get_or_create(
                 telefono=data['telefono'],
-                nombre=data['nombre_cliente']
+                defaults={'nombre': data['nombre_cliente']}
             )
-            # Attach current user to instance for signal
-            cliente._current_user = request.user
-            cliente.save()
 
             # Create VentaReserva without user
             venta_reserva = VentaReserva.objects.create(
