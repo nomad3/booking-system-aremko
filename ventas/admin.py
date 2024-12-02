@@ -9,6 +9,7 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.forms import DateInput, TimeInput, Select
 from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, GiftCard
+from .widgets import PrecioSelect  # Asegúrate de tener este widget si lo usas
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
@@ -19,42 +20,78 @@ admin.site.index_title = _("Bienvenido al Panel de Control")
 class ReservaServicioInlineForm(forms.ModelForm):
     class Meta:
         model = ReservaServicio
-        fields = ['servicio', 'fecha_agendamiento', 'cantidad_personas']
+        fields = ['servicio', 'fecha_agendamiento', 'cantidad_personas', 'precio_unitario', 'valor_total']
+        widgets = {
+            'fecha_agendamiento': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+            'servicio': forms.Select(attrs={'class': 'form-control'}),
+            'precio_unitario': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'readonly-field'}),
+            'valor_total': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'readonly-field'})
+        }
 
-    def clean_fecha_agendamiento(self):
-        """
-        Convertir el campo `fecha_agendamiento` en un objeto datetime si es necesario.
-        """
-        fecha_agendamiento = self.cleaned_data.get('fecha_agendamiento')
-
-        # Verificar si fecha_agendamiento es un string y convertirlo a datetime
-        if isinstance(fecha_agendamiento, str):
-            try:
-                fecha_agendamiento = datetime.strptime(fecha_agendamiento, '%Y-%m-%d %H:%M')
-                fecha_agendamiento = timezone.make_aware(fecha_agendamiento)  # Asegurarnos de que sea "aware"
-            except ValueError:
-                raise forms.ValidationError("El formato de la fecha de agendamiento no es válido. Debe ser YYYY-MM-DD HH:MM.")
-
-        return fecha_agendamiento
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Hacer que los campos precio_unitario y valor_total sean solo lectura
+        self.fields['precio_unitario'].widget.attrs['readonly'] = True
+        self.fields['valor_total'].widget.attrs['readonly'] = True
+        servicios = Servicio.objects.order_by('nombre')
+        self.fields['servicio'].choices = [(s.id, s.nombre) for s in servicios]
 
 class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
     form = ReservaServicioInlineForm
     extra = 1
+    readonly_fields = ['precio_unitario', 'valor_total']
+    can_delete = True
+    show_change_link = False
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "servicio":
             kwargs["queryset"] = Servicio.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+    class Media:
+        css = {
+            'all': ('admin/css/forms.css',)
+        }
+        js = ('admin/js/reserva_servicio_inline.js',)
+
+# Primero definimos el formulario
+class ReservaProductoInlineForm(forms.ModelForm):
+    class Meta:
+        model = ReservaProducto
+        fields = ['producto', 'cantidad', 'precio_base', 'valor_total']
+        widgets = {
+            'producto': forms.Select(attrs={'class': 'form-control'}),
+            'precio_base': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'readonly-field'}),
+            'valor_total': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'readonly-field'})
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['precio_base'].widget.attrs['readonly'] = True
+        self.fields['valor_total'].widget.attrs['readonly'] = True
+        productos = Producto.objects.order_by('nombre')
+        self.fields['producto'].choices = [(p.id, p.nombre) for p in productos]
+
+# Luego definimos el inline que usa el formulario
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
+    form = ReservaProductoInlineForm
     extra = 1
+    readonly_fields = ['precio_base', 'valor_total']
+    can_delete = True
+    show_change_link = False
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "producto":
             kwargs["queryset"] = Producto.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    class Media:
+        css = {
+            'all': ('admin/css/forms.css',)
+        }
+        js = ('admin/js/reserva_producto_inline.js',)
 
 class PagoInline(admin.TabularInline):
     model = Pago
@@ -82,7 +119,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         'total_productos', 'total', 'pagado', 'saldo_pendiente'
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
-    search_fields = ('id', 'cliente__nombre', 'cliente__email', 'cliente__telefono')
+    search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
     inlines = [ReservaServicioInline, ReservaProductoInline, PagoInline]
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
@@ -179,6 +216,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
 
     def cliente_info(self, obj):
         return f"{obj.cliente.nombre} - {obj.cliente.telefono}"
+
     cliente_info.short_description = 'Cliente'
     cliente_info.admin_order_field = 'cliente__nombre'
 
@@ -186,6 +224,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         if obj.fecha_reserva:
             return obj.fecha_reserva.strftime('%Y-%m-%d')
         return '-'
+
     fecha_reserva_corta.short_description = 'Fecha'
     fecha_reserva_corta.admin_order_field = 'fecha_reserva'
 
@@ -237,8 +276,8 @@ class ProductoAdmin(admin.ModelAdmin):
     autocomplete_fields = ['proveedor', 'categoria'] 
 
 class ClienteAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'email', 'telefono')
-    search_fields = ('nombre', 'email', 'telefono')  # Eliminar 'apellido'
+    search_fields = ('nombre', 'telefono', 'email')  # Campos por los que se puede buscar
+    list_display = ('nombre', 'telefono', 'email')  # Campos que se mostrarán en la lista
 
 class ServicioAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'precio_base', 'duracion', 'categoria', 'proveedor')
@@ -263,7 +302,6 @@ class PagoAdmin(admin.ModelAdmin):
         descripcion = f"Se ha eliminado el pago de {obj.monto} de la venta/reserva #{obj.venta_reserva.id}."
         registrar_movimiento(obj.venta_reserva.cliente, "Eliminación de Pago", descripcion, request.user)
         super().delete_model(request, obj)
-
 admin.site.register(CategoriaProducto, CategoriaProductoAdmin)
 admin.site.register(Producto, ProductoAdmin)
 admin.site.register(VentaReserva, VentaReservaAdmin)

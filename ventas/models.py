@@ -1,4 +1,3 @@
-
 from datetime import timedelta
 from django.contrib.auth.models import User
 from django.db import models
@@ -193,7 +192,7 @@ class Cliente(models.Model):
     ciudad = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.nombre} - {self.email}"
+        return f"{self.nombre} - {self.telefono}"
 
 class VentaReserva(models.Model):
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE)
@@ -394,6 +393,8 @@ class ReservaProducto(models.Model):
     venta_reserva = models.ForeignKey(VentaReserva, on_delete=models.CASCADE, related_name='reservaproductos')
     producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
     cantidad = models.PositiveIntegerField()
+    precio_base = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
+    valor_total = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
 
     def __str__(self):
         return f"{self.cantidad} x {self.producto.nombre} en Venta/Reserva #{self.venta_reserva.id}"
@@ -403,6 +404,8 @@ class ReservaServicio(models.Model):
     servicio = models.ForeignKey(Servicio, on_delete=models.CASCADE)
     fecha_agendamiento = models.DateTimeField(default=timezone.now)
     cantidad_personas = models.PositiveIntegerField(default=1)
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
+    valor_total = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
 
     def __str__(self):
         return f"{self.servicio.nombre} reservado para {self.fecha_agendamiento}"
