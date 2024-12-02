@@ -4,46 +4,83 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.db import transaction
-from .models import VentaReserva, Cliente, Servicio
+from django.contrib.auth.models import User
+from .models import VentaReserva, Cliente, Servicio, Producto, ReservaServicio, ReservaProducto
 
 @csrf_exempt
 @api_view(['POST'])
-@permission_classes([AllowAny])  # Allow anonymous access
+@permission_classes([AllowAny])
 def create_prebooking(request):
     try:
         with transaction.atomic():
             data = request.data
             
-            # Create or get cliente
+            # Get or create cliente
             cliente, created = Cliente.objects.get_or_create(
                 telefono=data['telefono'],
                 defaults={'nombre': data['nombre_cliente']}
             )
 
-            # Create pre-booking
-            pre_booking = VentaReserva.objects.create(
+            # Get system user
+            system_user, _ = User.objects.get_or_create(
+                username='system',
+                defaults={
+                    'is_active': True,
+                    'is_staff': True,
+                    'email': 'system@example.com'
+                }
+            )
+
+            # Create VentaReserva
+            venta_reserva = VentaReserva.objects.create(
                 cliente=cliente,
                 fecha_reserva=data['fecha_reserva'],
-                estado='pre_reserva',  # Or whatever status you use for pre-bookings
+                estado='pre_reserva',
                 comentarios=data.get('comentarios', ''),
-                discount_code=data.get('discount_code')
+                usuario=system_user
             )
 
             # Add services
             for servicio_data in data['servicios']:
                 servicio = Servicio.objects.get(id=servicio_data['servicio_id'])
-                pre_booking.servicios.create(
+                ReservaServicio.objects.create(
+                    venta_reserva=venta_reserva,
                     servicio=servicio,
                     cantidad_personas=servicio_data['cantidad_personas'],
                     fecha_agendamiento=servicio_data['fecha_agendamiento']
                 )
 
+            # Add discount code as product if provided
+            if data.get('discount_code'):
+                # Get or create discount product
+                discount_product, _ = Producto.objects.get_or_create(
+                    codigo=data['discount_code'],
+                    defaults={
+                        'nombre': f"Descuento {data['discount_code']}",
+                        'precio': 0,
+                        'tipo': 'descuento'
+                    }
+                )
+                
+                # Create ReservaProducto for discount
+                ReservaProducto.objects.create(
+                    venta_reserva=venta_reserva,
+                    producto=discount_product,
+                    cantidad=1,
+                    precio_unitario=0
+                )
+
             return Response({
                 'status': 'success',
                 'message': 'Pre-booking created successfully',
-                'pre_booking_id': pre_booking.id
+                'venta_reserva_id': venta_reserva.id
             }, status=status.HTTP_201_CREATED)
 
+    except Servicio.DoesNotExist:
+        return Response({
+            'status': 'error',
+            'message': 'Invalid service ID'
+        }, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({
             'status': 'error',
