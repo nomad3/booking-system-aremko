@@ -38,7 +38,8 @@ def create_prebooking(request):
                 fecha_reserva=parse_datetime(data['fecha_reserva']),
                 estado_reserva='pendiente',
                 estado_pago='pendiente',
-                comentarios=data.get('comentarios', '')
+                comentarios=data.get('comentarios', ''),
+                usuario=request.user
             )
             logger.info(f"VentaReserva created: {venta_reserva}")
 
