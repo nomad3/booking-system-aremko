@@ -24,43 +24,41 @@ def create_prebooking(request):
     try:
         with transaction.atomic():
             data = request.data
-            logger.info(f"Received prebooking request with data: {data}")
             
-            # Get or create cliente
+            # Get or create cliente with user context
             cliente, created = Cliente.objects.get_or_create(
                 telefono=data['telefono'],
                 defaults={'nombre': data['nombre_cliente']}
             )
+            # Add user context for the signal
+            cliente._current_user = request.user
+            if created:
+                cliente.save()  # This will trigger the signal with user context
 
-            # Create VentaReserva with the authenticated user
+            # Create VentaReserva with user context
             venta_reserva = VentaReserva.objects.create(
                 cliente=cliente,
                 fecha_reserva=parse_datetime(data['fecha_reserva']),
                 estado_reserva='pendiente',
                 estado_pago='pendiente',
-                comentarios=data.get('comentarios', ''),
-                usuario=request.user
+                comentarios=data.get('comentarios', '')
             )
-            logger.info(f"VentaReserva created: {venta_reserva}")
+            # Add user context for the signal
+            venta_reserva._current_user = request.user
+            venta_reserva.save()  # This will trigger the signal with user context
 
             # Add services
             for servicio_data in data['servicios']:
                 servicio = Servicio.objects.get(id=servicio_data['servicio_id'])
-                # Parse fecha_agendamiento
                 fecha_agendamiento = parse_datetime(servicio_data['fecha_agendamiento'])
-                if not fecha_agendamiento:
-                    raise ValueError(f"Invalid fecha_agendamiento format for service {servicio.id}")
-                
                 venta_reserva.agregar_servicio(
                     servicio=servicio,
                     fecha_agendamiento=fecha_agendamiento,
                     cantidad_personas=servicio_data.get('cantidad_personas', 1)
                 )
-                logger.info(f"Added service: {servicio}")
 
             # Calculate initial total before discount
             venta_reserva.calcular_total()
-            logger.info(f"Initial total calculated: {venta_reserva.total}")
 
             # Handle discount if provided
             discount_amount = Decimal('0')
@@ -71,38 +69,16 @@ def create_prebooking(request):
                         monto=discount_amount,
                         metodo_pago='descuento'
                     )
-                    logger.info(f"Applied discount: {discount_amount}")
 
-            # Create MovimientoCliente
-            MovimientoCliente.objects.create(
-                cliente=cliente,
-                tipo_movimiento='pre_reserva',
-                usuario=None,
-                comentarios=f"Pre-reserva automática - {data.get('comentarios', '')}",
-                venta_reserva=venta_reserva
-            )
-            logger.info("Created MovimientoCliente")
-
-            response_data = {
+            return Response({
                 'status': 'success',
                 'message': 'Pre-booking created successfully',
                 'venta_reserva_id': venta_reserva.id,
                 'total': float(venta_reserva.total),
                 'discount_applied': float(discount_amount)
-            }
-            logger.info(f"Returning success response: {response_data}")
-            return Response(response_data, status=status.HTTP_201_CREATED)
+            }, status=status.HTTP_201_CREATED)
 
-    except ValueError as e:
-        return Response({
-            'status': 'error',
-            'message': str(e),
-            'type': 'ValueError'
-        }, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        error_message = f"Error in create_prebooking: {str(e)}"
-        logger.error(error_message)
-        logger.error(traceback.format_exc())
         return Response({
             'status': 'error',
             'message': str(e),

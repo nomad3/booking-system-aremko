@@ -28,13 +28,17 @@ def get_or_create_system_user():
 
 @receiver(post_save, sender=VentaReserva)
 def registrar_movimiento_venta(sender, instance, created, **kwargs):
+    """Signal for tracking VentaReserva changes in admin panel"""
     if created:
         try:
             with transaction.atomic():
+                # Get the user from the request if available
+                user = getattr(instance, '_current_user', None)
+                
                 MovimientoCliente.objects.create(
                     cliente=instance.cliente,
                     tipo_movimiento='pre_reserva',
-                    usuario=instance.usuario,
+                    usuario=user,
                     fecha_movimiento=timezone.now(),
                     comentarios=f"Pre-reserva automática - {instance.comentarios or ''}",
                     venta_reserva=instance
@@ -59,13 +63,17 @@ def registrar_movimiento_eliminacion_venta(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Cliente)
 def registrar_movimiento_cliente(sender, instance, created, **kwargs):
+    """Signal for tracking Cliente changes in admin panel"""
     if created:
         try:
             with transaction.atomic():
+                # Get the user from the request if available
+                user = getattr(instance, '_current_user', None)
+                
                 MovimientoCliente.objects.create(
                     cliente=instance,
                     tipo_movimiento='creacion',
-                    usuario=instance.usuario if hasattr(instance, 'usuario') else None,
+                    usuario=user,
                     fecha_movimiento=timezone.now(),
                     comentarios='Cliente creado automáticamente'
                 )
