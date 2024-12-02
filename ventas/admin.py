@@ -23,9 +23,9 @@ class ReservaServicioInlineForm(forms.ModelForm):
         fields = ['servicio', 'fecha_agendamiento', 'cantidad_personas', 'precio_unitario', 'valor_total']
         widgets = {
             'fecha_agendamiento': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-            'servicio': forms.Select(attrs={'class': 'form-control'}),
-            'precio_unitario': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'readonly-field'}),
-            'valor_total': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'readonly-field'})
+            'servicio': Select(attrs={'class': 'form-control'}),
+            'precio_unitario': forms.NumberInput(attrs={'readonly': True}),
+            'valor_total': forms.NumberInput(attrs={'readonly': True}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -33,8 +33,22 @@ class ReservaServicioInlineForm(forms.ModelForm):
         # Hacer que los campos precio_unitario y valor_total sean solo lectura
         self.fields['precio_unitario'].widget.attrs['readonly'] = True
         self.fields['valor_total'].widget.attrs['readonly'] = True
-        servicios = Servicio.objects.order_by('nombre')
-        self.fields['servicio'].choices = [(s.id, s.nombre) for s in servicios]
+
+    def clean_fecha_agendamiento(self):
+        """
+        Convertir el campo `fecha_agendamiento` en un objeto datetime si es necesario.
+        """
+        fecha_agendamiento = self.cleaned_data.get('fecha_agendamiento')
+
+        # Verificar si fecha_agendamiento es un string y convertirlo a datetime
+        if isinstance(fecha_agendamiento, str):
+            try:
+                fecha_agendamiento = datetime.strptime(fecha_agendamiento, '%Y-%m-%d %H:%M')
+                fecha_agendamiento = timezone.make_aware(fecha_agendamiento)  # Asegurarnos de que sea "aware"
+            except ValueError:
+                raise forms.ValidationError("El formato de la fecha de agendamiento no es válido. Debe ser YYYY-MM-DD HH:MM.")
+
+        return fecha_agendamiento
 
 class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
@@ -50,10 +64,7 @@ class ReservaServicioInline(admin.TabularInline):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     class Media:
-        css = {
-            'all': ('admin/css/forms.css',)
-        }
-        js = ('admin/js/reserva_servicio_inline.js',)
+        js = ('admin/js/reserva_servicio_inline.js',)  # Asegúrate de tener el archivo JS correcto
 
 # Primero definimos el formulario
 class ReservaProductoInlineForm(forms.ModelForm):
@@ -61,17 +72,21 @@ class ReservaProductoInlineForm(forms.ModelForm):
         model = ReservaProducto
         fields = ['producto', 'cantidad', 'precio_base', 'valor_total']
         widgets = {
-            'producto': forms.Select(attrs={'class': 'form-control'}),
-            'precio_base': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'readonly-field'}),
-            'valor_total': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'readonly-field'})
+            'producto': PrecioSelect(choices=[], attribute={}),
+            'precio_base': forms.NumberInput(attrs={'readonly': True}),
+            'valor_total': forms.NumberInput(attrs={'readonly': True}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        productos = Producto.objects.order_by('nombre')
+        choices = [(producto.id, producto.nombre) for producto in productos]
+        precios = {str(producto.id): {'precio-base': producto.precio_base} for producto in productos}
+        self.fields['producto'].choices = choices
+        self.fields['producto'].widget = PrecioSelect(choices=choices, attribute=precios)
+        # Marcar los campos precio_base y valor_total como de solo lectura
         self.fields['precio_base'].widget.attrs['readonly'] = True
         self.fields['valor_total'].widget.attrs['readonly'] = True
-        productos = Producto.objects.order_by('nombre')
-        self.fields['producto'].choices = [(p.id, p.nombre) for p in productos]
 
 # Luego definimos el inline que usa el formulario
 class ReservaProductoInline(admin.TabularInline):
@@ -88,9 +103,6 @@ class ReservaProductoInline(admin.TabularInline):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     class Media:
-        css = {
-            'all': ('admin/css/forms.css',)
-        }
         js = ('admin/js/reserva_producto_inline.js',)
 
 class PagoInline(admin.TabularInline):
