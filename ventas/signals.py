@@ -14,7 +14,7 @@ from django.contrib.auth import get_user_model
 
 def get_or_create_system_user():
     """Helper function to get or create the system user"""
-    return User.objects.get_or_create(
+    system_user, _ = User.objects.get_or_create(
         username='system',
         defaults={
             'is_active': True,
@@ -23,19 +23,25 @@ def get_or_create_system_user():
             'first_name': 'System',
             'last_name': 'User'
         }
-    )[0]
+    )
+    return system_user
 
 @receiver(post_save, sender=VentaReserva)
 def registrar_movimiento_venta(sender, instance, created, **kwargs):
     if created:
         try:
             with transaction.atomic():
-                system_user = get_or_create_system_user()
+                # Get current user from instance or use system user
+                current_user = getattr(instance, '_current_user', None)
+                
+                # If no user or anonymous user, use system user
+                if not current_user or isinstance(current_user, AnonymousUser):
+                    current_user = get_or_create_system_user()
                 
                 MovimientoCliente.objects.create(
                     cliente=instance.cliente,
                     tipo_movimiento='pre_reserva',
-                    usuario=system_user,
+                    usuario=current_user,
                     fecha_movimiento=timezone.now(),
                     comentarios=f"Pre-reserva automática - {instance.comentarios or ''}",
                     venta_reserva=instance
@@ -63,12 +69,17 @@ def registrar_movimiento_cliente(sender, instance, created, **kwargs):
     if created:
         try:
             with transaction.atomic():
-                system_user = get_or_create_system_user()
+                # Get current user from instance or use system user
+                current_user = getattr(instance, '_current_user', None)
+                
+                # If no user or anonymous user, use system user
+                if not current_user or isinstance(current_user, AnonymousUser):
+                    current_user = get_or_create_system_user()
                 
                 MovimientoCliente.objects.create(
                     cliente=instance,
                     tipo_movimiento='creacion',
-                    usuario=system_user,
+                    usuario=current_user,
                     fecha_movimiento=timezone.now(),
                     comentarios='Cliente creado automáticamente'
                 )

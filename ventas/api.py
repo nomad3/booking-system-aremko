@@ -25,11 +25,12 @@ def create_prebooking(request):
             logger.info(f"Received prebooking request with data: {data}")
             
             # Get or create cliente
-            cliente, created = Cliente.objects.get_or_create(
+            cliente = Cliente(
                 telefono=data['telefono'],
-                defaults={'nombre': data['nombre_cliente']}
+                nombre=data['nombre_cliente']
             )
-            logger.info(f"Cliente {'created' if created else 'found'}: {cliente}")
+            cliente._current_user = request.user  # Attach user to instance
+            cliente.save()
 
             # Parse fecha_reserva
             fecha_reserva = parse_datetime(data['fecha_reserva'])
@@ -37,13 +38,15 @@ def create_prebooking(request):
                 raise ValueError("Invalid fecha_reserva format")
 
             # Create VentaReserva
-            venta_reserva = VentaReserva.objects.create(
+            venta_reserva = VentaReserva(
                 cliente=cliente,
                 fecha_reserva=fecha_reserva,
                 estado_reserva='pendiente',
                 estado_pago='pendiente',
                 comentarios=data.get('comentarios', '')
             )
+            venta_reserva._current_user = request.user  # Attach user to instance
+            venta_reserva.save()
             logger.info(f"VentaReserva created: {venta_reserva}")
 
             # Add services
