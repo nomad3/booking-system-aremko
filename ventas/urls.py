@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 from .views import servicios_vendidos_view, inicio_sistema_view, caja_diaria_view, auditoria_movimientos_view, venta_reserva_list, venta_reserva_detail
+from . import api
 
 # Registrar las vistas en el router de DRF
 router = DefaultRouter()
@@ -26,4 +27,5 @@ urlpatterns = [
     path('detalles-compras/', views.detalle_compra_list, name='detalle_compra_list'),  # Nueva ruta
     path('detalles-compras/<int:pk>/', views.detalle_compra_detail, name='detalle_compra_detail'),  # Opcional: detalle específico
     path('productos-vendidos/', views.productos_vendidos, name='productos_vendidos'),
+    path('api/prebooking/', api.create_prebooking, name='create_prebooking'),
 ]
