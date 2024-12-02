@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from django.db import transaction
 from django.contrib.auth.models import User
 from django.utils import timezone
-from .models import VentaReserva, Cliente, Servicio, Producto, ReservaServicio, ReservaProducto, MovimientoCliente
+from .models import VentaReserva, Cliente, Servicio, Producto, ReservaServicio, ReservaProducto, MovimientoCliente, Pago
 from decimal import Decimal
 import traceback
 import logging
@@ -31,7 +31,7 @@ def create_prebooking(request):
                 defaults={'nombre': data['nombre_cliente']}
             )[0]
 
-            # Create VentaReserva without usuario
+            # Create VentaReserva
             venta_reserva = VentaReserva.objects.create(
                 cliente=cliente,
                 fecha_reserva=parse_datetime(data['fecha_reserva']),
@@ -40,7 +40,7 @@ def create_prebooking(request):
                 comentarios=data.get('comentarios', '')
             )
 
-            # Add services
+            # Add services and calculate total
             for servicio_data in data['servicios']:
                 servicio = Servicio.objects.get(id=servicio_data['servicio_id'])
                 fecha_agendamiento = parse_datetime(servicio_data['fecha_agendamiento'])
@@ -50,28 +50,20 @@ def create_prebooking(request):
                     cantidad_personas=servicio_data.get('cantidad_personas', 1)
                 )
 
-            # Calculate initial total before discount
             venta_reserva.calcular_total()
 
-            # Handle discount if provided
+            # Handle discount
             discount_amount = Decimal('0')
-            if data.get('discount_code'):
-                if data['discount_code'] == 'AREMKO15':
-                    discount_amount = venta_reserva.total * Decimal('0.15')
-                    venta_reserva.registrar_pago(
-                        monto=discount_amount,
-                        metodo_pago='descuento'
-                    )
-
-            # Create MovimientoCliente with the authenticated user
-            MovimientoCliente.objects.create(
-                cliente=cliente,
-                tipo_movimiento='pre_reserva',
-                usuario=request.user,
-                fecha_movimiento=timezone.now(),
-                comentarios=f"Pre-reserva automática - {data.get('comentarios', '')}",
-                venta_reserva=venta_reserva
-            )
+            if data.get('discount_code') == 'AREMKO15':
+                discount_amount = venta_reserva.total * Decimal('0.15')
+                # Create Pago with user context
+                pago = Pago(
+                    venta_reserva=venta_reserva,
+                    monto=discount_amount,
+                    metodo_pago='descuento'
+                )
+                pago._current_user = request.user  # Add user context
+                pago.save()  # This will trigger the signal with user context
 
             return Response({
                 'status': 'success',

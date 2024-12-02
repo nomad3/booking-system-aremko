@@ -155,17 +155,22 @@ def registrar_movimiento_eliminacion_servicio(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Pago)
 def registrar_movimiento_pago(sender, instance, created, **kwargs):
-    usuario = get_current_user()
-    tipo = 'Pago Realizado' if created else 'Actualización de Pago'
-    descripcion = f"Se ha {'registrado' if created else 'actualizado'} un pago de {instance.monto} para la venta/reserva #{instance.venta_reserva.id} mediante {instance.metodo_pago}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance.venta_reserva.cliente,
-        tipo_movimiento=tipo,
-        descripcion=descripcion,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+    if created:
+        try:
+            with transaction.atomic():
+                # Get user from instance or use None
+                user = getattr(instance, '_current_user', None)
+                
+                MovimientoCliente.objects.create(
+                    cliente=instance.venta_reserva.cliente,
+                    tipo_movimiento='pago',
+                    usuario=user,
+                    fecha_movimiento=timezone.now(),
+                    comentarios=f'Pago registrado - {instance.metodo_pago} - ${instance.monto}',
+                    venta_reserva=instance.venta_reserva
+                )
+        except Exception as e:
+            print(f"Error in registrar_movimiento_pago: {e}")
 
    # NO necesitas actualizar el saldo aquí. Ya se hace en el save() de Pago.
 
