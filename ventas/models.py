@@ -391,9 +391,13 @@ class MovimientoCliente(models.Model):
         null=True,  # Allow null
         blank=True  # Allow blank
     )
-    comentarios = models.TextField(blank=True)
+    comentarios = models.TextField(blank=True)  # Keep as comentarios
     venta_reserva = models.ForeignKey(VentaReserva, on_delete=models.CASCADE)
-    fecha = models.DateTimeField(auto_now_add=True)
+    fecha_movimiento = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Movimiento de Cliente"
+        verbose_name_plural = "Movimientos de Clientes"
 
 class ReservaProducto(models.Model):
     venta_reserva = models.ForeignKey(VentaReserva, on_delete=models.CASCADE, related_name='reservaproductos')
