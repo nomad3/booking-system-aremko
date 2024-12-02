@@ -25,17 +25,13 @@ def create_prebooking(request):
         with transaction.atomic():
             data = request.data
             
-            # Get or create cliente with user context
-            cliente, created = Cliente.objects.get_or_create(
+            # Get or create cliente
+            cliente = Cliente.objects.get_or_create(
                 telefono=data['telefono'],
                 defaults={'nombre': data['nombre_cliente']}
-            )
-            # Add user context for the signal
-            cliente._current_user = request.user
-            if created:
-                cliente.save()  # This will trigger the signal with user context
+            )[0]
 
-            # Create VentaReserva with user context
+            # Create VentaReserva without usuario
             venta_reserva = VentaReserva.objects.create(
                 cliente=cliente,
                 fecha_reserva=parse_datetime(data['fecha_reserva']),
@@ -43,9 +39,6 @@ def create_prebooking(request):
                 estado_pago='pendiente',
                 comentarios=data.get('comentarios', '')
             )
-            # Add user context for the signal
-            venta_reserva._current_user = request.user
-            venta_reserva.save()  # This will trigger the signal with user context
 
             # Add services
             for servicio_data in data['servicios']:
@@ -69,6 +62,16 @@ def create_prebooking(request):
                         monto=discount_amount,
                         metodo_pago='descuento'
                     )
+
+            # Create MovimientoCliente with the authenticated user
+            MovimientoCliente.objects.create(
+                cliente=cliente,
+                tipo_movimiento='pre_reserva',
+                usuario=request.user,
+                fecha_movimiento=timezone.now(),
+                comentarios=f"Pre-reserva automática - {data.get('comentarios', '')}",
+                venta_reserva=venta_reserva
+            )
 
             return Response({
                 'status': 'success',
