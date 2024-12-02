@@ -9,7 +9,6 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.forms import DateInput, TimeInput, Select
 from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, GiftCard
-from .widgets import PrecioSelect  # Asegúrate de tener este widget si lo usas
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
@@ -20,17 +19,7 @@ admin.site.index_title = _("Bienvenido al Panel de Control")
 class ReservaServicioInlineForm(forms.ModelForm):
     class Meta:
         model = ReservaServicio
-        fields = ['servicio', 'fecha_agendamiento', 'cantidad_personas', 'precio_unitario', 'valor_total']
-        widgets = {
-            'fecha_agendamiento': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-            'servicio': Select(attrs={'class': 'form-control'}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Hacer que los campos precio_unitario y valor_total sean solo lectura
-        self.fields['precio_unitario'].widget.attrs['readonly'] = True
-        self.fields['valor_total'].widget.attrs['readonly'] = True
+        fields = ['servicio', 'fecha_agendamiento', 'cantidad_personas']
 
     def clean_fecha_agendamiento(self):
         """
@@ -52,33 +41,20 @@ class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
     form = ReservaServicioInlineForm
     extra = 1
-    readonly_fields = ['precio_unitario', 'valor_total']
-    can_delete = True
-    show_change_link = False
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "servicio":
             kwargs["queryset"] = Servicio.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-    class Media:
-        js = ('admin/js/reserva_servicio_inline.js',)  # Asegúrate de tener el archivo JS correcto
-
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
-    form = ReservaProductoInlineForm
     extra = 1
-    readonly_fields = ['precio_base', 'valor_total']
-    can_delete = True
-    show_change_link = False
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "producto":
             kwargs["queryset"] = Producto.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
-    class Media:
-        js = ('admin/js/reserva_producto_inline.js',)  # Asegúrate de tener este archivo JS
 
 class PagoInline(admin.TabularInline):
     model = Pago
@@ -203,7 +179,6 @@ class VentaReservaAdmin(admin.ModelAdmin):
 
     def cliente_info(self, obj):
         return f"{obj.cliente.nombre} - {obj.cliente.telefono}"
-
     cliente_info.short_description = 'Cliente'
     cliente_info.admin_order_field = 'cliente__nombre'
 
@@ -211,7 +186,6 @@ class VentaReservaAdmin(admin.ModelAdmin):
         if obj.fecha_reserva:
             return obj.fecha_reserva.strftime('%Y-%m-%d')
         return '-'
-
     fecha_reserva_corta.short_description = 'Fecha'
     fecha_reserva_corta.admin_order_field = 'fecha_reserva'
 
@@ -289,28 +263,10 @@ class PagoAdmin(admin.ModelAdmin):
         descripcion = f"Se ha eliminado el pago de {obj.monto} de la venta/reserva #{obj.venta_reserva.id}."
         registrar_movimiento(obj.venta_reserva.cliente, "Eliminación de Pago", descripcion, request.user)
         super().delete_model(request, obj)
+
 admin.site.register(CategoriaProducto, CategoriaProductoAdmin)
 admin.site.register(Producto, ProductoAdmin)
 admin.site.register(VentaReserva, VentaReservaAdmin)
 admin.site.register(Cliente, ClienteAdmin)
 admin.site.register(Servicio, ServicioAdmin)
 admin.site.register(CategoriaServicio)
-
-class ReservaProductoInlineForm(forms.ModelForm):
-    class Meta:
-        model = ReservaProducto
-        fields = ['producto', 'cantidad', 'precio_base', 'valor_total']
-        widgets = {
-            'producto': PrecioSelect(choices=[], attribute={}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        productos = Producto.objects.order_by('nombre')
-        choices = [(producto.id, producto.nombre) for producto in productos]
-        precios = {str(producto.id): {'precio-base': producto.precio_base} for producto in productos}
-        self.fields['producto'].choices = choices
-        self.fields['producto'].widget = PrecioSelect(choices=choices, attribute=precios)
-        # Marcar los campos precio_base y valor_total como de solo lectura
-        self.fields['precio_base'].widget.attrs['readonly'] = True
-        self.fields['valor_total'].widget.attrs['readonly'] = True
