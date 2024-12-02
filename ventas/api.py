@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.db import transaction
 from django.contrib.auth.models import User
+from django.utils import timezone
 from .models import VentaReserva, Cliente, Servicio, Producto, ReservaServicio, ReservaProducto, MovimientoCliente
 
 @csrf_exempt
@@ -14,31 +15,21 @@ def create_prebooking(request):
     try:
         with transaction.atomic():
             data = request.data
+            current_time = timezone.now()
             
-            # First, ensure system user exists
-            system_user = User.objects.filter(username='system').first()
-            if not system_user:
-                system_user = User.objects.create_user(
-                    username='system',
-                    email='system@example.com',
-                    password='secure_password_here'  # Change this in production
-                )
-                system_user.is_staff = True
-                system_user.save()
-
             # Get or create cliente
             cliente, created = Cliente.objects.get_or_create(
                 telefono=data['telefono'],
                 defaults={'nombre': data['nombre_cliente']}
             )
 
-            # Create VentaReserva with explicit system user
+            # Create VentaReserva without user
             venta_reserva = VentaReserva.objects.create(
                 cliente=cliente,
                 fecha_reserva=data['fecha_reserva'],
                 estado='pre_reserva',
                 comentarios=data.get('comentarios', ''),
-                usuario_id=system_user.id  # Use ID directly
+                usuario=None  # Set to None for now
             )
 
             # Add services
@@ -69,20 +60,21 @@ def create_prebooking(request):
                     precio_unitario=0
                 )
 
-            # Create MovimientoCliente with explicit system user
+            # Create MovimientoCliente with fecha_movimiento
             MovimientoCliente.objects.create(
                 cliente=cliente,
                 tipo_movimiento='pre_reserva',
-                usuario_id=system_user.id,  # Use ID directly
+                usuario=None,  # Set to None
                 comentarios=f"Pre-reserva automática - {data.get('comentarios', '')}",
-                venta_reserva=venta_reserva
+                venta_reserva=venta_reserva,
+                fecha_movimiento=current_time  # Add the current time
             )
 
             return Response({
                 'status': 'success',
                 'message': 'Pre-booking created successfully',
                 'venta_reserva_id': venta_reserva.id,
-                'system_user_id': system_user.id  # Include this for debugging
+                'fecha_movimiento': current_time.isoformat()
             }, status=status.HTTP_201_CREATED)
 
     except Servicio.DoesNotExist:
