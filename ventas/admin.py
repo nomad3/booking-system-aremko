@@ -9,6 +9,8 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.forms import DateInput, TimeInput, Select
 from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, GiftCard
+from django.http import HttpResponse
+import xlwt
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
@@ -237,8 +239,8 @@ class ProductoAdmin(admin.ModelAdmin):
     autocomplete_fields = ['proveedor', 'categoria'] 
 
 class ClienteAdmin(admin.ModelAdmin):
-    search_fields = ('nombre', 'telefono', 'email')  # Campos por los que se puede buscar
-    list_display = ('nombre', 'telefono', 'email')  # Campos que se mostrarán en la lista
+    search_fields = ('nombre', 'telefono', 'email')
+    list_display = ('nombre', 'telefono', 'email')
     actions = ['exportar_a_excel']
 
     def exportar_a_excel(self, request, queryset):
