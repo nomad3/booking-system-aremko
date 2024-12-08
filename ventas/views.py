@@ -30,6 +30,7 @@ from .serializers import (
     CategoriaServicioSerializer,
     VentaReservaSerializer
 )
+import xlwt
 
 
 def detalle_compra_list(request):
@@ -335,6 +336,62 @@ def servicios_vendidos_view(request):
         'venta_reserva_id': venta_reserva_id,
         'total_monto_vendido': total_monto_vendido
     }
+
+    # Verificar si se solicitó exportación
+    if request.GET.get('export') == 'excel':
+        response = HttpResponse(content_type='application/ms-excel')
+        response['Content-Disposition'] = 'attachment; filename="Servicios_Vendidos_{}.xls"'.format(
+            datetime.now().strftime('%Y%m%d_%H%M%S')
+        )
+
+        wb = xlwt.Workbook(encoding='utf-8')
+        ws = wb.add_sheet('Servicios Vendidos')
+
+        # Estilos
+        header_style = xlwt.easyxf('font: bold on; pattern: pattern solid, fore_colour gray25;')
+        date_style = xlwt.easyxf(num_format_str='DD/MM/YYYY')
+        time_style = xlwt.easyxf(num_format_str='HH:MM')
+        money_style = xlwt.easyxf(num_format_str='#,##0')
+
+        # Headers
+        headers = [
+            'ID Venta/Reserva',
+            'Cliente',
+            'Categoría del Servicio',
+            'Servicio',
+            'Fecha de Agendamiento',
+            'Hora de Agendamiento',
+            'Cantidad de Personas',
+            'Monto Total'
+        ]
+
+        for col, header in enumerate(headers):
+            ws.write(0, col, header, header_style)
+            ws.col(col).width = 256 * 20  # Ancho aproximado de 20 caracteres
+
+        # Datos
+        for row, servicio in enumerate(data, 1):
+            ws.write(row, 0, servicio['venta_reserva_id'])
+            ws.write(row, 1, servicio['cliente_nombre'])
+            ws.write(row, 2, servicio['categoria_servicio'])
+            ws.write(row, 3, servicio['servicio_nombre'])
+            
+            # Convertir fecha y hora a objetos datetime si son strings
+            fecha = servicio['fecha_agendamiento']
+            if isinstance(fecha, str):
+                fecha = datetime.strptime(fecha, '%Y-%m-%d').date()
+            ws.write(row, 4, fecha, date_style)
+            
+            hora = servicio['hora_agendamiento']
+            if isinstance(hora, str):
+                hora = datetime.strptime(hora, '%H:%M').time()
+            ws.write(row, 5, hora, time_style)
+            
+            ws.write(row, 6, servicio['cantidad_personas'])
+            ws.write(row, 7, servicio['total_monto'], money_style)
+
+        wb.save(response)
+        return response
 
     return render(request, 'ventas/servicios_vendidos.html', context)
 
