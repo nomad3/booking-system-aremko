@@ -28,4 +28,5 @@ urlpatterns = [
     path('detalles-compras/<int:pk>/', views.detalle_compra_detail, name='detalle_compra_detail'),  # Opcional: detalle específico
     path('productos-vendidos/', views.productos_vendidos, name='productos_vendidos'),
     path('ventas/prebooking/', api.create_prebooking, name='create_prebooking'),
+    path('exportar-clientes/', views.exportar_clientes_excel, name='exportar_clientes_excel'),
 ]
