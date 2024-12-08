@@ -911,9 +911,12 @@ def productos_vendidos(request):
         for row, producto in enumerate(productos, 1):
             monto_total = producto['cantidad'] * producto['producto__precio_base']
             
+            # Convertir la fecha a zona horaria local
+            fecha_venta = timezone.localtime(producto['venta_reserva__fecha_reserva'])
+            
             ws.write(row, 0, producto['venta_reserva_id'] or 'Sin ID')
             ws.write(row, 1, producto['venta_reserva__cliente__nombre'])
-            ws.write(row, 2, producto['venta_reserva__fecha_reserva'], date_style)
+            ws.write(row, 2, fecha_venta.strftime('%Y-%m-%d %H:%M'))  # Convertir a string
             ws.write(row, 3, producto['producto__proveedor__nombre'])
             ws.write(row, 4, producto['producto__nombre'])
             ws.write(row, 5, producto['cantidad'])
