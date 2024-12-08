@@ -29,4 +29,5 @@ urlpatterns = [
     path('productos-vendidos/', views.productos_vendidos, name='productos_vendidos'),
     path('ventas/prebooking/', api.create_prebooking, name='create_prebooking'),
     path('exportar-clientes/', views.exportar_clientes_excel, name='exportar_clientes_excel'),
+    path('clientes/', views.lista_clientes, name='lista_clientes'),
 ]
