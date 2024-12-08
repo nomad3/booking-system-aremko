@@ -33,7 +33,12 @@
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" class="btn btn-primary mb-2">Buscar</button>
+        <div class="btn-group mb-2">
+            <button type="submit" class="btn btn-primary">Buscar</button>
+            <button type="submit" name="export" value="excel" class="btn btn-success">
+                <i class="fas fa-file-excel"></i> Exportar a Excel
+            </button>
+        </div>
     </form>
 
     <!-- Mostrar los totales -->
@@ -90,4 +95,9 @@
         </tbody>
     </table>
 </div>
+
+{% block extrahead %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+{% endblock %}
+
 {% endblock %} 

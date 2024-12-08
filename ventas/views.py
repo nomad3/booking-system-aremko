@@ -876,4 +876,51 @@ def productos_vendidos(request):
         'total_monto_periodo': totales['total_monto_periodo'] or 0,
     }
 
+    # Verificar si se solicitó exportación
+    if request.GET.get('export') == 'excel':
+        response = HttpResponse(content_type='application/ms-excel')
+        response['Content-Disposition'] = 'attachment; filename="Productos_Vendidos_{}.xls"'.format(
+            datetime.now().strftime('%Y%m%d_%H%M%S')
+        )
+
+        wb = xlwt.Workbook(encoding='utf-8')
+        ws = wb.add_sheet('Productos Vendidos')
+
+        # Estilos
+        header_style = xlwt.easyxf('font: bold on; pattern: pattern solid, fore_colour gray25;')
+        date_style = xlwt.easyxf(num_format_str='DD/MM/YYYY HH:MM')
+        money_style = xlwt.easyxf(num_format_str='#,##0')
+
+        # Headers
+        headers = [
+            'ID Venta/Reserva',
+            'Cliente',
+            'Fecha Venta',
+            'Proveedor',
+            'Producto',
+            'Cantidad',
+            'Precio Unitario',
+            'Monto Total'
+        ]
+
+        for col, header in enumerate(headers):
+            ws.write(0, col, header, header_style)
+            ws.col(col).width = 256 * 20
+
+        # Datos
+        for row, producto in enumerate(productos, 1):
+            monto_total = producto['cantidad'] * producto['producto__precio_base']
+            
+            ws.write(row, 0, producto['venta_reserva_id'] or 'Sin ID')
+            ws.write(row, 1, producto['venta_reserva__cliente__nombre'])
+            ws.write(row, 2, producto['venta_reserva__fecha_reserva'], date_style)
+            ws.write(row, 3, producto['producto__proveedor__nombre'])
+            ws.write(row, 4, producto['producto__nombre'])
+            ws.write(row, 5, producto['cantidad'])
+            ws.write(row, 6, producto['producto__precio_base'], money_style)
+            ws.write(row, 7, monto_total, money_style)
+
+        wb.save(response)
+        return response
+
     return render(request, 'ventas/productos_vendidos.html', context)
