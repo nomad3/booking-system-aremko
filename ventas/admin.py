@@ -239,6 +239,36 @@ class ProductoAdmin(admin.ModelAdmin):
 class ClienteAdmin(admin.ModelAdmin):
     search_fields = ('nombre', 'telefono', 'email')  # Campos por los que se puede buscar
     list_display = ('nombre', 'telefono', 'email')  # Campos que se mostrarán en la lista
+    actions = ['exportar_a_excel']
+
+    def exportar_a_excel(self, request, queryset):
+        response = HttpResponse(content_type='application/ms-excel')
+        response['Content-Disposition'] = 'attachment; filename="clientes_{}.xls"'.format(
+            datetime.now().strftime('%Y%m%d_%H%M%S')
+        )
+
+        wb = xlwt.Workbook(encoding='utf-8')
+        ws = wb.add_sheet('Clientes')
+
+        # Estilos
+        header_style = xlwt.easyxf('font: bold on; pattern: pattern solid, fore_colour gray25;')
+
+        # Headers
+        headers = ['Nombre', 'Teléfono', 'Email']
+        for col, header in enumerate(headers):
+            ws.write(0, col, header, header_style)
+            ws.col(col).width = 256 * 20
+
+        # Datos
+        for row, cliente in enumerate(queryset, 1):
+            ws.write(row, 0, cliente.nombre)
+            ws.write(row, 1, cliente.telefono)
+            ws.write(row, 2, cliente.email)
+
+        wb.save(response)
+        return response
+
+    exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
 
 class ServicioAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'precio_base', 'duracion', 'categoria', 'proveedor')
