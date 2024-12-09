@@ -594,7 +594,7 @@ def inicio_sistema_view(request):
 
 # Función para verificar si el usuario es administrador
 def es_administrador(user):
-    return user.is_superuser
+    return user.is_staff or user.is_superuser
 
 @user_passes_test(es_administrador)  # Restringir el acceso a administradores
 def auditoria_movimientos_view(request):
