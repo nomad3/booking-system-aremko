@@ -941,10 +941,9 @@ def exportar_clientes_excel(request):
 
     # Estilos
     header_style = xlwt.easyxf('font: bold on; pattern: pattern solid, fore_colour gray25;')
-    date_style = xlwt.easyxf(num_format_str='DD/MM/YYYY')
 
     # Headers
-    headers = ['ID', 'Nombre', 'Teléfono', 'Email', 'Fecha de Registro']
+    headers = ['ID', 'Nombre', 'Teléfono', 'Email']
     for col, header in enumerate(headers):
         ws.write(0, col, header, header_style)
         ws.col(col).width = 256 * 20
@@ -958,10 +957,6 @@ def exportar_clientes_excel(request):
         ws.write(row, 1, cliente.nombre)
         ws.write(row, 2, cliente.telefono or '')
         ws.write(row, 3, cliente.email or '')
-        if cliente.fecha_registro:
-            ws.write(row, 4, cliente.fecha_registro.strftime('%Y-%m-%d'), date_style)
-        else:
-            ws.write(row, 4, '')
 
     wb.save(response)
     return response
