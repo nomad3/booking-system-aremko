@@ -32,6 +32,8 @@ from .serializers import (
 )
 import xlwt
 from django.core.paginator import Paginator
+from openpyxl import load_workbook
+from django.contrib import messages
 
 
 def detalle_compra_list(request):
@@ -988,3 +990,73 @@ def lista_clientes(request):
     
     # Asegurarse de que se está renderizando el template HTML
     return render(request, 'ventas/lista_clientes.html', context)
+
+@login_required
+@user_passes_test(es_administrador)  # Solo administradores pueden importar
+def importar_clientes_excel(request):
+    if request.method == 'POST' and request.FILES.get('archivo_excel'):
+        try:
+            archivo = request.FILES['archivo_excel']
+            wb = load_workbook(archivo)
+            ws = wb.active
+            
+            clientes_nuevos = []
+            clientes_actualizados = []
+            errores = []
+            
+            # Comenzar desde la segunda fila (ignorar encabezados)
+            with transaction.atomic():  # Usar transacción para asegurar integridad
+                for row in ws.iter_rows(min_row=2):
+                    try:
+                        # Asumiendo columnas: Nombre, Teléfono, Email
+                        nombre = row[0].value
+                        telefono = str(row[1].value) if row[1].value else ''
+                        email = row[2].value if row[2].value else ''
+                        
+                        if not nombre:  # Saltar filas sin nombre
+                            continue
+                            
+                        # Limpiar y formatear datos
+                        nombre = nombre.strip()
+                        telefono = telefono.strip()
+                        email = email.strip() if email else ''
+                        
+                        # Buscar cliente existente por teléfono o email
+                        cliente_existente = Cliente.objects.filter(
+                            Q(telefono=telefono) | Q(email=email)
+                        ).first() if (telefono or email) else None
+                        
+                        if cliente_existente:
+                            # Actualizar cliente existente
+                            cliente_existente.nombre = nombre
+                            if telefono:
+                                cliente_existente.telefono = telefono
+                            if email:
+                                cliente_existente.email = email
+                            cliente_existente.save()
+                            clientes_actualizados.append(nombre)
+                        else:
+                            # Crear nuevo cliente
+                            cliente = Cliente(
+                                nombre=nombre,
+                                telefono=telefono,
+                                email=email
+                            )
+                            cliente.save()
+                            clientes_nuevos.append(nombre)
+                            
+                    except Exception as e:
+                        errores.append(f"Error en fila {row[0].row}: {str(e)}")
+            
+            # Mostrar resultados
+            if clientes_nuevos:
+                messages.success(request, f'Se importaron {len(clientes_nuevos)} nuevos clientes.')
+            if clientes_actualizados:
+                messages.info(request, f'Se actualizaron {len(clientes_actualizados)} clientes existentes.')
+            if errores:
+                messages.warning(request, f'Hubo {len(errores)} errores durante la importación.')
+                
+        except Exception as e:
+            messages.error(request, f'Error al procesar el archivo: {str(e)}')
+            
+    return render(request, 'ventas/importar_clientes.html')

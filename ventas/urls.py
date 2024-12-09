@@ -29,5 +29,6 @@ urlpatterns = [
     path('ventas/prebooking/', api.create_prebooking, name='create_prebooking'),
     path('exportar-clientes/', views.exportar_clientes_excel, name='exportar_clientes_excel'),
     path('clientes/', views.lista_clientes, name='lista_clientes'),
+    path('importar-clientes/', views.importar_clientes_excel, name='importar_clientes_excel'),
     path('', include(router.urls)),  # Mover al final y agregar prefijo api/
 ]
