@@ -1007,28 +1007,31 @@ def importar_clientes_excel(request):
             with transaction.atomic():
                 for row in ws.iter_rows(min_row=2):
                     try:
-                        # Asumiendo columnas: Nombre, Teléfono, Email, Ciudad
-                        nombre = row[0].value
-                        telefono = str(row[1].value) if row[1].value else ''
-                        email = row[2].value if row[2].value else ''
-                        ciudad = row[3].value if len(row) > 3 and row[3].value else ''
+                        # Asumiendo columnas: ID/DNI, Nombre, Teléfono, Email, Ciudad
+                        identificacion = row[0].value
+                        nombre = row[1].value
+                        telefono = str(row[2].value) if row[2].value else ''
+                        email = row[3].value if row[3].value else ''
+                        ciudad = row[4].value if len(row) > 4 and row[4].value else ''
                         
                         if not nombre:  # Saltar filas sin nombre
                             continue
                             
                         # Limpiar y formatear datos
+                        identificacion = identificacion.strip() if identificacion else ''
                         nombre = nombre.strip()
                         telefono = telefono.strip()
                         email = email.strip() if email else ''
                         ciudad = ciudad.strip() if ciudad else ''
                         
-                        # Buscar cliente existente por teléfono o email
+                        # Buscar cliente existente por identificación, teléfono o email
                         cliente_existente = Cliente.objects.filter(
-                            Q(telefono=telefono) | Q(email=email)
-                        ).first() if (telefono or email) else None
+                            Q(identificacion=identificacion) | Q(telefono=telefono) | Q(email=email)
+                        ).first() if (identificacion or telefono or email) else None
                         
                         if cliente_existente:
                             # Actualizar cliente existente
+                            cliente_existente.identificacion = identificacion
                             cliente_existente.nombre = nombre
                             if telefono:
                                 cliente_existente.telefono = telefono
@@ -1041,6 +1044,7 @@ def importar_clientes_excel(request):
                         else:
                             # Crear nuevo cliente
                             cliente = Cliente(
+                                identificacion=identificacion,
                                 nombre=nombre,
                                 telefono=telefono,
                                 email=email,
