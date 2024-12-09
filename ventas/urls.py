@@ -32,3 +32,6 @@ urlpatterns = [
     path('importar-clientes/', views.importar_clientes_excel, name='importar_clientes_excel'),
     path('', include(router.urls)),  # Mover al final y agregar prefijo api/
 ]
+
+def es_administrador(user):
+    return user.is_staff or user.is_superuser
