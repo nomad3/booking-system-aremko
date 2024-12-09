@@ -6,12 +6,12 @@ from . import api
 
 # Registrar las vistas en el router de DRF
 router = DefaultRouter()
-router.register(r'proveedores', views.ProveedorViewSet)
-router.register(r'categorias', views.CategoriaProductoViewSet)
-router.register(r'productos', views.ProductoViewSet)
-router.register(r'ventasreservas', views.VentaReservaViewSet)
-router.register(r'pagos', views.PagoViewSet)
-router.register(r'clientes', views.ClienteViewSet)
+router.register(r'api/proveedores', views.ProveedorViewSet)
+router.register(r'api/categorias', views.CategoriaProductoViewSet)
+router.register(r'api/productos', views.ProductoViewSet)
+router.register(r'api/ventasreservas', views.VentaReservaViewSet)
+router.register(r'api/pagos', views.PagoViewSet)
+router.register(r'api/clientes', views.ClienteViewSet)
 
 # Añadir las nuevas vistas a las URLs
 urlpatterns = [
@@ -19,7 +19,6 @@ urlpatterns = [
     path('servicios-vendidos/', servicios_vendidos_view, name='servicios_vendidos'),
     path('caja-diaria/', caja_diaria_view, name='caja_diaria'),  # Nueva vista de caja diaria
     path('auditoria-movimientos/', auditoria_movimientos_view, name='auditoria_movimientos'),  # Nueva vista de auditoría
-    path('', include(router.urls)),  # Mantener las rutas del router
     path('venta_reservas/', views.venta_reserva_list, name='venta_reserva_list'),
     path('venta_reservas/<int:pk>/', views.venta_reserva_detail, name='venta_reserva_detail'),
     path('compras/', views.compra_list, name='compra_list'),
@@ -30,4 +29,5 @@ urlpatterns = [
     path('ventas/prebooking/', api.create_prebooking, name='create_prebooking'),
     path('exportar-clientes/', views.exportar_clientes_excel, name='exportar_clientes_excel'),
     path('clientes/', views.lista_clientes, name='lista_clientes'),
+    path('', include(router.urls)),  # Mover al final y agregar prefijo api/
 ]
