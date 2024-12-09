@@ -35,7 +35,9 @@
         <div class="d-grid gap-2">
           <a href="{% url 'admin:ventas_cliente_add' %}" class="btn btn-primary w-100 my-2">Agregar Cliente</a>
           <a href="{% url 'admin:ventas_cliente_changelist' %}" class="btn btn-secondary w-100 my-2">Ver y Modificar Clientes</a>
-          <a href="{% url 'lista_clientes' %}" class="btn btn-info w-100 my-2">Lista de Clientes y Exportación</a>
+          <a href="{% url 'lista_clientes' %}" class="btn btn-info w-100 my-2">Lista de Clientes</a>
+          <a href="{% url 'exportar_clientes_excel' %}" class="btn btn-success w-100 my-2">Exportar Clientes</a>
+          <a href="{% url 'importar_clientes_excel' %}" class="btn btn-warning w-100 my-2">Importar Clientes</a>
         </div>
       </div>
     </div>
