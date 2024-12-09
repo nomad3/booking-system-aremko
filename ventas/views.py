@@ -988,6 +988,8 @@ def lista_clientes(request):
         'clientes': clientes_paginados,
         'is_paginated': paginator.num_pages > 1,
         'page_obj': clientes_paginados,
+        'search_query': search_query,  # Añadido para mantener el valor de búsqueda
     }
     
+    # Asegurarse de que se está renderizando el template HTML
     return render(request, 'ventas/lista_clientes.html', context)
