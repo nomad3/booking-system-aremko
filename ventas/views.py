@@ -1004,14 +1004,14 @@ def importar_clientes_excel(request):
             clientes_actualizados = []
             errores = []
             
-            # Comenzar desde la segunda fila (ignorar encabezados)
-            with transaction.atomic():  # Usar transacción para asegurar integridad
+            with transaction.atomic():
                 for row in ws.iter_rows(min_row=2):
                     try:
-                        # Asumiendo columnas: Nombre, Teléfono, Email
+                        # Asumiendo columnas: Nombre, Teléfono, Email, Ciudad
                         nombre = row[0].value
                         telefono = str(row[1].value) if row[1].value else ''
                         email = row[2].value if row[2].value else ''
+                        ciudad = row[3].value if len(row) > 3 and row[3].value else ''
                         
                         if not nombre:  # Saltar filas sin nombre
                             continue
@@ -1020,6 +1020,7 @@ def importar_clientes_excel(request):
                         nombre = nombre.strip()
                         telefono = telefono.strip()
                         email = email.strip() if email else ''
+                        ciudad = ciudad.strip() if ciudad else ''
                         
                         # Buscar cliente existente por teléfono o email
                         cliente_existente = Cliente.objects.filter(
@@ -1033,6 +1034,8 @@ def importar_clientes_excel(request):
                                 cliente_existente.telefono = telefono
                             if email:
                                 cliente_existente.email = email
+                            if ciudad:
+                                cliente_existente.ciudad = ciudad
                             cliente_existente.save()
                             clientes_actualizados.append(nombre)
                         else:
@@ -1040,7 +1043,8 @@ def importar_clientes_excel(request):
                             cliente = Cliente(
                                 nombre=nombre,
                                 telefono=telefono,
-                                email=email
+                                email=email,
+                                ciudad=ciudad
                             )
                             cliente.save()
                             clientes_nuevos.append(nombre)
