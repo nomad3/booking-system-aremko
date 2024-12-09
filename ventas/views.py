@@ -31,6 +31,7 @@ from .serializers import (
     VentaReservaSerializer
 )
 import xlwt
+from django.core.paginator import Paginator
 
 
 def detalle_compra_list(request):
@@ -964,3 +965,29 @@ def exportar_clientes_excel(request):
 
     wb.save(response)
     return response
+
+@login_required
+def lista_clientes(request):
+    search_query = request.GET.get('search', '')
+    
+    # Filtrar clientes según la búsqueda
+    clientes = Cliente.objects.all().order_by('nombre')
+    if search_query:
+        clientes = clientes.filter(
+            Q(nombre__icontains=search_query) |
+            Q(telefono__icontains=search_query) |
+            Q(email__icontains=search_query)
+        )
+    
+    # Configurar paginación
+    paginator = Paginator(clientes, 25)  # 25 clientes por página
+    page = request.GET.get('page')
+    clientes_paginados = paginator.get_page(page)
+    
+    context = {
+        'clientes': clientes_paginados,
+        'is_paginated': paginator.num_pages > 1,
+        'page_obj': clientes_paginados,
+    }
+    
+    return render(request, 'ventas/lista_clientes.html', context)
