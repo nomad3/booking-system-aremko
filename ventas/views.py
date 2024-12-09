@@ -1007,62 +1007,87 @@ def importar_clientes_excel(request):
             with transaction.atomic():
                 for row in ws.iter_rows(min_row=2):
                     try:
-                        # Asumiendo columnas: ID/DNI, Nombre, Teléfono, Email, Ciudad
-                        identificacion = row[0].value
-                        nombre = row[1].value
-                        telefono = str(row[2].value) if row[2].value else ''
-                        email = row[3].value if row[3].value else ''
-                        ciudad = row[4].value if len(row) > 4 and row[4].value else ''
+                        # Validar que la fila tenga suficientes columnas
+                        if len(row) < 5:
+                            errores.append(f"Error en fila {row[0].row}: Faltan columnas. Se esperaban 5 columnas, se encontraron {len(row)}")
+                            continue
+
+                        # Obtener valores con validación
+                        identificacion = str(row[0].value).strip() if row[0].value is not None else ''
+                        nombre = str(row[1].value).strip() if row[1].value is not None else ''
+                        telefono = str(row[2].value).strip() if row[2].value is not None else ''
+                        email = str(row[3].value).strip() if row[3].value is not None else ''
+                        ciudad = str(row[4].value).strip() if row[4].value is not None else ''
                         
-                        if not nombre:  # Saltar filas sin nombre
+                        # Validaciones básicas
+                        if not nombre:
+                            errores.append(f"Error en fila {row[0].row}: El nombre es obligatorio")
+                            continue
+                        
+                        # Validar formato de email si existe
+                        if email and '@' not in email:
+                            errores.append(f"Error en fila {row[0].row}: Formato de email inválido: {email}")
                             continue
                             
-                        # Limpiar y formatear datos
-                        identificacion = identificacion.strip() if identificacion else ''
-                        nombre = nombre.strip()
-                        telefono = telefono.strip()
-                        email = email.strip() if email else ''
-                        ciudad = ciudad.strip() if ciudad else ''
+                        # Validar longitud del teléfono si existe
+                        if telefono and (len(telefono) < 8 or len(telefono) > 15):
+                            errores.append(f"Error en fila {row[0].row}: Longitud de teléfono inválida: {telefono}")
+                            continue
+
+                        # Buscar cliente existente
+                        criterios_busqueda = Q()
+                        if identificacion:
+                            criterios_busqueda |= Q(identificacion=identificacion)
+                        if telefono:
+                            criterios_busqueda |= Q(telefono=telefono)
+                        if email:
+                            criterios_busqueda |= Q(email=email)
                         
-                        # Buscar cliente existente por identificación, teléfono o email
-                        cliente_existente = Cliente.objects.filter(
-                            Q(identificacion=identificacion) | Q(telefono=telefono) | Q(email=email)
-                        ).first() if (identificacion or telefono or email) else None
+                        cliente_existente = Cliente.objects.filter(criterios_busqueda).first() if criterios_busqueda else None
                         
-                        if cliente_existente:
-                            # Actualizar cliente existente
-                            cliente_existente.identificacion = identificacion
-                            cliente_existente.nombre = nombre
-                            if telefono:
-                                cliente_existente.telefono = telefono
-                            if email:
-                                cliente_existente.email = email
-                            if ciudad:
-                                cliente_existente.ciudad = ciudad
-                            cliente_existente.save()
-                            clientes_actualizados.append(nombre)
-                        else:
-                            # Crear nuevo cliente
-                            cliente = Cliente(
-                                identificacion=identificacion,
-                                nombre=nombre,
-                                telefono=telefono,
-                                email=email,
-                                ciudad=ciudad
-                            )
-                            cliente.save()
-                            clientes_nuevos.append(nombre)
+                        try:
+                            if cliente_existente:
+                                # Actualizar cliente existente
+                                if identificacion:
+                                    cliente_existente.identificacion = identificacion
+                                cliente_existente.nombre = nombre
+                                if telefono:
+                                    cliente_existente.telefono = telefono
+                                if email:
+                                    cliente_existente.email = email
+                                if ciudad:
+                                    cliente_existente.ciudad = ciudad
+                                cliente_existente.save()
+                                clientes_actualizados.append(f"{nombre} (fila {row[0].row})")
+                            else:
+                                # Crear nuevo cliente
+                                cliente = Cliente(
+                                    identificacion=identificacion,
+                                    nombre=nombre,
+                                    telefono=telefono,
+                                    email=email,
+                                    ciudad=ciudad
+                                )
+                                cliente.save()
+                                clientes_nuevos.append(f"{nombre} (fila {row[0].row})")
+                        except Exception as e:
+                            errores.append(f"Error en fila {row[0].row}: Error al guardar en la base de datos: {str(e)}")
                             
                     except Exception as e:
                         errores.append(f"Error en fila {row[0].row}: {str(e)}")
             
-            # Mostrar resultados
+            # Mostrar resultados detallados
             if clientes_nuevos:
                 messages.success(request, f'Se importaron {len(clientes_nuevos)} nuevos clientes.')
             if clientes_actualizados:
                 messages.info(request, f'Se actualizaron {len(clientes_actualizados)} clientes existentes.')
             if errores:
                 messages.warning(request, f'Hubo {len(errores)} errores durante la importación.')
+                # Mostrar los primeros 10 errores específicos
+                for error in errores[:10]:
+                    messages.error(request, error)
+                if len(errores) > 10:
+                    messages.error(request, f'... y {len(errores) - 10} errores más.')
                 
         except Exception as e:
             messages.error(request, f'Error al procesar el archivo: {str(e)}')
