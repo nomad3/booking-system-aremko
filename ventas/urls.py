@@ -33,5 +33,3 @@ urlpatterns = [
     path('', include(router.urls)),  # Mover al final y agregar prefijo api/
 ]
 
-def es_administrador(user):
-    return user.is_staff or user.is_superuser
