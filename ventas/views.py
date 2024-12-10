@@ -1099,11 +1099,11 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
         for data in batch_data:
             try:
                 # Limpiar datos
-                documento = str(data['documento_identidad']).strip() if data['documento_identidad'] else ''
-                nombre = str(data['nombre']).strip()
-                telefono = limpiar_telefono(data['telefono'])
-                email = limpiar_email(data['email'])
-                ciudad = str(data['ciudad']).strip() if data['ciudad'] else ''
+                documento = str(data.get('documento_identidad', '')).strip()
+                nombre = str(data.get('nombre', '')).strip()
+                telefono = limpiar_telefono(data.get('telefono', ''))
+                email = limpiar_email(data.get('email', ''))
+                ciudad = str(data.get('ciudad', '')).strip()
 
                 # Verificar duplicados
                 if documento and documento in documentos_procesados:
@@ -1124,42 +1124,58 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
 
                 cliente_existente = Cliente.objects.filter(criterios_busqueda).first() if criterios_busqueda else None
 
-                try:
-                    if cliente_existente:
-                        # Actualizar cliente existente
-                        if documento:
-                            cliente_existente.documento_identidad = documento
-                        cliente_existente.nombre = nombre
-                        if telefono:
-                            cliente_existente.telefono = telefono
-                        if email:
-                            cliente_existente.email = email
-                        if ciudad:
-                            cliente_existente.ciudad = ciudad
-                        cliente_existente.save()
-                        clientes_actualizados.append(f"{nombre} (fila {data['row']})")
-                    else:
-                        # Crear nuevo cliente
-                        cliente = Cliente(
-                            documento_identidad=documento,
-                            nombre=nombre,
-                            telefono=telefono,
-                            email=email,
-                            ciudad=ciudad
-                        )
-                        cliente.save()
-                        clientes_nuevos.append(f"{nombre} (fila {data['row']})")
-
-                    # Registrar datos procesados
+                if cliente_existente:
+                    # Actualizar cliente existente
                     if documento:
-                        documentos_procesados.add(documento)
+                        cliente_existente.documento_identidad = documento
+                    cliente_existente.nombre = nombre
                     if telefono:
-                        telefonos_procesados.add(telefono)
+                        cliente_existente.telefono = telefono
                     if email:
-                        emails_procesados.add(email)
+                        cliente_existente.email = email
+                    if ciudad:
+                        cliente_existente.ciudad = ciudad
+                    cliente_existente.save()
+                    clientes_actualizados.append(f"{nombre} (fila {data['row']})")
+                else:
+                    # Crear nuevo cliente
+                    nuevo_cliente = {
+                        'documento_identidad': documento,
+                        'nombre': nombre,
+                        'telefono': telefono,
+                        'email': email,
+                        'ciudad': ciudad
+                    }
+                    cliente = Cliente.objects.create(**nuevo_cliente)
+                    clientes_nuevos.append(f"{nombre} (fila {data['row']})")
 
-                except Exception as e:
-                    errores.append(f"Error en fila {data['row']}: Error al guardar en la base de datos: {str(e)}")
+                # Registrar datos procesados
+                if documento:
+                    documentos_procesados.add(documento)
+                if telefono:
+                    telefonos_procesados.add(telefono)
+                if email:
+                    emails_procesados.add(email)
 
             except Exception as e:
-                errores.append(f"Error en fila {data['row']}: {str(e)}")
+                errores.append(f"Error en fila {data['row']}: Error al guardar en la base de datos: {str(e)}")
+
+@login_required
+def add_venta_reserva(request):
+    if request.method == 'POST':
+        try:
+            # ... código existente ...
+
+            # Crear movimiento del cliente usando 'detalle' en lugar de 'descripcion'
+            MovimientoCliente.objects.create(
+                cliente=venta_reserva.cliente,
+                tipo='Venta',
+                detalle=f'Venta/Reserva #{venta_reserva.id}',  # Usando el campo correcto 'detalle'
+                monto=venta_reserva.total
+            )
+
+            # ... resto del código ...
+
+        except Exception as e:
+            messages.error(request, f'Error al crear la venta/reserva: {str(e)}')
+            return redirect('admin:ventas_ventareserva_add')
