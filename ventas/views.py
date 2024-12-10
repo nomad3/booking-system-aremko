@@ -1010,11 +1010,6 @@ def importar_clientes_excel(request):
             
             for row in ws.iter_rows(min_row=2):
                 try:
-                    # Validar que la fila tenga suficientes columnas
-                    if len(row) < 5:
-                        errores.append(f"Error en fila {row[0].row}: Faltan columnas. Se esperaban 5 columnas")
-                        continue
-
                     # Obtener valores (permitiendo valores vacíos)
                     identificacion = row[0].value if row[0].value is not None else ''
                     nombre = row[1].value if row[1].value is not None else ''
@@ -1024,7 +1019,6 @@ def importar_clientes_excel(request):
                     
                     # Solo validar que el nombre no esté vacío
                     if not str(nombre).strip():
-                        errores.append(f"Error en fila {row[0].row}: El nombre es obligatorio")
                         continue
 
                     # Agregar datos al lote
@@ -1074,31 +1068,47 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
         """Limpia y formatea el número telefónico."""
         if not telefono:
             return ''
-        # Eliminar caracteres no numéricos
-        solo_numeros = ''.join(filter(str.isdigit, str(telefono)))
-        # Tomar los últimos 9 dígitos si hay más
-        return solo_numeros[-9:] if len(solo_numeros) > 9 else solo_numeros
+        try:
+            # Si es un número decimal o flotante, convertirlo a entero
+            if isinstance(telefono, (float, int)):
+                telefono = str(int(float(telefono)))
+            else:
+                telefono = str(telefono)
+            
+            # Eliminar caracteres no numéricos
+            solo_numeros = ''.join(filter(str.isdigit, telefono))
+            
+            # Si no hay números, retornar vacío
+            if not solo_numeros:
+                return ''
+            
+            # Tomar los últimos 9 dígitos
+            return solo_numeros[-9:]
+        except:
+            return ''
+
+    def limpiar_email(email):
+        """Limpia y valida el email."""
+        if not email:
+            return ''
+        # Ignorar si es el encabezado "Email"
+        if str(email).strip().lower() == 'email':
+            return ''
+        # Limpiar el email
+        email = str(email).strip()
+        # Retornar solo si tiene formato válido
+        return email if '@' in email else ''
 
     with transaction.atomic():
         for data in batch_data:
             try:
-                # Limpiar y validar datos
+                # Limpiar datos
                 identificacion = str(data['identificacion']).strip() if data['identificacion'] else ''
-                nombre = str(data['nombre']).strip() if data['nombre'] else ''
+                nombre = str(data['nombre']).strip()
                 telefono = limpiar_telefono(data['telefono'])
-                email = str(data['email']).strip() if data['email'] else ''
+                email = limpiar_email(data['email'])
                 ciudad = str(data['ciudad']).strip() if data['ciudad'] else ''
-                
-                # Validar solo el nombre como campo obligatorio
-                if not nombre:
-                    errores.append(f"Error en fila {data['row']}: El nombre es obligatorio")
-                    continue
-                
-                # Validar formato de email solo si no está vacío
-                if email and '@' not in email:
-                    errores.append(f"Error en fila {data['row']}: Formato de email inválido: {email}")
-                    continue
-                
+
                 # Buscar cliente existente
                 criterios_busqueda = Q()
                 if identificacion:
@@ -1107,14 +1117,14 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
                     criterios_busqueda |= Q(telefono=telefono)
                 if email:
                     criterios_busqueda |= Q(email=email)
-                
+
                 cliente_existente = Cliente.objects.filter(criterios_busqueda).first() if criterios_busqueda else None
-                
+
                 if cliente_existente:
-                    # Actualizar cliente existente solo con campos no vacíos
+                    # Actualizar cliente existente
                     if identificacion:
                         cliente_existente.identificacion = identificacion
-                    cliente_existente.nombre = nombre  # El nombre siempre se actualiza
+                    cliente_existente.nombre = nombre
                     if telefono:
                         cliente_existente.telefono = telefono
                     if email:
@@ -1134,6 +1144,6 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
                     )
                     cliente.save()
                     clientes_nuevos.append(f"{nombre} (fila {data['row']})")
-                    
+
             except Exception as e:
-                errores.append(f"Error en fila {data['row']}: Error al guardar en la base de datos: {str(e)}")
+                errores.append(f"Error en fila {data['row']}: {str(e)}")
