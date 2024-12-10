@@ -975,7 +975,6 @@ def lista_clientes(request):
             Q(nombre__icontains=search_query) |
             Q(telefono__icontains=search_query) |
             Q(email__icontains=search_query)
-        )
     
     # Configurar paginación
     paginator = Paginator(clientes, 25)  # 25 clientes por página
@@ -995,7 +994,7 @@ def lista_clientes(request):
 @login_required
 @user_passes_test(es_administrador)  # Solo administradores pueden importar
 def importar_clientes_excel(request):
-    BATCH_SIZE = 500  # Tamaño del lote
+    BATCH_SIZE = 500
     
     if request.method == 'POST' and request.FILES.get('archivo_excel'):
         try:
@@ -1009,34 +1008,23 @@ def importar_clientes_excel(request):
             total_procesados = 0
             batch_data = []
             
-            # Procesar todas las filas excepto la primera (encabezados)
             for row in ws.iter_rows(min_row=2):
                 try:
                     # Validar que la fila tenga suficientes columnas
                     if len(row) < 5:
-                        errores.append(f"Error en fila {row[0].row}: Faltan columnas. Se esperaban 5 columnas, se encontraron {len(row)}")
+                        errores.append(f"Error en fila {row[0].row}: Faltan columnas. Se esperaban 5 columnas")
                         continue
 
-                    # Obtener valores con validación
-                    identificacion = str(row[0].value).strip() if row[0].value is not None else ''
-                    nombre = str(row[1].value).strip() if row[1].value is not None else ''
-                    telefono = str(row[2].value).strip() if row[2].value is not None else ''
-                    email = str(row[3].value).strip() if row[3].value is not None else ''
-                    ciudad = str(row[4].value).strip() if row[4].value is not None else ''
+                    # Obtener valores (permitiendo valores vacíos)
+                    identificacion = row[0].value if row[0].value is not None else ''
+                    nombre = row[1].value if row[1].value is not None else ''
+                    telefono = row[2].value if row[2].value is not None else ''
+                    email = row[3].value if row[3].value is not None else ''
+                    ciudad = row[4].value if row[4].value is not None else ''
                     
-                    # Validaciones básicas
-                    if not nombre:
+                    # Solo validar que el nombre no esté vacío
+                    if not str(nombre).strip():
                         errores.append(f"Error en fila {row[0].row}: El nombre es obligatorio")
-                        continue
-                    
-                    # Validar formato de email si existe
-                    if email and '@' not in email:
-                        errores.append(f"Error en fila {row[0].row}: Formato de email inválido: {email}")
-                        continue
-                        
-                    # Validar longitud del teléfono si existe
-                    if telefono and (len(telefono) < 8 or len(telefono) > 15):
-                        errores.append(f"Error en fila {row[0].row}: Longitud de teléfono inválida: {telefono}")
                         continue
 
                     # Agregar datos al lote
@@ -1049,7 +1037,6 @@ def importar_clientes_excel(request):
                         'ciudad': ciudad
                     })
                     
-                    # Procesar el lote cuando alcanza el tamaño definido
                     if len(batch_data) >= BATCH_SIZE:
                         process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores)
                         total_procesados += len(batch_data)
@@ -1059,19 +1046,18 @@ def importar_clientes_excel(request):
                 except Exception as e:
                     errores.append(f"Error en fila {row[0].row}: {str(e)}")
             
-            # Procesar el último lote si quedan datos
+            # Procesar el último lote
             if batch_data:
                 process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores)
                 total_procesados += len(batch_data)
             
-            # Mostrar resultados finales
+            # Mostrar resultados
             if clientes_nuevos:
                 messages.success(request, f'Se importaron {len(clientes_nuevos)} nuevos clientes.')
             if clientes_actualizados:
                 messages.info(request, f'Se actualizaron {len(clientes_actualizados)} clientes existentes.')
             if errores:
                 messages.warning(request, f'Hubo {len(errores)} errores durante la importación.')
-                # Mostrar los primeros 10 errores específicos
                 for error in errores[:10]:
                     messages.error(request, error)
                 if len(errores) > 10:
@@ -1084,44 +1070,70 @@ def importar_clientes_excel(request):
 
 def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
     """Procesa un lote de datos de clientes."""
+    def limpiar_telefono(telefono):
+        """Limpia y formatea el número telefónico."""
+        if not telefono:
+            return ''
+        # Eliminar caracteres no numéricos
+        solo_numeros = ''.join(filter(str.isdigit, str(telefono)))
+        # Tomar los últimos 9 dígitos si hay más
+        return solo_numeros[-9:] if len(solo_numeros) > 9 else solo_numeros
+
     with transaction.atomic():
         for data in batch_data:
             try:
+                # Limpiar y validar datos
+                identificacion = str(data['identificacion']).strip() if data['identificacion'] else ''
+                nombre = str(data['nombre']).strip() if data['nombre'] else ''
+                telefono = limpiar_telefono(data['telefono'])
+                email = str(data['email']).strip() if data['email'] else ''
+                ciudad = str(data['ciudad']).strip() if data['ciudad'] else ''
+                
+                # Validar solo el nombre como campo obligatorio
+                if not nombre:
+                    errores.append(f"Error en fila {data['row']}: El nombre es obligatorio")
+                    continue
+                
+                # Validar formato de email solo si no está vacío
+                if email and '@' not in email:
+                    errores.append(f"Error en fila {data['row']}: Formato de email inválido: {email}")
+                    continue
+                
                 # Buscar cliente existente
                 criterios_busqueda = Q()
-                if data['identificacion']:
-                    criterios_busqueda |= Q(identificacion=data['identificacion'])
-                if data['telefono']:
-                    criterios_busqueda |= Q(telefono=data['telefono'])
-                if data['email']:
-                    criterios_busqueda |= Q(email=data['email'])
+                if identificacion:
+                    criterios_busqueda |= Q(identificacion=identificacion)
+                if telefono:
+                    criterios_busqueda |= Q(telefono=telefono)
+                if email:
+                    criterios_busqueda |= Q(email=email)
                 
                 cliente_existente = Cliente.objects.filter(criterios_busqueda).first() if criterios_busqueda else None
                 
                 if cliente_existente:
-                    # Actualizar cliente existente
-                    if data['identificacion']:
-                        cliente_existente.identificacion = data['identificacion']
-                    cliente_existente.nombre = data['nombre']
-                    if data['telefono']:
-                        cliente_existente.telefono = data['telefono']
-                    if data['email']:
-                        cliente_existente.email = data['email']
-                    if data['ciudad']:
-                        cliente_existente.ciudad = data['ciudad']
+                    # Actualizar cliente existente solo con campos no vacíos
+                    if identificacion:
+                        cliente_existente.identificacion = identificacion
+                    cliente_existente.nombre = nombre  # El nombre siempre se actualiza
+                    if telefono:
+                        cliente_existente.telefono = telefono
+                    if email:
+                        cliente_existente.email = email
+                    if ciudad:
+                        cliente_existente.ciudad = ciudad
                     cliente_existente.save()
-                    clientes_actualizados.append(f"{data['nombre']} (fila {data['row']})")
+                    clientes_actualizados.append(f"{nombre} (fila {data['row']})")
                 else:
                     # Crear nuevo cliente
                     cliente = Cliente(
-                        identificacion=data['identificacion'],
-                        nombre=data['nombre'],
-                        telefono=data['telefono'],
-                        email=data['email'],
-                        ciudad=data['ciudad']
+                        identificacion=identificacion,
+                        nombre=nombre,
+                        telefono=telefono,
+                        email=email,
+                        ciudad=ciudad
                     )
                     cliente.save()
-                    clientes_nuevos.append(f"{data['nombre']} (fila {data['row']})")
+                    clientes_nuevos.append(f"{nombre} (fila {data['row']})")
                     
             except Exception as e:
                 errores.append(f"Error en fila {data['row']}: Error al guardar en la base de datos: {str(e)}")
