@@ -1070,20 +1070,34 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
             if telefono is None:
                 return ''
                 
-            if isinstance(telefono, (float, int)):
-                telefono = str(int(float(telefono)))
-            else:
-                telefono = str(telefono)
-            
+            telefono = str(telefono)
             solo_numeros = ''.join(filter(str.isdigit, telefono.strip()))
             
             if not solo_numeros:
                 return ''
             
-            return solo_numeros[-9:]
+            return solo_numeros[-9:] if len(solo_numeros) >= 9 else solo_numeros
             
         except Exception:
             return ''
+
+    def extraer_nombre_telefono(texto):
+        """Extrae nombre y teléfono de un texto combinado."""
+        if not texto:
+            return '', ''
+        
+        texto = str(texto).strip()
+        partes = texto.split()
+        telefono = ''
+        nombre = texto
+        
+        for parte in reversed(partes):
+            if parte.replace('-', '').isdigit():
+                telefono = parte
+                nombre = texto.replace(telefono, '').strip()
+                break
+        
+        return nombre, telefono
 
     def limpiar_email(email):
         """Limpia y valida el email."""
@@ -1102,10 +1116,19 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
     with transaction.atomic():
         for data in batch_data:
             try:
-                # Limpiar datos
+                # Obtener y limpiar el documento de identidad
                 documento = str(data['identificacion']).strip() if data['identificacion'] else ''
-                nombre = str(data['nombre']).strip()
-                telefono = limpiar_telefono(data['telefono'])
+                
+                # Extraer nombre y teléfono del campo combinado
+                nombre_completo, telefono_extra = extraer_nombre_telefono(data['nombre'])
+                
+                # Si no hay nombre válido, continuar con el siguiente registro
+                if not nombre_completo:
+                    continue
+                
+                # Obtener teléfono del campo específico o del nombre si está disponible
+                telefono = limpiar_telefono(data['telefono']) or limpiar_telefono(telefono_extra)
+                
                 email = limpiar_email(data['email'])
                 ciudad = str(data['ciudad']).strip() if data['ciudad'] else ''
 
@@ -1128,38 +1151,42 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
 
                 cliente_existente = Cliente.objects.filter(criterios_busqueda).first() if criterios_busqueda else None
 
-                if cliente_existente:
-                    # Actualizar cliente existente
-                    if documento:
-                        cliente_existente.documento_identidad = documento
-                    cliente_existente.nombre = nombre
-                    if telefono:
-                        cliente_existente.telefono = telefono
-                    if email:
-                        cliente_existente.email = email
-                    if ciudad:
-                        cliente_existente.ciudad = ciudad
-                    cliente_existente.save()
-                    clientes_actualizados.append(f"{nombre} (fila {data['row']})")
-                else:
-                    # Crear nuevo cliente
-                    cliente = Cliente(
-                        documento_identidad=documento,
-                        nombre=nombre,
-                        telefono=telefono,
-                        email=email,
-                        ciudad=ciudad
-                    )
-                    cliente.save()
-                    clientes_nuevos.append(f"{nombre} (fila {data['row']})")
+                try:
+                    if cliente_existente:
+                        # Actualizar cliente existente
+                        if documento:
+                            cliente_existente.documento_identidad = documento
+                        cliente_existente.nombre = nombre_completo
+                        if telefono:
+                            cliente_existente.telefono = telefono
+                        if email:
+                            cliente_existente.email = email
+                        if ciudad:
+                            cliente_existente.ciudad = ciudad
+                        cliente_existente.save()
+                        clientes_actualizados.append(f"{nombre_completo} (fila {data['row']})")
+                    else:
+                        # Crear nuevo cliente usando los nombres correctos de los campos
+                        cliente = Cliente(
+                            documento_identidad=documento,  # Usar documento_identidad en lugar de identificacion
+                            nombre=nombre_completo,
+                            telefono=telefono,
+                            email=email,
+                            ciudad=ciudad
+                        )
+                        cliente.save()
+                        clientes_nuevos.append(f"{nombre_completo} (fila {data['row']})")
 
-                # Registrar datos procesados
-                if documento:
-                    documentos_procesados.add(documento)
-                if telefono:
-                    telefonos_procesados.add(telefono)
-                if email:
-                    emails_procesados.add(email)
+                    # Registrar datos procesados
+                    if documento:
+                        documentos_procesados.add(documento)
+                    if telefono:
+                        telefonos_procesados.add(telefono)
+                    if email:
+                        emails_procesados.add(email)
+
+                except Exception as e:
+                    errores.append(f"Error en fila {data['row']}: Error al guardar en la base de datos: {str(e)}")
 
             except Exception as e:
                 errores.append(f"Error en fila {data['row']}: {str(e)}")
