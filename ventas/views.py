@@ -1067,57 +1067,60 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
     def limpiar_telefono(telefono):
         """Limpia y formatea el número telefónico."""
         try:
-            # Si no hay valor, retornar vacío
             if telefono is None:
                 return ''
                 
-            # Si es un número decimal o flotante, convertirlo a entero
             if isinstance(telefono, (float, int)):
-                # Remover decimales y convertir a string
                 telefono = str(int(float(telefono)))
             else:
                 telefono = str(telefono)
             
-            # Eliminar caracteres no numéricos y espacios
             solo_numeros = ''.join(filter(str.isdigit, telefono.strip()))
             
-            # Si no hay números después de la limpieza, retornar vacío
             if not solo_numeros:
                 return ''
             
-            # Tomar los últimos 9 dígitos
             return solo_numeros[-9:]
             
         except Exception:
-            # Si hay cualquier error en el proceso, retornar vacío
             return ''
 
     def limpiar_email(email):
         """Limpia y valida el email."""
         if not email:
             return ''
-        # Ignorar si es el encabezado "Email"
         if str(email).strip().lower() == 'email':
             return ''
-        # Limpiar el email
         email = str(email).strip()
-        # Retornar solo si tiene formato válido
         return email if '@' in email else ''
+
+    # Set para mantener registro de documentos y teléfonos ya procesados
+    documentos_procesados = set()
+    telefonos_procesados = set()
+    emails_procesados = set()
 
     with transaction.atomic():
         for data in batch_data:
             try:
                 # Limpiar datos
-                identificacion = str(data['identificacion']).strip() if data['identificacion'] else ''
+                documento = str(data['identificacion']).strip() if data['identificacion'] else ''
                 nombre = str(data['nombre']).strip()
                 telefono = limpiar_telefono(data['telefono'])
                 email = limpiar_email(data['email'])
                 ciudad = str(data['ciudad']).strip() if data['ciudad'] else ''
 
+                # Verificar duplicados
+                if documento and documento in documentos_procesados:
+                    continue
+                if telefono and telefono in telefonos_procesados:
+                    continue
+                if email and email in emails_procesados:
+                    continue
+
                 # Buscar cliente existente
                 criterios_busqueda = Q()
-                if identificacion:
-                    criterios_busqueda |= Q(identificacion=identificacion)
+                if documento:
+                    criterios_busqueda |= Q(documento_identidad=documento)
                 if telefono:
                     criterios_busqueda |= Q(telefono=telefono)
                 if email:
@@ -1127,8 +1130,8 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
 
                 if cliente_existente:
                     # Actualizar cliente existente
-                    if identificacion:
-                        cliente_existente.identificacion = identificacion
+                    if documento:
+                        cliente_existente.documento_identidad = documento
                     cliente_existente.nombre = nombre
                     if telefono:
                         cliente_existente.telefono = telefono
@@ -1141,7 +1144,7 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
                 else:
                     # Crear nuevo cliente
                     cliente = Cliente(
-                        identificacion=identificacion,
+                        documento_identidad=documento,
                         nombre=nombre,
                         telefono=telefono,
                         email=email,
@@ -1149,6 +1152,14 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
                     )
                     cliente.save()
                     clientes_nuevos.append(f"{nombre} (fila {data['row']})")
+
+                # Registrar datos procesados
+                if documento:
+                    documentos_procesados.add(documento)
+                if telefono:
+                    telefonos_procesados.add(telefono)
+                if email:
+                    emails_procesados.add(email)
 
             except Exception as e:
                 errores.append(f"Error en fila {data['row']}: {str(e)}")
