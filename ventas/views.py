@@ -1011,11 +1011,11 @@ def importar_clientes_excel(request):
             for row in ws.iter_rows(min_row=2):
                 try:
                     # Obtener valores (permitiendo valores vacíos)
-                    identificacion = row[0].value if row[0].value is not None else ''
+                    documento_identidad = row[0].value if row[0].value is not None else ''
                     nombre = row[1].value if row[1].value is not None else ''
                     telefono = row[2].value if row[2].value is not None else ''
                     email = row[3].value if row[3].value is not None else ''
-                    ciudad = row[4].value if row[4].value is not None else ''
+                    ciudad = row[4].value if len(row) > 4 and row[4].value else ''
                     
                     # Solo validar que el nombre no esté vacío
                     if not str(nombre).strip():
@@ -1024,7 +1024,7 @@ def importar_clientes_excel(request):
                     # Agregar datos al lote
                     batch_data.append({
                         'row': row[0].row,
-                        'identificacion': identificacion,
+                        'documento_identidad': documento_identidad,  # Cambiado de identificacion
                         'nombre': nombre,
                         'telefono': telefono,
                         'email': email,
@@ -1081,24 +1081,6 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
         except Exception:
             return ''
 
-    def extraer_nombre_telefono(texto):
-        """Extrae nombre y teléfono de un texto combinado."""
-        if not texto:
-            return '', ''
-        
-        texto = str(texto).strip()
-        partes = texto.split()
-        telefono = ''
-        nombre = texto
-        
-        for parte in reversed(partes):
-            if parte.replace('-', '').isdigit():
-                telefono = parte
-                nombre = texto.replace(telefono, '').strip()
-                break
-        
-        return nombre, telefono
-
     def limpiar_email(email):
         """Limpia y valida el email."""
         if not email:
@@ -1116,19 +1098,10 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
     with transaction.atomic():
         for data in batch_data:
             try:
-                # Obtener y limpiar el documento de identidad
-                documento = str(data['identificacion']).strip() if data['identificacion'] else ''
-                
-                # Extraer nombre y teléfono del campo combinado
-                nombre_completo, telefono_extra = extraer_nombre_telefono(data['nombre'])
-                
-                # Si no hay nombre válido, continuar con el siguiente registro
-                if not nombre_completo:
-                    continue
-                
-                # Obtener teléfono del campo específico o del nombre si está disponible
-                telefono = limpiar_telefono(data['telefono']) or limpiar_telefono(telefono_extra)
-                
+                # Limpiar datos
+                documento = str(data['documento_identidad']).strip() if data['documento_identidad'] else ''
+                nombre = str(data['nombre']).strip()
+                telefono = limpiar_telefono(data['telefono'])
                 email = limpiar_email(data['email'])
                 ciudad = str(data['ciudad']).strip() if data['ciudad'] else ''
 
@@ -1156,7 +1129,7 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
                         # Actualizar cliente existente
                         if documento:
                             cliente_existente.documento_identidad = documento
-                        cliente_existente.nombre = nombre_completo
+                        cliente_existente.nombre = nombre
                         if telefono:
                             cliente_existente.telefono = telefono
                         if email:
@@ -1164,18 +1137,18 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
                         if ciudad:
                             cliente_existente.ciudad = ciudad
                         cliente_existente.save()
-                        clientes_actualizados.append(f"{nombre_completo} (fila {data['row']})")
+                        clientes_actualizados.append(f"{nombre} (fila {data['row']})")
                     else:
-                        # Crear nuevo cliente usando los nombres correctos de los campos
+                        # Crear nuevo cliente
                         cliente = Cliente(
-                            documento_identidad=documento,  # Usar documento_identidad en lugar de identificacion
-                            nombre=nombre_completo,
+                            documento_identidad=documento,
+                            nombre=nombre,
                             telefono=telefono,
                             email=email,
                             ciudad=ciudad
                         )
                         cliente.save()
-                        clientes_nuevos.append(f"{nombre_completo} (fila {data['row']})")
+                        clientes_nuevos.append(f"{nombre} (fila {data['row']})")
 
                     # Registrar datos procesados
                     if documento:
