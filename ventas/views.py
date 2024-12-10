@@ -1066,25 +1066,30 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
     """Procesa un lote de datos de clientes."""
     def limpiar_telefono(telefono):
         """Limpia y formatea el número telefónico."""
-        if not telefono:
-            return ''
         try:
+            # Si no hay valor, retornar vacío
+            if telefono is None:
+                return ''
+                
             # Si es un número decimal o flotante, convertirlo a entero
             if isinstance(telefono, (float, int)):
+                # Remover decimales y convertir a string
                 telefono = str(int(float(telefono)))
             else:
                 telefono = str(telefono)
             
-            # Eliminar caracteres no numéricos
-            solo_numeros = ''.join(filter(str.isdigit, telefono))
+            # Eliminar caracteres no numéricos y espacios
+            solo_numeros = ''.join(filter(str.isdigit, telefono.strip()))
             
-            # Si no hay números, retornar vacío
+            # Si no hay números después de la limpieza, retornar vacío
             if not solo_numeros:
                 return ''
             
             # Tomar los últimos 9 dígitos
             return solo_numeros[-9:]
-        except:
+            
+        except Exception:
+            # Si hay cualquier error en el proceso, retornar vacío
             return ''
 
     def limpiar_email(email):
