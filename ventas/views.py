@@ -1164,18 +1164,33 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
 def add_venta_reserva(request):
     if request.method == 'POST':
         try:
-            # ... código existente ...
+            form = VentaReservaForm(request.POST)
+            if form.is_valid():
+                venta_reserva = form.save(commit=False)
+                venta_reserva.usuario = request.user
+                venta_reserva.save()
+                form.save_m2m()
 
-            # Crear movimiento del cliente usando 'detalle' en lugar de 'descripcion'
-            MovimientoCliente.objects.create(
-                cliente=venta_reserva.cliente,
-                tipo='Venta',
-                detalle=f'Venta/Reserva #{venta_reserva.id}',  # Usando el campo correcto 'detalle'
-                monto=venta_reserva.total
-            )
+                # Crear movimiento del cliente usando 'detalle'
+                MovimientoCliente.objects.create(
+                    cliente=venta_reserva.cliente,
+                    tipo='Venta',
+                    detalle=f'Venta/Reserva #{venta_reserva.id}',  # Usando 'detalle' en lugar de 'descripcion'
+                    monto=venta_reserva.total
+                )
 
-            # ... resto del código ...
-
+                messages.success(request, 'Venta/Reserva creada exitosamente.')
+                if 'guardar_y_agregar' in request.POST:
+                    return redirect('admin:ventas_ventareserva_add')
+                else:
+                    return redirect('admin:ventas_ventareserva_changelist')
+            else:
+                messages.error(request, 'Por favor corrija los errores en el formulario.')
         except Exception as e:
             messages.error(request, f'Error al crear la venta/reserva: {str(e)}')
             return redirect('admin:ventas_ventareserva_add')
+
+    return render(request, 'admin/ventas/ventareserva/change_form.html', {
+        'form': VentaReservaForm(),
+        'title': 'Agregar Venta/Reserva',
+    })
