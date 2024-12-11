@@ -69,8 +69,8 @@ class PagoInline(admin.TabularInline):
 def registrar_movimiento(cliente, tipo_movimiento, descripcion, usuario):
     MovimientoCliente.objects.create(
         cliente=cliente,
-        tipo=tipo_movimiento,
-        detalle=descripcion,
+        tipo_movimiento=tipo_movimiento,
+        comentarios=descripcion,
         usuario=usuario
     )
 

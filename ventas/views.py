@@ -1171,12 +1171,12 @@ def add_venta_reserva(request):
                 venta_reserva.save()
                 form.save_m2m()
 
-                # Crear movimiento del cliente usando 'detalle'
+                # Crear movimiento del cliente usando los campos correctos
                 MovimientoCliente.objects.create(
                     cliente=venta_reserva.cliente,
-                    tipo='Venta',
-                    detalle=f'Venta/Reserva #{venta_reserva.id}',  # Usando 'detalle' en lugar de 'descripcion'
-                    monto=venta_reserva.total
+                    tipo_movimiento='Venta',           # Usar tipo_movimiento
+                    comentarios=f'Venta/Reserva #{venta_reserva.id}',  # Usar comentarios
+                    usuario=request.user
                 )
 
                 messages.success(request, 'Venta/Reserva creada exitosamente.')
