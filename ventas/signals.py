@@ -281,3 +281,24 @@ def update_compra_total(sender, instance, **kwargs):
         )['total'] or 0
         Compra.objects.filter(pk=compra.pk).update(total=total_detalles)
         logger.debug(f"Actualizando Compra ID {compra.pk}: Total Detalles = {total_detalles}")
+
+@receiver(post_save, sender=Pago)
+def crear_movimiento_cliente_pago(sender, instance, created, **kwargs):
+    if created:
+        MovimientoCliente.objects.create(
+            cliente=instance.venta_reserva.cliente,
+            monto=instance.monto,
+            tipo_movimiento='Pago',
+            comentarios=f'Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id}',  # Cambiado de 'descripcion' a 'comentarios'
+            usuario=instance.usuario
+        )
+
+@receiver(post_delete, sender=Pago)
+def crear_movimiento_cliente_pago_eliminado(sender, instance, **kwargs):
+    MovimientoCliente.objects.create(
+        cliente=instance.venta_reserva.cliente,
+        monto=-instance.monto,
+        tipo_movimiento='Anulación de Pago',
+        comentarios=f'Anulación de Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id}',  # Cambiado de 'descripcion' a 'comentarios'
+        usuario=get_current_user() or get_or_create_system_user()
+    )
