@@ -70,7 +70,7 @@ def registrar_movimiento(cliente, tipo_movimiento, descripcion, usuario):
     MovimientoCliente.objects.create(
         cliente=cliente,
         tipo_movimiento=tipo_movimiento,
-        comentarios=descripcion,
+        comentarios=descripcion,          # Cambiar a comentarios
         usuario=usuario
     )
 

@@ -1174,8 +1174,9 @@ def add_venta_reserva(request):
                 # Crear movimiento del cliente usando los campos correctos
                 MovimientoCliente.objects.create(
                     cliente=venta_reserva.cliente,
-                    tipo_movimiento='Venta',           # Usar tipo_movimiento
-                    comentarios=f'Venta/Reserva #{venta_reserva.id}',  # Usar comentarios
+                    monto=venta_reserva.total,
+                    tipo_movimiento='Venta',
+                    comentarios=f'Venta/Reserva #{venta_reserva.id}',
                     usuario=request.user
                 )
 
