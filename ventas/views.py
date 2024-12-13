@@ -35,6 +35,7 @@ from django.core.paginator import Paginator
 from openpyxl import load_workbook
 from django.contrib import messages
 from itertools import islice
+from django.views.decorators.csrf import csrf_protect
 
 
 def detalle_compra_list(request):
