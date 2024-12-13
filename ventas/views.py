@@ -975,6 +975,7 @@ def lista_clientes(request):
             Q(nombre__icontains=search_query) |
             Q(telefono__icontains=search_query) |
             Q(email__icontains=search_query)
+        )
     
     # Configurar paginación
     paginator = Paginator(clientes, 25)  # 25 clientes por página
