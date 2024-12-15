@@ -282,13 +282,13 @@ class PagoAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         if not obj.usuario:
-            obj.usuario = request.user  # Asigna el usuario actual
+            obj.usuario = request.user
         if change:
             tipo = "Actualización de Pago"
-            descripcion = f"Se ha actualizado el pago de {obj.total} para la venta/reserva #{obj.venta_reserva.id}."
+            descripcion = f"Se ha actualizado el pago de {obj.monto} para la venta/reserva #{obj.venta_reserva.id}."
         else:
             tipo = "Registro de Pago"
-            descripcion = f"Se ha registrado un nuevo pago de {obj.total} para la venta/reserva #{obj.venta_reserva.id}."
+            descripcion = f"Se ha registrado un nuevo pago de {obj.monto} para la venta/reserva #{obj.venta_reserva.id}."
         super().save_model(request, obj, form, change)
         registrar_movimiento(obj.venta_reserva.cliente, tipo, descripcion, request.user)
 
