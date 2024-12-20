@@ -49,12 +49,12 @@ def registrar_movimiento_venta(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=VentaReserva)
 def registrar_movimiento_eliminacion_venta(sender, instance, **kwargs):
     usuario = get_current_user()
-    descripcion = f"Se ha eliminado la venta/reserva con ID {instance.id} del cliente {instance.cliente.nombre}."
+    comentarios = f"Se ha eliminado la venta/reserva con ID {instance.id} del cliente {instance.cliente.nombre}."
     
     MovimientoCliente.objects.create(
         cliente=instance.cliente,
         tipo_movimiento='Eliminación de Venta/Reserva',
-        descripcion=descripcion,
+        comentarios=comentarios,
         usuario=usuario,
         fecha_movimiento=timezone.now()
     )
@@ -88,7 +88,7 @@ def registrar_movimiento_eliminacion_cliente(sender, instance, **kwargs):
     MovimientoCliente.objects.create(
         cliente=instance,
         tipo_movimiento='Eliminación de Cliente',
-        descripcion=descripcion,
+        comentarios=descripcion,
         usuario=usuario,
         fecha_movimiento=timezone.now()
     )
@@ -104,7 +104,7 @@ def registrar_movimiento_reserva_producto(sender, instance, created, **kwargs):
     MovimientoCliente.objects.create(
         cliente=instance.venta_reserva.cliente,
         tipo_movimiento=tipo,
-        descripcion=descripcion,
+        comentarios=descripcion,
         usuario=usuario,
         fecha_movimiento=timezone.now()
     )
@@ -117,7 +117,7 @@ def registrar_movimiento_eliminacion_producto(sender, instance, **kwargs):
     MovimientoCliente.objects.create(
         cliente=instance.venta_reserva.cliente,
         tipo_movimiento='Eliminación de Producto en Venta/Reserva',
-        descripcion=descripcion,
+        comentarios=descripcion,
         usuario=usuario,
         fecha_movimiento=timezone.now()
     )
@@ -126,17 +126,14 @@ def registrar_movimiento_eliminacion_producto(sender, instance, **kwargs):
 
 @receiver(post_save, sender=ReservaServicio)
 def registrar_movimiento_reserva_servicio(sender, instance, created, **kwargs):
-    usuario = get_current_user()
-    tipo = 'Añadido Servicio a Venta/Reserva' if created else 'Actualización de Servicio en Venta/Reserva'
-    descripcion = f"Se ha {'reservado' if created else 'actualizado'} el servicio {instance.servicio.nombre} para el {instance.fecha_agendamiento} en la venta/reserva #{instance.venta_reserva.id}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance.venta_reserva.cliente,
-        tipo_movimiento=tipo,
-        descripcion=descripcion,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+    if created:
+        MovimientoCliente.objects.create(
+            cliente=instance.venta_reserva.cliente,
+            tipo_movimiento='Reserva de Servicio',
+            comentarios=f'Se ha reservado el servicio {instance.servicio.nombre}',
+            usuario=get_current_user() or get_or_create_system_user(),
+            venta_reserva=instance.venta_reserva
+        )
 
 @receiver(post_delete, sender=ReservaServicio)
 def registrar_movimiento_eliminacion_servicio(sender, instance, **kwargs):
@@ -146,7 +143,7 @@ def registrar_movimiento_eliminacion_servicio(sender, instance, **kwargs):
     MovimientoCliente.objects.create(
         cliente=instance.venta_reserva.cliente,
         tipo_movimiento='Eliminación de Servicio en Venta/Reserva',
-        descripcion=descripcion,
+        comentarios=descripcion,
         usuario=usuario,
         fecha_movimiento=timezone.now()
     )
@@ -182,7 +179,7 @@ def registrar_movimiento_eliminacion_pago(sender, instance, **kwargs):
     MovimientoCliente.objects.create(
         cliente=instance.venta_reserva.cliente,
         tipo_movimiento='Eliminación de Pago',
-        descripcion=descripcion,
+        comentarios=descripcion,
         usuario=usuario,
         fecha_movimiento=timezone.now()
     )
