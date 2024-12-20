@@ -284,20 +284,20 @@ def crear_movimiento_cliente_pago(sender, instance, created, **kwargs):
     if created:
         MovimientoCliente.objects.create(
             cliente=instance.venta_reserva.cliente,
-            monto=instance.monto,
             tipo_movimiento='Pago',
-            comentarios=f'Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id}',  # Cambiado de 'descripcion' a 'comentarios'
-            usuario=instance.usuario
+            comentarios=f'Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id} - Monto: ${instance.monto}',
+            usuario=instance.usuario,
+            venta_reserva=instance.venta_reserva
         )
 
 @receiver(post_delete, sender=Pago)
 def crear_movimiento_cliente_pago_eliminado(sender, instance, **kwargs):
     MovimientoCliente.objects.create(
         cliente=instance.venta_reserva.cliente,
-        monto=-instance.monto,
         tipo_movimiento='Anulación de Pago',
-        comentarios=f'Anulación de Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id}',  # Cambiado de 'descripcion' a 'comentarios'
-        usuario=get_current_user() or get_or_create_system_user()
+        comentarios=f'Anulación de Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id} - Monto: ${instance.monto}',
+        usuario=get_current_user() or get_or_create_system_user(),
+        venta_reserva=instance.venta_reserva
     )
 
 @receiver(pre_save, sender=Pago)
