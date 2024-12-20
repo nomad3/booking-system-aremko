@@ -124,16 +124,18 @@ class VentaReservaAdmin(admin.ModelAdmin):
     
     # Guardar cambios con registro de movimiento
     def save_model(self, request, obj, form, change):
-        if not obj.usuario:
-            obj.usuario = request.user
-        if change:
-            tipo = "Actualización de Venta/Reserva"
-            descripcion = f"Se ha actualizado la venta/reserva por {obj.total}"
-        else:
-            tipo = "Registro de Venta/Reserva"
-            descripcion = f"Se ha registrado una nueva venta/reserva por {obj.total}"
+        # First save the object without checking for usuario
         super().save_model(request, obj, form, change)
-        registrar_movimiento(obj.cliente, tipo, descripcion, request.user)
+        
+        # Then create the movement record
+        if not change:  # Only for new instances
+            MovimientoCliente.objects.create(
+                cliente=obj.cliente,
+                tipo_movimiento='Venta',
+                comentarios=f'Venta/Reserva #{obj.id}',
+                usuario=request.user,
+                venta_reserva=obj
+            )
 
     # Eliminar con registro de movimiento
     def delete_model(self, request, obj):
