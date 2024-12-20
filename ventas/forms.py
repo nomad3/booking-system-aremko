@@ -45,7 +45,7 @@ class ReservaProductoForm(forms.ModelForm):
 class PagoInlineForm(forms.ModelForm):
     class Meta:
         model = Pago
-        fields = ['fecha_pago', 'monto', 'metodo_pago', 'giftcard', 'usuario']
+        fields = ['fecha_pago', 'monto', 'metodo_pago', 'giftcard']
 
     def clean(self):
         cleaned_data = super().clean()
@@ -65,3 +65,11 @@ class PagoInlineForm(forms.ModelForm):
                 raise ValidationError("No debe seleccionar una gift card para este método de pago.")
 
         return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if not instance.pk:  # If this is a new instance
+            instance.usuario = self.request.user if hasattr(self, 'request') else None
+        if commit:
+            instance.save()
+        return instance

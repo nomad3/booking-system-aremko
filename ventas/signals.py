@@ -302,3 +302,9 @@ def crear_movimiento_cliente_pago_eliminado(sender, instance, **kwargs):
         comentarios=f'Anulación de Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id}',  # Cambiado de 'descripcion' a 'comentarios'
         usuario=get_current_user() or get_or_create_system_user()
     )
+
+@receiver(pre_save, sender=Pago)
+def set_pago_user(sender, instance, **kwargs):
+    if not instance.pk and not instance.usuario:  # If this is a new instance and no user is set
+        from .middleware import get_current_user
+        instance.usuario = get_current_user()

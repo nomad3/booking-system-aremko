@@ -60,10 +60,15 @@ class ReservaProductoInline(admin.TabularInline):
 
 class PagoInline(admin.TabularInline):
     model = Pago
-    form = PagoInlineForm  # Asignar el formulario personalizado
+    form = PagoInlineForm
     extra = 1
-    fields = ['fecha_pago', 'monto', 'metodo_pago', 'giftcard', 'usuario']
-    autocomplete_fields = ['giftcard', 'usuario']
+    fields = ['fecha_pago', 'monto', 'metodo_pago', 'giftcard']
+    autocomplete_fields = ['giftcard']
+
+    def save_model(self, request, obj, form, change):
+        if not change:  # If this is a new instance
+            obj.usuario = request.user
+        super().save_model(request, obj, form, change)
 
 # Método para registrar movimientos en el sistema
 def registrar_movimiento(cliente, tipo_movimiento, descripcion, usuario):
