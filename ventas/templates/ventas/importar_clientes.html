@@ -1,0 +1,60 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Importar Clientes desde Excel</h1>
+    
+    <!-- Instrucciones -->
+    <div class="alert alert-info">
+        <h4>Instrucciones:</h4>
+        <ol>
+            <li>El archivo Excel debe tener las siguientes columnas en orden:
+                <ul>
+                    <li>ID/DNI/Pasaporte/RUT (opcional)</li>
+                    <li>Nombre (obligatorio)</li>
+                    <li>Teléfono (opcional)</li>
+                    <li>Email (opcional)</li>
+                    <li>Ciudad (opcional)</li>
+                </ul>
+            </li>
+            <li>La primera fila debe contener los encabezados</li>
+            <li>Los clientes existentes se actualizarán si coincide la identificación, teléfono o email</li>
+        </ol>
+    </div>
+
+    <!-- Mensajes de error/éxito -->
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Formulario de importación -->
+    <form method="post" enctype="multipart/form-data" class="mt-4">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="archivo_excel">Seleccionar archivo Excel:</label>
+            <input type="file" class="form-control-file" id="archivo_excel" name="archivo_excel" 
+                   accept=".xlsx,.xls" required>
+        </div>
+        <button type="submit" class="btn btn-primary mt-3">
+            <i class="fas fa-upload"></i> Importar Clientes
+        </button>
+        <a href="{% url 'lista_clientes' %}" class="btn btn-secondary mt-3">
+            <i class="fas fa-arrow-left"></i> Volver a Lista de Clientes
+        </a>
+    </form>
+</div>
+
+<style>
+    .container { max-width: 800px; }
+    .alert-info { margin: 20px 0; }
+    .form-group { margin-bottom: 20px; }
+    .btn { margin-right: 10px; }
+</style>
+{% endblock %} 

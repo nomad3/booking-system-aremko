@@ -32,10 +32,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'ventas',
     'rest_framework',
+    'rest_framework.authtoken',
+    'corsheaders',
 ]
 
 # MIDDLEWARE
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',  # Debe ir antes de AuthenticationMiddleware
@@ -95,3 +98,13 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ]
 }
+
+# For development
+CORS_ALLOW_ALL_ORIGINS = True  # Only use this in development!
+
+# For production, specify allowed origins:
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:8000",
+#     "http://127.0.0.1:8000",
+#     "https://your-production-domain.com",
+# ]

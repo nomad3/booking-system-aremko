@@ -9,7 +9,8 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.forms import DateInput, TimeInput, Select
 from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, GiftCard
-from .widgets import PrecioSelect  # Asegúrate de tener este widget si lo usas
+from django.http import HttpResponse
+import xlwt
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
@@ -20,92 +21,61 @@ admin.site.index_title = _("Bienvenido al Panel de Control")
 class ReservaServicioInlineForm(forms.ModelForm):
     class Meta:
         model = ReservaServicio
-        fields = ['servicio', 'fecha_agendamiento', 'cantidad_personas', 'precio_unitario', 'valor_total']
-        widgets = {
-            'fecha_agendamiento': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-            'servicio': forms.Select(attrs={'class': 'form-control'}),
-            'precio_unitario': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'readonly-field'}),
-            'valor_total': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'readonly-field'})
-        }
+        fields = ['servicio', 'fecha_agendamiento', 'cantidad_personas']
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Hacer que los campos precio_unitario y valor_total sean solo lectura
-        self.fields['precio_unitario'].widget.attrs['readonly'] = True
-        self.fields['valor_total'].widget.attrs['readonly'] = True
-        servicios = Servicio.objects.order_by('nombre')
-        self.fields['servicio'].choices = [(s.id, s.nombre) for s in servicios]
+    def clean_fecha_agendamiento(self):
+        """
+        Convertir el campo `fecha_agendamiento` en un objeto datetime si es necesario.
+        """
+        fecha_agendamiento = self.cleaned_data.get('fecha_agendamiento')
+
+        # Verificar si fecha_agendamiento es un string y convertirlo a datetime
+        if isinstance(fecha_agendamiento, str):
+            try:
+                fecha_agendamiento = datetime.strptime(fecha_agendamiento, '%Y-%m-%d %H:%M')
+                fecha_agendamiento = timezone.make_aware(fecha_agendamiento)  # Asegurarnos de que sea "aware"
+            except ValueError:
+                raise forms.ValidationError("El formato de la fecha de agendamiento no es válido. Debe ser YYYY-MM-DD HH:MM.")
+
+        return fecha_agendamiento
 
 class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
     form = ReservaServicioInlineForm
     extra = 1
-    readonly_fields = ['precio_unitario', 'valor_total']
-    can_delete = True
-    show_change_link = False
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "servicio":
             kwargs["queryset"] = Servicio.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-    class Media:
-        css = {
-            'all': ('admin/css/forms.css',)
-        }
-        js = ('admin/js/reserva_servicio_inline.js',)
-
-# Primero definimos el formulario
-class ReservaProductoInlineForm(forms.ModelForm):
-    class Meta:
-        model = ReservaProducto
-        fields = ['producto', 'cantidad', 'precio_base', 'valor_total']
-        widgets = {
-            'producto': forms.Select(attrs={'class': 'form-control'}),
-            'precio_base': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'readonly-field'}),
-            'valor_total': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'readonly-field'})
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['precio_base'].widget.attrs['readonly'] = True
-        self.fields['valor_total'].widget.attrs['readonly'] = True
-        productos = Producto.objects.order_by('nombre')
-        self.fields['producto'].choices = [(p.id, p.nombre) for p in productos]
-
-# Luego definimos el inline que usa el formulario
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
-    form = ReservaProductoInlineForm
     extra = 1
-    readonly_fields = ['precio_base', 'valor_total']
-    can_delete = True
-    show_change_link = False
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "producto":
             kwargs["queryset"] = Producto.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-    class Media:
-        css = {
-            'all': ('admin/css/forms.css',)
-        }
-        js = ('admin/js/reserva_producto_inline.js',)
-
 class PagoInline(admin.TabularInline):
     model = Pago
-    form = PagoInlineForm  # Asignar el formulario personalizado
+    form = PagoInlineForm
     extra = 1
-    fields = ['fecha_pago', 'monto', 'metodo_pago', 'giftcard', 'usuario']
-    autocomplete_fields = ['giftcard', 'usuario']
+    fields = ['fecha_pago', 'monto', 'metodo_pago', 'giftcard']
+    autocomplete_fields = ['giftcard']
+
+    def save_model(self, request, obj, form, change):
+        if not change:  # If this is a new instance
+            obj.usuario = request.user
+        super().save_model(request, obj, form, change)
 
 # Método para registrar movimientos en el sistema
 def registrar_movimiento(cliente, tipo_movimiento, descripcion, usuario):
     MovimientoCliente.objects.create(
         cliente=cliente,
         tipo_movimiento=tipo_movimiento,
-        descripcion=descripcion,
+        comentarios=descripcion,          # Cambiar a comentarios
         usuario=usuario
     )
 
@@ -154,14 +124,18 @@ class VentaReservaAdmin(admin.ModelAdmin):
     
     # Guardar cambios con registro de movimiento
     def save_model(self, request, obj, form, change):
-        if change:
-            tipo = "Actualización de Venta/Reserva"
-            descripcion = f"Se ha actualizado la venta/reserva con ID {obj.id} para el cliente {obj.cliente.nombre}."
-        else:
-            tipo = "Creación de Venta/Reserva"
-            descripcion = f"Se ha creado una nueva venta/reserva con ID {obj.id} para el cliente {obj.cliente.nombre}."
+        # First save the object without checking for usuario
         super().save_model(request, obj, form, change)
-        registrar_movimiento(obj.cliente, tipo, descripcion, request.user)
+        
+        # Then create the movement record
+        if not change:  # Only for new instances
+            MovimientoCliente.objects.create(
+                cliente=obj.cliente,
+                tipo_movimiento='Venta',
+                comentarios=f'Venta/Reserva #{obj.id}',
+                usuario=request.user,
+                venta_reserva=obj
+            )
 
     # Eliminar con registro de movimiento
     def delete_model(self, request, obj):
@@ -216,7 +190,6 @@ class VentaReservaAdmin(admin.ModelAdmin):
 
     def cliente_info(self, obj):
         return f"{obj.cliente.nombre} - {obj.cliente.telefono}"
-
     cliente_info.short_description = 'Cliente'
     cliente_info.admin_order_field = 'cliente__nombre'
 
@@ -224,7 +197,6 @@ class VentaReservaAdmin(admin.ModelAdmin):
         if obj.fecha_reserva:
             return obj.fecha_reserva.strftime('%Y-%m-%d')
         return '-'
-
     fecha_reserva_corta.short_description = 'Fecha'
     fecha_reserva_corta.admin_order_field = 'fecha_reserva'
 
@@ -276,8 +248,38 @@ class ProductoAdmin(admin.ModelAdmin):
     autocomplete_fields = ['proveedor', 'categoria'] 
 
 class ClienteAdmin(admin.ModelAdmin):
-    search_fields = ('nombre', 'telefono', 'email')  # Campos por los que se puede buscar
-    list_display = ('nombre', 'telefono', 'email')  # Campos que se mostrarán en la lista
+    search_fields = ('nombre', 'telefono', 'email')
+    list_display = ('nombre', 'telefono', 'email')
+    actions = ['exportar_a_excel']
+
+    def exportar_a_excel(self, request, queryset):
+        response = HttpResponse(content_type='application/ms-excel')
+        response['Content-Disposition'] = 'attachment; filename="clientes_{}.xls"'.format(
+            datetime.now().strftime('%Y%m%d_%H%M%S')
+        )
+
+        wb = xlwt.Workbook(encoding='utf-8')
+        ws = wb.add_sheet('Clientes')
+
+        # Estilos
+        header_style = xlwt.easyxf('font: bold on; pattern: pattern solid, fore_colour gray25;')
+
+        # Headers
+        headers = ['Nombre', 'Teléfono', 'Email']
+        for col, header in enumerate(headers):
+            ws.write(0, col, header, header_style)
+            ws.col(col).width = 256 * 20
+
+        # Datos
+        for row, cliente in enumerate(queryset, 1):
+            ws.write(row, 0, cliente.nombre)
+            ws.write(row, 1, cliente.telefono)
+            ws.write(row, 2, cliente.email)
+
+        wb.save(response)
+        return response
+
+    exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
 
 class ServicioAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'precio_base', 'duracion', 'categoria', 'proveedor')
@@ -288,7 +290,7 @@ class PagoAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         if not obj.usuario:
-            obj.usuario = request.user  # Asigna el usuario actual
+            obj.usuario = request.user
         if change:
             tipo = "Actualización de Pago"
             descripcion = f"Se ha actualizado el pago de {obj.monto} para la venta/reserva #{obj.venta_reserva.id}."
@@ -302,6 +304,7 @@ class PagoAdmin(admin.ModelAdmin):
         descripcion = f"Se ha eliminado el pago de {obj.monto} de la venta/reserva #{obj.venta_reserva.id}."
         registrar_movimiento(obj.venta_reserva.cliente, "Eliminación de Pago", descripcion, request.user)
         super().delete_model(request, obj)
+
 admin.site.register(CategoriaProducto, CategoriaProductoAdmin)
 admin.site.register(Producto, ProductoAdmin)
 admin.site.register(VentaReserva, VentaReservaAdmin)

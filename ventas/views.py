@@ -30,6 +30,12 @@ from .serializers import (
     CategoriaServicioSerializer,
     VentaReservaSerializer
 )
+import xlwt
+from django.core.paginator import Paginator
+from openpyxl import load_workbook
+from django.contrib import messages
+from itertools import islice
+from django.views.decorators.csrf import csrf_protect
 
 
 def detalle_compra_list(request):
@@ -336,6 +342,62 @@ def servicios_vendidos_view(request):
         'total_monto_vendido': total_monto_vendido
     }
 
+    # Verificar si se solicitó exportación
+    if request.GET.get('export') == 'excel':
+        response = HttpResponse(content_type='application/ms-excel')
+        response['Content-Disposition'] = 'attachment; filename="Servicios_Vendidos_{}.xls"'.format(
+            datetime.now().strftime('%Y%m%d_%H%M%S')
+        )
+
+        wb = xlwt.Workbook(encoding='utf-8')
+        ws = wb.add_sheet('Servicios Vendidos')
+
+        # Estilos
+        header_style = xlwt.easyxf('font: bold on; pattern: pattern solid, fore_colour gray25;')
+        date_style = xlwt.easyxf(num_format_str='DD/MM/YYYY')
+        time_style = xlwt.easyxf(num_format_str='HH:MM')
+        money_style = xlwt.easyxf(num_format_str='#,##0')
+
+        # Headers
+        headers = [
+            'ID Venta/Reserva',
+            'Cliente',
+            'Categoría del Servicio',
+            'Servicio',
+            'Fecha de Agendamiento',
+            'Hora de Agendamiento',
+            'Cantidad de Personas',
+            'Monto Total'
+        ]
+
+        for col, header in enumerate(headers):
+            ws.write(0, col, header, header_style)
+            ws.col(col).width = 256 * 20  # Ancho aproximado de 20 caracteres
+
+        # Datos
+        for row, servicio in enumerate(data, 1):
+            ws.write(row, 0, servicio['venta_reserva_id'])
+            ws.write(row, 1, servicio['cliente_nombre'])
+            ws.write(row, 2, servicio['categoria_servicio'])
+            ws.write(row, 3, servicio['servicio_nombre'])
+            
+            # Convertir fecha y hora a objetos datetime si son strings
+            fecha = servicio['fecha_agendamiento']
+            if isinstance(fecha, str):
+                fecha = datetime.strptime(fecha, '%Y-%m-%d').date()
+            ws.write(row, 4, fecha, date_style)
+            
+            hora = servicio['hora_agendamiento']
+            if isinstance(hora, str):
+                hora = datetime.strptime(hora, '%H:%M').time()
+            ws.write(row, 5, hora, time_style)
+            
+            ws.write(row, 6, servicio['cantidad_personas'])
+            ws.write(row, 7, servicio['total_monto'], money_style)
+
+        wb.save(response)
+        return response
+
     return render(request, 'ventas/servicios_vendidos.html', context)
 
 class ProveedorViewSet(viewsets.ModelViewSet):
@@ -534,7 +596,7 @@ def inicio_sistema_view(request):
 
 # Función para verificar si el usuario es administrador
 def es_administrador(user):
-    return user.is_superuser
+    return user.is_staff or user.is_superuser
 
 @user_passes_test(es_administrador)  # Restringir el acceso a administradores
 def auditoria_movimientos_view(request):
@@ -819,4 +881,319 @@ def productos_vendidos(request):
         'total_monto_periodo': totales['total_monto_periodo'] or 0,
     }
 
+    # Verificar si se solicitó exportación
+    if request.GET.get('export') == 'excel':
+        response = HttpResponse(content_type='application/ms-excel')
+        response['Content-Disposition'] = 'attachment; filename="Productos_Vendidos_{}.xls"'.format(
+            datetime.now().strftime('%Y%m%d_%H%M%S')
+        )
+
+        wb = xlwt.Workbook(encoding='utf-8')
+        ws = wb.add_sheet('Productos Vendidos')
+
+        # Estilos
+        header_style = xlwt.easyxf('font: bold on; pattern: pattern solid, fore_colour gray25;')
+        date_style = xlwt.easyxf(num_format_str='DD/MM/YYYY HH:MM')
+        money_style = xlwt.easyxf(num_format_str='#,##0')
+
+        # Headers
+        headers = [
+            'ID Venta/Reserva',
+            'Cliente',
+            'Fecha Venta',
+            'Proveedor',
+            'Producto',
+            'Cantidad',
+            'Precio Unitario',
+            'Monto Total'
+        ]
+
+        for col, header in enumerate(headers):
+            ws.write(0, col, header, header_style)
+            ws.col(col).width = 256 * 20
+
+        # Datos
+        for row, producto in enumerate(productos, 1):
+            monto_total = producto['cantidad'] * producto['producto__precio_base']
+            
+            # Convertir la fecha a zona horaria local
+            fecha_venta = timezone.localtime(producto['venta_reserva__fecha_reserva'])
+            
+            ws.write(row, 0, producto['venta_reserva_id'] or 'Sin ID')
+            ws.write(row, 1, producto['venta_reserva__cliente__nombre'])
+            ws.write(row, 2, fecha_venta.strftime('%Y-%m-%d %H:%M'))  # Convertir a string
+            ws.write(row, 3, producto['producto__proveedor__nombre'])
+            ws.write(row, 4, producto['producto__nombre'])
+            ws.write(row, 5, producto['cantidad'])
+            ws.write(row, 6, producto['producto__precio_base'], money_style)
+            ws.write(row, 7, monto_total, money_style)
+
+        wb.save(response)
+        return response
+
     return render(request, 'ventas/productos_vendidos.html', context)
+
+@login_required
+def exportar_clientes_excel(request):
+    response = HttpResponse(content_type='application/ms-excel')
+    response['Content-Disposition'] = 'attachment; filename="Clientes_{}.xls"'.format(
+        datetime.now().strftime('%Y%m%d_%H%M%S')
+    )
+
+    wb = xlwt.Workbook(encoding='utf-8')
+    ws = wb.add_sheet('Clientes')
+
+    # Estilos
+    header_style = xlwt.easyxf('font: bold on; pattern: pattern solid, fore_colour gray25;')
+
+    # Headers
+    headers = ['ID', 'Nombre', 'Teléfono', 'Email']
+    for col, header in enumerate(headers):
+        ws.write(0, col, header, header_style)
+        ws.col(col).width = 256 * 20
+
+    # Obtener todos los clientes
+    clientes = Cliente.objects.all().order_by('nombre')
+
+    # Datos
+    for row, cliente in enumerate(clientes, 1):
+        ws.write(row, 0, cliente.id)
+        ws.write(row, 1, cliente.nombre)
+        ws.write(row, 2, cliente.telefono or '')
+        ws.write(row, 3, cliente.email or '')
+
+    wb.save(response)
+    return response
+
+@login_required
+def lista_clientes(request):
+    search_query = request.GET.get('search', '')
+    
+    # Filtrar clientes según la búsqueda
+    clientes = Cliente.objects.all().order_by('nombre')
+    if search_query:
+        clientes = clientes.filter(
+            Q(nombre__icontains=search_query) |
+            Q(telefono__icontains=search_query) |
+            Q(email__icontains=search_query)
+        )
+    
+    # Configurar paginación
+    paginator = Paginator(clientes, 25)  # 25 clientes por página
+    page = request.GET.get('page')
+    clientes_paginados = paginator.get_page(page)
+    
+    context = {
+        'clientes': clientes_paginados,
+        'is_paginated': paginator.num_pages > 1,
+        'page_obj': clientes_paginados,
+        'search_query': search_query,  # Añadido para mantener el valor de búsqueda
+    }
+    
+    # Asegurarse de que se está renderizando el template HTML
+    return render(request, 'ventas/lista_clientes.html', context)
+
+@login_required
+@user_passes_test(es_administrador)  # Solo administradores pueden importar
+def importar_clientes_excel(request):
+    BATCH_SIZE = 500
+    
+    if request.method == 'POST' and request.FILES.get('archivo_excel'):
+        try:
+            archivo = request.FILES['archivo_excel']
+            wb = load_workbook(archivo)
+            ws = wb.active
+            
+            clientes_nuevos = []
+            clientes_actualizados = []
+            errores = []
+            total_procesados = 0
+            batch_data = []
+            
+            for row in ws.iter_rows(min_row=2):
+                try:
+                    # Obtener valores (permitiendo valores vacíos)
+                    documento_identidad = row[0].value if row[0].value is not None else ''
+                    nombre = row[1].value if row[1].value is not None else ''
+                    telefono = row[2].value if row[2].value is not None else ''
+                    email = row[3].value if row[3].value is not None else ''
+                    ciudad = row[4].value if len(row) > 4 and row[4].value else ''
+                    
+                    # Solo validar que el nombre no esté vacío
+                    if not str(nombre).strip():
+                        continue
+
+                    # Agregar datos al lote
+                    batch_data.append({
+                        'row': row[0].row,
+                        'documento_identidad': documento_identidad,  # Cambiado de identificacion
+                        'nombre': nombre,
+                        'telefono': telefono,
+                        'email': email,
+                        'ciudad': ciudad
+                    })
+                    
+                    if len(batch_data) >= BATCH_SIZE:
+                        process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores)
+                        total_procesados += len(batch_data)
+                        messages.info(request, f'Procesados {total_procesados} registros...')
+                        batch_data = []
+                        
+                except Exception as e:
+                    errores.append(f"Error en fila {row[0].row}: {str(e)}")
+            
+            # Procesar el último lote
+            if batch_data:
+                process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores)
+                total_procesados += len(batch_data)
+            
+            # Mostrar resultados
+            if clientes_nuevos:
+                messages.success(request, f'Se importaron {len(clientes_nuevos)} nuevos clientes.')
+            if clientes_actualizados:
+                messages.info(request, f'Se actualizaron {len(clientes_actualizados)} clientes existentes.')
+            if errores:
+                messages.warning(request, f'Hubo {len(errores)} errores durante la importación.')
+                for error in errores[:10]:
+                    messages.error(request, error)
+                if len(errores) > 10:
+                    messages.error(request, f'... y {len(errores) - 10} errores más.')
+                
+        except Exception as e:
+            messages.error(request, f'Error al procesar el archivo: {str(e)}')
+            
+    return render(request, 'ventas/importar_clientes.html')
+
+def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
+    """Procesa un lote de datos de clientes."""
+    def limpiar_telefono(telefono):
+        """Limpia y formatea el número telefónico."""
+        try:
+            if telefono is None:
+                return ''
+                
+            telefono = str(telefono)
+            solo_numeros = ''.join(filter(str.isdigit, telefono.strip()))
+            
+            if not solo_numeros:
+                return ''
+            
+            return solo_numeros[-9:] if len(solo_numeros) >= 9 else solo_numeros
+            
+        except Exception:
+            return ''
+
+    def limpiar_email(email):
+        """Limpia y valida el email."""
+        if not email:
+            return ''
+        if str(email).strip().lower() == 'email':
+            return ''
+        email = str(email).strip()
+        return email if '@' in email else ''
+
+    # Set para mantener registro de documentos y teléfonos ya procesados
+    documentos_procesados = set()
+    telefonos_procesados = set()
+    emails_procesados = set()
+
+    with transaction.atomic():
+        for data in batch_data:
+            try:
+                # Limpiar datos
+                documento = str(data.get('documento_identidad', '')).strip()
+                nombre = str(data.get('nombre', '')).strip()
+                telefono = limpiar_telefono(data.get('telefono', ''))
+                email = limpiar_email(data.get('email', ''))
+                ciudad = str(data.get('ciudad', '')).strip()
+
+                # Verificar duplicados
+                if documento and documento in documentos_procesados:
+                    continue
+                if telefono and telefono in telefonos_procesados:
+                    continue
+                if email and email in emails_procesados:
+                    continue
+
+                # Buscar cliente existente
+                criterios_busqueda = Q()
+                if documento:
+                    criterios_busqueda |= Q(documento_identidad=documento)
+                if telefono:
+                    criterios_busqueda |= Q(telefono=telefono)
+                if email:
+                    criterios_busqueda |= Q(email=email)
+
+                cliente_existente = Cliente.objects.filter(criterios_busqueda).first() if criterios_busqueda else None
+
+                if cliente_existente:
+                    # Actualizar cliente existente
+                    if documento:
+                        cliente_existente.documento_identidad = documento
+                    cliente_existente.nombre = nombre
+                    if telefono:
+                        cliente_existente.telefono = telefono
+                    if email:
+                        cliente_existente.email = email
+                    if ciudad:
+                        cliente_existente.ciudad = ciudad
+                    cliente_existente.save()
+                    clientes_actualizados.append(f"{nombre} (fila {data['row']})")
+                else:
+                    # Crear nuevo cliente
+                    nuevo_cliente = {
+                        'documento_identidad': documento,
+                        'nombre': nombre,
+                        'telefono': telefono,
+                        'email': email,
+                        'ciudad': ciudad
+                    }
+                    cliente = Cliente.objects.create(**nuevo_cliente)
+                    clientes_nuevos.append(f"{nombre} (fila {data['row']})")
+
+                # Registrar datos procesados
+                if documento:
+                    documentos_procesados.add(documento)
+                if telefono:
+                    telefonos_procesados.add(telefono)
+                if email:
+                    emails_procesados.add(email)
+
+            except Exception as e:
+                errores.append(f"Error en fila {data['row']}: Error al guardar en la base de datos: {str(e)}")
+
+@login_required
+def add_venta_reserva(request):
+    if request.method == 'POST':
+        try:
+            form = VentaReservaForm(request.POST)
+            if form.is_valid():
+                venta_reserva = form.save(commit=False)
+                venta_reserva.usuario = request.user
+                venta_reserva.save()
+                form.save_m2m()
+
+                # Crear movimiento del cliente usando los campos correctos
+                MovimientoCliente.objects.create(
+                    cliente=venta_reserva.cliente,
+                    monto=venta_reserva.total,
+                    tipo_movimiento='Venta',
+                    comentarios=f'Venta/Reserva #{venta_reserva.id}',
+                    usuario=request.user
+                )
+
+                messages.success(request, 'Venta/Reserva creada exitosamente.')
+                if 'guardar_y_agregar' in request.POST:
+                    return redirect('admin:ventas_ventareserva_add')
+                else:
+                    return redirect('admin:ventas_ventareserva_changelist')
+            else:
+                messages.error(request, 'Por favor corrija los errores en el formulario.')
+        except Exception as e:
+            messages.error(request, f'Error al crear la venta/reserva: {str(e)}')
+            return redirect('admin:ventas_ventareserva_add')
+
+    return render(request, 'admin/ventas/ventareserva/change_form.html', {
+        'form': VentaReservaForm(),
+        'title': 'Agregar Venta/Reserva',
+    })

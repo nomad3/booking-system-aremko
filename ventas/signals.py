@@ -6,34 +6,55 @@ from django.db import transaction
 from django.db import models
 from django.db.models import Sum, F, DecimalField 
 from .models import VentaReserva, Cliente, ReservaProducto, ReservaServicio, Pago, MovimientoCliente, DetalleCompra, Compra
-from django.contrib.auth.models import User  # Importa el modelo de usuario
+from django.contrib.auth.models import User, AnonymousUser  # Importa el modelo de usuario
 from .middleware import get_current_user  # Importa el middleware
+from django.contrib.auth import get_user_model
 
 # Movimientos y auditoría
 
+def get_or_create_system_user():
+    """Helper function to get or create the system user"""
+    system_user, _ = User.objects.get_or_create(
+        username='system',
+        defaults={
+            'is_active': True,
+            'is_staff': True,
+            'email': 'system@example.com',
+            'first_name': 'System',
+            'last_name': 'User'
+        }
+    )
+    return system_user
+
 @receiver(post_save, sender=VentaReserva)
 def registrar_movimiento_venta(sender, instance, created, **kwargs):
-    usuario = get_current_user()
-    tipo = 'Creación de Venta/Reserva' if created else 'Actualización de Venta/Reserva'
-    descripcion = f"Se ha {'creado' if created else 'actualizado'} la venta/reserva con ID {instance.id} para el cliente {instance.cliente.nombre}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance.cliente,
-        tipo_movimiento=tipo,
-        descripcion=descripcion,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+    """Signal for tracking VentaReserva changes in admin panel"""
+    if created:
+        try:
+            with transaction.atomic():
+                # Get the user from the request if available
+                user = getattr(instance, '_current_user', None)
+                
+                MovimientoCliente.objects.create(
+                    cliente=instance.cliente,
+                    tipo_movimiento='pre_reserva',
+                    usuario=user,
+                    fecha_movimiento=timezone.now(),
+                    comentarios=f"Pre-reserva automática - {instance.comentarios or ''}",
+                    venta_reserva=instance
+                )
+        except Exception as e:
+            print(f"Error in registrar_movimiento_venta: {e}")
 
 @receiver(post_delete, sender=VentaReserva)
 def registrar_movimiento_eliminacion_venta(sender, instance, **kwargs):
     usuario = get_current_user()
-    descripcion = f"Se ha eliminado la venta/reserva con ID {instance.id} del cliente {instance.cliente.nombre}."
+    comentarios = f"Se ha eliminado la venta/reserva con ID {instance.id} del cliente {instance.cliente.nombre}."
     
     MovimientoCliente.objects.create(
         cliente=instance.cliente,
         tipo_movimiento='Eliminación de Venta/Reserva',
-        descripcion=descripcion,
+        comentarios=comentarios,
         usuario=usuario,
         fecha_movimiento=timezone.now()
     )
@@ -42,16 +63,22 @@ def registrar_movimiento_eliminacion_venta(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Cliente)
 def registrar_movimiento_cliente(sender, instance, created, **kwargs):
-    usuario = get_current_user()
-    descripcion = f"Se ha {'creado' if created else 'actualizado'} el cliente: {instance.nombre}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance,
-        tipo_movimiento='Creación de Cliente' if created else 'Actualización de Cliente',
-        descripcion=descripcion,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+    """Signal for tracking Cliente changes in admin panel"""
+    if created:
+        try:
+            with transaction.atomic():
+                # Get the user from the request if available
+                user = getattr(instance, '_current_user', None)
+                
+                MovimientoCliente.objects.create(
+                    cliente=instance,
+                    tipo_movimiento='creacion',
+                    usuario=user,
+                    fecha_movimiento=timezone.now(),
+                    comentarios='Cliente creado automáticamente'
+                )
+        except Exception as e:
+            print(f"Error in registrar_movimiento_cliente: {e}")
 
 @receiver(post_delete, sender=Cliente)
 def registrar_movimiento_eliminacion_cliente(sender, instance, **kwargs):
@@ -61,7 +88,7 @@ def registrar_movimiento_eliminacion_cliente(sender, instance, **kwargs):
     MovimientoCliente.objects.create(
         cliente=instance,
         tipo_movimiento='Eliminación de Cliente',
-        descripcion=descripcion,
+        comentarios=descripcion,
         usuario=usuario,
         fecha_movimiento=timezone.now()
     )
@@ -77,7 +104,7 @@ def registrar_movimiento_reserva_producto(sender, instance, created, **kwargs):
     MovimientoCliente.objects.create(
         cliente=instance.venta_reserva.cliente,
         tipo_movimiento=tipo,
-        descripcion=descripcion,
+        comentarios=descripcion,
         usuario=usuario,
         fecha_movimiento=timezone.now()
     )
@@ -90,7 +117,7 @@ def registrar_movimiento_eliminacion_producto(sender, instance, **kwargs):
     MovimientoCliente.objects.create(
         cliente=instance.venta_reserva.cliente,
         tipo_movimiento='Eliminación de Producto en Venta/Reserva',
-        descripcion=descripcion,
+        comentarios=descripcion,
         usuario=usuario,
         fecha_movimiento=timezone.now()
     )
@@ -99,17 +126,14 @@ def registrar_movimiento_eliminacion_producto(sender, instance, **kwargs):
 
 @receiver(post_save, sender=ReservaServicio)
 def registrar_movimiento_reserva_servicio(sender, instance, created, **kwargs):
-    usuario = get_current_user()
-    tipo = 'Añadido Servicio a Venta/Reserva' if created else 'Actualización de Servicio en Venta/Reserva'
-    descripcion = f"Se ha {'reservado' if created else 'actualizado'} el servicio {instance.servicio.nombre} para el {instance.fecha_agendamiento} en la venta/reserva #{instance.venta_reserva.id}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance.venta_reserva.cliente,
-        tipo_movimiento=tipo,
-        descripcion=descripcion,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+    if created:
+        MovimientoCliente.objects.create(
+            cliente=instance.venta_reserva.cliente,
+            tipo_movimiento='Reserva de Servicio',
+            comentarios=f'Se ha reservado el servicio {instance.servicio.nombre}',
+            usuario=get_current_user() or get_or_create_system_user(),
+            venta_reserva=instance.venta_reserva
+        )
 
 @receiver(post_delete, sender=ReservaServicio)
 def registrar_movimiento_eliminacion_servicio(sender, instance, **kwargs):
@@ -119,7 +143,7 @@ def registrar_movimiento_eliminacion_servicio(sender, instance, **kwargs):
     MovimientoCliente.objects.create(
         cliente=instance.venta_reserva.cliente,
         tipo_movimiento='Eliminación de Servicio en Venta/Reserva',
-        descripcion=descripcion,
+        comentarios=descripcion,
         usuario=usuario,
         fecha_movimiento=timezone.now()
     )
@@ -128,17 +152,22 @@ def registrar_movimiento_eliminacion_servicio(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Pago)
 def registrar_movimiento_pago(sender, instance, created, **kwargs):
-    usuario = get_current_user()
-    tipo = 'Pago Realizado' if created else 'Actualización de Pago'
-    descripcion = f"Se ha {'registrado' if created else 'actualizado'} un pago de {instance.monto} para la venta/reserva #{instance.venta_reserva.id} mediante {instance.metodo_pago}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance.venta_reserva.cliente,
-        tipo_movimiento=tipo,
-        descripcion=descripcion,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+    if created:
+        try:
+            with transaction.atomic():
+                # Get user from instance or use None
+                user = getattr(instance, '_current_user', None)
+                
+                MovimientoCliente.objects.create(
+                    cliente=instance.venta_reserva.cliente,
+                    tipo_movimiento='pago',
+                    usuario=user,
+                    fecha_movimiento=timezone.now(),
+                    comentarios=f'Pago registrado - {instance.metodo_pago} - ${instance.monto}',
+                    venta_reserva=instance.venta_reserva
+                )
+        except Exception as e:
+            print(f"Error in registrar_movimiento_pago: {e}")
 
    # NO necesitas actualizar el saldo aquí. Ya se hace en el save() de Pago.
 
@@ -150,7 +179,7 @@ def registrar_movimiento_eliminacion_pago(sender, instance, **kwargs):
     MovimientoCliente.objects.create(
         cliente=instance.venta_reserva.cliente,
         tipo_movimiento='Eliminación de Pago',
-        descripcion=descripcion,
+        comentarios=descripcion,
         usuario=usuario,
         fecha_movimiento=timezone.now()
     )
@@ -249,3 +278,30 @@ def update_compra_total(sender, instance, **kwargs):
         )['total'] or 0
         Compra.objects.filter(pk=compra.pk).update(total=total_detalles)
         logger.debug(f"Actualizando Compra ID {compra.pk}: Total Detalles = {total_detalles}")
+
+@receiver(post_save, sender=Pago)
+def crear_movimiento_cliente_pago(sender, instance, created, **kwargs):
+    if created:
+        MovimientoCliente.objects.create(
+            cliente=instance.venta_reserva.cliente,
+            tipo_movimiento='Pago',
+            comentarios=f'Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id} - Monto: ${instance.monto}',
+            usuario=instance.usuario,
+            venta_reserva=instance.venta_reserva
+        )
+
+@receiver(post_delete, sender=Pago)
+def crear_movimiento_cliente_pago_eliminado(sender, instance, **kwargs):
+    MovimientoCliente.objects.create(
+        cliente=instance.venta_reserva.cliente,
+        tipo_movimiento='Anulación de Pago',
+        comentarios=f'Anulación de Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id} - Monto: ${instance.monto}',
+        usuario=get_current_user() or get_or_create_system_user(),
+        venta_reserva=instance.venta_reserva
+    )
+
+@receiver(pre_save, sender=Pago)
+def set_pago_user(sender, instance, **kwargs):
+    if not instance.pk and not instance.usuario:  # If this is a new instance and no user is set
+        from .middleware import get_current_user
+        instance.usuario = get_current_user()

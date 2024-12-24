@@ -30,7 +30,12 @@
             <label for="venta_reserva_id" class="sr-only">ID Venta/Reserva</label>
             <input type="text" id="venta_reserva_id" name="venta_reserva_id" value="{{ venta_reserva_id }}" class="form-control" placeholder="ID Venta/Reserva">
         </div>
-        <button type="submit" class="btn btn-primary mb-2">Buscar</button>
+        <div class="btn-group mb-2">
+            <button type="submit" class="btn btn-primary">Buscar</button>
+            <button type="submit" name="export" value="excel" class="btn btn-success">
+                <i class="fas fa-file-excel"></i> Exportar a Excel
+            </button>
+        </div>
     </form>
 
     <!-- Mostrar el monto total vendido -->
