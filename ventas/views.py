@@ -604,7 +604,7 @@ def auditoria_movimientos_view(request):
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin = request.GET.get('fecha_fin')
     tipo_movimiento = request.GET.get('tipo_movimiento')
-    usuario_username = request.GET.get('usuario')
+    usuario = request.GET.get('usuario')
 
     # Establecer fechas por defecto si no se proporcionan
     if not fecha_inicio:
@@ -628,8 +628,8 @@ def auditoria_movimientos_view(request):
         movimientos = movimientos.filter(fecha_movimiento__lte=fecha_fin_dt)
     if tipo_movimiento:
         movimientos = movimientos.filter(tipo_movimiento__icontains=tipo_movimiento)
-    if usuario_username:
-        movimientos = movimientos.filter(usuario__username=usuario_username)
+    if usuario:
+        movimientos = movimientos.filter(usuario__username=usuario)
 
     # Paginación
     paginator = Paginator(movimientos, 100)
@@ -641,8 +641,8 @@ def auditoria_movimientos_view(request):
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
         'tipo_movimiento': tipo_movimiento,
-        'usuario_username': usuario_username,
-        'usuarios': User.objects.all().order_by('username'),  # Ordenar usuarios alfabéticamente
+        'usuario_username': usuario,
+        'usuarios': User.objects.all().order_by('username'),
     }
     return render(request, 'ventas/auditoria_movimientos.html', context)
 
