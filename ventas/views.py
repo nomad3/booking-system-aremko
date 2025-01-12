@@ -616,20 +616,31 @@ def auditoria_movimientos_view(request):
     fecha_inicio_dt = timezone.make_aware(datetime.strptime(fecha_inicio, '%Y-%m-%d'))
     fecha_fin_dt = timezone.make_aware(datetime.strptime(fecha_fin, '%Y-%m-%d')) + timedelta(days=1)
 
-    # Obtener movimientos con select_related para optimizar consultas
+    # Iniciar el queryset base
     movimientos = MovimientoCliente.objects.select_related(
         'cliente', 'usuario', 'venta_reserva'
-    ).order_by('-fecha_movimiento')
+    )
 
     # Aplicar filtros
-    if fecha_inicio:
-        movimientos = movimientos.filter(fecha_movimiento__gte=fecha_inicio_dt)
-    if fecha_fin:
-        movimientos = movimientos.filter(fecha_movimiento__lte=fecha_fin_dt)
+    movimientos = movimientos.filter(
+        fecha_movimiento__gte=fecha_inicio_dt,
+        fecha_movimiento__lte=fecha_fin_dt
+    )
+
     if tipo_movimiento:
         movimientos = movimientos.filter(tipo_movimiento__icontains=tipo_movimiento)
-    if usuario:
-        movimientos = movimientos.filter(usuario__username=usuario)
+    
+    # Filtro de usuario mejorado
+    if usuario and usuario != '':
+        movimientos = movimientos.filter(usuario__username__exact=usuario)
+
+    # Ordenar por fecha descendente
+    movimientos = movimientos.order_by('-fecha_movimiento')
+
+    # Agregar print para depuración
+    print(f"Usuario seleccionado: {usuario}")
+    print(f"Query SQL: {movimientos.query}")
+    print(f"Cantidad de resultados: {movimientos.count()}")
 
     # Paginación
     paginator = Paginator(movimientos, 100)
@@ -642,8 +653,9 @@ def auditoria_movimientos_view(request):
         'fecha_fin': fecha_fin,
         'tipo_movimiento': tipo_movimiento,
         'usuario_username': usuario,
-        'usuarios': User.objects.all().order_by('username'),
+        'usuarios': User.objects.filter(is_active=True).order_by('username'),  # Solo usuarios activos
     }
+
     return render(request, 'ventas/auditoria_movimientos.html', context)
 
 @user_passes_test(es_administrador)  # Restringir el acceso a administradores
