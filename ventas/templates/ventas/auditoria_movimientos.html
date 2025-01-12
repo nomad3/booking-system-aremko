@@ -44,7 +44,7 @@
                 <th>Cliente</th>
                 <th>Tipo Movimiento</th>
                 <th>Descripción</th>
-                <th>Usuario</th>  <!-- Añadir columna de usuario -->
+                <th>Usuario</th>
             </tr>
         </thead>
         <tbody>
@@ -54,7 +54,7 @@
                 <td>{{ movimiento.cliente.nombre }}</td>
                 <td>{{ movimiento.tipo_movimiento }}</td>
                 <td>{{ movimiento.descripcion }}</td>
-                <td>{{ movimiento.usuario.username }}</td> <!-- Mostrar el nombre del usuario -->
+                <td>{{ movimiento.usuario.username }}</td>
             </tr>
             {% empty %}
             <tr>
@@ -63,5 +63,26 @@
             {% endfor %}
         </tbody>
     </table>
+
+    <!-- Agregar paginación -->
+    {% if movimientos.paginator.num_pages > 1 %}
+    <div class="pagination">
+        <span class="step-links">
+            {% if movimientos.has_previous %}
+                <a href="?page=1{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}{% if tipo_movimiento %}&tipo_movimiento={{ tipo_movimiento }}{% endif %}{% if usuario_username %}&usuario={{ usuario_username }}{% endif %}">&laquo; primera</a>
+                <a href="?page={{ movimientos.previous_page_number }}{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}{% if tipo_movimiento %}&tipo_movimiento={{ tipo_movimiento }}{% endif %}{% if usuario_username %}&usuario={{ usuario_username }}{% endif %}">anterior</a>
+            {% endif %}
+
+            <span class="current">
+                Página {{ movimientos.number }} de {{ movimientos.paginator.num_pages }}
+            </span>
+
+            {% if movimientos.has_next %}
+                <a href="?page={{ movimientos.next_page_number }}{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}{% if tipo_movimiento %}&tipo_movimiento={{ tipo_movimiento }}{% endif %}{% if usuario_username %}&usuario={{ usuario_username }}{% endif %}">siguiente</a>
+                <a href="?page={{ movimientos.paginator.num_pages }}{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}{% if tipo_movimiento %}&tipo_movimiento={{ tipo_movimiento }}{% endif %}{% if usuario_username %}&usuario={{ usuario_username }}{% endif %}">última &raquo;</a>
+            {% endif %}
+        </span>
+    </div>
+    {% endif %}
   </div>
 {% endblock %}

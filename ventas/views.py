@@ -633,17 +633,31 @@ def auditoria_movimientos_view(request):
     # Obtener todos los usuarios para la lista desplegable
     usuarios = User.objects.all()
 
-    # Pasar los movimientos al contexto de la plantilla
+    # Aplicar los filtros a los movimientos
+    movimientos = MovimientoCliente.objects.all().order_by('-fecha_movimiento')
+    
+    if fecha_inicio:
+        movimientos = movimientos.filter(fecha_movimiento__gte=fecha_inicio)
+    if fecha_fin:
+        movimientos = movimientos.filter(fecha_movimiento__lte=fecha_fin)
+    if tipo_movimiento:
+        movimientos = movimientos.filter(tipo_movimiento__icontains=tipo_movimiento)
+    if usuario_username:
+        movimientos = movimientos.filter(usuario__username=usuario_username)
+
+    # Agregar paginación
+    paginator = Paginator(movimientos, 100)  # 100 movimientos por página
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'movimientos': movimientos,
+        'movimientos': page_obj,  # Ahora pasamos el objeto de página en lugar de todos los movimientos
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
-        'cliente_id': cliente_id,
-        'tipo_movimiento': tipo_movimiento if tipo_movimiento != 'None' else '',
-        'usuario_username': usuario_username if usuario_username != 'None' else '',
-        'usuarios': usuarios,  # Enviar los usuarios al contexto para la lista desplegable
+        'tipo_movimiento': tipo_movimiento,
+        'usuario_username': usuario_username,
+        'usuarios': User.objects.all(),
     }
-
     return render(request, 'ventas/auditoria_movimientos.html', context)
 
 @user_passes_test(es_administrador)  # Restringir el acceso a administradores
