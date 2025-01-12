@@ -215,8 +215,11 @@ class DetalleCompraInline(admin.TabularInline):
     extra = 1
     autocomplete_fields = ['producto']
     fields = ['producto', 'descripcion', 'cantidad', 'precio_unitario']
-    # readonly_fields = ['producto']  # Elimina o comenta esta línea
-    show_change_link = False
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "producto":
+            kwargs["queryset"] = Producto.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 @admin.register(Compra)
 class CompraAdmin(admin.ModelAdmin):
