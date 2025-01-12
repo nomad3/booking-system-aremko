@@ -600,63 +600,49 @@ def es_administrador(user):
 
 @user_passes_test(es_administrador)  # Restringir el acceso a administradores
 def auditoria_movimientos_view(request):
-    # Obtener los parámetros del filtro
+    # Obtener parámetros del filtro
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin = request.GET.get('fecha_fin')
-    cliente_id = request.GET.get('cliente')
     tipo_movimiento = request.GET.get('tipo_movimiento')
-    usuario_username = request.GET.get('usuario')  # Cambiar a username en lugar de id
+    usuario_username = request.GET.get('usuario')
 
-    # Obtener todos los movimientos, pre-cargando datos del cliente y usuario
-    movimientos = MovimientoCliente.objects.select_related('cliente', 'usuario').all()
+    # Establecer fechas por defecto si no se proporcionan
+    if not fecha_inicio:
+        fecha_inicio = timezone.now().date().strftime('%Y-%m-%d')
+    if not fecha_fin:
+        fecha_fin = timezone.now().date().strftime('%Y-%m-%d')
 
-    # Filtrar por cliente si se proporciona
-    if cliente_id:
-        movimientos = movimientos.filter(cliente_id=cliente_id)
+    # Convertir fechas a objetos datetime
+    fecha_inicio_dt = timezone.make_aware(datetime.strptime(fecha_inicio, '%Y-%m-%d'))
+    fecha_fin_dt = timezone.make_aware(datetime.strptime(fecha_fin, '%Y-%m-%d')) + timedelta(days=1)
 
-    # Filtrar por rango de fechas si se proporciona
+    # Obtener movimientos con select_related para optimizar consultas
+    movimientos = MovimientoCliente.objects.select_related(
+        'cliente', 'usuario', 'venta_reserva'
+    ).order_by('-fecha_movimiento')
+
+    # Aplicar filtros
     if fecha_inicio:
-        fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d')
-        movimientos = movimientos.filter(fecha_movimiento__gte=fecha_inicio)
+        movimientos = movimientos.filter(fecha_movimiento__gte=fecha_inicio_dt)
     if fecha_fin:
-        fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d') + timedelta(days=1) - timedelta(seconds=1)
-        movimientos = movimientos.filter(fecha_movimiento__lte=fecha_fin)
-
-    # Filtrar por tipo de movimiento si se proporciona
-    if tipo_movimiento and tipo_movimiento != 'None':
-        movimientos = movimientos.filter(tipo_movimiento=tipo_movimiento)
-
-    # Filtrar por usuario si se proporciona
-    if usuario_username and usuario_username != 'None':
-        movimientos = movimientos.filter(usuario__username=usuario_username)
-
-    # Obtener todos los usuarios para la lista desplegable
-    usuarios = User.objects.all()
-
-    # Aplicar los filtros a los movimientos
-    movimientos = MovimientoCliente.objects.all().order_by('-fecha_movimiento')
-    
-    if fecha_inicio:
-        movimientos = movimientos.filter(fecha_movimiento__gte=fecha_inicio)
-    if fecha_fin:
-        movimientos = movimientos.filter(fecha_movimiento__lte=fecha_fin)
+        movimientos = movimientos.filter(fecha_movimiento__lte=fecha_fin_dt)
     if tipo_movimiento:
         movimientos = movimientos.filter(tipo_movimiento__icontains=tipo_movimiento)
     if usuario_username:
         movimientos = movimientos.filter(usuario__username=usuario_username)
 
-    # Agregar paginación
-    paginator = Paginator(movimientos, 100)  # 100 movimientos por página
+    # Paginación
+    paginator = Paginator(movimientos, 100)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
     context = {
-        'movimientos': page_obj,  # Ahora pasamos el objeto de página en lugar de todos los movimientos
+        'movimientos': page_obj,
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
         'tipo_movimiento': tipo_movimiento,
         'usuario_username': usuario_username,
-        'usuarios': User.objects.all(),
+        'usuarios': User.objects.all().order_by('username'),  # Ordenar usuarios alfabéticamente
     }
     return render(request, 'ventas/auditoria_movimientos.html', context)
 

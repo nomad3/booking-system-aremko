@@ -3,86 +3,98 @@
 {% block content %}
     {% include 'base_menu.html' %}
 
-  <div class="module">
-    <h1>Auditoría de Movimientos</h1>
+    <div class="module">
+        <h1>Auditoría de Movimientos</h1>
 
-    <!-- Formulario de filtros -->
-    <form method="GET" action="" class="form-inline">
-      <div class="form-row">
-        <div class="field-box">
-          <label for="fecha_inicio">Fecha Inicio:</label>
-          <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio|date:'Y-m-d' }}" class="vDateField">
-        </div>
-        <div class="field-box">
-          <label for="fecha_fin">Fecha Fin:</label>
-          <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin|date:'Y-m-d' }}" class="vDateField">
-        </div>
-        <div class="field-box">
-          <label for="tipo_movimiento">Tipo Movimiento:</label>
-          <input type="text" id="tipo_movimiento" name="tipo_movimiento" value="{{ tipo_movimiento }}" class="form-control">
-        </div>
-        <div class="field-box">
-          <label for="usuario">Usuario:</label>
-          <select id="usuario" name="usuario" class="form-control">
-            <option value="">-- Seleccionar Usuario --</option>
-            {% for usuario in usuarios %}
-              <option value="{{ usuario.username }}" {% if usuario_username == usuario.username %}selected{% endif %}>
-                {{ usuario.username }}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-      <button type="submit" class="btn btn-primary">Filtrar</button>
-    </form>
+        <!-- Formulario de filtros -->
+        <form method="GET" action="" class="form-inline">
+            <div class="form-row">
+                <div class="field-box">
+                    <label for="fecha_inicio">Fecha Inicio:</label>
+                    <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}" class="vDateField">
+                </div>
+                <div class="field-box">
+                    <label for="fecha_fin">Fecha Fin:</label>
+                    <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}" class="vDateField">
+                </div>
+                <div class="field-box">
+                    <label for="tipo_movimiento">Tipo Movimiento:</label>
+                    <input type="text" id="tipo_movimiento" name="tipo_movimiento" value="{{ tipo_movimiento }}" class="form-control">
+                </div>
+                <div class="field-box">
+                    <label for="usuario">Usuario:</label>
+                    <select id="usuario" name="usuario" class="form-control">
+                        <option value="">-- Todos los Usuarios --</option>
+                        {% for usuario in usuarios %}
+                            <option value="{{ usuario.username }}" {% if usuario_username == usuario.username %}selected{% endif %}>
+                                {{ usuario.username }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+        </form>
 
-    <!-- Tabla de movimientos -->
-    <table class="table table-striped table-bordered">
-        <thead>
-            <tr>
-                <th>Fecha</th>
-                <th>Cliente</th>
-                <th>Tipo Movimiento</th>
-                <th>Descripción</th>
-                <th>Usuario</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for movimiento in movimientos %}
-            <tr>
-                <td>{{ movimiento.fecha_movimiento|date:"d/m/Y H:i" }}</td>
-                <td>{{ movimiento.cliente.nombre }}</td>
-                <td>{{ movimiento.tipo_movimiento }}</td>
-                <td>{{ movimiento.descripcion }}</td>
-                <td>{{ movimiento.usuario.username }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="5">No se encontraron movimientos en el rango de fechas seleccionado.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+        <!-- Tabla de movimientos -->
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Tipo Movimiento</th>
+                    <th>Descripción</th>
+                    <th>Usuario</th>
+                    <th>N° Reserva</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for movimiento in movimientos %}
+                <tr>
+                    <td>{{ movimiento.fecha_movimiento|date:"d/m/Y H:i" }}</td>
+                    <td>{{ movimiento.cliente.nombre }}</td>
+                    <td>{{ movimiento.tipo_movimiento }}</td>
+                    <td>{{ movimiento.comentarios }}</td>
+                    <td>{{ movimiento.usuario.username }}</td>
+                    <td>{{ movimiento.venta_reserva.id|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6">No se encontraron movimientos en el rango de fechas seleccionado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 
-    <!-- Agregar paginación -->
-    {% if movimientos.paginator.num_pages > 1 %}
-    <div class="pagination">
-        <span class="step-links">
-            {% if movimientos.has_previous %}
-                <a href="?page=1{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}{% if tipo_movimiento %}&tipo_movimiento={{ tipo_movimiento }}{% endif %}{% if usuario_username %}&usuario={{ usuario_username }}{% endif %}">&laquo; primera</a>
-                <a href="?page={{ movimientos.previous_page_number }}{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}{% if tipo_movimiento %}&tipo_movimiento={{ tipo_movimiento }}{% endif %}{% if usuario_username %}&usuario={{ usuario_username }}{% endif %}">anterior</a>
-            {% endif %}
+        <!-- Paginación -->
+        {% if movimientos.paginator.num_pages > 1 %}
+        <div class="pagination">
+            <span class="step-links">
+                {% if movimientos.has_previous %}
+                    <a href="?page=1{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}{% if tipo_movimiento %}&tipo_movimiento={{ tipo_movimiento }}{% endif %}{% if usuario_username %}&usuario={{ usuario_username }}{% endif %}">&laquo; primera</a>
+                    <a href="?page={{ movimientos.previous_page_number }}{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}{% if tipo_movimiento %}&tipo_movimiento={{ tipo_movimiento }}{% endif %}{% if usuario_username %}&usuario={{ usuario_username }}{% endif %}">anterior</a>
+                {% endif %}
 
-            <span class="current">
-                Página {{ movimientos.number }} de {{ movimientos.paginator.num_pages }}
+                <span class="current">
+                    Página {{ movimientos.number }} de {{ movimientos.paginator.num_pages }}
+                </span>
+
+                {% if movimientos.has_next %}
+                    <a href="?page={{ movimientos.next_page_number }}{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}{% if tipo_movimiento %}&tipo_movimiento={{ tipo_movimiento }}{% endif %}{% if usuario_username %}&usuario={{ usuario_username }}{% endif %}">siguiente</a>
+                    <a href="?page={{ movimientos.paginator.num_pages }}{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}{% if tipo_movimiento %}&tipo_movimiento={{ tipo_movimiento }}{% endif %}{% if usuario_username %}&usuario={{ usuario_username }}{% endif %}">última &raquo;</a>
+                {% endif %}
             </span>
-
-            {% if movimientos.has_next %}
-                <a href="?page={{ movimientos.next_page_number }}{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}{% if tipo_movimiento %}&tipo_movimiento={{ tipo_movimiento }}{% endif %}{% if usuario_username %}&usuario={{ usuario_username }}{% endif %}">siguiente</a>
-                <a href="?page={{ movimientos.paginator.num_pages }}{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}{% if tipo_movimiento %}&tipo_movimiento={{ tipo_movimiento }}{% endif %}{% if usuario_username %}&usuario={{ usuario_username }}{% endif %}">última &raquo;</a>
-            {% endif %}
-        </span>
+        </div>
+        {% endif %}
     </div>
-    {% endif %}
-  </div>
+
+    <style>
+        .form-row { margin-bottom: 20px; display: flex; gap: 20px; align-items: flex-end; }
+        .field-box { display: flex; flex-direction: column; }
+        .field-box label { margin-bottom: 5px; }
+        .pagination { margin-top: 20px; text-align: center; }
+        .step-links { display: inline-block; }
+        .step-links a { margin: 0 5px; }
+        .current { margin: 0 10px; }
+    </style>
 {% endblock %}
