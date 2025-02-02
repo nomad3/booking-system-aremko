@@ -42,7 +42,7 @@ def create_prebooking(request):
 
             # Add services and calculate total
             for servicio_data in data['servicios']:
-                servicio = Servicio.objects.get(nombre=servicio_data['servicio_nombre'])
+                servicio = Servicio.objects.get(id=servicio_data['servicio_id'])
                 fecha_agendamiento = parse_datetime(servicio_data['fecha_agendamiento'])
                 venta_reserva.agregar_servicio(
                     servicio=servicio,
