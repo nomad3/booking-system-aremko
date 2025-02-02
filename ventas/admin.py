@@ -285,7 +285,8 @@ class ClienteAdmin(admin.ModelAdmin):
     exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
 
 class ServicioAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'precio_base', 'duracion', 'categoria', 'proveedor')
+    list_display = ('id', 'nombre', 'precio_base', 'duracion', 'categoria', 'proveedor')
+    search_fields = ('id', 'nombre')
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
