@@ -2,7 +2,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.db import transaction
 from django.contrib.auth.models import User
@@ -83,21 +83,35 @@ def create_prebooking(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
-@authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def get_cliente(request, telefono=None):
     """
     Obtiene un cliente por su teléfono o lista todos los clientes
     """
     try:
         if telefono:
-            cliente = get_object_or_404(Cliente, telefono=telefono)
-            serializer = ClienteSerializer(cliente)
-            return Response(serializer.data)
+            # Buscar todos los clientes con ese teléfono
+            clientes = Cliente.objects.filter(telefono=telefono)
+            if not clientes.exists():
+                return Response({
+                    'status': 'error',
+                    'message': 'No se encontró ningún cliente con ese teléfono'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            serializer = ClienteSerializer(clientes, many=True)
+            return Response({
+                'status': 'success',
+                'count': clientes.count(),
+                'data': serializer.data
+            })
         else:
             clientes = Cliente.objects.all()
             serializer = ClienteSerializer(clientes, many=True)
-            return Response(serializer.data)
+            return Response({
+                'status': 'success',
+                'count': clientes.count(),
+                'data': serializer.data
+            })
     except Exception as e:
         return Response({
             'status': 'error',
