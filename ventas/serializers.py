@@ -35,7 +35,7 @@ class ServicioSerializer(serializers.ModelSerializer):
 class ClienteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cliente
-        fields = '__all__'
+        fields = ['nombre', 'telefono', 'email', 'documento_identidad', 'ciudad', 'pais']
 
 
 class ReservaProductoSerializer(serializers.ModelSerializer):

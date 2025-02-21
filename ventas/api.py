@@ -13,6 +13,8 @@ import traceback
 import logging
 from datetime import datetime
 from django.utils.dateparse import parse_datetime
+from django.shortcuts import get_object_or_404
+from .serializers import ClienteSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -78,4 +80,79 @@ def create_prebooking(request):
             'status': 'error',
             'message': str(e),
             'traceback': traceback.format_exc()
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_cliente(request, telefono=None):
+    """
+    Obtiene un cliente por su teléfono o lista todos los clientes
+    """
+    try:
+        if telefono:
+            cliente = get_object_or_404(Cliente, telefono=telefono)
+            serializer = ClienteSerializer(cliente)
+            return Response(serializer.data)
+        else:
+            clientes = Cliente.objects.all()
+            serializer = ClienteSerializer(clientes, many=True)
+            return Response(serializer.data)
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def create_cliente(request):
+    """
+    Crea un nuevo cliente
+    """
+    try:
+        serializer = ClienteSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'status': 'success',
+                'message': 'Cliente creado exitosamente',
+                'data': serializer.data
+            }, status=status.HTTP_201_CREATED)
+        return Response({
+            'status': 'error',
+            'message': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['PUT'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def update_cliente(request, telefono):
+    """
+    Actualiza un cliente existente
+    """
+    try:
+        cliente = get_object_or_404(Cliente, telefono=telefono)
+        serializer = ClienteSerializer(cliente, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'status': 'success',
+                'message': 'Cliente actualizado exitosamente',
+                'data': serializer.data
+            })
+        return Response({
+            'status': 'error',
+            'message': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
         }, status=status.HTTP_400_BAD_REQUEST) 
