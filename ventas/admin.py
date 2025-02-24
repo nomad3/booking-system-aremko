@@ -62,7 +62,10 @@ class ReservaServicioInline(admin.TabularInline):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     class Media:
-        js = ('ventas/js/reserva_servicio_admin.js',)  # Ruta relativa desde el directorio static
+        js = (
+            'admin/js/jquery.init.js',  # Necesario para django.jQuery
+            'ventas/js/reserva_servicio_admin.js',
+        )
 
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
