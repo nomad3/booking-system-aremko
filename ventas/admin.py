@@ -9,9 +9,10 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.forms import DateInput, TimeInput, Select
 from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, GiftCard
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.contrib import messages
+from django.urls import path
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
@@ -20,13 +21,26 @@ admin.site.index_title = _("Bienvenido al Panel de Control")
 
 # Formulario personalizado para elegir los slots de horas según el servicio
 class ReservaServicioInlineForm(forms.ModelForm):
+    hora_inicio = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={'class': 'hora-inicio-select'})
+    )
+    
     class Meta:
         model = ReservaServicio
         fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas']
         
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if 'servicio' in self.initial:
+        
+        # Actualizar opciones del servicio
+        self.fields['servicio'].queryset = Servicio.objects.filter(activo=True)
+        
+        # Cargar slots si ya hay un servicio seleccionado
+        if self.instance and self.instance.servicio_id:
+            servicio = self.instance.servicio
+            self.fields['hora_inicio'].choices = [(t, t) for t in servicio.slots_disponibles]
+        elif 'servicio' in self.initial:
             servicio = Servicio.objects.get(pk=self.initial['servicio'])
             self.fields['hora_inicio'].choices = [(t, t) for t in servicio.slots_disponibles]
 
@@ -46,6 +60,9 @@ class ReservaServicioInline(admin.TabularInline):
         if db_field.name == "servicio":
             kwargs["queryset"] = Servicio.objects.filter(activo=True).order_by('nombre')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    class Media:
+        js = ('ventas/js/reserva_servicio_admin.js',)  # Crear este archivo
 
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
@@ -351,6 +368,17 @@ class ServicioAdmin(admin.ModelAdmin):
     def slots_preview(self, obj):
         return ', '.join(obj.slots_disponibles) if obj.slots_disponibles else '-'
     slots_preview.short_description = 'Slots Disponibles'
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('<int:pk>/slots/', self.admin_site.admin_view(self.get_slots))
+        ]
+        return custom_urls + urls
+    
+    def get_slots(self, request, pk):
+        servicio = Servicio.objects.get(pk=pk)
+        return JsonResponse({'slots': servicio.slots_disponibles})
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
