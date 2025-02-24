@@ -12,7 +12,7 @@ from decimal import Decimal
 import traceback
 import logging
 from datetime import datetime
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_datetime, parse_date
 from django.shortcuts import get_object_or_404
 from .serializers import ClienteSerializer
 
@@ -27,6 +27,23 @@ def create_prebooking(request):
         with transaction.atomic():
             data = request.data
             
+            # Validación de slots
+            for servicio_data in data['servicios']:
+                servicio = Servicio.objects.get(id=servicio_data['servicio_id'])
+                fecha = parse_date(servicio_data['fecha_agendamiento'])
+                hora = servicio_data['hora_inicio']
+                
+                if not verificar_disponibilidad(
+                    servicio=servicio,
+                    fecha_propuesta=fecha,
+                    hora_propuesta=hora,
+                    cantidad_personas=servicio_data.get('cantidad_personas', 1)
+                ):
+                    return Response({
+                        'status': 'error',
+                        'message': f'Slot {hora} no disponible para {servicio.nombre}'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
             # Get or create cliente
             cliente = Cliente.objects.get_or_create(
                 telefono=data['telefono'],

@@ -54,10 +54,26 @@ class ReservaProductoSerializer(serializers.ModelSerializer):
 
 class ReservaServicioSerializer(serializers.ModelSerializer):
     servicio = ServicioSerializer(read_only=True)
-
+    servicio_id = serializers.PrimaryKeyRelatedField(
+        queryset=Servicio.objects.all(),
+        source='servicio',
+        write_only=True
+    )
+    
     class Meta:
         model = ReservaServicio
-        fields = '__all__'
+        fields = ['id', 'servicio', 'servicio_id', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas']
+        
+    def validate(self, data):
+        servicio = data['servicio']
+        fecha = data['fecha_agendamiento']
+        hora = data['hora_inicio']
+        personas = data.get('cantidad_personas', 1)
+        
+        if not verificar_disponibilidad(servicio, fecha, hora, personas):
+            raise serializers.ValidationError(f"Slot {hora} no disponible para {servicio.nombre}")
+            
+        return data
 
 
 class PagoSerializer(serializers.ModelSerializer):

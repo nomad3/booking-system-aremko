@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.signals import post_save, post_delete
@@ -176,12 +176,19 @@ class CategoriaServicio(models.Model):
 class Servicio(models.Model):
     nombre = models.CharField(max_length=100)
     precio_base = models.DecimalField(max_digits=10, decimal_places=0)
-    duracion = models.DurationField(default=timedelta(hours=2))
+    duracion = models.PositiveIntegerField(help_text="Duración en minutos")
     categoria = models.ForeignKey(CategoriaServicio, on_delete=models.SET_NULL, null=True)
     proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True)
+    capacidad_maxima = models.PositiveIntegerField(default=1)
+    horario_apertura = models.TimeField(default='09:00')
+    horario_cierre = models.TimeField(default='23:59')
+    slots_disponibles = models.JSONField(default=list, help_text="Horarios disponibles en formato HH:MM")
 
     def __str__(self):
         return self.nombre
+
+    def horario_valido(self, hora_propuesta):
+        return hora_propuesta in self.slots_disponibles
 
 class Cliente(models.Model):
     nombre = models.CharField(max_length=100)
@@ -414,11 +421,18 @@ class ReservaProducto(models.Model):
 class ReservaServicio(models.Model):
     venta_reserva = models.ForeignKey(VentaReserva, on_delete=models.CASCADE, related_name='reservaservicios')
     servicio = models.ForeignKey(Servicio, on_delete=models.CASCADE)
-    fecha_agendamiento = models.DateTimeField(default=timezone.now)
+    fecha_agendamiento = models.DateField()
+    hora_inicio = models.CharField(max_length=5)
     cantidad_personas = models.PositiveIntegerField(default=1)
+    
+    @property
+    def fecha_hora_completa(self):
+        return timezone.make_aware(
+            datetime.combine(self.fecha_agendamiento, datetime.strptime(self.hora_inicio, "%H:%M").time())
+        )
 
     def __str__(self):
-        return f"{self.servicio.nombre} reservado para {self.fecha_agendamiento}"
+        return f"{self.servicio.nombre} reservado para {self.fecha_agendamiento} {self.hora_inicio}"
 
     def calcular_precio(self):
         return self.servicio.precio_base * self.cantidad_personas

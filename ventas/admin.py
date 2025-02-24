@@ -11,6 +11,8 @@ from django.forms import DateInput, TimeInput, Select
 from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, GiftCard
 from django.http import HttpResponse
 import xlwt
+from django.core.exceptions import ValidationError
+from django.contrib import messages
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
@@ -21,32 +23,29 @@ admin.site.index_title = _("Bienvenido al Panel de Control")
 class ReservaServicioInlineForm(forms.ModelForm):
     class Meta:
         model = ReservaServicio
-        fields = ['servicio', 'fecha_agendamiento', 'cantidad_personas']
-
-    def clean_fecha_agendamiento(self):
-        """
-        Convertir el campo `fecha_agendamiento` en un objeto datetime si es necesario.
-        """
-        fecha_agendamiento = self.cleaned_data.get('fecha_agendamiento')
-
-        # Verificar si fecha_agendamiento es un string y convertirlo a datetime
-        if isinstance(fecha_agendamiento, str):
-            try:
-                fecha_agendamiento = datetime.strptime(fecha_agendamiento, '%Y-%m-%d %H:%M')
-                fecha_agendamiento = timezone.make_aware(fecha_agendamiento)  # Asegurarnos de que sea "aware"
-            except ValueError:
-                raise forms.ValidationError("El formato de la fecha de agendamiento no es válido. Debe ser YYYY-MM-DD HH:MM.")
-
-        return fecha_agendamiento
+        fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas']
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'servicio' in self.initial:
+            servicio = Servicio.objects.get(pk=self.initial['servicio'])
+            self.fields['hora_inicio'].choices = [(t, t) for t in servicio.slots_disponibles]
 
 class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
     form = ReservaServicioInlineForm
     extra = 1
+    min_num = 0
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        formset.form.base_fields['hora_inicio'].widget.can_add_related = False
+        formset.form.base_fields['hora_inicio'].widget.can_change_related = False
+        return formset
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "servicio":
-            kwargs["queryset"] = Servicio.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
+            kwargs["queryset"] = Servicio.objects.filter(activo=True).order_by('nombre')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 class ReservaProductoInline(admin.TabularInline):
@@ -200,6 +199,24 @@ class VentaReservaAdmin(admin.ModelAdmin):
     fecha_reserva_corta.short_description = 'Fecha'
     fecha_reserva_corta.admin_order_field = 'fecha_reserva'
 
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        instance = form.instance
+        instance.calcular_total()  # Recalcular total después de guardar relaciones
+        
+        # Validar disponibilidad para reservas nuevas
+        if not change:
+            for reserva_servicio in instance.reservaservicios.all():
+                if not verificar_disponibilidad(
+                    servicio=reserva_servicio.servicio,
+                    fecha_propuesta=reserva_servicio.fecha_agendamiento,
+                    hora_propuesta=reserva_servicio.hora_inicio,
+                    cantidad_personas=reserva_servicio.cantidad_personas
+                ):
+                    messages.error(request, 
+                        f"Slot {reserva_servicio.hora_inicio} no disponible para {reserva_servicio.servicio.nombre}")
+                    reserva_servicio.delete()
+
     class Media:
         css = {
             'all': ('admin/css/custom.css',)
@@ -284,9 +301,57 @@ class ClienteAdmin(admin.ModelAdmin):
 
     exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
 
+class ServicioAdminForm(forms.ModelForm):
+    slots_input = forms.CharField(
+        widget=forms.TextInput(attrs={'placeholder': 'HH:MM separados por comas ej: 09:00,10:30'}),
+        help_text="Horarios disponibles en formato HH:MM"
+    )
+
+    class Meta:
+        model = Servicio
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.slots_disponibles:
+            self.initial['slots_input'] = ', '.join(self.instance.slots_disponibles)
+
+    def clean_slots_input(self):
+        slots = [s.strip() for s in self.cleaned_data['slots_input'].split(',')]
+        for slot in slots:
+            try:
+                datetime.strptime(slot, "%H:%M")
+            except ValueError:
+                raise ValidationError(f"Formato inválido: {slot}. Use HH:MM")
+        return slots
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.slots_disponibles = self.cleaned_data['slots_input']
+        if commit:
+            instance.save()
+        return instance
+
+@admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
-    list_display = ('id', 'nombre', 'precio_base', 'duracion', 'categoria', 'proveedor')
-    search_fields = ('id', 'nombre')
+    form = ServicioAdminForm
+    list_display = ('nombre', 'horario_apertura', 'horario_cierre', 'capacidad_maxima', 'slots_preview')
+    fieldsets = (
+        (None, {
+            'fields': ('nombre', 'precio_base', 'duracion', 'categoria', 'proveedor')
+        }),
+        ('Configuración Horaria', {
+            'fields': (
+                'horario_apertura', 
+                'horario_cierre',
+                ('capacidad_maxima', 'slots_input')
+            )
+        }),
+    )
+
+    def slots_preview(self, obj):
+        return ', '.join(obj.slots_disponibles) if obj.slots_disponibles else '-'
+    slots_preview.short_description = 'Slots Disponibles'
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
@@ -313,5 +378,4 @@ admin.site.register(CategoriaProducto, CategoriaProductoAdmin)
 admin.site.register(Producto, ProductoAdmin)
 admin.site.register(VentaReserva, VentaReservaAdmin)
 admin.site.register(Cliente, ClienteAdmin)
-admin.site.register(Servicio, ServicioAdmin)
 admin.site.register(CategoriaServicio)

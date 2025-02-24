@@ -9,6 +9,7 @@ from .models import VentaReserva, Cliente, ReservaProducto, ReservaServicio, Pag
 from django.contrib.auth.models import User, AnonymousUser  # Importa el modelo de usuario
 from .middleware import get_current_user  # Importa el middleware
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 # Movimientos y auditoría
 
@@ -305,3 +306,19 @@ def set_pago_user(sender, instance, **kwargs):
     if not instance.pk and not instance.usuario:  # If this is a new instance and no user is set
         from .middleware import get_current_user
         instance.usuario = get_current_user()
+
+@receiver(post_save, sender=ReservaServicio)
+@receiver(post_delete, sender=ReservaServicio)
+def actualizar_total_venta(sender, instance, **kwargs):
+    if instance.venta_reserva:
+        instance.venta_reserva.calcular_total()
+        
+@receiver(pre_save, sender=ReservaServicio)
+def validar_disponibilidad_admin(sender, instance, **kwargs):
+    if not verificar_disponibilidad(
+        servicio=instance.servicio,
+        fecha_propuesta=instance.fecha_agendamiento,
+        hora_propuesta=instance.hora_inicio,
+        cantidad_personas=instance.cantidad_personas
+    ):
+        raise ValidationError(f"Slot {instance.hora_inicio} no disponible para {instance.servicio.nombre}")
