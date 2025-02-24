@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const servicioId = django.jQuery(this).val();
         const selectName = django.jQuery(this).attr('id').replace('-servicio', '-hora_inicio');
         const $horaInicio = $row.find('#' + selectName);
+        const $container = $row.find('.horario-radio-container');
 
         console.log('Servicio ID:', servicioId); // Debug 1
         
@@ -22,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // Trigger para actualizar el UI
-                    $horaInicio.trigger('change');
+                    $container.trigger('change');
                 },
                 error: function(xhr) {
                     console.error('Error AJAX:', xhr.responseText); // Debug 3
