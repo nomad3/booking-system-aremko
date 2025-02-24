@@ -119,8 +119,7 @@ def get_cliente(request, telefono=None):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
-@authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def create_cliente(request):
     """
     Crea un nuevo cliente
@@ -198,3 +197,4 @@ def update_cliente(request, telefono):
             'trace': traceback.format_exc(),
             'received_data': request.data,
             'content_type': request.content_type
+        })
