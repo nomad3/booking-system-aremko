@@ -6,10 +6,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectName = django.jQuery(this).attr('id').replace('-servicio', '-hora_inicio');
         const $horaInicio = $row.find('#' + selectName);
 
+        console.log('Servicio ID:', servicioId); // Debug 1
+        
         if (servicioId) {
             django.jQuery.ajax({
                 url: `/admin/ventas/servicio/${servicioId}/slots/`,
                 success: function(data) {
+                    console.log('Respuesta AJAX:', data); // Debug 2
                     $horaInicio.empty();
                     data.slots.forEach(slot => {
                         $horaInicio.append(new Option(slot, slot));
@@ -22,6 +25,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Trigger para actualizar el UI
                     $horaInicio.trigger('change');
+                },
+                error: function(xhr) {
+                    console.error('Error AJAX:', xhr.responseText); // Debug 3
                 }
             });
         }

@@ -1214,8 +1214,14 @@ def add_venta_reserva(request):
 def servicio_slots(request, servicio_id):
     servicio = Servicio.objects.get(id=servicio_id)
     form = ReservaServicioForm(initial={'servicio': servicio})
-    return JsonResponse({
-        'html': render_to_string('ventas/horario_radio.html', {
-            'widget': form['hora_inicio'].field.widget
-        })
+    
+    # Forzar la creación de opciones
+    form.fields['hora_inicio'].widget.choices = [
+        (slot, slot) for slot in servicio.slots_disponibles
+    ]
+    
+    html = render_to_string('ventas/horario_radio.html', {
+        'widget': form['hora_inicio'].field.widget
     })
+    
+    return JsonResponse({'html': html})

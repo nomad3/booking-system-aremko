@@ -2,6 +2,9 @@
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin: 10px 0;
 }
 
 .horario-option {
@@ -18,4 +21,15 @@
 .horario-option input:checked + .horario-label {
     background: #79aec8;
     color: white;
+}
+
+.no-slots {
+    color: #dc3545;
+    font-style: italic;
+}
+
+/* Asegura visibilidad de labels */
+.horario-label {
+    display: inline-block !important;
+    margin-left: 5px;
 } 
