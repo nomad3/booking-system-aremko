@@ -173,6 +173,15 @@ class CategoriaServicio(models.Model):
     def __str__(self):
         return self.nombre
 
+def validate_slots_format(value):
+    """Valida que los slots tengan formato HH:MM"""
+    if not all(isinstance(slot, str) and len(slot) == 5 and slot[2] == ':' 
+               and 0 <= int(slot[:2]) <= 23 and 0 <= int(slot[3:]) <= 59 
+               for slot in value):
+        raise ValidationError(
+            "Formato inválido. Use ['09:00', '10:00', ...] con formato HH:MM"
+        )
+
 class Servicio(models.Model):
     nombre = models.CharField(max_length=100)
     precio_base = models.DecimalField(max_digits=10, decimal_places=0)
@@ -182,7 +191,11 @@ class Servicio(models.Model):
     capacidad_maxima = models.PositiveIntegerField(default=1)
     horario_apertura = models.TimeField(default='09:00')
     horario_cierre = models.TimeField(default='23:59')
-    slots_disponibles = models.JSONField(default=list, help_text="Horarios disponibles en formato HH:MM")
+    slots_disponibles = models.JSONField(
+        default=list,
+        help_text="Horarios disponibles en formato ['09:00', '10:00', ...]",
+        validators=[validate_slots_format]
+    )
     activo = models.BooleanField(
         default=True,
         help_text="Indica si el servicio está disponible para reservas"

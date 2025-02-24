@@ -25,11 +25,19 @@ class HorarioRadioSelect(RadioSelect):
     template_name = 'ventas/horario_radio.html'
 
 class ReservaServicioForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'servicio' in self.initial:
+            servicio = Servicio.objects.get(id=self.initial['servicio'])
+            self.fields['hora_inicio'].widget.choices = [
+                (slot, slot) for slot in servicio.slots_disponibles
+            ]
+
     class Meta:
         model = ReservaServicio
         fields = '__all__'
         widgets = {
-            'hora_inicio': HorarioRadioSelect(attrs={'class': 'horario-radio'})
+            'hora_inicio': HorarioRadioSelect()
         }
 
 class ReservaServicioInline(admin.TabularInline):

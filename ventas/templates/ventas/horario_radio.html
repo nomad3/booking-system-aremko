@@ -1,8 +1,8 @@
 <div class="horario-radio-container">
-{% for option in widget %}
+{% for value, label in widget.choices %}
     <label class="horario-option">
-        <input type="radio" name="{{ widget.name }}" value="{{ option.value }}" {% if option.selected %}checked{% endif %}>
-        <span class="horario-label">{{ option.label }}</span>
+        <input type="radio" name="{{ widget.name }}" value="{{ value }}">
+        <span class="horario-label">{{ label }}</span>
     </label>
 {% endfor %}
 </div> 
