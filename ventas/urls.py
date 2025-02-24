@@ -4,6 +4,7 @@ from . import views
 from .views import servicios_vendidos_view, inicio_sistema_view, caja_diaria_view, auditoria_movimientos_view, venta_reserva_list, venta_reserva_detail
 from . import api
 from .admin import ServicioAdmin
+from ventas.admin import servicio_admin
 
 # Registrar las vistas en el router de DRF
 router = DefaultRouter()
@@ -35,7 +36,6 @@ urlpatterns = [
     path('api/cliente/<str:telefono>/', api.get_cliente, name='get_cliente'),
     path('api/cliente/create/', api.create_cliente, name='create_cliente'),
     path('api/cliente/update/<str:telefono>/', api.update_cliente, name='update_cliente'),
-    path('admin/ventas/servicio/<int:pk>/slots/', ServicioAdmin.as_view(), name='servicio_slots'),
     path('', include(router.urls)),  # Mover al final y agregar prefijo api/
 ]
 
