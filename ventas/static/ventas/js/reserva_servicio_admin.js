@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 url: '/admin/ventas/servicio/' + servicioId + '/slots/',
                 success: function(data) {
                     console.log('Respuesta API:', data); // Debug 3
-                    var $horaInicio = $form.find('.field-hora_inicio select');
+                    var $horaInicio = $form.find('select[name$="-hora_inicio"]');
                     $horaInicio.empty();
                     django.jQuery.each(data.slots, function(index, value) {
                         console.log('Agregando slot:', value); // Debug 4
