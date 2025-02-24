@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.db.models import Sum
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from django.forms import DateInput, TimeInput, Select
+from django.forms import DateInput, TimeInput, Select, RadioSelect
 from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, GiftCard
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
@@ -21,36 +21,21 @@ admin.site.site_title = _("Panel de Administración")
 admin.site.index_title = _("Bienvenido al Panel de Control")
 
 # Formulario personalizado para elegir los slots de horas según el servicio
-class ReservaServicioInlineForm(forms.ModelForm):
-    hora_inicio = forms.ChoiceField(
-        choices=[],
-        widget=forms.Select(attrs={'class': 'hora-inicio-select'})
-    )
-    
+class HorarioRadioSelect(RadioSelect):
+    template_name = 'ventas/horario_radio.html'
+
+class ReservaServicioForm(forms.ModelForm):
     class Meta:
         model = ReservaServicio
-        fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas']
-        
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        
-        # Actualizar opciones del servicio
-        self.fields['servicio'].queryset = Servicio.objects.filter(activo=True)
-        
-        # Cargar slots si ya hay un servicio seleccionado
-        if self.instance and self.instance.servicio_id:
-            servicio = self.instance.servicio
-            self.fields['hora_inicio'].choices = [(t, t) for t in servicio.slots_disponibles]
-        elif 'servicio' in self.initial:
-            servicio = Servicio.objects.get(pk=self.initial['servicio'])
-            self.fields['hora_inicio'].choices = [(t, t) for t in servicio.slots_disponibles]
+        fields = '__all__'
+        widgets = {
+            'hora_inicio': HorarioRadioSelect(attrs={'class': 'horario-radio'})
+        }
 
 class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
+    form = ReservaServicioForm
     extra = 1
-    formfield_overrides = {
-        models.CharField: {'widget': forms.Select(attrs={'class': 'hora-inicio-select'})}
-    }
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
@@ -68,6 +53,7 @@ class ReservaServicioInline(admin.TabularInline):
             'admin/js/jquery.init.js',  # Necesario para django.jQuery
             'ventas/js/reserva_servicio_admin.js',
         )
+        css = {'all': ('ventas/css/admin.css',)}
 
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto

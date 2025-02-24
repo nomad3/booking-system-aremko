@@ -435,6 +435,10 @@ class ReservaServicio(models.Model):
             datetime.combine(self.fecha_agendamiento, datetime.strptime(self.hora_inicio, "%H:%M").time())
         )
 
+    @property
+    def slots_disponibles(self):
+        return self.servicio.slots_disponibles if self.servicio else []
+
     def __str__(self):
         return f"{self.servicio.nombre} reservado para {self.fecha_agendamiento} {self.hora_inicio}"
 

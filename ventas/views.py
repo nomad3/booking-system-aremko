@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from django.db.models import Sum, Q, Count, F
 from django.contrib.auth.decorators import user_passes_test
 import csv
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from datetime import datetime, timedelta
 from django.contrib.auth.decorators import login_required
@@ -36,6 +36,7 @@ from openpyxl import load_workbook
 from django.contrib import messages
 from itertools import islice
 from django.views.decorators.csrf import csrf_protect
+from django.template.loader import render_to_string
 
 
 def detalle_compra_list(request):
@@ -1208,4 +1209,13 @@ def add_venta_reserva(request):
     return render(request, 'admin/ventas/ventareserva/change_form.html', {
         'form': VentaReservaForm(),
         'title': 'Agregar Venta/Reserva',
+    })
+
+def servicio_slots(request, servicio_id):
+    servicio = Servicio.objects.get(id=servicio_id)
+    return JsonResponse({
+        'slots': servicio.slots_disponibles,
+        'html': render_to_string('ventas/horario_radio.html', {
+            'widget': ReservaServicioForm().fields['hora_inicio'].widget
+        })
     })
