@@ -10,7 +10,6 @@ from django.utils.translation import gettext_lazy as _
 from django.forms import DateInput, TimeInput, Select
 from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, GiftCard
 from django.http import HttpResponse
-import xlwt
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 
