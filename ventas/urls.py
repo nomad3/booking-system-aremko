@@ -31,10 +31,10 @@ urlpatterns = [
     path('exportar-clientes/', views.exportar_clientes_excel, name='exportar_clientes_excel'),
     path('clientes/', views.lista_clientes, name='lista_clientes'),
     path('importar-clientes/', views.importar_clientes_excel, name='importar_clientes_excel'),
-    path('api/cliente/', api.get_cliente, name='get_clientes'),
-    path('api/cliente/<str:telefono>/', api.get_cliente, name='get_cliente'),
     path('api/cliente/create/', api.create_cliente, name='create_cliente'),
     path('api/cliente/update/<str:telefono>/', api.update_cliente, name='update_cliente'),
+    path('api/cliente/', api.get_cliente, name='get_clientes'),
+    path('api/cliente/<str:telefono>/', api.get_cliente, name='get_cliente'),
     path('', include(router.urls)),  # Mover al final y agregar prefijo api/
 ]
 

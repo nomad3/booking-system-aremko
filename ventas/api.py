@@ -12,7 +12,7 @@ from decimal import Decimal
 import traceback
 import logging
 from datetime import datetime
-from django.utils.dateparse import parse_datetime, parse_date
+from django.utils.dateparse import parse_datetime
 from django.shortcuts import get_object_or_404
 from .serializers import ClienteSerializer
 
@@ -27,23 +27,6 @@ def create_prebooking(request):
         with transaction.atomic():
             data = request.data
             
-            # Validación de slots
-            for servicio_data in data['servicios']:
-                servicio = Servicio.objects.get(id=servicio_data['servicio_id'])
-                fecha = parse_date(servicio_data['fecha_agendamiento'])
-                hora = servicio_data['hora_inicio']
-                
-                if not verificar_disponibilidad(
-                    servicio=servicio,
-                    fecha_propuesta=fecha,
-                    hora_propuesta=hora,
-                    cantidad_personas=servicio_data.get('cantidad_personas', 1)
-                ):
-                    return Response({
-                        'status': 'error',
-                        'message': f'Slot {hora} no disponible para {servicio.nombre}'
-                    }, status=status.HTTP_400_BAD_REQUEST)
-
             # Get or create cliente
             cliente = Cliente.objects.get_or_create(
                 telefono=data['telefono'],
@@ -136,8 +119,7 @@ def get_cliente(request, telefono=None):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
-@authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def create_cliente(request):
     """
     Crea un nuevo cliente
@@ -162,28 +144,57 @@ def create_cliente(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PUT'])
-@authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def update_cliente(request, telefono):
     """
     Actualiza un cliente existente
     """
     try:
-        cliente = get_object_or_404(Cliente, telefono=telefono)
-        serializer = ClienteSerializer(cliente, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
+        # Debug: Imprimir información de la solicitud
+        print("Método:", request.method)
+        print("Headers:", request.headers)
+        print("Datos recibidos:", request.data)
+        print("Teléfono:", telefono)
+
+        # Buscar el cliente
+        cliente = Cliente.objects.filter(telefono=telefono).first()
+        
+        if not cliente:
             return Response({
-                'status': 'success',
-                'message': 'Cliente actualizado exitosamente',
-                'data': serializer.data
-            })
+                'status': 'error',
+                'message': f'No se encontró el cliente con teléfono {telefono}',
+                'telefono_buscado': telefono
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # Validar que hay datos para actualizar
+        if not request.data:
+            return Response({
+                'status': 'error',
+                'message': 'No se recibieron datos para actualizar'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Actualizar solo los campos proporcionados
+        if 'email' in request.data:
+            cliente.email = request.data['email']
+        if 'ciudad' in request.data:
+            cliente.ciudad = request.data['ciudad']
+        
+        # Guardar cambios
+        cliente.save()
+        
+        # Serializar y devolver respuesta
+        serializer = ClienteSerializer(cliente)
         return Response({
-            'status': 'error',
-            'message': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
+            'status': 'success',
+            'message': 'Cliente actualizado exitosamente',
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         return Response({
             'status': 'error',
-            'message': str(e)
-        }, status=status.HTTP_400_BAD_REQUEST) 
+            'message': str(e),
+            'trace': traceback.format_exc(),
+            'received_data': request.data,
+            'content_type': request.content_type
+        })
