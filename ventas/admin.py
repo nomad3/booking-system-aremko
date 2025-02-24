@@ -13,6 +13,7 @@ from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.urls import path
+from django.db import models
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
