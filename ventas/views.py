@@ -1213,9 +1213,8 @@ def add_venta_reserva(request):
 
 def servicio_slots(request, servicio_id):
     servicio = Servicio.objects.get(id=servicio_id)
-    form = ReservaServicioForm(initial={'servicio': servicio})
-    
-    # Forzar la creación de opciones
+    # Crear un formulario con los slots disponibles
+    form = ReservaServicioForm()
     form.fields['hora_inicio'].widget.choices = [
         (slot, slot) for slot in servicio.slots_disponibles
     ]

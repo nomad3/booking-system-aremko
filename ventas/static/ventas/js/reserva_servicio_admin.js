@@ -14,9 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 success: function(data) {
                     console.log('Respuesta AJAX:', data); // Debug 2
                     $horaInicio.empty();
-                    data.slots.forEach(slot => {
-                        $horaInicio.append(new Option(slot, slot));
-                    });
+                    $container.html(data.html).find('input[type="radio"]').first().trigger('click');
                     
                     // Forzar actualización de Select2 si está presente
                     if (django.jQuery.fn.select2) {
