@@ -23,7 +23,6 @@ admin.site.index_title = _("Bienvenido al Panel de Control")
 # Formulario personalizado para elegir los slots de horas según el servicio
 class HorarioRadioSelect(RadioSelect):
     template_name = 'ventas/horario_radio.html'
-    option_template_name = 'ventas/horario_radio_option.html'
 
 class ReservaServicioForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):

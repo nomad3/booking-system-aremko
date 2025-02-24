@@ -1,5 +1,8 @@
 <div class="horario-radio-container">
-{% for option in widget %}
-    {% include widget.option_template_name with widget=option %}
+{% for value, label in widget.choices %}
+    <label class="horario-option">
+        <input type="radio" name="{{ widget.name }}" value="{{ value }}">
+        <span class="horario-label">{{ label }}</span>
+    </label>
 {% endfor %}
 </div> 
