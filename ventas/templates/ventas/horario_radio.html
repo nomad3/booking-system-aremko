@@ -1,8 +1,13 @@
 <div class="horario-radio-container">
-{% for value, label in widget.choices %}
+{% if widget.choices %}
+    {% for value, label in widget.choices %}
+    <!-- Debug: {{ value }} -->
     <label class="horario-option">
         <input type="radio" name="{{ widget.name }}" value="{{ value }}">
         <span class="horario-label">{{ label }}</span>
     </label>
-{% endfor %}
+    {% endfor %}
+{% else %}
+    <p>No hay slots (DEBUG)</p>
+{% endif %}
 </div> 

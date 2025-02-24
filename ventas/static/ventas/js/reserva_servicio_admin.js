@@ -15,7 +15,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 success: function(data) {
                     console.log('Respuesta AJAX:', data); // Debug 2
                     $horaInicio.empty();
-                    $container.html(data.html).find('input[type="radio"]').first().trigger('click');
+                    if (data.html) {
+                        $container.html(data.html);
+                    } else {
+                        // Generar HTML manualmente
+                        const options = data.slots.map(slot => `
+                            <label class="horario-option">
+                                <input type="radio" name="${$container.find('input[type="radio"]').attr('name')}" value="${slot}">
+                                <span class="horario-label">${slot}</span>
+                            </label>
+                        `).join('');
+                        $container.html(options);
+                    }
                     
                     // Forzar actualización de Select2 si está presente
                     if (django.jQuery.fn.select2) {

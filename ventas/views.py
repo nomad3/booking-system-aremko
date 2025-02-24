@@ -1215,7 +1215,7 @@ def servicio_slots(request, servicio_id):
     servicio = Servicio.objects.get(id=servicio_id)
     html = render_to_string('ventas/horario_radio.html', {
         'widget': {
-            'name': 'hora_inicio',
+            'name': 'reservaservicios-0-hora_inicio',  # Nombre exacto del campo
             'choices': [(slot, slot) for slot in servicio.slots_disponibles]
         }
     })
