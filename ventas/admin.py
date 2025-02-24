@@ -46,9 +46,10 @@ class ReservaServicioInlineForm(forms.ModelForm):
 
 class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
-    form = ReservaServicioInlineForm
     extra = 1
-    min_num = 0
+    formfield_overrides = {
+        models.CharField: {'widget': forms.Select(attrs={'class': 'hora-inicio-select'})}
+    }
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
