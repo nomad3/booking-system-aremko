@@ -11,9 +11,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 url: '/admin/ventas/servicio/' + servicioId + '/slots/',
                 success: function(data) {
                     console.log('Respuesta API:', data); // Debug 3
-                    // Selector por atributo name que termina con "-hora_inicio"
-                    var $horaInicio = $row.find('select[name$="-hora_inicio"]');
-                    console.log('Elemento select encontrado:', $horaInicio.length); // Debug
+                    // Usar la clase del contenedor .field-hora_inicio
+                    var $horaInicio = $row.find('.field-hora_inicio select');
+                    
+                    // Debug: Verificar si encontró el elemento
+                    console.log('Elemento select:', $horaInicio);
                     
                     $horaInicio.empty();
                     django.jQuery.each(data.slots, function(index, value) {
@@ -26,10 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         );
                     });
                     
-                    // Si usas Select2
-                    if (django.jQuery.fn.select2) {
-                        $horaInicio.trigger('change.select2');
-                    }
+                    // Forzar actualización visual
+                    $horaInicio.trigger('change');
                 },
                 error: function(xhr) {
                     console.error('Error en la solicitud:', xhr.statusText); // Debug 5
