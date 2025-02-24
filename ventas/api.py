@@ -198,4 +198,3 @@ def update_cliente(request, telefono):
             'trace': traceback.format_exc(),
             'received_data': request.data,
             'content_type': request.content_type
-        }, status=status.HTTP_400_BAD_REQUEST)
