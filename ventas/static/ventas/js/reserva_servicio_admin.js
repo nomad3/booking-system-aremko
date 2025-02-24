@@ -11,7 +11,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 url: '/admin/ventas/servicio/' + servicioId + '/slots/',
                 success: function(data) {
                     console.log('Respuesta API:', data); // Debug 3
-                    var $horaInicio = $form.find('select[name$="-hora_inicio"]');
+                    // Buscar por el ID que contiene 'hora_inicio'
+                    var $horaInicio = $form.find('select[id*="hora_inicio"]');
+                    console.log('Elemento select encontrado:', $horaInicio.length); // Debug
+                    
                     $horaInicio.empty();
                     django.jQuery.each(data.slots, function(index, value) {
                         console.log('Agregando slot:', value); // Debug 4
