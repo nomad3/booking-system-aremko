@@ -183,6 +183,10 @@ class Servicio(models.Model):
     horario_apertura = models.TimeField(default='09:00')
     horario_cierre = models.TimeField(default='23:59')
     slots_disponibles = models.JSONField(default=list, help_text="Horarios disponibles en formato HH:MM")
+    activo = models.BooleanField(
+        default=True,
+        help_text="Indica si el servicio está disponible para reservas"
+    )
 
     def __str__(self):
         return self.nombre
