@@ -4,7 +4,6 @@ from . import views
 from .views import servicios_vendidos_view, inicio_sistema_view, caja_diaria_view, auditoria_movimientos_view, venta_reserva_list, venta_reserva_detail
 from . import api
 from .admin import ServicioAdmin
-from ventas.admin import servicio_admin
 
 # Registrar las vistas en el router de DRF
 router = DefaultRouter()
