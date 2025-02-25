@@ -191,11 +191,7 @@ class Servicio(models.Model):
     capacidad_maxima = models.PositiveIntegerField(default=1)
     horario_apertura = models.TimeField(default='09:00')
     horario_cierre = models.TimeField(default='23:59')
-    slots_disponibles = models.JSONField(
-        default=list,
-        help_text="Horarios disponibles en formato ['09:00', '10:00', ...]",
-        validators=[validate_slots_format]
-    )
+    slots_disponibles = models.JSONField(default=list)
     activo = models.BooleanField(
         default=True,
         help_text="Indica si el servicio está disponible para reservas"
@@ -208,8 +204,8 @@ class Servicio(models.Model):
         return hora_propuesta in self.slots_disponibles
 
     def slots_para_fecha(self, fecha):
-        # Lógica para obtener slots según la fecha
-        return self.slots_disponibles  # Implementa tu lógica real aquí
+        # Ejemplo básico - implementa tu lógica real
+        return self.slots_disponibles if fecha.weekday() < 5 else []
 
 class Cliente(models.Model):
     nombre = models.CharField(max_length=100)

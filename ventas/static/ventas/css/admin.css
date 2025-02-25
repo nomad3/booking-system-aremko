@@ -32,4 +32,16 @@
 .horario-label {
     display: inline-block !important;
     margin-left: 5px;
+}
+
+/* Resalta el servicio seleccionado */
+.field-servicio select:valid {
+    border: 2px solid #4CAF50;
+    background-color: #f8fff8;
+}
+
+/* Indicador visual de selección */
+.field-servicio select option:checked {
+    font-weight: bold;
+    background: #e8f5e9 linear-gradient(0deg, #e8f5e9 0%, #e8f5e9 100%);
 } 
