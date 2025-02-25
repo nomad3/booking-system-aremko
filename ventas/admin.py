@@ -14,10 +14,7 @@ from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.urls import path
 from django.db import models
-from django.urls import path
-from django.urls import reverse
-from django.urls import re_path
-from django.urls import get_object_or_404
+from django.shortcuts import get_object_or_404
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
