@@ -382,14 +382,15 @@ class ServicioAdmin(admin.ModelAdmin):
     
     def slots_view(self, request, servicio_id):
         servicio = get_object_or_404(Servicio, id=servicio_id)
-        fecha = request.GET.get('fecha')
+        fecha_str = request.GET.get('fecha')
         
-        # Implementa tu lógica de validación de fecha aquí
-        slots = servicio.slots_para_fecha(fecha) if fecha else []
+        try:
+            fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+            slots = servicio.slots_para_fecha(fecha)
+        except (ValueError, TypeError):
+            slots = []
         
-        return JsonResponse({
-            'slots': slots
-        })
+        return JsonResponse({'slots': slots})
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
