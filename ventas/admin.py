@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.db.models import Sum
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from django.forms import DateInput, TimeInput, Select, RadioSelect
+from django.forms import DateInput, TimeInput, Select, RadioSelect, widgets
 from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, GiftCard
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
@@ -37,7 +37,7 @@ class ReservaServicioForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['hora_inicio'].widget.attrs.update({'class': 'hora-inicio-select'})
         self.fields['_actualizar'] = forms.CharField(
-            widget=forms.ButtonInput(attrs={
+            widget=widgets.Input(attrs={
                 'type': 'button',
                 'class': 'actualizar-horarios',
                 'value': 'Consultar Disponibilidad'
