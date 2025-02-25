@@ -207,6 +207,10 @@ class Servicio(models.Model):
     def horario_valido(self, hora_propuesta):
         return hora_propuesta in self.slots_disponibles
 
+    def slots_para_fecha(self, fecha):
+        # Lógica para obtener slots según la fecha
+        return self.slots_disponibles  # Implementa tu lógica real aquí
+
 class Cliente(models.Model):
     nombre = models.CharField(max_length=100)
     email = models.EmailField()
@@ -440,17 +444,11 @@ class ReservaServicio(models.Model):
     servicio = models.ForeignKey(Servicio, on_delete=models.CASCADE)
     fecha_agendamiento = models.DateField()
     hora_inicio = models.CharField(max_length=5)
-    cantidad_personas = models.PositiveIntegerField(default=1)
     
-    @property
-    def fecha_hora_completa(self):
-        return timezone.make_aware(
-            datetime.combine(self.fecha_agendamiento, datetime.strptime(self.hora_inicio, "%H:%M").time())
-        )
-
-    @property
     def slots_disponibles(self):
-        return self.servicio.slots_disponibles if self.servicio else []
+        if self.servicio and self.fecha_agendamiento:
+            return self.servicio.slots_para_fecha(self.fecha_agendamiento)
+        return []
 
     def __str__(self):
         return f"{self.servicio.nombre} reservado para {self.fecha_agendamiento} {self.hora_inicio}"

@@ -14,6 +14,10 @@ from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.urls import path
 from django.db import models
+from django.urls import path
+from django.urls import reverse
+from django.urls import re_path
+from django.urls import get_object_or_404
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
@@ -25,20 +29,24 @@ class HorarioRadioSelect(RadioSelect):
     template_name = 'ventas/horario_radio.html'
 
 class ReservaServicioForm(forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if 'servicio' in self.initial:
-            servicio = Servicio.objects.get(id=self.initial['servicio'])
-            self.fields['hora_inicio'].widget.choices = [
-                (slot, slot) for slot in servicio.slots_disponibles
-            ]
-
     class Meta:
         model = ReservaServicio
         fields = '__all__'
         widgets = {
-            'hora_inicio': HorarioRadioSelect()
+            'hora_inicio': forms.Select()
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['hora_inicio'].widget.attrs.update({'class': 'hora-inicio-select'})
+        self.fields['_actualizar'] = forms.CharField(
+            widget=forms.ButtonInput(attrs={
+                'type': 'button',
+                'class': 'actualizar-horarios',
+                'value': 'Consultar Disponibilidad'
+            }),
+            required=False
+        )
 
 class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
@@ -57,11 +65,7 @@ class ReservaServicioInline(admin.TabularInline):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     class Media:
-        js = (
-            'admin/js/jquery.init.js',  # Necesario para django.jQuery
-            'ventas/js/reserva_servicio_admin.js',
-        )
-        css = {'all': ('ventas/css/admin.css',)}
+        js = ('ventas/js/admin_reservas.js',)
 
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
@@ -371,13 +375,24 @@ class ServicioAdmin(admin.ModelAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path('<int:pk>/slots/', self.admin_site.admin_view(self.get_slots))
+            path(
+                '<int:servicio_id>/slots/',
+                self.admin_site.admin_view(self.slots_view),
+                name='servicio_slots'
+            ),
         ]
         return custom_urls + urls
     
-    def get_slots(self, request, pk):
-        servicio = Servicio.objects.get(pk=pk)
-        return JsonResponse({'slots': servicio.slots_disponibles})
+    def slots_view(self, request, servicio_id):
+        servicio = get_object_or_404(Servicio, id=servicio_id)
+        fecha = request.GET.get('fecha')
+        
+        # Implementa tu lógica de validación de fecha aquí
+        slots = servicio.slots_para_fecha(fecha) if fecha else []
+        
+        return JsonResponse({
+            'slots': slots
+        })
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
