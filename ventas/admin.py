@@ -381,15 +381,23 @@ class ServicioAdmin(admin.ModelAdmin):
         return custom_urls + urls
     
     def slots_view(self, request, servicio_id):
+        print("\n=== Llamada a slots_view ===")
+        print(f"Servicio ID: {servicio_id}")
+        print(f"Fecha recibida: {request.GET.get('fecha')}")
+        
         servicio = get_object_or_404(Servicio, id=servicio_id)
         fecha_str = request.GET.get('fecha')
         
         try:
             fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+            print(f"Fecha parseada: {fecha}")
             slots = servicio.slots_para_fecha(fecha)
-        except (ValueError, TypeError):
+            print(f"Slots obtenidos: {slots}")
+        except Exception as e:
+            print(f"Error: {str(e)}")
             slots = []
         
+        print(f"Slots a devolver: {slots}\n")
         return JsonResponse({'slots': slots})
 
 @admin.register(Pago)
