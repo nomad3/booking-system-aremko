@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from django.db.models import Sum, Q, Count, F
 from django.contrib.auth.decorators import user_passes_test
 import csv
-from django.http import HttpResponse
-from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render, get_object_or_404, redirect
 from datetime import datetime, timedelta
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
@@ -592,6 +592,189 @@ def inicio_sistema_view(request):
     Vista que renderiza la página de inicio del sistema con enlaces a los recursos importantes.
     """
     return render(request, 'ventas/inicio_sistema.html')
+
+def homepage_view(request):
+    """
+    Vista que renderiza la página de inicio pública de Aremko.cl
+    Muestra los servicios disponibles y permite realizar reservas.
+    """
+    # Obtener servicios activos
+    servicios = Servicio.objects.filter(activo=True).select_related('categoria')
+    categorias = CategoriaServicio.objects.all()
+    
+    # Obtener carrito de compras de la sesión o crear uno nuevo
+    cart = request.session.get('cart', {'servicios': [], 'total': 0})
+    
+    context = {
+        'servicios': servicios,
+        'categorias': categorias,
+        'cart': cart
+    }
+    return render(request, 'ventas/homepage.html', context)
+
+def add_to_cart(request):
+    """
+    Vista para agregar un servicio al carrito de compras
+    """
+    if request.method == 'POST':
+        servicio_id = request.POST.get('servicio_id')
+        fecha = request.POST.get('fecha')
+        hora = request.POST.get('hora')
+        cantidad_personas = int(request.POST.get('cantidad_personas', 1))
+        
+        try:
+            servicio = Servicio.objects.get(id=servicio_id)
+            
+            # Obtener carrito actual o crear uno nuevo
+            cart = request.session.get('cart', {'servicios': [], 'total': 0})
+            
+            # Agregar servicio al carrito
+            item = {
+                'servicio_id': servicio.id,
+                'nombre': servicio.nombre,
+                'precio': float(servicio.precio_base),
+                'fecha': fecha,
+                'hora': hora,
+                'cantidad_personas': cantidad_personas,
+                'subtotal': float(servicio.precio_base) * cantidad_personas
+            }
+            
+            cart['servicios'].append(item)
+            
+            # Recalcular total
+            cart['total'] = sum(item['subtotal'] for item in cart['servicios'])
+            
+            # Guardar carrito en la sesión
+            request.session['cart'] = cart
+            
+            return JsonResponse({'success': True, 'cart': cart})
+        except Servicio.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Servicio no encontrado'})
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
+def remove_from_cart(request):
+    """
+    Vista para eliminar un servicio del carrito de compras
+    """
+    if request.method == 'POST':
+        index = int(request.POST.get('index'))
+        
+        # Obtener carrito actual
+        cart = request.session.get('cart', {'servicios': [], 'total': 0})
+        
+        if 0 <= index < len(cart['servicios']):
+            # Eliminar servicio del carrito
+            del cart['servicios'][index]
+            
+            # Recalcular total
+            cart['total'] = sum(item['subtotal'] for item in cart['servicios'])
+            
+            # Guardar carrito en la sesión
+            request.session['cart'] = cart
+            
+            return JsonResponse({'success': True, 'cart': cart})
+        
+        return JsonResponse({'success': False, 'error': 'Índice inválido'})
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
+def checkout(request):
+    """
+    Vista para procesar el checkout del carrito
+    """
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre')
+        email = request.POST.get('email')
+        telefono = request.POST.get('telefono')
+        documento_identidad = request.POST.get('documento_identidad', '')
+        
+        # Obtener carrito actual
+        cart = request.session.get('cart', {'servicios': [], 'total': 0})
+        
+        if not cart['servicios']:
+            return JsonResponse({'success': False, 'error': 'El carrito está vacío'})
+        
+        try:
+            with transaction.atomic():
+                # Crear o actualizar cliente
+                cliente, created = Cliente.objects.get_or_create(
+                    email=email,
+                    defaults={
+                        'nombre': nombre,
+                        'telefono': telefono,
+                        'documento_identidad': documento_identidad
+                    }
+                )
+                
+                if not created:
+                    # Actualizar información del cliente
+                    cliente.nombre = nombre
+                    cliente.telefono = telefono
+                    if documento_identidad:
+                        cliente.documento_identidad = documento_identidad
+                    cliente.save()
+                
+                # Crear venta/reserva
+                venta_reserva = VentaReserva.objects.create(
+                    cliente=cliente,
+                    fecha_reserva=timezone.now()
+                )
+                
+                # Agregar servicios a la venta/reserva
+                for item in cart['servicios']:
+                    servicio = Servicio.objects.get(id=item['servicio_id'])
+                    fecha_agendamiento = datetime.strptime(item['fecha'], '%Y-%m-%d').date()
+                    
+                    # Crear reserva de servicio
+                    ReservaServicio.objects.create(
+                        venta_reserva=venta_reserva,
+                        servicio=servicio,
+                        fecha_agendamiento=fecha_agendamiento,
+                        hora_inicio=item['hora'],
+                        cantidad_personas=item['cantidad_personas']
+                    )
+                
+                # Calcular total
+                venta_reserva.calcular_total()
+                
+                # Limpiar carrito
+                request.session['cart'] = {'servicios': [], 'total': 0}
+                
+                return JsonResponse({
+                    'success': True, 
+                    'message': 'Reserva creada exitosamente',
+                    'reserva_id': venta_reserva.id
+                })
+                
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
+def get_available_hours(request):
+    """
+    Vista para obtener las horas disponibles para un servicio en una fecha específica
+    """
+    servicio_id = request.GET.get('servicio_id')
+    fecha = request.GET.get('fecha')
+    
+    try:
+        servicio = Servicio.objects.get(id=servicio_id)
+        fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
+        
+        # Obtener reservas existentes para este servicio en esta fecha
+        reservas = ReservaServicio.objects.filter(
+            servicio=servicio,
+            fecha_agendamiento=fecha_obj
+        ).values_list('hora_inicio', flat=True)
+        
+        # Obtener horas disponibles (slots_disponibles menos las horas ya reservadas)
+        horas_disponibles = [hora for hora in servicio.slots_disponibles if hora not in reservas]
+        
+        return JsonResponse({'success': True, 'horas_disponibles': horas_disponibles})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 
 
 # Función para verificar si el usuario es administrador

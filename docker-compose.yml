@@ -1,26 +1,70 @@
-# docker-compose.yml
-
 version: '3.8'
 
 services:
   web:
     build: .
-    command: gunicorn aremko_project.wsgi:application --bind 0.0.0.0:${PORT}
+    command: >
+      bash -c "python manage.py migrate &&
+               python manage.py collectstatic --noinput &&
+               python manage.py shell -c \"
+                 from django.contrib.auth import get_user_model;
+                 User = get_user_model();
+                 import os;
+                 username = os.environ.get('DJANGO_SUPERUSER_USERNAME');
+                 email = os.environ.get('DJANGO_SUPERUSER_EMAIL');
+                 password = os.environ.get('DJANGO_SUPERUSER_PASSWORD');
+                 if username and email and password and not User.objects.filter(username=username).exists():
+                   User.objects.create_superuser(username, email, password);
+                   print('Superuser created successfully');
+                 else:
+                   print('Superuser already exists or environment variables not set');
+               \" &&
+               python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
     ports:
-      - "8000:8000"  # Para desarrollo local
+      - "8001:8000"
     env_file:
       - .env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 
   db:
     image: postgres:13
-    environment:
-      POSTGRES_DB: aremko_db
-      POSTGRES_USER: aremko_user
-      POSTGRES_PASSWORD: aremko_password
     volumes:
       - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # pgAdmin web interface available at http://localhost:5050
+  # Login with admin@example.com / admin
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
 
 volumes:
   postgres_data:
+  static_volume:
+  media_volume:

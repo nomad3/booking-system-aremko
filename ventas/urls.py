@@ -1,7 +1,11 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
-from .views import servicios_vendidos_view, inicio_sistema_view, caja_diaria_view, auditoria_movimientos_view, venta_reserva_list, venta_reserva_detail
+from .views import (
+    servicios_vendidos_view, inicio_sistema_view, caja_diaria_view, 
+    auditoria_movimientos_view, venta_reserva_list, venta_reserva_detail,
+    homepage_view, add_to_cart, remove_from_cart, checkout, get_available_hours
+)
 from . import api
 from .admin import ServicioAdmin
 
@@ -16,7 +20,12 @@ router.register(r'api/clientes', views.ClienteViewSet)
 
 # Añadir las nuevas vistas a las URLs
 urlpatterns = [
-    path('', inicio_sistema_view, name='inicio_sistema'),  # Nueva vista de inicio
+    path('admin-dashboard/', inicio_sistema_view, name='inicio_sistema'),  # Vista de inicio del sistema admin
+    path('', homepage_view, name='homepage'),  # Nueva vista de inicio pública
+    path('cart/add/', add_to_cart, name='add_to_cart'),
+    path('cart/remove/', remove_from_cart, name='remove_from_cart'),
+    path('cart/checkout/', checkout, name='checkout'),
+    path('get-available-hours/', get_available_hours, name='get_available_hours'),
     path('servicios-vendidos/', servicios_vendidos_view, name='servicios_vendidos'),
     path('caja-diaria/', caja_diaria_view, name='caja_diaria'),  # Nueva vista de caja diaria
     path('auditoria-movimientos/', auditoria_movimientos_view, name='auditoria_movimientos'),  # Nueva vista de auditoría
@@ -37,4 +46,3 @@ urlpatterns = [
     path('api/cliente/<str:telefono>/', api.get_cliente, name='get_cliente'),
     path('', include(router.urls)),  # Mover al final y agregar prefijo api/
 ]
-
