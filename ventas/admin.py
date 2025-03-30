@@ -7,14 +7,12 @@ from django.utils import timezone
 from django.db.models import Sum
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from django.forms import DateInput, TimeInput, Select, RadioSelect, widgets
+from django.forms import DateInput, TimeInput, Select
 from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, GiftCard
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.urls import path
-from django.db import models
-from django.shortcuts import get_object_or_404
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
@@ -22,33 +20,35 @@ admin.site.site_title = _("Panel de Administración")
 admin.site.index_title = _("Bienvenido al Panel de Control")
 
 # Formulario personalizado para elegir los slots de horas según el servicio
-class HorarioRadioSelect(RadioSelect):
-    template_name = 'ventas/horario_radio.html'
-
-class ReservaServicioForm(forms.ModelForm):
+class ReservaServicioInlineForm(forms.ModelForm):
+    hora_inicio = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={'class': 'hora-inicio-select'})
+    )
+    
     class Meta:
         model = ReservaServicio
-        fields = '__all__'
-        widgets = {
-            'hora_inicio': forms.Select()
-        }
-
+        fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas']
+        
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['hora_inicio'].widget.attrs.update({'class': 'hora-inicio-select'})
-        self.fields['_actualizar'] = forms.CharField(
-            widget=widgets.Input(attrs={
-                'type': 'button',
-                'class': 'actualizar-horarios',
-                'value': 'Consultar Disponibilidad'
-            }),
-            required=False
-        )
+        
+        # Actualizar opciones del servicio
+        self.fields['servicio'].queryset = Servicio.objects.filter(activo=True)
+        
+        # Cargar slots si ya hay un servicio seleccionado
+        if self.instance and self.instance.servicio_id:
+            servicio = self.instance.servicio
+            self.fields['hora_inicio'].choices = [(t, t) for t in servicio.slots_disponibles]
+        elif 'servicio' in self.initial:
+            servicio = Servicio.objects.get(pk=self.initial['servicio'])
+            self.fields['hora_inicio'].choices = [(t, t) for t in servicio.slots_disponibles]
 
 class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
-    form = ReservaServicioForm
+    form = ReservaServicioInlineForm
     extra = 1
+    min_num = 0
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
@@ -62,7 +62,7 @@ class ReservaServicioInline(admin.TabularInline):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     class Media:
-        js = ('ventas/js/admin_reservas.js',)
+        js = ('ventas/js/reserva_servicio_admin.js',)  # Crear este archivo
 
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
@@ -372,33 +372,13 @@ class ServicioAdmin(admin.ModelAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path(
-                '<int:servicio_id>/slots/',
-                self.admin_site.admin_view(self.slots_view),
-                name='servicio_slots'
-            ),
+            path('<int:pk>/slots/', self.admin_site.admin_view(self.get_slots))
         ]
         return custom_urls + urls
     
-    def slots_view(self, request, servicio_id):
-        print("\n=== Llamada a slots_view ===")
-        print(f"Servicio ID: {servicio_id}")
-        print(f"Fecha recibida: {request.GET.get('fecha')}")
-        
-        servicio = get_object_or_404(Servicio, id=servicio_id)
-        fecha_str = request.GET.get('fecha')
-        
-        try:
-            fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-            print(f"Fecha parseada: {fecha}")
-            slots = servicio.slots_para_fecha(fecha)
-            print(f"Slots obtenidos: {slots}")
-        except Exception as e:
-            print(f"Error: {str(e)}")
-            slots = []
-        
-        print(f"Slots a devolver: {slots}\n")
-        return JsonResponse({'slots': slots})
+    def get_slots(self, request, pk):
+        servicio = Servicio.objects.get(pk=pk)
+        return JsonResponse({'slots': servicio.slots_disponibles})
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):

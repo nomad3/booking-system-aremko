@@ -92,9 +92,6 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-STATICFILES_DIRS = [
-    BASE_DIR / "ventas/static",
-]
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [

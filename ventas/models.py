@@ -173,15 +173,6 @@ class CategoriaServicio(models.Model):
     def __str__(self):
         return self.nombre
 
-def validate_slots_format(value):
-    """Valida que los slots tengan formato HH:MM"""
-    if not all(isinstance(slot, str) and len(slot) == 5 and slot[2] == ':' 
-               and 0 <= int(slot[:2]) <= 23 and 0 <= int(slot[3:]) <= 59 
-               for slot in value):
-        raise ValidationError(
-            "Formato inválido. Use ['09:00', '10:00', ...] con formato HH:MM"
-        )
-
 class Servicio(models.Model):
     nombre = models.CharField(max_length=100)
     precio_base = models.DecimalField(max_digits=10, decimal_places=0)
@@ -191,7 +182,7 @@ class Servicio(models.Model):
     capacidad_maxima = models.PositiveIntegerField(default=1)
     horario_apertura = models.TimeField(default='09:00')
     horario_cierre = models.TimeField(default='23:59')
-    slots_disponibles = models.JSONField(default=list)
+    slots_disponibles = models.JSONField(default=list, help_text="Horarios disponibles en formato HH:MM")
     activo = models.BooleanField(
         default=True,
         help_text="Indica si el servicio está disponible para reservas"
@@ -202,10 +193,6 @@ class Servicio(models.Model):
 
     def horario_valido(self, hora_propuesta):
         return hora_propuesta in self.slots_disponibles
-
-    def slots_para_fecha(self, fecha):
-        # Ejemplo básico - implementa tu lógica real
-        return self.slots_disponibles if fecha.weekday() < 5 else []
 
 class Cliente(models.Model):
     nombre = models.CharField(max_length=100)
@@ -440,11 +427,13 @@ class ReservaServicio(models.Model):
     servicio = models.ForeignKey(Servicio, on_delete=models.CASCADE)
     fecha_agendamiento = models.DateField()
     hora_inicio = models.CharField(max_length=5)
+    cantidad_personas = models.PositiveIntegerField(default=1)
     
-    def slots_disponibles(self):
-        if self.servicio and self.fecha_agendamiento:
-            return self.servicio.slots_para_fecha(self.fecha_agendamiento)
-        return []
+    @property
+    def fecha_hora_completa(self):
+        return timezone.make_aware(
+            datetime.combine(self.fecha_agendamiento, datetime.strptime(self.hora_inicio, "%H:%M").time())
+        )
 
     def __str__(self):
         return f"{self.servicio.nombre} reservado para {self.fecha_agendamiento} {self.hora_inicio}"
