@@ -769,8 +769,32 @@ def get_available_hours(request):
             fecha_agendamiento=fecha_obj
         ).values_list('hora_inicio', flat=True)
         
+        # Si el servicio no tiene slots_disponibles definidos, crear algunos por defecto
+        if not servicio.slots_disponibles or len(servicio.slots_disponibles) == 0:
+            # Generar slots de hora en hora desde horario_apertura hasta horario_cierre
+            hora_apertura = servicio.horario_apertura.hour
+            hora_cierre = servicio.horario_cierre.hour
+            
+            # Si la hora de cierre es 0 (medianoche), ajustar a 24 para el cálculo
+            if hora_cierre == 0:
+                hora_cierre = 24
+                
+            slots_por_defecto = []
+            for hora in range(hora_apertura, hora_cierre):
+                slots_por_defecto.append(f"{hora:02d}:00")
+                # También agregar slots de media hora si hay suficiente espacio
+                if hora < hora_cierre - 1 or (hora == hora_cierre - 1 and servicio.duracion <= 30):
+                    slots_por_defecto.append(f"{hora:02d}:30")
+            
+            # Actualizar el servicio con los slots generados
+            servicio.slots_disponibles = slots_por_defecto
+            servicio.save()
+        
         # Obtener horas disponibles (slots_disponibles menos las horas ya reservadas)
         horas_disponibles = [hora for hora in servicio.slots_disponibles if hora not in reservas]
+        
+        # Ordenar las horas disponibles
+        horas_disponibles.sort()
         
         return JsonResponse({'success': True, 'horas_disponibles': horas_disponibles})
     except Exception as e:
