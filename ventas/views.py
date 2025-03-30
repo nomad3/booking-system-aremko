@@ -797,8 +797,12 @@ def get_available_hours(request):
         horas_disponibles.sort()
         
         return JsonResponse({'success': True, 'horas_disponibles': horas_disponibles})
+    except Servicio.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Servicio no encontrado'})
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': f'Error de formato: {str(e)}'})
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+        return JsonResponse({'success': False, 'error': f'Error: {str(e)}'})
 
 
 # Función para verificar si el usuario es administrador
