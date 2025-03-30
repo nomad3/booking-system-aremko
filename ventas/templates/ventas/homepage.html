@@ -852,7 +852,7 @@
             horaSelect.innerHTML = '<option value="">Cargando horas...</option>';
             
             // Realizar petición AJAX para obtener horas disponibles
-            fetch(`/get-available-hours/?servicio_id=${servicioId}&fecha=${fecha}`)
+            fetch(`/ventas/get-available-hours/?servicio_id=${servicioId}&fecha=${fecha}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
