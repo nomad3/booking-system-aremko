@@ -383,7 +383,12 @@
                             window.location.href = "{% url 'homepage' %}";
                         }
                     } else {
-                        alert('Error al procesar la reserva: ' + (data.error || 'Error desconocido'));
+                        // Handle error message which could be a string or an array
+                        let errorMessage = data.error;
+                        if (Array.isArray(data.error)) {
+                            errorMessage = data.error.join('\n');
+                        }
+                        alert('Error al procesar la reserva: ' + errorMessage);
                     }
                 })
                 .catch(error => {

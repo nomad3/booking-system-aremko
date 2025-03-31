@@ -751,6 +751,24 @@ def complete_checkout(request):
             if not cart.get('servicios'):
                 return JsonResponse({'success': False, 'error': 'El carrito está vacío'})
             
+            # Validate availability before creating anything
+            unavailable_slots = []
+            for servicio in cart['servicios']:
+                servicio_id = servicio.get('id')
+                if not servicio_id:
+                    continue
+                
+                servicio_obj = Servicio.objects.get(id=servicio_id)
+                fecha = datetime.strptime(servicio['fecha'], '%Y-%m-%d').date()
+                hora = servicio['hora']
+                
+                # Check if the slot is still available
+                if not is_slot_available(servicio_obj, fecha, hora):
+                    unavailable_slots.append(f"Slot {hora} no disponible para {servicio_obj.nombre}")
+            
+            if unavailable_slots:
+                return JsonResponse({'success': False, 'error': unavailable_slots})
+            
             # Create cliente if it doesn't exist
             cliente, created = Cliente.objects.get_or_create(
                 email=email,
@@ -821,6 +839,18 @@ def complete_checkout(request):
     
     # If not POST, return error as JSON
     return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
+# Helper function to check slot availability
+def is_slot_available(servicio, fecha, hora):
+    # Check if there are any existing reservations for this service, date and time
+    existing_reservas = ReservaServicio.objects.filter(
+        servicio=servicio,
+        fecha_agendamiento=fecha,
+        hora_inicio=hora
+    )
+    
+    # If there are no existing reservations, the slot is available
+    return not existing_reservas.exists()
 
 def get_available_hours(request):
     """
