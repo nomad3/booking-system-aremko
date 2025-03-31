@@ -283,7 +283,11 @@
         const processingOverlay = document.getElementById('processingOverlay');
         
         if (completeCheckoutBtn) {
-            completeCheckoutBtn.addEventListener('click', function() {
+            completeCheckoutBtn.addEventListener('click', function(e) {
+                e.preventDefault(); // Prevent default button behavior
+                
+                console.log("Checkout button clicked");
+                
                 // Get form values
                 const nombre = document.getElementById('checkoutNombre').value;
                 const email = document.getElementById('checkoutEmail').value;
@@ -304,22 +308,23 @@
                     return;
                 }
                 
-                // Prepare form data
+                // Show loading indicator
+                completeCheckoutBtn.disabled = true;
+                completeCheckoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+                
+                // Show processing overlay
+                if (processingOverlay) {
+                    processingOverlay.style.display = 'flex';
+                }
+                
+                // Create form data
                 const formData = new FormData();
                 formData.append('nombre', nombre);
                 formData.append('email', email);
                 formData.append('telefono', telefono);
                 formData.append('documento_identidad', documento);
                 
-                // Show loading indicator
-                completeCheckoutBtn.disabled = true;
-                completeCheckoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
-                completeCheckoutBtn.classList.add('btn-processing');
-                
-                // Show processing overlay
-                if (processingOverlay) {
-                    processingOverlay.style.display = 'flex';
-                }
+                console.log("Sending checkout request");
                 
                 // Send request
                 fetch('{% url "complete_checkout" %}', {
@@ -330,6 +335,8 @@
                     }
                 })
                 .then(response => {
+                    console.log("Received response:", response.status);
+                    
                     // Hide processing overlay
                     if (processingOverlay) {
                         processingOverlay.style.display = 'none';
@@ -338,14 +345,14 @@
                     // Re-enable button
                     completeCheckoutBtn.disabled = false;
                     completeCheckoutBtn.innerHTML = 'Completar Reserva';
-                    completeCheckoutBtn.classList.remove('btn-processing');
                     
                     if (!response.ok) {
                         return response.text().then(text => {
+                            console.log("Error response text:", text);
                             try {
                                 return JSON.parse(text);
                             } catch (e) {
-                                console.error("Server returned non-JSON response:", text);
+                                console.error("Failed to parse response as JSON:", e);
                                 throw new Error(`Error del servidor (${response.status}). Por favor, intenta nuevamente.`);
                             }
                         });
@@ -353,18 +360,23 @@
                     return response.json();
                 })
                 .then(data => {
-                    console.log("Checkout response:", data);
+                    console.log("Checkout response data:", data);
+                    
                     if (data.success) {
                         // Show success modal
                         if (data.reserva_id) {
                             const reservaIdSpan = document.getElementById('reservaId');
-                            if (reservaIdSpan) reservaIdSpan.textContent = data.reserva_id;
+                            if (reservaIdSpan) {
+                                reservaIdSpan.textContent = data.reserva_id;
+                                console.log("Set reserva ID:", data.reserva_id);
+                            }
                         }
                         
                         const successModalEl = document.getElementById('successModal');
                         if (successModalEl) {
                             const successModal = new bootstrap.Modal(successModalEl);
                             successModal.show();
+                            console.log("Success modal shown");
                         } else {
                             console.error("Success modal element not found");
                             alert("¡Reserva creada exitosamente!");
@@ -375,6 +387,8 @@
                     }
                 })
                 .catch(error => {
+                    console.error('Error al procesar la reserva:', error);
+                    
                     // Hide processing overlay
                     if (processingOverlay) {
                         processingOverlay.style.display = 'none';
@@ -383,9 +397,7 @@
                     // Re-enable button
                     completeCheckoutBtn.disabled = false;
                     completeCheckoutBtn.innerHTML = 'Completar Reserva';
-                    completeCheckoutBtn.classList.remove('btn-processing');
                     
-                    console.error('Error al procesar la reserva:', error);
                     alert(`Error al procesar la reserva: ${error.message}. Por favor, intenta nuevamente.`);
                 });
             });

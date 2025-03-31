@@ -746,25 +746,81 @@ def complete_checkout(request):
             print("CART STRUCTURE:")
             print(f"Cart type: {type(cart)}")
             print(f"Cart keys: {cart.keys()}")
+            print(f"Cart servicios: {cart.get('servicios', [])}")
             
-            # Make a copy of the cart before checking if it's empty
-            cart_copy = cart.copy()
-            
-            if not cart.get('servicios') or len(cart.get('servicios', [])) == 0:
-                print("ERROR: Cart is empty or 'servicios' key is missing")
+            if not cart.get('servicios'):
                 return JsonResponse({'success': False, 'error': 'El carrito está vacío'})
             
-            # Create cliente and process the order with the cart copy
-            # This ensures we don't lose the cart data if the session is modified elsewhere
+            # Create cliente if it doesn't exist
+            cliente, created = Cliente.objects.get_or_create(
+                email=email,
+                defaults={
+                    'nombre': nombre,
+                    'telefono': telefono,
+                    'documento_identidad': documento_identidad
+                }
+            )
             
-            # Rest of your code using cart_copy instead of cart
-            # ...
+            # If cliente exists but we have new info, update it
+            if not created:
+                cliente.nombre = nombre
+                cliente.telefono = telefono
+                if documento_identidad:
+                    cliente.documento_identidad = documento_identidad
+                cliente.save()
             
+            # Create VentaReserva
+            with transaction.atomic():
+                venta = VentaReserva.objects.create(
+                    cliente=cliente,
+                    total=cart['total'],
+                    estado_pago='pendiente',
+                    estado_reserva='pendiente',
+                    fecha_reserva=timezone.now()
+                )
+                
+                # Create ReservaServicio for each service in cart
+                for servicio in cart['servicios']:
+                    # Get the service ID
+                    servicio_id = servicio.get('id')
+                    
+                    if not servicio_id:
+                        print(f"Warning: Missing service ID in cart item: {servicio}")
+                        continue
+                    
+                    servicio_obj = Servicio.objects.get(id=servicio_id)
+                    fecha = datetime.strptime(servicio['fecha'], '%Y-%m-%d').date()
+                    
+                    ReservaServicio.objects.create(
+                        venta_reserva=venta,
+                        servicio=servicio_obj,
+                        fecha_agendamiento=fecha,
+                        hora_inicio=servicio['hora'],
+                        cantidad_personas=servicio['cantidad_personas']
+                    )
+                
+                # Recalculate total based on the services added
+                venta.calcular_total()
+                venta.save()
+                
+                # Clear cart
+                request.session['cart'] = {'servicios': [], 'total': 0}
+                request.session.modified = True
+                
+                # Return success response
+                return JsonResponse({
+                    'success': True, 
+                    'message': 'Reserva creada exitosamente',
+                    'reserva_id': venta.id
+                })
+        
         except Exception as e:
-            messages.error(request, f'Error al procesar la compra: {str(e)}')
-            return redirect('checkout')
+            import traceback
+            traceback.print_exc()
+            return JsonResponse({'success': False, 'error': str(e)})
     
-    return render(request, 'ventas/checkout.html')
+    # If not POST, return error as JSON
+    return JsonResponse({'success': False, 'error': 'Método no permitido'})
 
 def get_available_hours(request):
     """
