@@ -1,76 +1,97 @@
 {% extends "admin/base_site.html" %}
-{% load static custom_tags ventas_extras %}
+{% load static custom_tags ventas_extras humanize %} {# Added humanize #}
+
+{% block extrahead %}
+    {{ block.super }}
+    <!-- Modern Airbnb-style CSS -->
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+    {# Font Awesome is loaded in admin/base_site.html #}
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h1>Productos Vendidos</h1>
+<div class="modern-container mt-4"> {# Use modern-container #}
+    <div class="page-header mb-4"> {# Use page-header #}
+        <h1>Productos Vendidos</h1>
+    </div>
 
-    <!-- Formulario de búsqueda y filtros -->
-    <form method="GET" action="" class="form-inline mb-4">
-        <div class="form-group mx-sm-3 mb-2">
-            <label for="fecha_inicio" class="sr-only">Fecha Inicio</label>
-            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio|date:'Y-m-d' }}" class="form-control" placeholder="Fecha Inicio" required>
+    <!-- Filter Form -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-filter me-2"></i>Filtros
         </div>
-        <div class="form-group mx-sm-3 mb-2">
-            <label for="fecha_fin" class="sr-only">Fecha Fin</label>
-            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin|date:'Y-m-d' }}" class="form-control" placeholder="Fecha Fin" required>
-        </div>
-        <div class="form-group mx-sm-3 mb-2">
-            <label for="proveedor" class="sr-only">Proveedor</label>
-            <select id="proveedor" name="proveedor" class="form-control">
+        <div class="card-body">
+            <form method="GET" action="" class="row g-3 align-items-end">
+                <div class="col-md-6 col-lg-3">
+                    <label for="fecha_inicio" class="form-label">Fecha Inicio:</label>
+                    <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio|date:'Y-m-d' }}" class="form-control" required>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="fecha_fin" class="form-label">Fecha Fin:</label>
+                    <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin|date:'Y-m-d' }}" class="form-control" required>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="proveedor" class="form-label">Proveedor:</label>
+                    <select id="proveedor" name="proveedor" class="form-select"> {# Use form-select #}
                 <option value="">Todos los proveedores</option>
                 {% for proveedor in proveedores %}
                     <option value="{{ proveedor.id }}" {% if proveedor_id == proveedor.id %}selected{% endif %}>{{ proveedor.nombre }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="form-group mx-sm-3 mb-2">
-            <label for="producto" class="sr-only">Producto</label>
-            <select id="producto" name="producto" class="form-control">
+                <div class="col-md-6 col-lg-3">
+                    <label for="producto" class="form-label">Producto:</label>
+                    <select id="producto" name="producto" class="form-select"> {# Use form-select #}
                 <option value="">Todos los productos</option>
                 {% for producto in productos_lista %}
                     <option value="{{ producto.id }}" {% if producto_id == producto.id|stringformat:"s" %}selected{% endif %}>{{ producto.nombre }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="btn-group mb-2">
-            <button type="submit" class="btn btn-primary">Buscar</button>
-            <button type="submit" name="export" value="excel" class="btn btn-success">
+                <div class="col-12 text-center mt-3">
+                    <button type="submit" class="btn btn-modern btn-primary-modern me-2">Buscar</button> {# Use modern button #}
+                    <button type="submit" name="export" value="excel" class="btn btn-modern btn-success-modern"> {# Use modern button #}
                 <i class="fas fa-file-excel"></i> Exportar a Excel
             </button>
         </div>
     </form>
 
     <!-- Mostrar los totales -->
-    <div class="alert alert-info mb-4">
-        <div class="row">
-            <div class="col-md-6">
-                <strong>Cantidad Total de Productos: </strong>{{ total_cantidad_productos }}
-            </div>
-            <div class="col-md-6">
-                <strong>Monto Total del Periodo: </strong>{{ total_monto_periodo|formato_clp }}
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Cantidad Total de Productos: </strong>{{ total_cantidad_productos|default:0 }}
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <strong>Monto Total del Periodo: </strong>{{ total_monto_periodo|intcomma }} {# Use humanize #}
             </div>
         </div>
     </div>
 
     <!-- Tabla de productos vendidos -->
-    <table class="table table-striped table-bordered">
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-boxes me-2"></i>Resultados
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0"> {# Added table-hover #}
         <thead>
             <tr>
-                <th>ID Venta/Reserva</th>
-                <th>Cliente</th>
-                <th>Fecha Venta</th>
-                <th>Proveedor</th>
-                <th>Producto</th>
-                <th>Cantidad</th>
-                <th>Precio Unitario</th>
-                <th>Monto Total</th>
+                <th class="px-4 py-3">ID Venta/Reserva</th>
+                <th class="px-4 py-3">Cliente</th>
+                <th class="px-4 py-3">Fecha Venta</th>
+                <th class="px-4 py-3">Proveedor</th>
+                <th class="px-4 py-3">Producto</th>
+                <th class="px-4 py-3 text-end">Cantidad</th> {# Align right #}
+                <th class="px-4 py-3 text-end">Precio Unitario</th> {# Align right #}
+                <th class="px-4 py-3 text-end">Monto Total</th> {# Align right #}
             </tr>
         </thead>
         <tbody>
             {% for producto in productos %}
             <tr>
-                <td>
+                <td class="px-4 py-3">
                     {% if producto.venta_reserva_id %}
                         <a href="{% url 'venta_reserva_detail' producto.venta_reserva_id %}">
                             {{ producto.venta_reserva_id }}
@@ -79,25 +100,23 @@
                         Sin ID
                     {% endif %}
                 </td>
-                <td>{{ producto.venta_reserva__cliente__nombre }}</td>
-                <td>{{ producto.venta_reserva__fecha_reserva|date:"Y-m-d H:i" }}</td>
-                <td>{{ producto.producto__proveedor__nombre }}</td>
-                <td>{{ producto.producto__nombre }}</td>
-                <td>{{ producto.cantidad }}</td>
-                <td>{{ producto.producto__precio_base|formato_clp }}</td>
-                <td>{{ producto.cantidad|multiply:producto.producto__precio_base|formato_clp }}</td>
+                <td class="px-4 py-3">{{ producto.venta_reserva__cliente__nombre }}</td>
+                <td class="px-4 py-3">{{ producto.venta_reserva__fecha_reserva|date:"Y-m-d H:i" }}</td>
+                <td class="px-4 py-3">{{ producto.producto__proveedor__nombre }}</td>
+                <td class="px-4 py-3">{{ producto.producto__nombre }}</td>
+                <td class="px-4 py-3 text-end">{{ producto.cantidad }}</td> {# Align right #}
+                <td class="px-4 py-3 text-end">{{ producto.producto__precio_base|intcomma }}</td> {# Use humanize #}
+                <td class="px-4 py-3 text-end">{{ producto.cantidad|multiply:producto.producto__precio_base|intcomma }}</td> {# Use humanize #}
             </tr>
             {% empty %}
             <tr>
-                <td colspan="8">No se encontraron productos vendidos.</td>
+                <td colspan="8" class="text-center py-4">No se encontraron productos vendidos.</td> {# Centered text #}
             </tr>
             {% endfor %}
         </tbody>
     </table>
+            </div>
+        </div>
+    </div>
 </div>
-
-{% block extrahead %}
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
 {% endblock %}
-
-{% endblock %} 

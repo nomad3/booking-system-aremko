@@ -1,422 +1,94 @@
+{% extends "ventas/base_public.html" %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aremko - Reserva de Servicios</title>
-    
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Flatpickr for date picker -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    
-    <!-- Custom CSS -->
-    <style>
-        :root {
-            --primary-color: #FF5A5F;
-            --secondary-color: #00A699;
-            --dark-gray: #484848;
-            --light-gray: #767676;
-            --background: #f7f7f7;
-            --white: #ffffff;
-        }
-        
-        body {
-            font-family: 'Nunito', sans-serif;
-            background-color: var(--background);
-            color: var(--dark-gray);
-        }
-        
-        .navbar-brand {
-            font-weight: 700;
-            color: var(--primary-color) !important;
-        }
-        
-        .hero-section {
-            background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://images.unsplash.com/photo-1540555700478-4be289fbecef?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80');
-            background-size: cover;
-            background-position: center;
-            color: white;
-            padding: 100px 0;
-            margin-bottom: 50px;
-        }
-        
-        .hero-content {
-            max-width: 600px;
-            margin: 0 auto;
-            text-align: center;
-        }
-        
-        .hero-content h1 {
-            font-size: 3rem;
-            font-weight: 700;
-            margin-bottom: 20px;
-        }
-        
-        .hero-content p {
-            font-size: 1.2rem;
-            margin-bottom: 30px;
-        }
-        
-        .section-title {
-            text-align: center;
-            margin-bottom: 40px;
-            font-weight: 700;
-            color: var(--dark-gray);
-        }
-        
-        .card {
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            margin-bottom: 30px;
-            border: none;
-        }
-        
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-        }
-        
-        .card-img-top {
-            height: 200px;
-            object-fit: cover;
-        }
-        
-        .card-body {
-            padding: 20px;
-        }
-        
-        .card-title {
-            font-weight: 700;
-            margin-bottom: 10px;
-        }
-        
-        .card-text {
-            color: var(--light-gray);
-            margin-bottom: 15px;
-        }
-        
-        .price {
-            font-weight: 700;
-            color: var(--primary-color);
-            font-size: 1.2rem;
-            margin-bottom: 15px;
-        }
-        
-        .btn-primary {
-            background-color: var(--primary-color);
-            border-color: var(--primary-color);
-            border-radius: 8px;
-            font-weight: 600;
-            padding: 10px 20px;
-        }
-        
-        .btn-primary:hover {
-            background-color: #ff3a40;
-            border-color: #ff3a40;
-        }
-        
-        .btn-secondary {
-            background-color: var(--secondary-color);
-            border-color: var(--secondary-color);
-            border-radius: 8px;
-            font-weight: 600;
-            padding: 10px 20px;
-        }
-        
-        .btn-secondary:hover {
-            background-color: #008f86;
-            border-color: #008f86;
-        }
-        
-        .features-section {
-            padding: 80px 0;
-            background-color: white;
-        }
-        
-        .feature-box {
-            text-align: center;
-            padding: 30px 20px;
-        }
-        
-        .feature-icon {
-            font-size: 3rem;
-            color: var(--primary-color);
-            margin-bottom: 20px;
-        }
-        
-        .feature-title {
-            font-weight: 700;
-            margin-bottom: 15px;
-        }
-        
-        .testimonials-section {
-            padding: 80px 0;
-            background-color: #f8f9fa;
-        }
-        
-        .testimonial-card {
-            padding: 30px;
-            border-radius: 12px;
-            background-color: white;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
-        }
-        
-        .testimonial-text {
-            font-style: italic;
-            margin-bottom: 20px;
-        }
-        
-        .testimonial-author {
-            font-weight: 700;
-        }
-        
-        .footer {
-            background-color: var(--dark-gray);
-            color: white;
-            padding: 50px 0 20px;
-        }
-        
-        .footer h5 {
-            font-weight: 700;
-            margin-bottom: 20px;
-        }
-        
-        .footer ul {
-            list-style: none;
-            padding-left: 0;
-        }
-        
-        .footer ul li {
-            margin-bottom: 10px;
-        }
-        
-        .footer ul li a {
-            color: #ddd;
-            text-decoration: none;
-        }
-        
-        .footer ul li a:hover {
-            color: white;
-        }
-        
-        .social-icons {
-            font-size: 1.5rem;
-            margin-right: 15px;
-        }
-        
-        .copyright {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #666;
-            text-align: center;
-        }
-        
-        /* Shopping Cart Styles */
-        .cart-icon {
-            position: relative;
-            cursor: pointer;
-        }
-        
-        .cart-count {
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            background-color: var(--primary-color);
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            font-weight: 700;
-        }
-        
-        .cart-dropdown {
-            position: absolute;
-            right: 0;
-            top: 100%;
-            width: 350px;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            z-index: 1000;
-            display: none;
-        }
-        
-        .cart-dropdown.show {
-            display: block;
-        }
-        
-        .cart-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .cart-item-details {
-            flex: 1;
-        }
-        
-        .cart-item-title {
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        
-        .cart-item-info {
-            font-size: 0.8rem;
-            color: var(--light-gray);
-        }
-        
-        .cart-item-price {
-            font-weight: 700;
-            color: var(--primary-color);
-        }
-        
-        .cart-item-remove {
-            color: var(--light-gray);
-            cursor: pointer;
-            margin-left: 10px;
-        }
-        
-        .cart-item-remove:hover {
-            color: var(--primary-color);
-        }
-        
-        .cart-total {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 0;
-            font-weight: 700;
-        }
-        
-        .modal-body {
-            padding: 30px;
-        }
-        
-        .booking-form label {
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        
-        .booking-form .form-control {
-            border-radius: 8px;
-            padding: 10px 15px;
-            margin-bottom: 20px;
-        }
-        
-        .booking-form .form-select {
-            border-radius: 8px;
-            padding: 10px 15px;
-            margin-bottom: 20px;
-        }
-        
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            .hero-content h1 {
-                font-size: 2.5rem;
-            }
-            
-            .cart-dropdown {
-                width: 300px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-white py-3">
-        <div class="container">
-            <a class="navbar-brand" href="{% url 'homepage' %}">
-                AREMKO
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="#servicios">Servicios</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#caracteristicas">Características</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#testimonios">Testimonios</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#contacto">Contacto</a>
-                    </li>
-                </ul>
-                <div class="d-flex align-items-center">
-                    <div class="cart-icon me-4" id="cartIcon">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span class="cart-count" id="cartCount">{{ cart.servicios|length }}</span>
-                        
-                        <!-- Cart Dropdown -->
-                        <div class="cart-dropdown" id="cartDropdown">
-                            <h5 class="mb-3">Tu Carrito</h5>
-                            <div id="cartItems">
-                                {% if cart.servicios %}
-                                    {% for item in cart.servicios %}
-                                        <div class="cart-item">
-                                            <div class="cart-item-details">
-                                                <div class="cart-item-title">{{ item.nombre }}</div>
-                                                <div class="cart-item-info">
-                                                    {{ item.fecha }} | {{ item.hora }} | {{ item.cantidad_personas }} persona(s)
-                                                </div>
-                                            </div>
-                                            <div class="cart-item-price">${{ item.subtotal }}</div>
-                                            <div class="cart-item-remove" onclick="removeFromCart({{ forloop.counter0 }})">
-                                                <i class="fas fa-times"></i>
-                                            </div>
-                                        </div>
-                                    {% endfor %}
-                                {% else %}
-                                    <p class="text-center">Tu carrito está vacío</p>
-                                {% endif %}
-                            </div>
-                            
-                            {% if cart.servicios %}
-                                <div class="cart-total">
-                                    <span>Total:</span>
-                                    <span id="cartTotal">${{ cart.total }}</span>
-                                </div>
-                                <button class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#checkoutModal">
-                                    Finalizar Reserva
-                                </button>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <a href="{% url 'inicio_sistema' %}" class="btn btn-outline-secondary">
-                        <i class="fas fa-user me-2"></i>Acceso Admin
-                    </a>
-                </div>
-            </div>
-        </div>
-    </nav>
 
-    <!-- Hero Section -->
-    <section class="hero-section">
-        <div class="container">
+{% block title %}Aremko - Reserva de Servicios{% endblock %}
+
+{% block extra_style %}
+<style>
+/* Homepage specific styles */
+.hero-section {
+    background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://images.unsplash.com/photo-1540555700478-4be289fbecef?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80');
+    background-size: cover;
+    background-position: center;
+    color: white;
+    padding: 100px 0;
+    margin-bottom: 50px;
+}
+
+.hero-content {
+    max-width: 600px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.hero-content h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+
+.hero-content p {
+    font-size: 1.2rem;
+    margin-bottom: 30px;
+}
+
+.features-section {
+    padding: 80px 0;
+    background-color: white;
+}
+
+.feature-box {
+    text-align: center;
+    padding: 30px 20px;
+}
+
+.feature-icon {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: 20px;
+}
+
+.feature-title {
+    font-weight: 700;
+    margin-bottom: 15px;
+}
+
+.testimonials-section {
+    padding: 80px 0;
+    background-color: #f8f9fa;
+}
+
+.testimonial-card {
+    padding: 30px;
+    border-radius: 12px;
+    background-color: white;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    margin-bottom: 30px;
+}
+
+.testimonial-text {
+    font-style: italic;
+    margin-bottom: 20px;
+}
+
+.testimonial-author {
+    font-weight: 700;
+}
+
+/* Responsive adjustments for hero */
+@media (max-width: 768px) {
+    .hero-content h1 {
+        font-size: 2.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
             <div class="hero-content">
                 <h1>Reserva tus servicios en Aremko</h1>
                 <p>Descubre y reserva los mejores servicios para tu bienestar y comodidad.</p>
@@ -427,10 +99,10 @@
         </div>
     </section>
 
-    <!-- Services Section -->
-    <section class="container mb-5" id="servicios">
-        <h2 class="section-title mb-4">Nuestros Servicios</h2>
-        
+<!-- Services Section -->
+<section class="container mb-5" id="servicios">
+    <h2 class="section-title mb-4">Nuestros Servicios</h2>
+    
         <!-- Category Filter -->
         <div class="row mb-4">
             <div class="col-12">
@@ -467,11 +139,11 @@
         </div>
     </section>
 
-    <!-- Features Section -->
-    <section class="features-section" id="caracteristicas">
-        <div class="container">
-            <h2 class="section-title mb-5">¿Por qué elegirnos?</h2>
-            <div class="row">
+<!-- Features Section -->
+<section class="features-section" id="caracteristicas">
+    <div class="container">
+        <h2 class="section-title mb-5">¿Por qué elegirnos?</h2>
+        <div class="row">
                 <div class="col-lg-3 col-md-6">
                     <div class="feature-box">
                         <div class="feature-icon">
@@ -512,11 +184,11 @@
         </div>
     </section>
 
-    <!-- Testimonials Section -->
-    <section class="testimonials-section" id="testimonios">
-        <div class="container">
-            <h2 class="section-title mb-5">Lo que dicen nuestros clientes</h2>
-            <div class="row">
+<!-- Testimonials Section -->
+<section class="testimonials-section" id="testimonios">
+    <div class="container">
+        <h2 class="section-title mb-5">Lo que dicen nuestros clientes</h2>
+        <div class="row">
                 <div class="col-lg-4 col-md-6">
                     <div class="testimonial-card">
                         <div class="testimonial-text">
@@ -545,52 +217,12 @@
         </div>
     </section>
 
-    <!-- Footer -->
-    <footer class="footer" id="contacto">
-        <div class="container">
-            <div class="row">
-                <div class="col-lg-4 col-md-6 mb-4">
-                    <h5>Aremko</h5>
-                    <p>Ofrecemos los mejores servicios para tu bienestar y comodidad. Reserva ahora y disfruta de una experiencia única.</p>
-                    <div class="mt-3">
-                        <a href="#" class="text-white social-icons"><i class="fab fa-facebook"></i></a>
-                        <a href="#" class="text-white social-icons"><i class="fab fa-instagram"></i></a>
-                        <a href="#" class="text-white social-icons"><i class="fab fa-twitter"></i></a>
-                    </div>
-                </div>
-                <div class="col-lg-2 col-md-6 mb-4">
-                    <h5>Enlaces</h5>
-                    <ul>
-                        <li><a href="#servicios">Servicios</a></li>
-                        <li><a href="#caracteristicas">Características</a></li>
-                        <li><a href="#testimonios">Testimonios</a></li>
-                        <li><a href="#contacto">Contacto</a></li>
-                    </ul>
-                </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <h5>Servicios</h5>
-                    <ul>
-                        {% for categoria in categorias %}
-                            <li><a href="#servicios">{{ categoria.nombre }}</a></li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <h5>Contacto</h5>
-                    <ul>
-                        <li><i class="fas fa-map-marker-alt me-2"></i> Dirección, Ciudad, País</li>
-                        <li><i class="fas fa-phone me-2"></i> +56 9 1234 5678</li>
-                        <li><i class="fas fa-envelope me-2"></i> info@aremko.cl</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="copyright">
-                <p>&copy; 2025 Aremko. Todos los derechos reservados.</p>
-            </div>
         </div>
-    </footer>
+    </section>
+{% endblock %}
 
-    <!-- Booking Modal -->
+{% block modals %}
+<!-- Booking Modal (Specific to homepage, keep it here) -->
     <div class="modal fade" id="bookingModal" tabindex="-1" aria-labelledby="bookingModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -647,377 +279,210 @@
             </div>
         </div>
     </div>
+{# Checkout and Success modals are now in base_public.html #}
+{% endblock %}
 
-    <!-- Checkout Modal -->
-    <div class="modal fade" id="checkoutModal" tabindex="-1" aria-labelledby="checkoutModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="checkoutModalLabel">Finalizar Reserva</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="checkoutForm" class="booking-form">
-                        <div class="mb-3">
-                            <label for="nombre" class="form-label">Nombre Completo</label>
-                            <input type="text" class="form-control" id="nombre" name="nombre" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="email" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="email" name="email" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="telefono" class="form-label">Teléfono</label>
-                            <input type="tel" class="form-control" id="telefono" name="telefono" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="documento_identidad" class="form-label">ID/DNI/Passport/RUT (opcional)</label>
-                            <input type="text" class="form-control" id="documento_identidad" name="documento_identidad">
-                        </div>
-                        
-                        <div class="mb-4">
-                            <h6>Resumen de la Reserva</h6>
-                            <div id="checkoutItems">
-                                {% for item in cart.servicios %}
-                                    <div class="cart-item">
-                                        <div class="cart-item-details">
-                                            <div class="cart-item-title">{{ item.nombre }}</div>
-                                            <div class="cart-item-info">
-                                                {{ item.fecha }} | {{ item.hora }} | {{ item.cantidad_personas }} persona(s)
-                                            </div>
-                                        </div>
-                                        <div class="cart-item-price">${{ item.subtotal }}</div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                            
-                            <div class="cart-total">
-                                <span>Total:</span>
-                                <span id="checkoutTotal">${{ cart.total }}</span>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" id="completeCheckoutBtn">Completar Reserva</button>
-                </div>
-            </div>
-        </div>
-    </div>
+{% block extra_script %}
+<script>
+    // Make openBookingModal globally accessible
+    window.openBookingModal = function(servicioId, servicioNombre, servicioPrecio) {
+        console.log("Opening booking modal for:", servicioId, servicioNombre, servicioPrecio);
+        currentServicioId = servicioId;
+        currentServicioNombre = servicioNombre;
+        currentServicioPrecio = servicioPrecio;
 
-    <!-- Success Modal -->
-    <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="successModalLabel">¡Reserva Exitosa!</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body text-center">
-                    <i class="fas fa-check-circle text-success" style="font-size: 4rem; margin-bottom: 20px;"></i>
-                    <h4>¡Gracias por tu reserva!</h4>
-                    <p>Tu reserva ha sido procesada exitosamente. Hemos enviado un correo electrónico con los detalles de tu reserva.</p>
-                    <p>ID de Reserva: <span id="reservaId"></span></p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Cerrar</button>
-                </div>
-            </div>
-        </div>
-    </div>
+        document.getElementById('servicioId').value = servicioId;
+        document.getElementById('servicioNombre').value = servicioNombre;
+        document.getElementById('fecha').value = '';
+        document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
+        document.getElementById('cantidadPersonas').value = '1';
+        document.getElementById('precioTotal').value = servicioPrecio;
 
-    <!-- Bootstrap JS Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Flatpickr JS -->
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    
-    <!-- Custom JS -->
-    <script>
-        // Variables globales
-        let currentServicioId = null;
-        let currentServicioNombre = null;
-        let currentServicioPrecio = 0;
-        
-        // Función para abrir el modal de reserva
-        function openBookingModal(servicioId, servicioNombre, servicioPrecio) {
-            currentServicioId = servicioId;
-            currentServicioNombre = servicioNombre;
-            currentServicioPrecio = servicioPrecio;
-            
-            // Establecer valores en el formulario
-            document.getElementById('servicioId').value = servicioId;
-            document.getElementById('servicioNombre').value = servicioNombre;
-            
-            // Limpiar campos
-            document.getElementById('fecha').value = '';
-            document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
-            document.getElementById('cantidadPersonas').value = '1';
-            document.getElementById('precioTotal').value = servicioPrecio;
-            
-            // Mostrar el modal
-            const bookingModal = new bootstrap.Modal(document.getElementById('bookingModal'));
+        const bookingModalEl = document.getElementById('bookingModal');
+        if (bookingModalEl) {
+            const bookingModal = new bootstrap.Modal(bookingModalEl);
             bookingModal.show();
+        } else {
+            console.error("Booking modal element not found");
         }
-        
-        // Función para cargar horas disponibles
-        function loadAvailableHours(servicioId, fecha) {
-            // Limpiar selector de horas
-            const horaSelect = document.getElementById('hora');
-            horaSelect.innerHTML = '<option value="">Cargando horas disponibles...</option>';
-            
-            // Realizar petición AJAX para obtener horas disponibles
-            fetch(`{% url 'get_available_hours' %}?servicio_id=${servicioId}&fecha=${fecha}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Limpiar selector
-                        horaSelect.innerHTML = '<option value="">Selecciona una hora</option>';
-                        
-                        // Agregar horas disponibles
-                        data.horas_disponibles.forEach(hora => {
-                            const option = document.createElement('option');
-                            option.value = hora;
-                            option.textContent = hora;
-                            horaSelect.appendChild(option);
-                        });
-                    } else {
-                        console.error('Error al cargar horas disponibles:', data.error);
-                        horaSelect.innerHTML = '<option value="">Error al cargar horas</option>';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error en la petición:', error);
-                    horaSelect.innerHTML = '<option value="">Error al cargar horas</option>';
-                });
+    }
+
+    // Variables globales específicas de la homepage
+    let currentServicioId = null;
+    let currentServicioNombre = null;
+    let currentServicioPrecio = 0;
+
+    // Función para cargar horas disponibles (específica de homepage)
+    function loadAvailableHours(servicioId, fecha) {
+        console.log("Loading available hours for:", servicioId, fecha);
+        const horaSelect = document.getElementById('hora');
+        if (!horaSelect) {
+            console.error("Hora select element not found");
+            return;
         }
-        
-        // Función para actualizar el precio total
-        function updatePrecioTotal() {
-            const cantidadPersonas = parseInt(document.getElementById('cantidadPersonas').value);
-            const precioTotal = currentServicioPrecio * cantidadPersonas;
-            document.getElementById('precioTotal').value = precioTotal;
-        }
-        
-        // Función para agregar al carrito
-        function addToCart() {
-            const servicioId = document.getElementById('servicioId').value;
-            const fecha = document.getElementById('fecha').value;
-            const hora = document.getElementById('hora').value;
-            const cantidadPersonas = document.getElementById('cantidadPersonas').value;
-            
-            // Validar campos
-            if (!fecha) {
-                alert('Por favor selecciona una fecha');
-                return;
-            }
-            
-            if (!hora) {
-                alert('Por favor selecciona una hora');
-                return;
-            }
-            
-            // Crear FormData para enviar
-            const formData = new FormData();
-            formData.append('servicio_id', servicioId);
-            formData.append('fecha', fecha);
-            formData.append('hora', hora);
-            formData.append('cantidad_personas', cantidadPersonas);
-            
-            // Enviar petición AJAX
-            fetch('{% url "add_to_cart" %}', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
-                }
-            })
+        horaSelect.innerHTML = '<option value="">Cargando horas disponibles...</option>';
+        horaSelect.disabled = true; // Disable while loading
+
+        fetch(`{% url 'get_available_hours' %}?servicio_id=${servicioId}&fecha=${fecha}`)
             .then(response => {
-                // Redirigir a la página de checkout
-                window.location.href = "{% url 'checkout' %}";
-            })
-            .catch(error => {
-                console.error('Error al agregar al carrito:', error);
-                alert('Error al agregar al carrito. Por favor intenta de nuevo.');
-            });
-        }
-        
-        // Función para eliminar del carrito
-        function removeFromCart(index) {
-            // Crear FormData para enviar
-            const formData = new FormData();
-            formData.append('index', index);
-            
-            // Enviar petición AJAX
-            fetch('{% url "remove_from_cart" %}', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
+                return response.json();
             })
-            .then(response => response.json())
             .then(data => {
-                if (data.success) {
-                    // Actualizar carrito en la página
-                    window.location.reload();
+                console.log("Available hours response:", data);
+                horaSelect.innerHTML = '<option value="">Selecciona una hora</option>';
+                if (data.success && data.horas_disponibles.length > 0) {
+                    data.horas_disponibles.forEach(hora => {
+                        const option = document.createElement('option');
+                        option.value = hora;
+                        option.textContent = hora;
+                        horaSelect.appendChild(option);
+                    });
+                    horaSelect.disabled = false; // Enable after loading
                 } else {
-                    console.error('Error al eliminar del carrito:', data.error);
-                    alert('Error al eliminar del carrito. Por favor intenta de nuevo.');
+                    horaSelect.innerHTML = '<option value="">No hay horas disponibles</option>';
+                    console.warn('No available hours found or error:', data.error);
                 }
             })
             .catch(error => {
-                console.error('Error en la petición:', error);
-                alert('Error al eliminar del carrito. Por favor intenta de nuevo.');
+                console.error('Error fetching available hours:', error);
+                horaSelect.innerHTML = '<option value="">Error al cargar horas</option>';
+                // Keep disabled on error
             });
+    }
+
+    // Función para actualizar el precio total (específica de homepage)
+    function updatePrecioTotal() {
+        const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
+        const precioTotalInput = document.getElementById('precioTotal');
+        if (cantidadPersonasSelect && precioTotalInput) {
+            const cantidadPersonas = parseInt(cantidadPersonasSelect.value);
+            const precioTotal = currentServicioPrecio * cantidadPersonas;
+            precioTotalInput.value = precioTotal;
+            console.log("Updated total price:", precioTotal);
         }
-        
-        // Función para completar el checkout
-        function completeCheckout() {
-            const nombre = document.getElementById('nombre').value;
-            const email = document.getElementById('email').value;
-            const telefono = document.getElementById('telefono').value;
-            const documento_identidad = document.getElementById('documento_identidad').value;
-            
-            // Validar campos
-            if (!nombre) {
-                alert('Por favor ingresa tu nombre');
-                return;
-            }
-            
-            if (!email) {
-                alert('Por favor ingresa tu email');
-                return;
-            }
-            
-            if (!telefono) {
-                alert('Por favor ingresa tu teléfono');
-                return;
-            }
-            
-            // Crear FormData para enviar
-            const formData = new FormData();
-            formData.append('nombre', nombre);
-            formData.append('email', email);
-            formData.append('telefono', telefono);
-            formData.append('documento_identidad', documento_identidad);
-            
-            // Enviar petición AJAX
-            fetch('{% url "checkout_api" %}', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Mostrar modal de éxito
-                    document.getElementById('reservaId').textContent = data.reserva_id;
-                    
-                    // Cerrar modal de checkout
-                    const checkoutModal = bootstrap.Modal.getInstance(document.getElementById('checkoutModal'));
-                    checkoutModal.hide();
-                    
-                    // Mostrar modal de éxito
-                    const successModal = new bootstrap.Modal(document.getElementById('successModal'));
-                    successModal.show();
-                } else {
-                    console.error('Error en el checkout:', data.error);
-                    alert('Error al procesar la reserva: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error en la petición:', error);
-                alert('Error al procesar la reserva. Por favor intenta de nuevo.');
-            });
+    }
+
+    // Función para agregar al carrito (específica de homepage)
+    function addToCart() {
+        console.log("Attempting to add to cart...");
+        const servicioId = document.getElementById('servicioId').value;
+        const fecha = document.getElementById('fecha').value;
+        const hora = document.getElementById('hora').value;
+        const cantidadPersonas = document.getElementById('cantidadPersonas').value;
+
+        if (!fecha) {
+            alert('Por favor selecciona una fecha');
+            return;
         }
-        
-        // Función para obtener cookie CSRF
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
+        if (!hora) {
+            alert('Por favor selecciona una hora');
+            return;
         }
-        
-        // Inicializar
-        document.addEventListener('DOMContentLoaded', function() {
-            // Inicializar el carrito
-            const cartIcon = document.getElementById('cartIcon');
-            cartIcon.addEventListener('click', function() {
-                window.location.href = "{% url 'cart' %}";
-            });
-            
-            // Inicializar Flatpickr para el selector de fecha
-            flatpickr("#fecha", {
+
+        const formData = new FormData();
+        formData.append('servicio_id', servicioId);
+        formData.append('fecha', fecha);
+        formData.append('hora', hora);
+        formData.append('cantidad_personas', cantidadPersonas);
+
+        console.log("Adding to cart with data:", { servicioId, fecha, hora, cantidadPersonas });
+
+        fetch('{% url "add_to_cart" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken') // Assumes getCookie is global (from base)
+            }
+        })
+        .then(response => {
+            console.log("Add to cart response status:", response.status);
+            if (!response.ok) {
+                 // If response is not ok, try to read error message if available
+                 return response.text().then(text => {
+                     throw new Error(`Server responded with ${response.status}: ${text || 'No additional error info'}`);
+                 });
+            }
+             // Check if the response is a redirect (status 3xx) or success (status 2xx)
+             // Django redirects often return 302, fetch might follow it automatically
+             // If fetch followed redirect, response.url will be the new URL
+            if (response.redirected) {
+                 console.log("Redirected after add to cart, going to:", response.url);
+                 window.location.href = response.url; // Go to the redirected page (likely checkout)
+            } else {
+                 // If not redirected, assume success and manually redirect (or update UI)
+                 console.log("Add to cart successful, redirecting to checkout...");
+                 window.location.href = "{% url 'checkout' %}";
+            }
+        })
+        .catch(error => {
+            console.error('Error adding to cart:', error);
+            alert(`Error al agregar al carrito: ${error.message}. Por favor intenta de nuevo.`);
+        });
+    }
+
+    // Inicializar listeners específicos de la homepage
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("Homepage DOMContentLoaded");
+
+        // Flatpickr for date picker
+        const fechaInput = document.getElementById('fecha');
+        if (fechaInput) {
+            flatpickr(fechaInput, {
                 minDate: "today",
                 dateFormat: "Y-m-d",
-                locale: {
-                    firstDayOfWeek: 1,
-                    weekdays: {
-                        shorthand: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'],
-                        longhand: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-                    },
-                    months: {
-                        shorthand: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
-                        longhand: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-                    }
-                },
+                locale: "es",
                 onChange: function(selectedDates, dateStr) {
-                    // Cuando cambia la fecha, cargar las horas disponibles
                     if (currentServicioId) {
                         loadAvailableHours(currentServicioId, dateStr);
                     }
                 }
             });
-            
-            // Agregar evento de cambio al selector de cantidad de personas
-            document.getElementById('cantidadPersonas').addEventListener('change', updatePrecioTotal);
-            
-            // Agregar evento de clic al botón de agregar al carrito
-            document.getElementById('addToCartBtn').addEventListener('click', addToCart);
-            
-            // Agregar evento de clic al botón de completar checkout
-            document.getElementById('completeCheckoutBtn').addEventListener('click', completeCheckout);
-            
-            // Inicializar filtro de categorías
-            document.querySelectorAll('.category-filter').forEach(button => {
-                button.addEventListener('click', function() {
-                    const category = this.getAttribute('data-category');
-                    
-                    // Remover clase activa de todos los botones
-                    document.querySelectorAll('.category-filter').forEach(btn => {
-                        btn.classList.remove('active');
-                    });
-                    
-                    // Agregar clase activa al botón seleccionado
-                    this.classList.add('active');
-                    
-                    // Filtrar tarjetas de servicios
-                    document.querySelectorAll('.service-card').forEach(card => {
-                        if (category === 'all' || card.getAttribute('data-category') === category) {
-                            card.style.display = 'block';
-                        } else {
-                            card.style.display = 'none';
-                        }
-                    });
+            console.log("Flatpickr initialized for #fecha");
+        } else {
+            console.error("Fecha input element not found");
+        }
+
+        // Listener for quantity change
+        const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
+        if (cantidadPersonasSelect) {
+            cantidadPersonasSelect.addEventListener('change', updatePrecioTotal);
+            console.log("Event listener added for #cantidadPersonas change");
+        } else {
+             console.error("CantidadPersonas select element not found");
+        }
+
+        // Listener for "Add to Cart" button in modal
+        const addToCartBtn = document.getElementById('addToCartBtn');
+        if (addToCartBtn) {
+            addToCartBtn.addEventListener('click', addToCart);
+            console.log("Event listener added for #addToCartBtn click");
+        } else {
+             console.error("Add to cart button element not found");
+        }
+
+        // Listener for category filters
+        document.querySelectorAll('.category-filter').forEach(button => {
+            button.addEventListener('click', function() {
+                const category = this.getAttribute('data-category');
+                console.log("Category filter clicked:", category);
+
+                document.querySelectorAll('.category-filter').forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+
+                document.querySelectorAll('.service-card').forEach(card => {
+                    if (category === 'all' || card.getAttribute('data-category') === category) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
                 });
             });
         });
-    </script>
-</body>
-</html>
+        console.log("Event listeners added for category filters");
+
+    });
+</script>
+{% endblock %}

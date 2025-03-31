@@ -1,85 +1,109 @@
 {% extends "admin/base_site.html" %}
+{% load static humanize %} {# Added humanize #}
+
+{% block extrahead %}
+    {{ block.super }}
+    <!-- Modern Airbnb-style CSS -->
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+    {# Font Awesome is loaded in admin/base_site.html #}
+{% endblock %}
 
 {% block content %}
+{% include 'base_menu.html' %} {# Assuming this menu is styled correctly #}
 
-{% include 'base_menu.html' %}
+<div class="modern-container mt-4"> {# Use modern-container #}
+    <div class="page-header mb-4"> {# Use page-header #}
+        <h1>Servicios Vendidos</h1>
+    </div>
 
-<div class="container" style="text-align: center; margin-top: 50px;">
-    <h1>Servicios Vendidos</h1>
-
-    <!-- Formulario de búsqueda y filtros -->
-    <form method="GET" action="" class="form-inline mb-4">
-        <div class="form-group mx-sm-3 mb-2">
-            <label for="fecha_inicio" class="sr-only">Fecha Inicio</label>
-            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio|date:'Y-m-d' }}" class="form-control" placeholder="Fecha Inicio" required>
+    <!-- Filter Form -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-filter me-2"></i>Filtros
         </div>
-        <div class="form-group mx-sm-3 mb-2">
-            <label for="fecha_fin" class="sr-only">Fecha Fin</label>
-            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin|date:'Y-m-d' }}" class="form-control" placeholder="Fecha Fin" required>
-        </div>
-        <div class="form-group mx-sm-3 mb-2">
-            <label for="categoria" class="sr-only">Categoría</label>
-            <select id="categoria" name="categoria" class="form-control">
+        <div class="card-body">
+            <form method="GET" action="" class="row g-3 align-items-end">
+                <div class="col-md-6 col-lg-3">
+                    <label for="fecha_inicio" class="form-label">Fecha Inicio:</label>
+                    <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio|date:'Y-m-d' }}" class="form-control" required>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="fecha_fin" class="form-label">Fecha Fin:</label>
+                    <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin|date:'Y-m-d' }}" class="form-control" required>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="categoria" class="form-label">Categoría:</label>
+                    <select id="categoria" name="categoria" class="form-select"> {# Use form-select #}
                 <option value="">Todas las categorías</option>
                 {% for categoria in categorias %}
                     <option value="{{ categoria.id }}" {% if categoria_id == categoria.id %}selected{% endif %}>{{ categoria.nombre }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="form-group mx-sm-3 mb-2">
-            <label for="venta_reserva_id" class="sr-only">ID Venta/Reserva</label>
-            <input type="text" id="venta_reserva_id" name="venta_reserva_id" value="{{ venta_reserva_id }}" class="form-control" placeholder="ID Venta/Reserva">
-        </div>
-        <div class="btn-group mb-2">
-            <button type="submit" class="btn btn-primary">Buscar</button>
-            <button type="submit" name="export" value="excel" class="btn btn-success">
+                <div class="col-md-6 col-lg-3">
+                    <label for="venta_reserva_id" class="form-label">ID Venta/Reserva:</label>
+                    <input type="text" id="venta_reserva_id" name="venta_reserva_id" value="{{ venta_reserva_id }}" class="form-control" placeholder="ID Venta/Reserva">
+                </div>
+                <div class="col-12 text-center mt-3">
+                    <button type="submit" class="btn btn-modern btn-primary-modern me-2">Buscar</button> {# Use modern button #}
+                    <button type="submit" name="export" value="excel" class="btn btn-modern btn-success-modern"> {# Use modern button #}
                 <i class="fas fa-file-excel"></i> Exportar a Excel
             </button>
         </div>
     </form>
 
     <!-- Mostrar el monto total vendido -->
-    <div class="alert alert-info">
-        <strong>Total Monto Vendido: ${{ total_monto_vendido|floatformat:0 }}</strong>
+    <div class="card mb-4">
+        <div class="card-body text-center">
+            <strong>Total Monto Vendido: ${{ total_monto_vendido|intcomma }}</strong> {# Use humanize #}
+        </div>
     </div>
 
     <!-- Tabla de servicios vendidos -->
-    <table class="table table-striped table-bordered">
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-concierge-bell me-2"></i>Resultados
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0"> {# Added table-hover #}
         <thead>
             <tr>
-                <th>ID Venta/Reserva</th>
-                <th>Cliente</th>
-                <th>Categoría del Servicio</th>
-                <th>Servicio</th>
-                <th>Fecha de Agendamiento</th>
-                <th>Hora de Agendamiento</th>
-                <th>Cantidad de Personas</th>
-                <th>Monto Total</th>
+                <th class="px-4 py-3">ID Venta/Reserva</th>
+                <th class="px-4 py-3">Cliente</th>
+                <th class="px-4 py-3">Categoría</th>
+                <th class="px-4 py-3">Servicio</th>
+                <th class="px-4 py-3">Fecha</th>
+                <th class="px-4 py-3">Hora</th>
+                <th class="px-4 py-3 text-end">Personas</th> {# Align right #}
+                <th class="px-4 py-3 text-end">Monto Total</th> {# Align right #}
             </tr>
         </thead>
         <tbody>
             {% for servicio in servicios %}
             <tr>
-                <td>
+                <td class="px-4 py-3">
                     <a href="{% url 'admin:ventas_ventareserva_change' servicio.venta_reserva_id %}">
                         {{ servicio.venta_reserva_id }}
                     </a>
                 </td>
-                <td>{{ servicio.cliente_nombre }}</td>
-                <td>{{ servicio.categoria_servicio }}</td>
-                <td>{{ servicio.servicio_nombre }}</td>
-                <td>{{ servicio.fecha_agendamiento }}</td>
-                <td>{{ servicio.hora_agendamiento }}</td>
-                <td>{{ servicio.cantidad_personas }}</td>
-                <td>${{ servicio.total_monto|floatformat:0 }}</td>
+                <td class="px-4 py-3">{{ servicio.cliente_nombre }}</td>
+                <td class="px-4 py-3">{{ servicio.categoria_servicio }}</td>
+                <td class="px-4 py-3">{{ servicio.servicio_nombre }}</td>
+                <td class="px-4 py-3">{{ servicio.fecha_agendamiento }}</td>
+                <td class="px-4 py-3">{{ servicio.hora_agendamiento }}</td>
+                <td class="px-4 py-3 text-end">{{ servicio.cantidad_personas }}</td> {# Align right #}
+                <td class="px-4 py-3 text-end">${{ servicio.total_monto|intcomma }}</td> {# Use humanize #}
             </tr>
             {% empty %}
             <tr>
-                <td colspan="8">No se encontraron servicios vendidos.</td>
+                <td colspan="8" class="text-center py-4">No se encontraron servicios vendidos.</td> {# Centered text #}
             </tr>
             {% endfor %}
         </tbody>
     </table>
+            </div>
+        </div>
+    </div>
 </div>
-
 {% endblock %}

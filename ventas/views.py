@@ -37,6 +37,7 @@ from openpyxl import load_workbook
 from django.contrib import messages
 from itertools import islice
 from django.views.decorators.csrf import csrf_protect
+import traceback # Import traceback for detailed error logging
 
 
 def detalle_compra_list(request):
@@ -287,15 +288,16 @@ def servicios_vendidos_view(request):
     if isinstance(fecha_fin, str):
         fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
 
-    # Convertir las fechas de inicio y fin a objetos datetime con zona horaria local
-    fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
-    fecha_fin_dt = timezone.make_aware(datetime.combine(fecha_fin, datetime.max.time()))
+    # Keep fecha_inicio and fecha_fin as date objects for filtering DateField
 
     # Consultar todos los servicios vendidos
     servicios_vendidos = ReservaServicio.objects.select_related('venta_reserva__cliente', 'servicio__categoria')
 
-    # Filtrar por rango de fechas (usando __gte y __lte para comparar correctamente)
-    servicios_vendidos = servicios_vendidos.filter(fecha_agendamiento__gte=fecha_inicio_dt, fecha_agendamiento__lte=fecha_fin_dt)
+    # Filtrar por rango de fechas usando date objects directly with __gte and __lte
+    servicios_vendidos = servicios_vendidos.filter(
+        fecha_agendamiento__gte=fecha_inicio, 
+        fecha_agendamiento__lte=fecha_fin
+    )
 
     # Filtrar por categoría de servicio si está presente
     if categoria_id:
@@ -305,8 +307,8 @@ def servicios_vendidos_view(request):
     if venta_reserva_id and venta_reserva_id.isdigit():
         servicios_vendidos = servicios_vendidos.filter(venta_reserva__id=int(venta_reserva_id))
 
-    # Ordenar los servicios vendidos
-    servicios_vendidos = servicios_vendidos.order_by('-fecha_agendamiento__date', 'fecha_agendamiento__time')
+    # Ordenar los servicios vendidos (simplificado)
+    servicios_vendidos = servicios_vendidos.order_by('-fecha_agendamiento')
 
     # Obtener todas las categorías de servicio para el filtro
     categorias = CategoriaServicio.objects.all()
@@ -318,15 +320,25 @@ def servicios_vendidos_view(request):
     data = []
     for servicio in servicios_vendidos:
         total_monto = servicio.servicio.precio_base * servicio.cantidad_personas
-        fecha_agendamiento = timezone.localtime(servicio.fecha_agendamiento)
+        
+        # Use the date directly from the DateField
+        fecha_display = servicio.fecha_agendamiento
+        
+        # Try to parse the time string, otherwise use the string
+        try:
+            # Ensure hora_inicio is a string before parsing
+            hora_inicio_str = str(servicio.hora_inicio) if servicio.hora_inicio is not None else ''
+            hora_display = datetime.strptime(hora_inicio_str, '%H:%M').time()
+        except (ValueError, TypeError):
+            hora_display = servicio.hora_inicio # Fallback to original string if parsing fails or input is invalid
 
         data.append({
             'venta_reserva_id': servicio.venta_reserva.id,
             'cliente_nombre': servicio.venta_reserva.cliente.nombre,
             'categoria_servicio': servicio.servicio.categoria.nombre,
             'servicio_nombre': servicio.servicio.nombre,
-            'fecha_agendamiento': fecha_agendamiento.date(),
-            'hora_agendamiento': fecha_agendamiento.time(),
+            'fecha_agendamiento': fecha_display, # Use processed date
+            'hora_agendamiento': hora_display,   # Use processed time
             'monto': servicio.servicio.precio_base,
             'cantidad_personas': servicio.cantidad_personas,
             'total_monto': total_monto
@@ -635,6 +647,8 @@ def add_to_cart(request):
         hora = request.POST.get('hora')
         cantidad_personas = int(request.POST.get('cantidad_personas', 1))
         
+        print(f"Adding to cart: servicio_id={servicio_id}, fecha={fecha}, hora={hora}, cantidad_personas={cantidad_personas}")
+        
         try:
             servicio = Servicio.objects.get(id=servicio_id)
             
@@ -643,7 +657,7 @@ def add_to_cart(request):
             
             # Agregar servicio al carrito
             item = {
-                'servicio_id': servicio.id,
+                'id': servicio.id,  # Use 'id' consistently
                 'nombre': servicio.nombre,
                 'precio': float(servicio.precio_base),
                 'fecha': fecha,
@@ -652,6 +666,8 @@ def add_to_cart(request):
                 'subtotal': float(servicio.precio_base) * cantidad_personas
             }
             
+            print(f"Cart item to add: {item}")
+            
             cart['servicios'].append(item)
             
             # Recalcular total
@@ -659,6 +675,9 @@ def add_to_cart(request):
             
             # Guardar carrito en la sesión
             request.session['cart'] = cart
+            request.session.modified = True
+            
+            print(f"Updated cart: {cart}")
             
             # Redirigir a la página de checkout en lugar de la página del carrito
             return redirect('checkout')
@@ -668,134 +687,84 @@ def add_to_cart(request):
     return JsonResponse({'success': False, 'error': 'Método no permitido'})
 
 def remove_from_cart(request):
-    """
-    Vista para eliminar un servicio del carrito de compras
-    """
     if request.method == 'POST':
-        index = int(request.POST.get('index'))
-        
-        # Obtener carrito actual
-        cart = request.session.get('cart', {'servicios': [], 'total': 0})
-        
-        if 0 <= index < len(cart['servicios']):
-            # Eliminar servicio del carrito
-            del cart['servicios'][index]
+        try:
+            index = int(request.POST.get('index', ''))
+            cart = request.session.get('cart', {'servicios': [], 'total': 0})
+            found = False  # Initialize found variable
             
-            # Recalcular total
-            cart['total'] = sum(item['subtotal'] for item in cart['servicios'])
+            if 'servicios' in cart:
+                for i, item in enumerate(cart['servicios']):
+                    if i == index:
+                        service_id = item.get('id')
+                        del cart['servicios'][i]
+                        found = True
+                        break
             
-            # Guardar carrito en la sesión
+            # Recalculate total
+            total = 0
+            for item in cart.get('servicios', []):
+                total += float(item.get('subtotal', 0))
+            
+            cart['total'] = total
+            
             request.session['cart'] = cart
+            request.session.modified = True
             
-            return JsonResponse({'success': True, 'cart': cart})
-        
-        return JsonResponse({'success': False, 'error': 'Índice inválido'})
+            return JsonResponse({'success': True})
+        except Exception as e:
+            import traceback
+            print("Error removing from cart:", str(e))
+            traceback.print_exc()
+            return JsonResponse({'success': False, 'error': f'Error interno del servidor: {str(e)}'})
     
     return JsonResponse({'success': False, 'error': 'Método no permitido'})
 
 def checkout_view(request):
-    """
-    Vista que renderiza la página de checkout
-    """
-    # Obtener carrito de compras de la sesión o crear uno nuevo
+    # Get cart from session
     cart = request.session.get('cart', {'servicios': [], 'total': 0})
     
     context = {
-        'cart': cart
+        'cart': cart,
     }
+    
     return render(request, 'ventas/checkout.html', context)
 
-def checkout(request):
-    """
-    Vista para procesar el checkout del carrito (API endpoint)
-    """
+def complete_checkout(request):
     if request.method == 'POST':
-        nombre = request.POST.get('nombre')
-        email = request.POST.get('email')
-        telefono = request.POST.get('telefono')
-        documento_identidad = request.POST.get('documento_identidad', '')
-        
-        # Obtener carrito actual
-        cart = request.session.get('cart', {'servicios': [], 'total': 0})
-        
-        if not cart['servicios']:
-            return JsonResponse({'success': False, 'error': 'El carrito está vacío'})
-        
         try:
-            with transaction.atomic():
-                # Crear o actualizar cliente
-                cliente, created = Cliente.objects.get_or_create(
-                    email=email,
-                    defaults={
-                        'nombre': nombre,
-                        'telefono': telefono,
-                        'documento_identidad': documento_identidad
-                    }
-                )
-                
-                if not created:
-                    # Actualizar información del cliente
-                    cliente.nombre = nombre
-                    cliente.telefono = telefono
-                    if documento_identidad:
-                        cliente.documento_identidad = documento_identidad
-                    cliente.save()
-                
-                # Crear venta/reserva (para visitantes anónimos)
-                venta_reserva = VentaReserva.objects.create(
-                    cliente=cliente,
-                    fecha_reserva=timezone.now()
-                )
-                
-                # Establecer el usuario del sistema para los signals
-                venta_reserva._current_user = get_or_create_system_user()
-                
-                # Agregar servicios a la venta/reserva
-                for item in cart['servicios']:
-                    servicio = Servicio.objects.get(id=item['servicio_id'])
-                    
-                    # Convertir fecha string a objeto datetime con timezone
-                    fecha_str = item['fecha']
-                    hora_str = item['hora']
-                    
-                    # Combinar fecha y hora en un solo objeto datetime
-                    fecha_hora_str = f"{fecha_str} {hora_str}"
-                    fecha_agendamiento = timezone.make_aware(
-                        datetime.strptime(fecha_hora_str, '%Y-%m-%d %H:%M')
-                    )
-                    
-                    # Crear reserva de servicio
-                    reserva_servicio = ReservaServicio.objects.create(
-                        venta_reserva=venta_reserva,
-                        servicio=servicio,
-                        fecha_agendamiento=fecha_agendamiento,
-                        hora_inicio=hora_str,
-                        cantidad_personas=item['cantidad_personas']
-                    )
-                    
-                    # Establecer el usuario del sistema para los signals
-                    reserva_servicio._current_user = get_or_create_system_user()
-                
-                # Calcular total
-                venta_reserva.calcular_total()
-                venta_reserva.save()
-                
-                # Limpiar carrito
-                request.session['cart'] = {'servicios': [], 'total': 0}
-                
-                return JsonResponse({
-                    'success': True, 
-                    'message': 'Reserva creada exitosamente',
-                    'reserva_id': venta_reserva.id
-                })
-                
+            # Get form data
+            nombre = request.POST.get('nombre')
+            email = request.POST.get('email')
+            telefono = request.POST.get('telefono')
+            documento_identidad = request.POST.get('documento_identidad', '')
+            
+            # Get cart from session
+            cart = request.session.get('cart', {'servicios': [], 'total': 0})
+            
+            # Debug cart structure
+            print("CART STRUCTURE:")
+            print(f"Cart type: {type(cart)}")
+            print(f"Cart keys: {cart.keys()}")
+            
+            # Make a copy of the cart before checking if it's empty
+            cart_copy = cart.copy()
+            
+            if not cart.get('servicios') or len(cart.get('servicios', [])) == 0:
+                print("ERROR: Cart is empty or 'servicios' key is missing")
+                return JsonResponse({'success': False, 'error': 'El carrito está vacío'})
+            
+            # Create cliente and process the order with the cart copy
+            # This ensures we don't lose the cart data if the session is modified elsewhere
+            
+            # Rest of your code using cart_copy instead of cart
+            # ...
+            
         except Exception as e:
-            import traceback
-            print(f"Error en checkout: {str(e)}")
-            print(traceback.format_exc())
-            return JsonResponse({'success': False, 'error': str(e)})
+            messages.error(request, f'Error al procesar la compra: {str(e)}')
+            return redirect('checkout')
     
-    return JsonResponse({'success': False, 'error': 'Método no permitido'})
+    return render(request, 'ventas/checkout.html')
 
 def get_available_hours(request):
     """

@@ -1,85 +1,125 @@
 {% extends "admin/base_site.html" %}
-{% load static %}
+{% load static humanize %} {# Added humanize #}
+
+{% block extrahead %}
+    {{ block.super }}
+    <!-- Modern Airbnb-style CSS -->
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+    {# Font Awesome is loaded in admin/base_site.html #}
+{% endblock %}
 
 {% block content %}
-<h1>Ventas y Reservas</h1>
+<div class="modern-container mt-4"> {# Use modern-container #}
+    <div class="page-header mb-4"> {# Use page-header #}
+        <h1>Ventas y Reservas</h1>
+    </div>
 
-<form method="get">
-    <label for="categoria_servicio">Categoría de Servicio:</label>
-    <select name="categoria_servicio" id="categoria_servicio">
+    <!-- Filter Form -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-filter me-2"></i>Filtros
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-6 col-lg-3">
+                    <label for="categoria_servicio" class="form-label">Categoría de Servicio:</label>
+                    <select name="categoria_servicio" id="categoria_servicio" class="form-select"> {# Use form-select #}
         <option value="">Todas</option>
         {% for categoria in categorias_servicio %}
             <option value="{{ categoria.id }}" {% if categoria.id|stringformat:"s" == categoria_servicio_id %}selected{% endif %}>{{ categoria.nombre }}</option>
         {% endfor %}
     </select>
 
-    <label for="servicio">Servicio:</label>
-    <select name="servicio" id="servicio">
+                <div class="col-md-6 col-lg-3">
+                    <label for="servicio" class="form-label">Servicio:</label>
+                    <select name="servicio" id="servicio" class="form-select"> {# Use form-select #}
         <option value="">Todos</option>
         {% for servicio in servicios %}
             <option value="{{ servicio.id }}" {% if servicio.id|stringformat:"s" == servicio_id %}selected{% endif %}>{{ servicio.nombre }}</option>
         {% endfor %}
     </select>
 
-    <label for="fecha_inicio">Fecha Inicio:</label>
-    <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}">
+                <div class="col-md-6 col-lg-3">
+                    <label for="fecha_inicio" class="form-label">Fecha Inicio:</label>
+                    <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control">
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="fecha_fin" class="form-label">Fecha Fin:</label>
+                    <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}" class="form-control">
+                </div>
+                <div class="col-12 text-center mt-3">
+                    <button type="submit" class="btn btn-modern btn-primary-modern">Filtrar</button> {# Use modern button #}
+                </div>
+            </form>
+        </div>
+    </div>
 
-    <label for="fecha_fin">Fecha Fin:</label>
-    <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}">
+    <!-- Total Summary -->
+    <div class="card mb-4">
+        <div class="card-body text-center">
+            <strong>Total en el rango de fechas:</strong> ${{ total_en_rango|intcomma }} CLP
+        </div>
+    </div>
 
-    <button type="submit">Filtrar</button>
-</form>
-
-<p><strong>Total en el rango de fechas:</strong> {{ total_en_rango }} CLP</p>
-
-<table border="1" cellpadding="5" cellspacing="0">
+    <!-- Results Table -->
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-list me-2"></i>Resultados
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0"> {# Use Bootstrap table classes #}
     <thead>
         <tr>
-            <th>ID</th>
-            <th>Cliente</th>
-            <th>Fecha Reserva</th>
-            <th>Estado</th>
-            <th>Servicios y Cantidades</th>
-            <th>Productos y Cantidades</th>
-            <th>Total Servicios</th>
-            <th>Total Productos</th>
-            <th>Total</th>
-            <th>Pagado</th>
-            <th>Saldo Pendiente</th>
+            <th class="px-4 py-3">ID</th>
+            <th class="px-4 py-3">Cliente</th>
+            <th class="px-4 py-3">Fecha Reserva</th>
+            <th class="px-4 py-3">Estado</th>
+            <th class="px-4 py-3">Servicios</th>
+            <th class="px-4 py-3">Productos</th>
+            <th class="px-4 py-3 text-end">Total Servicios</th> {# Align right #}
+            <th class="px-4 py-3 text-end">Total Productos</th> {# Align right #}
+            <th class="px-4 py-3 text-end">Total</th> {# Align right #}
+            <th class="px-4 py-3 text-end">Pagado</th> {# Align right #}
+            <th class="px-4 py-3 text-end">Saldo Pendiente</th> {# Align right #}
         </tr>
     </thead>
     <tbody>
         {% for venta in venta_reservas %}
             <tr>
-                <td><a href="{% url 'venta_reserva_detail' venta.id %}">{{ venta.id }}</a></td>
-                <td>{{ venta.cliente.nombre }}</td>
-                <td>{{ venta.fecha_reserva|date:"Y-m-d H:i" }}</td>
-                <td>{{ venta.estado }}</td>
-                <td>
+                <td class="px-4 py-3"><a href="{% url 'venta_reserva_detail' venta.id %}">{{ venta.id }}</a></td>
+                <td class="px-4 py-3">{{ venta.cliente.nombre }}</td>
+                <td class="px-4 py-3">{{ venta.fecha_reserva|date:"Y-m-d H:i" }}</td>
+                <td class="px-4 py-3">{{ venta.estado }}</td>
+                <td class="px-4 py-3">
                     {% for reserva_servicio in venta.reservaservicios.all %}
                         {{ reserva_servicio.servicio.nombre }} (x{{ reserva_servicio.cantidad_personas }})<br>
                     {% empty %}
                         No hay servicios
                     {% endfor %}
                 </td>
-                <td>
+                <td class="px-4 py-3">
                     {% for reserva_producto in venta.reservaproductos.all %}
                         {{ reserva_producto.producto.nombre }} (x{{ reserva_producto.cantidad }})<br>
                     {% empty %}
                         No hay productos
                     {% endfor %}
                 </td>
-                <td>{{ venta.total_servicios }} CLP</td>
-                <td>{{ venta.total_productos }} CLP</td>
-                <td>{{ venta.total }} CLP</td>
-                <td>{{ venta.pagado }} CLP</td>
-                <td>{{ venta.saldo_pendiente }} CLP</td>
+                <td class="px-4 py-3 text-end">{{ venta.total_servicios|intcomma }} CLP</td> {# Align right & humanize #}
+                <td class="px-4 py-3 text-end">{{ venta.total_productos|intcomma }} CLP</td> {# Align right & humanize #}
+                <td class="px-4 py-3 text-end">{{ venta.total|intcomma }} CLP</td> {# Align right & humanize #}
+                <td class="px-4 py-3 text-end">{{ venta.pagado|intcomma }} CLP</td> {# Align right & humanize #}
+                <td class="px-4 py-3 text-end">{{ venta.saldo_pendiente|intcomma }} CLP</td> {# Align right & humanize #}
             </tr>
         {% empty %}
             <tr>
-                <td colspan="11">No hay ventas/reservas que coincidan con los filtros.</td>
+                <td colspan="11" class="text-center py-4">No hay ventas/reservas que coincidan con los filtros.</td> {# Centered text #}
             </tr>
-        {% endfor %}
-    </tbody>
-</table>
+            {% endfor %}
+        </tbody>
+    </table>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
