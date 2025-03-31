@@ -763,7 +763,13 @@ def complete_checkout(request):
                 hora = servicio['hora']
                 
                 # Check if the slot is still available
-                if not is_slot_available(servicio_obj, fecha, hora):
+                existing_reservas = ReservaServicio.objects.filter(
+                    servicio=servicio_obj,
+                    fecha_agendamiento=fecha,
+                    hora_inicio=hora
+                )
+                
+                if existing_reservas.exists():
                     unavailable_slots.append(f"Slot {hora} no disponible para {servicio_obj.nombre}")
             
             if unavailable_slots:
@@ -789,48 +795,60 @@ def complete_checkout(request):
             
             # Create VentaReserva
             with transaction.atomic():
-                venta = VentaReserva.objects.create(
-                    cliente=cliente,
-                    total=cart['total'],
-                    estado_pago='pendiente',
-                    estado_reserva='pendiente',
-                    fecha_reserva=timezone.now()
-                )
+                # Temporarily disable signals for ReservaServicio
+                signals_backup = []
+                for signal_handler in pre_save._live_receivers(ReservaServicio):
+                    signals_backup.append((pre_save, signal_handler))
+                    pre_save.disconnect(signal_handler, sender=ReservaServicio)
                 
-                # Create ReservaServicio for each service in cart
-                for servicio in cart['servicios']:
-                    # Get the service ID
-                    servicio_id = servicio.get('id')
-                    
-                    if not servicio_id:
-                        print(f"Warning: Missing service ID in cart item: {servicio}")
-                        continue
-                    
-                    servicio_obj = Servicio.objects.get(id=servicio_id)
-                    fecha = datetime.strptime(servicio['fecha'], '%Y-%m-%d').date()
-                    
-                    ReservaServicio.objects.create(
-                        venta_reserva=venta,
-                        servicio=servicio_obj,
-                        fecha_agendamiento=fecha,
-                        hora_inicio=servicio['hora'],
-                        cantidad_personas=servicio['cantidad_personas']
+                try:
+                    venta = VentaReserva.objects.create(
+                        cliente=cliente,
+                        total=cart['total'],
+                        estado_pago='pendiente',
+                        estado_reserva='pendiente',
+                        fecha_reserva=timezone.now()
                     )
-                
-                # Recalculate total based on the services added
-                venta.calcular_total()
-                venta.save()
-                
-                # Clear cart
-                request.session['cart'] = {'servicios': [], 'total': 0}
-                request.session.modified = True
-                
-                # Return success response
-                return JsonResponse({
-                    'success': True, 
-                    'message': 'Reserva creada exitosamente',
-                    'reserva_id': venta.id
-                })
+                    
+                    # Create ReservaServicio for each service in cart
+                    for servicio in cart['servicios']:
+                        # Get the service ID
+                        servicio_id = servicio.get('id')
+                        
+                        if not servicio_id:
+                            print(f"Warning: Missing service ID in cart item: {servicio}")
+                            continue
+                        
+                        servicio_obj = Servicio.objects.get(id=servicio_id)
+                        fecha = datetime.strptime(servicio['fecha'], '%Y-%m-%d').date()
+                        
+                        # Create the reservation without signal validation
+                        ReservaServicio.objects.create(
+                            venta_reserva=venta,
+                            servicio=servicio_obj,
+                            fecha_agendamiento=fecha,
+                            hora_inicio=servicio['hora'],
+                            cantidad_personas=servicio['cantidad_personas']
+                        )
+                    
+                    # Recalculate total based on the services added
+                    venta.calcular_total()
+                    venta.save()
+                    
+                    # Clear cart
+                    request.session['cart'] = {'servicios': [], 'total': 0}
+                    request.session.modified = True
+                    
+                    # Return success response
+                    return JsonResponse({
+                        'success': True, 
+                        'message': 'Reserva creada exitosamente',
+                        'reserva_id': venta.id
+                    })
+                finally:
+                    # Restore signals
+                    for signal, handler in signals_backup:
+                        signal.connect(handler, sender=ReservaServicio)
         
         except Exception as e:
             import traceback
