@@ -251,6 +251,13 @@
             formData.append('telefono', telefono);
             formData.append('documento_identidad', documento);
             
+            // Show loading indicator or disable button
+            const completeCheckoutBtn = document.getElementById('completeCheckoutBtn');
+            if (completeCheckoutBtn) {
+                completeCheckoutBtn.disabled = true;
+                completeCheckoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+            }
+            
             // Send request
             fetch('{% url "complete_checkout" %}', {
                 method: 'POST',
@@ -260,9 +267,22 @@
                 }
             })
             .then(response => {
+                // Re-enable button
+                if (completeCheckoutBtn) {
+                    completeCheckoutBtn.disabled = false;
+                    completeCheckoutBtn.innerHTML = 'Completar Reserva';
+                }
+                
                 if (!response.ok) {
+                    // Try to get the response as text first
                     return response.text().then(text => {
-                        throw new Error(`Server responded with ${response.status}: ${text || 'No additional error info'}`);
+                        // Try to parse as JSON, if it fails, it's probably HTML
+                        try {
+                            return JSON.parse(text);
+                        } catch (e) {
+                            // If it's not valid JSON, throw an error with the status
+                            throw new Error(`Error del servidor (${response.status}). Por favor, intenta nuevamente.`);
+                        }
                     });
                 }
                 return response.json();
@@ -289,6 +309,12 @@
                 }
             })
             .catch(error => {
+                // Re-enable button if not already done
+                if (completeCheckoutBtn) {
+                    completeCheckoutBtn.disabled = false;
+                    completeCheckoutBtn.innerHTML = 'Completar Reserva';
+                }
+                
                 console.error('Error al procesar la reserva:', error);
                 alert(`Error al procesar la reserva: ${error.message}. Por favor, intenta nuevamente.`);
             });
