@@ -1,7 +1,7 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 
-{% block title %}Aremko - Carrito de Compras{% endblock %}
+{% block title %}Aremko - Tu Carrito{% endblock %}
 
 {% block extra_style %}
 <style>
@@ -18,45 +18,69 @@
     .cart-item {
         background-color: white;
         border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         padding: 20px;
         margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .cart-item-info {
+        flex-grow: 1;
     }
     
     .cart-item-title {
         font-weight: 700;
         font-size: 1.2rem;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
     }
     
-    .cart-item-info {
+    .cart-item-details {
         color: var(--light-gray);
-        margin-bottom: 15px;
+        font-size: 0.9rem;
     }
     
     .cart-item-price {
         font-weight: 700;
         color: var(--primary-color);
-        font-size: 1.2rem;
+        font-size: 1.3rem;
+        margin: 0 20px;
     }
     
-    .cart-total {
+    .cart-summary {
         background-color: white;
         border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        padding: 20px;
-        margin-top: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 25px;
     }
     
-    .cart-total-title {
+    .cart-summary-title {
         font-weight: 700;
-        margin-bottom: 15px;
+        margin-bottom: 20px;
+        color: var(--dark-gray);
     }
     
-    .cart-total-amount {
+    .cart-summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+    
+    .cart-summary-total {
         font-weight: 700;
-        font-size: 1.5rem;
+        font-size: 1.3rem;
         color: var(--primary-color);
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+    }
+    
+    .btn-remove {
+        color: var(--primary-color);
+        background: none;
+        border: none;
+        cursor: pointer;
     }
     
     .empty-cart {
@@ -69,77 +93,101 @@
         color: var(--light-gray);
         margin-bottom: 20px;
     }
+    
+    .cart-actions {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+    }
+    
+    @media (max-width: 768px) {
+        .cart-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .cart-item-price {
+            margin: 10px 0;
+        }
+        
+        .cart-actions {
+            flex-direction: column;
+        }
+        
+        .cart-actions .btn {
+            margin-bottom: 10px;
+            width: 100%;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <!-- Cart Section -->
-    <section class="cart-section">
-        <div class="container">
-            <h1 class="cart-title">Tu Carrito de Compras</h1>
-            
+<section class="cart-section">
+    <div class="container">
+        <h1 class="cart-title">Tu Carrito de Compras</h1>
+        
+        <div class="row">
             {% if cart.servicios %}
-                <div class="row">
-                    <div class="col-lg-8">
+                <div class="col-lg-8">
+                    {% for item in cart.servicios %}
+                        <div class="cart-item">
+                            <div class="cart-item-info">
+                                <h3 class="cart-item-title">{{ item.nombre }}</h3>
+                                <p class="cart-item-details">
+                                    <i class="far fa-calendar-alt"></i> {{ item.fecha }} | 
+                                    <i class="far fa-clock"></i> {{ item.hora }} | 
+                                    <i class="fas fa-users"></i> {{ item.cantidad_personas }} persona(s)
+                                </p>
+                            </div>
+                            <div class="cart-item-price">${{ item.subtotal }}</div>
+                            <button class="btn-remove" onclick="removeFromCart({{ forloop.counter0 }})">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="col-lg-4">
+                    <div class="cart-summary">
+                        <h3 class="cart-summary-title">Resumen del Pedido</h3>
+                        
                         {% for item in cart.servicios %}
-                            <div class="cart-item">
-                                <div class="row align-items-center">
-                                    <div class="col-md-8">
-                                        <h3 class="cart-item-title">{{ item.nombre }}</h3>
-                                        <p class="cart-item-info">
-                                            <i class="far fa-calendar-alt me-2"></i>{{ item.fecha }} | 
-                                            <i class="far fa-clock me-2"></i>{{ item.hora }} | 
-                                            <i class="fas fa-user me-2"></i>{{ item.cantidad_personas }} persona(s)
-                                        </p>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <p class="cart-item-price">${{ item.subtotal }}</p>
-                                    </div>
-                                    <div class="col-md-1 text-end">
-                                        <button class="btn btn-sm btn-outline-danger" onclick="removeFromCart('{{ forloop.counter0 }}')">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </div>
+                            <div class="cart-summary-row">
+                                <span>{{ item.nombre }} ({{ item.cantidad_personas }})</span>
+                                <span>${{ item.subtotal }}</span>
                             </div>
                         {% endfor %}
-                    </div>
-                    
-                    <div class="col-lg-4">
-                        <div class="cart-total">
-                            <h4 class="cart-total-title">Resumen del Pedido</h4>
-                            <hr>
-                            <div class="d-flex justify-content-between mb-3">
-                                <span>Subtotal:</span>
-                                <span>${{ cart.total }}</span>
-                            </div>
-                            <div class="d-flex justify-content-between mb-4">
-                                <span>Total:</span>
-                                <span id="checkoutTotal">${{ cart.total }}</span>
-                            </div>
-                            <button class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#checkoutModal">
-                                Finalizar Reserva
-                            </button>
-                            <a href="{% url 'homepage' %}" class="btn btn-outline-secondary w-100 mt-3">
-                                Continuar Reservando
-                            </a>
+                        
+                        <div class="cart-summary-row cart-summary-total">
+                            <span>Total:</span>
+                            <span>${{ cart.total }}</span>
+                        </div>
+                        
+                        <div class="cart-actions">
+                            <a href="{% url 'homepage' %}#servicios" class="btn btn-outline-secondary">Seguir Comprando</a>
+                            <a href="{% url 'checkout' %}" class="btn btn-primary">Finalizar Reserva</a>
                         </div>
                     </div>
                 </div>
             {% else %}
-                <div class="empty-cart">
-                    <div class="empty-cart-icon">
-                        <i class="fas fa-shopping-cart"></i>
+                <div class="col-12">
+                    <div class="empty-cart">
+                        <div class="empty-cart-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <h3>Tu carrito está vacío</h3>
+                        <p>Parece que aún no has agregado ningún servicio a tu carrito.</p>
+                        <a href="{% url 'homepage' %}#servicios" class="btn btn-primary mt-3">
+                            Ver Servicios
+                        </a>
                     </div>
-                    <h3>Tu carrito está vacío</h3>
-                    <p>Parece que aún no has agregado ningún servicio a tu carrito.</p>
-                    <a href="{% url 'homepage' %}#servicios" class="btn btn-primary mt-3">
-                        Ver Servicios
-                    </a>
                 </div>
             {% endif %}
         </div>
-    </section>
+    </div>
+</section>
 {% endblock %}
 
 {% block modals %}
