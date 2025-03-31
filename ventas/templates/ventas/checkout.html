@@ -86,110 +86,153 @@
         color: var(--light-gray);
         margin-bottom: 20px;
     }
+    
+    /* Processing button styles */
+    .btn-processing {
+        position: relative;
+        pointer-events: none;
+        background-color: var(--secondary-color) !important;
+    }
+    
+    .processing-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        display: none;
+    }
+    
+    .processing-content {
+        background-color: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        text-align: center;
+    }
+    
+    .processing-spinner {
+        font-size: 2rem;
+        color: var(--primary-color);
+        margin-bottom: 15px;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
+<!-- Processing Overlay -->
+<div id="processingOverlay" class="processing-overlay">
+    <div class="processing-content">
+        <div class="processing-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+        </div>
+        <h4>Procesando</h4>
+        <p>Estamos procesando tu reserva...</p>
+    </div>
+</div>
+
 <!-- Checkout Section -->
-    <section class="checkout-section">
-        <div class="container">
-            <h1 class="checkout-title">Finalizar Reserva</h1>
-            
-            {% if cart.servicios %}
-                <div class="row">
-                    <div class="col-lg-8">
-                        <div class="checkout-form">
-                            <h4 class="mb-4">Información de Contacto</h4>
-                            <form id="checkoutForm"> {# Keep form ID if needed, but inputs need updated IDs #}
-                                <div class="mb-3">
-                                    <label for="checkoutNombre" class="form-label">Nombre Completo</label>
-                                    <input type="text" class="form-control" id="checkoutNombre" name="nombre" required> {# Updated ID #}
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label for="checkoutEmail" class="form-label">Email</label>
-                                    <input type="email" class="form-control" id="checkoutEmail" name="email" required> {# Updated ID #}
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label for="checkoutTelefono" class="form-label">Teléfono</label>
-                                    <input type="tel" class="form-control" id="checkoutTelefono" name="telefono" required> {# Updated ID #}
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label for="checkoutDocumento" class="form-label">ID/DNI/Passport/RUT (opcional)</label>
-                                    <input type="text" class="form-control" id="checkoutDocumento" name="documento_identidad"> {# Updated ID #}
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                    
-                    <div class="col-lg-4">
-                        <div class="cart-total">
-                            <h4 class="cart-total-title">Resumen del Pedido</h4>
-                            <hr>
-                            
-                            {% for item in cart.servicios %}
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span>{{ item.nombre }} ({{ item.cantidad_personas }} persona(s))</span>
-                                    <span>${{ item.subtotal }}</span>
-                                </div>
-                            {% endfor %}
-                            
-                            <hr>
-                            <div class="d-flex justify-content-between mb-4">
-                                <span>Total:</span>
-                                <span class="cart-total-amount">${{ cart.total }}</span>
+<section class="checkout-section">
+    <div class="container">
+        <h1 class="checkout-title">Finalizar Reserva</h1>
+        
+        {% if cart.servicios %}
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="checkout-form">
+                        <h4 class="mb-4">Información de Contacto</h4>
+                        <form id="checkoutForm">
+                            <div class="mb-3">
+                                <label for="checkoutNombre" class="form-label">Nombre Completo</label>
+                                <input type="text" class="form-control" id="checkoutNombre" name="nombre" required>
                             </div>
-                            <button class="btn btn-primary w-100" id="completeCheckoutBtn">
-                                Completar Reserva
-                            </button>
-                            <a href="{% url 'cart' %}" class="btn btn-outline-secondary w-100 mt-3">
-                                Volver al Carrito
-                            </a>
-                        </div>
+                            
+                            <div class="mb-3">
+                                <label for="checkoutEmail" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="checkoutEmail" name="email" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="checkoutTelefono" class="form-label">Teléfono</label>
+                                <input type="tel" class="form-control" id="checkoutTelefono" name="telefono" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="checkoutDocumento" class="form-label">ID/DNI/Passport/RUT (opcional)</label>
+                                <input type="text" class="form-control" id="checkoutDocumento" name="documento_identidad">
+                            </div>
+                        </form>
                     </div>
                 </div>
                 
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <h4 class="mb-3">Detalles de la Reserva</h4>
+                <div class="col-lg-4">
+                    <div class="cart-total">
+                        <h4 class="cart-total-title">Resumen del Pedido</h4>
+                        <hr>
+                        
                         {% for item in cart.servicios %}
-                            <div class="cart-item">
-                                <div class="row align-items-center">
-                                    <div class="col-md-8">
-                                        <h3 class="cart-item-title">{{ item.nombre }}</h3>
-                                        <p class="cart-item-info">
-                                            <i class="far fa-calendar-alt me-2"></i>{{ item.fecha }} | 
-                                            <i class="far fa-clock me-2"></i>{{ item.hora }} | 
-                                            <i class="fas fa-user me-2"></i>{{ item.cantidad_personas }} persona(s)
-                                        </p>
-                                    </div>
-                                    <div class="col-md-4 text-end">
-                                        <p class="cart-item-price">${{ item.subtotal }}</p>
-                                    </div>
-                                </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>{{ item.nombre }} ({{ item.cantidad_personas }} persona(s))</span>
+                                <span>${{ item.subtotal }}</span>
                             </div>
                         {% endfor %}
+                        
+                        <hr>
+                        <div class="d-flex justify-content-between mb-4">
+                            <span>Total:</span>
+                            <span class="cart-total-amount">${{ cart.total }}</span>
+                        </div>
+                        <button class="btn btn-primary w-100" id="completeCheckoutBtn">
+                            Completar Reserva
+                        </button>
+                        <a href="{% url 'cart' %}" class="btn btn-outline-secondary w-100 mt-3">
+                            Volver al Carrito
+                        </a>
                     </div>
                 </div>
-            {% else %}
-                <div class="empty-cart">
-                    <div class="empty-cart-icon">
-                        <i class="fas fa-shopping-cart"></i>
-                    </div>
-                    <h3>Tu carrito está vacío</h3>
-                    <p>Parece que aún no has agregado ningún servicio a tu carrito.</p>
-                    <a href="{% url 'homepage' %}#servicios" class="btn btn-primary mt-3">
-                        Ver Servicios
-                    </a>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-12">
+                    <h4 class="mb-3">Detalles de la Reserva</h4>
+                    {% for item in cart.servicios %}
+                        <div class="cart-item">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h3 class="cart-item-title">{{ item.nombre }}</h3>
+                                    <p class="cart-item-info">
+                                        <i class="far fa-calendar-alt me-2"></i>{{ item.fecha }} | 
+                                        <i class="far fa-clock me-2"></i>{{ item.hora }} | 
+                                        <i class="fas fa-user me-2"></i>{{ item.cantidad_personas }} persona(s)
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <p class="cart-item-price">${{ item.subtotal }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
                 </div>
-            {% endif %}
-        </div>
-    </section>
-
-        </div>
-    </section>
+            </div>
+        {% else %}
+            <div class="empty-cart">
+                <div class="empty-cart-icon">
+                    <i class="fas fa-shopping-cart"></i>
+                </div>
+                <h3>Tu carrito está vacío</h3>
+                <p>Parece que aún no has agregado ningún servicio a tu carrito.</p>
+                <a href="{% url 'homepage' %}#servicios" class="btn btn-primary mt-3">
+                    Ver Servicios
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</section>
 {% endblock %}
 
 {% block modals %}
@@ -219,111 +262,134 @@
 
 {% block extra_script %}
 <script>
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
-        // Make sure the completeCheckout function can find the success modal
-        window.completeCheckout = function() {
-            console.log("Complete checkout function called");
-            
-            // Get form values
-            const nombre = document.getElementById('checkoutNombre').value;
-            const email = document.getElementById('checkoutEmail').value;
-            const telefono = document.getElementById('checkoutTelefono').value;
-            const documento = document.getElementById('checkoutDocumento').value;
-            
-            // Validate form
-            if (!nombre || !email || !telefono) {
-                alert('Por favor completa todos los campos requeridos');
-                return;
-            }
-            
-            // Get CSRF token
-            const csrfToken = getCookie('csrftoken');
-            if (!csrfToken) {
-                console.error("CSRF Token not found!");
-                alert("Error de seguridad. Intenta recargar la página.");
-                return;
-            }
-            
-            // Prepare form data
-            const formData = new FormData();
-            formData.append('nombre', nombre);
-            formData.append('email', email);
-            formData.append('telefono', telefono);
-            formData.append('documento_identidad', documento);
-            
-            // Show loading indicator or disable button
-            const completeCheckoutBtn = document.getElementById('completeCheckoutBtn');
-            if (completeCheckoutBtn) {
+        const completeCheckoutBtn = document.getElementById('completeCheckoutBtn');
+        const processingOverlay = document.getElementById('processingOverlay');
+        
+        if (completeCheckoutBtn) {
+            completeCheckoutBtn.addEventListener('click', function() {
+                // Get form values
+                const nombre = document.getElementById('checkoutNombre').value;
+                const email = document.getElementById('checkoutEmail').value;
+                const telefono = document.getElementById('checkoutTelefono').value;
+                const documento = document.getElementById('checkoutDocumento').value;
+                
+                // Validate form
+                if (!nombre || !email || !telefono) {
+                    alert('Por favor completa todos los campos requeridos');
+                    return;
+                }
+                
+                // Get CSRF token
+                const csrfToken = getCookie('csrftoken');
+                if (!csrfToken) {
+                    console.error("CSRF Token not found!");
+                    alert("Error de seguridad. Intenta recargar la página.");
+                    return;
+                }
+                
+                // Prepare form data
+                const formData = new FormData();
+                formData.append('nombre', nombre);
+                formData.append('email', email);
+                formData.append('telefono', telefono);
+                formData.append('documento_identidad', documento);
+                
+                // Show loading indicator
                 completeCheckoutBtn.disabled = true;
                 completeCheckoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
-            }
-            
-            // Send request
-            fetch('{% url "complete_checkout" %}', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': csrfToken
-                }
-            })
-            .then(response => {
-                // Re-enable button
-                if (completeCheckoutBtn) {
-                    completeCheckoutBtn.disabled = false;
-                    completeCheckoutBtn.innerHTML = 'Completar Reserva';
+                completeCheckoutBtn.classList.add('btn-processing');
+                
+                // Show processing overlay
+                if (processingOverlay) {
+                    processingOverlay.style.display = 'flex';
                 }
                 
-                if (!response.ok) {
-                    // Try to get the response as text first
-                    return response.text().then(text => {
-                        // Try to parse as JSON, if it fails, it's probably HTML
-                        try {
-                            return JSON.parse(text);
-                        } catch (e) {
-                            // If it's not valid JSON, throw an error with the status
-                            throw new Error(`Error del servidor (${response.status}). Por favor, intenta nuevamente.`);
-                        }
-                    });
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log("Checkout response:", data);
-                if (data.success) {
-                    // Show success modal
-                    if (data.reserva_id) {
-                        const reservaIdSpan = document.getElementById('reservaId');
-                        if (reservaIdSpan) reservaIdSpan.textContent = data.reserva_id;
+                // Send request
+                fetch('{% url "complete_checkout" %}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                })
+                .then(response => {
+                    // Hide processing overlay
+                    if (processingOverlay) {
+                        processingOverlay.style.display = 'none';
                     }
                     
-                    const successModalEl = document.getElementById('successModal');
-                    if (successModalEl) {
-                        const successModal = new bootstrap.Modal(successModalEl);
-                        successModal.show();
-                    } else {
-                        console.error("Success modal element not found");
-                        alert("¡Reserva creada exitosamente!");
-                    }
-                } else {
-                    alert('Error al procesar la reserva: ' + (data.error || 'Error desconocido'));
-                }
-            })
-            .catch(error => {
-                // Re-enable button if not already done
-                if (completeCheckoutBtn) {
+                    // Re-enable button
                     completeCheckoutBtn.disabled = false;
                     completeCheckoutBtn.innerHTML = 'Completar Reserva';
-                }
-                
-                console.error('Error al procesar la reserva:', error);
-                alert(`Error al procesar la reserva: ${error.message}. Por favor, intenta nuevamente.`);
+                    completeCheckoutBtn.classList.remove('btn-processing');
+                    
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            try {
+                                return JSON.parse(text);
+                            } catch (e) {
+                                console.error("Server returned non-JSON response:", text);
+                                throw new Error(`Error del servidor (${response.status}). Por favor, intenta nuevamente.`);
+                            }
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Checkout response:", data);
+                    if (data.success) {
+                        // Show success modal
+                        if (data.reserva_id) {
+                            const reservaIdSpan = document.getElementById('reservaId');
+                            if (reservaIdSpan) reservaIdSpan.textContent = data.reserva_id;
+                        }
+                        
+                        const successModalEl = document.getElementById('successModal');
+                        if (successModalEl) {
+                            const successModal = new bootstrap.Modal(successModalEl);
+                            successModal.show();
+                        } else {
+                            console.error("Success modal element not found");
+                            alert("¡Reserva creada exitosamente!");
+                            window.location.href = "{% url 'homepage' %}";
+                        }
+                    } else {
+                        alert('Error al procesar la reserva: ' + (data.error || 'Error desconocido'));
+                    }
+                })
+                .catch(error => {
+                    // Hide processing overlay
+                    if (processingOverlay) {
+                        processingOverlay.style.display = 'none';
+                    }
+                    
+                    // Re-enable button
+                    completeCheckoutBtn.disabled = false;
+                    completeCheckoutBtn.innerHTML = 'Completar Reserva';
+                    completeCheckoutBtn.classList.remove('btn-processing');
+                    
+                    console.error('Error al procesar la reserva:', error);
+                    alert(`Error al procesar la reserva: ${error.message}. Por favor, intenta nuevamente.`);
+                });
             });
-        };
-        
-        // Add event listener to the button
-        const completeCheckoutBtn = document.getElementById('completeCheckoutBtn');
-        if (completeCheckoutBtn) {
-            completeCheckoutBtn.addEventListener('click', window.completeCheckout);
+            
             console.log("Event listener added for completeCheckoutBtn");
         } else {
             console.error("Complete checkout button not found");
