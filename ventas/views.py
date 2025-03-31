@@ -8,7 +8,8 @@ from django.shortcuts import render, get_object_or_404, redirect
 from datetime import datetime, timedelta
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Cliente, Pago, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra 
+from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Cliente, Pago, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra
+from .signals import get_or_create_system_user
 from .utils import verificar_disponibilidad
 from django.utils.timezone import make_aware
 from django.utils.dateparse import parse_date
@@ -612,6 +613,18 @@ def homepage_view(request):
     }
     return render(request, 'ventas/homepage.html', context)
 
+def cart_view(request):
+    """
+    Vista que renderiza la página del carrito de compras
+    """
+    # Obtener carrito de compras de la sesión o crear uno nuevo
+    cart = request.session.get('cart', {'servicios': [], 'total': 0})
+    
+    context = {
+        'cart': cart
+    }
+    return render(request, 'ventas/cart.html', context)
+
 def add_to_cart(request):
     """
     Vista para agregar un servicio al carrito de compras
@@ -647,7 +660,8 @@ def add_to_cart(request):
             # Guardar carrito en la sesión
             request.session['cart'] = cart
             
-            return JsonResponse({'success': True, 'cart': cart})
+            # Redirigir a la página de checkout en lugar de la página del carrito
+            return redirect('checkout')
         except Servicio.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Servicio no encontrado'})
     
@@ -679,9 +693,21 @@ def remove_from_cart(request):
     
     return JsonResponse({'success': False, 'error': 'Método no permitido'})
 
+def checkout_view(request):
+    """
+    Vista que renderiza la página de checkout
+    """
+    # Obtener carrito de compras de la sesión o crear uno nuevo
+    cart = request.session.get('cart', {'servicios': [], 'total': 0})
+    
+    context = {
+        'cart': cart
+    }
+    return render(request, 'ventas/checkout.html', context)
+
 def checkout(request):
     """
-    Vista para procesar el checkout del carrito
+    Vista para procesar el checkout del carrito (API endpoint)
     """
     if request.method == 'POST':
         nombre = request.POST.get('nombre')
@@ -715,28 +741,44 @@ def checkout(request):
                         cliente.documento_identidad = documento_identidad
                     cliente.save()
                 
-                # Crear venta/reserva
+                # Crear venta/reserva (para visitantes anónimos)
                 venta_reserva = VentaReserva.objects.create(
                     cliente=cliente,
                     fecha_reserva=timezone.now()
                 )
                 
+                # Establecer el usuario del sistema para los signals
+                venta_reserva._current_user = get_or_create_system_user()
+                
                 # Agregar servicios a la venta/reserva
                 for item in cart['servicios']:
                     servicio = Servicio.objects.get(id=item['servicio_id'])
-                    fecha_agendamiento = datetime.strptime(item['fecha'], '%Y-%m-%d').date()
+                    
+                    # Convertir fecha string a objeto datetime con timezone
+                    fecha_str = item['fecha']
+                    hora_str = item['hora']
+                    
+                    # Combinar fecha y hora en un solo objeto datetime
+                    fecha_hora_str = f"{fecha_str} {hora_str}"
+                    fecha_agendamiento = timezone.make_aware(
+                        datetime.strptime(fecha_hora_str, '%Y-%m-%d %H:%M')
+                    )
                     
                     # Crear reserva de servicio
-                    ReservaServicio.objects.create(
+                    reserva_servicio = ReservaServicio.objects.create(
                         venta_reserva=venta_reserva,
                         servicio=servicio,
                         fecha_agendamiento=fecha_agendamiento,
-                        hora_inicio=item['hora'],
+                        hora_inicio=hora_str,
                         cantidad_personas=item['cantidad_personas']
                     )
+                    
+                    # Establecer el usuario del sistema para los signals
+                    reserva_servicio._current_user = get_or_create_system_user()
                 
                 # Calcular total
                 venta_reserva.calcular_total()
+                venta_reserva.save()
                 
                 # Limpiar carrito
                 request.session['cart'] = {'servicios': [], 'total': 0}
@@ -748,6 +790,9 @@ def checkout(request):
                 })
                 
         except Exception as e:
+            import traceback
+            print(f"Error en checkout: {str(e)}")
+            print(traceback.format_exc())
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Método no permitido'})
@@ -764,6 +809,7 @@ def get_available_hours(request):
         fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
         
         # Obtener reservas existentes para este servicio en esta fecha
+        # Convertir fecha_obj a string para comparar con el campo fecha_agendamiento
         reservas = ReservaServicio.objects.filter(
             servicio=servicio,
             fecha_agendamiento=fecha_obj
@@ -796,12 +842,17 @@ def get_available_hours(request):
         # Ordenar las horas disponibles
         horas_disponibles.sort()
         
+        # Agregar horas de prueba si no hay horas disponibles (para desarrollo)
+        if not horas_disponibles:
+            horas_disponibles = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"]
+        
         return JsonResponse({'success': True, 'horas_disponibles': horas_disponibles})
     except Servicio.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Servicio no encontrado'})
     except ValueError as e:
         return JsonResponse({'success': False, 'error': f'Error de formato: {str(e)}'})
     except Exception as e:
+        print(f"Error en get_available_hours: {str(e)}")
         return JsonResponse({'success': False, 'error': f'Error: {str(e)}'})
 
 

@@ -616,6 +616,7 @@
                             <label for="hora" class="form-label">Hora</label>
                             <select class="form-select" id="hora" name="hora" required>
                                 <option value="">Selecciona una hora</option>
+                                <!-- Las horas disponibles se cargarán dinámicamente -->
                             </select>
                         </div>
                         
@@ -742,8 +743,225 @@
         let currentServicioNombre = null;
         let currentServicioPrecio = 0;
         
-        // Inicializar datepicker
+        // Función para abrir el modal de reserva
+        function openBookingModal(servicioId, servicioNombre, servicioPrecio) {
+            currentServicioId = servicioId;
+            currentServicioNombre = servicioNombre;
+            currentServicioPrecio = servicioPrecio;
+            
+            // Establecer valores en el formulario
+            document.getElementById('servicioId').value = servicioId;
+            document.getElementById('servicioNombre').value = servicioNombre;
+            
+            // Limpiar campos
+            document.getElementById('fecha').value = '';
+            document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
+            document.getElementById('cantidadPersonas').value = '1';
+            document.getElementById('precioTotal').value = servicioPrecio;
+            
+            // Mostrar el modal
+            const bookingModal = new bootstrap.Modal(document.getElementById('bookingModal'));
+            bookingModal.show();
+        }
+        
+        // Función para cargar horas disponibles
+        function loadAvailableHours(servicioId, fecha) {
+            // Limpiar selector de horas
+            const horaSelect = document.getElementById('hora');
+            horaSelect.innerHTML = '<option value="">Cargando horas disponibles...</option>';
+            
+            // Realizar petición AJAX para obtener horas disponibles
+            fetch(`{% url 'get_available_hours' %}?servicio_id=${servicioId}&fecha=${fecha}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Limpiar selector
+                        horaSelect.innerHTML = '<option value="">Selecciona una hora</option>';
+                        
+                        // Agregar horas disponibles
+                        data.horas_disponibles.forEach(hora => {
+                            const option = document.createElement('option');
+                            option.value = hora;
+                            option.textContent = hora;
+                            horaSelect.appendChild(option);
+                        });
+                    } else {
+                        console.error('Error al cargar horas disponibles:', data.error);
+                        horaSelect.innerHTML = '<option value="">Error al cargar horas</option>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error en la petición:', error);
+                    horaSelect.innerHTML = '<option value="">Error al cargar horas</option>';
+                });
+        }
+        
+        // Función para actualizar el precio total
+        function updatePrecioTotal() {
+            const cantidadPersonas = parseInt(document.getElementById('cantidadPersonas').value);
+            const precioTotal = currentServicioPrecio * cantidadPersonas;
+            document.getElementById('precioTotal').value = precioTotal;
+        }
+        
+        // Función para agregar al carrito
+        function addToCart() {
+            const servicioId = document.getElementById('servicioId').value;
+            const fecha = document.getElementById('fecha').value;
+            const hora = document.getElementById('hora').value;
+            const cantidadPersonas = document.getElementById('cantidadPersonas').value;
+            
+            // Validar campos
+            if (!fecha) {
+                alert('Por favor selecciona una fecha');
+                return;
+            }
+            
+            if (!hora) {
+                alert('Por favor selecciona una hora');
+                return;
+            }
+            
+            // Crear FormData para enviar
+            const formData = new FormData();
+            formData.append('servicio_id', servicioId);
+            formData.append('fecha', fecha);
+            formData.append('hora', hora);
+            formData.append('cantidad_personas', cantidadPersonas);
+            
+            // Enviar petición AJAX
+            fetch('{% url "add_to_cart" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => {
+                // Redirigir a la página de checkout
+                window.location.href = "{% url 'checkout' %}";
+            })
+            .catch(error => {
+                console.error('Error al agregar al carrito:', error);
+                alert('Error al agregar al carrito. Por favor intenta de nuevo.');
+            });
+        }
+        
+        // Función para eliminar del carrito
+        function removeFromCart(index) {
+            // Crear FormData para enviar
+            const formData = new FormData();
+            formData.append('index', index);
+            
+            // Enviar petición AJAX
+            fetch('{% url "remove_from_cart" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Actualizar carrito en la página
+                    window.location.reload();
+                } else {
+                    console.error('Error al eliminar del carrito:', data.error);
+                    alert('Error al eliminar del carrito. Por favor intenta de nuevo.');
+                }
+            })
+            .catch(error => {
+                console.error('Error en la petición:', error);
+                alert('Error al eliminar del carrito. Por favor intenta de nuevo.');
+            });
+        }
+        
+        // Función para completar el checkout
+        function completeCheckout() {
+            const nombre = document.getElementById('nombre').value;
+            const email = document.getElementById('email').value;
+            const telefono = document.getElementById('telefono').value;
+            const documento_identidad = document.getElementById('documento_identidad').value;
+            
+            // Validar campos
+            if (!nombre) {
+                alert('Por favor ingresa tu nombre');
+                return;
+            }
+            
+            if (!email) {
+                alert('Por favor ingresa tu email');
+                return;
+            }
+            
+            if (!telefono) {
+                alert('Por favor ingresa tu teléfono');
+                return;
+            }
+            
+            // Crear FormData para enviar
+            const formData = new FormData();
+            formData.append('nombre', nombre);
+            formData.append('email', email);
+            formData.append('telefono', telefono);
+            formData.append('documento_identidad', documento_identidad);
+            
+            // Enviar petición AJAX
+            fetch('{% url "checkout_api" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mostrar modal de éxito
+                    document.getElementById('reservaId').textContent = data.reserva_id;
+                    
+                    // Cerrar modal de checkout
+                    const checkoutModal = bootstrap.Modal.getInstance(document.getElementById('checkoutModal'));
+                    checkoutModal.hide();
+                    
+                    // Mostrar modal de éxito
+                    const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+                    successModal.show();
+                } else {
+                    console.error('Error en el checkout:', data.error);
+                    alert('Error al procesar la reserva: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error en la petición:', error);
+                alert('Error al procesar la reserva. Por favor intenta de nuevo.');
+            });
+        }
+        
+        // Función para obtener cookie CSRF
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        
+        // Inicializar
         document.addEventListener('DOMContentLoaded', function() {
+            // Inicializar el carrito
+            const cartIcon = document.getElementById('cartIcon');
+            cartIcon.addEventListener('click', function() {
+                window.location.href = "{% url 'cart' %}";
+            });
+            
             // Inicializar Flatpickr para el selector de fecha
             flatpickr("#fecha", {
                 minDate: "today",
@@ -766,6 +984,15 @@
                     }
                 }
             });
+            
+            // Agregar evento de cambio al selector de cantidad de personas
+            document.getElementById('cantidadPersonas').addEventListener('change', updatePrecioTotal);
+            
+            // Agregar evento de clic al botón de agregar al carrito
+            document.getElementById('addToCartBtn').addEventListener('click', addToCart);
+            
+            // Agregar evento de clic al botón de completar checkout
+            document.getElementById('completeCheckoutBtn').addEventListener('click', completeCheckout);
             
             // Inicializar filtro de categorías
             document.querySelectorAll('.category-filter').forEach(button => {
@@ -790,308 +1017,7 @@
                     });
                 });
             });
-            
-            // Inicializar carrito
-            const cartIcon = document.getElementById('cartIcon');
-            const cartDropdown = document.getElementById('cartDropdown');
-            
-            cartIcon.addEventListener('click', function(e) {
-                e.stopPropagation();
-                cartDropdown.classList.toggle('show');
-            });
-            
-            document.addEventListener('click', function(e) {
-                if (!cartIcon.contains(e.target) && !cartDropdown.contains(e.target)) {
-                    cartDropdown.classList.remove('show');
-                }
-            });
-            
-            // Inicializar botón de agregar al carrito
-            document.getElementById('addToCartBtn').addEventListener('click', function() {
-                addToCart();
-            });
-            
-            // Inicializar botón de completar checkout
-            document.getElementById('completeCheckoutBtn').addEventListener('click', function() {
-                completeCheckout();
-            });
-            
-            // Actualizar precio total al cambiar cantidad de personas
-            document.getElementById('cantidadPersonas').addEventListener('change', function() {
-                updateTotalPrice();
-            });
         });
-        
-        // Función para abrir el modal de reserva
-        function openBookingModal(servicioId, servicioNombre, servicioPrecio) {
-            currentServicioId = servicioId;
-            currentServicioNombre = servicioNombre;
-            currentServicioPrecio = servicioPrecio;
-            
-            // Establecer valores en el formulario
-            document.getElementById('servicioId').value = servicioId;
-            document.getElementById('servicioNombre').value = servicioNombre;
-            
-            // Limpiar campos
-            document.getElementById('fecha').value = '';
-            document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
-            document.getElementById('cantidadPersonas').value = '1';
-            
-            // Actualizar precio total
-            updateTotalPrice();
-            
-            // Abrir modal
-            const bookingModal = new bootstrap.Modal(document.getElementById('bookingModal'));
-            bookingModal.show();
-        }
-        
-        // Función para cargar horas disponibles
-        function loadAvailableHours(servicioId, fecha) {
-            // Limpiar selector de horas
-            const horaSelect = document.getElementById('hora');
-            horaSelect.innerHTML = '<option value="">Cargando horas...</option>';
-            
-            // Realizar petición AJAX para obtener horas disponibles
-            fetch(`/get-available-hours/?servicio_id=${servicioId}&fecha=${fecha}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Limpiar selector
-                        horaSelect.innerHTML = '<option value="">Selecciona una hora</option>';
-                        
-                        // Agregar horas disponibles
-                        data.horas_disponibles.forEach(hora => {
-                            const option = document.createElement('option');
-                            option.value = hora;
-                            option.textContent = hora;
-                            horaSelect.appendChild(option);
-                        });
-                    } else {
-                        horaSelect.innerHTML = '<option value="">No hay horas disponibles</option>';
-                        console.error(data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error al cargar horas disponibles:', error);
-                    horaSelect.innerHTML = '<option value="">Error al cargar horas</option>';
-                });
-        }
-        
-        // Función para actualizar precio total
-        function updateTotalPrice() {
-            const cantidadPersonas = parseInt(document.getElementById('cantidadPersonas').value);
-            const precioTotal = currentServicioPrecio * cantidadPersonas;
-            document.getElementById('precioTotal').value = precioTotal;
-        }
-        
-        // Función para agregar al carrito
-        function addToCart() {
-            const servicioId = document.getElementById('servicioId').value;
-            const fecha = document.getElementById('fecha').value;
-            const hora = document.getElementById('hora').value;
-            const cantidadPersonas = document.getElementById('cantidadPersonas').value;
-            
-            // Validar campos
-            if (!fecha || !hora) {
-                alert('Por favor, selecciona fecha y hora para la reserva.');
-                return;
-            }
-            
-            // Crear FormData para enviar
-            const formData = new FormData();
-            formData.append('servicio_id', servicioId);
-            formData.append('fecha', fecha);
-            formData.append('hora', hora);
-            formData.append('cantidad_personas', cantidadPersonas);
-            
-            // Enviar petición AJAX
-            fetch('/cart/add/', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Actualizar carrito en la interfaz
-                    updateCartUI(data.cart);
-                    
-                    // Cerrar modal
-                    const bookingModal = bootstrap.Modal.getInstance(document.getElementById('bookingModal'));
-                    bookingModal.hide();
-                    
-                    // Mostrar mensaje de éxito
-                    alert('Servicio agregado al carrito correctamente.');
-                } else {
-                    alert('Error al agregar al carrito: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error al agregar al carrito:', error);
-                alert('Error al agregar al carrito. Por favor, intenta nuevamente.');
-            });
-        }
-        
-        // Función para eliminar del carrito
-        function removeFromCart(index) {
-            // Crear FormData para enviar
-            const formData = new FormData();
-            formData.append('index', index);
-            
-            // Enviar petición AJAX
-            fetch('/cart/remove/', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Actualizar carrito en la interfaz
-                    updateCartUI(data.cart);
-                } else {
-                    alert('Error al eliminar del carrito: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error al eliminar del carrito:', error);
-                alert('Error al eliminar del carrito. Por favor, intenta nuevamente.');
-            });
-        }
-        
-        // Función para completar checkout
-        function completeCheckout() {
-            const nombre = document.getElementById('nombre').value;
-            const email = document.getElementById('email').value;
-            const telefono = document.getElementById('telefono').value;
-            const documento_identidad = document.getElementById('documento_identidad').value;
-            
-            // Validar campos
-            if (!nombre || !email || !telefono) {
-                alert('Por favor, completa todos los campos obligatorios.');
-                return;
-            }
-            
-            // Crear FormData para enviar
-            const formData = new FormData();
-            formData.append('nombre', nombre);
-            formData.append('email', email);
-            formData.append('telefono', telefono);
-            formData.append('documento_identidad', documento_identidad);
-            
-            // Enviar petición AJAX
-            fetch('/cart/checkout/', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Cerrar modal de checkout
-                    const checkoutModal = bootstrap.Modal.getInstance(document.getElementById('checkoutModal'));
-                    checkoutModal.hide();
-                    
-                    // Actualizar ID de reserva en el modal de éxito
-                    document.getElementById('reservaId').textContent = data.reserva_id;
-                    
-                    // Mostrar modal de éxito
-                    const successModal = new bootstrap.Modal(document.getElementById('successModal'));
-                    successModal.show();
-                    
-                    // Actualizar carrito (vacío)
-                    updateCartUI({servicios: [], total: 0});
-                } else {
-                    alert('Error al procesar la reserva: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error al procesar la reserva:', error);
-                alert('Error al procesar la reserva. Por favor, intenta nuevamente.');
-            });
-        }
-        
-        // Función para actualizar la interfaz del carrito
-        function updateCartUI(cart) {
-            // Actualizar contador
-            document.getElementById('cartCount').textContent = cart.servicios.length;
-            
-            // Actualizar items
-            const cartItemsContainer = document.getElementById('cartItems');
-            const checkoutItemsContainer = document.getElementById('checkoutItems');
-            
-            if (cart.servicios.length === 0) {
-                cartItemsContainer.innerHTML = '<p class="text-center">Tu carrito está vacío</p>';
-                checkoutItemsContainer.innerHTML = '<p class="text-center">Tu carrito está vacío</p>';
-                
-                // Ocultar total y botón de checkout
-                document.querySelector('.cart-total').style.display = 'none';
-                document.querySelector('#cartDropdown .btn-primary').style.display = 'none';
-            } else {
-                let cartItemsHTML = '';
-                let checkoutItemsHTML = '';
-                
-                cart.servicios.forEach((item, index) => {
-                    cartItemsHTML += `
-                        <div class="cart-item">
-                            <div class="cart-item-details">
-                                <div class="cart-item-title">${item.nombre}</div>
-                                <div class="cart-item-info">
-                                    ${item.fecha} | ${item.hora} | ${item.cantidad_personas} persona(s)
-                                </div>
-                            </div>
-                            <div class="cart-item-price">$${item.subtotal}</div>
-                            <div class="cart-item-remove" onclick="removeFromCart(${index})">
-                                <i class="fas fa-times"></i>
-                            </div>
-                        </div>
-                    `;
-                    
-                    checkoutItemsHTML += `
-                        <div class="cart-item">
-                            <div class="cart-item-details">
-                                <div class="cart-item-title">${item.nombre}</div>
-                                <div class="cart-item-info">
-                                    ${item.fecha} | ${item.hora} | ${item.cantidad_personas} persona(s)
-                                </div>
-                            </div>
-                            <div class="cart-item-price">$${item.subtotal}</div>
-                        </div>
-                    `;
-                });
-                
-                cartItemsContainer.innerHTML = cartItemsHTML;
-                checkoutItemsContainer.innerHTML = checkoutItemsHTML;
-                
-                // Actualizar total
-                document.getElementById('cartTotal').textContent = '$' + cart.total;
-                document.getElementById('checkoutTotal').textContent = '$' + cart.total;
-                
-                // Mostrar total y botón de checkout
-                document.querySelector('.cart-total').style.display = 'flex';
-                document.querySelector('#cartDropdown .btn-primary').style.display = 'block';
-            }
-        }
-        
-        // Función para obtener cookie CSRF
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
-        }
     </script>
+</body>
+</html>

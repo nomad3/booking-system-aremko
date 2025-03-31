@@ -10,6 +10,7 @@ from django.contrib.auth.models import User, AnonymousUser  # Importa el modelo 
 from .middleware import get_current_user  # Importa el middleware
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from .utils import verificar_disponibilidad  # Import the verificar_disponibilidad function
 
 # Movimientos y auditoría
 
@@ -50,6 +51,13 @@ def registrar_movimiento_venta(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=VentaReserva)
 def registrar_movimiento_eliminacion_venta(sender, instance, **kwargs):
     usuario = get_current_user()
+    # If user is AnonymousUser, use system user
+    if usuario and isinstance(usuario, AnonymousUser):
+        usuario = get_or_create_system_user()
+    # If still no user, use system user
+    if not usuario:
+        usuario = get_or_create_system_user()
+        
     comentarios = f"Se ha eliminado la venta/reserva con ID {instance.id} del cliente {instance.cliente.nombre}."
     
     MovimientoCliente.objects.create(
@@ -84,6 +92,13 @@ def registrar_movimiento_cliente(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=Cliente)
 def registrar_movimiento_eliminacion_cliente(sender, instance, **kwargs):
     usuario = get_current_user()
+    # If user is AnonymousUser, use system user
+    if usuario and isinstance(usuario, AnonymousUser):
+        usuario = get_or_create_system_user()
+    # If still no user, use system user
+    if not usuario:
+        usuario = get_or_create_system_user()
+        
     descripcion = f"Se ha eliminado el cliente: {instance.nombre}."
     
     MovimientoCliente.objects.create(
@@ -99,6 +114,13 @@ def registrar_movimiento_eliminacion_cliente(sender, instance, **kwargs):
 @receiver(post_save, sender=ReservaProducto)
 def registrar_movimiento_reserva_producto(sender, instance, created, **kwargs):
     usuario = get_current_user()
+    # If user is AnonymousUser, use system user
+    if usuario and isinstance(usuario, AnonymousUser):
+        usuario = get_or_create_system_user()
+    # If still no user, use system user
+    if not usuario:
+        usuario = get_or_create_system_user()
+        
     tipo = 'Añadido Producto a Venta/Reserva' if created else 'Actualización de Producto en Venta/Reserva'
     descripcion = f"Se ha {'añadido' if created else 'actualizado'} {instance.cantidad} x {instance.producto.nombre} en la venta/reserva #{instance.venta_reserva.id}."
     
@@ -113,6 +135,13 @@ def registrar_movimiento_reserva_producto(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=ReservaProducto)
 def registrar_movimiento_eliminacion_producto(sender, instance, **kwargs):
     usuario = get_current_user()
+    # If user is AnonymousUser, use system user
+    if usuario and isinstance(usuario, AnonymousUser):
+        usuario = get_or_create_system_user()
+    # If still no user, use system user
+    if not usuario:
+        usuario = get_or_create_system_user()
+        
     descripcion = f"Se ha eliminado {instance.cantidad} x {instance.producto.nombre} de la venta/reserva #{instance.venta_reserva.id}."
     
     MovimientoCliente.objects.create(
@@ -128,17 +157,35 @@ def registrar_movimiento_eliminacion_producto(sender, instance, **kwargs):
 @receiver(post_save, sender=ReservaServicio)
 def registrar_movimiento_reserva_servicio(sender, instance, created, **kwargs):
     if created:
+        # Get user from instance or use system user
+        user = getattr(instance, '_current_user', None)
+        if not user:
+            user = get_current_user()
+            # If user is AnonymousUser, use system user
+            if user and isinstance(user, AnonymousUser):
+                user = get_or_create_system_user()
+            # If still no user, use system user
+            if not user:
+                user = get_or_create_system_user()
+                
         MovimientoCliente.objects.create(
             cliente=instance.venta_reserva.cliente,
             tipo_movimiento='Reserva de Servicio',
             comentarios=f'Se ha reservado el servicio {instance.servicio.nombre}',
-            usuario=get_current_user() or get_or_create_system_user(),
+            usuario=user,
             venta_reserva=instance.venta_reserva
         )
 
 @receiver(post_delete, sender=ReservaServicio)
 def registrar_movimiento_eliminacion_servicio(sender, instance, **kwargs):
     usuario = get_current_user()
+    # If user is AnonymousUser, use system user
+    if usuario and isinstance(usuario, AnonymousUser):
+        usuario = get_or_create_system_user()
+    # If still no user, use system user
+    if not usuario:
+        usuario = get_or_create_system_user()
+        
     descripcion = f"Se ha eliminado la reserva del servicio {instance.servicio.nombre} de la venta/reserva #{instance.venta_reserva.id}."
     
     MovimientoCliente.objects.create(
@@ -175,6 +222,13 @@ def registrar_movimiento_pago(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=Pago)
 def registrar_movimiento_eliminacion_pago(sender, instance, **kwargs):
     usuario = get_current_user()
+    # If user is AnonymousUser, use system user
+    if usuario and isinstance(usuario, AnonymousUser):
+        usuario = get_or_create_system_user()
+    # If still no user, use system user
+    if not usuario:
+        usuario = get_or_create_system_user()
+        
     descripcion = f"Se ha eliminado el pago de {instance.monto} de la venta/reserva #{instance.venta_reserva.id}."
     
     MovimientoCliente.objects.create(
@@ -293,11 +347,19 @@ def crear_movimiento_cliente_pago(sender, instance, created, **kwargs):
 
 @receiver(post_delete, sender=Pago)
 def crear_movimiento_cliente_pago_eliminado(sender, instance, **kwargs):
+    usuario = get_current_user()
+    # If user is AnonymousUser, use system user
+    if usuario and isinstance(usuario, AnonymousUser):
+        usuario = get_or_create_system_user()
+    # If still no user, use system user
+    if not usuario:
+        usuario = get_or_create_system_user()
+        
     MovimientoCliente.objects.create(
         cliente=instance.venta_reserva.cliente,
         tipo_movimiento='Anulación de Pago',
         comentarios=f'Anulación de Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id} - Monto: ${instance.monto}',
-        usuario=get_current_user() or get_or_create_system_user(),
+        usuario=usuario,
         venta_reserva=instance.venta_reserva
     )
 
@@ -305,7 +367,15 @@ def crear_movimiento_cliente_pago_eliminado(sender, instance, **kwargs):
 def set_pago_user(sender, instance, **kwargs):
     if not instance.pk and not instance.usuario:  # If this is a new instance and no user is set
         from .middleware import get_current_user
-        instance.usuario = get_current_user()
+        usuario = get_current_user()
+        # If user is AnonymousUser, use system user
+        if usuario and isinstance(usuario, AnonymousUser):
+            usuario = get_or_create_system_user()
+        # If still no user, use system user
+        if not usuario:
+            usuario = get_or_create_system_user()
+            
+        instance.usuario = usuario
 
 @receiver(post_save, sender=ReservaServicio)
 @receiver(post_delete, sender=ReservaServicio)

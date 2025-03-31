@@ -4,7 +4,8 @@ from . import views
 from .views import (
     servicios_vendidos_view, inicio_sistema_view, caja_diaria_view, 
     auditoria_movimientos_view, venta_reserva_list, venta_reserva_detail,
-    homepage_view, add_to_cart, remove_from_cart, checkout, get_available_hours
+    homepage_view, add_to_cart, remove_from_cart, checkout, get_available_hours,
+    cart_view, checkout_view
 )
 from . import api
 from .admin import ServicioAdmin
@@ -22,9 +23,11 @@ router.register(r'api/clientes', views.ClienteViewSet)
 urlpatterns = [
     path('admin-dashboard/', inicio_sistema_view, name='inicio_sistema'),  # Vista de inicio del sistema admin
     path('', homepage_view, name='homepage'),  # Nueva vista de inicio pública
+    path('cart/', cart_view, name='cart'),  # Vista del carrito de compras
+    path('checkout/', checkout_view, name='checkout'),  # Vista de la página de checkout
     path('cart/add/', add_to_cart, name='add_to_cart'),
     path('cart/remove/', remove_from_cart, name='remove_from_cart'),
-    path('cart/checkout/', checkout, name='checkout'),
+    path('cart/checkout/', checkout, name='checkout_api'),  # API endpoint para procesar el checkout
     path('get-available-hours/', get_available_hours, name='get_available_hours'),
     path('servicios-vendidos/', servicios_vendidos_view, name='servicios_vendidos'),
     path('caja-diaria/', caja_diaria_view, name='caja_diaria'),  # Nueva vista de caja diaria
