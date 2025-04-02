@@ -79,5 +79,5 @@ echo "Recolectando archivos estáticos..."
 python manage.py collectstatic --noinput
 
 # Iniciar Gunicorn para servir la aplicación
-echo "Iniciando Gunicorn en el puerto $PORT..."
-exec gunicorn aremko_project.wsgi:application --bind 0.0.0.0:"$PORT"
+echo "Iniciando Gunicorn en el puerto $PORT con timeout de 120s..."
+exec gunicorn aremko_project.wsgi:application --bind 0.0.0.0:"$PORT" --timeout 120

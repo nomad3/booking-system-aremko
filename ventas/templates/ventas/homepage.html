@@ -1,5 +1,6 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
+{% load humanize %} {# Load humanize template tags #}
 
 {% block title %}Aremko - Reserva de Servicios{% endblock %}
 
@@ -127,9 +128,12 @@
                         <div class="card-body">
                             <h5 class="card-title">{{ servicio.nombre }}</h5>
                             <p class="card-text">{{ servicio.categoria.nombre }}</p>
-                            <p class="price">${{ servicio.precio_base }} <small class="text-muted">por persona</small></p>
+                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p> {# Apply filters #}
                             <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion }} minutos</small></p>
-                            <button class="btn btn-primary w-100" onclick="openBookingModal({{ servicio.id }}, '{{ servicio.nombre }}', {{ servicio.precio_base }})">
+                            <button class="btn btn-primary w-100 js-open-booking-modal" 
+                                    data-servicio-id="{{ servicio.id }}" 
+                                    data-servicio-nombre="{{ servicio.nombre|escapejs }}" 
+                                    data-servicio-precio="{{ servicio.precio_base }}"> {# Use data attributes #}
                                 <i class="fas fa-calendar-plus me-2"></i>Reservar
                             </button>
                         </div>
@@ -284,31 +288,23 @@
 
 {% block extra_script %}
 <script>
-    // Make openBookingModal globally accessible
-    window.openBookingModal = function(servicioId, servicioNombre, servicioPrecio) {
-        console.log("Opening booking modal for:", servicioId, servicioNombre, servicioPrecio);
-        currentServicioId = servicioId;
-        currentServicioNombre = servicioNombre;
-        currentServicioPrecio = servicioPrecio;
-
-        document.getElementById('servicioId').value = servicioId;
-        document.getElementById('servicioNombre').value = servicioNombre;
-        document.getElementById('fecha').value = '';
-        document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
-        document.getElementById('cantidadPersonas').value = '1';
-        document.getElementById('precioTotal').value = servicioPrecio;
-
-        const bookingModalEl = document.getElementById('bookingModal');
-        if (bookingModalEl) {
-            const bookingModal = new bootstrap.Modal(bookingModalEl);
-            bookingModal.show();
-        } else {
-            console.error("Booking modal element not found");
-        }
+    // Helper function to format numbers as CLP (dot for thousands, no decimals)
+    function formatCLP(value) {
+      const numberValue = Number(value);
+      if (isNaN(numberValue)) {
+        return '0'; // Return '0' if not a valid number
+      }
+      // Use Intl.NumberFormat for Chilean Spanish locale formatting
+      return new Intl.NumberFormat('es-CL', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(numberValue);
     }
 
+    // Removed global openBookingModal function
+
     // Variables globales específicas de la homepage
-    let currentServicioId = null;
+    let currentServicioId = null; // Keep this for date change logic
     let currentServicioNombre = null;
     let currentServicioPrecio = 0;
 
@@ -360,8 +356,8 @@
         if (cantidadPersonasSelect && precioTotalInput) {
             const cantidadPersonas = parseInt(cantidadPersonasSelect.value);
             const precioTotal = currentServicioPrecio * cantidadPersonas;
-            precioTotalInput.value = precioTotal;
-            console.log("Updated total price:", precioTotal);
+            precioTotalInput.value = formatCLP(precioTotal); // Format updated price
+            console.log("Updated total price:", formatCLP(precioTotal));
         }
     }
 
@@ -426,6 +422,40 @@
     // Inicializar listeners específicos de la homepage
     document.addEventListener('DOMContentLoaded', function() {
         console.log("Homepage DOMContentLoaded");
+
+        // Add listener for booking modal buttons
+        document.querySelectorAll('.js-open-booking-modal').forEach(button => {
+            button.addEventListener('click', function() {
+                const servicioId = this.dataset.servicioId;
+                const servicioNombre = this.dataset.servicioNombre;
+                const servicioPrecio = parseFloat(this.dataset.servicioPrecio); // Ensure it's a number
+
+                console.log("Opening booking modal via listener for:", servicioId, servicioNombre, servicioPrecio);
+                
+                // Store current service details globally (needed for date/quantity changes)
+                currentServicioId = servicioId;
+                currentServicioNombre = servicioNombre;
+                currentServicioPrecio = servicioPrecio;
+
+                // Populate modal fields
+                document.getElementById('servicioId').value = servicioId;
+                document.getElementById('servicioNombre').value = servicioNombre;
+                document.getElementById('fecha').value = ''; // Clear date
+                document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>'; // Reset hours
+                document.getElementById('cantidadPersonas').value = '1'; // Reset quantity
+                document.getElementById('precioTotal').value = formatCLP(servicioPrecio); // Format initial price
+
+                // Show modal
+                const bookingModalEl = document.getElementById('bookingModal');
+                if (bookingModalEl) {
+                    const bookingModal = new bootstrap.Modal(bookingModalEl);
+                    bookingModal.show();
+                } else {
+                    console.error("Booking modal element not found");
+                }
+            });
+        });
+        console.log("Event listeners added for .js-open-booking-modal buttons");
 
         // Flatpickr for date picker
         const fechaInput = document.getElementById('fecha');

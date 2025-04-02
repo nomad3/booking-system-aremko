@@ -1,5 +1,6 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
+{% load humanize %} {# Load humanize template tags #}
 
 {% block title %}Aremko - Finalizar Reserva{% endblock %}
 
@@ -67,14 +68,12 @@
     
     .cart-total-title {
         font-weight: 700;
-        margin-bottom: 15px;
+        margin-bottom: 20px; /* Match cart.html */
+        color: var(--dark-gray); /* Match cart.html */
     }
     
-    .cart-total-amount {
-        font-weight: 700;
-        font-size: 1.5rem;
-        color: var(--primary-color);
-    }
+    /* Remove cart-total-amount as it's handled by cart-summary-total now */
+    /* .cart-total-amount { ... } */
     
     .empty-cart {
         text-align: center;
@@ -121,6 +120,37 @@
         color: var(--primary-color);
         margin-bottom: 15px;
     }
+
+    /* Add/Update styles from cart.html */
+    .cart-summary { /* Added from cart.html */
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 25px;
+    }
+    .cart-summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px; /* Match cart.html */
+        /* width: 100%; /* Removed */
+    }
+    .cart-summary-total {
+        font-weight: 700; /* Match cart.html */
+        font-size: 1.3rem; /* Match cart.html */
+        color: var(--primary-color); /* Match cart.html */
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+    }
+    .cart-actions { /* Added from cart.html */
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+    }
+
+    /* Remove unused rule */
+    /* .summary-total-value { ... } */
+
 </style>
 {% endblock %}
 
@@ -169,30 +199,30 @@
                         </form>
                     </div>
                 </div>
-                
                 <div class="col-lg-4">
-                    <div class="cart-total">
-                        <h4 class="cart-total-title">Resumen del Pedido</h4>
-                        <hr>
+                    <!-- Use cart.html structure and classes -->
+                    <div class="cart-summary"> 
+                        <h3 class="cart-summary-title">Resumen del Pedido</h3>
                         
                         {% for item in cart.servicios %}
-                            <div class="d-flex justify-content-between mb-2">
+                            <div class="cart-summary-row">
                                 <span>{{ item.nombre }} ({{ item.cantidad_personas }} persona(s))</span>
-                                <span>${{ item.subtotal }}</span>
+                                <span>${{ item.subtotal|floatformat:0|intcomma }}</span> {# Apply filters #}
                             </div>
                         {% endfor %}
                         
-                        <hr>
-                        <div class="d-flex justify-content-between mb-4">
+                        <div class="cart-summary-row cart-summary-total">
                             <span>Total:</span>
-                            <span class="cart-total-amount">${{ cart.total }}</span>
+                            <span>${{ cart.total|floatformat:0|intcomma }}</span> {# Apply filters #}
                         </div>
-                        <button class="btn btn-primary w-100" id="completeCheckoutBtn">
-                            Completar Reserva
-                        </button>
-                        <a href="{% url 'cart' %}" class="btn btn-outline-secondary w-100 mt-3">
-                            Volver al Carrito
-                        </a>
+                        
+                        <!-- Buttons moved inside and wrapped in cart-actions -->
+                        <div class="cart-actions"> 
+                            <a href="{% url 'cart' %}" class="btn btn-outline-secondary">Volver al Carrito</a>
+                            <button class="btn btn-primary" id="completeCheckoutBtn">
+                                Completar Reserva
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -212,7 +242,7 @@
                                     </p>
                                 </div>
                                 <div class="col-md-4 text-end">
-                                    <p class="cart-item-price">${{ item.subtotal }}</p>
+                                    <p class="cart-item-price">${{ item.subtotal|floatformat:0|intcomma }}</p> {# Apply filters #}
                                 </div>
                             </div>
                         </div>

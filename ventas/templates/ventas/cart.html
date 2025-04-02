@@ -1,5 +1,6 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
+{% load humanize %} {# Load humanize template tags #}
 
 {% block title %}Aremko - Tu Carrito{% endblock %}
 
@@ -141,7 +142,7 @@
                                     <i class="fas fa-users"></i> {{ item.cantidad_personas }} persona(s)
                                 </p>
                             </div>
-                            <div class="cart-item-price">${{ item.subtotal }}</div>
+                            <div class="cart-item-price">${{ item.subtotal|floatformat:0|intcomma }}</div> {# Apply filters #}
                             <button class="btn-remove" onclick="removeFromCart({{ forloop.counter0 }})">
                                 <i class="fas fa-trash-alt"></i>
                             </button>
@@ -156,13 +157,13 @@
                         {% for item in cart.servicios %}
                             <div class="cart-summary-row">
                                 <span>{{ item.nombre }} ({{ item.cantidad_personas }})</span>
-                                <span>${{ item.subtotal }}</span>
+                                <span>${{ item.subtotal|floatformat:0|intcomma }}</span> {# Apply filters #}
                             </div>
                         {% endfor %}
                         
                         <div class="cart-summary-row cart-summary-total">
                             <span>Total:</span>
-                            <span>${{ cart.total }}</span>
+                            <span>${{ cart.total|floatformat:0|intcomma }}</span> {# Apply filters #}
                         </div>
                         
                         <div class="cart-actions">
@@ -214,9 +215,7 @@
         fetch('{% url "remove_from_cart" %}', { 
             method: 'POST',
             body: formData,
-            headers: {
-                'X-CSRFToken': csrfToken
-            }
+            headers: { 'X-CSRFToken': csrfToken } // Rewritten on one line
         }) 
         .then(response => {
             console.log("Remove response status:", response.status); 
