@@ -53,6 +53,12 @@ echo "Base de datos está disponible."
 echo "Aplicando migraciones..."
 python manage.py migrate
 
+# Add this section to run populate_fake_data.py in dev environment only
+if [ "$ENVIRONMENT" = "development" ] || [ "$DJANGO_ENV" = "development" ]; then
+  echo "Ambiente de desarrollo detectado. Poblando datos falsos..."
+  python populate_fake_data.py
+fi
+
 # Crear superusuario si no existe
 echo "Creando superusuario si no existe..."
 python manage.py shell <<EOF
