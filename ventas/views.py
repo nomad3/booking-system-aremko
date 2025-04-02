@@ -14,6 +14,7 @@ from .utils import verificar_disponibilidad
 from django.utils.timezone import make_aware
 from django.utils.dateparse import parse_date
 from django.db import models
+from django.db.models.signals import pre_save # Import pre_save
 from django.db.models import Q, Sum
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
