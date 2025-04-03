@@ -308,6 +308,8 @@
         return cookieValue;
     }
 
+    let isProcessingCheckout = false; // Flag to prevent double submission
+
     document.addEventListener('DOMContentLoaded', function() {
         const completeCheckoutBtn = document.getElementById('completeCheckoutBtn');
         const processingOverlay = document.getElementById('processingOverlay');
@@ -315,6 +317,13 @@
         if (completeCheckoutBtn) {
             completeCheckoutBtn.addEventListener('click', function(e) {
                 e.preventDefault(); // Prevent default button behavior
+                
+                // Prevent double submission
+                if (isProcessingCheckout) {
+                    console.log("Checkout already in progress, ignoring click.");
+                    return; 
+                }
+                isProcessingCheckout = true; // Set flag
                 
                 console.log("Checkout button clicked");
                 
@@ -372,11 +381,13 @@
                         processingOverlay.style.display = 'none';
                     }
                     
-                    // Re-enable button
-                    completeCheckoutBtn.disabled = false;
-                    completeCheckoutBtn.innerHTML = 'Completar Reserva';
+                    // Re-enable button and reset flag ONLY AFTER processing is done
+                    // completeCheckoutBtn.disabled = false; // Moved to finally block
+                    // completeCheckoutBtn.innerHTML = 'Completar Reserva'; // Moved to finally block
                     
                     if (!response.ok) {
+                        // Reset flag on error before throwing
+                        // isProcessingCheckout = false; // Moved to finally block
                         return response.text().then(text => {
                             console.log("Error response text:", text);
                             try {
@@ -434,6 +445,13 @@
                     completeCheckoutBtn.innerHTML = 'Completar Reserva';
                     
                     alert(`Error al procesar la reserva: ${error.message}. Por favor, intenta nuevamente.`);
+                })
+                .finally(() => {
+                    // Always re-enable button and reset flag when fetch completes (success or error)
+                    completeCheckoutBtn.disabled = false;
+                    completeCheckoutBtn.innerHTML = 'Completar Reserva';
+                    isProcessingCheckout = false; 
+                    console.log("Checkout processing finished.");
                 });
             });
             
