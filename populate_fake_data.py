@@ -75,25 +75,32 @@ def update_or_create_services():
             print(f'Processing category: {category_name}')
 
             for service_name, slots in services.items():
-                # Use update_or_create to handle existing services
-                # We only update category and slots, preserving other fields like price/duration
-                service, created = Servicio.objects.update_or_create(
-                    nombre=service_name,
-                    defaults={
-                        'categoria': category,
-                        'slots_disponibles': slots,
-                        'activo': True # Ensure service is active
-                        # We DON'T update 'precio_base' or 'duracion' here
-                        # Assuming 'horario_apertura' and 'horario_cierre' are also set correctly
-                    }
-                )
-
-                if created:
-                    print(f'  Created service: {service_name} with slots {slots}')
-                    # Note: If created, price/duration might be default or null.
-                    # Consider adding default values in the model or handling this case.
-                else:
+                try:
+                    # Try to get the existing service
+                    service = Servicio.objects.get(nombre=service_name)
+                    # If it exists, update only specific fields
+                    service.categoria = category
+                    service.slots_disponibles = slots
+                    service.activo = True
+                    service.save()
                     print(f'  Updated service: {service_name} with slots {slots}')
+                except Servicio.DoesNotExist:
+                    # If it doesn't exist, create it with placeholder price/duration
+                    Servicio.objects.create(
+                        nombre=service_name,
+                        categoria=category,
+                        slots_disponibles=slots,
+                        activo=True,
+                        precio_base=0,  # Placeholder price
+                        duracion=60,    # Placeholder duration
+                        horario_apertura=time(9, 0), # Default opening
+                        horario_cierre=time(23, 0)  # Default closing
+                    )
+                    print(f'  Created service: {service_name} with slots {slots}. '
+                          f'WARNING: Using placeholder price (0) and duration (60 min). Please update manually.')
+                except Exception as e_inner:
+                    # Catch potential errors during update/create for a specific service
+                    print(f'ERROR processing service "{service_name}" in category "{category_name}": {e_inner}')
 
         except CategoriaServicio.DoesNotExist:
             print(f'WARNING: Category "{category_name}" not found. Skipping services.')
