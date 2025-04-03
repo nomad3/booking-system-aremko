@@ -308,6 +308,53 @@
         return cookieValue;
     }
 
+    // Function to fetch client data based on phone number
+    async function fetchClientData(telefono) {
+        // Basic validation/normalization (remove spaces, etc.) - consider more robust validation
+        const cleanedTelefono = telefono.replace(/\s+/g, ''); 
+        if (cleanedTelefono.length < 9) { // Example: Minimum length check
+             console.log("Phone number too short to fetch data.");
+             return; // Don't fetch if number is too short
+        }
+        
+        console.log(`Fetching client data for phone: ${cleanedTelefono}`);
+        try {
+            // IMPORTANT: Create this URL and View in Django
+            const response = await fetch(`/api/get-client-by-phone/?telefono=${encodeURIComponent(cleanedTelefono)}`); 
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.cliente) {
+                    console.log("Client found:", data.cliente);
+                    // Pre-fill form fields
+                    const nombreInput = document.getElementById('checkoutNombre');
+                    const emailInput = document.getElementById('checkoutEmail');
+                    const documentoInput = document.getElementById('checkoutDocumento'); // Assuming you want to fill this too
+
+                    if (nombreInput) nombreInput.value = data.cliente.nombre || '';
+                    if (emailInput) emailInput.value = data.cliente.email || '';
+                    if (documentoInput) documentoInput.value = data.cliente.documento_identidad || '';
+                    
+                    // Optional: Make fields read-only or visually indicate they were pre-filled
+                    // if (nombreInput) nombreInput.readOnly = true;
+                    // if (emailInput) emailInput.readOnly = true;
+                    
+                } else {
+                    console.log("Client not found for this phone number.");
+                    // Optional: Clear fields if no client is found after a previous find?
+                    // document.getElementById('checkoutNombre').value = '';
+                    // document.getElementById('checkoutEmail').value = '';
+                    // document.getElementById('checkoutDocumento').value = '';
+                }
+            } else {
+                console.error(`Error fetching client data: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('Error during fetchClientData:', error);
+        }
+    }
+
+
     let isProcessingCheckout = false; // Flag to prevent double submission
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -458,6 +505,18 @@
             console.log("Event listener added for completeCheckoutBtn");
         } else {
             console.error("Complete checkout button not found");
+        }
+
+        // Add event listener for the phone input field
+        const telefonoInput = document.getElementById('checkoutTelefono');
+        if (telefonoInput) {
+            // Use 'blur' event to trigger fetch when user moves out of the field
+            telefonoInput.addEventListener('blur', function() {
+                fetchClientData(this.value);
+            });
+            console.log("Event listener added for checkoutTelefono blur");
+        } else {
+            console.error("Telefono input not found");
         }
     });
 </script>

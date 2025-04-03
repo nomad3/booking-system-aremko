@@ -198,3 +198,41 @@ def update_cliente(request, telefono):
             'received_data': request.data,
             'content_type': request.content_type
         })
+
+@api_view(['GET'])
+@permission_classes([AllowAny]) # Allow access without authentication for this specific task
+def get_client_by_phone(request):
+    """
+    Fetches client data based on the provided phone number.
+    """
+    telefono = request.GET.get('telefono', None)
+    
+    if not telefono:
+        return Response({'error': 'Phone number parameter is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Basic cleaning - remove common non-digit characters
+    # Consider using phonenumbers library here for more robust parsing/validation if needed
+    cleaned_telefono = ''.join(filter(str.isdigit, telefono))
+    
+    # Add '+' if it's likely an international number but missing the prefix
+    # This is a basic heuristic, might need refinement based on expected input formats
+    if len(cleaned_telefono) > 9 and not telefono.startswith('+'):
+         # Attempt to guess country code if needed, or assume a default like +56 for Chile
+         # For simplicity, let's assume '+' was just missing
+         formatted_telefono = '+' + cleaned_telefono
+    else:
+         formatted_telefono = telefono # Use original if it already has '+' or is short
+
+    try:
+        # Try finding client with the potentially formatted number or original input
+        cliente = Cliente.objects.filter(Q(telefono=formatted_telefono) | Q(telefono=telefono)).first() 
+        
+        if cliente:
+            serializer = ClienteSerializer(cliente)
+            return Response({'cliente': serializer.data})
+        else:
+            return Response({'cliente': None}, status=status.HTTP_404_NOT_FOUND)
+            
+    except Exception as e:
+        logger.error(f"Error fetching client by phone {telefono}: {e}")
+        return Response({'error': 'An error occurred while fetching client data.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

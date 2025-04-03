@@ -792,23 +792,47 @@ def complete_checkout(request):
             if unavailable_slots:
                 return JsonResponse({'success': False, 'error': unavailable_slots})
             
-            # Create cliente if it doesn't exist
+            # Clean/normalize phone number (basic example)
+            # Consider using phonenumbers library for robust parsing/validation
+            cleaned_telefono = ''.join(filter(str.isdigit, telefono))
+            if len(cleaned_telefono) > 9 and not telefono.startswith('+'):
+                 formatted_telefono = '+' + cleaned_telefono # Basic international format assumption
+            else:
+                 formatted_telefono = telefono
+
+            # Get or create cliente using the phone number
             cliente, created = Cliente.objects.get_or_create(
-                email=email,
+                telefono=formatted_telefono, # Use phone number for lookup
                 defaults={
                     'nombre': nombre,
-                    'telefono': telefono,
+                    'email': email, # Still save email if provided
                     'documento_identidad': documento_identidad
                 }
             )
             
-            # If cliente exists but we have new info, update it
+            # If cliente exists, update name/email if they were changed in the form
             if not created:
-                cliente.nombre = nombre
-                cliente.telefono = telefono
-                if documento_identidad:
-                    cliente.documento_identidad = documento_identidad
-                cliente.save()
+                update_needed = False
+                if cliente.nombre != nombre:
+                    cliente.nombre = nombre
+                    update_needed = True
+                # Update email only if it's provided and different, or if it was null before
+                if email and cliente.email != email: 
+                    cliente.email = email
+                    update_needed = True
+                elif not cliente.email and email: # Add email if it was missing
+                    cliente.email = email
+                    update_needed = True
+                # Update document if provided and different
+                if documento_identidad and cliente.documento_identidad != documento_identidad:
+                     cliente.documento_identidad = documento_identidad
+                     update_needed = True
+                elif not cliente.documento_identidad and documento_identidad: # Add doc if missing
+                     cliente.documento_identidad = documento_identidad
+                     update_needed = True
+                     
+                if update_needed:
+                    cliente.save()
             
             # Create VentaReserva
             with transaction.atomic():

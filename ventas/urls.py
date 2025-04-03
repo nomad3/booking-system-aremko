@@ -5,7 +5,8 @@ from .views import (
     servicios_vendidos_view, inicio_sistema_view, caja_diaria_view, 
     auditoria_movimientos_view, venta_reserva_list, venta_reserva_detail,
     homepage_view, add_to_cart, remove_from_cart, checkout_view, get_available_hours,
-    cart_view, complete_checkout, categoria_detail_view # Added categoria_detail_view
+    cart_view, complete_checkout, categoria_detail_view, # Added categoria_detail_view
+    get_client_by_phone # Added get_client_by_phone
 )
 from . import api
 from .admin import ServicioAdmin
@@ -42,6 +43,7 @@ urlpatterns = [
     path('api/cliente/update/<str:telefono>/', api.update_cliente, name='update_cliente'),
     path('api/cliente/', api.get_cliente, name='get_clientes'),
     path('api/cliente/<str:telefono>/', api.get_cliente, name='get_cliente'),
+    path('api/get-client-by-phone/', api.get_client_by_phone, name='get_client_by_phone'), # New URL for phone lookup
     # Booking process URLs
     path('get-available-hours/', views.get_available_hours, name='get_available_hours'),
     path('check-availability/', views.check_slot_availability, name='check_slot_availability'), # Added URL

@@ -325,8 +325,8 @@ class ServicioAdminForm(forms.ModelForm):
 
     class Meta:
         model = Servicio
-        fields = '__all__'
-
+        fields = '__all__' # Ensure all fields are included
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.slots_disponibles:
@@ -351,10 +351,12 @@ class ServicioAdminForm(forms.ModelForm):
 @admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
     form = ServicioAdminForm
-    list_display = ('nombre', 'horario_apertura', 'horario_cierre', 'capacidad_maxima', 'slots_preview')
+    list_display = ('nombre', 'categoria', 'precio_base', 'duracion', 'activo', 'imagen') # Added imagen
+    list_filter = ('categoria', 'activo')
+    search_fields = ('nombre', 'categoria__nombre')
     fieldsets = (
         (None, {
-            'fields': ('nombre', 'precio_base', 'duracion', 'categoria', 'proveedor')
+            'fields': ('nombre', 'categoria', 'precio_base', 'duracion', 'imagen', 'proveedor', 'activo') # Added imagen, activo
         }),
         ('Configuración Horaria', {
             'fields': (
@@ -401,8 +403,14 @@ class PagoAdmin(admin.ModelAdmin):
         registrar_movimiento(obj.venta_reserva.cliente, "Eliminación de Pago", descripcion, request.user)
         super().delete_model(request, obj)
 
+# Custom Admin for CategoriaServicio to show image field
+@admin.register(CategoriaServicio)
+class CategoriaServicioAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'imagen')
+    search_fields = ('nombre',)
+
 admin.site.register(CategoriaProducto, CategoriaProductoAdmin)
 admin.site.register(Producto, ProductoAdmin)
 admin.site.register(VentaReserva, VentaReservaAdmin)
 admin.site.register(Cliente, ClienteAdmin)
-admin.site.register(CategoriaServicio)
+# CategoriaServicio is now registered with the custom class above
