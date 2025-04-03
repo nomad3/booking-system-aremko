@@ -695,9 +695,9 @@ def add_to_cart(request):
             request.session.modified = True
             
             print(f"Updated cart: {cart}")
-            
-            # Redirigir a la página de checkout en lugar de la página del carrito
-            return redirect('checkout')
+
+            # Redirigir a la página del carrito
+            return redirect('cart') # Redirect to cart view
         except Servicio.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Servicio no encontrado'})
     
