@@ -5,10 +5,10 @@ from .views import (
     servicios_vendidos_view, inicio_sistema_view, caja_diaria_view, 
     auditoria_movimientos_view, venta_reserva_list, venta_reserva_detail,
     homepage_view, add_to_cart, remove_from_cart, checkout_view, get_available_hours,
-    cart_view, complete_checkout, categoria_detail_view, # Added categoria_detail_view
-    get_client_by_phone # Added get_client_by_phone
+    cart_view, complete_checkout, categoria_detail_view # Added categoria_detail_view
+    # get_client_by_phone is in api.py, not views.py
 )
-from . import api
+from . import api # Import the api module
 from .admin import ServicioAdmin
 
 # Registrar las vistas en el router de DRF
