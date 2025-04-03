@@ -1,0 +1,375 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ categoria_actual.nombre }} - Servicios | Aremko Spa Puerto Varas{% endblock %}
+
+{% block meta_description %}
+<meta name="description" content="Explora nuestros servicios de {{ categoria_actual.nombre }} en Aremko Spa Puerto Varas. Reserva tu experiencia de relajación hoy.">
+{% endblock %}
+
+{% block extra_style %}
+<style>
+/* Styles specific to category detail page */
+.category-header {
+    background-color: var(--light-gray); /* Or use an image */
+    padding: 60px 0;
+    margin-bottom: 50px;
+    text-align: center;
+}
+
+.category-header h1 {
+    color: var(--primary-color);
+    font-weight: 700;
+}
+
+/* Re-use homepage styles for consistency */
+.service-card .card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.service-card .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+.service-card .price {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+.section-title {
+    text-align: center;
+    font-weight: 700;
+    color: var(--dark-gray);
+    position: relative;
+    padding-bottom: 15px;
+    margin-bottom: 40px;
+}
+.section-title::after {
+    content: '';
+    position: absolute;
+    display: block;
+    width: 60px;
+    height: 3px;
+    background: var(--primary-color);
+    bottom: 0;
+    left: calc(50% - 30px);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Category Header -->
+<section class="category-header">
+    <div class="container">
+        <h1>{{ categoria_actual.nombre }}</h1>
+        {# Optional: Add a short description for the category if available in the model #}
+        {# <p class="lead text-muted">{{ categoria_actual.descripcion }}</p> #}
+    </div>
+</section>
+
+<!-- Services in Category Section -->
+<section class="container mb-5" id="servicios-categoria">
+    <h2 class="section-title mb-4">Servicios Disponibles</h2>
+
+    <div class="row">
+        {% for servicio in servicios %}
+            <div class="col-lg-4 col-md-6 mb-4 service-card"> {# Added mb-4 for spacing #}
+                <div class="card h-100">
+                    {# Placeholder image - consider adding specific images per service/category #}
+                    <img src="https://source.unsplash.com/random/300x200/?{{ servicio.nombre|urlencode }}" class="card-img-top" alt="{{ servicio.nombre }}">
+                    <div class="card-body d-flex flex-column"> {# Use flex column for button alignment #}
+                        <h5 class="card-title">{{ servicio.nombre }}</h5>
+                        {# <p class="card-text">{{ servicio.descripcion|truncatewords:15 }}</p> #} {# Optional: Add service description #}
+                        <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
+                        <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion }} minutos</small></p>
+                        <button class="btn btn-primary w-100 mt-auto js-open-booking-modal" {# Use mt-auto to push button down #}
+                                data-servicio-id="{{ servicio.id }}"
+                                data-servicio-nombre="{{ servicio.nombre|escapejs }}"
+                                data-servicio-precio="{{ servicio.precio_base }}">
+                            <i class="fas fa-calendar-plus me-2"></i>Reservar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <p class="text-center">No hay servicios disponibles en esta categoría en este momento.</p>
+            </div>
+        {% endfor %}
+    </div>
+
+    {# Optional: Link back to all services or homepage #}
+    <div class="text-center mt-4">
+        <a href="{% url 'homepage' %}#servicios" class="btn btn-outline-secondary">Ver Todos los Servicios</a>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block modals %}
+<!-- Booking Modal (Copied from homepage for consistency) -->
+<div class="modal fade" id="bookingModal" tabindex="-1" aria-labelledby="bookingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bookingModalLabel">Reservar Servicio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="bookingForm" class="booking-form">
+                    <input type="hidden" id="servicioId" name="servicio_id">
+
+                    <div class="mb-3">
+                        <label for="servicioNombre" class="form-label">Servicio</label>
+                        <input type="text" class="form-control" id="servicioNombre" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="fecha" class="form-label">Fecha</label>
+                        <input type="text" class="form-control" id="fecha" name="fecha" placeholder="Selecciona una fecha" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="hora" class="form-label">Hora</label>
+                        <select class="form-select" id="hora" name="hora" required>
+                            <option value="">Selecciona una hora</option>
+                            <!-- Las horas disponibles se cargarán dinámicamente -->
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="cantidadPersonas" class="form-label">Cantidad de Personas</label>
+                        <select class="form-select" id="cantidadPersonas" name="cantidad_personas">
+                            <option value="1">1 persona</option>
+                            <option value="2">2 personas</option>
+                            <option value="3">3 personas</option>
+                            <option value="4">4 personas</option>
+                            <option value="5">5 personas</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="precioTotal" class="form-label">Precio Total</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="text" class="form-control" id="precioTotal" readonly>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="addToCartBtn">Agregar al Carrito</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+{# Include the same booking script logic as the homepage #}
+<script>
+    // Helper function to format numbers as CLP (dot for thousands, no decimals)
+    function formatCLP(value) {
+      const numberValue = Number(value);
+      if (isNaN(numberValue)) {
+        return '0'; // Return '0' if not a valid number
+      }
+      return new Intl.NumberFormat('es-CL', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(numberValue);
+    }
+
+    // Global variables for the booking modal on this page
+    let currentServicioId = null;
+    let currentServicioNombre = null;
+    let currentServicioPrecio = 0;
+
+    // Function to load available hours
+    function loadAvailableHours(servicioId, fecha) {
+        console.log("Loading available hours for:", servicioId, fecha);
+        const horaSelect = document.getElementById('hora');
+        if (!horaSelect) return;
+        horaSelect.innerHTML = '<option value="">Cargando horas...</option>';
+        horaSelect.disabled = true;
+
+        fetch(`{% url 'get_available_hours' %}?servicio_id=${servicioId}&fecha=${fecha}`)
+            .then(response => response.ok ? response.json() : Promise.reject(`HTTP error! status: ${response.status}`))
+            .then(data => {
+                horaSelect.innerHTML = '<option value="">Selecciona una hora</option>';
+                if (data.success && data.horas_disponibles.length > 0) {
+                    data.horas_disponibles.forEach(hora => {
+                        const option = document.createElement('option');
+                        option.value = hora;
+                        option.textContent = hora;
+                        horaSelect.appendChild(option);
+                    });
+                    horaSelect.disabled = false;
+                } else {
+                    horaSelect.innerHTML = '<option value="">No hay horas disponibles</option>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching available hours:', error);
+                horaSelect.innerHTML = '<option value="">Error al cargar horas</option>';
+            });
+    }
+
+    // Function to update total price
+    function updatePrecioTotal() {
+        const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
+        const precioTotalInput = document.getElementById('precioTotal');
+        if (cantidadPersonasSelect && precioTotalInput) {
+            const cantidadPersonas = parseInt(cantidadPersonasSelect.value);
+            const precioTotal = currentServicioPrecio * cantidadPersonas;
+            precioTotalInput.value = formatCLP(precioTotal);
+        }
+        // Also validate the slot when quantity changes, if time is already selected
+        const horaSelect = document.getElementById('hora');
+        if (horaSelect && horaSelect.value) {
+            validateSelectedSlot();
+        }
+    }
+
+    // Function to check availability of the selected slot
+    async function validateSelectedSlot() {
+        const servicioId = document.getElementById('servicioId').value;
+        const fecha = document.getElementById('fecha').value;
+        const hora = document.getElementById('hora').value;
+        const addToCartBtn = document.getElementById('addToCartBtn');
+        const horaSelect = document.getElementById('hora');
+
+        const existingWarning = horaSelect.parentNode.querySelector('.text-danger');
+        if (existingWarning) existingWarning.remove();
+
+        if (!servicioId || !fecha || !hora) {
+            addToCartBtn.disabled = true;
+            return;
+        }
+
+        addToCartBtn.disabled = true;
+
+        try {
+            const response = await fetch(`{% url 'check_slot_availability' %}?servicio_id=${servicioId}&fecha=${fecha}&hora=${hora}`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+
+            if (data.available) {
+                addToCartBtn.disabled = false;
+            } else {
+                addToCartBtn.disabled = true;
+                const warningMsg = document.createElement('small');
+                warningMsg.className = 'text-danger d-block mt-1';
+                warningMsg.textContent = 'Hora no disponible.';
+                horaSelect.parentNode.appendChild(warningMsg);
+            }
+        } catch (error) {
+            console.error('Error checking slot availability:', error);
+            const warningMsg = document.createElement('small');
+            warningMsg.className = 'text-danger d-block mt-1';
+            warningMsg.textContent = 'Error al verificar disponibilidad.';
+            horaSelect.parentNode.appendChild(warningMsg);
+            addToCartBtn.disabled = true;
+        }
+    }
+
+    // Function to add to cart
+    function addToCart() {
+        const servicioId = document.getElementById('servicioId').value;
+        const fecha = document.getElementById('fecha').value;
+        const hora = document.getElementById('hora').value;
+        const cantidadPersonas = document.getElementById('cantidadPersonas').value;
+
+        if (!fecha || !hora) {
+            alert('Por favor selecciona una fecha y hora');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('servicio_id', servicioId);
+        formData.append('fecha', fecha);
+        formData.append('hora', hora);
+        formData.append('cantidad_personas', cantidadPersonas);
+
+        fetch('{% url "add_to_cart" %}', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': getCookie('csrftoken') } // Assumes getCookie is global
+        })
+        .then(response => {
+            if (!response.ok) {
+                 return response.text().then(text => { throw new Error(`Server responded with ${response.status}: ${text || 'No error info'}`); });
+            }
+            if (response.redirected) {
+                 window.location.href = response.url; // Go to checkout
+            } else {
+                 window.location.href = "{% url 'checkout' %}"; // Fallback redirect
+            }
+        })
+        .catch(error => {
+            console.error('Error adding to cart:', error);
+            alert(`Error al agregar al carrito: ${error.message}.`);
+        });
+    }
+
+    // Initialize listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        // Listener for booking modal buttons
+        document.querySelectorAll('.js-open-booking-modal').forEach(button => {
+            button.addEventListener('click', function() {
+                currentServicioId = this.dataset.servicioId;
+                currentServicioNombre = this.dataset.servicioNombre;
+                currentServicioPrecio = parseFloat(this.dataset.servicioPrecio);
+
+                document.getElementById('servicioId').value = currentServicioId;
+                document.getElementById('servicioNombre').value = currentServicioNombre;
+                document.getElementById('fecha').value = '';
+                document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
+                document.getElementById('cantidadPersonas').value = '1';
+                document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio);
+
+                const bookingModalEl = document.getElementById('bookingModal');
+                if (bookingModalEl) {
+                    const bookingModal = new bootstrap.Modal(bookingModalEl);
+                    bookingModal.show();
+                }
+            });
+        });
+
+        // Flatpickr for date picker
+        const fechaInput = document.getElementById('fecha');
+        if (fechaInput) {
+            flatpickr(fechaInput, {
+                minDate: "today",
+                dateFormat: "Y-m-d",
+                locale: "es",
+                onChange: function(selectedDates, dateStr) {
+                    if (currentServicioId) {
+                        loadAvailableHours(currentServicioId, dateStr);
+                    }
+                }
+            });
+        }
+
+        // Listener for quantity change
+        const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
+        if (cantidadPersonasSelect) {
+            cantidadPersonasSelect.addEventListener('change', updatePrecioTotal);
+        }
+
+        // Listener for time selection change
+        const horaSelect = document.getElementById('hora');
+        if (horaSelect) {
+            horaSelect.addEventListener('change', validateSelectedSlot);
+        }
+
+        // Listener for "Add to Cart" button in modal
+        const addToCartBtn = document.getElementById('addToCartBtn');
+        if (addToCartBtn) {
+            addToCartBtn.addEventListener('click', addToCart);
+        }
+    });
+</script>
+{% endblock %}

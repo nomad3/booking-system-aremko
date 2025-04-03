@@ -626,6 +626,22 @@ def homepage_view(request):
     }
     return render(request, 'ventas/homepage.html', context)
 
+def categoria_detail_view(request, categoria_id):
+    """
+    Vista que muestra los servicios de una categoría específica.
+    """
+    categoria = get_object_or_404(CategoriaServicio, id=categoria_id)
+    servicios = Servicio.objects.filter(categoria=categoria, activo=True)
+    categorias = CategoriaServicio.objects.all() # For potential navigation/filtering
+
+    context = {
+        'categoria_actual': categoria,
+        'servicios': servicios,
+        'categorias': categorias,
+        'cart': request.session.get('cart', {'servicios': [], 'total': 0}) # Include cart context
+    }
+    return render(request, 'ventas/category_detail.html', context)
+
 def cart_view(request):
     """
     Vista que renderiza la página del carrito de compras
@@ -927,7 +943,42 @@ def get_available_hours(request):
         return JsonResponse({'success': False, 'error': f'Error de formato: {str(e)}'})
     except Exception as e:
         print(f"Error en get_available_hours: {str(e)}")
+        # Correct indentation for the return statement below
         return JsonResponse({'success': False, 'error': f'Error: {str(e)}'})
+
+def check_slot_availability(request):
+    """
+    View to check if a specific service slot (date and time) is available.
+    """
+    servicio_id = request.GET.get('servicio_id')
+    fecha_str = request.GET.get('fecha')
+    hora = request.GET.get('hora')
+
+    if not all([servicio_id, fecha_str, hora]):
+        return JsonResponse({'available': False, 'error': 'Missing parameters'}, status=400)
+
+    try:
+        servicio = Servicio.objects.get(id=servicio_id)
+        fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+
+        # Check if the specific slot is already booked
+        is_booked = ReservaServicio.objects.filter(
+            servicio=servicio,
+            fecha_agendamiento=fecha,
+            hora_inicio=hora
+        ).exists()
+
+        return JsonResponse({'available': not is_booked})
+
+    except Servicio.DoesNotExist:
+        return JsonResponse({'available': False, 'error': 'Servicio no encontrado'}, status=404)
+    except ValueError:
+        return JsonResponse({'available': False, 'error': 'Formato de fecha inválido'}, status=400)
+    except Exception as e:
+        # Log the exception for debugging
+        print(f"Error checking slot availability: {e}") 
+        traceback.print_exc()
+        return JsonResponse({'available': False, 'error': 'Error interno del servidor'}, status=500)
 
 
 # Función para verificar si el usuario es administrador

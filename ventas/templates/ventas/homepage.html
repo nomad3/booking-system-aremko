@@ -2,14 +2,18 @@
 {% load static %}
 {% load humanize %} {# Load humanize template tags #}
 
-{% block title %}Aremko - Reserva de Servicios{% endblock %}
+{% block title %}Aremko Spa Puerto Varas: Masajes, Tinajas y Alojamiento{% endblock %} {# SEO Title #}
+
+{% block meta_description %}
+<meta name="description" content="Descubre Aremko, tu spa en Puerto Varas. Ofrecemos masajes relajantes, tinajas calientes privadas y alojamiento confortable en la Región de Los Lagos. ¡Reserva tu escapada!">
+{% endblock %}
 
 {% block extra_style %}
 <style>
 /* Homepage specific styles */
 .hero-section {
-    /* Updated background image for massage/hot tub/lodging theme */
-    background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80'); /* Example: Cozy interior/lodge */
+    /* Updated background image for spa/wellness theme */
+    background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://images.unsplash.com/photo-1515377905703-c478cb051af4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80'); /* Example: Hot tub */
     background-size: cover;
     background-position: center;
     color: white;
@@ -153,12 +157,34 @@
                 <img src="https://images.unsplash.com/photo-1515377905703-c478cb051af4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow" alt="Tina Caliente Relajante Aremko"> {# Changed image to hot tub focus #}
             </div>
             <div class="col-md-6">
-                <h2 class="section-title mb-3">Tu Refugio de Relajación</h2> {# Updated title #}
-                <p class="lead">En Aremko, combinamos la serenidad del alojamiento confortable con la terapia rejuvenecedora de masajes expertos y la calidez de nuestras tinas calientes.</p> {# Updated lead text #}
-                <p>Nuestro objetivo es ofrecerte una experiencia completa de desconexión. Ya sea que busques aliviar tensiones con un masaje, sumergirte en una tina caliente bajo las estrellas o simplemente descansar en un entorno tranquilo, aquí encontrarás tu espacio ideal.</p> {# Updated paragraph #}
-                <a href="#caracteristicas" class="btn btn-outline-primary mt-3">Descubre los Beneficios</a> {# Updated button text #}
+                <h2 class="section-title mb-3">Tu Refugio de Relajación en Puerto Varas</h2> {# Added location #}
+                <p class="lead">En Aremko Spa Puerto Varas, combinamos la serenidad del alojamiento confortable con la terapia rejuvenecedora de masajes expertos y la calidez de nuestras tinajas calientes en la Región de Los Lagos.</p> {# Added keywords #}
+                <p>Nuestro objetivo es ofrecerte una experiencia completa de desconexión. Ya sea que busques aliviar tensiones con un masaje, sumergirte en nuestras tinajas bajo las estrellas o simplemente descansar en un entorno tranquilo, aquí encontrarás tu espacio ideal.</p> {# Adjusted 'tina caliente' to 'tinajas' #}
+                <a href="#caracteristicas" class="btn btn-outline-primary mt-3">Descubre los Beneficios</a>
             </div>
         </div>
+    </div>
+</section>
+
+<!-- Service Categories Section -->
+<section class="container my-5" id="categorias-servicios">
+    <h2 class="section-title mb-4">Explora Nuestras Categorías</h2>
+    <div class="row">
+        {% for categoria in categorias %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 text-center">
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <h5 class="card-title">{{ categoria.nombre }}</h5>
+                    {# Link to the category detail page #}
+                    <a href="{% url 'categoria_detail' categoria.id %}" class="btn btn-outline-primary mt-auto">Ver Servicios</a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <p class="text-center">No hay categorías de servicios disponibles en este momento.</p>
+        </div>
+        {% endfor %}
     </div>
 </section>
 
@@ -216,7 +242,7 @@
                             <i class="fas fa-hand-sparkles"></i> {# Massage icon #}
                         </div>
                         <h4 class="feature-title">Masajes Terapéuticos</h4>
-                        <p>Libera tensiones y revitaliza tu cuerpo con nuestras técnicas de masaje expertas.</p> {# Updated text #}
+                        <p>Libera tensiones y revitaliza tu cuerpo con nuestras técnicas de masaje expertas en nuestro spa de Puerto Varas.</p> {# Added keyword context #}
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-6">
@@ -224,8 +250,8 @@
                         <div class="feature-icon">
                             <i class="fas fa-hot-tub"></i> {# Hot tub icon #}
                         </div>
-                        <h4 class="feature-title">Tinas Calientes</h4>
-                        <p>Sumérgete en la calidez y relájate profundamente en nuestras tinas privadas.</p> {# Updated text #}
+                        <h4 class="feature-title">Tinajas Calientes Los Lagos</h4> {# Added keyword #}
+                        <p>Sumérgete en la calidez y relájate profundamente en nuestras tinajas privadas en la Región de Los Lagos.</p> {# Added keyword context #}
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-6">
@@ -234,7 +260,7 @@
                             <i class="fas fa-bed"></i> {# Accommodation icon #}
                         </div>
                         <h4 class="feature-title">Alojamiento Confortable</h4>
-                        <p>Descansa en nuestros espacios acogedores diseñados para tu tranquilidad.</p> {# Updated text #}
+                        <p>Descansa en nuestros espacios acogedores diseñados para tu tranquilidad cerca de Puerto Varas.</p> {# Added location context #}
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-6">
@@ -243,7 +269,7 @@
                             <i class="fas fa-calendar-alt"></i> {# Booking icon (kept) #}
                         </div>
                         <h4 class="feature-title">Reserva Fácil</h4>
-                        <p>Agenda tu escapada de relajación de forma rápida y sencilla online.</p> {# Updated text #}
+                        <p>Agenda tu escapada de relajación en Aremko Spa de forma rápida y sencilla online.</p> {# Added brand/keyword #}
                     </div>
                 </div>
             </div>
@@ -449,6 +475,60 @@
             precioTotalInput.value = formatCLP(precioTotal); // Format updated price
             console.log("Updated total price:", formatCLP(precioTotal));
         }
+        // Also validate the slot when quantity changes, if time is already selected
+        const horaSelect = document.getElementById('hora');
+        if (horaSelect && horaSelect.value) {
+            validateSelectedSlot();
+        }
+    }
+
+    // Function to check availability of the selected slot
+    async function validateSelectedSlot() {
+        const servicioId = document.getElementById('servicioId').value;
+        const fecha = document.getElementById('fecha').value;
+        const hora = document.getElementById('hora').value;
+        const addToCartBtn = document.getElementById('addToCartBtn');
+        const horaSelect = document.getElementById('hora');
+        
+        // Remove previous warnings
+        const existingWarning = horaSelect.parentNode.querySelector('.text-danger');
+        if (existingWarning) {
+            existingWarning.remove();
+        }
+
+        if (!servicioId || !fecha || !hora) {
+            addToCartBtn.disabled = true; // Disable if not all info is selected
+            return; 
+        }
+
+        addToCartBtn.disabled = true; // Disable button while checking
+
+        try {
+            const response = await fetch(`{% url 'check_slot_availability' %}?servicio_id=${servicioId}&fecha=${fecha}&hora=${hora}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+
+            if (data.available) {
+                addToCartBtn.disabled = false; // Enable button
+            } else {
+                // Slot not available, disable button and show warning
+                addToCartBtn.disabled = true;
+                const warningMsg = document.createElement('small');
+                warningMsg.className = 'text-danger d-block mt-1'; // Bootstrap classes for styling
+                warningMsg.textContent = 'Hora no disponible.';
+                horaSelect.parentNode.appendChild(warningMsg);
+            }
+        } catch (error) {
+            console.error('Error checking slot availability:', error);
+            // Optionally show a generic error message, keep button disabled
+            const warningMsg = document.createElement('small');
+            warningMsg.className = 'text-danger d-block mt-1';
+            warningMsg.textContent = 'Error al verificar disponibilidad.';
+            horaSelect.parentNode.appendChild(warningMsg);
+            addToCartBtn.disabled = true;
+        }
     }
 
     // Función para agregar al carrito (específica de homepage)
@@ -572,6 +652,15 @@
             console.log("Event listener added for #cantidadPersonas change");
         } else {
              console.error("CantidadPersonas select element not found");
+        }
+
+        // Listener for time selection change
+        const horaSelect = document.getElementById('hora');
+        if (horaSelect) {
+            horaSelect.addEventListener('change', validateSelectedSlot);
+            console.log("Event listener added for #hora change");
+        } else {
+            console.error("Hora select element not found");
         }
 
         // Listener for "Add to Cart" button in modal

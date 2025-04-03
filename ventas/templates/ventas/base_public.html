@@ -21,12 +21,13 @@
     <!-- Custom CSS -->
     <style>
         :root {
-            --primary-color: #FF5A5F;
-            --secondary-color: #00A699;
-            --dark-gray: #484848;
-            --light-gray: #767676;
-            --background: #f7f7f7;
-            --white: #ffffff;
+            /* Wooden/Coffee Theme */
+            --primary-color: #A0522D;    /* Sienna (Reddish-Brown) */
+            --secondary-color: #D2B48C; /* Tan */
+            --dark-gray: #5C4033;       /* Dark Brown */
+            --light-gray: #A9A9A9;      /* Dark Gray (for text) */
+            --background: #FAF0E6;     /* Linen (Off-white/Beige) */
+            --white: #ffffff;          /* White (Keep for high contrast) */
         }
         
         body {
@@ -295,8 +296,17 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     {% block nav_items %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'homepage' %}#servicios">Servicios</a>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownServicios" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Servicios
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="navbarDropdownServicios">
+                            <li><a class="dropdown-item" href="{% url 'homepage' %}#servicios">Todos los Servicios</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            {% for cat in todas_las_categorias %}
+                            <li><a class="dropdown-item" href="{% url 'categoria_detail' cat.id %}">{{ cat.nombre }}</a></li>
+                            {% endfor %}
+                        </ul>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'homepage' %}#caracteristicas">Características</a>

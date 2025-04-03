@@ -5,7 +5,7 @@ from .views import (
     servicios_vendidos_view, inicio_sistema_view, caja_diaria_view, 
     auditoria_movimientos_view, venta_reserva_list, venta_reserva_detail,
     homepage_view, add_to_cart, remove_from_cart, checkout_view, get_available_hours,
-    cart_view, complete_checkout
+    cart_view, complete_checkout, categoria_detail_view # Added categoria_detail_view
 )
 from . import api
 from .admin import ServicioAdmin
@@ -23,6 +23,7 @@ router.register(r'api/clientes', views.ClienteViewSet)
 urlpatterns = [
     path('admin-dashboard/', inicio_sistema_view, name='inicio_sistema'),  # Vista de inicio del sistema admin
     path('', homepage_view, name='homepage'),  # Nueva vista de inicio pública
+    path('categoria/<int:categoria_id>/', views.categoria_detail_view, name='categoria_detail'), # New category detail URL
     path('servicios-vendidos/', servicios_vendidos_view, name='servicios_vendidos'),
     path('caja-diaria/', caja_diaria_view, name='caja_diaria'),  # Nueva vista de caja diaria
     path('auditoria-movimientos/', auditoria_movimientos_view, name='auditoria_movimientos'),  # Nueva vista de auditoría
@@ -41,7 +42,14 @@ urlpatterns = [
     path('api/cliente/update/<str:telefono>/', api.update_cliente, name='update_cliente'),
     path('api/cliente/', api.get_cliente, name='get_clientes'),
     path('api/cliente/<str:telefono>/', api.get_cliente, name='get_cliente'),
-    path('complete-checkout/', views.complete_checkout, name='complete_checkout'),
+    # Booking process URLs
+    path('get-available-hours/', views.get_available_hours, name='get_available_hours'),
+    path('check-availability/', views.check_slot_availability, name='check_slot_availability'), # Added URL
+    path('add-to-cart/', views.add_to_cart, name='add_to_cart'),
+    path('remove-from-cart/', views.remove_from_cart, name='remove_from_cart'),
+    path('cart/', views.cart_view, name='cart'), # Added cart view URL
     path('checkout/', views.checkout_view, name='checkout'),
-    path('', include(router.urls)),  # Mover al final y agregar prefijo api/
+    path('complete-checkout/', views.complete_checkout, name='complete_checkout'),
+    # API Router
+    path('', include(router.urls)),
 ]

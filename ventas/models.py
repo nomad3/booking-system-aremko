@@ -169,6 +169,7 @@ class DetalleCompra(models.Model):
 class CategoriaServicio(models.Model):
     nombre = models.CharField(max_length=100)
     horarios = models.CharField(max_length=200, help_text="Ingresa los horarios disponibles separados por comas. Ejemplo: 14:00, 15:30, 17:00", blank=True)
+    imagen_url = models.URLField(max_length=500, blank=True, null=True, help_text="URL de la imagen para la categoría")
 
     def __str__(self):
         return self.nombre
@@ -187,6 +188,7 @@ class Servicio(models.Model):
         default=True,
         help_text="Indica si el servicio está disponible para reservas"
     )
+    imagen_url = models.URLField(max_length=500, blank=True, null=True, help_text="URL de la imagen para el servicio")
 
     def __str__(self):
         return self.nombre
