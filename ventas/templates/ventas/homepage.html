@@ -8,7 +8,8 @@
 <style>
 /* Homepage specific styles */
 .hero-section {
-    background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://images.unsplash.com/photo-1540555700478-4be289fbecef?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80');
+    /* Updated background image for massage/hot tub/lodging theme */
+    background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80'); /* Example: Cozy interior/lodge */
     background-size: cover;
     background-position: center;
     color: white;
@@ -82,6 +83,50 @@
         font-size: 2.5rem;
     }
 }
+
+/* Styles for new sections */
+.philosophy-section {
+    background-color: #ffffff; /* White background */
+}
+
+.gallery-section {
+    background-color: #f8f9fa; /* Light gray background */
+}
+.gallery-section img {
+    transition: transform 0.3s ease;
+}
+.gallery-section img:hover {
+    transform: scale(1.05);
+}
+
+.cta-section {
+    /* background-color: var(--primary-color); /* Already set via class */
+    /* color: white; /* Already set via class */
+}
+.cta-section h2 {
+    font-weight: 700;
+}
+
+/* General section title styling (if not already in base) */
+.section-title {
+    text-align: center;
+    font-weight: 700;
+    color: var(--dark-gray);
+    position: relative;
+    padding-bottom: 15px;
+    margin-bottom: 40px; /* Add consistent bottom margin */
+}
+.section-title::after {
+    content: '';
+    position: absolute;
+    display: block;
+    width: 60px;
+    height: 3px;
+    background: var(--primary-color);
+    bottom: 0;
+    left: calc(50% - 30px);
+}
+
 </style>
 {% endblock %}
 
@@ -91,14 +136,31 @@
 <section class="hero-section">
     <div class="container">
             <div class="hero-content">
-                <h1>Reserva tus servicios en Aremko</h1>
-                <p>Descubre y reserva los mejores servicios para tu bienestar y comodidad.</p>
+                <h1>Tu Escapada Perfecta: Masajes, Tinas y Alojamiento</h1> {# New heading #}
+                <p>Desconecta y recarga energías con nuestros masajes relajantes, tinas calientes y cómodas opciones de alojamiento.</p> {# New text #}
                 <a href="#servicios" class="btn btn-primary btn-lg">
-                    <i class="fas fa-calendar-check me-2"></i>Reservar Ahora
+                    <i class="fas fa-concierge-bell me-2"></i>Explorar Experiencias {# New icon and text #}
                 </a>
             </div>
         </div>
     </section>
+
+<!-- Our Philosophy Section -->
+<section class="philosophy-section py-5">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-6 mb-4 mb-md-0">
+                <img src="https://images.unsplash.com/photo-1515377905703-c478cb051af4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow" alt="Tina Caliente Relajante Aremko"> {# Changed image to hot tub focus #}
+            </div>
+            <div class="col-md-6">
+                <h2 class="section-title mb-3">Tu Refugio de Relajación</h2> {# Updated title #}
+                <p class="lead">En Aremko, combinamos la serenidad del alojamiento confortable con la terapia rejuvenecedora de masajes expertos y la calidez de nuestras tinas calientes.</p> {# Updated lead text #}
+                <p>Nuestro objetivo es ofrecerte una experiencia completa de desconexión. Ya sea que busques aliviar tensiones con un masaje, sumergirte en una tina caliente bajo las estrellas o simplemente descansar en un entorno tranquilo, aquí encontrarás tu espacio ideal.</p> {# Updated paragraph #}
+                <a href="#caracteristicas" class="btn btn-outline-primary mt-3">Descubre los Beneficios</a> {# Updated button text #}
+            </div>
+        </div>
+    </div>
+</section>
 
 <!-- Services Section -->
 <section class="container mb-5" id="servicios">
@@ -146,47 +208,65 @@
 <!-- Features Section -->
 <section class="features-section" id="caracteristicas">
     <div class="container">
-        <h2 class="section-title mb-5">¿Por qué elegirnos?</h2>
+        <h2 class="section-title mb-5">Experiencias Aremko</h2> {# Updated section title #}
         <div class="row">
                 <div class="col-lg-3 col-md-6">
                     <div class="feature-box">
                         <div class="feature-icon">
-                            <i class="fas fa-calendar-check"></i>
+                            <i class="fas fa-hand-sparkles"></i> {# Massage icon #}
+                        </div>
+                        <h4 class="feature-title">Masajes Terapéuticos</h4>
+                        <p>Libera tensiones y revitaliza tu cuerpo con nuestras técnicas de masaje expertas.</p> {# Updated text #}
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="feature-box">
+                        <div class="feature-icon">
+                            <i class="fas fa-hot-tub"></i> {# Hot tub icon #}
+                        </div>
+                        <h4 class="feature-title">Tinas Calientes</h4>
+                        <p>Sumérgete en la calidez y relájate profundamente en nuestras tinas privadas.</p> {# Updated text #}
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="feature-box">
+                        <div class="feature-icon">
+                            <i class="fas fa-bed"></i> {# Accommodation icon #}
+                        </div>
+                        <h4 class="feature-title">Alojamiento Confortable</h4>
+                        <p>Descansa en nuestros espacios acogedores diseñados para tu tranquilidad.</p> {# Updated text #}
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="feature-box">
+                        <div class="feature-icon">
+                            <i class="fas fa-calendar-alt"></i> {# Booking icon (kept) #}
                         </div>
                         <h4 class="feature-title">Reserva Fácil</h4>
-                        <p>Reserva tus servicios en minutos con nuestro sistema intuitivo.</p>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6">
-                    <div class="feature-box">
-                        <div class="feature-icon">
-                            <i class="fas fa-star"></i>
-                        </div>
-                        <h4 class="feature-title">Calidad Garantizada</h4>
-                        <p>Todos nuestros servicios cumplen con los más altos estándares de calidad.</p>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6">
-                    <div class="feature-box">
-                        <div class="feature-icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                        <h4 class="feature-title">Ahorra Tiempo</h4>
-                        <p>Olvídate de las llamadas y las esperas. Reserva cuando quieras.</p>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6">
-                    <div class="feature-box">
-                        <div class="feature-icon">
-                            <i class="fas fa-shield-alt"></i>
-                        </div>
-                        <h4 class="feature-title">Seguridad</h4>
-                        <p>Tu información personal está segura con nosotros.</p>
+                        <p>Agenda tu escapada de relajación de forma rápida y sencilla online.</p> {# Updated text #}
                     </div>
                 </div>
             </div>
         </div>
     </section>
+
+<!-- Image Gallery Section -->
+<section class="gallery-section py-5 bg-light">
+    <div class="container">
+        <h2 class="section-title mb-5 text-center">Nuestros Espacios</h2> {# Updated title #}
+        <div class="row">
+            <div class="col-md-4 mb-4">
+                <img src="https://images.unsplash.com/photo-1519823551278-64ac92734fb1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Sala de Masajes Relajante"> {# Massage focus #}
+            </div>
+            <div class="col-md-4 mb-4">
+                <img src="https://images.unsplash.com/photo-1584592487903-6d47417a141f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Tina Caliente Privada"> {# Hot tub focus #}
+            </div>
+            <div class="col-md-4 mb-4">
+                <img src="https://images.unsplash.com/photo-1560185893-a55ec67692d9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Habitación Acogedora"> {# Accommodation focus #}
+            </div>
+        </div>
+    </div>
+</section>
 
 <!-- Testimonials Section -->
 <section class="testimonials-section" id="testimonios">
@@ -221,8 +301,18 @@
         </div>
     </section>
 
-        </div>
-    </section>
+<!-- Final CTA Section -->
+<section class="cta-section text-center py-5 bg-primary text-white">
+    <div class="container">
+        <h2 class="mb-3">Reserva Tu Experiencia Aremko</h2> {# Updated title #}
+        <p class="lead mb-4">Disfruta de nuestros masajes, sumérgete en las tinas calientes o quédate en nuestro tranquilo alojamiento. ¡Tu escapada ideal te espera!</p> {# Updated text #}
+        <a href="#servicios" class="btn btn-light btn-lg">
+            <i class="fas fa-calendar-check me-2"></i>Ver Disponibilidad y Reservar {# Updated button text #}
+        </a>
+    </div>
+</section>
+
+{# Removed potentially extraneous closing tags #}
 {% endblock %}
 
 {% block modals %}
