@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ventas', '0033_add_image_fields'),
+        ('ventas', '0032_remove_categoriaservicio_imagen_url_and_more'),
     ]
 
     operations = [
