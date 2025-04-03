@@ -40,32 +40,33 @@ def create_categories():
 
 
 def update_or_create_services():
-    """Updates or creates services based on spreadsheet data."""
+    """Updates or creates services based on spreadsheet and provided data."""
     print('Updating/Creating services...')
     
-    # Data extracted from the spreadsheet image
+    # Data combining spreadsheet slots and provided price/duration info
+    # Using consistent price/duration per category for missing values
     services_config = {
         'Cabañas': {
-            'Torre': ["16:00"],
-            'Tepa': ["16:00"],
-            'Acantilado': ["16:00"],
-            'Laurel': ["16:00"],
-            'Arrayan': ["16:00"],
+            'Torre':      {'slots': ["16:00"], 'precio': 90000, 'duracion': 1440},
+            'Tepa':       {'slots': ["16:00"], 'precio': 90000, 'duracion': 1440},
+            'Acantilado': {'slots': ["16:00"], 'precio': 90000, 'duracion': 1440},
+            'Laurel':     {'slots': ["16:00"], 'precio': 90000, 'duracion': 1440},
+            'Arrayan':    {'slots': ["16:00"], 'precio': 90000, 'duracion': 1440},
         },
         'Tinas sin hidromasaje': {
-            'Osorno': ["14:30", "17:00"],
-            'Calbuco': ["17:00", "19:30"],
-            'Tronador': ["19:30"],
-            'Hornopiren': ["22:00"],
+            'Osorno':     {'slots': ["14:30", "17:00"], 'precio': 25000, 'duracion': 120},
+            'Calbuco':    {'slots': ["17:00", "19:30"], 'precio': 25000, 'duracion': 120},
+            'Tronador':   {'slots': ["19:30"], 'precio': 25000, 'duracion': 120},
+            'Hornopiren': {'slots': ["22:00"], 'precio': 25000, 'duracion': 120},
         },
         'Tinas con hidromasaje': {
-            'Puntiagudo': ["14:00", "16:30"],
-            'Llaima': ["16:30", "19:00"],
-            'Villarrica': ["19:00"],
-            'Puyehue': ["21:30"],
+            'Puntiagudo': {'slots': ["14:00", "16:30"], 'precio': 30000, 'duracion': 120},
+            'Llaima':     {'slots': ["16:30", "19:00"], 'precio': 30000, 'duracion': 120},
+            'Villarrica': {'slots': ["19:00"], 'precio': 30000, 'duracion': 120},
+            'Puyehue':    {'slots': ["21:30"], 'precio': 30000, 'duracion': 120},
         },
         'Masajes': {
-            'Relajación o Descontracturante': ["15:30", "16:45", "18:00", "19:15"],
+            'Relajación o Descontracturante': {'slots': ["15:30", "16:45", "18:00", "19:15"], 'precio': 80000, 'duracion': 50},
         }
     }
 
@@ -74,30 +75,32 @@ def update_or_create_services():
             category = CategoriaServicio.objects.get(nombre=category_name)
             print(f'Processing category: {category_name}')
 
-            for service_name, slots in services.items():
+            for service_name, details in services.items():
+                slots = details['slots']
+                precio = details['precio']
+                duracion = details['duracion']
                 try:
                     # Try to get the existing service
                     service = Servicio.objects.get(nombre=service_name)
-                    # If it exists, update only specific fields
+                    # If it exists, update only category, slots, and activo status
                     service.categoria = category
                     service.slots_disponibles = slots
                     service.activo = True
                     service.save()
                     print(f'  Updated service: {service_name} with slots {slots}')
                 except Servicio.DoesNotExist:
-                    # If it doesn't exist, create it with placeholder price/duration
+                    # If it doesn't exist, create it with the provided price/duration
                     Servicio.objects.create(
                         nombre=service_name,
                         categoria=category,
                         slots_disponibles=slots,
                         activo=True,
-                        precio_base=0,  # Placeholder price
-                        duracion=60,    # Placeholder duration
-                        horario_apertura=time(9, 0), # Default opening
-                        horario_cierre=time(23, 0)  # Default closing
+                        precio_base=precio,
+                        duracion=duracion,
+                        horario_apertura=time(9, 0), # Default opening (adjust if needed)
+                        horario_cierre=time(23, 59) # Default closing (adjust if needed)
                     )
-                    print(f'  Created service: {service_name} with slots {slots}. '
-                          f'WARNING: Using placeholder price (0) and duration (60 min). Please update manually.')
+                    print(f'  Created service: {service_name} with price {precio}, duration {duracion}, slots {slots}.')
                 except Exception as e_inner:
                     # Catch potential errors during update/create for a specific service
                     print(f'ERROR processing service "{service_name}" in category "{category_name}": {e_inner}')
