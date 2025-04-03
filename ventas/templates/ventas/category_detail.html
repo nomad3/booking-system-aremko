@@ -1,6 +1,7 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 {% load humanize %}
+{% load ventas_extras %} {# Load custom filters #}
 
 {% block title %}{{ categoria_actual.nombre }} - Servicios | Aremko Spa Puerto Varas{% endblock %}
 
@@ -82,7 +83,7 @@
                         <h5 class="card-title">{{ servicio.nombre }}</h5>
                         {# <p class="card-text">{{ servicio.descripcion|truncatewords:15 }}</p> #} {# Optional: Add service description #}
                         <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
-                        <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion }} minutos</small></p>
+                        <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p> {# Use custom filter #}
                         <button class="btn btn-primary w-100 mt-auto js-open-booking-modal" {# Use mt-auto to push button down #}
                                 data-servicio-id="{{ servicio.id }}"
                                 data-servicio-nombre="{{ servicio.nombre|escapejs }}"

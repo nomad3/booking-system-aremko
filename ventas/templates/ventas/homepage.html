@@ -1,6 +1,7 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 {% load humanize %} {# Load humanize template tags #}
+{% load ventas_extras %} {# Load custom filters #}
 
 {% block title %}Aremko Spa Puerto Varas: Masajes, Tinajas y Alojamiento{% endblock %} {# SEO Title #}
 
@@ -217,7 +218,7 @@
                             <h5 class="card-title">{{ servicio.nombre }}</h5>
                             <p class="card-text">{{ servicio.categoria.nombre }}</p>
                             <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p> {# Apply filters #}
-                            <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion }} minutos</small></p>
+                            <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p> {# Use custom filter #}
                             <button class="btn btn-primary w-100 js-open-booking-modal" 
                                     data-servicio-id="{{ servicio.id }}" 
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}" 
