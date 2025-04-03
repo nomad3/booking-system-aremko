@@ -141,8 +141,8 @@ if __name__ == '__main__':
     # Create service categories
     create_categories()
     
-    # Create services
-    create_services()
+    # Update or Create services using the new function name
+    update_or_create_services()
     
     # Create clients
     create_clients()
