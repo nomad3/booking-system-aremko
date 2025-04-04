@@ -220,12 +220,27 @@
                                         {% endif %}
                                     </label>
                                     {% if value == 'transferencia' %}
-                                        <div id="bankTransferInfo" class="form-text mt-1" style="display: block;">
-                                            Recibirás los detalles para la transferencia una vez confirmada la reserva. El pago debe realizarse para asegurar tu cupo.
+                                        <!-- Text shown directly under the radio button -->
+                                        <div class="form-text mt-1">
+                                            Selecciona esta opción para ver los detalles de la cuenta. Tu reserva quedará pendiente hasta confirmar el pago.
                                         </div>
                                     {% endif %}
                                 </div>
                             {% endfor %}
+
+                            <!-- Hidden Bank Details Div - Shown by JS -->
+                            <div id="bankDetailsSection" class="alert alert-info mt-3" style="display: none;">
+                                <h5>Instrucciones para Transferencia Bancaria</h5>
+                                <p>Para confirmar tu reserva (que se creará en estado pendiente), por favor realiza la transferencia a la siguiente cuenta:</p>
+                                <pre>Banco: Banco Ficticio S.A.
+Tipo de Cuenta: Cuenta Corriente
+Número de Cuenta: 1234567890
+Nombre Titular: Empresa Ejemplo Ltda.
+RUT Titular: 77.777.777-7
+Email para comprobante: pagos@ejemplo.com</pre> {# Placeholder details #}
+                                <p><strong>Importante:</strong> Tu reserva se mantendrá como pendiente hasta que confirmemos la recepción del pago.</p>
+                            </div>
+                            <!-- End Hidden Bank Details Div -->
                         {% else %}
                             <p>No hay métodos de pago disponibles en este momento.</p>
                         {% endif %}
@@ -423,22 +438,9 @@
                 existingBankInfo.remove();
             }
 
-            if (paymentMethod === 'transferencia' && data.bank_details) {
-                const bankInfoDiv = document.createElement('div');
-                bankInfoDiv.classList.add('alert', 'alert-info', 'mt-3', 'bank-transfer-instructions');
-                bankInfoDiv.innerHTML = `
-                    <h5>Instrucciones para Transferencia Bancaria</h5>
-                    <p>Por favor, realiza la transferencia a la siguiente cuenta para confirmar tu reserva:</p>
-                    <pre>${data.bank_details.replace(/\n/g, '<br>')}</pre>
-                    <p><strong>Importante:</strong> Tu reserva se mantendrá como pendiente hasta que confirmemos la recepción del pago.</p>
-                `;
-                const reservaIdParagraph = document.getElementById('reservaIdText');
-                if (reservaIdParagraph) {
-                    successModalBody.insertBefore(bankInfoDiv, reservaIdParagraph);
-                } else {
-                    successModalBody.appendChild(bankInfoDiv);
-                }
-            }
+            // Bank details are shown on the page now, not needed in the modal.
+            // if (paymentMethod === 'transferencia' && data.bank_details) { ... } // Ensure this logic is removed or commented out if present
+
         }
 
         if (successModalEl) {
@@ -474,9 +476,8 @@
         } catch (error) {
             handleCheckoutError(error, overlay, button);
         } finally {
-            // Only hide processing if not showing modal (modal implies success)
-            // The modal display handles user feedback. Resetting button is needed.
-             hideProcessing(null, button); // Reset button, don't hide overlay yet if modal shown
+            // Ensure overlay is hidden and button is reset in all cases for bank transfer
+            hideProcessing(overlay, button);
         }
     }
 
@@ -602,6 +603,28 @@
         } else {
             console.error("Telefono input not found");
         }
+
+        // --- Add listener for payment method change ---
+        const paymentMethodRadios = document.querySelectorAll('input[name="paymentMethod"]');
+        const bankDetailsSection = document.getElementById('bankDetailsSection');
+
+        function toggleBankDetails() {
+            const selectedPaymentMethod = document.querySelector('input[name="paymentMethod"]:checked');
+            if (selectedPaymentMethod && selectedPaymentMethod.value === 'transferencia' && bankDetailsSection) {
+                bankDetailsSection.style.display = 'block';
+            } else if (bankDetailsSection) {
+                bankDetailsSection.style.display = 'none';
+            }
+        }
+
+        paymentMethodRadios.forEach(radio => {
+            radio.addEventListener('change', toggleBankDetails);
+        });
+
+        // Initial check in case 'transferencia' is pre-selected on page load
+        toggleBankDetails();
+        // --- End listener for payment method change ---
+
     });
 </script>
 {% endblock %}

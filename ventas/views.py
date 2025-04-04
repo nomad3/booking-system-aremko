@@ -1186,24 +1186,12 @@ def complete_checkout(request):
                     # Recalculate total based on the services added
                     venta.calcular_total() # This already saves and updates saldo/estado_pago
 
-                    # If bank transfer, ensure estado_pago remains 'pendiente'
-                    # and prepare bank details for the response.
-                    bank_details_text = None
+                    # If bank transfer, ensure estado_pago remains 'pendiente'.
+                    # Bank details are now shown directly on the checkout page via JS,
+                    # so no need to send them back in the JSON response here.
                     if metodo_pago == 'transferencia':
                         venta.estado_pago = 'pendiente' # Explicitly set as pending
                         venta.save(update_fields=['estado_pago']) # Save only this field change
-
-                        # Using fake details as requested
-                        bank_details_text = """
-                        Banco: Banco Ficticio S.A.
-                        Tipo de Cuenta: Cuenta Corriente
-                        Número de Cuenta: 1234567890
-                        Nombre Titular: Empresa Ejemplo Ltda.
-                        RUT Titular: 77.777.777-7
-                        Email para comprobante: pagos@ejemplo.com
-                        """
-                        bank_details_text = "\n".join(line.strip() for line in bank_details_text.strip().splitlines())
-
 
                     # Clear cart
                     request.session['cart'] = {'servicios': [], 'total': 0}
@@ -1216,8 +1204,9 @@ def complete_checkout(request):
                         'reserva_id': venta.id,
                         'metodo_pago': metodo_pago # Include payment method in response
                     }
-                    if bank_details_text:
-                        response_data['bank_details'] = bank_details_text
+                    # Removed bank_details_text from response
+                    # if bank_details_text:
+                    #     response_data['bank_details'] = bank_details_text
 
                     return JsonResponse(response_data)
                 finally:
