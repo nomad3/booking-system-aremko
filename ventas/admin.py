@@ -334,8 +334,8 @@ class ServicioAdminForm(forms.ModelForm):
 
     class Meta:
         model = Servicio
-        # Exclude the original JSONField, we use slots_input instead
-        exclude = ('slots_disponibles',) 
+        fields = '__all__' # Include all fields, including slots_disponibles
+        # exclude = ('slots_disponibles',) # REMOVE exclude
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -354,51 +354,62 @@ class ServicioAdminForm(forms.ModelForm):
         #      self.initial['slots_input'] = json.dumps({ ... }, indent=4)
 
 
-    def clean_slots_input(self):
-        """Validate the JSON input and the structure."""
-        slots_data_str = self.cleaned_data.get('slots_input', '{}') # Default to empty JSON if blank
+    def clean(self):
+        """Validate the JSON input and assign the cleaned dict to slots_disponibles."""
+        cleaned_data = super().clean()
+        slots_data_str = cleaned_data.get('slots_input', '{}') # Default to empty JSON if blank
         try:
             # Allow empty input, default to empty dict
             if not slots_data_str.strip():
-                slots_data = {}
+                slots_data = {} # Correctly indented
             else:
                 slots_data = json.loads(slots_data_str)
         except json.JSONDecodeError as e:
-            raise ValidationError(f"JSON inválido: {e}")
+            # Raise validation error specific to the slots_input field
+            self.add_error('slots_input', f"JSON inválido: {e}") 
+            return cleaned_data # Stop further cleaning if JSON is invalid
 
         if not isinstance(slots_data, dict):
-            raise ValidationError("La entrada debe ser un diccionario JSON válido (ej: {\"monday\": [\"10:00\"]}).")
+            self.add_error('slots_input', "La entrada debe ser un diccionario JSON válido (ej: {\"monday\": [\"10:00\"]}).")
+            return cleaned_data
 
         valid_days = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
-        
-        # Validate structure and time format
-        for day, slots in slots_data.items():
-            if day not in valid_days:
-                raise ValidationError(f"Clave de día inválida: '{day}'. Use nombres de días en inglés en minúsculas (monday, tuesday, etc.).")
-            
-            if not isinstance(slots, list):
-                raise ValidationError(f"El valor para '{day}' debe ser una lista de horarios (ej: [\"10:00\", \"11:30\"]).")
-                
-            for slot in slots:
-                if not isinstance(slot, str):
-                     raise ValidationError(f"El horario '{slot}' en '{day}' debe ser una cadena de texto (ej: \"10:00\").")
-                try:
-                    # Validate HH:MM format
-                    datetime.strptime(slot, "%H:%M") 
-                except ValueError:
-                    raise ValidationError(f"Formato de horario inválido: '{slot}' en '{day}'. Use HH:MM (ej: \"10:00\", \"14:30\").")
-        
-        # Optionally ensure all days are present, even if empty (good practice)
-        for day in valid_days:
-            slots_data.setdefault(day, []) # Use setdefault to add if missing
 
-        return slots_data # Return the validated dictionary
+        # Validate structure and time format
+        try:
+            for day, slots in slots_data.items():
+                if day not in valid_days:
+                    raise ValidationError(f"Clave de día inválida: '{day}'. Use nombres de días en inglés en minúsculas (monday, tuesday, etc.).")
+                
+                if not isinstance(slots, list):
+                    raise ValidationError(f"El valor para '{day}' debe ser una lista de horarios (ej: [\"10:00\", \"11:30\"]).")
+                    
+                for slot in slots:
+                    if not isinstance(slot, str):
+                         raise ValidationError(f"El horario '{slot}' en '{day}' debe ser una cadena de texto (ej: \"10:00\").")
+                    try:
+                        # Validate HH:MM format
+                        datetime.strptime(slot, "%H:%M") 
+                    except ValueError:
+                        raise ValidationError(f"Formato de horario inválido: '{slot}' en '{day}'. Use HH:MM (ej: \"10:00\", \"14:30\").")
+            
+            # Optionally ensure all days are present, even if empty (good practice)
+            for day in valid_days:
+                slots_data.setdefault(day, []) # Use setdefault to add if missing
+
+            # Assign the validated dictionary to the actual model field's cleaned data
+            cleaned_data['slots_disponibles'] = slots_data 
+
+        except ValidationError as e:
+             # Add error to the specific input field if validation fails
+             self.add_error('slots_input', e)
+
+        return cleaned_data # Return the full cleaned_data dictionary
 
     def save(self, commit=True):
-        # Save the form instance first to get the object
-        instance = super().save(commit=False) 
-        # Assign the cleaned dictionary from slots_input to the actual model field
-        instance.slots_disponibles = self.cleaned_data['slots_input'] 
+        # The cleaned_data['slots_disponibles'] now holds the correct dictionary.
+        # Let the default save handle it since 'slots_disponibles' is no longer excluded.
+        instance = super().save(commit=commit) 
         if commit:
             instance.save()
         return instance
