@@ -198,6 +198,40 @@
                             </div>
                         </form>
                     </div>
+
+                    <!-- Payment Method Selection -->
+                    <div class="checkout-form mt-4">
+                        <h4 class="mb-4">Método de Pago</h4>
+                        {% if payment_methods %}
+                            {% for value, name in payment_methods %}
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" 
+                                           type="radio" 
+                                           name="paymentMethod" 
+                                           id="payment_{{ value }}" 
+                                           value="{{ value }}"
+                                           {% if value == 'transferencia' %}checked{% endif %} {# Default check bank transfer #}
+                                           {% if value == 'flow' %}disabled{% endif %} {# Disable flow for now #}
+                                           >
+                                    <label class="form-check-label" for="payment_{{ value }}">
+                                        {{ name }}
+                                        {% if value == 'flow' %}
+                                            <span class="badge bg-secondary">Próximamente</span>
+                                        {% endif %}
+                                    </label>
+                                    {% if value == 'transferencia' %}
+                                        <div id="bankTransferInfo" class="form-text mt-1" style="display: block;">
+                                            Recibirás los detalles para la transferencia una vez confirmada la reserva. El pago debe realizarse para asegurar tu cupo.
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p>No hay métodos de pago disponibles en este momento.</p>
+                        {% endif %}
+                    </div>
+                    <!-- End Payment Method Selection -->
+
                 </div>
                 <div class="col-lg-4">
                     <!-- Use cart.html structure and classes -->
@@ -379,6 +413,7 @@
                 const email = document.getElementById('checkoutEmail').value;
                 const telefono = document.getElementById('checkoutTelefono').value;
                 const documento = document.getElementById('checkoutDocumento').value;
+                const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value; // Get selected payment method
                 
                 // Validate form
                 if (!nombre || !email || !telefono) {
@@ -409,8 +444,9 @@
                 formData.append('email', email);
                 formData.append('telefono', telefono);
                 formData.append('documento_identidad', documento);
+                formData.append('metodo_pago', paymentMethod); // Add payment method to form data
                 
-                console.log("Sending checkout request");
+                console.log("Sending checkout request with payment method:", paymentMethod);
                 
                 // Send request
                 fetch('{% url "complete_checkout" %}', {
@@ -452,15 +488,34 @@
                     
                     if (data.success) {
                         // Show success modal
-                        if (data.reserva_id) {
-                            const reservaIdSpan = document.getElementById('reservaId');
-                            if (reservaIdSpan) {
-                                reservaIdSpan.textContent = data.reserva_id;
-                                console.log("Set reserva ID:", data.reserva_id);
+                        const reservaIdSpan = document.getElementById('reservaId');
+                        const successModalEl = document.getElementById('successModal');
+                        const successModalBody = successModalEl ? successModalEl.querySelector('.modal-body') : null;
+
+                        if (reservaIdSpan && data.reserva_id) {
+                            reservaIdSpan.textContent = data.reserva_id;
+                            console.log("Set reserva ID:", data.reserva_id);
+                        }
+
+                        // Add bank transfer info if applicable
+                        if (data.metodo_pago === 'transferencia' && data.bank_details && successModalBody) {
+                            const bankInfoDiv = document.createElement('div');
+                            bankInfoDiv.classList.add('alert', 'alert-info', 'mt-3');
+                            bankInfoDiv.innerHTML = `
+                                <h5>Instrucciones para Transferencia Bancaria</h5>
+                                <p>Por favor, realiza la transferencia a la siguiente cuenta para confirmar tu reserva:</p>
+                                <pre>${data.bank_details.replace(/\n/g, '<br>')}</pre> 
+                                <p><strong>Importante:</strong> Tu reserva se mantendrá como pendiente hasta que confirmemos la recepción del pago.</p>
+                            `;
+                            // Insert bank info before the ID paragraph
+                            const reservaIdParagraph = document.getElementById('reservaIdText');
+                            if (reservaIdParagraph) {
+                                successModalBody.insertBefore(bankInfoDiv, reservaIdParagraph);
+                            } else {
+                                successModalBody.appendChild(bankInfoDiv); // Fallback
                             }
                         }
-                        
-                        const successModalEl = document.getElementById('successModal');
+
                         if (successModalEl) {
                             const successModal = new bootstrap.Modal(successModalEl);
                             successModal.show();

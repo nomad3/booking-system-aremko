@@ -45,7 +45,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
-      - "5434:5432" # Changed host port from 5433 to 5434
+      - "5435:5432" # Changed host port from 5434 to 5435 to avoid conflict
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -60,7 +60,7 @@ services:
       - PGADMIN_DEFAULT_EMAIL=admin@example.com
       - PGADMIN_DEFAULT_PASSWORD=admin
     ports:
-      - "5051:80" # Changed host port from 5050 to 5051
+      - "5052:80" # Changed host port from 5051 to 5052 to avoid conflict
     depends_on:
       - db
 

@@ -745,6 +745,18 @@ def checkout_view(request):
         'cart': cart,
     }
     
+    # Get relevant payment methods for checkout
+    # Filter Pago.METODOS_PAGO to only include public-facing options
+    public_payment_methods = [
+        choice for choice in Pago.METODOS_PAGO 
+        if choice[0] in ['transferencia', 'flow'] # Explicitly define public methods for now
+    ]
+    
+    context = {
+        'cart': cart,
+        'payment_methods': public_payment_methods, # Add payment methods to context
+    }
+    
     return render(request, 'ventas/checkout.html', context)
 
 def complete_checkout(request):
@@ -755,7 +767,8 @@ def complete_checkout(request):
             email = request.POST.get('email')
             telefono = request.POST.get('telefono')
             documento_identidad = request.POST.get('documento_identidad', '')
-            
+            metodo_pago = request.POST.get('metodo_pago') # Get payment method
+
             # Get cart from session
             cart = request.session.get('cart', {'servicios': [], 'total': 0})
             
@@ -873,19 +886,42 @@ def complete_checkout(request):
                         )
                     
                     # Recalculate total based on the services added
-                    venta.calcular_total()
-                    venta.save()
-                    
+                    venta.calcular_total() # This already saves and updates saldo/estado_pago
+
+                    # If bank transfer, ensure estado_pago remains 'pendiente'
+                    # and prepare bank details for the response.
+                    bank_details_text = None
+                    if metodo_pago == 'transferencia':
+                        venta.estado_pago = 'pendiente' # Explicitly set as pending
+                        venta.save(update_fields=['estado_pago']) # Save only this field change
+
+                        # Using fake details as requested
+                        bank_details_text = """
+                        Banco: Banco Ficticio S.A.
+                        Tipo de Cuenta: Cuenta Corriente
+                        Número de Cuenta: 1234567890
+                        Nombre Titular: Empresa Ejemplo Ltda.
+                        RUT Titular: 77.777.777-7
+                        Email para comprobante: pagos@ejemplo.com
+                        """
+                        bank_details_text = "\n".join(line.strip() for line in bank_details_text.strip().splitlines())
+
+
                     # Clear cart
                     request.session['cart'] = {'servicios': [], 'total': 0}
                     request.session.modified = True
                     
                     # Return success response
-                    return JsonResponse({
-                        'success': True, 
+                    response_data = {
+                        'success': True,
                         'message': 'Reserva creada exitosamente',
-                        'reserva_id': venta.id
-                    })
+                        'reserva_id': venta.id,
+                        'metodo_pago': metodo_pago # Include payment method in response
+                    }
+                    if bank_details_text:
+                        response_data['bank_details'] = bank_details_text
+
+                    return JsonResponse(response_data)
                 finally:
                     # Restore signals
                     for signal, handler in signals_backup:

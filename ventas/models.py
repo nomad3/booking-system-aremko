@@ -54,12 +54,13 @@ class Compra(models.Model):
     METODOS_PAGO = [
         ('tarjeta', 'Tarjeta de Crédito/Débito'),
         ('efectivo', 'Efectivo'),
+        ('transferencia', 'Transferencia Bancaria'), # Added generic transfer option
         ('webpay', 'WebPay'),
         ('descuento', 'Descuento'),
         ('giftcard', 'GiftCard'),
         ('flow', 'FLOW'),
         ('mercadopago', 'MercadoPago'),
-        ('scotiabank', 'Tranferencia ScotiaBank'),
+        ('scotiabank', 'Transferencia ScotiaBank'), # Keep specific ones for admin use
         ('bancoestado', 'Transferencia BancoEstado'),
         ('cuentarut', 'Transferencia CuentaRut'),
         ('machjorge', 'mach jorge'),
@@ -336,12 +337,13 @@ class Pago(models.Model):
     METODOS_PAGO = [
         ('tarjeta', 'Tarjeta de Crédito/Débito'),
         ('efectivo', 'Efectivo'),
+        ('transferencia', 'Transferencia Bancaria'), # Added generic transfer option
         ('webpay', 'WebPay'),
         ('descuento', 'Descuento'),
         ('giftcard', 'GiftCard'),
         ('flow', 'FLOW'),
         ('mercadopago', 'MercadoPago'),
-        ('scotiabank', 'Tranferencia ScotiaBank'),
+        ('scotiabank', 'Transferencia ScotiaBank'), # Keep specific ones for admin use
         ('bancoestado', 'Transferencia BancoEstado'),
         ('cuentarut', 'Transferencia CuentaRut'),
         ('machjorge', 'mach jorge'),
