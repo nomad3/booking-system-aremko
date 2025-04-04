@@ -217,12 +217,17 @@
                         <div class="card-body">
                             <h5 class="card-title">{{ servicio.nombre }}</h5>
                             <p class="card-text">{{ servicio.categoria.nombre }}</p>
-                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p> {# Apply filters #}
+                            {% if servicio.tipo_servicio == 'cabana' %}
+                                <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
+                            {% else %}
+                                <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p> {# Apply filters #}
+                            {% endif %}
                             <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p> {# Use custom filter #}
-                            <button class="btn btn-primary w-100 js-open-booking-modal" 
-                                    data-servicio-id="{{ servicio.id }}" 
-                                    data-servicio-nombre="{{ servicio.nombre|escapejs }}" 
-                                    data-servicio-precio="{{ servicio.precio_base }}"> {# Use data attributes #}
+                            <button class="btn btn-primary w-100 js-open-booking-modal"
+                                    data-servicio-id="{{ servicio.id }}"
+                                    data-servicio-nombre="{{ servicio.nombre|escapejs }}"
+                                    data-servicio-precio="{{ servicio.precio_base }}"
+                                    data-servicio-tipo="{{ servicio.tipo_servicio }}"> {# Add service type #}
                                 <i class="fas fa-calendar-plus me-2"></i>Reservar
                             </button>
                         </div>
@@ -421,9 +426,10 @@
     // Removed global openBookingModal function
 
     // Variables globales específicas de la homepage
-    let currentServicioId = null; // Keep this for date change logic
+    let currentServicioId = null;
     let currentServicioNombre = null;
     let currentServicioPrecio = 0;
+    let currentServicioTipo = 'otro'; // Add type, default to 'otro'
 
     // Función para cargar horas disponibles (específica de homepage)
     function loadAvailableHours(servicioId, fecha) {
@@ -472,9 +478,15 @@
         const precioTotalInput = document.getElementById('precioTotal');
         if (cantidadPersonasSelect && precioTotalInput) {
             const cantidadPersonas = parseInt(cantidadPersonasSelect.value);
-            const precioTotal = currentServicioPrecio * cantidadPersonas;
-            precioTotalInput.value = formatCLP(precioTotal); // Format updated price
-            console.log("Updated total price:", formatCLP(precioTotal));
+            let precioTotal = 0;
+            // Calculate price based on service type
+            if (currentServicioTipo === 'cabana') {
+                precioTotal = currentServicioPrecio; // Fixed price for cabin
+            } else {
+                precioTotal = currentServicioPrecio * cantidadPersonas; // Price per person for others
+            }
+            precioTotalInput.value = formatCLP(precioTotal);
+            console.log("Updated total price:", formatCLP(precioTotal), "for type:", currentServicioTipo);
         }
         // Also validate the slot when quantity changes, if time is already selected
         const horaSelect = document.getElementById('hora');
@@ -599,22 +611,40 @@
             button.addEventListener('click', function() {
                 const servicioId = this.dataset.servicioId;
                 const servicioNombre = this.dataset.servicioNombre;
-                const servicioPrecio = parseFloat(this.dataset.servicioPrecio); // Ensure it's a number
+                const servicioPrecio = parseFloat(this.dataset.servicioPrecio);
+                const servicioTipo = this.dataset.servicioTipo || 'otro'; // Get service type
 
-                console.log("Opening booking modal via listener for:", servicioId, servicioNombre, servicioPrecio);
-                
-                // Store current service details globally (needed for date/quantity changes)
+                console.log("Opening booking modal via listener for:", servicioId, servicioNombre, servicioPrecio, servicioTipo);
+
+                // Store current service details globally
                 currentServicioId = servicioId;
                 currentServicioNombre = servicioNombre;
                 currentServicioPrecio = servicioPrecio;
+                currentServicioTipo = servicioTipo; // Store type
 
                 // Populate modal fields
                 document.getElementById('servicioId').value = servicioId;
                 document.getElementById('servicioNombre').value = servicioNombre;
-                document.getElementById('fecha').value = ''; // Clear date
-                document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>'; // Reset hours
-                document.getElementById('cantidadPersonas').value = '1'; // Reset quantity
-                document.getElementById('precioTotal').value = formatCLP(servicioPrecio); // Format initial price
+                document.getElementById('fecha').value = '';
+                document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
+                document.getElementById('hora').disabled = true; // Disable initially
+
+                // Handle quantity selector based on service type
+                const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
+                const cantidadPersonasLabel = document.querySelector('label[for="cantidadPersonas"]'); // Get label too
+                if (servicioTipo === 'cabana') {
+                    cantidadPersonasSelect.value = '2'; // Default/max for cabin
+                    cantidadPersonasSelect.disabled = true; // Disable quantity selection
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none'; // Hide label
+                    cantidadPersonasSelect.style.display = 'none'; // Hide select
+                    document.getElementById('precioTotal').value = formatCLP(servicioPrecio); // Show fixed price
+                } else {
+                    cantidadPersonasSelect.value = '1'; // Default for others
+                    cantidadPersonasSelect.disabled = false; // Enable quantity selection
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'block'; // Show label
+                    cantidadPersonasSelect.style.display = 'block'; // Show select
+                    document.getElementById('precioTotal').value = formatCLP(servicioPrecio); // Show initial price per person
+                }
 
                 // Show modal
                 const bookingModalEl = document.getElementById('bookingModal');

@@ -107,8 +107,8 @@ class VentaReservaAdmin(admin.ModelAdmin):
     # Restore the date filter
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
-    # Temporarily comment out inlines to isolate the issue
-    # inlines = [ReservaServicioInline, ReservaProductoInline, PagoInline]
+    # Restore inlines
+    inlines = [ReservaServicioInline, ReservaProductoInline, PagoInline]
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
         'productos_y_cantidades', 'servicios_y_cantidades',

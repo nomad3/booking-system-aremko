@@ -82,12 +82,17 @@
                     <div class="card-body d-flex flex-column"> {# Use flex column for button alignment #}
                         <h5 class="card-title">{{ servicio.nombre }}</h5>
                         {# <p class="card-text">{{ servicio.descripcion|truncatewords:15 }}</p> #} {# Optional: Add service description #}
-                        <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
+                        {% if servicio.tipo_servicio == 'cabana' %}
+                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
+                        {% else %}
+                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
+                        {% endif %}
                         <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p> {# Use custom filter #}
                         <button class="btn btn-primary w-100 mt-auto js-open-booking-modal" {# Use mt-auto to push button down #}
                                 data-servicio-id="{{ servicio.id }}"
                                 data-servicio-nombre="{{ servicio.nombre|escapejs }}"
-                                data-servicio-precio="{{ servicio.precio_base }}">
+                                data-servicio-precio="{{ servicio.precio_base }}"
+                                data-servicio-tipo="{{ servicio.tipo_servicio }}"> {# Add service type #}
                             <i class="fas fa-calendar-plus me-2"></i>Reservar
                         </button>
                     </div>
@@ -187,6 +192,7 @@
     let currentServicioId = null;
     let currentServicioNombre = null;
     let currentServicioPrecio = 0;
+    let currentServicioTipo = 'otro'; // Add type
 
     // Function to load available hours
     function loadAvailableHours(servicioId, fecha) {
@@ -224,7 +230,13 @@
         const precioTotalInput = document.getElementById('precioTotal');
         if (cantidadPersonasSelect && precioTotalInput) {
             const cantidadPersonas = parseInt(cantidadPersonasSelect.value);
-            const precioTotal = currentServicioPrecio * cantidadPersonas;
+            let precioTotal = 0;
+             // Calculate price based on service type
+            if (currentServicioTipo === 'cabana') {
+                precioTotal = currentServicioPrecio; // Fixed price for cabin
+            } else {
+                precioTotal = currentServicioPrecio * cantidadPersonas; // Price per person for others
+            }
             precioTotalInput.value = formatCLP(precioTotal);
         }
         // Also validate the slot when quantity changes, if time is already selected
@@ -323,13 +335,31 @@
                 currentServicioId = this.dataset.servicioId;
                 currentServicioNombre = this.dataset.servicioNombre;
                 currentServicioPrecio = parseFloat(this.dataset.servicioPrecio);
+                currentServicioTipo = this.dataset.servicioTipo || 'otro'; // Get service type
 
                 document.getElementById('servicioId').value = currentServicioId;
                 document.getElementById('servicioNombre').value = currentServicioNombre;
                 document.getElementById('fecha').value = '';
                 document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
-                document.getElementById('cantidadPersonas').value = '1';
-                document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio);
+                document.getElementById('hora').disabled = true; // Disable initially
+
+                 // Handle quantity selector based on service type
+                const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
+                const cantidadPersonasLabel = document.querySelector('label[for="cantidadPersonas"]'); // Get label too
+                if (currentServicioTipo === 'cabana') {
+                    cantidadPersonasSelect.value = '2'; // Default/max for cabin
+                    cantidadPersonasSelect.disabled = true; // Disable quantity selection
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none'; // Hide label
+                    cantidadPersonasSelect.style.display = 'none'; // Hide select
+                    document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio); // Show fixed price
+                } else {
+                    cantidadPersonasSelect.value = '1'; // Default for others
+                    cantidadPersonasSelect.disabled = false; // Enable quantity selection
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'block'; // Show label
+                    cantidadPersonasSelect.style.display = 'block'; // Show select
+                    document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio); // Show initial price per person
+                }
+
 
                 const bookingModalEl = document.getElementById('bookingModal');
                 if (bookingModalEl) {
