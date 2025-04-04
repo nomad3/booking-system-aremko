@@ -52,6 +52,10 @@ urlpatterns = [
     path('cart/', views.cart_view, name='cart'), # Added cart view URL
     path('checkout/', views.checkout_view, name='checkout'),
     path('complete-checkout/', views.complete_checkout, name='complete_checkout'),
+    # Flow Payment URLs
+    path('api/flow/create/', views.create_flow_payment, name='create_flow_payment'),
+    path('payment/confirmation/', views.flow_confirmation, name='flow_confirmation'), # Adjust path as needed
+    path('payment/return/', views.flow_return, name='flow_return'), # Adjust path as needed
     # API Router
     path('', include(router.urls)),
 ]
