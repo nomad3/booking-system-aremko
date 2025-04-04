@@ -55,9 +55,11 @@
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 <div>
                                     {{ reserva_servicio.servicio.nombre }} (x{{ reserva_servicio.cantidad_personas }})<br>
-                                    <small class="text-muted">{{ reserva_servicio.fecha_agendamiento|date:"Y-m-d H:i" }}</small>
+                                    {# Format DateField without time specifiers #}
+                                    <small class="text-muted">{{ reserva_servicio.fecha_agendamiento|date:"Y-m-d" }} {{ reserva_servicio.hora_inicio }}</small> 
                                 </div>
-                                <span class="badge bg-primary rounded-pill">${{ reserva_servicio.subtotal|intcomma }}</span>
+                                {# Assuming subtotal is calculated correctly elsewhere or add it here #}
+                                <span class="badge bg-primary rounded-pill">${{ reserva_servicio.calcular_precio|intcomma }}</span>
                             </li>
                         {% empty %}
                             <li class="list-group-item">No hay servicios</li>
