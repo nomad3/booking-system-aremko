@@ -187,7 +187,23 @@ class Servicio(models.Model):
     slots_disponibles = models.JSONField(default=list, help_text="Horarios disponibles en formato HH:MM")
     activo = models.BooleanField(
         default=True,
-        help_text="Indica si el servicio está disponible para reservas"
+        help_text="Indica si el servicio está disponible para reservas (uso interno)"
+    )
+    publicado_web = models.BooleanField(
+        default=True,
+        help_text="Marcar si este servicio debe ser visible y reservable en la página web pública."
+    )
+    TIPO_SERVICIO_CHOICES = [
+        ('tina', 'Tina'),
+        ('masaje', 'Masaje'),
+        ('cabana', 'Cabaña'),
+        ('otro', 'Otro'),
+    ]
+    tipo_servicio = models.CharField(
+        max_length=10,
+        choices=TIPO_SERVICIO_CHOICES,
+        default='otro',
+        help_text="Tipo de servicio para aplicar lógicas específicas (ej. precios, horarios)."
     )
     imagen = models.ImageField(upload_to='servicios/', blank=True, null=True, help_text="Imagen para el servicio")
 
@@ -431,8 +447,9 @@ class ReservaServicio(models.Model):
     servicio = models.ForeignKey(Servicio, on_delete=models.CASCADE)
     fecha_agendamiento = models.DateField()
     hora_inicio = models.CharField(max_length=5)
-    cantidad_personas = models.PositiveIntegerField(default=1)
-    
+    # Default to 1, but enforce max 2 for cabins during booking if needed
+    cantidad_personas = models.PositiveIntegerField(default=1) 
+
     @property
     def fecha_hora_completa(self):
         return timezone.make_aware(
@@ -443,4 +460,15 @@ class ReservaServicio(models.Model):
         return f"{self.servicio.nombre} reservado para {self.fecha_agendamiento} {self.hora_inicio}"
 
     def calcular_precio(self):
-        return self.servicio.precio_base * self.cantidad_personas
+        """Calcula el precio basado en el tipo de servicio."""
+        if self.servicio.tipo_servicio == 'cabana':
+            # Precio fijo para cabañas, independientemente de las personas (max 2)
+            return self.servicio.precio_base
+        else:
+            # Precio normal basado en personas para otros servicios
+            return self.servicio.precio_base * self.cantidad_personas
+    
+    # Add subtotal property for consistency in templates if needed
+    @property
+    def subtotal(self):
+        return self.calcular_precio()

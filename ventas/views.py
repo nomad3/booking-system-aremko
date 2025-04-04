@@ -911,10 +911,10 @@ def homepage_view(request):
     Vista que renderiza la página de inicio pública de Aremko.cl
     Muestra los servicios disponibles y permite realizar reservas.
     """
-    # Obtener servicios activos
-    servicios = Servicio.objects.filter(activo=True).select_related('categoria')
+    # Obtener servicios activos Y publicados en la web
+    servicios = Servicio.objects.filter(activo=True, publicado_web=True).select_related('categoria')
     categorias = CategoriaServicio.objects.all()
-    
+
     # Obtener carrito de compras de la sesión o crear uno nuevo
     cart = request.session.get('cart', {'servicios': [], 'total': 0})
     
@@ -930,7 +930,8 @@ def categoria_detail_view(request, categoria_id):
     Vista que muestra los servicios de una categoría específica.
     """
     categoria = get_object_or_404(CategoriaServicio, id=categoria_id)
-    servicios = Servicio.objects.filter(categoria=categoria, activo=True)
+    # Filter by category, active, AND published
+    servicios = Servicio.objects.filter(categoria=categoria, activo=True, publicado_web=True)
     categorias = CategoriaServicio.objects.all() # For potential navigation/filtering
 
     context = {
@@ -964,10 +965,23 @@ def add_to_cart(request):
         cantidad_personas = int(request.POST.get('cantidad_personas', 1))
         
         print(f"Adding to cart: servicio_id={servicio_id}, fecha={fecha}, hora={hora}, cantidad_personas={cantidad_personas}")
-        
+
         try:
             servicio = Servicio.objects.get(id=servicio_id)
-            
+
+            # --- Cabin Specific Logic ---
+            if servicio.tipo_servicio == 'cabana':
+                # Enforce max 2 people for cabins
+                if cantidad_personas > 2:
+                     messages.error(request, "La capacidad máxima para las cabañas es de 2 personas.")
+                     # Redirect back to where the user came from, if possible
+                     referer_url = request.META.get('HTTP_REFERER', reverse('homepage'))
+                     return redirect(referer_url)
+                # Set quantity to 1 or 2, price is fixed anyway
+                cantidad_personas = min(cantidad_personas, 2) 
+                print(f"Cabin selected, quantity adjusted/capped at: {cantidad_personas}")
+
+
             # Obtener carrito actual o crear uno nuevo
             cart = request.session.get('cart', {'servicios': [], 'total': 0})
             
@@ -979,9 +993,10 @@ def add_to_cart(request):
                 'fecha': fecha,
                 'hora': hora,
                 'cantidad_personas': cantidad_personas,
-                'subtotal': float(servicio.precio_base) * cantidad_personas
+                 # Calculate subtotal based on service type
+                'subtotal': float(servicio.precio_base) if servicio.tipo_servicio == 'cabana' else float(servicio.precio_base) * cantidad_personas
             }
-            
+
             print(f"Cart item to add: {item}")
             
             cart['servicios'].append(item)
@@ -1241,27 +1256,720 @@ def get_available_hours(request):
     Vista para obtener las horas disponibles para un servicio en una fecha específica
     """
     servicio_id = request.GET.get('servicio_id')
-    fecha = request.GET.get('fecha')
-    
+    fecha_str = request.GET.get('fecha')
+
+    if not servicio_id or not fecha_str:
+        return JsonResponse({'success': False, 'error': 'Faltan parámetros servicio_id o fecha.'})
+
     try:
         servicio = Servicio.objects.get(id=servicio_id)
-        fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
-        
-        # Obtener reservas existentes para este servicio en esta fecha
-        # Convertir fecha_obj a string para comparar con el campo fecha_agendamiento
+        fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        day_name = fecha_obj.strftime('%A').lower() # Get day name in English lowercase (e.g., 'monday')
+
+        # --- Get slots for the specific day from the JSON field ---
+        # Ensure slots_disponibles is a dict
+        daily_slots_config = servicio.slots_disponibles if isinstance(servicio.slots_disponibles, dict) else {}
+        available_slots_for_day = daily_slots_config.get(day_name, []) # Get slots for the specific day, default to empty list
+
+        if not available_slots_for_day:
+             # If no specific slots defined for the day, maybe fallback or return empty?
+             # For now, return empty if no slots are defined for that day.
+             print(f"No slots defined for service {servicio_id} on {day_name}")
+             return JsonResponse({'success': True, 'horas_disponibles': []})
+
+
+        # --- Get existing reservations for this service on this date ---
         reservas = ReservaServicio.objects.filter(
             servicio=servicio,
             fecha_agendamiento=fecha_obj
         ).values_list('hora_inicio', flat=True)
-        
-        # Si el servicio no tiene slots_disponibles definidos, crear algunos por defecto
-        if not servicio.slots_disponibles or len(servicio.slots_disponibles) == 0:
-            # Generar slots de hora en hora desde horario_apertura hasta horario_cierre
-            hora_apertura = servicio.horario_apertura.hour
-            hora_cierre = servicio.horario_cierre.hour
-            
-            # Si la hora de cierre es 0 (medianoche), ajustar a 24 para el cálculo
-            if hora_cierre == 0:
+        booked_slots = set(reservas) # Convert to set for faster lookup
+
+        # --- Filter available slots by removing booked ones ---
+        horas_disponibles = [hora for hora in available_slots_for_day if hora not in booked_slots]
+
+        # --- Sort the final list ---
+        horas_disponibles.sort() # Sort alphabetically/numerically
+
+        # # Original fallback logic (commented out, using day-specific logic now)
+        # if not servicio.slots_disponibles or len(servicio.slots_disponibles) == 0:
+        #     hora_apertura = servicio.horario_apertura.hour
+        #     hora_cierre = servicio.horario_cierre.hour
+        #     if hora_cierre == 0:
+        #         hora_cierre = 24
+        #     slots_por_defecto = []
+        #     for hora in range(hora_apertura, hora_cierre):
+        #         slots_por_defecto.append(f"{hora:02d}:00")
+        #         if hora < hora_cierre - 1 or (hora == hora_cierre - 1 and servicio.duracion <= 30):
+        #             slots_por_defecto.append(f"{hora:02d}:30")
+        #     servicio.slots_disponibles = slots_por_defecto
+        #     servicio.save()
+        # horas_disponibles = [hora for hora in servicio.slots_disponibles if hora not in reservas]
+        # horas_disponibles.sort()
+        # if not horas_disponibles:
+        #     horas_disponibles = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"]
+
+        return JsonResponse({'success': True, 'horas_disponibles': horas_disponibles})
+    except Servicio.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Servicio no encontrado'})
+    except ValueError as e:
+        # Handle potential date parsing errors
+        return JsonResponse({'success': False, 'error': f'Error de formato de fecha: {str(e)}'})
+    except Exception as e:
+        print(f"Error en get_available_hours: {str(e)}")
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'})
+
+def check_slot_availability(request):
+    """
+    View to check if a specific service slot (date and time) is available.
+    """
+    servicio_id = request.GET.get('servicio_id')
+    fecha_str = request.GET.get('fecha')
+    hora = request.GET.get('hora')
+
+    if not all([servicio_id, fecha_str, hora]):
+        return JsonResponse({'available': False, 'error': 'Missing parameters'}, status=400)
+
+    try:
+        servicio = Servicio.objects.get(id=servicio_id)
+        fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+
+        # Check if the specific slot is already booked
+        is_booked = ReservaServicio.objects.filter(
+            servicio=servicio,
+            fecha_agendamiento=fecha,
+            hora_inicio=hora
+        ).exists()
+
+        return JsonResponse({'available': not is_booked})
+
+    except Servicio.DoesNotExist:
+        return JsonResponse({'available': False, 'error': 'Servicio no encontrado'}, status=404)
+    except ValueError:
+        return JsonResponse({'available': False, 'error': 'Formato de fecha inválido'}, status=400)
+    except Exception as e:
+        # Log the exception for debugging
+        print(f"Error checking slot availability: {e}")
+        traceback.print_exc()
+        return JsonResponse({'available': False, 'error': 'Error interno del servidor'}, status=500)
+
+
+# Función para verificar si el usuario es administrador
+def es_administrador(user):
+    return user.is_staff or user.is_superuser
+
+@user_passes_test(es_administrador)  # Restringir el acceso a administradores
+def auditoria_movimientos_view(request):
+    # Obtener parámetros del filtro
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+    tipo_movimiento = request.GET.get('tipo_movimiento')
+    usuario = request.GET.get('usuario')
+
+    # Establecer fechas por defecto si no se proporcionan
+    if not fecha_inicio:
+        fecha_inicio = timezone.now().date().strftime('%Y-%m-%d')
+    if not fecha_fin:
+        fecha_fin = timezone.now().date().strftime('%Y-%m-%d')
+
+    # Convertir fechas a objetos datetime
+    fecha_inicio_dt = timezone.make_aware(datetime.strptime(fecha_inicio, '%Y-%m-%d'))
+    fecha_fin_dt = timezone.make_aware(datetime.strptime(fecha_fin, '%Y-%m-%d')) + timedelta(days=1)
+
+    # Iniciar el queryset base
+    movimientos = MovimientoCliente.objects.select_related(
+        'cliente', 'usuario', 'venta_reserva'
+    )
+
+    # Aplicar filtros
+    movimientos = movimientos.filter(
+        fecha_movimiento__gte=fecha_inicio_dt,
+        fecha_movimiento__lte=fecha_fin_dt
+    )
+
+    if tipo_movimiento:
+        movimientos = movimientos.filter(tipo_movimiento__icontains=tipo_movimiento)
+
+    # Filtro de usuario mejorado
+    if usuario and usuario != '':
+        movimientos = movimientos.filter(usuario__username__exact=usuario)
+
+    # Ordenar por fecha descendente
+    movimientos = movimientos.order_by('-fecha_movimiento')
+
+    # Agregar print para depuración
+    print(f"Usuario seleccionado: {usuario}")
+    print(f"Query SQL: {movimientos.query}")
+    print(f"Cantidad de resultados: {movimientos.count()}")
+
+    # Paginación
+    paginator = Paginator(movimientos, 100)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'movimientos': page_obj,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'tipo_movimiento': tipo_movimiento,
+        'usuario_username': usuario,
+        'usuarios': User.objects.filter(is_active=True).order_by('username'),  # Solo usuarios activos
+    }
+
+    return render(request, 'ventas/auditoria_movimientos.html', context)
+
+@user_passes_test(es_administrador)  # Restringir el acceso a administradores
+def caja_diaria_view(request):
+    # Obtener rango de fechas desde los parámetros GET
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+    metodo_pago = request.GET.get('metodo_pago')  # Nuevo filtro
+
+    # Establecer fechas por defecto (hoy) si no se proporcionan
+    today = timezone.localdate()
+    if not fecha_inicio:
+        fecha_inicio = today.strftime('%Y-%m-%d')
+    if not fecha_fin:
+        fecha_fin = today.strftime('%Y-%m-%d')
+
+    # Parsear las cadenas de fecha a objetos date
+    try:
+        fecha_inicio_parsed = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+        fecha_fin_parsed = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+    except ValueError:
+        # Manejar errores de formato de fecha
+        fecha_inicio_parsed = today
+        fecha_fin_parsed = today
+
+    # Validar que fecha_inicio no es posterior a fecha_fin
+    if fecha_inicio_parsed > fecha_fin_parsed:
+        fecha_inicio_parsed, fecha_fin_parsed = fecha_fin_parsed, fecha_inicio_parsed
+        fecha_inicio, fecha_fin = fecha_fin, fecha_inicio
+
+    # Ajustar fecha_fin para incluir todo el día
+    fecha_fin_parsed_datetime = timezone.make_aware(datetime.combine(fecha_fin_parsed, datetime.min.time())) + timedelta(days=1)
+
+    # Obtener el usuario seleccionado del parámetro GET
+    usuario_id = request.GET.get('usuario')
+
+    # Obtener todos los usuarios para el filtro
+    usuarios = User.objects.all()
+
+    # Filtrar Pago basado en fecha_pago
+    pagos = Pago.objects.filter(
+        fecha_pago__range=(fecha_inicio_parsed, fecha_fin_parsed_datetime)
+    )
+
+    # Filtrar los pagos por usuario si se ha seleccionado uno
+    if usuario_id:
+        pagos = pagos.filter(usuario_id=usuario_id)
+    else:
+        usuario_id = ''
+
+    # Filtrar por método de pago si se ha seleccionado uno
+    if metodo_pago:
+        pagos = pagos.filter(metodo_pago=metodo_pago)
+    else:
+        metodo_pago = ''
+
+    # Filtrar VentaReserva basado en ReservaServicio.fecha_agendamiento
+    ventas = VentaReserva.objects.filter(
+        reservaservicios__fecha_agendamiento__range=(fecha_inicio_parsed, fecha_fin_parsed_datetime)
+    ).distinct()
+
+    # Calcular totales
+    total_ventas = ventas.aggregate(total=Sum('total'))['total'] or 0
+    total_pagos = pagos.aggregate(total=Sum('monto'))['total'] or 0
+
+    # Agrupar pagos por método de pago y contar transacciones
+    pagos_grouped = pagos.values('metodo_pago').annotate(
+        total_monto=Sum('monto'),
+        cantidad_transacciones=Count('id')
+    ).order_by('metodo_pago')
+
+    # Obtener los métodos de pago para el filtro
+    METODOS_PAGO = Pago.METODOS_PAGO
+
+    context = {
+        'ventas': ventas,
+        'pagos': pagos,
+        'total_ventas': total_ventas,
+        'total_pagos': total_pagos,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'pagos_grouped': pagos_grouped,
+        'usuarios': usuarios,
+        'usuario_id': usuario_id,
+        'metodo_pago': metodo_pago,  # Añadir al contexto
+        'METODOS_PAGO': METODOS_PAGO,  # Añadir al contexto
+    }
+
+    return render(request, 'ventas/caja_diaria.html', context)
+
+def caja_diaria_recepcionistas_view(request):
+    # Lista de usuarios permitidos (por username)
+    usuarios_permitidos_usernames = ['Lina', 'Edson', 'Ernesto', 'Rafael']
+    usuarios_permitidos = User.objects.filter(username__in=usuarios_permitidos_usernames)
+
+    # Obtener rango de fechas y filtros
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+    metodo_pago = request.GET.get('metodo_pago')
+    usuario_id = request.GET.get('usuario')
+
+    # Establecer fechas por defecto
+    today = timezone.localdate()
+    if not fecha_inicio:
+        fecha_inicio = today.strftime('%Y-%m-%d')
+    if not fecha_fin:
+        fecha_fin = today.strftime('%Y-%m-%d')
+
+    # Parsear fechas
+    try:
+        fecha_inicio_parsed = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+        fecha_fin_parsed = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+    except ValueError:
+        fecha_inicio_parsed = today
+        fecha_fin_parsed = today
+
+    # Validar fechas
+    if fecha_inicio_parsed > fecha_fin_parsed:
+        fecha_inicio_parsed, fecha_fin_parsed = fecha_fin_parsed, fecha_inicio_parsed
+        fecha_inicio, fecha_fin = fecha_fin, fecha_inicio
+
+    # Ajustar fecha_fin
+    fecha_fin_parsed_datetime = timezone.make_aware(datetime.combine(fecha_fin_parsed, datetime.max.time()))
+
+    # Filtrar pagos
+    pagos = Pago.objects.filter(
+        fecha_pago__range=(fecha_inicio_parsed, fecha_fin_parsed_datetime),
+        usuario__in=usuarios_permitidos
+    )
+
+    if usuario_id:
+        pagos = pagos.filter(usuario_id=usuario_id)
+
+    if metodo_pago:
+        pagos = pagos.filter(metodo_pago=metodo_pago)
+
+    # Filtrar ventas basadas en pagos filtrados
+    ventas = VentaReserva.objects.filter(
+        pagos__in=pagos
+    ).distinct()
+
+    # Calcular totales
+    total_ventas = ventas.aggregate(total=Sum('total'))['total'] or 0
+    total_pagos = pagos.aggregate(total=Sum('monto'))['total'] or 0
+
+    # Agrupar pagos
+    pagos_grouped = pagos.values('metodo_pago').annotate(
+        total_monto=Sum('monto'),
+        cantidad_transacciones=Count('id')
+    ).order_by('metodo_pago')
+
+    # Contexto
+    context = {
+        'ventas': ventas,
+        'pagos': pagos,
+        'total_ventas': total_ventas,
+        'total_pagos': total_pagos,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'pagos_grouped': pagos_grouped,
+        'usuarios': usuarios_permitidos,
+        'usuario_id': usuario_id or '',
+        'metodo_pago': metodo_pago or '',
+        'METODOS_PAGO': Pago.METODOS_PAGO,
+    }
+
+    return render(request, 'ventas/caja_diaria_recepcionistas.html', context)
+
+@login_required
+def productos_vendidos(request):
+    # Obtener fechas del request
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+    proveedor_id = request.GET.get('proveedor')
+    producto_id = request.GET.get('producto')
+
+    # Establecer fechas por defecto si no se proporcionan
+    if not fecha_inicio or not fecha_fin:
+        fecha_actual = timezone.now().date()
+        fecha_inicio = fecha_actual
+        fecha_fin = fecha_actual
+    else:
+        fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+        fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+
+    # Construir la consulta base
+    productos_query = ReservaProducto.objects.select_related(
+        'venta_reserva',
+        'venta_reserva__cliente',
+        'producto',
+        'producto__categoria'
+    ).filter(
+        venta_reserva__fecha_reserva__date__range=[fecha_inicio, fecha_fin]
+    )
+
+    # Aplicar filtros adicionales solo si se proporcionan valores válidos
+    if proveedor_id and proveedor_id.strip():
+        productos_query = productos_query.filter(producto__proveedor_id=proveedor_id)
+
+    if producto_id and producto_id.strip():
+        productos_query = productos_query.filter(producto_id=producto_id)
+
+    # Calcular totales
+    totales = productos_query.aggregate(
+        total_cantidad_productos=Sum('cantidad'),
+        total_monto_periodo=Sum(F('cantidad') * F('producto__precio_base'))
+    )
+
+    # Obtener los resultados
+    productos = productos_query.values(
+        'venta_reserva_id',
+        'venta_reserva__cliente__nombre',
+        'venta_reserva__fecha_reserva',
+        'producto__proveedor__nombre',
+        'producto__nombre',
+        'cantidad',
+        'producto__precio_base'
+    ).annotate(
+        total_monto=F('cantidad') * F('producto__precio_base')
+    ).order_by('-venta_reserva__fecha_reserva')
+
+    # Obtener listas para los filtros
+    todos_proveedores = Proveedor.objects.all().order_by('nombre')
+    todos_productos = Producto.objects.all().order_by('nombre')
+
+    context = {
+        'productos': productos,
+        'proveedores': todos_proveedores,
+        'productos_lista': todos_productos,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'proveedor_id': proveedor_id if proveedor_id else '',
+        'producto_id': producto_id if producto_id else '',
+        'total_cantidad_productos': totales['total_cantidad_productos'] or 0,
+        'total_monto_periodo': totales['total_monto_periodo'] or 0,
+    }
+
+    # Verificar si se solicitó exportación
+    if request.GET.get('export') == 'excel':
+        response = HttpResponse(content_type='application/ms-excel')
+        response['Content-Disposition'] = 'attachment; filename="Productos_Vendidos_{}.xls"'.format(
+            datetime.now().strftime('%Y%m%d_%H%M%S')
+        )
+
+        wb = xlwt.Workbook(encoding='utf-8')
+        ws = wb.add_sheet('Productos Vendidos')
+
+        # Estilos
+        header_style = xlwt.easyxf('font: bold on; pattern: pattern solid, fore_colour gray25;')
+        date_style = xlwt.easyxf(num_format_str='DD/MM/YYYY HH:MM')
+        money_style = xlwt.easyxf(num_format_str='#,##0')
+
+        # Headers
+        headers = [
+            'ID Venta/Reserva',
+            'Cliente',
+            'Fecha Venta',
+            'Proveedor',
+            'Producto',
+            'Cantidad',
+            'Precio Unitario',
+            'Monto Total'
+        ]
+
+        for col, header in enumerate(headers):
+            ws.write(0, col, header, header_style)
+            ws.col(col).width = 256 * 20
+
+        # Datos
+        for row, producto in enumerate(productos, 1):
+            monto_total = producto['cantidad'] * producto['producto__precio_base']
+
+            # Convertir la fecha a zona horaria local
+            fecha_venta = timezone.localtime(producto['venta_reserva__fecha_reserva'])
+
+            ws.write(row, 0, producto['venta_reserva_id'] or 'Sin ID')
+            ws.write(row, 1, producto['venta_reserva__cliente__nombre'])
+            ws.write(row, 2, fecha_venta.strftime('%Y-%m-%d %H:%M'))  # Convertir a string
+            ws.write(row, 3, producto['producto__proveedor__nombre'])
+            ws.write(row, 4, producto['producto__nombre'])
+            ws.write(row, 5, producto['cantidad'])
+            ws.write(row, 6, producto['producto__precio_base'], money_style)
+            ws.write(row, 7, monto_total, money_style)
+
+        wb.save(response)
+        return response
+
+    return render(request, 'ventas/productos_vendidos.html', context)
+
+@login_required
+def exportar_clientes_excel(request):
+    response = HttpResponse(content_type='application/ms-excel')
+    response['Content-Disposition'] = 'attachment; filename="Clientes_{}.xls"'.format(
+        datetime.now().strftime('%Y%m%d_%H%M%S')
+    )
+
+    wb = xlwt.Workbook(encoding='utf-8')
+    ws = wb.add_sheet('Clientes')
+
+    # Estilos
+    header_style = xlwt.easyxf('font: bold on; pattern: pattern solid, fore_colour gray25;')
+
+    # Headers
+    headers = ['ID', 'Nombre', 'Teléfono', 'Email']
+    for col, header in enumerate(headers):
+        ws.write(0, col, header, header_style)
+        ws.col(col).width = 256 * 20
+
+    # Obtener todos los clientes
+    clientes = Cliente.objects.all().order_by('nombre')
+
+    # Datos
+    for row, cliente in enumerate(clientes, 1):
+        ws.write(row, 0, cliente.id)
+        ws.write(row, 1, cliente.nombre)
+        ws.write(row, 2, cliente.telefono or '')
+        ws.write(row, 3, cliente.email or '')
+
+    wb.save(response)
+    return response
+
+@login_required
+def lista_clientes(request):
+    search_query = request.GET.get('search', '')
+
+    # Filtrar clientes según la búsqueda
+    clientes = Cliente.objects.all().order_by('nombre')
+    if search_query:
+        clientes = clientes.filter(
+            Q(nombre__icontains=search_query) |
+            Q(telefono__icontains=search_query) |
+            Q(email__icontains=search_query)
+        )
+
+    # Configurar paginación
+    paginator = Paginator(clientes, 25)  # 25 clientes por página
+    page = request.GET.get('page')
+    clientes_paginados = paginator.get_page(page)
+
+    context = {
+        'clientes': clientes_paginados,
+        'is_paginated': paginator.num_pages > 1,
+        'page_obj': clientes_paginados,
+        'search_query': search_query,  # Añadido para mantener el valor de búsqueda
+    }
+
+    # Asegurarse de que se está renderizando el template HTML
+    return render(request, 'ventas/lista_clientes.html', context)
+
+@login_required
+@user_passes_test(es_administrador)  # Solo administradores pueden importar
+def importar_clientes_excel(request):
+    BATCH_SIZE = 500
+
+    if request.method == 'POST' and request.FILES.get('archivo_excel'):
+        try:
+            archivo = request.FILES['archivo_excel']
+            wb = load_workbook(archivo)
+            ws = wb.active
+
+            clientes_nuevos = []
+            clientes_actualizados = []
+            errores = []
+            total_procesados = 0
+            batch_data = []
+
+            for row in ws.iter_rows(min_row=2):
+                try:
+                    # Obtener valores (permitiendo valores vacíos)
+                    documento_identidad = row[0].value if row[0].value is not None else ''
+                    nombre = row[1].value if row[1].value is not None else ''
+                    telefono = row[2].value if row[2].value is not None else ''
+                    email = row[3].value if row[3].value is not None else ''
+                    ciudad = row[4].value if len(row) > 4 and row[4].value else ''
+
+                    # Solo validar que el nombre no esté vacío
+                    if not str(nombre).strip():
+                        continue
+
+                    # Agregar datos al lote
+                    batch_data.append({
+                        'row': row[0].row,
+                        'documento_identidad': documento_identidad,  # Cambiado de identificacion
+                        'nombre': nombre,
+                        'telefono': telefono,
+                        'email': email,
+                        'ciudad': ciudad
+                    })
+
+                    if len(batch_data) >= BATCH_SIZE:
+                        process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores)
+                        total_procesados += len(batch_data)
+                        messages.info(request, f'Procesados {total_procesados} registros...')
+                        batch_data = []
+
+                except Exception as e:
+                    errores.append(f"Error en fila {row[0].row}: {str(e)}")
+
+            # Procesar el último lote
+            if batch_data:
+                process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores)
+                total_procesados += len(batch_data)
+
+            # Mostrar resultados
+            if clientes_nuevos:
+                messages.success(request, f'Se importaron {len(clientes_nuevos)} nuevos clientes.')
+            if clientes_actualizados:
+                messages.info(request, f'Se actualizaron {len(clientes_actualizados)} clientes existentes.')
+            if errores:
+                messages.warning(request, f'Hubo {len(errores)} errores durante la importación.')
+                for error in errores[:10]:
+                    messages.error(request, error)
+                if len(errores) > 10:
+                    messages.error(request, f'... y {len(errores) - 10} errores más.')
+
+        except Exception as e:
+            messages.error(request, f'Error al procesar el archivo: {str(e)}')
+
+    return render(request, 'ventas/importar_clientes.html')
+
+def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
+    """Procesa un lote de datos de clientes."""
+    def limpiar_telefono(telefono):
+        """Limpia y formatea el número telefónico."""
+        try:
+            if telefono is None:
+                return ''
+
+            telefono = str(telefono)
+            solo_numeros = ''.join(filter(str.isdigit, telefono.strip()))
+
+            if not solo_numeros:
+                return ''
+
+            return solo_numeros[-9:] if len(solo_numeros) >= 9 else solo_numeros
+
+        except Exception:
+            return ''
+
+    def limpiar_email(email):
+        """Limpia y valida el email."""
+        if not email:
+            return ''
+        if str(email).strip().lower() == 'email':
+            return ''
+        email = str(email).strip()
+        return email if '@' in email else ''
+
+    # Set para mantener registro de documentos y teléfonos ya procesados
+    documentos_procesados = set()
+    telefonos_procesados = set()
+    emails_procesados = set()
+
+    with transaction.atomic():
+        for data in batch_data:
+            try:
+                # Limpiar datos
+                documento = str(data.get('documento_identidad', '')).strip()
+                nombre = str(data.get('nombre', '')).strip()
+                telefono = limpiar_telefono(data.get('telefono', ''))
+                email = limpiar_email(data.get('email', ''))
+                ciudad = str(data.get('ciudad', '')).strip()
+
+                # Verificar duplicados
+                if documento and documento in documentos_procesados:
+                    continue
+                if telefono and telefono in telefonos_procesados:
+                    continue
+                if email and email in emails_procesados:
+                    continue
+
+                # Buscar cliente existente
+                criterios_busqueda = Q()
+                if documento:
+                    criterios_busqueda |= Q(documento_identidad=documento)
+                if telefono:
+                    criterios_busqueda |= Q(telefono=telefono)
+                if email:
+                    criterios_busqueda |= Q(email=email)
+
+                cliente_existente = Cliente.objects.filter(criterios_busqueda).first() if criterios_busqueda else None
+
+                if cliente_existente:
+                    # Actualizar cliente existente
+                    if documento:
+                        cliente_existente.documento_identidad = documento
+                    cliente_existente.nombre = nombre
+                    if telefono:
+                        cliente_existente.telefono = telefono
+                    if email:
+                        cliente_existente.email = email
+                    if ciudad:
+                        cliente_existente.ciudad = ciudad
+                    cliente_existente.save()
+                    clientes_actualizados.append(f"{nombre} (fila {data['row']})")
+                else:
+                    # Crear nuevo cliente
+                    nuevo_cliente = {
+                        'documento_identidad': documento,
+                        'nombre': nombre,
+                        'telefono': telefono,
+                        'email': email,
+                        'ciudad': ciudad
+                    }
+                    cliente = Cliente.objects.create(**nuevo_cliente)
+                    clientes_nuevos.append(f"{nombre} (fila {data['row']})")
+
+                # Registrar datos procesados
+                if documento:
+                    documentos_procesados.add(documento)
+                if telefono:
+                    telefonos_procesados.add(telefono)
+                if email:
+                    emails_procesados.add(email)
+
+            except Exception as e:
+                errores.append(f"Error en fila {data['row']}: Error al guardar en la base de datos: {str(e)}")
+
+@login_required
+def add_venta_reserva(request):
+    if request.method == 'POST':
+        try:
+            form = VentaReservaForm(request.POST)
+            if form.is_valid():
+                venta_reserva = form.save(commit=False)
+                venta_reserva.usuario = request.user
+                venta_reserva.save()
+                form.save_m2m()
+
+                # Crear movimiento del cliente usando los campos correctos
+                MovimientoCliente.objects.create(
+                    cliente=venta_reserva.cliente,
+                    monto=venta_reserva.total,
+                    tipo_movimiento='Venta',
+                    comentarios=f'Venta/Reserva #{venta_reserva.id}',
+                    usuario=request.user
+                )
+
+                messages.success(request, 'Venta/Reserva creada exitosamente.')
+                if 'guardar_y_agregar' in request.POST:
+                    return redirect('admin:ventas_ventareserva_add')
+                else:
+                    return redirect('admin:ventas_ventareserva_changelist')
+            else:
+                messages.error(request, 'Por favor corrija los errores en el formulario.')
+        except Exception as e:
+            messages.error(request, f'Error al crear la venta/reserva: {str(e)}')
+            return redirect('admin:ventas_ventareserva_add')
+
+    return render(request, 'admin/ventas/ventareserva/change_form.html', {
+        'form': VentaReservaForm(),
+        'title': 'Agregar Venta/Reserva',
+    })
                 hora_cierre = 24
                 
             slots_por_defecto = []

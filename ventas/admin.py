@@ -326,7 +326,7 @@ class ClienteAdmin(admin.ModelAdmin):
 class ServicioAdminForm(forms.ModelForm):
     slots_input = forms.CharField(
         widget=forms.TextInput(attrs={'placeholder': 'HH:MM separados por comas ej: 09:00,10:30'}),
-        help_text="Horarios disponibles en formato HH:MM"
+        help_text='''Horarios por día (JSON). Ej: {"monday": ["16:00", "18:00"], ...}'''
     )
 
     class Meta:
@@ -357,12 +357,12 @@ class ServicioAdminForm(forms.ModelForm):
 @admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
     form = ServicioAdminForm
-    list_display = ('nombre', 'categoria', 'precio_base', 'duracion', 'activo', 'imagen') # Added imagen
-    list_filter = ('categoria', 'activo')
+    list_display = ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'activo', 'publicado_web', 'imagen') # Added tipo_servicio, publicado_web
+    list_filter = ('categoria', 'activo', 'publicado_web', 'tipo_servicio') # Added publicado_web, tipo_servicio
     search_fields = ('nombre', 'categoria__nombre')
     fieldsets = (
         (None, {
-            'fields': ('nombre', 'categoria', 'precio_base', 'duracion', 'imagen', 'proveedor', 'activo') # Added imagen, activo
+            'fields': ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'imagen', 'proveedor', 'activo', 'publicado_web') # Added tipo_servicio, publicado_web
         }),
         ('Configuración Horaria', {
             'fields': (
