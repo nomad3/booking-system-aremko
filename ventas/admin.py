@@ -62,7 +62,8 @@ class ReservaServicioInline(admin.TabularInline):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     class Media:
-        js = ('ventas/js/reserva_servicio_admin.js',)  # Crear este archivo
+        # Corrected path based on file structure
+        js = ('ventas/js/reserva_servicio_admin.js',) 
 
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
@@ -209,8 +210,11 @@ class VentaReservaAdmin(admin.ModelAdmin):
     cliente_info.admin_order_field = 'cliente__nombre'
 
     def fecha_reserva_corta(self, obj):
+        # Ensure we handle potential None value and only format the date part
         if obj.fecha_reserva:
-            return obj.fecha_reserva.strftime('%Y-%m-%d')
+            # Use timezone.localtime to convert to local time before formatting
+            local_time = timezone.localtime(obj.fecha_reserva)
+            return local_time.strftime('%Y-%m-%d') # Format as date only
         return '-'
     fecha_reserva_corta.short_description = 'Fecha'
     fecha_reserva_corta.admin_order_field = 'fecha_reserva'
