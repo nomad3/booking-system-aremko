@@ -104,8 +104,8 @@ class VentaReservaAdmin(admin.ModelAdmin):
         'productos_y_cantidades', 'total_servicios', 
         'total_productos', 'total', 'pagado', 'saldo_pendiente'
     )
-    # Temporarily comment out date filter to isolate the issue
-    list_filter = ('estado_pago', 'estado_reserva', ) # 'fecha_reserva')
+    # Restore the date filter
+    list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
     # Temporarily comment out inlines to isolate the issue
     # inlines = [ReservaServicioInline, ReservaProductoInline, PagoInline]
