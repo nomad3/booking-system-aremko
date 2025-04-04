@@ -497,22 +497,32 @@
                             console.log("Set reserva ID:", data.reserva_id);
                         }
 
-                        // Add bank transfer info if applicable
-                        if (data.metodo_pago === 'transferencia' && data.bank_details && successModalBody) {
-                            const bankInfoDiv = document.createElement('div');
-                            bankInfoDiv.classList.add('alert', 'alert-info', 'mt-3');
-                            bankInfoDiv.innerHTML = `
-                                <h5>Instrucciones para Transferencia Bancaria</h5>
-                                <p>Por favor, realiza la transferencia a la siguiente cuenta para confirmar tu reserva:</p>
-                                <pre>${data.bank_details.replace(/\n/g, '<br>')}</pre> 
-                                <p><strong>Importante:</strong> Tu reserva se mantendrá como pendiente hasta que confirmemos la recepción del pago.</p>
-                            `;
-                            // Insert bank info before the ID paragraph
-                            const reservaIdParagraph = document.getElementById('reservaIdText');
-                            if (reservaIdParagraph) {
-                                successModalBody.insertBefore(bankInfoDiv, reservaIdParagraph);
-                            } else {
-                                successModalBody.appendChild(bankInfoDiv); // Fallback
+                        // --- Ensure modal body exists before manipulating ---
+                        if (successModalBody) {
+                            // --- Remove any existing bank info first ---
+                            const existingBankInfo = successModalBody.querySelector('.bank-transfer-instructions');
+                            if (existingBankInfo) {
+                                existingBankInfo.remove();
+                            }
+
+                            // Add bank transfer info if applicable
+                            if (data.metodo_pago === 'transferencia' && data.bank_details) {
+                                const bankInfoDiv = document.createElement('div');
+                                // --- Add specific class for easier selection ---
+                                bankInfoDiv.classList.add('alert', 'alert-info', 'mt-3', 'bank-transfer-instructions');
+                                bankInfoDiv.innerHTML = `
+                                    <h5>Instrucciones para Transferencia Bancaria</h5>
+                                    <p>Por favor, realiza la transferencia a la siguiente cuenta para confirmar tu reserva:</p>
+                                    <pre>${data.bank_details.replace(/\n/g, '<br>')}</pre>
+                                    <p><strong>Importante:</strong> Tu reserva se mantendrá como pendiente hasta que confirmemos la recepción del pago.</p>
+                                `;
+                                // Insert bank info before the ID paragraph
+                                const reservaIdParagraph = document.getElementById('reservaIdText');
+                                if (reservaIdParagraph) {
+                                    successModalBody.insertBefore(bankInfoDiv, reservaIdParagraph);
+                                } else {
+                                    successModalBody.appendChild(bankInfoDiv); // Fallback
+                                }
                             }
                         }
 
