@@ -474,25 +474,25 @@ Email para comprobante: pagos@ejemplo.com</pre> {# Placeholder details #}
             console.log("Bank Transfer Checkout Success:", data);
             // Instead of showing modal, redirect to the detail page
             if (data.redirect_url) {
-                // Add a flag to indicate redirection is happening
-                window.location.href = data.redirect_url + '?redirecting=true';
-                // Don't hide processing here as we are redirecting
-                return; // Exit function after redirect starts
+                console.log("Redirect URL received:", data.redirect_url); 
+                console.log("Attempting redirect now using assign()...");
+                window.location.assign(data.redirect_url); // Use assign
+                // Log after attempting redirect (might not execute if redirect is immediate)
+                console.log("Redirect using assign() initiated."); 
+                // Don't hide processing here as we are redirecting.
+                return; // Exit function explicitly after starting redirect
             } else {
-                // Fallback if URL is missing (though it shouldn't be)
+                // Fallback if URL is missing (shouldn't happen)
                 console.error("Redirect URL missing in response.");
                 displaySuccessModal(data, 'transferencia'); // Show modal as fallback
+                // Hide processing if we fell back to the modal
+                hideProcessing(overlay, button); 
             }
         } catch (error) {
-            handleCheckoutError(error, overlay, button);
-        } finally {
-            // Hide processing only if we didn't redirect
-            // Check if the flag we added exists in the URL
-            const urlParams = new URLSearchParams(window.location.search);
-            if (!urlParams.has('redirecting')) {
-                 hideProcessing(overlay, button);
-            }
-        }
+            // Handle errors and ensure processing is hidden
+            handleCheckoutError(error, overlay, button); 
+        } 
+        // Removed the finally block here, hideProcessing is called within catch or fallback else
     }
 
     async function handleFlowCheckout(formData, overlay, button) {
