@@ -472,12 +472,26 @@ Email para comprobante: pagos@ejemplo.com</pre> {# Placeholder details #}
             });
             const data = await handleApiResponse(response); // Handles ok check and JSON parsing
             console.log("Bank Transfer Checkout Success:", data);
-            displaySuccessModal(data, 'transferencia');
+            // Instead of showing modal, redirect to the detail page
+            if (data.redirect_url) {
+                // Add a flag to indicate redirection is happening
+                window.location.href = data.redirect_url + '?redirecting=true';
+                // Don't hide processing here as we are redirecting
+                return; // Exit function after redirect starts
+            } else {
+                // Fallback if URL is missing (though it shouldn't be)
+                console.error("Redirect URL missing in response.");
+                displaySuccessModal(data, 'transferencia'); // Show modal as fallback
+            }
         } catch (error) {
             handleCheckoutError(error, overlay, button);
         } finally {
-            // Ensure overlay is hidden and button is reset in all cases for bank transfer
-            hideProcessing(overlay, button);
+            // Hide processing only if we didn't redirect
+            // Check if the flag we added exists in the URL
+            const urlParams = new URLSearchParams(window.location.search);
+            if (!urlParams.has('redirecting')) {
+                 hideProcessing(overlay, button);
+            }
         }
     }
 

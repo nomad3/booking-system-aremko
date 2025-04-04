@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import user_passes_test
 import csv
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse # Import reverse
 from datetime import datetime, timedelta
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
@@ -1197,16 +1198,17 @@ def complete_checkout(request):
                     request.session['cart'] = {'servicios': [], 'total': 0}
                     request.session.modified = True
                     
-                    # Return success response
+                    # Generate the detail URL
+                    detail_url = reverse('venta_reserva_detail', kwargs={'pk': venta.id})
+
+                    # Return success response including the detail URL
                     response_data = {
                         'success': True,
                         'message': 'Reserva creada exitosamente',
                         'reserva_id': venta.id,
-                        'metodo_pago': metodo_pago # Include payment method in response
+                        'metodo_pago': metodo_pago,
+                        'redirect_url': detail_url # Add the redirect URL
                     }
-                    # Removed bank_details_text from response
-                    # if bank_details_text:
-                    #     response_data['bank_details'] = bank_details_text
 
                     return JsonResponse(response_data)
                 finally:
