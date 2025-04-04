@@ -13,6 +13,7 @@ from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.urls import path
+import json # Import json module
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
@@ -324,32 +325,80 @@ class ClienteAdmin(admin.ModelAdmin):
     exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
 
 class ServicioAdminForm(forms.ModelForm):
+    # Use a TextArea for better JSON editing experience
     slots_input = forms.CharField(
-        widget=forms.TextInput(attrs={'placeholder': 'HH:MM separados por comas ej: 09:00,10:30'}),
-        help_text='''Horarios por día (JSON). Ej: {"monday": ["16:00", "18:00"], ...}'''
+        label="Horarios Disponibles por Día (JSON)", # More descriptive label
+        widget=forms.Textarea(attrs={'rows': 10, 'cols': 60, 'placeholder': '{\n    "monday": ["16:00", "18:00"],\n    "tuesday": [],\n    ...\n}'}),
+        help_text='''Define los slots por día en formato JSON. Claves: "monday", "tuesday", etc. Valores: listas de strings "HH:MM".'''
     )
 
     class Meta:
         model = Servicio
-        fields = '__all__' # Ensure all fields are included
+        # Exclude the original JSONField, we use slots_input instead
+        exclude = ('slots_disponibles',) 
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance and self.instance.slots_disponibles:
-            self.initial['slots_input'] = ', '.join(self.instance.slots_disponibles)
+        # Populate the text area with the JSON string representation of the dictionary
+        if self.instance and self.instance.pk:
+            # Ensure slots_disponibles is a dict before dumping
+            slots_data = self.instance.slots_disponibles if isinstance(self.instance.slots_disponibles, dict) else {}
+            try:
+                # Pretty print the JSON for better readability in the admin
+                self.initial['slots_input'] = json.dumps(slots_data, indent=4, ensure_ascii=False)
+            except TypeError:
+                 # Fallback if JSON serialization fails
+                 self.initial['slots_input'] = '{}'
+        # Don't set a default empty structure here, let the field be blank if no data
+        # elif not self.initial.get('slots_input'):
+        #      self.initial['slots_input'] = json.dumps({ ... }, indent=4)
+
 
     def clean_slots_input(self):
-        slots = [s.strip() for s in self.cleaned_data['slots_input'].split(',')]
-        for slot in slots:
-            try:
-                datetime.strptime(slot, "%H:%M")
-            except ValueError:
-                raise ValidationError(f"Formato inválido: {slot}. Use HH:MM")
-        return slots
+        """Validate the JSON input and the structure."""
+        slots_data_str = self.cleaned_data.get('slots_input', '{}') # Default to empty JSON if blank
+        try:
+            # Allow empty input, default to empty dict
+            if not slots_data_str.strip():
+                slots_data = {}
+            else:
+                slots_data = json.loads(slots_data_str)
+        except json.JSONDecodeError as e:
+            raise ValidationError(f"JSON inválido: {e}")
+
+        if not isinstance(slots_data, dict):
+            raise ValidationError("La entrada debe ser un diccionario JSON válido (ej: {\"monday\": [\"10:00\"]}).")
+
+        valid_days = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
+        
+        # Validate structure and time format
+        for day, slots in slots_data.items():
+            if day not in valid_days:
+                raise ValidationError(f"Clave de día inválida: '{day}'. Use nombres de días en inglés en minúsculas (monday, tuesday, etc.).")
+            
+            if not isinstance(slots, list):
+                raise ValidationError(f"El valor para '{day}' debe ser una lista de horarios (ej: [\"10:00\", \"11:30\"]).")
+                
+            for slot in slots:
+                if not isinstance(slot, str):
+                     raise ValidationError(f"El horario '{slot}' en '{day}' debe ser una cadena de texto (ej: \"10:00\").")
+                try:
+                    # Validate HH:MM format
+                    datetime.strptime(slot, "%H:%M") 
+                except ValueError:
+                    raise ValidationError(f"Formato de horario inválido: '{slot}' en '{day}'. Use HH:MM (ej: \"10:00\", \"14:30\").")
+        
+        # Optionally ensure all days are present, even if empty (good practice)
+        for day in valid_days:
+            slots_data.setdefault(day, []) # Use setdefault to add if missing
+
+        return slots_data # Return the validated dictionary
 
     def save(self, commit=True):
-        instance = super().save(commit=False)
-        instance.slots_disponibles = self.cleaned_data['slots_input']
+        # Save the form instance first to get the object
+        instance = super().save(commit=False) 
+        # Assign the cleaned dictionary from slots_input to the actual model field
+        instance.slots_disponibles = self.cleaned_data['slots_input'] 
         if commit:
             instance.save()
         return instance
