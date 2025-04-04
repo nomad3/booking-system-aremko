@@ -331,7 +331,9 @@ Email para comprobante: pagos@ejemplo.com</pre> {# Placeholder details #}
                 <p class="text-center">Hemos enviado un correo electrónico con los detalles de tu reserva.</p>
                 <p class="text-center" id="reservaIdText">ID de Reserva: <span id="reservaId"></span></p>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer justify-content-between"> 
+                {# Placeholder for the detail button - JS will add it here #}
+                <div id="detailButtonPlaceholder"></div> 
                 <a href="{% url 'homepage' %}" class="btn btn-primary">Volver al Inicio</a>
             </div>
         </div>
@@ -427,10 +429,33 @@ Email para comprobante: pagos@ejemplo.com</pre> {# Placeholder details #}
         const reservaIdSpan = document.getElementById('reservaId');
         const successModalEl = document.getElementById('successModal');
         const successModalBody = successModalEl ? successModalEl.querySelector('.modal-body') : null;
+        const modalFooter = successModalEl ? successModalEl.querySelector('.modal-footer') : null;
+        const detailButtonPlaceholder = document.getElementById('detailButtonPlaceholder');
 
+        // Set Reserva ID
         if (reservaIdSpan && data.reserva_id) {
             reservaIdSpan.textContent = data.reserva_id;
         }
+
+        // Add "Ver Detalle" button if URL exists and placeholder is found
+        if (data.redirect_url && detailButtonPlaceholder) {
+            // Remove any existing detail button first
+            const existingDetailBtn = detailButtonPlaceholder.querySelector('.btn-view-detail');
+            if (existingDetailBtn) {
+                existingDetailBtn.remove();
+            }
+
+            // Create new detail button
+            const detailBtn = document.createElement('a');
+            detailBtn.href = data.redirect_url;
+            detailBtn.textContent = 'Ver Detalle de Reserva';
+            detailBtn.className = 'btn btn-secondary btn-view-detail'; // Add specific class
+            detailButtonPlaceholder.appendChild(detailBtn); // Add the button
+        } else if (detailButtonPlaceholder) {
+             // Clear placeholder if no URL
+             detailButtonPlaceholder.innerHTML = '';
+        }
+
 
         if (successModalBody) {
             const existingBankInfo = successModalBody.querySelector('.bank-transfer-instructions');
@@ -472,22 +497,10 @@ Email para comprobante: pagos@ejemplo.com</pre> {# Placeholder details #}
             });
             const data = await handleApiResponse(response); // Handles ok check and JSON parsing
             console.log("Bank Transfer Checkout Success:", data);
-            // Instead of showing modal, redirect to the detail page
-            if (data.redirect_url) {
-                console.log("Redirect URL received:", data.redirect_url); 
-                console.log("Attempting redirect now using assign()...");
-                window.location.assign(data.redirect_url); // Use assign
-                // Log after attempting redirect (might not execute if redirect is immediate)
-                console.log("Redirect using assign() initiated."); 
-                // Don't hide processing here as we are redirecting.
-                return; // Exit function explicitly after starting redirect
-            } else {
-                // Fallback if URL is missing (shouldn't happen)
-                console.error("Redirect URL missing in response.");
-                displaySuccessModal(data, 'transferencia'); // Show modal as fallback
-                // Hide processing if we fell back to the modal
-                hideProcessing(overlay, button); 
-            }
+            // Show success modal instead of redirecting
+            displaySuccessModal(data, 'transferencia'); 
+            // Hide processing overlay after showing modal
+            hideProcessing(overlay, button); 
         } catch (error) {
             // Handle errors and ensure processing is hidden
             handleCheckoutError(error, overlay, button); 
