@@ -54,9 +54,9 @@
                         {% for reserva_servicio in venta.reservaservicios.all %}
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 <div>
-                                    {{ reserva_servicio.servicio.nombre }} (x{{ reserva_servicio.cantidad_personas }})<br>
+                                    {{ reserva_servicio.servicio.nombre }} {% if reserva_servicio.servicio.categoria %}({{ reserva_servicio.servicio.categoria.nombre }}){% endif %} (x{{ reserva_servicio.cantidad_personas }})<br>
                                     {# Format DateField without time specifiers #}
-                                    <small class="text-muted">{{ reserva_servicio.fecha_agendamiento|date:"Y-m-d" }} {{ reserva_servicio.hora_inicio }}</small> 
+                                    <small class="text-muted">{{ reserva_servicio.fecha_agendamiento|date:"Y-m-d" }} {{ reserva_servicio.hora_inicio }}</small>
                                 </div>
                                 {# Assuming subtotal is calculated correctly elsewhere or add it here #}
                                 <span class="badge bg-primary rounded-pill">${{ reserva_servicio.calcular_precio|intcomma }}</span>
