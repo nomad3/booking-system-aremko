@@ -23,11 +23,12 @@ admin.site.site_header = _("Sistema de Gestión de Ventas")
 admin.site.site_title = _("Panel de Administración")
 admin.site.index_title = _("Bienvenido al Panel de Control")
 
-# Formulario personalizado para elegir los slots de horas según el servicio
+# Formulario para ReservaServicioInline con hora_inicio como texto
 class ReservaServicioInlineForm(forms.ModelForm):
-    hora_inicio = forms.ChoiceField(
-        choices=[],
-        widget=forms.Select(attrs={'class': 'hora-inicio-select'})
+    # Cambiado a CharField para entrada de texto simple (ej: "14:00")
+    hora_inicio = forms.CharField(
+        max_length=5, 
+        widget=forms.TextInput(attrs={'placeholder': 'HH:MM'})
     )
     
     class Meta:
@@ -36,41 +37,8 @@ class ReservaServicioInlineForm(forms.ModelForm):
         
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
-        # Actualizar opciones del servicio
+        # Solo filtramos los servicios activos
         self.fields['servicio'].queryset = Servicio.objects.filter(activo=True)
-        
-        # Cargar slots si ya hay un servicio seleccionado
-        # Handle potential non-dict data gracefully
-        slots_disponibles_data = []
-        if self.instance and self.instance.servicio_id:
-            servicio = self.instance.servicio
-            if isinstance(servicio.slots_disponibles, dict): # Check if it's a dict
-                 # Example: Flatten all times from the dict into the choices
-                 all_times = set()
-                 for day_slots in servicio.slots_disponibles.values():
-                     if isinstance(day_slots, list):
-                         all_times.update(day_slots)
-                 slots_disponibles_data = sorted(list(all_times))
-            else:
-                 # Handle cases where it might be None or not a dict yet
-                 slots_disponibles_data = [] 
-                 
-        elif 'servicio' in self.initial:
-             try:
-                 servicio = Servicio.objects.get(pk=self.initial['servicio'])
-                 if isinstance(servicio.slots_disponibles, dict):
-                     all_times = set()
-                     for day_slots in servicio.slots_disponibles.values():
-                         if isinstance(day_slots, list):
-                             all_times.update(day_slots)
-                     slots_disponibles_data = sorted(list(all_times))
-                 else:
-                     slots_disponibles_data = []
-             except Servicio.DoesNotExist:
-                 slots_disponibles_data = []
-
-        self.fields['hora_inicio'].choices = [(t, t) for t in slots_disponibles_data]
 
 
 class ReservaServicioInline(admin.TabularInline):
@@ -92,9 +60,7 @@ class ReservaServicioInline(admin.TabularInline):
             kwargs["queryset"] = Servicio.objects.filter(activo=True).order_by('nombre')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-    class Media:
-        # Path relative to the app's static directory
-        js = ('js/reserva_servicio_admin.js',) 
+    # No Media class needed anymore as JS is removed
 
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
@@ -438,32 +404,7 @@ class ServicioAdmin(admin.ModelAdmin):
     # def slots_preview(self, obj): ...
     # slots_preview.short_description = 'Slots Disponibles' # Keep description if needed, but method is removed
 
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_urls = [
-            path('<int:pk>/slots/', self.admin_site.admin_view(self.get_slots))
-        ]
-        return custom_urls + urls
-    
-    def get_slots(self, request, pk):
-        try:
-            servicio = Servicio.objects.get(pk=pk)
-            slots_data = servicio.slots_disponibles or {} # Handle None case
-            all_times = set()
-            if isinstance(slots_data, dict):
-                for day_slots in slots_data.values():
-                    if isinstance(day_slots, list):
-                        all_times.update(day_slots)
-            
-            # Sort the times for consistent order
-            sorted_times = sorted(list(all_times)) 
-            return JsonResponse({'slots': sorted_times})
-        except Servicio.DoesNotExist:
-            return JsonResponse({'slots': []}, status=404)
-        except Exception as e:
-            # Log the error ideally
-            print(f"Error getting slots for service {pk}: {e}") 
-            return JsonResponse({'slots': []}, status=500)
+    # Removed get_urls and get_slots as they are no longer needed
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
