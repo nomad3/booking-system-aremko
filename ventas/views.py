@@ -1395,6 +1395,15 @@ def auditoria_movimientos_view(request):
     print(f"Usuario seleccionado: {usuario}")
     print(f"Query SQL: {movimientos.query}")
     print(f"Cantidad de resultados: {movimientos.count()}")
+
+    # Paginación
+    paginator = Paginator(movimientos, 100)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'movimientos': page_obj,
+        'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
         'tipo_movimiento': tipo_movimiento,
         'usuario_username': usuario,
@@ -1941,16 +1950,17 @@ def add_venta_reserva(request):
 
                 messages.success(request, 'Venta/Reserva creada exitosamente.')
                 if 'guardar_y_agregar' in request.POST:
-                    return redirect('admin:ventas_ventareserva_add')
-                else:
-                    return redirect('admin:ventas_ventareserva_changelist')
-            else:
-                messages.error(request, 'Por favor corrija los errores en el formulario.')
+                    return redirect('add_venta_reserva')
+                return redirect('venta_reserva_list')
         except Exception as e:
             messages.error(request, f'Error al crear la venta/reserva: {str(e)}')
-            return redirect('admin:ventas_ventareserva_add')
+    else:
+        form = VentaReservaForm()
 
-    return render(request, 'admin/ventas/ventareserva/change_form.html', {
-        'form': VentaReservaForm(),
-        'title': 'Agregar Venta/Reserva',
-    })
+    context = {
+        'form': form,
+        'clientes': Cliente.objects.all(),
+        'servicios': Servicio.objects.all(),
+        'productos': Producto.objects.all(),
+    }
+    return render(request, 'ventas/add_venta_reserva.html', context)

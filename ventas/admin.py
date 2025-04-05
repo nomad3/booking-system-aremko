@@ -14,6 +14,9 @@ from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.urls import path
 import json # Import json module
+import xlwt # Added for Excel export
+from django.core.paginator import Paginator
+from openpyxl import load_workbook
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
@@ -38,12 +41,37 @@ class ReservaServicioInlineForm(forms.ModelForm):
         self.fields['servicio'].queryset = Servicio.objects.filter(activo=True)
         
         # Cargar slots si ya hay un servicio seleccionado
+        # Handle potential non-dict data gracefully
+        slots_disponibles_data = []
         if self.instance and self.instance.servicio_id:
             servicio = self.instance.servicio
-            self.fields['hora_inicio'].choices = [(t, t) for t in servicio.slots_disponibles]
+            if isinstance(servicio.slots_disponibles, dict): # Check if it's a dict
+                 # Example: Flatten all times from the dict into the choices
+                 all_times = set()
+                 for day_slots in servicio.slots_disponibles.values():
+                     if isinstance(day_slots, list):
+                         all_times.update(day_slots)
+                 slots_disponibles_data = sorted(list(all_times))
+            else:
+                 # Handle cases where it might be None or not a dict yet
+                 slots_disponibles_data = [] 
+                 
         elif 'servicio' in self.initial:
-            servicio = Servicio.objects.get(pk=self.initial['servicio'])
-            self.fields['hora_inicio'].choices = [(t, t) for t in servicio.slots_disponibles]
+             try:
+                 servicio = Servicio.objects.get(pk=self.initial['servicio'])
+                 if isinstance(servicio.slots_disponibles, dict):
+                     all_times = set()
+                     for day_slots in servicio.slots_disponibles.values():
+                         if isinstance(day_slots, list):
+                             all_times.update(day_slots)
+                     slots_disponibles_data = sorted(list(all_times))
+                 else:
+                     slots_disponibles_data = []
+             except Servicio.DoesNotExist:
+                 slots_disponibles_data = []
+
+        self.fields['hora_inicio'].choices = [(t, t) for t in slots_disponibles_data]
+
 
 class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
@@ -53,8 +81,10 @@ class ReservaServicioInline(admin.TabularInline):
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
-        formset.form.base_fields['hora_inicio'].widget.can_add_related = False
-        formset.form.base_fields['hora_inicio'].widget.can_change_related = False
+        # Ensure hora_inicio field exists before modifying widget attributes
+        if 'hora_inicio' in formset.form.base_fields:
+            formset.form.base_fields['hora_inicio'].widget.can_add_related = False
+            formset.form.base_fields['hora_inicio'].widget.can_change_related = False
         return formset
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -325,50 +355,43 @@ class ClienteAdmin(admin.ModelAdmin):
     exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
 
 class ServicioAdminForm(forms.ModelForm):
-    # Use a TextArea for better JSON editing experience
-    slots_input = forms.CharField(
-        label="Horarios Disponibles por Día (JSON)", # More descriptive label
-        widget=forms.Textarea(attrs={'rows': 10, 'cols': 60, 'placeholder': '{\n    "monday": ["16:00", "18:00"],\n    "tuesday": [],\n    ...\n}'}),
-        help_text='''Define los slots por día en formato JSON. Claves: "monday", "tuesday", etc. Valores: listas de strings "HH:MM".'''
-    )
+    # We removed the extra 'slots_input' field. We now directly use the 'slots_disponibles' field.
 
     class Meta:
         model = Servicio
         fields = '__all__' # Include the actual model field
+        widgets = {
+            # Use a Textarea for the JSONField for easier editing
+            'slots_disponibles': forms.Textarea(attrs={'rows': 10, 'cols': 60, 'placeholder': '{\n    "monday": ["16:00", "18:00"],\n    "tuesday": [],\n    ...\n}'}),
+        }
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Populate the text area with the JSON string representation of the dictionary
-        if self.instance and self.instance.pk:
-            # Ensure slots_disponibles is a dict before dumping
-            slots_data = self.instance.slots_disponibles if isinstance(self.instance.slots_disponibles, dict) else {}
-            try:
-                # Pretty print the JSON for better readability in the admin
-                self.initial['slots_input'] = json.dumps(slots_data, indent=4, ensure_ascii=False)
-            except TypeError:
-                 # Fallback if JSON serialization fails
-                 self.initial['slots_input'] = '{}'
-        # Don't set a default empty structure here, let the field be blank if no data
-        # elif not self.initial.get('slots_input'):
-        #      self.initial['slots_input'] = json.dumps({ ... }, indent=4)
+    # No custom __init__ needed for this approach
 
-
-    def clean_slots_input(self):
-        """Validate the JSON input from the text area and return the dictionary."""
-        slots_data_str = self.cleaned_data.get('slots_input', '{}') # Get the raw string
-        try:
-            if not slots_data_str.strip():
-                slots_data = {}
-            else:
-                slots_data = json.loads(slots_data_str)
-        except json.JSONDecodeError as e:
-            raise ValidationError(f"JSON inválido: {e}")
-
-        if not isinstance(slots_data, dict):
-            raise ValidationError("La entrada debe ser un diccionario JSON válido (ej: {\"monday\": [\"10:00\"]}).")
-
-        valid_days = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
+    def clean_slots_disponibles(self):
+        """Validate the JSON input directly from the slots_disponibles field."""
+        slots_data = self.cleaned_data.get('slots_disponibles') 
         
+        # The default JSONField widget might already return a dict if input is valid JSON,
+        # but we should handle the case where it might be a string if invalid.
+        if isinstance(slots_data, str):
+            try:
+                # Try parsing if it's still a string (e.g., invalid JSON submitted)
+                if not slots_data.strip():
+                     slots_data = {}
+                else:
+                     slots_data = json.loads(slots_data)
+            except json.JSONDecodeError as e:
+                raise ValidationError(f"JSON inválido: {e}")
+        
+        # Ensure it's a dictionary after potential parsing
+        if not isinstance(slots_data, dict):
+            # Provide a default empty dict if it's None or not a dict somehow
+            slots_data = {} 
+            # Optionally raise an error if you require a dict structure
+            # raise ValidationError("La entrada debe ser un diccionario JSON válido.")
+
+        # Proceed with validation if we have a dictionary
+        valid_days = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
         for day, slots in slots_data.items():
             if day not in valid_days:
                 raise ValidationError(f"Clave de día inválida: '{day}'. Use nombres de días en inglés en minúsculas (monday, tuesday, etc.).")
@@ -385,28 +408,11 @@ class ServicioAdminForm(forms.ModelForm):
         for day in valid_days:
             slots_data.setdefault(day, [])
 
-        # Return the validated dictionary. It will be stored in cleaned_data['slots_input']
+        # Return the validated dictionary. This will be stored in cleaned_data['slots_disponibles']
         return slots_data
 
-    def clean(self):
-        """Assign the validated dictionary from slots_input to slots_disponibles."""
-        cleaned_data = super().clean()
-        # Get the dictionary validated by clean_slots_input
-        slots_dict = cleaned_data.get('slots_input') 
-        
-        # Assign the dictionary to the actual model field's cleaned data
-        if slots_dict is not None: # Check if clean_slots_input ran successfully
-             cleaned_data['slots_disponibles'] = slots_dict
-        else:
-             # Handle case where slots_input might be missing or failed cleaning earlier
-             # Assigning an empty dict might be safer depending on model null/blank settings
-             cleaned_data['slots_disponibles'] = {} 
-             # Optionally add a non-field error if needed
-             # self.add_error(None, "Error processing schedule input.")
-
-        return cleaned_data
-
-    # No custom save method needed anymore. Default save will use cleaned_data['slots_disponibles']
+    # No custom clean or save method needed anymore. 
+    # clean_slots_disponibles handles validation, and default save handles persistence.
 
 @admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
@@ -422,14 +428,15 @@ class ServicioAdmin(admin.ModelAdmin):
             'fields': (
                 'horario_apertura', 
                 'horario_cierre',
-                ('capacidad_maxima', 'slots_input')
+                'capacidad_maxima', 
+                'slots_disponibles' # Use the actual field name here
             )
         }),
     )
 
-    def slots_preview(self, obj):
-        return ', '.join(obj.slots_disponibles) if obj.slots_disponibles else '-'
-    slots_preview.short_description = 'Slots Disponibles'
+    # Remove slots_preview as the default widget shows the JSON now
+    # def slots_preview(self, obj): ...
+    # slots_preview.short_description = 'Slots Disponibles' # Keep description if needed, but method is removed
 
     def get_urls(self):
         urls = super().get_urls()
