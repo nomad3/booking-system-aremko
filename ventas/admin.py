@@ -93,8 +93,8 @@ class ReservaServicioInline(admin.TabularInline):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     class Media:
-        # Corrected path based on file structure
-        js = ('ventas/js/reserva_servicio_admin.js',) 
+        # Path relative to the app's static directory
+        js = ('js/reserva_servicio_admin.js',) 
 
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
