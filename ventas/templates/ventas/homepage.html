@@ -213,7 +213,12 @@
             {% for servicio in servicios %}
                 <div class="col-lg-4 col-md-6 service-card" data-category="{{ servicio.categoria.id }}">
                     <div class="card h-100">
-                        <img src="https://source.unsplash.com/random/300x200/?{{ servicio.nombre|urlencode }}" class="card-img-top" alt="{{ servicio.nombre }}">
+                        {% if servicio.imagen %}
+                            <img src="{{ servicio.imagen.url }}" class="card-img-top" alt="{{ servicio.nombre }}">
+                        {% else %}
+                            {# Optional: Add a default placeholder image if needed #}
+                            {# <img src="{% static 'path/to/default/image.png' %}" class="card-img-top" alt="{{ servicio.nombre }}"> #}
+                        {% endif %}
                         <div class="card-body">
                             <h5 class="card-title">{{ servicio.nombre }}</h5>
                             <p class="card-text">{{ servicio.categoria.nombre }}</p>

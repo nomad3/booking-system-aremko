@@ -446,8 +446,24 @@ class ServicioAdmin(admin.ModelAdmin):
         return custom_urls + urls
     
     def get_slots(self, request, pk):
-        servicio = Servicio.objects.get(pk=pk)
-        return JsonResponse({'slots': servicio.slots_disponibles})
+        try:
+            servicio = Servicio.objects.get(pk=pk)
+            slots_data = servicio.slots_disponibles or {} # Handle None case
+            all_times = set()
+            if isinstance(slots_data, dict):
+                for day_slots in slots_data.values():
+                    if isinstance(day_slots, list):
+                        all_times.update(day_slots)
+            
+            # Sort the times for consistent order
+            sorted_times = sorted(list(all_times)) 
+            return JsonResponse({'slots': sorted_times})
+        except Servicio.DoesNotExist:
+            return JsonResponse({'slots': []}, status=404)
+        except Exception as e:
+            # Log the error ideally
+            print(f"Error getting slots for service {pk}: {e}") 
+            return JsonResponse({'slots': []}, status=500)
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
