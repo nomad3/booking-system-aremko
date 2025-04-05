@@ -1265,17 +1265,23 @@ def get_available_hours(request):
     try:
         servicio = Servicio.objects.get(id=servicio_id)
         fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        print(f"[get_available_hours] Date requested: {fecha_obj}") # Debug date
         day_name = fecha_obj.strftime('%A').lower() # Get day name in English lowercase (e.g., 'monday')
+        print(f"[get_available_hours] Day name calculated: {day_name}") # Debug day name
 
         # --- Get slots for the specific day from the JSON field ---
+        print(f"[get_available_hours] Raw slots_disponibles from DB for service {servicio.id}: {servicio.slots_disponibles}") # Debug raw data
+        print(f"[get_available_hours] Type of slots_disponibles: {type(servicio.slots_disponibles)}") # Debug type
         # Ensure slots_disponibles is a dict
         daily_slots_config = servicio.slots_disponibles if isinstance(servicio.slots_disponibles, dict) else {}
+        print(f"[get_available_hours] Interpreted daily_slots_config: {daily_slots_config}") # Debug interpreted dict
         available_slots_for_day = daily_slots_config.get(day_name, []) # Get slots for the specific day, default to empty list
+        print(f"[get_available_hours] Slots found for {day_name}: {available_slots_for_day}") # Debug slots for the day
 
         if not available_slots_for_day:
              # If no specific slots defined for the day, maybe fallback or return empty?
              # For now, return empty if no slots are defined for that day.
-             print(f"No slots defined for service {servicio_id} on {day_name}")
+             print(f"[get_available_hours] No slots defined in JSON for service {servicio_id} on {day_name}")
              return JsonResponse({'success': True, 'horas_disponibles': []})
 
 
@@ -1284,13 +1290,16 @@ def get_available_hours(request):
             servicio=servicio,
             fecha_agendamiento=fecha_obj
         ).values_list('hora_inicio', flat=True)
-        booked_slots = set(reservas) # Convert to set for faster lookup
+        booked_slots = set(str(h) for h in reservas) # Ensure booked slots are strings for comparison
+        print(f"[get_available_hours] Booked slots for {fecha_obj}: {booked_slots}") # Debug booked slots
 
         # --- Filter available slots by removing booked ones ---
-        horas_disponibles = [hora for hora in available_slots_for_day if hora not in booked_slots]
+        horas_disponibles = [hora for hora in available_slots_for_day if str(hora) not in booked_slots]
+        print(f"[get_available_hours] Filtered available hours: {horas_disponibles}") # Debug filtered list
 
         # --- Sort the final list ---
         horas_disponibles.sort() # Sort alphabetically/numerically
+        print(f"[get_available_hours] Final sorted list: {horas_disponibles}") # Debug final list
 
         return JsonResponse({'success': True, 'horas_disponibles': horas_disponibles})
     except Servicio.DoesNotExist:
@@ -1386,15 +1395,6 @@ def auditoria_movimientos_view(request):
     print(f"Usuario seleccionado: {usuario}")
     print(f"Query SQL: {movimientos.query}")
     print(f"Cantidad de resultados: {movimientos.count()}")
-
-    # Paginación
-    paginator = Paginator(movimientos, 100)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-
-    context = {
-        'movimientos': page_obj,
-        'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
         'tipo_movimiento': tipo_movimiento,
         'usuario_username': usuario,
