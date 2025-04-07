@@ -383,19 +383,19 @@ class ServicioAdminForm(forms.ModelForm):
 @admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
     form = ServicioAdminForm
-    list_display = ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'activo', 'publicado_web', 'imagen') # Added tipo_servicio, publicado_web
-    list_filter = ('categoria', 'activo', 'publicado_web', 'tipo_servicio') # Added publicado_web, tipo_servicio
+    list_display = ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima', 'activo', 'publicado_web', 'imagen') # Added capacity fields
+    list_filter = ('categoria', 'activo', 'publicado_web', 'tipo_servicio')
     search_fields = ('nombre', 'categoria__nombre')
     fieldsets = (
         (None, {
-            'fields': ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'imagen', 'proveedor', 'activo', 'publicado_web') # Added tipo_servicio, publicado_web
+            'fields': ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima', 'imagen', 'proveedor', 'activo', 'publicado_web') # Added capacity fields
         }),
         ('Configuración Horaria', {
             'fields': (
-                'horario_apertura', 
+                'horario_apertura',
                 'horario_cierre',
-                'capacidad_maxima', 
-                'slots_disponibles' # Use the actual field name here
+                # 'capacidad_maxima', # Moved to main fieldset
+                'slots_disponibles'
             )
         }),
     )
