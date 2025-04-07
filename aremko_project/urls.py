@@ -1,19 +1,25 @@
 from django.contrib import admin
 from django.urls import path, include
-from ventas import views
-from ventas.views import servicios_vendidos_view
-from ventas.views import inicio_sistema_view
-from ventas.views import caja_diaria_view
-from ventas.views import auditoria_movimientos_view, venta_reserva_list, venta_reserva_detail
+from django.conf import settings # Import settings
+from django.conf.urls.static import static # Import static
+# Remove direct import of ventas.views
+# from ventas import views
+from django.contrib.auth import views as auth_views # Import auth views
+# Import the specific view function needed for the root URL
+from ventas.views.public_views import homepage_view
 
 urlpatterns = [
-    path('admin/', admin.site.urls),  # Esta línea es clave para registrar el namespace 'admin'
-    path('', inicio_sistema_view, name='inicio_sistema'),  # Nueva vista de inicio
-    path('ventas/', include('ventas.urls')),  # Incluye las urls de la app 'ventas'
-    path('servicios-vendidos/', servicios_vendidos_view, name='servicios_vendidos'),
-    path('caja-diaria/', caja_diaria_view, name='caja_diaria'),  # Nueva vista de caja diaria
-    path('auditoria-movimientos/', auditoria_movimientos_view, name='auditoria_movimientos'),  # Nueva vista de auditoría
-    path('venta_reservas/', views.venta_reserva_list, name='venta_reserva_list'),
-    path('venta_reservas/<int:pk>/', views.venta_reserva_detail, name='venta_reserva_detail'),
-    path('caja_diaria_recepcionistas/', views.caja_diaria_recepcionistas_view, name='caja_diaria_recepcionistas'),
+    path('admin/', admin.site.urls),
+    # Root URL pointing to the homepage view in its new location
+    path('', homepage_view, name='homepage'), # Use the directly imported view
+    # Include all URLs from the ventas app under the /ventas/ prefix
+    path('ventas/', include('ventas.urls')),
+    # Include Django auth urls
+    path('accounts/', include('django.contrib.auth.urls')), # Provides login, logout, etc.
+    # Removed redundant URL patterns previously defined here,
+    # as they are now handled within ventas.urls
 ]
+
+# Serve media files during development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

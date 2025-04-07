@@ -1,31 +1,40 @@
-<!-- ventas/templates/ventas/caja_diaria_recepcionistas.html -->
 {% extends "admin/base_site.html" %}
-
+{% load static %}
 {% load ventas_extras %}
+{% load humanize %} {# Load humanize #}
+
+{% block extrahead %}
+    {{ block.super }}
+    <!-- Modern Airbnb-style CSS -->
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+{% endblock %}
 
 {% block content %}
-{% include 'base_menu.html' %}
+{# Removed include 'base_menu.html' - Relying on admin base navigation #}
 
-<h1>Caja Diaria - Recepcionistas</h1>
+<div class="modern-container mt-4"> {# Use modern-container #}
+    <div class="page-header mb-4"> {# Use page-header #}
+        <h1>Caja Diaria - Recepcionistas</h1>
+    </div>
 
-<!-- Formulario de Filtro por Rango de Fechas, Usuario y Método de Pago -->
-<form method="get" class="form-inline mb-4">
-    <!-- Filtro de Fecha Inicio -->
-    <div class="form-group mr-2">
-        <label for="fecha_inicio" class="mr-2">Fecha Inicio:</label>
-        <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control">
-    </div>
-    
-    <!-- Filtro de Fecha Fin -->
-    <div class="form-group mr-2">
-        <label for="fecha_fin" class="mr-2">Fecha Fin:</label>
-        <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}" class="form-control">
-    </div>
-    
-    <!-- Filtro de Usuario -->
-    <div class="form-group mr-2">
-        <label for="usuario" class="mr-2">Usuario:</label>
-        <select id="usuario" name="usuario" class="form-control">
+    <!-- Filter Form -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-filter me-2"></i>Filtros
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-6 col-lg-3">
+                    <label for="fecha_inicio" class="form-label">Fecha Inicio:</label>
+                    <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control">
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="fecha_fin" class="form-label">Fecha Fin:</label>
+                    <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}" class="form-control">
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="usuario" class="form-label">Usuario:</label>
+                    <select id="usuario" name="usuario" class="form-select"> {# Use form-select #}
             <option value="">-- Todos los Usuarios --</option>
             {% for usuario in usuarios %}
                 <option value="{{ usuario.id }}" {% if usuario.id|stringformat:"s" == usuario_id %}selected{% endif %}>{{ usuario.username }}</option>
@@ -33,10 +42,9 @@
         </select>
     </div>
     
-    <!-- Filtro de Método de Pago -->
-    <div class="form-group mr-2">
-        <label for="metodo_pago" class="mr-2">Método de Pago:</label>
-        <select id="metodo_pago" name="metodo_pago" class="form-control">
+                <div class="col-md-6 col-lg-3">
+                    <label for="metodo_pago" class="form-label">Método de Pago:</label>
+                    <select id="metodo_pago" name="metodo_pago" class="form-select"> {# Use form-select #}
             <option value="">-- Todos los Métodos --</option>
             {% for codigo, nombre in METODOS_PAGO %}
                 <option value="{{ codigo }}" {% if codigo == metodo_pago %}selected{% endif %}>{{ nombre }}</option>
@@ -44,89 +52,119 @@
         </select>
     </div>
 
-    <!-- Botón de Filtrar -->
-    <button type="submit" class="btn btn-primary">Filtrar</button>
-</form>
+                <div class="col-12 text-center">
+                    <button type="submit" class="btn btn-modern btn-primary-modern">Filtrar</button> {# Use modern button #}
+                </div>
+            </form>
+        </div>
+    </div>
 
-<!-- Desglose de Pagos por Método de Pago -->
-<h2>Pagos por Método de Pago</h2>
-<table class="table table-bordered">
+    <!-- Desglose de Pagos por Método de Pago -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-chart-pie me-2"></i>Pagos por Método de Pago
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover mb-0"> {# Added table-hover #}
     <thead>
         <tr>
-            <th>Método de Pago</th>
-            <th>Total Monto</th>
-            <th>Cantidad de Transacciones</th> <!-- Nueva Columna -->
+            <th class="px-4 py-3">Método de Pago</th>
+            <th class="px-4 py-3 text-end">Total Monto</th> {# Align right #}
+            <th class="px-4 py-3 text-end">Cantidad de Transacciones</th> {# Align right #}
         </tr>
     </thead>
     <tbody>
         {% for pago in pagos_grouped %}
         <tr>
-            <td>{{ pago.metodo_pago }}</td>
-            <td>{{ pago.total_monto|formato_clp }}</td> <!-- Aplicar formato CLP -->
-            <td>{{ pago.cantidad_transacciones }}</td> <!-- Mostrar el Conteo -->
+            <td class="px-4 py-3">{{ pago.metodo_pago }}</td>
+            <td class="px-4 py-3 text-end">{{ pago.total_monto|intcomma }}</td> {# Use humanize #}
+            <td class="px-4 py-3 text-end">{{ pago.cantidad_transacciones }}</td>
         </tr>
         {% empty %}
         <tr>
-            <td colspan="3">No hay pagos en este rango de fechas.</td>
+            <td colspan="3" class="text-center py-4">No hay pagos que coincidan con los filtros.</td> {# Centered text #}
         </tr>
         {% endfor %}
     </tbody>
 </table>
+            </div>
+        </div>
+    </div>
 
-<!-- Pagos -->
-<h2>Pagos</h2>
-<table class="table table-striped">
+    <!-- Pagos -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-money-bill-wave me-2"></i>Listado de Pagos
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
     <thead>
         <tr>
-            <th>ID</th>
-            <th>Venta</th>
-            <th>Fecha Pago</th>
-            <th>Monto</th>
-            <th>Método de Pago</th> <!-- Nueva Columna -->
+            <th class="px-4 py-3">ID</th>
+            <th class="px-4 py-3">Venta ID</th>
+            <th class="px-4 py-3">Fecha Pago</th>
+            <th class="px-4 py-3 text-end">Monto</th> {# Align right #}
+            <th class="px-4 py-3">Método de Pago</th>
         </tr>
     </thead>
     <tbody>
         {% for pago in pagos %}
         <tr>
-            <td>{{ pago.id }}</td>
-            <td>{{ pago.venta_reserva }}</td>
-            <td>{{ pago.fecha_pago|date:"Y-m-d" }}</td>
-            <td>{{ pago.monto|formato_clp }}</td> <!-- Aplicar formato CLP -->
-            <td>{{ pago.metodo_pago }}</td> <!-- Mostrar Método de Pago -->
+            <td class="px-4 py-3">{{ pago.id }}</td>
+            <td class="px-4 py-3">{{ pago.venta_reserva.id }}</td> {# Show ID #}
+            <td class="px-4 py-3">{{ pago.fecha_pago|date:"Y-m-d" }}</td>
+            <td class="px-4 py-3 text-end">{{ pago.monto|intcomma }}</td> {# Use humanize #}
+            <td class="px-4 py-3">{{ pago.metodo_pago }}</td>
         </tr>
         {% empty %}
         <tr>
-            <td colspan="5">No hay pagos en este rango de fechas.</td>
+            <td colspan="5" class="text-center py-4">No hay pagos que coincidan con los filtros.</td> {# Centered text #}
         </tr>
         {% endfor %}
     </tbody>
 </table>
-<p><strong>Total Pagos:</strong> {{ total_pagos|formato_clp }}</p> <!-- Aplicar formato CLP -->
+            </div>
+        </div>
+        <div class="card-footer text-end"> {# Add footer for total #}
+            <strong>Total Pagos:</strong> {{ total_pagos|intcomma }}
+        </div>
+    </div>
 
-<!-- (Opcional) Gráfico de Pagos por Método de Pago -->
-<h2>Gráfico de Pagos por Método de Pago</h2>
-<canvas id="pagosChart" width="400" height="200"></canvas>
+    <!-- (Opcional) Gráfico de Pagos por Método de Pago -->
+    <div class="card">
+        <div class="card-header">
+             <i class="fas fa-chart-bar me-2"></i>Gráfico de Pagos por Método de Pago
+        </div>
+        <div class="card-body">
+            <canvas id="pagosChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+
+</div> {# End modern-container #}
 
 <!-- Incluir Chart.js desde CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    // Chart.js script remains here as admin base doesn't have extra_script block
     var ctx = document.getElementById('pagosChart').getContext('2d');
     var pagosChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: [{% for pago in pagos_grouped %}'{{ pago.metodo_pago }}',{% endfor %}],
+            labels: [{% for pago in pagos_grouped %}'{{ pago.metodo_pago }}'{% if not forloop.last %},{% endif %}{% endfor %}],
             datasets: [{
                 label: 'Total Monto',
-                data: [{% for pago in pagos_grouped %}{{ pago.total_monto }},{% endfor %}],
+                data: [{% for pago in pagos_grouped %}{{ pago.total_monto|default:0|add:0 }}{% if not forloop.last %},{% endif %}{% endfor %}], // Force numeric conversion
                 backgroundColor: 'rgba(54, 162, 235, 0.6)',
                 borderColor: 'rgba(54, 162, 235, 1)',
                 borderWidth: 1
             }, {
                 label: 'Cantidad de Transacciones',
-                data: [{% for pago in pagos_grouped %}{{ pago.cantidad_transacciones }},{% endfor %}],
+                data: [{% for pago in pagos_grouped %}{{ pago.cantidad_transacciones|default:0|add:0 }}{% if not forloop.last %},{% endif %}{% endfor %}], // Force numeric conversion
                 backgroundColor: 'rgba(255, 99, 132, 0.6)',
                 borderColor: 'rgba(255,99,132,1)',
-                borderWidth: 1
+                borderWidth: 1, // Added trailing comma
             }]
         },
         options: {

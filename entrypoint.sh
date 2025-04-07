@@ -53,6 +53,12 @@ echo "Base de datos está disponible."
 echo "Aplicando migraciones..."
 python manage.py migrate
 
+# Add this section to run populate_fake_data.py in dev environment only
+if [ "$ENVIRONMENT" = "development" ] || [ "$DJANGO_ENV" = "development" ]; then
+  echo "Ambiente de desarrollo detectado. Poblando datos falsos..."
+  python populate_fake_data.py
+fi
+
 # Crear superusuario si no existe
 echo "Creando superusuario si no existe..."
 python manage.py shell <<EOF
@@ -78,6 +84,6 @@ EOF
 echo "Recolectando archivos estáticos..."
 python manage.py collectstatic --noinput
 
-# Iniciar Gunicorn para servir la aplicación
-echo "Iniciando Gunicorn en el puerto $PORT..."
-exec gunicorn aremko_project.wsgi:application --bind 0.0.0.0:"$PORT"
+# Iniciar Gunicorn para servir la aplicación, binding explicitly to port 8000, 1 worker, debug logging
+echo "Iniciando Gunicorn en 0.0.0.0:8000 con 1 worker, timeout 120s, log-level debug..."
+exec gunicorn aremko_project.wsgi:application --bind 0.0.0.0:8000 --workers 1 --timeout 120 --log-level debug

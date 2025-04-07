@@ -9,45 +9,57 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.forms import DateInput, TimeInput, Select
 from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, GiftCard
-from django.http import HttpResponse
-import xlwt
+from django.http import HttpResponse, JsonResponse
+from django.core.exceptions import ValidationError
+from django.contrib import messages
+from django.urls import path
+import json # Import json module
+import xlwt # Added for Excel export
+from django.core.paginator import Paginator
+from openpyxl import load_workbook
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
 admin.site.site_title = _("Panel de Administración")
-admin.site.index_title = _("Bienvenido al Panel de Control")
 
-# Formulario personalizado para elegir los slots de horas según el servicio
+# Formulario para ReservaServicioInline con hora_inicio como texto
 class ReservaServicioInlineForm(forms.ModelForm):
+    # Cambiado a CharField para entrada de texto simple (ej: "14:00")
+    hora_inicio = forms.CharField(
+        max_length=5, 
+        widget=forms.TextInput(attrs={'placeholder': 'HH:MM'})
+    )
+    
     class Meta:
         model = ReservaServicio
-        fields = ['servicio', 'fecha_agendamiento', 'cantidad_personas']
+        fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas']
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Solo filtramos los servicios activos
+        self.fields['servicio'].queryset = Servicio.objects.filter(activo=True)
 
-    def clean_fecha_agendamiento(self):
-        """
-        Convertir el campo `fecha_agendamiento` en un objeto datetime si es necesario.
-        """
-        fecha_agendamiento = self.cleaned_data.get('fecha_agendamiento')
-
-        # Verificar si fecha_agendamiento es un string y convertirlo a datetime
-        if isinstance(fecha_agendamiento, str):
-            try:
-                fecha_agendamiento = datetime.strptime(fecha_agendamiento, '%Y-%m-%d %H:%M')
-                fecha_agendamiento = timezone.make_aware(fecha_agendamiento)  # Asegurarnos de que sea "aware"
-            except ValueError:
-                raise forms.ValidationError("El formato de la fecha de agendamiento no es válido. Debe ser YYYY-MM-DD HH:MM.")
-
-        return fecha_agendamiento
 
 class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
     form = ReservaServicioInlineForm
     extra = 1
+    min_num = 0
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        # Ensure hora_inicio field exists before modifying widget attributes
+        if 'hora_inicio' in formset.form.base_fields:
+            formset.form.base_fields['hora_inicio'].widget.can_add_related = False
+            formset.form.base_fields['hora_inicio'].widget.can_change_related = False
+        return formset
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "servicio":
-            kwargs["queryset"] = Servicio.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
+            kwargs["queryset"] = Servicio.objects.filter(activo=True).order_by('nombre')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    # No Media class needed anymore as JS is removed
 
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
@@ -88,8 +100,10 @@ class VentaReservaAdmin(admin.ModelAdmin):
         'productos_y_cantidades', 'total_servicios', 
         'total_productos', 'total', 'pagado', 'saldo_pendiente'
     )
+    # Restore the date filter
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
+    # Restore inlines
     inlines = [ReservaServicioInline, ReservaProductoInline, PagoInline]
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
@@ -194,11 +208,32 @@ class VentaReservaAdmin(admin.ModelAdmin):
     cliente_info.admin_order_field = 'cliente__nombre'
 
     def fecha_reserva_corta(self, obj):
+        # Ensure we handle potential None value and only format the date part
         if obj.fecha_reserva:
-            return obj.fecha_reserva.strftime('%Y-%m-%d')
+            # Use timezone.localtime to convert to local time before formatting
+            local_time = timezone.localtime(obj.fecha_reserva)
+            return local_time.strftime('%Y-%m-%d') # Format as date only
         return '-'
     fecha_reserva_corta.short_description = 'Fecha'
     fecha_reserva_corta.admin_order_field = 'fecha_reserva'
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        instance = form.instance
+        instance.calcular_total()  # Recalcular total después de guardar relaciones
+        
+        # Validar disponibilidad para reservas nuevas
+        if not change:
+            for reserva_servicio in instance.reservaservicios.all():
+                if not verificar_disponibilidad(
+                    servicio=reserva_servicio.servicio,
+                    fecha_propuesta=reserva_servicio.fecha_agendamiento,
+                    hora_propuesta=reserva_servicio.hora_inicio,
+                    cantidad_personas=reserva_servicio.cantidad_personas
+                ):
+                    messages.error(request, 
+                        f"Slot {reserva_servicio.hora_inicio} no disponible para {reserva_servicio.servicio.nombre}")
+                    reserva_servicio.delete()
 
     class Media:
         css = {
@@ -215,8 +250,11 @@ class DetalleCompraInline(admin.TabularInline):
     extra = 1
     autocomplete_fields = ['producto']
     fields = ['producto', 'descripcion', 'cantidad', 'precio_unitario']
-    # readonly_fields = ['producto']  # Elimina o comenta esta línea
-    show_change_link = False
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "producto":
+            kwargs["queryset"] = Producto.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 @admin.register(Compra)
 class CompraAdmin(admin.ModelAdmin):
@@ -281,8 +319,91 @@ class ClienteAdmin(admin.ModelAdmin):
 
     exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
 
+class ServicioAdminForm(forms.ModelForm):
+    # We removed the extra 'slots_input' field. We now directly use the 'slots_disponibles' field.
+
+    class Meta:
+        model = Servicio
+        fields = '__all__' # Include the actual model field
+        widgets = {
+            # Use a Textarea for the JSONField for easier editing
+            'slots_disponibles': forms.Textarea(attrs={'rows': 10, 'cols': 60, 'placeholder': '{\n    "monday": ["16:00", "18:00"],\n    "tuesday": [],\n    ...\n}'}),
+        }
+    
+    # No custom __init__ needed for this approach
+
+    def clean_slots_disponibles(self):
+        """Validate the JSON input directly from the slots_disponibles field."""
+        slots_data = self.cleaned_data.get('slots_disponibles') 
+        
+        # The default JSONField widget might already return a dict if input is valid JSON,
+        # but we should handle the case where it might be a string if invalid.
+        if isinstance(slots_data, str):
+            try:
+                # Try parsing if it's still a string (e.g., invalid JSON submitted)
+                if not slots_data.strip():
+                     slots_data = {}
+                else:
+                     slots_data = json.loads(slots_data)
+            except json.JSONDecodeError as e:
+                raise ValidationError(f"JSON inválido: {e}")
+        
+        # Ensure it's a dictionary after potential parsing
+        if not isinstance(slots_data, dict):
+            # Provide a default empty dict if it's None or not a dict somehow
+            slots_data = {} 
+            # Optionally raise an error if you require a dict structure
+            # raise ValidationError("La entrada debe ser un diccionario JSON válido.")
+
+        # Proceed with validation if we have a dictionary
+        valid_days = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
+        for day, slots in slots_data.items():
+            if day not in valid_days:
+                raise ValidationError(f"Clave de día inválida: '{day}'. Use nombres de días en inglés en minúsculas (monday, tuesday, etc.).")
+            if not isinstance(slots, list):
+                raise ValidationError(f"El valor para '{day}' debe ser una lista de horarios (ej: [\"10:00\", \"11:30\"]).")
+            for slot in slots:
+                if not isinstance(slot, str):
+                    raise ValidationError(f"El horario '{slot}' en '{day}' debe ser una cadena de texto (ej: \"10:00\").")
+                try:
+                    datetime.strptime(slot, "%H:%M")
+                except ValueError:
+                    raise ValidationError(f"Formato de horario inválido: '{slot}' en '{day}'. Use HH:MM (ej: \"10:00\", \"14:30\").")
+
+        for day in valid_days:
+            slots_data.setdefault(day, [])
+
+        # Return the validated dictionary. This will be stored in cleaned_data['slots_disponibles']
+        return slots_data
+
+    # No custom clean or save method needed anymore. 
+    # clean_slots_disponibles handles validation, and default save handles persistence.
+
+@admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'precio_base', 'duracion', 'categoria', 'proveedor')
+    form = ServicioAdminForm
+    list_display = ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima', 'activo', 'publicado_web', 'imagen') # Added capacity fields
+    list_filter = ('categoria', 'activo', 'publicado_web', 'tipo_servicio')
+    search_fields = ('nombre', 'categoria__nombre')
+    fieldsets = (
+        (None, {
+            'fields': ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima', 'imagen', 'proveedor', 'activo', 'publicado_web') # Added capacity fields
+        }),
+        ('Configuración Horaria', {
+            'fields': (
+                'horario_apertura',
+                'horario_cierre',
+                # 'capacidad_maxima', # Moved to main fieldset
+                'slots_disponibles'
+            )
+        }),
+    )
+
+    # Remove slots_preview as the default widget shows the JSON now
+    # def slots_preview(self, obj): ...
+    # slots_preview.short_description = 'Slots Disponibles' # Keep description if needed, but method is removed
+
+    # Removed get_urls and get_slots as they are no longer needed
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
@@ -305,9 +426,14 @@ class PagoAdmin(admin.ModelAdmin):
         registrar_movimiento(obj.venta_reserva.cliente, "Eliminación de Pago", descripcion, request.user)
         super().delete_model(request, obj)
 
+# Custom Admin for CategoriaServicio to show image field
+@admin.register(CategoriaServicio)
+class CategoriaServicioAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'imagen')
+    search_fields = ('nombre',)
+
 admin.site.register(CategoriaProducto, CategoriaProductoAdmin)
 admin.site.register(Producto, ProductoAdmin)
 admin.site.register(VentaReserva, VentaReservaAdmin)
 admin.site.register(Cliente, ClienteAdmin)
-admin.site.register(Servicio, ServicioAdmin)
-admin.site.register(CategoriaServicio)
+# CategoriaServicio is now registered with the custom class above

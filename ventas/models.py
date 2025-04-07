@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.signals import post_save, post_delete
@@ -54,12 +54,13 @@ class Compra(models.Model):
     METODOS_PAGO = [
         ('tarjeta', 'Tarjeta de Crédito/Débito'),
         ('efectivo', 'Efectivo'),
+        ('transferencia', 'Transferencia Bancaria'), # Added generic transfer option
         ('webpay', 'WebPay'),
         ('descuento', 'Descuento'),
         ('giftcard', 'GiftCard'),
         ('flow', 'FLOW'),
         ('mercadopago', 'MercadoPago'),
-        ('scotiabank', 'Tranferencia ScotiaBank'),
+        ('scotiabank', 'Transferencia ScotiaBank'), # Keep specific ones for admin use
         ('bancoestado', 'Transferencia BancoEstado'),
         ('cuentarut', 'Transferencia CuentaRut'),
         ('machjorge', 'mach jorge'),
@@ -169,6 +170,7 @@ class DetalleCompra(models.Model):
 class CategoriaServicio(models.Model):
     nombre = models.CharField(max_length=100)
     horarios = models.CharField(max_length=200, help_text="Ingresa los horarios disponibles separados por comas. Ejemplo: 14:00, 15:30, 17:00", blank=True)
+    imagen = models.ImageField(upload_to='categorias/', blank=True, null=True, help_text="Imagen para la categoría")
 
     def __str__(self):
         return self.nombre
@@ -176,17 +178,46 @@ class CategoriaServicio(models.Model):
 class Servicio(models.Model):
     nombre = models.CharField(max_length=100)
     precio_base = models.DecimalField(max_digits=10, decimal_places=0)
-    duracion = models.DurationField(default=timedelta(hours=2))
+    duracion = models.PositiveIntegerField(help_text="Duración en minutos")
     categoria = models.ForeignKey(CategoriaServicio, on_delete=models.SET_NULL, null=True)
-    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True)
+    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True) # Allow blank provider
+    capacidad_minima = models.PositiveIntegerField(default=1, help_text="Mínimo de personas para reservar")
+    capacidad_maxima = models.PositiveIntegerField(default=1, help_text="Máximo de personas permitidas")
+    horario_apertura = models.TimeField(default='09:00')
+    horario_cierre = models.TimeField(default='23:59')
+    slots_disponibles = models.JSONField(default=list, help_text="Horarios disponibles en formato HH:MM")
+    activo = models.BooleanField(
+        default=True,
+        help_text="Indica si el servicio está disponible para reservas (uso interno)"
+    )
+    publicado_web = models.BooleanField(
+        default=True,
+        help_text="Marcar si este servicio debe ser visible y reservable en la página web pública."
+    )
+    TIPO_SERVICIO_CHOICES = [
+        ('tina', 'Tina'),
+        ('masaje', 'Masaje'),
+        ('cabana', 'Cabaña'),
+        ('otro', 'Otro'),
+    ]
+    tipo_servicio = models.CharField(
+        max_length=10,
+        choices=TIPO_SERVICIO_CHOICES,
+        default='otro',
+        help_text="Tipo de servicio para aplicar lógicas específicas (ej. precios, horarios)."
+    )
+    imagen = models.ImageField(upload_to='servicios/', blank=True, null=True, help_text="Imagen para el servicio")
 
     def __str__(self):
         return self.nombre
 
+    def horario_valido(self, hora_propuesta):
+        return hora_propuesta in self.slots_disponibles
+
 class Cliente(models.Model):
     nombre = models.CharField(max_length=100)
-    email = models.EmailField()
-    telefono = models.CharField(max_length=20)
+    email = models.EmailField(blank=True, null=True) # Allow blank email if phone is primary
+    telefono = models.CharField(max_length=20, unique=True, help_text="Número de teléfono único (formato internacional preferido)") # Add unique=True
     documento_identidad = models.CharField(max_length=20, null=True, blank=True, verbose_name="ID/DNI/Passport/RUT")
     pais = models.CharField(max_length=100, null=True, blank=True)
     ciudad = models.CharField(max_length=100, null=True, blank=True)
@@ -323,12 +354,13 @@ class Pago(models.Model):
     METODOS_PAGO = [
         ('tarjeta', 'Tarjeta de Crédito/Débito'),
         ('efectivo', 'Efectivo'),
+        ('transferencia', 'Transferencia Bancaria'), # Added generic transfer option
         ('webpay', 'WebPay'),
         ('descuento', 'Descuento'),
         ('giftcard', 'GiftCard'),
         ('flow', 'FLOW'),
         ('mercadopago', 'MercadoPago'),
-        ('scotiabank', 'Tranferencia ScotiaBank'),
+        ('scotiabank', 'Transferencia ScotiaBank'), # Keep specific ones for admin use
         ('bancoestado', 'Transferencia BancoEstado'),
         ('cuentarut', 'Transferencia CuentaRut'),
         ('machjorge', 'mach jorge'),
@@ -414,11 +446,30 @@ class ReservaProducto(models.Model):
 class ReservaServicio(models.Model):
     venta_reserva = models.ForeignKey(VentaReserva, on_delete=models.CASCADE, related_name='reservaservicios')
     servicio = models.ForeignKey(Servicio, on_delete=models.CASCADE)
-    fecha_agendamiento = models.DateTimeField(default=timezone.now)
-    cantidad_personas = models.PositiveIntegerField(default=1)
+    fecha_agendamiento = models.DateField()
+    hora_inicio = models.CharField(max_length=5)
+    # Default to 1, but enforce max 2 for cabins during booking if needed
+    cantidad_personas = models.PositiveIntegerField(default=1) 
+
+    @property
+    def fecha_hora_completa(self):
+        return timezone.make_aware(
+            datetime.combine(self.fecha_agendamiento, datetime.strptime(self.hora_inicio, "%H:%M").time())
+        )
 
     def __str__(self):
-        return f"{self.servicio.nombre} reservado para {self.fecha_agendamiento}"
+        return f"{self.servicio.nombre} reservado para {self.fecha_agendamiento} {self.hora_inicio}"
 
     def calcular_precio(self):
-        return self.servicio.precio_base * self.cantidad_personas
+        """Calcula el precio basado en el tipo de servicio."""
+        if self.servicio.tipo_servicio == 'cabana':
+            # Precio fijo para cabañas, independientemente de las personas (max 2)
+            return self.servicio.precio_base
+        else:
+            # Precio normal basado en personas para otros servicios
+            return self.servicio.precio_base * self.cantidad_personas
+    
+    # Add subtotal property for consistency in templates if needed
+    @property
+    def subtotal(self):
+        return self.calcular_precio()

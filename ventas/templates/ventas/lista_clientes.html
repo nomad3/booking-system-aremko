@@ -1,22 +1,30 @@
 {% extends "admin/base_site.html" %}
 {% load static %}
 
+{% block extrahead %}
+    {{ block.super }}
+    <!-- Modern Airbnb-style CSS -->
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-    <h1>Lista de Clientes</h1>
+<div class="modern-container mt-4"> {# Use modern-container #}
+    <div class="page-header"> {# Add page header consistent with inicio_sistema #}
+        <h1>Lista de Clientes</h1>
+    </div>
 
     <!-- Filtros de búsqueda -->
     <form method="GET" action="" class="form-inline mb-4">
         <div class="form-group mx-sm-3 mb-2">
             <input type="text" class="form-control" id="search" name="search" 
-                   value="{{ search_query }}" placeholder="Buscar por nombre, teléfono o email">
+                    value="{{ search_query }}" placeholder="Buscar por nombre, teléfono o email">
         </div>
-        <button type="submit" class="btn btn-primary mb-2">Buscar</button>
+        <button type="submit" class="btn btn-modern btn-primary-modern mb-2">Buscar</button> {# Use modern button #}
         <div class="mb-3">
-            <a href="{% url 'exportar_clientes_excel' %}" class="btn btn-success">
+            <a href="{% url 'exportar_clientes_excel' %}" class="btn btn-modern btn-success-modern"> {# Use modern button #}
                 <i class="fas fa-file-excel"></i> Exportar a Excel
             </a>
-            <a href="{% url 'importar_clientes_excel' %}" class="btn btn-primary">
+            <a href="{% url 'importar_clientes_excel' %}" class="btn btn-modern btn-warning-modern"> {# Use modern button (warning for import?) #}
                 <i class="fas fa-upload"></i> Importar desde Excel
             </a>
         </div>
@@ -79,15 +87,5 @@
     </nav>
     {% endif %}
 </div>
-
-{% block extrahead %}
-<style>
-    .container { margin-top: 20px; }
-    .btn-success { margin-left: 10px; }
-    .form-inline { display: flex; align-items: center; gap: 10px; }
-    .table { margin-top: 20px; }
-    .pagination { margin-top: 20px; }
-</style>
 {% endblock %}
-
-{% endblock %} 
+{# Removed inline style block as styles should come from base or modern.css #}

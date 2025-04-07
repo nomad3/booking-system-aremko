@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize', # Add humanize app
     'ventas',
     'rest_framework',
     'rest_framework.authtoken',
@@ -55,8 +56,10 @@ ROOT_URLCONF = 'aremko_project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'ventas', 'templates')],
-        'APP_DIRS': True,
+        # Standard practice: Point DIRS to a project-level templates directory
+        # Even if it doesn't exist, APP_DIRS=True will still find app templates.
+        'DIRS': [BASE_DIR / 'templates'],
+        'APP_DIRS': True, # This allows Django to find templates in installed apps (like admin)
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -67,6 +70,7 @@ TEMPLATES = [
                 'django.template.context_processors.static',
                 'django.template.context_processors.tz',
                 'django.contrib.messages.context_processors.messages',  # Necesario
+                'ventas.context_processors.categorias_processor', # Add category processor
             ],
         },
     },
@@ -91,6 +95,10 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Media files configuration (for ImageField)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
 REST_FRAMEWORK = {

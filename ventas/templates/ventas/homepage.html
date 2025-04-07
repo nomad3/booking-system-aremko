@@ -1,0 +1,733 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+{% load humanize %} {# Load humanize template tags #}
+{% load ventas_extras %} {# Load custom filters #}
+
+{% block title %}Aremko Spa Puerto Varas: Masajes, Tinajas y Alojamiento{% endblock %} {# SEO Title #}
+
+{% block meta_description %}
+<meta name="description" content="Descubre Aremko, tu spa en Puerto Varas. Ofrecemos masajes relajantes, tinajas calientes privadas y alojamiento confortable en la Región de Los Lagos. ¡Reserva tu escapada!">
+{% endblock %}
+
+{% block extra_style %}
+<style>
+/* Homepage specific styles */
+.hero-section {
+    /* Updated background image for spa/wellness theme */
+    background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://images.unsplash.com/photo-1515377905703-c478cb051af4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80'); /* Example: Hot tub */
+    background-size: cover;
+    background-position: center;
+    color: white;
+    padding: 100px 0;
+    margin-bottom: 50px;
+}
+
+.hero-content {
+    max-width: 600px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.hero-content h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+
+.hero-content p {
+    font-size: 1.2rem;
+    margin-bottom: 30px;
+}
+
+.features-section {
+    padding: 80px 0;
+    background-color: white;
+}
+
+.feature-box {
+    text-align: center;
+    padding: 30px 20px;
+}
+
+.feature-icon {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: 20px;
+}
+
+.feature-title {
+    font-weight: 700;
+    margin-bottom: 15px;
+}
+
+.testimonials-section {
+    padding: 80px 0;
+    background-color: #f8f9fa;
+}
+
+.testimonial-card {
+    padding: 30px;
+    border-radius: 12px;
+    background-color: white;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    margin-bottom: 30px;
+}
+
+.testimonial-text {
+    font-style: italic;
+    margin-bottom: 20px;
+}
+
+.testimonial-author {
+    font-weight: 700;
+}
+
+/* Responsive adjustments for hero */
+@media (max-width: 768px) {
+    .hero-content h1 {
+        font-size: 2.5rem;
+    }
+}
+
+/* Styles for new sections */
+.philosophy-section {
+    background-color: #ffffff; /* White background */
+}
+
+.gallery-section {
+    background-color: #f8f9fa; /* Light gray background */
+}
+.gallery-section img {
+    transition: transform 0.3s ease;
+}
+.gallery-section img:hover {
+    transform: scale(1.05);
+}
+
+.cta-section {
+    /* background-color: var(--primary-color); /* Already set via class */
+    /* color: white; /* Already set via class */
+}
+.cta-section h2 {
+    font-weight: 700;
+}
+
+/* General section title styling (if not already in base) */
+.section-title {
+    text-align: center;
+    font-weight: 700;
+    color: var(--dark-gray);
+    position: relative;
+    padding-bottom: 15px;
+    margin-bottom: 40px; /* Add consistent bottom margin */
+}
+.section-title::after {
+    content: '';
+    position: absolute;
+    display: block;
+    width: 60px;
+    height: 3px;
+    background: var(--primary-color);
+    bottom: 0;
+    left: calc(50% - 30px);
+}
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
+            <div class="hero-content">
+                <h1>Tu Escapada Perfecta: Masajes, Tinas y Alojamiento</h1> {# New heading #}
+                <p>Desconectate y recargate energías con nuestros masajes relajantes, tinas calientes y preciosas opciones de alojamiento.</p> {# New text #}
+                <a href="#servicios" class="btn btn-primary btn-lg">
+                    <i class="fas fa-concierge-bell me-2"></i>Explorar Experiencias {# New icon and text #}
+                </a>
+            </div>
+        </div>
+    </section>
+
+<!-- Our Philosophy Section -->
+<section class="philosophy-section py-5">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-6 mb-4 mb-md-0">
+                <img src="https://images.unsplash.com/photo-1515377905703-c478cb051af4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow" alt="Tina Caliente Relajante Aremko"> {# Changed image to hot tub focus #}
+            </div>
+            <div class="col-md-6">
+                <h2 class="section-title mb-3">Tu Refugio de Relajación en Puerto Varas</h2> {# Added location #}
+                <p class="lead">En Aremko Spa Puerto Varas, combinamos la serenidad del alojamiento confortable con la terapia rejuvenecedora de masajes expertos y la calidez de nuestras tinajas calientes en la Región de Los Lagos.</p> {# Added keywords #}
+                <p>Nuestro objetivo es ofrecerte una experiencia completa de desconexión. Ya sea que busques aliviar tensiones con un masaje, sumergirte en nuestras tinajas bajo las estrellas o simplemente descansar en un entorno tranquilo, aquí encontrarás tu espacio ideal.</p> {# Adjusted 'tina caliente' to 'tinajas' #}
+                <a href="#caracteristicas" class="btn btn-outline-primary mt-3">Descubre los Beneficios</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Service Categories Section -->
+<section class="container my-5" id="categorias-servicios">
+    <h2 class="section-title mb-4">Explora Nuestros Servicios</h2>
+    <div class="row">
+        {% for categoria in categorias %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 text-center">
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <h5 class="card-title">{{ categoria.nombre }}</h5>
+                    {# Link to the category detail page #}
+                    <a href="{% url 'categoria_detail' categoria.id %}" class="btn btn-outline-primary mt-auto">Ver Servicios</a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <p class="text-center">No hay categorías de servicios disponibles en este momento.</p>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Services Section -->
+<section class="container mb-5" id="servicios">
+    <h2 class="section-title mb-4">Nuestros Servicios</h2>
+    
+        <!-- Category Filter -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-center flex-wrap">
+                    <button class="btn btn-outline-secondary m-1 category-filter active" data-category="all">
+                        Todos
+                    </button>
+                    {% for categoria in categorias %}
+                        <button class="btn btn-outline-secondary m-1 category-filter" data-category="{{ categoria.id }}">
+                            {{ categoria.nombre }}
+                        </button>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            {% for servicio in servicios %}
+                <div class="col-lg-4 col-md-6 service-card" data-category="{{ servicio.categoria.id }}">
+                    <div class="card h-100">
+                        {% if servicio.imagen %}
+                            <img src="{{ servicio.imagen.url }}" class="card-img-top" alt="{{ servicio.nombre }}">
+                        {% else %}
+                            {# Optional: Add a default placeholder image if needed #}
+                            {# <img src="{% static 'path/to/default/image.png' %}" class="card-img-top" alt="{{ servicio.nombre }}"> #}
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title">{{ servicio.nombre }}</h5>
+                            <p class="card-text">{{ servicio.categoria.nombre }}</p>
+                            {% if servicio.tipo_servicio == 'cabana' %}
+                                <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
+                            {% else %}
+                                <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p> {# Apply filters #}
+                            {% endif %}
+                            <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p> {# Use custom filter #}
+                            <button class="btn btn-primary w-100 js-open-booking-modal"
+                                    data-servicio-id="{{ servicio.id }}"
+                                    data-servicio-nombre="{{ servicio.nombre|escapejs }}"
+                                    data-servicio-precio="{{ servicio.precio_base }}"
+                                    data-servicio-tipo="{{ servicio.tipo_servicio }}"> {# Add service type #}
+                                <i class="fas fa-calendar-plus me-2"></i>Reservar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+<!-- Features Section -->
+<section class="features-section" id="caracteristicas">
+    <div class="container">
+        <h2 class="section-title mb-5">Experiencias Aremko</h2> {# Updated section title #}
+        <div class="row">
+                <div class="col-lg-3 col-md-6">
+                    <div class="feature-box">
+                        <div class="feature-icon">
+                            <i class="fas fa-hand-sparkles"></i> {# Massage icon #}
+                        </div>
+                        <h4 class="feature-title">Masajes Terapéuticos</h4>
+                        <p>Libera tensiones y revitaliza tu cuerpo con nuestras técnicas de masaje expertas en nuestro spa de Puerto Varas.</p> {# Added keyword context #}
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="feature-box">
+                        <div class="feature-icon">
+                            <i class="fas fa-hot-tub"></i> {# Hot tub icon #}
+                        </div>
+                        <h4 class="feature-title">Tinajas Calientes Puerto Varas</h4> {# Added keyword #}
+                        <p>Sumérgete en la calidez y relájate profundamente en nuestras tinajas privadas en la Región de Los Lagos.</p> {# Added keyword context #}
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="feature-box">
+                        <div class="feature-icon">
+                            <i class="fas fa-bed"></i> {# Accommodation icon #}
+                        </div>
+                        <h4 class="feature-title">Alojamiento De Lujo</h4>
+                        <p>Descansa en nuestros espacios acogedores diseñados para tu tranquilidad cerca de Puerto Varas.</p> {# Added location context #}
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="feature-box">
+                        <div class="feature-icon">
+                            <i class="fas fa-calendar-alt"></i> {# Booking icon (kept) #}
+                        </div>
+                        <h4 class="feature-title">Reserva Fácil</h4>
+                        <p>Agenda tu escapada de relajación en Aremko Spa de forma rápida y sencilla online.</p> {# Added brand/keyword #}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+<!-- Image Gallery Section -->
+<section class="gallery-section py-5 bg-light">
+    <div class="container">
+        <h2 class="section-title mb-5 text-center">Nuestros Espacios</h2> {# Updated title #}
+        <div class="row">
+            <div class="col-md-4 mb-4">
+                <img src="https://images.unsplash.com/photo-1519823551278-64ac92734fb1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Sala de Masajes Relajante"> {# Massage focus #}
+            </div>
+            <div class="col-md-4 mb-4">
+                <img src="https://images.unsplash.com/photo-1584592487903-6d47417a141f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Tina Caliente Privada"> {# Hot tub focus #}
+            </div>
+            <div class="col-md-4 mb-4">
+                <img src="https://images.unsplash.com/photo-1560185893-a55ec67692d9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Habitación Acogedora"> {# Accommodation focus #}
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Testimonials Section -->
+<section class="testimonials-section" id="testimonios">
+    <div class="container">
+        <h2 class="section-title mb-5">Lo que dicen nuestros clientes</h2>
+        <div class="row">
+                <div class="col-lg-4 col-md-6">
+                    <div class="testimonial-card">
+                        <div class="testimonial-text">
+                            "Excelente servicio. La reserva fue muy fácil y el servicio superó mis expectativas. Definitivamente volveré a reservar."
+                        </div>
+                        <div class="testimonial-author">- María González</div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="testimonial-card">
+                        <div class="testimonial-text">
+                            "Me encantó la facilidad para reservar. El personal fue muy amable y profesional. Recomiendo ampliamente sus servicios."
+                        </div>
+                        <div class="testimonial-author">- Juan Pérez</div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="testimonial-card">
+                        <div class="testimonial-text">
+                            "La mejor experiencia que he tenido. El sistema de reservas es muy intuitivo y el servicio fue de primera calidad."
+                        </div>
+                        <div class="testimonial-author">- Ana Rodríguez</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+<!-- Final CTA Section -->
+<section class="cta-section text-center py-5 bg-primary text-white">
+    <div class="container">
+        <h2 class="mb-3">Reserva Tu Experiencia Aremko</h2> {# Updated title #}
+        <p class="lead mb-4">Disfruta de nuestros masajes, sumérgete en las tinas calientes o quédate en nuestro tranquilo alojamiento. ¡Tu escapada ideal te espera!</p> {# Updated text #}
+        <a href="#servicios" class="btn btn-light btn-lg">
+            <i class="fas fa-calendar-check me-2"></i>Ver Disponibilidad y Reservar {# Updated button text #}
+        </a>
+    </div>
+</section>
+
+{# Removed potentially extraneous closing tags #}
+{% endblock %}
+
+{% block modals %}
+<!-- Booking Modal (Specific to homepage, keep it here) -->
+    <div class="modal fade" id="bookingModal" tabindex="-1" aria-labelledby="bookingModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bookingModalLabel">Reservar Servicio</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="bookingForm" class="booking-form">
+                        <input type="hidden" id="servicioId" name="servicio_id">
+                        
+                        <div class="mb-3">
+                            <label for="servicioNombre" class="form-label">Servicio</label>
+                            <input type="text" class="form-control" id="servicioNombre" readonly>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="fecha" class="form-label">Fecha</label>
+                            <input type="text" class="form-control" id="fecha" name="fecha" placeholder="Selecciona una fecha" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="hora" class="form-label">Hora</label>
+                            <select class="form-select" id="hora" name="hora" required>
+                                <option value="">Selecciona una hora</option>
+                                <!-- Las horas disponibles se cargarán dinámicamente -->
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="cantidadPersonas" class="form-label">Cantidad de Personas</label>
+                            <select class="form-select" id="cantidadPersonas" name="cantidad_personas">
+                                <option value="1">1 persona</option>
+                                <option value="2">2 personas</option>
+                                <option value="3">3 personas</option>
+                                <option value="4">4 personas</option>
+                                <option value="5">5 personas</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="precioTotal" class="form-label">Precio Total</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="text" class="form-control" id="precioTotal" readonly>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="addToCartBtn">Agregar al Carrito</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{# Checkout and Success modals are now in base_public.html #}
+{% endblock %}
+
+{% block extra_script %}
+<script>
+    // Helper function to format numbers as CLP (dot for thousands, no decimals)
+    function formatCLP(value) {
+      const numberValue = Number(value);
+      if (isNaN(numberValue)) {
+        return '0'; // Return '0' if not a valid number
+      }
+      // Use Intl.NumberFormat for Chilean Spanish locale formatting
+      return new Intl.NumberFormat('es-CL', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(numberValue);
+    }
+
+    // Removed global openBookingModal function
+
+    // Variables globales específicas de la homepage
+    let currentServicioId = null;
+    let currentServicioNombre = null;
+    let currentServicioPrecio = 0;
+    let currentServicioTipo = 'otro'; // Add type, default to 'otro'
+
+    // Función para cargar horas disponibles (específica de homepage)
+    function loadAvailableHours(servicioId, fecha) {
+        console.log("Loading available hours for:", servicioId, fecha);
+        const horaSelect = document.getElementById('hora');
+        if (!horaSelect) {
+            console.error("Hora select element not found");
+            return;
+        }
+        horaSelect.innerHTML = '<option value="">Cargando horas disponibles...</option>';
+        horaSelect.disabled = true; // Disable while loading
+
+        fetch(`{% url 'get_available_hours' %}?servicio_id=${servicioId}&fecha=${fecha}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Available hours response:", data);
+                horaSelect.innerHTML = '<option value="">Selecciona una hora</option>';
+                if (data.success && data.horas_disponibles.length > 0) {
+                    data.horas_disponibles.forEach(hora => {
+                        const option = document.createElement('option');
+                        option.value = hora;
+                        option.textContent = hora;
+                        horaSelect.appendChild(option);
+                    });
+                    horaSelect.disabled = false; // Enable after loading
+                } else {
+                    horaSelect.innerHTML = '<option value="">No hay horas disponibles</option>';
+                    console.warn('No available hours found or error:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching available hours:', error);
+                horaSelect.innerHTML = '<option value="">Error al cargar horas</option>';
+                // Keep disabled on error
+            });
+    }
+
+    // Función para actualizar el precio total (específica de homepage)
+    function updatePrecioTotal() {
+        const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
+        const precioTotalInput = document.getElementById('precioTotal');
+        if (cantidadPersonasSelect && precioTotalInput) {
+            const cantidadPersonas = parseInt(cantidadPersonasSelect.value);
+            let precioTotal = 0;
+            // Calculate price based on service type
+            if (currentServicioTipo === 'cabana') {
+                precioTotal = currentServicioPrecio; // Fixed price for cabin
+            } else {
+                precioTotal = currentServicioPrecio * cantidadPersonas; // Price per person for others
+            }
+            precioTotalInput.value = formatCLP(precioTotal);
+            console.log("Updated total price:", formatCLP(precioTotal), "for type:", currentServicioTipo);
+        }
+        // Also validate the slot when quantity changes, if time is already selected
+        const horaSelect = document.getElementById('hora');
+        if (horaSelect && horaSelect.value) {
+            validateSelectedSlot();
+        }
+    }
+
+    // Function to check availability of the selected slot
+    async function validateSelectedSlot() {
+        const servicioId = document.getElementById('servicioId').value;
+        const fecha = document.getElementById('fecha').value;
+        const hora = document.getElementById('hora').value;
+        const addToCartBtn = document.getElementById('addToCartBtn');
+        const horaSelect = document.getElementById('hora');
+        
+        // Remove previous warnings
+        const existingWarning = horaSelect.parentNode.querySelector('.text-danger');
+        if (existingWarning) {
+            existingWarning.remove();
+        }
+
+        if (!servicioId || !fecha || !hora) {
+            addToCartBtn.disabled = true; // Disable if not all info is selected
+            return; 
+        }
+
+        addToCartBtn.disabled = true; // Disable button while checking
+
+        try {
+            const response = await fetch(`{% url 'check_slot_availability' %}?servicio_id=${servicioId}&fecha=${fecha}&hora=${hora}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+
+            if (data.available) {
+                addToCartBtn.disabled = false; // Enable button
+            } else {
+                // Slot not available, disable button and show warning
+                addToCartBtn.disabled = true;
+                const warningMsg = document.createElement('small');
+                warningMsg.className = 'text-danger d-block mt-1'; // Bootstrap classes for styling
+                warningMsg.textContent = 'Hora no disponible.';
+                horaSelect.parentNode.appendChild(warningMsg);
+            }
+        } catch (error) {
+            console.error('Error checking slot availability:', error);
+            // Optionally show a generic error message, keep button disabled
+            const warningMsg = document.createElement('small');
+            warningMsg.className = 'text-danger d-block mt-1';
+            warningMsg.textContent = 'Error al verificar disponibilidad.';
+            horaSelect.parentNode.appendChild(warningMsg);
+            addToCartBtn.disabled = true;
+        }
+    }
+
+    // Función para agregar al carrito (específica de homepage)
+    function addToCart() {
+        console.log("Attempting to add to cart...");
+        const servicioId = document.getElementById('servicioId').value;
+        const fecha = document.getElementById('fecha').value;
+        const hora = document.getElementById('hora').value;
+        const cantidadPersonas = document.getElementById('cantidadPersonas').value;
+
+        if (!fecha) {
+            alert('Por favor selecciona una fecha');
+            return;
+        }
+        if (!hora) {
+            alert('Por favor selecciona una hora');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('servicio_id', servicioId);
+        formData.append('fecha', fecha);
+        formData.append('hora', hora);
+        formData.append('cantidad_personas', cantidadPersonas);
+
+        console.log("Adding to cart with data:", { servicioId, fecha, hora, cantidadPersonas });
+
+        fetch('{% url "add_to_cart" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken') // Assumes getCookie is global (from base)
+            }
+        })
+        .then(response => {
+            console.log("Add to cart response status:", response.status);
+            if (!response.ok) {
+                 // If response is not ok, try to read error message if available
+                 return response.text().then(text => {
+                     throw new Error(`Server responded with ${response.status}: ${text || 'No additional error info'}`);
+                 });
+            }
+             // Check if the response is a redirect (status 3xx) or success (status 2xx)
+             // Django redirects often return 302, fetch might follow it automatically
+             // If fetch followed redirect, response.url will be the new URL
+            if (response.redirected) {
+                 console.log("Redirected after add to cart, going to:", response.url);
+                 window.location.href = response.url; // Go to the redirected page (likely checkout)
+            } else {
+                 // If not redirected, assume success and manually redirect (or update UI)
+                 console.log("Add to cart successful, redirecting to checkout...");
+                 window.location.href = "{% url 'checkout' %}";
+            }
+        })
+        .catch(error => {
+            console.error('Error adding to cart:', error);
+            alert(`Error al agregar al carrito: ${error.message}. Por favor intenta de nuevo.`);
+        });
+    }
+
+    // Inicializar listeners específicos de la homepage
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("Homepage DOMContentLoaded");
+
+        // Add listener for booking modal buttons
+        document.querySelectorAll('.js-open-booking-modal').forEach(button => {
+            button.addEventListener('click', function() {
+                const servicioId = this.dataset.servicioId;
+                const servicioNombre = this.dataset.servicioNombre;
+                const servicioPrecio = parseFloat(this.dataset.servicioPrecio);
+                const servicioTipo = this.dataset.servicioTipo || 'otro'; // Get service type
+
+                console.log("Opening booking modal via listener for:", servicioId, servicioNombre, servicioPrecio, servicioTipo);
+
+                // Store current service details globally
+                currentServicioId = servicioId;
+                currentServicioNombre = servicioNombre;
+                currentServicioPrecio = servicioPrecio;
+                currentServicioTipo = servicioTipo; // Store type
+
+                // Populate modal fields
+                document.getElementById('servicioId').value = servicioId;
+                document.getElementById('servicioNombre').value = servicioNombre;
+                document.getElementById('fecha').value = '';
+                document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
+                document.getElementById('hora').disabled = true; // Disable initially
+
+                // Handle quantity selector based on service type
+                const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
+                const cantidadPersonasLabel = document.querySelector('label[for="cantidadPersonas"]'); // Get label too
+                if (servicioTipo === 'cabana') {
+                    cantidadPersonasSelect.value = '2'; // Default/max for cabin
+                    cantidadPersonasSelect.disabled = true; // Disable quantity selection
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none'; // Hide label
+                    cantidadPersonasSelect.style.display = 'none'; // Hide select
+                    document.getElementById('precioTotal').value = formatCLP(servicioPrecio); // Show fixed price
+                } else {
+                    cantidadPersonasSelect.value = '1'; // Default for others
+                    cantidadPersonasSelect.disabled = false; // Enable quantity selection
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'block'; // Show label
+                    cantidadPersonasSelect.style.display = 'block'; // Show select
+                    document.getElementById('precioTotal').value = formatCLP(servicioPrecio); // Show initial price per person
+                }
+
+                // Show modal
+                const bookingModalEl = document.getElementById('bookingModal');
+                if (bookingModalEl) {
+                    const bookingModal = new bootstrap.Modal(bookingModalEl);
+                    bookingModal.show();
+                } else {
+                    console.error("Booking modal element not found");
+                }
+            });
+        });
+        console.log("Event listeners added for .js-open-booking-modal buttons");
+
+        // Flatpickr for date picker
+        const fechaInput = document.getElementById('fecha');
+        if (fechaInput) {
+            flatpickr(fechaInput, {
+                minDate: "today",
+                dateFormat: "Y-m-d",
+                locale: "es",
+                onChange: function(selectedDates, dateStr) {
+                    if (currentServicioId) {
+                        loadAvailableHours(currentServicioId, dateStr);
+                    }
+                }
+            });
+            console.log("Flatpickr initialized for #fecha");
+        } else {
+            console.error("Fecha input element not found");
+        }
+
+        // Listener for quantity change
+        const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
+        if (cantidadPersonasSelect) {
+            cantidadPersonasSelect.addEventListener('change', updatePrecioTotal);
+            console.log("Event listener added for #cantidadPersonas change");
+        } else {
+             console.error("CantidadPersonas select element not found");
+        }
+
+        // Listener for time selection change
+        const horaSelect = document.getElementById('hora');
+        if (horaSelect) {
+            horaSelect.addEventListener('change', validateSelectedSlot);
+            console.log("Event listener added for #hora change");
+        } else {
+            console.error("Hora select element not found");
+        }
+
+        // Listener for "Add to Cart" button in modal
+        const addToCartBtn = document.getElementById('addToCartBtn');
+        if (addToCartBtn) {
+            addToCartBtn.addEventListener('click', addToCart);
+            console.log("Event listener added for #addToCartBtn click");
+        } else {
+             console.error("Add to cart button element not found");
+        }
+
+        // Listener for category filters
+        document.querySelectorAll('.category-filter').forEach(button => {
+            button.addEventListener('click', function() {
+                const category = this.getAttribute('data-category');
+                console.log("Category filter clicked:", category);
+
+                document.querySelectorAll('.category-filter').forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+
+                document.querySelectorAll('.service-card').forEach(card => {
+                    if (category === 'all' || card.getAttribute('data-category') === category) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+        });
+        console.log("Event listeners added for category filters");
+
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,117 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Aremko - Estado del Pago{% endblock %}
+
+{% block extra_style %}
+<style>
+    .status-section {
+        padding: 60px 0;
+        text-align: center;
+    }
+    .status-icon {
+        font-size: 5rem;
+        margin-bottom: 25px;
+    }
+    .status-success {
+        color: var(--bs-success); /* Bootstrap success color */
+    }
+    .status-danger {
+        color: var(--bs-danger); /* Bootstrap danger color */
+    }
+    .status-warning {
+        color: var(--bs-warning); /* Bootstrap warning color */
+    }
+    .status-title {
+        font-weight: 700;
+        margin-bottom: 15px;
+    }
+    .status-message {
+        margin-bottom: 30px;
+        color: var(--dark-gray);
+    }
+    .status-details {
+        background-color: #f8f9fa; /* Light background */
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+        display: inline-block; /* Center the box */
+        text-align: left; /* Align text inside the box */
+        max-width: 500px; /* Limit width */
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .status-details p {
+        margin-bottom: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="status-section">
+    <div class="container">
+        {% if payment_status == 'exitoso' %}
+            <div class="status-icon status-success">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h2 class="status-title">¡Pago Exitoso!</h2>
+            <p class="status-message">Tu pago ha sido procesado correctamente y tu reserva está confirmada.</p>
+            {% if venta %}
+            <div class="status-details">
+                <p><strong>Reserva ID:</strong> {{ venta.id }}</p>
+                <p><strong>Cliente:</strong> {{ venta.cliente.nombre }}</p>
+                <p><strong>Monto Pagado:</strong> ${{ venta.pagado|floatformat:0|intcomma }}</p>
+                <p>Recibirás un correo electrónico con los detalles completos.</p>
+            </div>
+            {% endif %}
+
+        {% elif payment_status == 'rechazado' %}
+            <div class="status-icon status-danger">
+                <i class="fas fa-times-circle"></i>
+            </div>
+            <h2 class="status-title">Pago Rechazado</h2>
+            <p class="status-message">Lamentablemente, tu pago no pudo ser procesado.</p>
+            {% if error_message %}<p class="text-danger">{{ error_message }}</p>{% endif %}
+            <p>Por favor, intenta nuevamente o contacta a soporte si el problema persiste.</p>
+             {% if reserva_id %}
+                <p>Tu reserva (ID: {{ reserva_id }}) se mantiene pendiente.</p>
+             {% endif %}
+
+
+        {% elif payment_status == 'cancelado' %}
+            <div class="status-icon status-warning">
+                <i class="fas fa-ban"></i>
+            </div>
+            <h2 class="status-title">Pago Cancelado</h2>
+            <p class="status-message">Has cancelado el proceso de pago.</p>
+             {% if reserva_id %}
+                <p>Tu reserva (ID: {{ reserva_id }}) se mantiene pendiente. Puedes intentar pagarla más tarde o contactarnos.</p>
+             {% endif %}
+
+        {% else %} {# Pendiente o error #}
+            <div class="status-icon status-warning">
+                <i class="fas fa-exclamation-circle"></i>
+            </div>
+            <h2 class="status-title">Estado del Pago Pendiente o Desconocido</h2>
+            {% if error_message %}
+                <p class="status-message text-danger">{{ error_message }}</p>
+            {% else %}
+                <p class="status-message">Estamos verificando el estado de tu pago. Si ya realizaste el pago, puede tomar unos momentos en reflejarse.</p>
+            {% endif %}
+             {% if reserva_id %}
+                <p>Reserva ID: {{ reserva_id }}</p>
+             {% endif %}
+            <p>Contacta a soporte si tienes dudas.</p>
+        {% endif %}
+
+        <div class="mt-4">
+            <a href="{% url 'homepage' %}" class="btn btn-primary">Volver al Inicio</a>
+            {% if payment_status != 'exitoso' and reserva_id %}
+                 {# Optionally add a link to retry payment or view reservation status #}
+                 {# <a href="{% url 'view_reservation' reserva_id %}" class="btn btn-secondary">Ver mi Reserva</a> #}
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}
