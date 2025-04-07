@@ -11,8 +11,8 @@ from ..models import ( # Relative imports
     Proveedor, CategoriaProducto, Producto, VentaReserva, Cliente, Pago,
     Servicio, ReservaProducto, ReservaServicio, CategoriaServicio
 )
-# Import Cliente model directly for the new view
-from ..models import Cliente
+# Import Cliente and Servicio models directly for the new views
+from ..models import Cliente, Servicio, Proveedor
 from ..serializers import ( # Relative imports
     ProveedorSerializer, CategoriaProductoSerializer, ProductoSerializer,
     VentaReservaSerializer, ClienteSerializer, PagoSerializer,
@@ -307,4 +307,8 @@ def get_client_details_by_phone(request):
     except Exception as e:
         # Log the error for debugging
         print(f"Error in get_client_details_by_phone: {e}")
+        # Log the error for debugging
+        print(f"Error in get_client_details_by_phone: {e}")
         return JsonResponse({'error': 'Error interno del servidor'}, status=500)
+
+# Removed get_service_providers view as it's no longer needed for admin JS

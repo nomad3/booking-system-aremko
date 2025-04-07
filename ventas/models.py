@@ -180,7 +180,13 @@ class Servicio(models.Model):
     precio_base = models.DecimalField(max_digits=10, decimal_places=0)
     duracion = models.PositiveIntegerField(help_text="Duración en minutos")
     categoria = models.ForeignKey(CategoriaServicio, on_delete=models.SET_NULL, null=True)
-    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True) # Allow blank provider
+    # Changed from ForeignKey to ManyToManyField
+    proveedores = models.ManyToManyField(
+        Proveedor,
+        blank=True,
+        related_name='servicios_ofrecidos',
+        help_text="Selecciona los proveedores (ej. masajistas) que pueden realizar este servicio."
+    )
     capacidad_minima = models.PositiveIntegerField(default=1, help_text="Mínimo de personas para reservar")
     capacidad_maxima = models.PositiveIntegerField(default=1, help_text="Máximo de personas permitidas")
     horario_apertura = models.TimeField(default='09:00')
@@ -449,7 +455,16 @@ class ReservaServicio(models.Model):
     fecha_agendamiento = models.DateField()
     hora_inicio = models.CharField(max_length=5)
     # Default to 1, but enforce max 2 for cabins during booking if needed
-    cantidad_personas = models.PositiveIntegerField(default=1) 
+    cantidad_personas = models.PositiveIntegerField(default=1)
+    # Add field to link specific provider for this instance (e.g., masseuse)
+    proveedor_asignado = models.ForeignKey(
+        Proveedor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reservas_asignadas',
+        help_text="Proveedor específico asignado para esta reserva (ej. masajista)."
+    )
 
     @property
     def fecha_hora_completa(self):
@@ -473,3 +488,18 @@ class ReservaServicio(models.Model):
     @property
     def subtotal(self):
         return self.calcular_precio()
+
+    def clean(self):
+        # Basic validation example: Ensure assigned provider is valid for the service type
+        super().clean()
+        if self.servicio and self.proveedor_asignado:
+            if self.servicio.tipo_servicio == 'masaje':
+                if not self.servicio.proveedores.filter(pk=self.proveedor_asignado.pk).exists():
+                    raise ValidationError({
+                        'proveedor_asignado': f"El proveedor '{self.proveedor_asignado}' no está habilitado para el servicio '{self.servicio}'."
+                    })
+            # Optional: Clear provider if service is not a massage type?
+            # elif self.servicio.tipo_servicio != 'masaje':
+            #     self.proveedor_asignado = None # Or raise validation error
+
+    # Consider adding validation in save() as well if needed, clean() isn't called automatically everywhere.

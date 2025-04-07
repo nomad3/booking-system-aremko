@@ -22,30 +22,28 @@ from openpyxl import load_workbook
 admin.site.site_header = _("Sistema de Gestión de Ventas")
 admin.site.site_title = _("Panel de Administración")
 
-# Formulario para ReservaServicioInline con hora_inicio como texto
-class ReservaServicioInlineForm(forms.ModelForm):
-    # Cambiado a CharField para entrada de texto simple (ej: "14:00")
-    hora_inicio = forms.CharField(
-        max_length=5, 
-        widget=forms.TextInput(attrs={'placeholder': 'HH:MM'})
-    )
-    
-    class Meta:
-        model = ReservaServicio
-        fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas']
-        
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Solo filtramos los servicios activos
-        self.fields['servicio'].queryset = Servicio.objects.filter(activo=True)
-
+# Removed ReservaServicioInlineForm as it's no longer needed for custom widget/JS
 
 class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
-    form = ReservaServicioInlineForm
+    # form = ReservaServicioInlineForm # Removed custom form
+    fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas', 'proveedor_asignado'] # Ensure field is listed
+    autocomplete_fields = ['servicio', 'proveedor_asignado'] # Add autocomplete for proveedor_asignado
     extra = 1
     min_num = 0
 
+    # Keep the formfield_for_foreignkey if you still want to filter the servicio dropdown
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "servicio":
+            kwargs["queryset"] = Servicio.objects.filter(activo=True).order_by('nombre')
+        # No special handling needed for proveedor_asignado here, autocomplete handles it
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    # Removed Media class as JS is no longer needed
+    # class Media:
+    #     js = ('admin/js/reserva_servicio_admin.js',)
+
+    # The get_formset modification for hora_inicio might still be relevant if using CharField
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
         # Ensure hora_inicio field exists before modifying widget attributes
@@ -59,7 +57,9 @@ class ReservaServicioInline(admin.TabularInline):
             kwargs["queryset"] = Servicio.objects.filter(activo=True).order_by('nombre')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-    # No Media class needed anymore as JS is removed
+    # Add Media class to include custom JavaScript for dynamic filtering
+    class Media:
+        js = ('admin/js/reserva_servicio_admin.js',) # Path relative to STATIC_URL
 
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
@@ -384,10 +384,12 @@ class ServicioAdmin(admin.ModelAdmin):
     form = ServicioAdminForm
     list_display = ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima', 'activo', 'publicado_web', 'imagen') # Added capacity fields
     list_filter = ('categoria', 'activo', 'publicado_web', 'tipo_servicio')
-    search_fields = ('nombre', 'categoria__nombre')
+    search_fields = ('nombre', 'categoria__nombre', 'proveedores__nombre') # Added proveedores to search
+    filter_horizontal = ('proveedores',) # Use a nice widget for ManyToMany
     fieldsets = (
         (None, {
-            'fields': ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima', 'imagen', 'proveedor', 'activo', 'publicado_web') # Added capacity fields
+            # Changed 'proveedor' to 'proveedores'
+            'fields': ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima', 'imagen', 'proveedores', 'activo', 'publicado_web')
         }),
         ('Configuración Horaria', {
             'fields': (
