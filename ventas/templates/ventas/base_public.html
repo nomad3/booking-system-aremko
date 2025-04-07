@@ -17,8 +17,11 @@
     
     <!-- Flatpickr for date picker -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+    <!-- Link to your custom modern CSS -->
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
     
-    <!-- Custom CSS -->
+    <!-- Custom CSS (Inline styles - consider moving more to modern.css) -->
     <style>
         :root {
             /* Wooden/Coffee Theme */
@@ -413,22 +416,30 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <!-- Add a spinner/loading indicator (optional) -->
+                    <div id="checkoutLoading" class="text-center mb-3" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Buscando...</span>
+                        </div>
+                    </div>
                     <form id="checkoutForm" class="booking-form">
+                        <!-- Moved Telefono field first -->
+                        <div class="mb-3">
+                            <label for="checkoutTelefono" class="form-label">Teléfono</label>
+                            <input type="tel" class="form-control" id="checkoutTelefono" name="telefono" required placeholder="+56912345678">
+                            <div class="form-text">Ingresa tu número para buscar tus datos.</div>
+                        </div>
+
                         <div class="mb-3">
                             <label for="checkoutNombre" class="form-label">Nombre Completo</label>
                             <input type="text" class="form-control" id="checkoutNombre" name="nombre" required>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="checkoutEmail" class="form-label">Email</label>
                             <input type="email" class="form-control" id="checkoutEmail" name="email" required>
                         </div>
-                        
-                        <div class="mb-3">
-                            <label for="checkoutTelefono" class="form-label">Teléfono</label>
-                            <input type="tel" class="form-control" id="checkoutTelefono" name="telefono" required>
-                        </div>
-                        
+
                         <div class="mb-3">
                             <label for="checkoutDocumento" class="form-label">ID/DNI/Passport/RUT (opcional)</label>
                             <input type="text" class="form-control" id="checkoutDocumento" name="documento_identidad">
@@ -536,9 +547,9 @@
             formData.append('telefono', telefono);
             formData.append('documento_identidad', documento_identidad);
             
-            console.log("Sending checkout request to:", '{% url "checkout_api" %}'); 
+            console.log("Sending checkout request to:", '{% url "complete_checkout" %}'); 
             // Enviar petición AJAX
-            fetch('{% url "checkout_api" %}', { 
+            fetch('{% url "complete_checkout" %}', { 
                 method: 'POST',
                 body: formData,
                 headers: {
@@ -666,6 +677,62 @@
             } else {
                 console.error("Complete checkout button not found");
             }
+
+            // --- Client Lookup via Phone ---
+            const phoneInput = document.getElementById('checkoutTelefono');
+            const nameInput = document.getElementById('checkoutNombre');
+            const emailInput = document.getElementById('checkoutEmail');
+            const docInput = document.getElementById('checkoutDocumento');
+            const loadingIndicator = document.getElementById('checkoutLoading'); // Optional loading indicator
+
+            if (phoneInput && nameInput && emailInput && docInput) {
+                phoneInput.addEventListener('blur', function() { // Trigger on blur (losing focus)
+                    const phoneNumber = this.value.trim();
+                    // Basic validation - adjust length check as needed for Chilean numbers
+                    if (phoneNumber.length >= 9) { 
+                        if(loadingIndicator) loadingIndicator.style.display = 'block'; // Show loading
+
+                        // Construct the API URL
+                        const lookupUrl = `{% url 'get_client_details_by_phone' %}?telefono=${encodeURIComponent(phoneNumber)}`;
+                        console.log("Looking up client:", lookupUrl);
+
+                        fetch(lookupUrl)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                console.log("Lookup response:", data);
+                                if (data.found) {
+                                    nameInput.value = data.nombre;
+                                    emailInput.value = data.email;
+                                    docInput.value = data.documento_identidad;
+                                    console.log("Client data populated.");
+                                } else {
+                                    // Optional: Clear fields if client not found, or leave them as is
+                                    // nameInput.value = '';
+                                    // emailInput.value = '';
+                                    // docInput.value = '';
+                                    console.log("Client not found.");
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error looking up client:', error);
+                                // Optionally inform the user, but avoid annoying alerts
+                            })
+                            .finally(() => {
+                                if(loadingIndicator) loadingIndicator.style.display = 'none'; // Hide loading
+                            });
+                    }
+                });
+                console.log("Event listener added for #checkoutTelefono blur");
+            } else {
+                 console.error("One or more checkout form fields not found for phone lookup.");
+            }
+            // --- End Client Lookup ---
+
         });
     </script>
     {# Page specific script goes here, outside the main script tag #}

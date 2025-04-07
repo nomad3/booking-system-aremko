@@ -21,7 +21,7 @@
         border-radius: 12px;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         padding: 30px;
-        margin-bottom: 30px;
+        margin-bottom: 30px; /* Keep margin for spacing between rows */
     }
 
     .checkout-form label {
@@ -58,22 +58,31 @@
         font-size: 1.1rem; /* Slightly smaller for summary */
     }
 
-    .cart-total {
+    .cart-summary { /* Added from cart.html */
         background-color: white;
         border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 25px;
+        margin-bottom: 30px; /* Match checkout-form margin */
+    }
+    .cart-summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px; /* Match cart.html */
+    }
+    .cart-summary-total {
+        font-weight: 700; /* Match cart.html */
+        font-size: 1.3rem; /* Match cart.html */
+        color: var(--primary-color); /* Match cart.html */
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+    }
+    .cart-actions { /* Added from cart.html */
+        display: flex;
+        justify-content: space-between;
         margin-top: 20px;
     }
-
-    .cart-total-title {
-        font-weight: 700;
-        margin-bottom: 20px; /* Match cart.html */
-        color: var(--dark-gray); /* Match cart.html */
-    }
-
-    /* Remove cart-total-amount as it's handled by cart-summary-total now */
-    /* .cart-total-amount { ... } */
 
     .empty-cart {
         text-align: center;
@@ -121,36 +130,6 @@
         margin-bottom: 15px;
     }
 
-    /* Add/Update styles from cart.html */
-    .cart-summary { /* Added from cart.html */
-        background-color: white;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        padding: 25px;
-    }
-    .cart-summary-row {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 10px; /* Match cart.html */
-        /* width: 100%; /* Removed */
-    }
-    .cart-summary-total {
-        font-weight: 700; /* Match cart.html */
-        font-size: 1.3rem; /* Match cart.html */
-        color: var(--primary-color); /* Match cart.html */
-        margin-top: 15px;
-        padding-top: 15px;
-        border-top: 1px solid #eee;
-    }
-    .cart-actions { /* Added from cart.html */
-        display: flex;
-        justify-content: space-between;
-        margin-top: 20px;
-    }
-
-    /* Remove unused rule */
-    /* .summary-total-value { ... } */
-
 </style>
 {% endblock %}
 
@@ -172,100 +151,45 @@
         <h1 class="checkout-title">Finalizar Reserva</h1>
 
         {% if cart.servicios %}
-            <div class="row">
-                <div class="col-lg-8">
+            <!-- Row 1: Contact Info & Order Summary -->
+            <div class="row mb-4">
+                <div class="col-lg-7"> {# Contact Info takes more space #}
                     <div class="checkout-form">
                         <h4 class="mb-4">Información de Contacto</h4>
                         <form id="checkoutForm">
                             <div class="mb-3">
+                                <label for="checkoutTelefono" class="form-label">Teléfono</label>
+                                <input type="tel" class="form-control" id="checkoutTelefono" name="telefono" required placeholder="+56912345678">
+                                <div class="form-text">Ingresa tu número para buscar tus datos.</div>
+                            </div>
+                            <div class="mb-3">
                                 <label for="checkoutNombre" class="form-label">Nombre Completo</label>
                                 <input type="text" class="form-control" id="checkoutNombre" name="nombre" required>
                             </div>
-
                             <div class="mb-3">
                                 <label for="checkoutEmail" class="form-label">Email</label>
                                 <input type="email" class="form-control" id="checkoutEmail" name="email" required>
                             </div>
-
-                            <div class="mb-3">
-                                <label for="checkoutTelefono" class="form-label">Teléfono</label>
-                                <input type="tel" class="form-control" id="checkoutTelefono" name="telefono" required>
-                            </div>
-
                             <div class="mb-3">
                                 <label for="checkoutDocumento" class="form-label">ID/DNI/Passport/RUT (opcional)</label>
                                 <input type="text" class="form-control" id="checkoutDocumento" name="documento_identidad">
                             </div>
                         </form>
                     </div>
-
-                    <!-- Payment Method Selection -->
-                    <div class="checkout-form mt-4">
-                        <h4 class="mb-4">Método de Pago</h4>
-                        {% if payment_methods %}
-                            {% for value, name in payment_methods %}
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input"
-                                           type="radio"
-                                           name="paymentMethod"
-                                           id="payment_{{ value }}"
-                                           value="{{ value }}"
-                                           {% if value == 'transferencia' %}checked{% endif %} {# Default check bank transfer #}
-                                           {% if value == 'flow' %}disabled{% endif %} {# Disable flow for now - REMOVE 'disabled' TO ENABLE #}
-                                           >
-                                    <label class="form-check-label" for="payment_{{ value }}">
-                                        {{ name }}
-                                        {% if value == 'flow' %}
-                                            <span class="badge bg-secondary">Próximamente</span>
-                                        {% endif %}
-                                    </label>
-                                    {% if value == 'transferencia' %}
-                                        <!-- Text shown directly under the radio button -->
-                                        <div class="form-text mt-1">
-                                            Selecciona esta opción para ver los detalles de la cuenta. Tu reserva quedará pendiente hasta confirmar el pago.
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            {% endfor %}
-
-                            <!-- Hidden Bank Details Div - Shown by JS -->
-                            <div id="bankDetailsSection" class="alert alert-info mt-3" style="display: none;">
-                                <h5>Instrucciones para Transferencia Bancaria</h5>
-                                <p>Para confirmar tu reserva (que se creará en estado pendiente), por favor realiza la transferencia a la siguiente cuenta:</p>
-                                <pre>Banco: Banco Ficticio S.A.
-Tipo de Cuenta: Cuenta Corriente
-Número de Cuenta: 1234567890
-Nombre Titular: Empresa Ejemplo Ltda.
-RUT Titular: 77.777.777-7
-Email para comprobante: pagos@ejemplo.com</pre> {# Placeholder details #}
-                                <p><strong>Importante:</strong> Tu reserva se mantendrá como pendiente hasta que confirmemos la recepción del pago.</p>
-                            </div>
-                            <!-- End Hidden Bank Details Div -->
-                        {% else %}
-                            <p>No hay métodos de pago disponibles en este momento.</p>
-                        {% endif %}
-                    </div>
-                    <!-- End Payment Method Selection -->
-
                 </div>
-                <div class="col-lg-4">
-                    <!-- Use cart.html structure and classes -->
+                <div class="col-lg-5"> {# Order Summary takes less space #}
                     <div class="cart-summary">
                         <h3 class="cart-summary-title">Resumen del Pedido</h3>
-
                         {% for item in cart.servicios %}
                             <div class="cart-summary-row">
                                 <span>{{ item.nombre }} ({{ item.cantidad_personas }} persona(s))</span>
-                                <span>${{ item.subtotal|floatformat:0|intcomma }}</span> {# Apply filters #}
+                                <span>${{ item.subtotal|floatformat:0|intcomma }}</span>
                             </div>
                         {% endfor %}
-
                         <div class="cart-summary-row cart-summary-total">
                             <span>Total:</span>
-                            <span>${{ cart.total|floatformat:0|intcomma }}</span> {# Apply filters #}
+                            <span>${{ cart.total|floatformat:0|intcomma }}</span>
                         </div>
-
-                        <!-- Buttons moved inside and wrapped in cart-actions -->
                         <div class="cart-actions">
                             <a href="{% url 'cart' %}" class="btn btn-outline-secondary">Volver al Carrito</a>
                             <button class="btn btn-primary" id="completeCheckoutBtn">
@@ -276,26 +200,76 @@ Email para comprobante: pagos@ejemplo.com</pre> {# Placeholder details #}
                 </div>
             </div>
 
-            <div class="row mt-4">
-                <div class="col-12">
-                    <h4 class="mb-3">Detalles de la Reserva</h4>
-                    {% for item in cart.servicios %}
-                        <div class="cart-item">
+            <!-- Row 2: Reservation Details (Left) & Payment Method (Right) -->
+            <div class="row">
+                <div class="col-lg-6">
+                    <!-- Reservation Details -->
+                    <div class="checkout-form"> {# Use checkout-form for consistent padding/shadow #}
+                        <h4 class="mb-3">Detalles de la Reserva</h4>
+                        {% for item in cart.servicios %}
+                        <div class="cart-item mb-3"> {# Reduced bottom margin slightly #}
                             <div class="row align-items-center">
                                 <div class="col-md-8">
-                                    <h3 class="cart-item-title">{{ item.nombre }}</h3>
-                                    <p class="cart-item-info">
-                                        <i class="far fa-calendar-alt me-2"></i>{{ item.fecha }} |
-                                        <i class="far fa-clock me-2"></i>{{ item.hora }} |
-                                        <i class="fas fa-user me-2"></i>{{ item.cantidad_personas }} persona(s)
+                                    <h5 class="cart-item-title mb-1">{{ item.nombre }}</h5> {# Slightly smaller heading #}
+                                    <p class="cart-item-info mb-0"> {# Remove bottom margin #}
+                                        <i class="far fa-calendar-alt me-1"></i>{{ item.fecha }} |
+                                        <i class="far fa-clock ms-2 me-1"></i>{{ item.hora }} |
+                                        <i class="fas fa-user ms-2 me-1"></i>{{ item.cantidad_personas }} persona(s)
                                     </p>
                                 </div>
                                 <div class="col-md-4 text-end">
-                                    <p class="cart-item-price">${{ item.subtotal|floatformat:0|intcomma }}</p> {# Apply filters #}
+                                    <p class="cart-item-price mb-0">${{ item.subtotal|floatformat:0|intcomma }}</p> {# Remove bottom margin #}
                                 </div>
                             </div>
                         </div>
-                    {% endfor %}
+                        {% endfor %}
+                    </div>
+                    <!-- End Reservation Details -->
+                </div>
+                <div class="col-lg-6">
+                    <!-- Payment Method Selection -->
+                    <div class="checkout-form">
+                        <h4 class="mb-4">Método de Pago</h4>
+                        {% if payment_methods %}
+                            {% for value, name in payment_methods %}
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input"
+                                           type="radio"
+                                           name="paymentMethod"
+                                           id="payment_{{ value }}"
+                                           value="{{ value }}"
+                                           {% if value == 'transferencia' %}checked{% endif %}
+                                           {% if value == 'flow' %}disabled{% endif %}
+                                           >
+                                    <label class="form-check-label" for="payment_{{ value }}">
+                                        {{ name }}
+                                        {% if value == 'flow' %}
+                                            <span class="badge bg-secondary">Próximamente</span>
+                                        {% endif %}
+                                    </label>
+                                    {% if value == 'transferencia' %}
+                                        <div class="form-text mt-1">
+                                            Selecciona esta opción para ver los detalles de la cuenta. Tu reserva quedará pendiente hasta confirmar el pago.
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                            <div id="bankDetailsSection" class="alert alert-info mt-3" style="display: none;">
+                                <h5>Instrucciones para Transferencia Bancaria</h5>
+                                <p>Para confirmar tu reserva (que se creará en estado pendiente), por favor realiza la transferencia a la siguiente cuenta:</p>
+                                <pre>Banco: Banco Ficticio S.A.
+Tipo de Cuenta: Cuenta Corriente
+Número de Cuenta: 1234567890
+Nombre Titular: Empresa Ejemplo Ltda.
+RUT Titular: 77.777.777-7
+Email para comprobante: pagos@ejemplo.com</pre>
+                                <p><strong>Importante:</strong> Tu reserva se mantendrá como pendiente hasta que confirmemos la recepción del pago.</p>
+                            </div>
+                        {% else %}
+                            <p>No hay métodos de pago disponibles en este momento.</p>
+                        {% endif %}
+                    </div>
+                    <!-- End Payment Method Selection -->
                 </div>
             </div>
         {% else %}
@@ -370,19 +344,26 @@ Email para comprobante: pagos@ejemplo.com</pre> {# Placeholder details #}
         }
         console.log(`Fetching client data for phone: ${cleanedTelefono}`);
         try {
-            const response = await fetch(`/api/get-client-by-phone/?telefono=${encodeURIComponent(cleanedTelefono)}`);
+            // Corrected API endpoint URL name
+            const lookupUrl = `{% url 'get_client_details_by_phone' %}?telefono=${encodeURIComponent(cleanedTelefono)}`;
+            const response = await fetch(lookupUrl); 
             if (response.ok) {
                 const data = await response.json();
-                if (data.cliente) {
-                    console.log("Client found:", data.cliente);
+                // Updated to check data.found directly
+                if (data.found) { 
+                    console.log("Client found:", data);
                     const nombreInput = document.getElementById('checkoutNombre');
                     const emailInput = document.getElementById('checkoutEmail');
                     const documentoInput = document.getElementById('checkoutDocumento');
-                    if (nombreInput) nombreInput.value = data.cliente.nombre || '';
-                    if (emailInput) emailInput.value = data.cliente.email || '';
-                    if (documentoInput) documentoInput.value = data.cliente.documento_identidad || '';
+                    if (nombreInput) nombreInput.value = data.nombre || '';
+                    if (emailInput) emailInput.value = data.email || '';
+                    if (documentoInput) documentoInput.value = data.documento_identidad || '';
                 } else {
                     console.log("Client not found for this phone number.");
+                     // Optionally clear fields if client not found
+                    // document.getElementById('checkoutNombre').value = '';
+                    // document.getElementById('checkoutEmail').value = '';
+                    // document.getElementById('checkoutDocumento').value = '';
                 }
             } else {
                 console.error(`Error fetching client data: ${response.status} ${response.statusText}`);
@@ -655,3 +636,41 @@ Email para comprobante: pagos@ejemplo.com</pre> {# Placeholder details #}
     });
 </script>
 {% endblock %}
+</final_file_content>
+
+IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including any auto-formatting (e.g., if you used single quotes but the formatter converted them to double quotes). Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.
+
+<environment_details>
+# VSCode Visible Files
+ventas/templates/ventas/checkout.html
+
+# VSCode Open Tabs
+ventas/templates/ventas/homepage.html
+ventas/admin.py
+ventas/views/flow_views.py
+ventas/views/public_views.py
+ventas/views/availability_views.py
+ventas/views/reporting_views.py
+ventas/views/crud_views.py
+ventas/views/import_export_views.py
+ventas/views.py
+aremko_project/urls.py
+ventas/views/__init__.py
+ventas/views/misc_views.py
+ventas/signals.py
+ventas/tests.py
+ventas/utils.py
+aremko_project/settings.py
+populate_fake_data.py
+ventas/views/checkout_views.py
+ventas/views/api_views.py
+ventas/urls.py
+ventas/templates/ventas/base_public.html
+ventas/templates/ventas/checkout.html
+
+# Current Time
+4/6/2025, 8:16:26 PM (America/Santiago, UTC-4:00)
+
+# Current Mode
+ACT MODE
+</environment_details>

@@ -385,10 +385,12 @@ def actualizar_total_venta(sender, instance, **kwargs):
         
 @receiver(pre_save, sender=ReservaServicio)
 def validar_disponibilidad_admin(sender, instance, **kwargs):
+    # Pass the instance itself to verificar_disponibilidad to exclude it from checks if it exists
     if not verificar_disponibilidad(
         servicio=instance.servicio,
         fecha_propuesta=instance.fecha_agendamiento,
         hora_propuesta=instance.hora_inicio,
-        cantidad_personas=instance.cantidad_personas
+        cantidad_personas=instance.cantidad_personas,
+        reserva_actual=instance # Pass the current instance
     ):
         raise ValidationError(f"Slot {instance.hora_inicio} no disponible para {instance.servicio.nombre}")

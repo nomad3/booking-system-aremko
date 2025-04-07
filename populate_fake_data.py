@@ -45,28 +45,39 @@ def update_or_create_services():
     
     # Data combining spreadsheet slots and provided price/duration info
     # Using consistent price/duration per category for missing values
+    # Define the standard weekly slots
+    standard_slots = {
+        "monday": ["16:00", "18:00"],
+        "tuesday": [],
+        "wednesday": ["16:00", "18:00"],
+        "thursday": ["16:00", "18:00"],
+        "friday": ["14:00", "16:00", "18:00", "20:00"],
+        "saturday": ["14:00", "16:00", "18:00", "20:00"],
+        "sunday": ["14:00", "16:00"]
+    }
+
     services_config = {
         'Cabañas': {
-            'Torre':      {'slots': ["16:00"], 'precio': 90000, 'duracion': 1440},
-            'Tepa':       {'slots': ["16:00"], 'precio': 90000, 'duracion': 1440},
-            'Acantilado': {'slots': ["16:00"], 'precio': 90000, 'duracion': 1440},
-            'Laurel':     {'slots': ["16:00"], 'precio': 90000, 'duracion': 1440},
-            'Arrayan':    {'slots': ["16:00"], 'precio': 90000, 'duracion': 1440},
+            'Torre':      {'slots': standard_slots, 'precio': 90000, 'duracion': 1440},
+            'Tepa':       {'slots': standard_slots, 'precio': 90000, 'duracion': 1440},
+            'Acantilado': {'slots': standard_slots, 'precio': 90000, 'duracion': 1440},
+            'Laurel':     {'slots': standard_slots, 'precio': 90000, 'duracion': 1440},
+            'Arrayan':    {'slots': standard_slots, 'precio': 90000, 'duracion': 1440},
         },
         'Tinas sin hidromasaje': {
-            'Osorno':     {'slots': ["14:30", "17:00"], 'precio': 25000, 'duracion': 120},
-            'Calbuco':    {'slots': ["17:00", "19:30"], 'precio': 25000, 'duracion': 120},
-            'Tronador':   {'slots': ["19:30"], 'precio': 25000, 'duracion': 120},
-            'Hornopiren': {'slots': ["22:00"], 'precio': 25000, 'duracion': 120},
+            'Osorno':     {'slots': standard_slots, 'precio': 25000, 'duracion': 120},
+            'Calbuco':    {'slots': standard_slots, 'precio': 25000, 'duracion': 120},
+            'Tronador':   {'slots': standard_slots, 'precio': 25000, 'duracion': 120},
+            'Hornopiren': {'slots': standard_slots, 'precio': 25000, 'duracion': 120},
         },
         'Tinas con hidromasaje': {
-            'Puntiagudo': {'slots': ["14:00", "16:30"], 'precio': 30000, 'duracion': 120},
-            'Llaima':     {'slots': ["16:30", "19:00"], 'precio': 30000, 'duracion': 120},
-            'Villarrica': {'slots': ["19:00"], 'precio': 30000, 'duracion': 120},
-            'Puyehue':    {'slots': ["21:30"], 'precio': 30000, 'duracion': 120},
+            'Puntiagudo': {'slots': standard_slots, 'precio': 30000, 'duracion': 120},
+            'Llaima':     {'slots': standard_slots, 'precio': 30000, 'duracion': 120},
+            'Villarrica': {'slots': standard_slots, 'precio': 30000, 'duracion': 120},
+            'Puyehue':    {'slots': standard_slots, 'precio': 30000, 'duracion': 120},
         },
         'Masajes': {
-            'Relajación o Descontracturante': {'slots': ["15:30", "16:45", "18:00", "19:15"], 'precio': 80000, 'duracion': 50},
+            'Relajación o Descontracturante': {'slots': standard_slots, 'precio': 80000, 'duracion': 50},
         }
     }
 

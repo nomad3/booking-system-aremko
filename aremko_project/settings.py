@@ -56,8 +56,10 @@ ROOT_URLCONF = 'aremko_project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'ventas', 'templates')],
-        'APP_DIRS': True,
+        # Standard practice: Point DIRS to a project-level templates directory
+        # Even if it doesn't exist, APP_DIRS=True will still find app templates.
+        'DIRS': [BASE_DIR / 'templates'],
+        'APP_DIRS': True, # This allows Django to find templates in installed apps (like admin)
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
