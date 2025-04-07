@@ -59,6 +59,8 @@ urlpatterns = [
     path('payment/return/', flow_views.flow_return, name='flow_return'), # Adjust path as needed
     # New API endpoint for client lookup by phone
     path('api/get-client-details/', api_views.get_client_details_by_phone, name='get_client_details_by_phone'),
+    # Removed URL for get_service_providers as it's no longer needed
+    # path('api/get-service-providers/<int:servicio_id>/', api_views.get_service_providers, name='get_service_providers'),
     # API Router (Keep this last if possible, or ensure specific paths come first)
     path('', include(router.urls)),
 ]

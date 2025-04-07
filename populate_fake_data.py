@@ -12,7 +12,8 @@ django.setup()
 # --- End Django Setup ---
 
 # Now import models after Django setup
-from ventas.models import CategoriaServicio, Servicio, Cliente 
+from django.db import IntegrityError # Import IntegrityError
+from ventas.models import CategoriaServicio, Servicio, Cliente
 
 # Note: This script is now standalone, not a management command.
 # We'll define functions directly instead of using BaseCommand.
@@ -135,37 +136,59 @@ def update_or_create_services():
 
 
 def create_clients():
-    """Creates sample clients."""
-    print('Creating clients...')
-    # Sample client data
+    """Creates sample clients, including duplicates and poorly formatted numbers for testing."""
+    print('Creating clients (including duplicates for testing)...')
+    # Sample client data - ADDING DUPLICATES AND BAD FORMATS
     clients_data = [
+        # Original valid numbers
         {'nombre': 'Juan Pérez', 'email': 'juan.perez@example.com', 'telefono': '912345678'},
         {'nombre': 'María González', 'email': 'maria.gonzalez@example.com', 'telefono': '923456789'},
-        {'nombre': 'Carlos Rodríguez', 'email': 'carlos.rodriguez@example.com', 'telefono': '934567890'},
-        {'nombre': 'Ana Martínez', 'email': 'ana.martinez@example.com', 'telefono': '945678901'},
+        # Duplicates and variations
+        {'nombre': 'Carlos Rodríguez', 'email': 'carlos.r@example.com', 'telefono': '934567890'}, # Same number as below
+        {'nombre': 'Carlos R.', 'email': 'carlos.rodriguez@example.com', 'telefono': '+56934567890'}, # Same number, different format
+        {'nombre': 'Ana Martínez', 'email': 'ana.martinez@example.com', 'telefono': '945 678 901'}, # Number with spaces
+        {'nombre': 'Ana M.', 'email': 'ana.m@example.com', 'telefono': '945678901'}, # Duplicate of spaced number
         {'nombre': 'Pedro Sánchez', 'email': 'pedro.sanchez@example.com', 'telefono': '956789012'},
         {'nombre': 'Laura López', 'email': 'laura.lopez@example.com', 'telefono': '967890123'},
         {'nombre': 'Miguel Fernández', 'email': 'miguel.fernandez@example.com', 'telefono': '978901234'},
         {'nombre': 'Sofía Díaz', 'email': 'sofia.diaz@example.com', 'telefono': '989012345'},
         {'nombre': 'Javier Moreno', 'email': 'javier.moreno@example.com', 'telefono': '990123456'},
         {'nombre': 'Carmen Álvarez', 'email': 'carmen.alvarez@example.com', 'telefono': '901234567'},
+        # Invalid/Placeholder numbers
+        {'nombre': 'Test Cero', 'email': 'cero@example.com', 'telefono': '0000'},
+        {'nombre': 'Test Cero Cero', 'email': 'cerocero@example.com', 'telefono': '00000'},
+        {'nombre': 'Test Cero Dup', 'email': 'cerodup@example.com', 'telefono': '0000'},
+        # Number that normalizes to the same as another
+        {'nombre': 'Juan Perez Intl', 'email': 'juan.perez.intl@example.com', 'telefono': '+56912345678'}, # Normalizes same as first Juan
+        # Number that won't normalize correctly
+        {'nombre': 'Bad Phone', 'email': 'bad@example.com', 'telefono': '12345'},
     ]
-    
+
+    created_count = 0
+    skipped_count = 0
     for client_data in clients_data:
-        client, created = Cliente.objects.get_or_create(
-            email=client_data['email'],
-            defaults={
-                'nombre': client_data['nombre'],
-                'telefono': client_data['telefono'],
-                'ciudad': 'Santiago',
-                'pais': 'Chile'
-            }
-        )
-        
-        if created:
-            print(f'  Created client: {client_data["nombre"]}')
-        else:
-            print(f'  Client already exists: {client_data["nombre"]}')
+        # Use get_or_create based on phone first, then email if phone is missing/duplicate risk
+        # This is a simplified approach for testing; real-world might need more robust merging.
+        # For this test, we prioritize creating entries even if they might conflict initially.
+        try:
+            # Attempt creation directly - let the merge script handle conflicts
+            client = Cliente.objects.create(
+                nombre=client_data['nombre'],
+                email=client_data['email'], # Added missing email field
+                telefono=client_data['telefono'],
+                ciudad='Santiago',
+                pais='Chile'
+            ) # Added missing closing parenthesis
+            print(f'  Created client: {client_data["nombre"]} (Phone: {client_data["telefono"]})')
+            created_count += 1
+        except IntegrityError:
+             print(f'  Skipped client (potential duplicate): {client_data["nombre"]} (Phone: {client_data["telefono"]})')
+             skipped_count += 1
+        except Exception as e:
+             print(f'  Error creating client {client_data["nombre"]}: {e}')
+             skipped_count += 1
+
+    print(f'\nFinished creating clients. Created: {created_count}, Skipped/Errors: {skipped_count}')
 
 # --- Main execution block ---
 if __name__ == '__main__':
