@@ -21,7 +21,6 @@ from openpyxl import load_workbook
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
 admin.site.site_title = _("Panel de Administración")
-admin.site.index_title = _("Bienvenido al Panel de Control")
 
 # Formulario para ReservaServicioInline con hora_inicio como texto
 class ReservaServicioInlineForm(forms.ModelForm):
