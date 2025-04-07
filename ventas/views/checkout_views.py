@@ -39,18 +39,24 @@ def add_to_cart(request):
         try:
             servicio = Servicio.objects.get(id=servicio_id)
 
-            # --- Cabin Specific Logic ---
-            if servicio.tipo_servicio == 'cabana':
-                # Enforce max 2 people for cabins
-                if cantidad_personas > 2:
-                     messages.error(request, "La capacidad máxima para las cabañas es de 2 personas.")
-                     # Redirect back to where the user came from, if possible
-                     referer_url = request.META.get('HTTP_REFERER', reverse('homepage')) # Assuming 'homepage' is the name of your homepage URL
-                     return redirect(referer_url)
-                # Set quantity to 1 or 2, price is fixed anyway
-                cantidad_personas = min(cantidad_personas, 2)
-                print(f"Cabin selected, quantity adjusted/capped at: {cantidad_personas}")
+            # --- Capacity Validation ---
+            # Ensure minimum capacity is met
+            if cantidad_personas < servicio.capacidad_minima:
+                 messages.error(request, f"La cantidad mínima de personas para '{servicio.nombre}' es {servicio.capacidad_minima}.")
+                 referer_url = request.META.get('HTTP_REFERER', reverse('homepage'))
+                 return redirect(referer_url)
 
+            # Ensure maximum capacity is not exceeded
+            if cantidad_personas > servicio.capacidad_maxima:
+                 messages.error(request, f"La capacidad máxima para '{servicio.nombre}' es {servicio.capacidad_maxima} personas.")
+                 referer_url = request.META.get('HTTP_REFERER', reverse('homepage'))
+                 return redirect(referer_url)
+
+            # --- Cabin Specific Logic (Price is fixed, quantity handled by general capacity check) ---
+            # No specific quantity adjustment needed here anymore as max_cap handles it.
+            # if servicio.tipo_servicio == 'cabana':
+            #     cantidad_personas = min(cantidad_personas, servicio.capacidad_maxima) # Already checked above
+            #     print(f"Cabin selected, quantity: {cantidad_personas}")
 
             # Obtener carrito actual o crear uno nuevo
             cart = request.session.get('cart', {'servicios': [], 'total': 0})

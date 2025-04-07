@@ -180,8 +180,9 @@ class Servicio(models.Model):
     precio_base = models.DecimalField(max_digits=10, decimal_places=0)
     duracion = models.PositiveIntegerField(help_text="Duración en minutos")
     categoria = models.ForeignKey(CategoriaServicio, on_delete=models.SET_NULL, null=True)
-    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True)
-    capacidad_maxima = models.PositiveIntegerField(default=1)
+    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True) # Allow blank provider
+    capacidad_minima = models.PositiveIntegerField(default=1, help_text="Mínimo de personas para reservar")
+    capacidad_maxima = models.PositiveIntegerField(default=1, help_text="Máximo de personas permitidas")
     horario_apertura = models.TimeField(default='09:00')
     horario_cierre = models.TimeField(default='23:59')
     slots_disponibles = models.JSONField(default=list, help_text="Horarios disponibles en formato HH:MM")
