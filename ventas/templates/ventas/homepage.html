@@ -231,10 +231,11 @@
                 <div class="col-lg-4 col-md-6 service-card" data-category="{{ servicio.categoria.id }}">
                     <div class="card h-100">
                         {% if servicio.imagen %}
-                            <img src="{{ servicio.imagen.url }}" class="card-img-top" alt="{{ servicio.nombre }}">
+                            {# Use the URL directly from the 'imagen' field #}
+                            <img src="{{ servicio.imagen }}" class="card-img-top" alt="{{ servicio.nombre }}">
                         {% else %}
                             {# Optional: Add a default placeholder image if needed #}
-                            {# <img src="{% static 'path/to/default/image.png' %}" class="card-img-top" alt="{{ servicio.nombre }}"> #}
+                            {# <img src="{% static 'path/to/default/placeholder.png' %}" class="card-img-top" alt="{{ servicio.nombre }}"> #}
                         {% endif %}
                         <div class="card-body">
                             <h5 class="card-title">{{ servicio.nombre }}</h5>
