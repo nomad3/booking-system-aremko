@@ -385,8 +385,8 @@ class ServicioAdmin(admin.ModelAdmin):
     filter_horizontal = ('proveedores',) # Use a nice widget for ManyToMany
     fieldsets = (
         (None, {
-            # Changed 'proveedor' to 'proveedores'
-            'fields': ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima', 'imagen', 'proveedores', 'activo', 'publicado_web')
+            # Changed 'proveedor' to 'proveedores', added 'descripcion_web'
+            'fields': ('nombre', 'categoria', 'tipo_servicio', 'descripcion_web', 'precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima', 'imagen', 'proveedores', 'activo', 'publicado_web')
         }),
         ('Configuración Horaria', {
             'fields': (
