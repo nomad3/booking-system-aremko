@@ -132,6 +132,23 @@
     left: calc(50% - 30px);
 }
 
+/* Styles for service description truncation */
+.service-description-truncated {
+    display: -webkit-box;
+    -webkit-line-clamp: 3; /* Limit to 3 lines */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 0.25rem; /* Small margin before 'Ver más' */
+    /* Ensure line breaks within the description are respected up to the limit */
+    white-space: normal; /* Override potential parent styles */
+}
+
+.ver-mas-link {
+    cursor: pointer;
+    display: inline-block; /* Or block if needed */
+}
+
 </style>
 {% endblock %}
 
@@ -222,21 +239,29 @@
                         <div class="card-body">
                             <h5 class="card-title">{{ servicio.nombre }}</h5>
                             <p class="card-text text-muted"><small>{{ servicio.categoria.nombre }}</small></p> {# Category name smaller #}
-                            {# Display web description if it exists #}
+                            {# Display web description if it exists - Truncated #}
                             {% if servicio.descripcion_web %}
-                            <p class="card-text mb-2">{{ servicio.descripcion_web|linebreaksbr }}</p>
+                            <div class="service-description-wrapper mb-2">
+                                <p class="card-text service-description-truncated">
+                                    {{ servicio.descripcion_web|linebreaksbr }}
+                                </p>
+                                {# Link to trigger the modal #}
+                                <a href="#" class="ver-mas-link small" data-bs-toggle="modal" data-bs-target="#serviceDescriptionModal" data-description="{{ servicio.descripcion_web|linebreaksbr|escapejs }}" data-title="{{ servicio.nombre|escapejs }}">Ver más</a>
+                            </div>
                             {% endif %}
                             {% if servicio.tipo_servicio == 'cabana' %}
                                 <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
                             {% else %}
                                 <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p> {# Apply filters #}
                             {% endif %}
-                            <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p> {# Use custom filter #}
+                            
                             <button class="btn btn-primary w-100 js-open-booking-modal"
                                     data-servicio-id="{{ servicio.id }}"
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}"
                                     data-servicio-precio="{{ servicio.precio_base }}"
-                                    data-servicio-tipo="{{ servicio.tipo_servicio }}"> {# Add service type #}
+                                    data-servicio-tipo="{{ servicio.tipo_servicio }}" 
+                                    data-servicio-min="{{ servicio.capacidad_minima }}" 
+                                    data-servicio-max="{{ servicio.capacidad_maxima }}"> {# Add capacity #}
                                 <i class="fas fa-calendar-plus me-2"></i>Reservar
                             </button>
                         </div>
@@ -414,6 +439,24 @@
             </div>
         </div>
     </div>
+
+<!-- Service Description Modal -->
+<div class="modal fade" id="serviceDescriptionModal" tabindex="-1" aria-labelledby="serviceDescriptionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="serviceDescriptionModalLabel">Descripción del Servicio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="serviceDescriptionModalBody">
+                <!-- Full description will be loaded here by JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
 {# Checkout and Success modals are now in base_public.html #}
 {% endblock %}
 
@@ -438,7 +481,9 @@
     let currentServicioId = null;
     let currentServicioNombre = null;
     let currentServicioPrecio = 0;
-    let currentServicioTipo = 'otro'; // Add type, default to 'otro'
+    let currentServicioTipo = 'otro';
+    let currentServicioMin = 1; // Default min capacity
+    let currentServicioMax = 1; // Default max capacity
 
     // Función para cargar horas disponibles (específica de homepage)
     function loadAvailableHours(servicioId, fecha) {
@@ -497,10 +542,70 @@
             precioTotalInput.value = formatCLP(precioTotal);
             console.log("Updated total price:", formatCLP(precioTotal), "for type:", currentServicioTipo);
         }
+        
+        // Validate quantity after updating price
+        validateCantidadPersonas(); 
+        
         // Also validate the slot when quantity changes, if time is already selected
         const horaSelect = document.getElementById('hora');
         if (horaSelect && horaSelect.value) {
-            validateSelectedSlot();
+            validateSelectedSlot(); // This will re-evaluate the button state considering time
+        } else {
+            // If time is not selected, ensure button is disabled if quantity is invalid
+            const addToCartBtn = document.getElementById('addToCartBtn');
+            if (!isCantidadValid()) {
+                addToCartBtn.disabled = true;
+            }
+        }
+    }
+
+    // Function to validate the selected number of people
+    function isCantidadValid() {
+        const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
+        if (!cantidadPersonasSelect || cantidadPersonasSelect.disabled) {
+            return true; // Skip validation if disabled (e.g., for cabins)
+        }
+        const cantidadPersonas = parseInt(cantidadPersonasSelect.value);
+        return cantidadPersonas >= currentServicioMin && cantidadPersonas <= currentServicioMax;
+    }
+
+    // Function to show/hide quantity validation message and update button state
+    function validateCantidadPersonas() {
+        const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
+        const addToCartBtn = document.getElementById('addToCartBtn');
+        const parentDiv = cantidadPersonasSelect.parentNode;
+        let errorMsg = parentDiv.querySelector('.cantidad-error-msg');
+
+        if (!isCantidadValid()) {
+            // Show error message
+            if (!errorMsg) {
+                errorMsg = document.createElement('small');
+                errorMsg.className = 'text-danger d-block mt-1 cantidad-error-msg';
+                parentDiv.appendChild(errorMsg);
+            }
+            let message = `Cantidad debe estar entre ${currentServicioMin} y ${currentServicioMax}.`;
+            if (currentServicioMin === currentServicioMax) {
+                message = `Cantidad debe ser ${currentServicioMin}.`;
+            }
+            errorMsg.textContent = message;
+            errorMsg.style.display = 'block';
+            addToCartBtn.disabled = true; // Disable button if quantity is invalid
+        } else {
+            // Hide error message
+            if (errorMsg) {
+                errorMsg.style.display = 'none';
+            }
+            // Re-enable button ONLY if time is also valid (or not yet selected)
+            // validateSelectedSlot will handle enabling if time is valid.
+            // If time is not selected yet, we don't enable here, let time selection handle it.
+            const horaSelect = document.getElementById('hora');
+             if (!horaSelect || !horaSelect.value) {
+                 // If time isn't selected, keep button disabled until time is valid
+                 addToCartBtn.disabled = true;
+             } else {
+                 // If time IS selected, re-run time validation which will enable if appropriate
+                 validateSelectedSlot();
+             }
         }
     }
 
@@ -511,19 +616,25 @@
         const hora = document.getElementById('hora').value;
         const addToCartBtn = document.getElementById('addToCartBtn');
         const horaSelect = document.getElementById('hora');
-        
+
         // Remove previous warnings
         const existingWarning = horaSelect.parentNode.querySelector('.text-danger');
         if (existingWarning) {
             existingWarning.remove();
         }
 
-        if (!servicioId || !fecha || !hora) {
-            addToCartBtn.disabled = true; // Disable if not all info is selected
-            return; 
+        // Also check quantity validity before proceeding with time check
+        if (!isCantidadValid()) {
+             addToCartBtn.disabled = true;
+             return; // Don't check time if quantity is already invalid
         }
 
-        addToCartBtn.disabled = true; // Disable button while checking
+        if (!servicioId || !fecha || !hora) {
+            addToCartBtn.disabled = true; // Disable if not all info is selected
+            return;
+        }
+
+        addToCartBtn.disabled = true; // Disable button while checking time
 
         try {
             const response = await fetch(`{% url 'check_slot_availability' %}?servicio_id=${servicioId}&fecha=${fecha}&hora=${hora}`);
@@ -532,10 +643,11 @@
             }
             const data = await response.json();
 
-            if (data.available) {
-                addToCartBtn.disabled = false; // Enable button
+            // Enable button ONLY if time is available AND quantity is valid
+            if (data.available && isCantidadValid()) {
+                addToCartBtn.disabled = false; 
             } else {
-                // Slot not available, disable button and show warning
+                // Slot not available or quantity invalid, disable button and show warning if needed
                 addToCartBtn.disabled = true;
                 const warningMsg = document.createElement('small');
                 warningMsg.className = 'text-danger d-block mt-1'; // Bootstrap classes for styling
@@ -621,41 +733,66 @@
                 const servicioId = this.dataset.servicioId;
                 const servicioNombre = this.dataset.servicioNombre;
                 const servicioPrecio = parseFloat(this.dataset.servicioPrecio);
-                const servicioTipo = this.dataset.servicioTipo || 'otro'; // Get service type
+                const servicioTipo = this.dataset.servicioTipo || 'otro';
+                const servicioMin = parseInt(this.dataset.servicioMin) || 1; // Get min capacity
+                const servicioMax = parseInt(this.dataset.servicioMax) || 1; // Get max capacity
 
-                console.log("Opening booking modal via listener for:", servicioId, servicioNombre, servicioPrecio, servicioTipo);
+                console.log("Opening booking modal via listener for:", servicioId, servicioNombre, servicioPrecio, servicioTipo, `Min: ${servicioMin}`, `Max: ${servicioMax}`);
 
                 // Store current service details globally
                 currentServicioId = servicioId;
                 currentServicioNombre = servicioNombre;
                 currentServicioPrecio = servicioPrecio;
-                currentServicioTipo = servicioTipo; // Store type
+                currentServicioTipo = servicioTipo;
+                currentServicioMin = servicioMin; // Store min capacity
+                currentServicioMax = servicioMax; // Store max capacity
 
                 // Populate modal fields
                 document.getElementById('servicioId').value = servicioId;
                 document.getElementById('servicioNombre').value = servicioNombre;
                 document.getElementById('fecha').value = '';
                 document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
-                document.getElementById('hora').disabled = true; // Disable initially
+                document.getElementById('hora').disabled = true;
+                document.getElementById('addToCartBtn').disabled = true; // Disable button initially
 
-                // Handle quantity selector based on service type
+                // Handle quantity selector based on service type and capacity
                 const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
-                const cantidadPersonasLabel = document.querySelector('label[for="cantidadPersonas"]'); // Get label too
-                if (servicioTipo === 'cabana') {
-                    cantidadPersonasSelect.value = '2'; // Default/max for cabin
-                    cantidadPersonasSelect.disabled = true; // Disable quantity selection
-                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none'; // Hide label
-                    cantidadPersonasSelect.style.display = 'none'; // Hide select
-                    document.getElementById('precioTotal').value = formatCLP(servicioPrecio); // Show fixed price
+                const cantidadPersonasLabel = document.querySelector('label[for="cantidadPersonas"]');
+                const cantidadErrorMsg = cantidadPersonasSelect.parentNode.querySelector('.cantidad-error-msg');
+                if (cantidadErrorMsg) cantidadErrorMsg.style.display = 'none'; // Hide previous error
+
+                // Populate options dynamically based on min/max, only if not a cabin
+                cantidadPersonasSelect.innerHTML = ''; // Clear existing options
+                if (servicioTipo !== 'cabana') {
+                    for (let i = 1; i <= 5; i++) { // Assuming max 5 is a general limit, adjust if needed
+                         if (i >= currentServicioMin && i <= currentServicioMax) {
+                            const option = document.createElement('option');
+                            option.value = i;
+                            option.textContent = `${i} persona${i > 1 ? 's' : ''}`;
+                            cantidadPersonasSelect.appendChild(option);
+                         }
+                    }
+                    // Set default value to minimum if possible, otherwise the first valid option
+                    cantidadPersonasSelect.value = currentServicioMin <= 5 ? currentServicioMin : (cantidadPersonasSelect.options.length > 0 ? cantidadPersonasSelect.options[0].value : '1');
+                    cantidadPersonasSelect.disabled = false;
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'block';
+                    cantidadPersonasSelect.style.display = 'block';
                 } else {
-                    cantidadPersonasSelect.value = '1'; // Default for others
-                    cantidadPersonasSelect.disabled = false; // Enable quantity selection
-                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'block'; // Show label
-                    cantidadPersonasSelect.style.display = 'block'; // Show select
-                    document.getElementById('precioTotal').value = formatCLP(servicioPrecio); // Show initial price per person
+                    // Special handling for cabins (assuming fixed capacity, e.g., 2)
+                    const option = document.createElement('option');
+                    option.value = currentServicioMax; // Use max as the fixed value for cabins
+                    option.textContent = `${currentServicioMax} persona${currentServicioMax > 1 ? 's' : ''}`;
+                    cantidadPersonasSelect.appendChild(option);
+                    cantidadPersonasSelect.value = currentServicioMax;
+                    cantidadPersonasSelect.disabled = true;
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none';
+                    cantidadPersonasSelect.style.display = 'none';
                 }
 
-                // Show modal
+                // Update price and run initial validation after setting defaults
+                updatePrecioTotal(); 
+
+                 // Show modal
                 const bookingModalEl = document.getElementById('bookingModal');
                 if (bookingModalEl) {
                     const bookingModal = new bootstrap.Modal(bookingModalEl);
@@ -731,6 +868,29 @@
             });
         });
         console.log("Event listeners added for category filters");
+
+        // Listener for the service description modal
+        const serviceDescriptionModalEl = document.getElementById('serviceDescriptionModal');
+        if (serviceDescriptionModalEl) {
+            serviceDescriptionModalEl.addEventListener('show.bs.modal', function (event) {
+                // Button that triggered the modal
+                const button = event.relatedTarget;
+                // Extract info from data-* attributes
+                const description = button.getAttribute('data-description');
+                const title = button.getAttribute('data-title');
+
+                // Update the modal's content.
+                const modalTitle = serviceDescriptionModalEl.querySelector('.modal-title');
+                const modalBody = serviceDescriptionModalEl.querySelector('.modal-body');
+
+                modalTitle.textContent = title || 'Descripción del Servicio'; // Fallback title
+                // Use innerHTML to render the line breaks correctly
+                modalBody.innerHTML = description || 'No hay descripción disponible.'; // Fallback text
+            });
+            console.log("Event listener added for service description modal 'show.bs.modal'");
+        } else {
+            console.error("Service description modal element not found");
+        }
 
     });
 </script>
