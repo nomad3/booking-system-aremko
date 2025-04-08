@@ -26,46 +26,39 @@ admin.site.site_title = _("Panel de Administración")
 
 class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
-    # form = ReservaServicioInlineForm # Removed custom form
-    fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas', 'proveedor_asignado'] # Ensure field is listed
-    autocomplete_fields = ['servicio', 'proveedor_asignado'] # Add autocomplete for proveedor_asignado
+    # Use default form but explicitly list fields to ensure order and inclusion
+    fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas', 'proveedor_asignado']
+    readonly_fields = [] # Ensure no fields are inadvertently read-only here
+    autocomplete_fields = ['servicio', 'proveedor_asignado'] # Use autocomplete
     extra = 1
     min_num = 0
 
-    # Keep the formfield_for_foreignkey if you still want to filter the servicio dropdown
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "servicio":
-            kwargs["queryset"] = Servicio.objects.filter(activo=True).order_by('nombre')
-        # No special handling needed for proveedor_asignado here, autocomplete handles it
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    # Removed custom formfield_for_foreignkey - let autocomplete handle filtering based on search_fields in related admin
+    # Removed Media class
 
-    # Removed Media class as JS is no longer needed
-    # class Media:
-    #     js = ('admin/js/reserva_servicio_admin.js',)
-
-    # The get_formset modification for hora_inicio might still be relevant if using CharField
-    def get_formset(self, request, obj=None, **kwargs):
-        formset = super().get_formset(request, obj, **kwargs)
-        # Ensure hora_inicio field exists before modifying widget attributes
-        if 'hora_inicio' in formset.form.base_fields:
-            formset.form.base_fields['hora_inicio'].widget.can_add_related = False
-            formset.form.base_fields['hora_inicio'].widget.can_change_related = False
-        return formset
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "servicio":
-            kwargs["queryset"] = Servicio.objects.filter(activo=True).order_by('nombre')
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
-    # Add Media class to include custom JavaScript for dynamic filtering
-    class Media:
-        js = ('admin/js/reserva_servicio_admin.js',) # Path relative to STATIC_URL
+    # Removed get_formset override for simplicity, relying on default widgets + autocomplete
+    # def get_formset(self, request, obj=None, **kwargs): ...
 
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
     extra = 1
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "producto":
+            kwargs["queryset"] = Producto.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+class PagoInline(admin.TabularInline):
+    model = Pago
+    form = PagoInlineForm
+    extra = 1
+    fields = ['fecha_pago', 'monto', 'metodo_pago', 'giftcard']
+    autocomplete_fields = ['giftcard']
+
+    def save_model(self, request, obj, form, change):
+        if not change:  # If this is a new instance
+            obj.usuario = request.user
+        super().save_model(request, obj, form, change)
         if db_field.name == "producto":
             kwargs["queryset"] = Producto.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
         return super().formfield_for_foreignkey(db_field, request, **kwargs)

@@ -35,9 +35,9 @@ def servicios_vendidos_view(request):
     except ValueError:
         fecha_fin = hoy
 
-    # Consultar todos los servicios vendidos
+    # Consultar todos los servicios vendidos, including assigned provider
     servicios_vendidos = ReservaServicio.objects.select_related(
-        'venta_reserva__cliente', 'servicio__categoria'
+        'venta_reserva__cliente', 'servicio__categoria', 'proveedor_asignado'
     )
 
     # Filtrar por rango de fechas usando date objects directly with __gte and __lte
@@ -102,7 +102,8 @@ def servicios_vendidos_view(request):
             'hora_agendamiento_str': hora_display_str, # Use formatted string for display/export
             'monto': servicio.servicio.precio_base,
             'cantidad_personas': servicio.cantidad_personas,
-            'total_monto': total_monto
+            'total_monto': total_monto,
+            'proveedor_asignado': servicio.proveedor_asignado.nombre if servicio.proveedor_asignado else 'N/A' # Add assigned provider name
         })
 
     # Pasar los datos y las categorías a la plantilla
@@ -141,7 +142,8 @@ def servicios_vendidos_view(request):
             'Fecha de Agendamiento',
             'Hora de Agendamiento',
             'Cantidad de Personas',
-            'Monto Total'
+            'Monto Total',
+            'Proveedor Asignado' # Add new header
         ]
 
         for col, header in enumerate(headers):
@@ -158,6 +160,7 @@ def servicios_vendidos_view(request):
             ws.write(row, 5, servicio_data['hora_agendamiento_str']) # Use string for Excel time
             ws.write(row, 6, servicio_data['cantidad_personas'])
             ws.write(row, 7, servicio_data['total_monto'], money_style)
+            ws.write(row, 8, servicio_data['proveedor_asignado']) # Add provider data to Excel
 
         wb.save(response)
         return response
