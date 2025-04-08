@@ -246,7 +246,7 @@
                                     {{ servicio.descripcion_web|linebreaksbr }}
                                 </p>
                                 {# Link to trigger the modal #}
-                                <a href="#" class="ver-mas-link small" data-bs-toggle="modal" data-bs-target="#serviceDescriptionModal" data-description="{{ servicio.descripcion_web|linebreaksbr|escapejs }}" data-title="{{ servicio.nombre|escapejs }}">Ver más</a>
+                                <a href="#" class="ver-mas-link small" data-bs-toggle="modal" data-bs-target="#serviceDescriptionModal" data-description="{{ servicio.descripcion_web|linebreaksbr }}" data-title="{{ servicio.nombre|escapejs }}">Ver más</a>
                             </div>
                             {% endif %}
                             {% if servicio.tipo_servicio == 'cabana' %}
