@@ -36,8 +36,12 @@ class ReservaServicioInline(admin.TabularInline):
     # Removed custom formfield_for_foreignkey - let autocomplete handle filtering based on search_fields in related admin
     # Removed Media class
 
-    # Removed get_formset override for simplicity, relying on default widgets + autocomplete
-    # def get_formset(self, request, obj=None, **kwargs): ...
+    # Add back get_formset to set placeholder for hora_inicio CharField
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        if 'hora_inicio' in formset.form.base_fields and isinstance(formset.form.base_fields['hora_inicio'].widget, forms.TextInput):
+             formset.form.base_fields['hora_inicio'].widget.attrs.update({'placeholder': 'HH:MM', 'style': 'width: 7em;'}) # Add placeholder and width
+        return formset
 
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
