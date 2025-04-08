@@ -77,6 +77,7 @@
                 <th class="px-4 py-3">Hora</th>
                 <th class="px-4 py-3 text-end">Personas</th> {# Align right #}
                 <th class="px-4 py-3 text-end">Monto Total</th> {# Align right #}
+                <th class="px-4 py-3">Proveedor Asignado</th> {# New column #}
             </tr>
         </thead>
         <tbody>
@@ -91,13 +92,14 @@
                 <td class="px-4 py-3">{{ servicio.categoria_servicio }}</td>
                 <td class="px-4 py-3">{{ servicio.servicio_nombre }}</td>
                 <td class="px-4 py-3">{{ servicio.fecha_agendamiento }}</td>
-                <td class="px-4 py-3">{{ servicio.hora_agendamiento }}</td>
+                <td class="px-4 py-3">{{ servicio.hora_agendamiento_str }}</td> {# Use the formatted string #}
                 <td class="px-4 py-3 text-end">{{ servicio.cantidad_personas }}</td> {# Align right #}
                 <td class="px-4 py-3 text-end">${{ servicio.total_monto|intcomma }}</td> {# Use humanize #}
+                <td class="px-4 py-3">{{ servicio.proveedor_asignado }}</td> {# Display assigned provider #}
             </tr>
             {% empty %}
             <tr>
-                <td colspan="8" class="text-center py-4">No se encontraron servicios vendidos.</td> {# Centered text #}
+                <td colspan="9" class="text-center py-4">No se encontraron servicios vendidos.</td> {# Updated colspan to 9 #}
             </tr>
             {% endfor %}
         </tbody>
