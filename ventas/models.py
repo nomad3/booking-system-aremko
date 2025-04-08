@@ -213,6 +213,11 @@ class Servicio(models.Model):
         help_text="Tipo de servicio para aplicar lógicas específicas (ej. precios, horarios)."
     )
     imagen = models.ImageField(upload_to='servicios/', blank=True, null=True, help_text="Imagen para el servicio")
+    descripcion_web = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Descripción detallada para mostrar en la página web pública."
+    )
 
     def __str__(self):
         return self.nombre
