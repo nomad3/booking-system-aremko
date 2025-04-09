@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
+    'storages', # Add django-storages
 ]
 
 # MIDDLEWARE
@@ -96,9 +97,37 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Media files configuration (for ImageField)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# Media files configuration (Local vs GCS)
+# Check if GOOGLE_APPLICATION_CREDENTIALS is set (indicating GCS usage)
+if os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
+    DEFAULT_FILE_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
+    GS_BUCKET_NAME = os.getenv('GS_BUCKET_NAME', 'aremkoweb') # Use env var or default
+    GS_PROJECT_ID = os.getenv('GS_PROJECT_ID', 'aremko-e51ae') # Use env var or default
+    # Construct the full path to the credentials file relative to BASE_DIR
+    GS_CREDENTIALS_PATH = BASE_DIR / os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+    # Check if the credentials file exists before setting GS_CREDENTIALS
+    if GS_CREDENTIALS_PATH.is_file():
+        # Note: django-storages expects the *path* to the credentials file,
+        # not the content, when using GS_CREDENTIALS setting directly like this.
+        # However, it's often more robust to rely on the GOOGLE_APPLICATION_CREDENTIALS
+        # environment variable being set correctly in the deployment environment,
+        # which google-cloud-storage library picks up automatically.
+        # Setting GS_CREDENTIALS explicitly might be needed in some setups.
+        # For now, we'll rely on the environment variable being set.
+        pass # GS_CREDENTIALS = str(GS_CREDENTIALS_PATH) # Uncomment if needed
+
+    # Make uploaded files publicly readable by default
+    GS_DEFAULT_ACL = 'publicRead'
+    GS_FILE_OVERWRITE = False # Prevent overwriting files with the same name
+
+    # Update MEDIA_URL for GCS
+    MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/media/'
+    MEDIA_ROOT = f'gs://{GS_BUCKET_NAME}/media' # Optional: For management commands
+
+else:
+    # Default to local file storage if GOOGLE_APPLICATION_CREDENTIALS is not set
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
 REST_FRAMEWORK = {

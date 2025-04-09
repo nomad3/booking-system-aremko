@@ -23,7 +23,8 @@ services:
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
-      - media_volume:/app/media
+      # Mount the credentials file into the container
+      - ./aremko-e51ae-0912defb776b.json:/app/aremko-e51ae-0912defb776b.json:ro # Mount as read-only
     ports:
       - "8002:8000" # Changed host port from 8001 to 8002
     env_file:
@@ -33,6 +34,10 @@ services:
         condition: service_healthy
     environment:
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Google Cloud Storage settings
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/aremko-e51ae-0912defb776b.json
+      - GS_BUCKET_NAME=aremkoweb
+      - GS_PROJECT_ID=aremko-e51ae
 
   db:
     image: postgres:13
@@ -67,4 +72,4 @@ services:
 volumes:
   postgres_data:
   static_volume:
-  media_volume:
+  # media_volume is no longer needed as files are stored in GCS

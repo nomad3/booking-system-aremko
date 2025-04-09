@@ -170,7 +170,13 @@ class DetalleCompra(models.Model):
 class CategoriaServicio(models.Model):
     nombre = models.CharField(max_length=100)
     horarios = models.CharField(max_length=200, help_text="Ingresa los horarios disponibles separados por comas. Ejemplo: 14:00, 15:30, 17:00", blank=True)
-    imagen = models.URLField(max_length=1024, blank=True, null=True, help_text="URL de la imagen externa (ej. Google Cloud Storage)") # Changed from ImageField
+    # Changed to ImageField to use Django's storage backend (GCS)
+    imagen = models.ImageField(
+        upload_to='categorias/', # Subdirectory within MEDIA_ROOT (GCS bucket)
+        blank=True,
+        null=True,
+        help_text="Imagen representativa de la categoría."
+    )
 
     def __str__(self):
         return self.nombre
@@ -212,7 +218,13 @@ class Servicio(models.Model):
         default='otro',
         help_text="Tipo de servicio para aplicar lógicas específicas (ej. precios, horarios)."
     )
-    imagen = models.URLField(max_length=1024, blank=True, null=True, help_text="URL de la imagen externa (ej. Google Cloud Storage)") # Changed from ImageField
+    # Changed to ImageField to use Django's storage backend (GCS)
+    imagen = models.ImageField(
+        upload_to='servicios/', # Subdirectory within MEDIA_ROOT (GCS bucket)
+        blank=True,
+        null=True,
+        help_text="Imagen representativa del servicio."
+    )
     descripcion_web = models.TextField(
         blank=True,
         null=True,
