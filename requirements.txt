@@ -1,7 +1,7 @@
 Django==4.2
 psycopg2-binary==2.9.6  # PostgreSQL adapter
 google-api-python-client==2.85.0  # Google Calendar API
-google-auth==2.15.0
+google-auth # Removed version pin to allow compatible version installation
 google-auth-oauthlib==0.7.1
 google-auth-httplib2==0.1.0
 requests==2.28.1  # Para la integración con ManyChat
