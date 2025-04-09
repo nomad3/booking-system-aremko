@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 import random
 import string
-from django.db.models import Sum, F
+from django.db.models import Sum, F, DecimalField, FloatField # Added DecimalField, FloatField
 
 class Proveedor(models.Model):
     nombre = models.CharField(max_length=100)
@@ -429,10 +429,11 @@ class MovimientoCliente(models.Model):
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE)
     tipo_movimiento = models.CharField(max_length=50)
     fecha_movimiento = models.DateTimeField(auto_now_add=True)
+    # Changed on_delete to SET_NULL to prevent IntegrityError during test teardown
     usuario = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL,
-        null=True,
+        User,
+        on_delete=models.SET_NULL, # Keep user info if possible, but allow deletion
+        null=True, # Allow null values
         blank=True
     )
     comentarios = models.TextField(blank=True)
@@ -508,3 +509,192 @@ class ReservaServicio(models.Model):
             #     self.proveedor_asignado = None # Or raise validation error
 
     # Consider adding validation in save() as well if needed, clean() isn't called automatically everywhere.
+
+
+# --- CRM & Marketing Models ---
+
+class Campaign(models.Model):
+    STATUS_CHOICES = [
+        ('Planning', 'Planning'),
+        ('Active', 'Active'),
+        ('Completed', 'Completed'),
+        ('Cancelled', 'Cancelled'),
+    ]
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='Planning')
+    goal = models.TextField(blank=True)
+    budget = DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+    # Placeholder for ROI calculation methods
+    def get_associated_leads_count(self):
+        return self.leads.count()
+
+    def get_won_deals_count(self):
+        return self.deals.filter(stage='Closed Won').count()
+
+    def get_won_deals_value(self):
+        return self.deals.filter(stage='Closed Won').aggregate(total_value=Sum('amount'))['total_value'] or 0
+
+
+class Lead(models.Model):
+    STATUS_CHOICES = [
+        ('New', 'New'),
+        ('Contacted', 'Contacted'),
+        ('Qualified', 'Qualified'),
+        ('Unqualified', 'Unqualified'),
+        ('Converted', 'Converted'),
+    ]
+    SOURCE_CHOICES = [
+        ('Website Form', 'Website Form'),
+        ('Referral', 'Referral'),
+        ('Cold Call', 'Cold Call'),
+        ('Event', 'Event'),
+        ('Campaign', 'Campaign'),
+        ('Other', 'Other'), # Added Other for flexibility
+    ]
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    email = models.EmailField(unique=True)
+    phone = models.CharField(max_length=30, blank=True, null=True) # Increased length
+    company_name = models.CharField(max_length=255, blank=True, null=True)
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='New')
+    source = models.CharField(max_length=50, choices=SOURCE_CHOICES, blank=True, null=True)
+    notes = models.TextField(blank=True)
+    campaign = models.ForeignKey(Campaign, on_delete=models.SET_NULL, null=True, blank=True, related_name='leads')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} ({self.email})"
+
+
+class Company(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    website = models.URLField(blank=True, null=True)
+    address = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Contact(models.Model):
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    email = models.EmailField(unique=True)
+    phone = models.CharField(max_length=30, blank=True, null=True) # Increased length
+    job_title = models.CharField(max_length=100, blank=True, null=True)
+    company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name='contacts')
+    # Link to Django's built-in User model
+    linked_user = models.OneToOneField(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='crm_contact'
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} ({self.email})"
+
+
+class Deal(models.Model):
+    STAGE_CHOICES = [
+        ('Prospecting', 'Prospecting'),
+        ('Qualification', 'Qualification'),
+        ('Proposal', 'Proposal'),
+        ('Negotiation', 'Negotiation'),
+        ('Closed Won', 'Closed Won'),
+        ('Closed Lost', 'Closed Lost'),
+    ]
+    name = models.CharField(max_length=255)
+    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='deals')
+    stage = models.CharField(max_length=50, choices=STAGE_CHOICES, default='Prospecting')
+    expected_close_date = models.DateField(null=True, blank=True)
+    amount = DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    probability = FloatField(null=True, blank=True, help_text="Probability from 0.0 to 1.0")
+    # Assuming 'ventas.VentaReserva' is your booking/purchase model as requested
+    related_booking = models.ForeignKey(
+        'ventas.VentaReserva', # Using the likely model name from your app
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='crm_deal'
+    )
+    campaign = models.ForeignKey(Campaign, on_delete=models.SET_NULL, null=True, blank=True, related_name='deals')
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Deal: {self.name} for {self.contact}"
+
+
+class Activity(models.Model):
+    TYPE_CHOICES = [
+        ('Call', 'Call'),
+        ('Email Sent', 'Email Sent'),
+        ('Email Received', 'Email Received'),
+        ('Meeting', 'Meeting'),
+        ('Note Added', 'Note Added'),
+        ('Status Change', 'Status Change'),
+        ('Other', 'Other'), # Added Other
+    ]
+    activity_type = models.CharField(max_length=50, choices=TYPE_CHOICES)
+    subject = models.CharField(max_length=255)
+    notes = models.TextField(blank=True)
+    activity_date = models.DateTimeField(default=timezone.now)
+    related_lead = models.ForeignKey(Lead, on_delete=models.CASCADE, null=True, blank=True, related_name='activities')
+    related_contact = models.ForeignKey(Contact, on_delete=models.CASCADE, null=True, blank=True, related_name='activities')
+    related_deal = models.ForeignKey(Deal, on_delete=models.CASCADE, null=True, blank=True, related_name='activities')
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_activities'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        related_object = self.related_lead or self.related_contact or self.related_deal or "System"
+        return f"{self.activity_type}: {self.subject} ({related_object})"
+
+    def clean(self):
+        """Ensure only one related object (Lead, Contact, or Deal) is linked."""
+        super().clean()
+        related_objects = [self.related_lead, self.related_contact, self.related_deal]
+        linked_count = sum(1 for obj in related_objects if obj is not None)
+        if linked_count > 1:
+            raise ValidationError("An activity can only be related to one Lead, Contact, OR Deal at a time.")
+        # Optional: Ensure at least one is linked if required by your logic
+        # if linked_count == 0:
+        #     raise ValidationError("An activity must be related to a Lead, Contact, or Deal.")
+
+    # Optional: Add a CheckConstraint for database-level validation (requires Django 3.0+)
+    # class Meta:
+    #     constraints = [
+    #         models.CheckConstraint(
+    #             check=(
+    #                 models.Q(related_lead__isnull=False, related_contact__isnull=True, related_deal__isnull=True) |
+    #                 models.Q(related_lead__isnull=True, related_contact__isnull=False, related_deal__isnull=True) |
+    #                 models.Q(related_lead__isnull=True, related_contact__isnull=True, related_deal__isnull=False) |
+    #                 # Optional: Allow activities not linked to any (e.g., general notes)
+    #                 models.Q(related_lead__isnull=True, related_contact__isnull=True, related_deal__isnull=True)
+    #             ),
+    #             name='crm_activity_single_relation'
+    #         )
+    #     ]
