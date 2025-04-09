@@ -391,6 +391,11 @@ def validar_disponibilidad_admin(sender, instance, **kwargs):
         fecha_propuesta=instance.fecha_agendamiento,
         hora_propuesta=instance.hora_inicio,
         cantidad_personas=instance.cantidad_personas,
-        reserva_actual=instance # Pass the current instance
+        reserva_actual=instance, # Pass the current instance to exclude itself
+        proveedor_asignado=instance.proveedor_asignado # Pass the provider being assigned
     ):
-        raise ValidationError(f"Slot {instance.hora_inicio} no disponible para {instance.servicio.nombre}")
+        # Customize error message if provider is the issue
+        error_msg = f"Slot {instance.hora_inicio} no disponible para {instance.servicio.nombre}"
+        if instance.servicio.tipo_servicio == 'masaje' and instance.proveedor_asignado:
+            error_msg += f" con el proveedor {instance.proveedor_asignado.nombre}"
+        raise ValidationError(error_msg)
