@@ -511,24 +511,28 @@ class ReservaServicio(models.Model):
     # Consider adding validation in save() as well if needed, clean() isn't called automatically everywhere.
 
 
-# --- CRM & Marketing Models ---
+# --- Modelos CRM & Marketing ---
 
 class Campaign(models.Model):
     STATUS_CHOICES = [
-        ('Planning', 'Planning'),
-        ('Active', 'Active'),
-        ('Completed', 'Completed'),
-        ('Cancelled', 'Cancelled'),
+        ('Planning', 'Planificación'),
+        ('Active', 'Activa'),
+        ('Completed', 'Completada'),
+        ('Cancelled', 'Cancelada'),
     ]
-    name = models.CharField(max_length=255, unique=True)
-    description = models.TextField(blank=True)
-    start_date = models.DateField(null=True, blank=True)
-    end_date = models.DateField(null=True, blank=True)
-    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='Planning')
-    goal = models.TextField(blank=True)
-    budget = DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    name = models.CharField(max_length=255, unique=True, verbose_name="Nombre")
+    description = models.TextField(blank=True, verbose_name="Descripción")
+    start_date = models.DateField(null=True, blank=True, verbose_name="Fecha de Inicio")
+    end_date = models.DateField(null=True, blank=True, verbose_name="Fecha de Fin")
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='Planning', verbose_name="Estado")
+    goal = models.TextField(blank=True, verbose_name="Objetivo")
+    budget = DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Presupuesto")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Fecha de Actualización")
+
+    class Meta:
+        verbose_name = "Campaña"
+        verbose_name_plural = "Campañas"
 
     def __str__(self):
         return self.name
@@ -546,65 +550,78 @@ class Campaign(models.Model):
 
 class Lead(models.Model):
     STATUS_CHOICES = [
-        ('New', 'New'),
-        ('Contacted', 'Contacted'),
-        ('Qualified', 'Qualified'),
-        ('Unqualified', 'Unqualified'),
-        ('Converted', 'Converted'),
+        ('New', 'Nuevo'),
+        ('Contacted', 'Contactado'),
+        ('Qualified', 'Calificado'),
+        ('Unqualified', 'No Calificado'),
+        ('Converted', 'Convertido'),
     ]
     SOURCE_CHOICES = [
-        ('Website Form', 'Website Form'),
-        ('Referral', 'Referral'),
-        ('Cold Call', 'Cold Call'),
-        ('Event', 'Event'),
-        ('Campaign', 'Campaign'),
-        ('Other', 'Other'), # Added Other for flexibility
+        ('Website Form', 'Formulario Web'),
+        ('Referral', 'Referido'),
+        ('Cold Call', 'Llamada en Frío'),
+        ('Event', 'Evento'),
+        ('Campaign', 'Campaña'),
+        ('Other', 'Otro'),
     ]
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    email = models.EmailField(unique=True)
-    phone = models.CharField(max_length=30, blank=True, null=True) # Increased length
-    company_name = models.CharField(max_length=255, blank=True, null=True)
-    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='New')
-    source = models.CharField(max_length=50, choices=SOURCE_CHOICES, blank=True, null=True)
-    notes = models.TextField(blank=True)
-    campaign = models.ForeignKey(Campaign, on_delete=models.SET_NULL, null=True, blank=True, related_name='leads')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    first_name = models.CharField(max_length=100, verbose_name="Nombre")
+    last_name = models.CharField(max_length=100, verbose_name="Apellido")
+    email = models.EmailField(unique=True, verbose_name="Correo Electrónico")
+    phone = models.CharField(max_length=30, blank=True, null=True, verbose_name="Teléfono")
+    company_name = models.CharField(max_length=255, blank=True, null=True, verbose_name="Nombre Compañía")
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='New', verbose_name="Estado")
+    source = models.CharField(max_length=50, choices=SOURCE_CHOICES, blank=True, null=True, verbose_name="Fuente")
+    notes = models.TextField(blank=True, verbose_name="Notas")
+    campaign = models.ForeignKey(Campaign, on_delete=models.SET_NULL, null=True, blank=True, related_name='leads', verbose_name="Campaña")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Fecha de Actualización")
+
+    class Meta:
+        verbose_name = "Lead (Prospecto)"
+        verbose_name_plural = "Leads (Prospectos)"
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.email})"
 
 
 class Company(models.Model):
-    name = models.CharField(max_length=255, unique=True)
-    website = models.URLField(blank=True, null=True)
-    address = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    name = models.CharField(max_length=255, unique=True, verbose_name="Nombre")
+    website = models.URLField(blank=True, null=True, verbose_name="Sitio Web")
+    address = models.TextField(blank=True, verbose_name="Dirección")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Fecha de Actualización")
+
+    class Meta:
+        verbose_name = "Compañía"
+        verbose_name_plural = "Compañías"
 
     def __str__(self):
         return self.name
 
 
 class Contact(models.Model):
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    email = models.EmailField(unique=True)
-    phone = models.CharField(max_length=30, blank=True, null=True) # Increased length
-    job_title = models.CharField(max_length=100, blank=True, null=True)
-    company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name='contacts')
+    first_name = models.CharField(max_length=100, verbose_name="Nombre")
+    last_name = models.CharField(max_length=100, verbose_name="Apellido")
+    email = models.EmailField(unique=True, verbose_name="Correo Electrónico")
+    phone = models.CharField(max_length=30, blank=True, null=True, verbose_name="Teléfono")
+    job_title = models.CharField(max_length=100, blank=True, null=True, verbose_name="Cargo")
+    company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name='contacts', verbose_name="Compañía")
     # Link to Django's built-in User model
     linked_user = models.OneToOneField(
         User,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='crm_contact'
+        related_name='crm_contact',
+        verbose_name="Usuario Vinculado"
     )
-    notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    notes = models.TextField(blank=True, verbose_name="Notas")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Fecha de Actualización")
+
+    class Meta:
+        verbose_name = "Contacto"
+        verbose_name_plural = "Contactos"
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.email})"
@@ -612,66 +629,76 @@ class Contact(models.Model):
 
 class Deal(models.Model):
     STAGE_CHOICES = [
-        ('Prospecting', 'Prospecting'),
-        ('Qualification', 'Qualification'),
-        ('Proposal', 'Proposal'),
-        ('Negotiation', 'Negotiation'),
-        ('Closed Won', 'Closed Won'),
-        ('Closed Lost', 'Closed Lost'),
+        ('Prospecting', 'Prospección'),
+        ('Qualification', 'Calificación'),
+        ('Proposal', 'Propuesta'),
+        ('Negotiation', 'Negociación'),
+        ('Closed Won', 'Cerrada Ganada'),
+        ('Closed Lost', 'Cerrada Perdida'),
     ]
-    name = models.CharField(max_length=255)
-    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='deals')
-    stage = models.CharField(max_length=50, choices=STAGE_CHOICES, default='Prospecting')
-    expected_close_date = models.DateField(null=True, blank=True)
-    amount = DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    probability = FloatField(null=True, blank=True, help_text="Probability from 0.0 to 1.0")
+    name = models.CharField(max_length=255, verbose_name="Nombre Oportunidad")
+    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='deals', verbose_name="Contacto")
+    stage = models.CharField(max_length=50, choices=STAGE_CHOICES, default='Prospecting', verbose_name="Etapa")
+    expected_close_date = models.DateField(null=True, blank=True, verbose_name="Fecha Cierre Estimada")
+    amount = DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Monto")
+    probability = FloatField(null=True, blank=True, help_text="Probabilidad de 0.0 a 1.0", verbose_name="Probabilidad")
     # Assuming 'ventas.VentaReserva' is your booking/purchase model as requested
     related_booking = models.ForeignKey(
         'ventas.VentaReserva', # Using the likely model name from your app
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='crm_deal'
+        related_name='crm_deal',
+        verbose_name="Reserva Vinculada"
     )
-    campaign = models.ForeignKey(Campaign, on_delete=models.SET_NULL, null=True, blank=True, related_name='deals')
-    notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    campaign = models.ForeignKey(Campaign, on_delete=models.SET_NULL, null=True, blank=True, related_name='deals', verbose_name="Campaña")
+    notes = models.TextField(blank=True, verbose_name="Notas")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Fecha de Actualización")
+
+    class Meta:
+        verbose_name = "Oportunidad (Deal)"
+        verbose_name_plural = "Oportunidades (Deals)"
 
     def __str__(self):
-        return f"Deal: {self.name} for {self.contact}"
+        return f"Oportunidad: {self.name} para {self.contact}"
 
 
 class Activity(models.Model):
     TYPE_CHOICES = [
-        ('Call', 'Call'),
-        ('Email Sent', 'Email Sent'),
-        ('Email Received', 'Email Received'),
-        ('Meeting', 'Meeting'),
-        ('Note Added', 'Note Added'),
-        ('Status Change', 'Status Change'),
-        ('Other', 'Other'), # Added Other
+        ('Call', 'Llamada'),
+        ('Email Sent', 'Correo Enviado'),
+        ('Email Received', 'Correo Recibido'),
+        ('Meeting', 'Reunión'),
+        ('Note Added', 'Nota Agregada'),
+        ('Status Change', 'Cambio de Estado'),
+        ('Other', 'Otro'),
     ]
-    activity_type = models.CharField(max_length=50, choices=TYPE_CHOICES)
-    subject = models.CharField(max_length=255)
-    notes = models.TextField(blank=True)
-    activity_date = models.DateTimeField(default=timezone.now)
-    related_lead = models.ForeignKey(Lead, on_delete=models.CASCADE, null=True, blank=True, related_name='activities')
-    related_contact = models.ForeignKey(Contact, on_delete=models.CASCADE, null=True, blank=True, related_name='activities')
-    related_deal = models.ForeignKey(Deal, on_delete=models.CASCADE, null=True, blank=True, related_name='activities')
+    activity_type = models.CharField(max_length=50, choices=TYPE_CHOICES, verbose_name="Tipo de Actividad")
+    subject = models.CharField(max_length=255, verbose_name="Asunto")
+    notes = models.TextField(blank=True, verbose_name="Notas")
+    activity_date = models.DateTimeField(default=timezone.now, verbose_name="Fecha Actividad")
+    related_lead = models.ForeignKey(Lead, on_delete=models.CASCADE, null=True, blank=True, related_name='activities', verbose_name="Lead Relacionado")
+    related_contact = models.ForeignKey(Contact, on_delete=models.CASCADE, null=True, blank=True, related_name='activities', verbose_name="Contacto Relacionado")
+    related_deal = models.ForeignKey(Deal, on_delete=models.CASCADE, null=True, blank=True, related_name='activities', verbose_name="Oportunidad Relacionada")
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='created_activities'
+        related_name='created_activities',
+        verbose_name="Creado por"
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Fecha de Actualización")
+
+    class Meta:
+        verbose_name = "Actividad"
+        verbose_name_plural = "Actividades"
 
     def __str__(self):
-        related_object = self.related_lead or self.related_contact or self.related_deal or "System"
-        return f"{self.activity_type}: {self.subject} ({related_object})"
+        related_object = self.related_lead or self.related_contact or self.related_deal or "Sistema"
+        return f"{self.get_activity_type_display()}: {self.subject} ({related_object})"
 
     def clean(self):
         """Ensure only one related object (Lead, Contact, or Deal) is linked."""

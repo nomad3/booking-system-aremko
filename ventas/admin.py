@@ -442,19 +442,23 @@ admin.site.register(Cliente, ClienteAdmin)
 # CategoriaServicio is now registered with the custom class above
 
 
-# --- CRM & Marketing Admin Configurations ---
+# --- Configuraciones Admin CRM & Marketing ---
 
-# Inlines first
+# Inlines primero
 
 class ActivityInline(admin.TabularInline):
     model = Activity
+    verbose_name = "Actividad"
+    verbose_name_plural = "Actividades"
     fields = ('activity_date', 'activity_type', 'subject', 'created_by', 'notes')
     readonly_fields = ('created_at', 'updated_at')
     extra = 1
-    autocomplete_fields = ['created_by'] # Autocomplete for user
+    autocomplete_fields = ['created_by']
 
 class DealInline(admin.TabularInline):
     model = Deal
+    verbose_name = "Oportunidad"
+    verbose_name_plural = "Oportunidades"
     fields = ('name', 'stage', 'amount', 'expected_close_date', 'campaign')
     readonly_fields = ('created_at', 'updated_at')
     extra = 1
@@ -462,12 +466,16 @@ class DealInline(admin.TabularInline):
 
 class LeadInline(admin.TabularInline):
     model = Lead
+    verbose_name = "Lead (Prospecto)"
+    verbose_name_plural = "Leads (Prospectos)"
     fields = ('first_name', 'last_name', 'email', 'status', 'source')
     readonly_fields = ('created_at', 'updated_at')
     extra = 1
 
 class ContactInline(admin.TabularInline):
     model = Contact
+    verbose_name = "Contacto"
+    verbose_name_plural = "Contactos"
     fields = ('first_name', 'last_name', 'email', 'phone', 'job_title')
     readonly_fields = ('created_at', 'updated_at')
     extra = 1
@@ -479,57 +487,46 @@ class ContactInline(admin.TabularInline):
 class LeadAdmin(admin.ModelAdmin):
 
     def convert_to_contact(self, request, queryset):
-        """Admin action to convert qualified leads to contacts and deals."""
+        """Acción Admin para convertir prospectos calificados a contactos y oportunidades."""
         converted_count = 0
         skipped_count = 0
         for lead in queryset.filter(status='Qualified'):
-            # Basic check to avoid duplicate contacts by email
             if not Contact.objects.filter(email=lead.email).exists():
-                # Find or create company
                 company = None
                 if lead.company_name:
                     company, _ = Company.objects.get_or_create(name=lead.company_name)
-
-                # Create Contact
                 contact = Contact.objects.create(
                     first_name=lead.first_name,
                     last_name=lead.last_name,
                     email=lead.email,
                     phone=lead.phone,
                     company=company,
-                    # Note: Linking to User requires separate logic based on your system's user identification
                 )
-
-                # Optional: Create initial Deal
                 Deal.objects.create(
-                    name=f"Initial Deal for {contact.first_name} {contact.last_name}",
+                    name=f"Oportunidad Inicial para {contact.first_name} {contact.last_name}",
                     contact=contact,
-                    stage='Qualification', # Default stage for new deal from lead
-                    campaign=lead.campaign # Carry over campaign if present
+                    stage='Qualification',
+                    campaign=lead.campaign
                 )
-
-                # Update Lead status
                 lead.status = 'Converted'
                 lead.save(update_fields=['status'])
-
-                # Log Activity for conversion
                 Activity.objects.create(
                     activity_type='Status Change',
-                    subject=f'Lead Converted to Contact: {contact}',
+                    subject=f'Lead Convertido a Contacto: {contact}',
                     related_lead=lead,
-                    created_by=request.user # Assumes admin user is logged in
+                    created_by=request.user
                 )
                 converted_count += 1
             else:
-                 messages.warning(request, f"Contact with email {lead.email} already exists. Skipped conversion for Lead ID {lead.id}.")
+                 messages.warning(request, f"Contacto con email {lead.email} ya existe. Conversión omitida para Lead ID {lead.id}.")
                  skipped_count += 1
 
         if converted_count > 0:
-            messages.success(request, f'{converted_count} qualified leads converted successfully.')
+            messages.success(request, f'{converted_count} leads calificados convertidos exitosamente.')
         if skipped_count == 0 and converted_count == 0:
-             messages.info(request, 'No qualified leads selected or eligible for conversion.')
+             messages.info(request, 'No se seleccionaron leads calificados o elegibles para conversión.')
 
-    convert_to_contact.short_description = "Convert selected Qualified Leads to Contacts"
+    convert_to_contact.short_description = "Convertir Leads Calificados a Contactos"
 
     list_display = ('email', 'first_name', 'last_name', 'status', 'source', 'campaign', 'created_at', 'updated_at')
     list_filter = ('status', 'source', 'campaign', 'created_at')
@@ -538,12 +535,12 @@ class LeadAdmin(admin.ModelAdmin):
     autocomplete_fields = ['campaign']
     fieldsets = (
         (None, {'fields': ('first_name', 'last_name', 'email', 'phone', 'company_name')}),
-        ('Status & Source', {'fields': ('status', 'source', 'campaign')}),
-        ('Details', {'fields': ('notes',)}),
-        ('Timestamps', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
+        ('Estado y Fuente', {'fields': ('status', 'source', 'campaign')}),
+        ('Detalles', {'fields': ('notes',)}),
+        ('Marcas de Tiempo', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
     readonly_fields = ('created_at', 'updated_at')
-    actions = [convert_to_contact] # Register the admin action
+    actions = [convert_to_contact]
 
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
@@ -561,9 +558,9 @@ class ContactAdmin(admin.ModelAdmin):
     autocomplete_fields = ['company', 'linked_user']
     fieldsets = (
         (None, {'fields': ('first_name', 'last_name', 'email', 'phone', 'job_title')}),
-        ('Association', {'fields': ('company', 'linked_user')}),
-        ('Details', {'fields': ('notes',)}),
-        ('Timestamps', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
+        ('Asociación', {'fields': ('company', 'linked_user')}),
+        ('Detalles', {'fields': ('notes',)}),
+        ('Marcas de Tiempo', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
     readonly_fields = ('created_at', 'updated_at')
 
@@ -576,9 +573,9 @@ class ActivityAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         (None, {'fields': ('activity_type', 'subject', 'activity_date', 'created_by')}),
-        ('Related To (Link only ONE)', {'fields': ('related_lead', 'related_contact', 'related_deal')}),
-        ('Details', {'fields': ('notes',)}),
-        ('Timestamps', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
+        ('Relacionado Con (Vincular solo UNO)', {'fields': ('related_lead', 'related_contact', 'related_deal')}),
+        ('Detalles', {'fields': ('notes',)}),
+        ('Marcas de Tiempo', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
 
 @admin.register(Campaign)
@@ -586,26 +583,26 @@ class CampaignAdmin(admin.ModelAdmin):
     list_display = ('name', 'status', 'start_date', 'end_date', 'budget', 'get_associated_leads_count', 'get_won_deals_count', 'get_won_deals_value')
     list_filter = ('status', 'start_date', 'end_date')
     search_fields = ('name', 'description', 'goal')
-    inlines = [LeadInline] # Show leads associated with this campaign
+    inlines = [LeadInline]
     fieldsets = (
         (None, {'fields': ('name', 'status', 'description', 'goal')}),
-        ('Timeline & Budget', {'fields': ('start_date', 'end_date', 'budget')}),
-        ('Timestamps', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
+        ('Fechas y Presupuesto', {'fields': ('start_date', 'end_date', 'budget')}),
+        ('Marcas de Tiempo', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
     readonly_fields = ('created_at', 'updated_at')
 
     def get_associated_leads_count(self, obj):
         return obj.get_associated_leads_count()
-    get_associated_leads_count.short_description = 'Leads'
+    get_associated_leads_count.short_description = 'Leads Asociados'
 
     def get_won_deals_count(self, obj):
         return obj.get_won_deals_count()
-    get_won_deals_count.short_description = 'Deals Won'
+    get_won_deals_count.short_description = 'Oportunidades Ganadas'
 
     def get_won_deals_value(self, obj):
         value = obj.get_won_deals_value()
-        return f"${value:,.2f}" if value else "$0.00" # Format as currency
-    get_won_deals_value.short_description = 'Won Value'
+        return f"${value:,.0f}" if value else "$0" # Format as currency without decimals
+    get_won_deals_value.short_description = 'Valor Ganado'
 
 
 @admin.register(Deal)
@@ -617,9 +614,9 @@ class DealAdmin(admin.ModelAdmin):
     autocomplete_fields = ['contact', 'campaign', 'related_booking']
     fieldsets = (
         (None, {'fields': ('name', 'contact', 'stage')}),
-        ('Value & Timeline', {'fields': ('amount', 'probability', 'expected_close_date')}),
-        ('Association', {'fields': ('campaign', 'related_booking')}),
-        ('Details', {'fields': ('notes',)}),
-        ('Timestamps', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
+        ('Valor y Fechas', {'fields': ('amount', 'probability', 'expected_close_date')}),
+        ('Asociación', {'fields': ('campaign', 'related_booking')}),
+        ('Detalles', {'fields': ('notes',)}),
+        ('Marcas de Tiempo', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
     readonly_fields = ('created_at', 'updated_at')
