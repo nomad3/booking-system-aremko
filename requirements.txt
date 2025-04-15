@@ -18,3 +18,4 @@ Pillow>=9.0.0     # For ImageField support
 phonenumbers>=8.12.0 # For phone number validation/formatting
 google-cloud-storage>=2.0.0 # For Google Cloud Storage
 django-storages>=1.14.0 # For Django storage backends (Removed [google] extra)
+django-solo>=2.1.0 # For singleton configuration models

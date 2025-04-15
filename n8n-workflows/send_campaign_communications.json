@@ -1,0 +1,820 @@
+{
+  "name": "Django CRM - Enviar Comunicaciones de Campaña",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "id": "5df7a75f-a9a1-4b4a-9b7a-7f8a9b7a8f9a"
+    },
+    {
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "campaignId",
+              "value": 1
+            }
+          ],
+          "string": [
+            {
+              "name": "djangoAppUrl",
+              "value": "YOUR_DJANGO_APP_URL"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Set Campaign ID & URL",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Set Campaign ID & URL\"].json[\"djangoAppUrl\"]}}/api/campaigns/{{$node[\"Set Campaign ID & URL\"].json[\"campaignId\"]}}/details/",
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "YOUR_API_KEY"
+            }
+          ]
+        }
+      },
+      "name": "Get Campaign Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        650,
+        150
+      ],
+      "id": "b2c3d4e5-f6a7-8901-2345-678901abcdef",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Set Campaign ID & URL\"].json[\"djangoAppUrl\"]}}/api/campaigns/{{$node[\"Set Campaign ID & URL\"].json[\"campaignId\"]}}/targets/",
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "YOUR_API_KEY"
+            }
+          ]
+        }
+      },
+      "name": "Get Campaign Targets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        650,
+        450
+      ],
+      "id": "c3d4e5f6-a7b8-9012-3456-789012abcdef",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "name": "Loop Targets",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        850,
+        450
+      ],
+      "id": "d4e5f6a7-b8c9-0123-4567-890123abcdef",
+      "inputs": {
+        "main": [
+          [
+            {
+              "id": "c3d4e5f6-a7b8-9012-3456-789012abcdef",
+              "output": "main"
+            }
+          ]
+        ]
+      },
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.email}}",
+              "operation": "isNotEmpty"
+            },
+            {
+              "value1": "={{$node[\"Get Campaign Details\"].json[\"email_body_template\"]}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "IF Email Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        100
+      ],
+      "id": "e5f6a7b8-c9d0-1234-5678-901234abcdef",
+      "inputs": {
+        "main": [
+          [
+            {
+              "id": "d4e5f6a7-b8c9-0123-4567-890123abcdef",
+              "output": "main"
+            }
+          ]
+        ]
+      },
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "subject": "={{$node[\"Get Campaign Details\"].json[\"email_subject_template\"].replace('{nombre_cliente}', $json.nombre)}}",
+        "to": "={{$json.email}}",
+        "text": "={{$node[\"Get Campaign Details\"].json[\"email_body_template\"].replace('{nombre_cliente}', $json.nombre)}}"
+      },
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        0
+      ],
+      "id": "f6a7b8c9-d0e1-2345-6789-012345abcdef",
+      "inputs": {
+        "main": [
+          [
+            {
+              "id": "e5f6a7b8-c9d0-1234-5678-901234abcdef",
+              "output": "true"
+            }
+          ]
+        ]
+      },
+      "credentials": {
+        "emailSendApi": {
+          "id": "YOUR_EMAIL_CREDENTIAL_ID",
+          "name": "Your Email Credential Name"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Set Campaign ID & URL\"].json[\"djangoAppUrl\"]}}/api/activities/log/",
+        "options": {},
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contact_identifier_type",
+              "value": "email"
+            },
+            {
+              "name": "contact_identifier",
+              "value": "={{$json.email}}"
+            },
+            {
+              "name": "campaign_id",
+              "value": "={{$node[\"Set Campaign ID & URL\"].json[\"campaignId\"]}}"
+            },
+            {
+              "name": "activity_type",
+              "value": "Email Sent"
+            },
+            {
+              "name": "subject",
+              "value": "={{$node[\"Send Email\"].parameter[\"subject\"]}}"
+            },
+            {
+              "name": "notes",
+              "value": "Email enviado via n8n."
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "YOUR_API_KEY"
+            }
+          ]
+        }
+      },
+      "name": "Log Email Activity (Success)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1450,
+        0
+      ],
+      "id": "a7b8c9d0-e1f2-3456-7890-123456abcdef",
+      "inputs": {
+        "main": [
+          [
+            {
+              "id": "f6a7b8c9-d0e1-2345-6789-012345abcdef",
+              "output": "main"
+            }
+          ]
+        ]
+      },
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Set Campaign ID & URL\"].json[\"djangoAppUrl\"]}}/api/activities/log/",
+        "options": {},
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contact_identifier_type",
+              "value": "email"
+            },
+            {
+              "name": "contact_identifier",
+              "value": "={{$json.email}}"
+            },
+            {
+              "name": "campaign_id",
+              "value": "={{$node[\"Set Campaign ID & URL\"].json[\"campaignId\"]}}"
+            },
+            {
+              "name": "activity_type",
+              "value": "Email Failed"
+            },
+            {
+              "name": "subject",
+              "value": "={{$node[\"Get Campaign Details\"].json[\"email_subject_template\"].replace('{nombre_cliente}', $json.nombre)}}"
+            },
+            {
+              "name": "notes",
+              "value": "Email no enviado via n8n (sin email o plantilla)."
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "YOUR_API_KEY"
+            }
+          ]
+        }
+      },
+      "name": "Log Email Activity (Skipped/No Email)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1250,
+        200
+      ],
+      "id": "b8c9d0e1-f2a3-4567-8901-234567abcdef",
+      "inputs": {
+        "main": [
+          [
+            {
+              "id": "e5f6a7b8-c9d0-1234-5678-901234abcdef",
+              "output": "false"
+            }
+          ]
+        ]
+      },
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.telefono}}",
+              "operation": "isNotEmpty"
+            },
+            {
+              "value1": "={{$node[\"Get Campaign Details\"].json[\"sms_template\"]}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "IF SMS Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        450
+      ],
+      "id": "sms-if-node-id",
+      "inputs": {
+        "main": [
+          [
+            {
+              "id": "d4e5f6a7-b8c9-0123-4567-890123abcdef",
+              "output": "main"
+            }
+          ]
+        ]
+      },
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "from": "YOUR_TWILIO_PHONE_NUMBER",
+        "to": "={{$json.telefono}}",
+        "text": "={{$node[\"Get Campaign Details\"].json[\"sms_template\"].replace('{nombre_cliente}', $json.nombre)}}"
+      },
+      "name": "Send SMS (Twilio Example)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        350
+      ],
+      "id": "sms-send-node-id",
+      "inputs": {
+        "main": [
+          [
+            {
+              "id": "sms-if-node-id",
+              "output": "true"
+            }
+          ]
+        ]
+      },
+      "credentials": {
+        "twilioApi": {
+          "id": "YOUR_TWILIO_CREDENTIAL_ID",
+          "name": "Your Twilio Credential Name"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Set Campaign ID & URL\"].json[\"djangoAppUrl\"]}}/api/activities/log/",
+        "options": {},
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contact_identifier_type",
+              "value": "phone"
+            },
+            {
+              "name": "contact_identifier",
+              "value": "={{$json.telefono}}"
+            },
+            {
+              "name": "campaign_id",
+              "value": "={{$node[\"Set Campaign ID & URL\"].json[\"campaignId\"]}}"
+            },
+            {
+              "name": "activity_type",
+              "value": "SMS Sent"
+            },
+            {
+              "name": "subject",
+              "value": "SMS Campaña: {{$node[\"Get Campaign Details\"].json[\"name\"]}}"
+            },
+            {
+              "name": "notes",
+              "value": "SMS enviado via n8n (Twilio)."
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "YOUR_API_KEY"
+            }
+          ]
+        }
+      },
+      "name": "Log SMS Activity (Success)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1450,
+        350
+      ],
+      "id": "sms-log-success-node-id",
+      "inputs": {
+        "main": [
+          [
+            {
+              "id": "sms-send-node-id",
+              "output": "main"
+            }
+          ]
+        ]
+      },
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Set Campaign ID & URL\"].json[\"djangoAppUrl\"]}}/api/activities/log/",
+        "options": {},
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contact_identifier_type",
+              "value": "phone"
+            },
+            {
+              "name": "contact_identifier",
+              "value": "={{$json.telefono}}"
+            },
+            {
+              "name": "campaign_id",
+              "value": "={{$node[\"Set Campaign ID & URL\"].json[\"campaignId\"]}}"
+            },
+            {
+              "name": "activity_type",
+              "value": "SMS Failed"
+            },
+            {
+              "name": "subject",
+              "value": "SMS Campaña: {{$node[\"Get Campaign Details\"].json[\"name\"]}}"
+            },
+            {
+              "name": "notes",
+              "value": "SMS no enviado via n8n (sin teléfono o plantilla)."
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "YOUR_API_KEY"
+            }
+          ]
+        }
+      },
+      "name": "Log SMS Activity (Skipped/No Phone)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1250,
+        550
+      ],
+      "id": "sms-log-skipped-node-id",
+      "inputs": {
+        "main": [
+          [
+            {
+              "id": "sms-if-node-id",
+              "output": "false"
+            }
+          ]
+        ]
+      },
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.telefono}}",
+              "operation": "isNotEmpty"
+            },
+            {
+              "value1": "={{$node[\"Get Campaign Details\"].json[\"whatsapp_template\"]}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "IF WhatsApp Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        750
+      ],
+      "id": "whatsapp-if-node-id",
+      "inputs": {
+        "main": [
+          [
+            {
+              "id": "d4e5f6a7-b8c9-0123-4567-890123abcdef",
+              "output": "main"
+            }
+          ]
+        ]
+      },
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:YOUR_TWILIO_WHATSAPP_NUMBER",
+        "to": "whatsapp:={{$json.telefono}}",
+        "text": "={{$node[\"Get Campaign Details\"].json[\"whatsapp_template\"].replace('{nombre_cliente}', $json.nombre)}}"
+      },
+      "name": "Send WhatsApp (Twilio Example)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        650
+      ],
+      "id": "whatsapp-send-node-id",
+      "inputs": {
+        "main": [
+          [
+            {
+              "id": "whatsapp-if-node-id",
+              "output": "true"
+            }
+          ]
+        ]
+      },
+      "credentials": {
+        "twilioApi": {
+          "id": "YOUR_TWILIO_CREDENTIAL_ID",
+          "name": "Your Twilio Credential Name"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Set Campaign ID & URL\"].json[\"djangoAppUrl\"]}}/api/activities/log/",
+        "options": {},
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contact_identifier_type",
+              "value": "phone"
+            },
+            {
+              "name": "contact_identifier",
+              "value": "={{$json.telefono}}"
+            },
+            {
+              "name": "campaign_id",
+              "value": "={{$node[\"Set Campaign ID & URL\"].json[\"campaignId\"]}}"
+            },
+            {
+              "name": "activity_type",
+              "value": "WhatsApp Sent"
+            },
+            {
+              "name": "subject",
+              "value": "WhatsApp Campaña: {{$node[\"Get Campaign Details\"].json[\"name\"]}}"
+            },
+            {
+              "name": "notes",
+              "value": "WhatsApp enviado via n8n (Twilio)."
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "YOUR_API_KEY"
+            }
+          ]
+        }
+      },
+      "name": "Log WhatsApp Activity (Success)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1450,
+        650
+      ],
+      "id": "whatsapp-log-success-node-id",
+      "inputs": {
+        "main": [
+          [
+            {
+              "id": "whatsapp-send-node-id",
+              "output": "main"
+            }
+          ]
+        ]
+      },
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Set Campaign ID & URL\"].json[\"djangoAppUrl\"]}}/api/activities/log/",
+        "options": {},
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contact_identifier_type",
+              "value": "phone"
+            },
+            {
+              "name": "contact_identifier",
+              "value": "={{$json.telefono}}"
+            },
+            {
+              "name": "campaign_id",
+              "value": "={{$node[\"Set Campaign ID & URL\"].json[\"campaignId\"]}}"
+            },
+            {
+              "name": "activity_type",
+              "value": "WhatsApp Failed"
+            },
+            {
+              "name": "subject",
+              "value": "WhatsApp Campaña: {{$node[\"Get Campaign Details\"].json[\"name\"]}}"
+            },
+            {
+              "name": "notes",
+              "value": "WhatsApp no enviado via n8n (sin teléfono o plantilla)."
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "YOUR_API_KEY"
+            }
+          ]
+        }
+      },
+      "name": "Log WhatsApp Activity (Skipped/No Phone)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1250,
+        850
+      ],
+      "id": "whatsapp-log-skipped-node-id",
+      "inputs": {
+        "main": [
+          [
+            {
+              "id": "whatsapp-if-node-id",
+              "output": "false"
+            }
+          ]
+        ]
+      },
+      "credentials": {}
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Set Campaign ID & URL",
+            "input": "main"
+          }
+        ]
+      ]
+    },
+    "Set Campaign ID & URL": {
+      "main": [
+        [
+          {
+            "node": "Get Campaign Details",
+            "input": "main"
+          },
+          {
+            "node": "Get Campaign Targets",
+            "input": "main"
+          }
+        ]
+      ]
+    },
+    "Get Campaign Targets": {
+      "main": [
+        [
+          {
+            "node": "Loop Targets",
+            "input": "main"
+          }
+        ]
+      ]
+    },
+    "Loop Targets": {
+      "main": [
+        [
+          {
+            "node": "IF Email Exists?",
+            "input": "main"
+          },
+          {
+            "node": "IF SMS Exists?",
+            "input": "main"
+          },
+          {
+            "node": "IF WhatsApp Exists?",
+            "input": "main"
+          }
+        ]
+      ]
+    },
+    "IF Email Exists?": {
+      "true": [
+        [
+          {
+            "node": "Send Email",
+            "input": "main"
+          }
+        ]
+      ],
+      "false": [
+        [
+          {
+            "node": "Log Email Activity (Skipped/No Email)",
+            "input": "main"
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Log Email Activity (Success)",
+            "input": "main"
+          }
+        ]
+      ]
+    },
+    "IF SMS Exists?": {
+        "true": [
+            [
+                {
+                    "node": "Send SMS (Twilio Example)",
+                    "input": "main"
+                }
+            ]
+        ],
+        "false": [
+            [
+                {
+                    "node": "Log SMS Activity (Skipped/No Phone)",
+                    "input": "main"
+                }
+            ]
+        ]
+    },
+    "Send SMS (Twilio Example)": {
+        "main": [
+            [
+                {
+                    "node": "Log SMS Activity (Success)",
+                    "input": "main"
+                }
+            ]
+        ]
+    },
+    "IF WhatsApp Exists?": {
+        "true": [
+            [
+                {
+                    "node": "Send WhatsApp (Twilio Example)",
+                    "input": "main"
+                }
+            ]
+        ],
+        "false": [
+            [
+                {
+                    "node": "Log WhatsApp Activity (Skipped/No Phone)",
+                    "input": "main"
+                }
+            ]
+        ]
+    },
+    "Send WhatsApp (Twilio Example)": {
+        "main": [
+            [
+                {
+                    "node": "Log WhatsApp Activity (Success)",
+                    "input": "main"
+                }
+            ]
+        ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "id": "some-unique-workflow-id-1"
+}

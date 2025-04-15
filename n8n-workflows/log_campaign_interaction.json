@@ -1,0 +1,153 @@
+{
+  "name": "Django CRM - Log Campaign Interaction",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "YOUR_UNIQUE_WEBHOOK_PATH",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "id": "webhook-trigger-id",
+      "webhookId": "YOUR_N8N_WEBHOOK_ID",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "djangoAppUrl",
+              "value": "YOUR_DJANGO_APP_URL"
+            },
+            {
+              "name": "contactIdentifier",
+              "value": "={{$json.body[\"event-data\"].recipient}}"
+            },
+            {
+              "name": "contactIdentifierType",
+              "value": "email"
+            },
+            {
+              "name": "interactionType",
+              "value": "EMAIL_OPEN"
+            },
+            {
+              "name": "campaignId",
+              "value": "={{$json.body[\"event-data\"][\"user-variables\"].campaign_id}}"
+            },
+             {
+              "name": "activityId",
+              "value": "={{$json.body[\"event-data\"][\"user-variables\"].activity_id}}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{new Date($json.body[\"event-data\"].timestamp * 1000).toISOString()}}"
+            }
+          ],
+           "json": [
+             {
+                "name": "details",
+                "value": "={{ { ip: $json.body['event-data'].ip, user_agent: $json.body['event-data']['client-info']['user-agent'] } }}"
+             }
+           ]
+        },
+        "options": {}
+      },
+      "name": "Extract Interaction Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "id": "extract-data-id",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Extract Interaction Data\"].json[\"djangoAppUrl\"]}}/api/interactions/log/",
+        "options": {},
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contact_identifier_type",
+              "value": "={{$node[\"Extract Interaction Data\"].json[\"contactIdentifierType\"]}}"
+            },
+            {
+              "name": "contact_identifier",
+              "value": "={{$node[\"Extract Interaction Data\"].json[\"contactIdentifier\"]}}"
+            },
+            {
+              "name": "campaign_id",
+              "value": "={{$node[\"Extract Interaction Data\"].json[\"campaignId\"]}}"
+            },
+            {
+              "name": "interaction_type",
+              "value": "={{$node[\"Extract Interaction Data\"].json[\"interactionType\"]}}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{$node[\"Extract Interaction Data\"].json[\"timestamp\"]}}"
+            },
+             {
+              "name": "details",
+              "value": "={{$node[\"Extract Interaction Data\"].json[\"details\"]}}"
+            },
+             {
+              "name": "activity_id",
+              "value": "={{$node[\"Extract Interaction Data\"].json[\"activityId\"]}}"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "YOUR_API_KEY"
+            }
+          ]
+        }
+      },
+      "name": "Log Interaction to Django",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        650,
+        300
+      ],
+      "id": "log-interaction-id",
+      "credentials": {}
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Interaction Data",
+            "input": "main"
+          }
+        ]
+      ]
+    },
+    "Extract Interaction Data": {
+      "main": [
+        [
+          {
+            "node": "Log Interaction to Django",
+            "input": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "id": "some-unique-workflow-id-2"
+}
