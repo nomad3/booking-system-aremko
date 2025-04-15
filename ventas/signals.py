@@ -1,18 +1,48 @@
 import logging
-from django.db.models.signals import post_save, post_delete, m2m_changed, pre_save
+from django.db.models.signals import post_save, post_delete, m2m_changed, pre_save, pre_delete # Added pre_delete
 from django.dispatch import receiver
 from django.utils import timezone
 from django.db import transaction
 from django.db import models
-from django.db.models import Sum, F, DecimalField 
-from .models import VentaReserva, Cliente, ReservaProducto, ReservaServicio, Pago, MovimientoCliente, DetalleCompra, Compra
+from django.db.models import Sum, F, DecimalField
+# Import all relevant models, including CRM ones
+from .models import (
+    VentaReserva, Cliente, ReservaProducto, ReservaServicio, Pago, MovimientoCliente,
+    DetalleCompra, Compra, Producto, Servicio, Activity, Lead
+)
 from django.contrib.auth.models import User, AnonymousUser  # Importa el modelo de usuario
 from .middleware import get_current_user  # Importa el middleware
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from .utils import verificar_disponibilidad  # Import the verificar_disponibilidad function
 
-# Movimientos y auditoría
+logger = logging.getLogger(__name__)
+
+# --- CRM Signals ---
+
+@receiver(post_save, sender=Activity)
+def update_lead_status_on_activity(sender, instance, created, **kwargs):
+    """
+    Updates Lead status to 'Contacted' when a relevant activity is logged
+    for the first time for a 'New' lead.
+    """
+    if created and instance.related_lead:
+        try:
+            lead = instance.related_lead
+            # Define which activities trigger the status change
+            trigger_activities = ['Call', 'Email Sent', 'Meeting']
+            if lead.status == 'New' and instance.activity_type in trigger_activities:
+                lead.status = 'Contacted'
+                lead.save(update_fields=['status']) # Update only the status field efficiently
+        except Lead.DoesNotExist:
+             logger.warning(f"Lead associated with Activity {instance.pk} does not exist.")
+        except Exception as e:
+            logger.error(f"Error in update_lead_status_on_activity signal for Activity {instance.pk}: {e}")
+
+
+# --- Existing Signals ---
+
+# Movimientos y auditoría (Temporarily Disabled)
 
 def get_or_create_system_user():
     """Helper function to get or create the system user"""
@@ -28,283 +58,407 @@ def get_or_create_system_user():
     )
     return system_user
 
-@receiver(post_save, sender=VentaReserva)
-def registrar_movimiento_venta(sender, instance, created, **kwargs):
-    """Signal for tracking VentaReserva changes in admin panel"""
-    if created:
-        try:
-            with transaction.atomic():
-                # Get the user from the request if available
-                user = getattr(instance, '_current_user', None)
-                
-                MovimientoCliente.objects.create(
-                    cliente=instance.cliente,
-                    tipo_movimiento='pre_reserva',
-                    usuario=user,
-                    fecha_movimiento=timezone.now(),
-                    comentarios=f"Pre-reserva automática - {instance.comentarios or ''}",
-                    venta_reserva=instance
-                )
-        except Exception as e:
-            print(f"Error in registrar_movimiento_venta: {e}")
+# @receiver(post_save, sender=VentaReserva) # Temporarily disabled MovimientoCliente logging
+# def registrar_movimiento_venta(sender, instance, created, **kwargs):
+#     """Signal for tracking VentaReserva changes in admin panel"""
+#     if created:
+#         try:
+#             with transaction.atomic():
+#                 # Get the user from the request if available, default to None if invalid
+#                 user = getattr(instance, '_current_user', None)
+#                 if isinstance(user, AnonymousUser): # Explicitly check for AnonymousUser
+#                     user = None
+#
+#                 # Ensure cliente exists
+#                 if instance.cliente:
+#                     MovimientoCliente.objects.create(
+#                         cliente=instance.cliente,
+#                         tipo_movimiento='pre_reserva',
+#                         usuario=user, # Allow None if user context is lost
+#                         fecha_movimiento=timezone.now(),
+#                         comentarios=f"Pre-reserva automática - {instance.comentarios or ''}",
+#                         venta_reserva=instance
+#                     )
+#         except Exception as e:
+#             logger.error(f"Error in registrar_movimiento_venta signal for VentaReserva {instance.pk}: {e}")
 
-@receiver(post_delete, sender=VentaReserva)
-def registrar_movimiento_eliminacion_venta(sender, instance, **kwargs):
-    usuario = get_current_user()
-    # If user is AnonymousUser, use system user
-    if usuario and isinstance(usuario, AnonymousUser):
-        usuario = get_or_create_system_user()
-    # If still no user, use system user
-    if not usuario:
-        usuario = get_or_create_system_user()
-        
-    comentarios = f"Se ha eliminado la venta/reserva con ID {instance.id} del cliente {instance.cliente.nombre}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance.cliente,
-        tipo_movimiento='Eliminación de Venta/Reserva',
-        comentarios=comentarios,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+# @receiver(pre_delete, sender=VentaReserva) # Temporarily disabled MovimientoCliente logging
+# def registrar_movimiento_eliminacion_venta(sender, instance, **kwargs):
+#     usuario = get_current_user()
+#     # Ensure we always have a user, defaulting to system user
+#     if not usuario or isinstance(usuario, AnonymousUser):
+#         usuario = get_or_create_system_user()
+#
+#     # Check if cliente still exists before creating movement
+#     # Accessing instance.cliente might fail if it was deleted cascade
+#     try:
+#         cliente_nombre = instance.cliente.nombre if instance.cliente else "Cliente Desconocido"
+#         cliente_obj = instance.cliente # Keep the object if it exists
+#     except ObjectDoesNotExist:
+#         cliente_nombre = "Cliente Eliminado"
+#         cliente_obj = None # Cannot link movement if client is gone
+#
+#     comentarios = f"Se ha eliminado la venta/reserva con ID {instance.id} del cliente {cliente_nombre}."
+#
+#     if cliente_obj: # Only create if we have a valid client reference
+#         try:
+#             MovimientoCliente.objects.create(
+#                 cliente=cliente_obj,
+#                 tipo_movimiento='Eliminación de Venta/Reserva',
+#                 comentarios=comentarios,
+#                 usuario=None, # Set user to None for deletion logs
+#                 fecha_movimiento=timezone.now()
+#             )
+#         except Exception as e:
+#             logger.error(f"Error creating movement log for deleting VentaReserva {instance.pk}: {e}") # Adjusted log message
 
 # Clientes
 
-@receiver(post_save, sender=Cliente)
-def registrar_movimiento_cliente(sender, instance, created, **kwargs):
-    """Signal for tracking Cliente changes in admin panel"""
-    if created:
-        try:
-            with transaction.atomic():
-                # Get the user from the request if available
-                user = getattr(instance, '_current_user', None)
-                
-                MovimientoCliente.objects.create(
-                    cliente=instance,
-                    tipo_movimiento='creacion',
-                    usuario=user,
-                    fecha_movimiento=timezone.now(),
-                    comentarios='Cliente creado automáticamente'
-                )
-        except Exception as e:
-            print(f"Error in registrar_movimiento_cliente: {e}")
+# @receiver(post_save, sender=Cliente) # Temporarily disabled MovimientoCliente logging
+# def registrar_movimiento_cliente(sender, instance, created, **kwargs):
+#     """Signal for tracking Cliente changes in admin panel"""
+#     if created:
+#         try:
+#             with transaction.atomic():
+#                 # Get the user from the request if available, default to None if invalid
+#                 user = getattr(instance, '_current_user', None)
+#                 if isinstance(user, AnonymousUser):
+#                     user = None
+#
+#                 MovimientoCliente.objects.create(
+#                     cliente=instance,
+#                     tipo_movimiento='creacion',
+#                     usuario=user, # Allow None
+#                     fecha_movimiento=timezone.now(),
+#                     comentarios='Cliente creado automáticamente'
+#                 )
+#         except Exception as e:
+#             logger.error(f"Error in registrar_movimiento_cliente signal for Cliente {instance.pk}: {e}")
 
-@receiver(post_delete, sender=Cliente)
-def registrar_movimiento_eliminacion_cliente(sender, instance, **kwargs):
-    usuario = get_current_user()
-    # If user is AnonymousUser, use system user
-    if usuario and isinstance(usuario, AnonymousUser):
-        usuario = get_or_create_system_user()
-    # If still no user, use system user
-    if not usuario:
-        usuario = get_or_create_system_user()
-        
-    descripcion = f"Se ha eliminado el cliente: {instance.nombre}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance,
-        tipo_movimiento='Eliminación de Cliente',
-        comentarios=descripcion,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+# @receiver(pre_delete, sender=Cliente) # Temporarily disabled MovimientoCliente logging
+# def registrar_movimiento_eliminacion_cliente(sender, instance, **kwargs):
+#     # Logging before deletion is generally safer for audit trails.
+#     usuario = get_current_user()
+#     if not usuario or isinstance(usuario, AnonymousUser):
+#         usuario = get_or_create_system_user()
+#
+#     descripcion = f"Se va a eliminar el cliente: {instance.nombre} (ID: {instance.pk})." # Adjusted message
+#
+#     # Create the log before the client is actually deleted
+#     try:
+#         MovimientoCliente.objects.create(
+#             cliente=instance, # Instance still exists here
+#             tipo_movimiento='Eliminación de Cliente',
+#             comentarios=descripcion,
+#             usuario=None, # Set user to None for deletion logs
+#             fecha_movimiento=timezone.now()
+#         )
+#     except Exception as e:
+#          logger.error(f"Failed to log pre-deletion movement for Cliente {instance.pk}: {e}")
+
 
 # Productos
 
-@receiver(post_save, sender=ReservaProducto)
-def registrar_movimiento_reserva_producto(sender, instance, created, **kwargs):
-    usuario = get_current_user()
-    # If user is AnonymousUser, use system user
-    if usuario and isinstance(usuario, AnonymousUser):
-        usuario = get_or_create_system_user()
-    # If still no user, use system user
-    if not usuario:
-        usuario = get_or_create_system_user()
-        
-    tipo = 'Añadido Producto a Venta/Reserva' if created else 'Actualización de Producto en Venta/Reserva'
-    descripcion = f"Se ha {'añadido' if created else 'actualizado'} {instance.cantidad} x {instance.producto.nombre} en la venta/reserva #{instance.venta_reserva.id}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance.venta_reserva.cliente,
-        tipo_movimiento=tipo,
-        comentarios=descripcion,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+# @receiver(post_save, sender=ReservaProducto) # Temporarily disabled MovimientoCliente logging
+# def registrar_movimiento_reserva_producto(sender, instance, created, **kwargs):
+#     # Default to None if user context is unreliable
+#     usuario = get_current_user()
+#     if not usuario or isinstance(usuario, AnonymousUser):
+#         usuario = None
+#
+#     try:
+#         # Ensure related objects exist
+#         venta_reserva = instance.venta_reserva
+#         producto = instance.producto
+#         cliente = venta_reserva.cliente
+#
+#         if cliente and producto:
+#             tipo = 'Añadido Producto a Venta/Reserva' if created else 'Actualización de Producto en Venta/Reserva'
+#             descripcion = f"Se ha {'añadido' if created else 'actualizado'} {instance.cantidad} x {producto.nombre} en la venta/reserva #{venta_reserva.id}."
+#
+#             MovimientoCliente.objects.create(
+#                 cliente=cliente,
+#                 tipo_movimiento=tipo,
+#                 comentarios=descripcion,
+#                 usuario=usuario,
+#                 fecha_movimiento=timezone.now()
+#             )
+#     except ObjectDoesNotExist:
+#         logger.warning(f"Could not log movement for ReservaProducto {instance.pk} due to missing related object (VentaReserva, Producto, or Cliente).")
+#     except Exception as e:
+#         logger.error(f"Error in registrar_movimiento_reserva_producto signal for ReservaProducto {instance.pk}: {e}")
 
-@receiver(post_delete, sender=ReservaProducto)
-def registrar_movimiento_eliminacion_producto(sender, instance, **kwargs):
-    usuario = get_current_user()
-    # If user is AnonymousUser, use system user
-    if usuario and isinstance(usuario, AnonymousUser):
-        usuario = get_or_create_system_user()
-    # If still no user, use system user
-    if not usuario:
-        usuario = get_or_create_system_user()
-        
-    descripcion = f"Se ha eliminado {instance.cantidad} x {instance.producto.nombre} de la venta/reserva #{instance.venta_reserva.id}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance.venta_reserva.cliente,
-        tipo_movimiento='Eliminación de Producto en Venta/Reserva',
-        comentarios=descripcion,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+
+# @receiver(pre_delete, sender=ReservaProducto) # Temporarily disabled MovimientoCliente logging
+# def registrar_movimiento_eliminacion_producto(sender, instance, **kwargs):
+#     usuario = get_current_user()
+#     if not usuario or isinstance(usuario, AnonymousUser):
+#         usuario = get_or_create_system_user()
+#
+#     try:
+#         # Access related objects carefully, they might be gone soon
+#         venta_reserva_id = instance.venta_reserva_id
+#         producto_nombre = instance.producto.nombre if hasattr(instance, 'producto') and instance.producto else "Producto Desconocido"
+#         cliente = instance.venta_reserva.cliente if hasattr(instance, 'venta_reserva') and instance.venta_reserva and hasattr(instance.venta_reserva, 'cliente') and instance.venta_reserva.cliente else None
+#
+#         if cliente:
+#             descripcion = f"Se va a eliminar {instance.cantidad} x {producto_nombre} de la venta/reserva #{venta_reserva_id}." # Adjusted message
+#             MovimientoCliente.objects.create(
+#                 cliente=cliente,
+#                 tipo_movimiento='Eliminación de Producto en Venta/Reserva',
+#                 comentarios=descripcion,
+#                 usuario=None, # Set user to None for deletion logs
+#                 fecha_movimiento=timezone.now()
+#             )
+#     except ObjectDoesNotExist:
+#          logger.warning(f"Could not log pre-deletion movement for ReservaProducto {instance.pk} due to missing related object.")
+#     except Exception as e:
+#         logger.error(f"Error logging pre-deletion movement for ReservaProducto {instance.pk}: {e}") # Adjusted log message
+
 
 # Servicios
 
-@receiver(post_save, sender=ReservaServicio)
-def registrar_movimiento_reserva_servicio(sender, instance, created, **kwargs):
-    if created:
-        # Get user from instance or use system user
-        user = getattr(instance, '_current_user', None)
-        if not user:
-            user = get_current_user()
-            # If user is AnonymousUser, use system user
-            if user and isinstance(user, AnonymousUser):
-                user = get_or_create_system_user()
-            # If still no user, use system user
-            if not user:
-                user = get_or_create_system_user()
-                
-        MovimientoCliente.objects.create(
-            cliente=instance.venta_reserva.cliente,
-            tipo_movimiento='Reserva de Servicio',
-            comentarios=f'Se ha reservado el servicio {instance.servicio.nombre}',
-            usuario=user,
-            venta_reserva=instance.venta_reserva
-        )
+# @receiver(post_save, sender=ReservaServicio) # Temporarily disabled MovimientoCliente logging
+# def registrar_movimiento_reserva_servicio(sender, instance, created, **kwargs):
+#     if created:
+#         # Default to None if user context is unreliable
+#         user = getattr(instance, '_current_user', None)
+#         if not user:
+#             user = get_current_user()
+#         if not user or isinstance(user, AnonymousUser):
+#             user = None # Default to None
+#
+#         try:
+#             # Ensure related objects exist
+#             venta_reserva = instance.venta_reserva
+#             servicio = instance.servicio
+#             cliente = venta_reserva.cliente
+#
+#             if cliente and servicio:
+#                 MovimientoCliente.objects.create(
+#                     cliente=cliente,
+#                     tipo_movimiento='Reserva de Servicio',
+#                     comentarios=f'Se ha reservado el servicio {servicio.nombre}',
+#                     usuario=user,
+#                     venta_reserva=venta_reserva
+#                 )
+#         except ObjectDoesNotExist:
+#             logger.warning(f"Could not log movement for ReservaServicio {instance.pk} due to missing related object (VentaReserva, Servicio, or Cliente).")
+#         except Exception as e:
+#             logger.error(f"Error in registrar_movimiento_reserva_servicio signal for ReservaServicio {instance.pk}: {e}")
 
-@receiver(post_delete, sender=ReservaServicio)
-def registrar_movimiento_eliminacion_servicio(sender, instance, **kwargs):
-    usuario = get_current_user()
-    # If user is AnonymousUser, use system user
-    if usuario and isinstance(usuario, AnonymousUser):
-        usuario = get_or_create_system_user()
-    # If still no user, use system user
-    if not usuario:
-        usuario = get_or_create_system_user()
-        
-    descripcion = f"Se ha eliminado la reserva del servicio {instance.servicio.nombre} de la venta/reserva #{instance.venta_reserva.id}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance.venta_reserva.cliente,
-        tipo_movimiento='Eliminación de Servicio en Venta/Reserva',
-        comentarios=descripcion,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+
+# @receiver(pre_delete, sender=ReservaServicio) # Temporarily disabled MovimientoCliente logging
+# def registrar_movimiento_eliminacion_servicio(sender, instance, **kwargs):
+#     usuario = get_current_user()
+#     if not usuario or isinstance(usuario, AnonymousUser):
+#         usuario = get_or_create_system_user()
+#
+#     try:
+#         venta_reserva_id = instance.venta_reserva_id
+#         servicio_nombre = instance.servicio.nombre if hasattr(instance, 'servicio') and instance.servicio else "Servicio Desconocido"
+#         cliente = instance.venta_reserva.cliente if hasattr(instance, 'venta_reserva') and instance.venta_reserva and hasattr(instance.venta_reserva, 'cliente') and instance.venta_reserva.cliente else None
+#
+#         if cliente:
+#             descripcion = f"Se va a eliminar la reserva del servicio {servicio_nombre} de la venta/reserva #{venta_reserva_id}." # Adjusted message
+#             MovimientoCliente.objects.create(
+#                 cliente=cliente,
+#                 tipo_movimiento='Eliminación de Servicio en Venta/Reserva',
+#                 comentarios=descripcion,
+#                 usuario=None, # Set user to None for deletion logs
+#                 fecha_movimiento=timezone.now()
+#             )
+#     except ObjectDoesNotExist:
+#         logger.warning(f"Could not log pre-deletion movement for ReservaServicio {instance.pk} due to missing related object.")
+#     except Exception as e:
+#         logger.error(f"Error logging pre-deletion movement for ReservaServicio {instance.pk}: {e}") # Adjusted log message
+
 
 # Pagos
 
-@receiver(post_save, sender=Pago)
-def registrar_movimiento_pago(sender, instance, created, **kwargs):
-    if created:
-        try:
-            with transaction.atomic():
-                # Get user from instance or use None
-                user = getattr(instance, '_current_user', None)
-                
-                MovimientoCliente.objects.create(
-                    cliente=instance.venta_reserva.cliente,
-                    tipo_movimiento='pago',
-                    usuario=user,
-                    fecha_movimiento=timezone.now(),
-                    comentarios=f'Pago registrado - {instance.metodo_pago} - ${instance.monto}',
-                    venta_reserva=instance.venta_reserva
-                )
-        except Exception as e:
-            print(f"Error in registrar_movimiento_pago: {e}")
+# @receiver(post_save, sender=Pago) # Temporarily disabled MovimientoCliente logging
+# def registrar_movimiento_pago(sender, instance, created, **kwargs):
+#     if created:
+#         try:
+#             # User should be set by pre_save signal 'set_pago_user'
+#             user = instance.usuario
+#             # Add fallback just in case pre_save failed or user became invalid
+#             if not user:
+#                  current_ctx_user = get_current_user()
+#                  if not current_ctx_user or isinstance(current_ctx_user, AnonymousUser):
+#                      user = None # Default to None if context is unreliable
+#                  else:
+#                      user = current_ctx_user # Use context user if valid
+#
+#             # Ensure related objects exist
+#             venta_reserva = instance.venta_reserva
+#             cliente = venta_reserva.cliente
+#
+#             if cliente: # Check if cliente exists
+#                 MovimientoCliente.objects.create(
+#                     cliente=cliente,
+#                     tipo_movimiento='pago',
+#                     usuario=user, # Use user from instance
+#                     fecha_movimiento=timezone.now(),
+#                     comentarios=f'Pago registrado - {instance.metodo_pago} - ${instance.monto}',
+#                     venta_reserva=venta_reserva
+#                 )
+#         except ObjectDoesNotExist:
+#              logger.warning(f"Could not log movement for Pago {instance.pk} due to missing related VentaReserva or Cliente.")
+#         except Exception as e:
+#             logger.error(f"Error in registrar_movimiento_pago signal for Pago {instance.pk}: {e}")
 
-   # NO necesitas actualizar el saldo aquí. Ya se hace en el save() de Pago.
+# @receiver(pre_delete, sender=Pago) # Temporarily disabled MovimientoCliente logging
+# def registrar_movimiento_eliminacion_pago(sender, instance, **kwargs):
+#     usuario = get_current_user()
+#     if not usuario or isinstance(usuario, AnonymousUser):
+#         usuario = get_or_create_system_user()
+#
+#     try:
+#         # Check if related objects still exist
+#         venta_reserva = instance.venta_reserva
+#         cliente = venta_reserva.cliente if venta_reserva else None
+#
+#         if cliente: # Only log if client exists
+#             descripcion = f"Se va a eliminar el pago de {instance.monto} de la venta/reserva #{venta_reserva.id}." # Adjusted message
+#             MovimientoCliente.objects.create(
+#                 cliente=cliente,
+#                 tipo_movimiento='Eliminación de Pago',
+#                 comentarios=descripcion,
+#                 usuario=None, # Set user to None for deletion logs
+#                 fecha_movimiento=timezone.now()
+#             )
+#
+#         # Update balance if venta_reserva still exists
+#         # This logic is potentially problematic in pre_delete as the state might change.
+#         # Consider if balance update should happen elsewhere or be triggered differently.
+#         # If kept, ensure it doesn't rely on the Pago instance existing after this signal.
+#         # if venta_reserva:
+#         #     try:
+#         #         # Re-fetch to be safe? Or trust instance?
+#         #         venta_reserva_obj = VentaReserva.objects.get(pk=venta_reserva.pk)
+#         #         # How to reliably subtract the amount being deleted?
+#         #         # Maybe VentaReserva.calcular_total() should be robust enough?
+#         #         # Let's rely on calcular_total being called elsewhere after deletion.
+#         #         pass # Removing direct balance manipulation from pre_delete
+#         #     except VentaReserva.DoesNotExist:
+#         #         logger.warning(f"VentaReserva {venta_reserva.pk} not found when attempting balance update during Pago {instance.pk} pre_delete.")
+#         #     except Exception as e:
+#         #          logger.error(f"Error attempting balance update during Pago {instance.pk} pre_delete: {e}")
+#
+#     except ObjectDoesNotExist:
+#         logger.warning(f"Could not log pre-deletion movement for Pago {instance.pk} due to missing related VentaReserva or Cliente.")
+#     except Exception as e:
+#         logger.error(f"Error in registrar_movimiento_eliminacion_pago (pre_delete) signal for Pago {instance.pk}: {e}")
 
-@receiver(post_delete, sender=Pago)
-def registrar_movimiento_eliminacion_pago(sender, instance, **kwargs):
-    usuario = get_current_user()
-    # If user is AnonymousUser, use system user
-    if usuario and isinstance(usuario, AnonymousUser):
-        usuario = get_or_create_system_user()
-    # If still no user, use system user
-    if not usuario:
-        usuario = get_or_create_system_user()
-        
-    descripcion = f"Se ha eliminado el pago de {instance.monto} de la venta/reserva #{instance.venta_reserva.id}."
-    
-    MovimientoCliente.objects.create(
-        cliente=instance.venta_reserva.cliente,
-        tipo_movimiento='Eliminación de Pago',
-        comentarios=descripcion,
-        usuario=usuario,
-        fecha_movimiento=timezone.now()
-    )
+# @receiver(post_save, sender=Pago) # Temporarily disabled MovimientoCliente logging (Redundant with registrar_movimiento_pago)
+# def crear_movimiento_cliente_pago(sender, instance, created, **kwargs):
+#     if created:
+#         MovimientoCliente.objects.create(
+#             cliente=instance.venta_reserva.cliente,
+#             tipo_movimiento='Pago',
+#             comentarios=f'Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id} - Monto: ${instance.monto}',
+#             usuario=instance.usuario, # User should be set by pre_save signal
+#             venta_reserva=instance.venta_reserva
+#         )
 
-    # Restar el pago eliminado y actualizar el saldo pendiente
-    instance.venta_reserva.pagado -= instance.monto
-    instance.venta_reserva.actualizar_saldo()
-    instance.venta_reserva.calcular_total()  # Recalcular el total
+# @receiver(post_delete, sender=Pago) # Temporarily disabled MovimientoCliente logging (Redundant with registrar_movimiento_eliminacion_pago)
+# def crear_movimiento_cliente_pago_eliminado(sender, instance, **kwargs):
+#     usuario = get_current_user()
+#     # Ensure we always have a user, defaulting to system user
+#     if not usuario or isinstance(usuario, AnonymousUser):
+#         usuario = get_or_create_system_user()
+#
+#     # Check if related objects still exist
+#     if hasattr(instance, 'venta_reserva') and instance.venta_reserva and instance.venta_reserva.cliente:
+#         MovimientoCliente.objects.create(
+#             cliente=instance.venta_reserva.cliente,
+#             tipo_movimiento='Anulación de Pago',
+#             comentarios=f'Anulación de Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id} - Monto: ${instance.monto}',
+#             usuario=usuario,
+#             venta_reserva=instance.venta_reserva
+#         )
 
-@receiver(post_delete, sender=ReservaProducto)
-def actualizar_total_al_eliminar_producto(sender, instance, **kwargs):
-    instance.venta_reserva.calcular_total()
 
-@receiver(post_delete, sender=ReservaServicio)
-def actualizar_total_al_eliminar_servicio(sender, instance, **kwargs):
-    instance.venta_reserva.calcular_total()
+# Signals for updating totals (Keep these active)
 
-@receiver(post_save, sender=ReservaServicio)
-def actualizar_total_al_guardar_servicio(sender, instance, created, raw, using, update_fields, **kwargs):  # Agrega raw y using
-    if created:
-        instance.venta_reserva.calcular_total()
-    elif not raw:  # Verifica que no sea una creación raw
-        try:
-            anterior_reserva_servicio = ReservaServicio.objects.using(using).get(pk=instance.pk)
-            if anterior_reserva_servicio.cantidad_personas != instance.cantidad_personas or anterior_reserva_servicio.servicio != instance.servicio:
-                instance.venta_reserva.calcular_total()
-        except ReservaServicio.DoesNotExist:
-            pass  # La instancia no existía antes, probablemente creada a través del inline
+# Using pre_delete for total updates might be more reliable than post_delete
+@receiver(pre_delete, sender=ReservaProducto)
+def actualizar_total_antes_eliminar_producto(sender, instance, **kwargs):
+    try:
+        if instance.venta_reserva:
+            # Call calculate total *before* the item is gone
+            # This assumes calcular_total can handle this scenario or is adjusted
+            instance.venta_reserva.calcular_total() # Or pass excluded item?
+    except ObjectDoesNotExist:
+        logger.warning(f"VentaReserva not found when updating total before ReservaProducto {instance.pk} deletion.")
+    except Exception as e:
+            logger.error(f"Error updating total before ReservaProducto {instance.pk} deletion: {e}")
 
-@receiver(post_save, sender=ReservaProducto)
-@receiver(post_save, sender=ReservaServicio)
-def actualizar_total_venta_reserva(sender, instance, created, **kwargs):
-    instance.venta_reserva.actualizar_total()
-    instance.venta_reserva.save() # Guardar los cambios del total
+@receiver(pre_delete, sender=ReservaServicio) # Keep this signal for total updates
+def actualizar_total_antes_eliminar_servicio(sender, instance, **kwargs):
+    try:
+        if instance.venta_reserva:
+            instance.venta_reserva.calcular_total() # Or pass excluded item?
+    except ObjectDoesNotExist:
+        logger.warning(f"VentaReserva not found when updating total before ReservaServicio {instance.pk} deletion.")
+    except Exception as e:
+            logger.error(f"Error updating total before ReservaServicio {instance.pk} deletion: {e}")
 
-@receiver(post_save, sender=ReservaProducto)
+# post_save for adding/updating items should still trigger total calculation
+@receiver(post_save, sender=ReservaServicio) # Keep this signal for total updates
+def actualizar_total_al_guardar_servicio(sender, instance, created, raw, using, update_fields, **kwargs):
+    try:
+        if instance.venta_reserva and not raw: # Avoid recalculating during fixture loading
+             instance.venta_reserva.calcular_total()
+    except ObjectDoesNotExist:
+        logger.warning(f"VentaReserva not found when updating total after ReservaServicio {instance.pk} save.")
+    except Exception as e:
+            logger.error(f"Error updating total after ReservaServicio {instance.pk} save: {e}")
+
+@receiver(post_save, sender=ReservaProducto) # Keep this signal for total updates
+def actualizar_total_al_guardar_producto(sender, instance, created, raw, using, update_fields, **kwargs):
+    try:
+        if instance.venta_reserva and not raw: # Avoid recalculating during fixture loading
+             instance.venta_reserva.calcular_total()
+    except ObjectDoesNotExist:
+        logger.warning(f"VentaReserva not found when updating total after ReservaProducto {instance.pk} save.")
+    except Exception as e:
+        logger.error(f"Error updating total after ReservaProducto {instance.pk} save: {e}")
+
+
+# Inventory Update Signals (Keep these active)
+
+@receiver(post_save, sender=ReservaProducto) # Keep this signal for inventory updates
 def actualizar_inventario(sender, instance, created, **kwargs):
-    if created:
-        with transaction.atomic():
-            instance.producto.reducir_inventario(instance.cantidad)
-    else:
-        cantidad_anterior = getattr(instance, '_cantidad_anterior', 0)
-        diferencia = instance.cantidad - cantidad_anterior
-        with transaction.atomic():
-            if diferencia > 0:
-                instance.producto.reducir_inventario(diferencia)
-            elif diferencia < 0:
-                # Since diferencia is negative, subtracting it will add back to the inventory
-                instance.producto.cantidad_disponible -= diferencia
-                instance.producto.save()
+    try:
+        producto = instance.producto
+        if producto:
+            if created:
+                with transaction.atomic():
+                    producto.reducir_inventario(instance.cantidad)
+            else:
+                cantidad_anterior = getattr(instance, '_cantidad_anterior', 0)
+                diferencia = instance.cantidad - cantidad_anterior
+                if diferencia != 0:
+                    with transaction.atomic():
+                        # Re-fetch product inside transaction for safety
+                        prod_atomic = Producto.objects.select_for_update().get(pk=producto.pk)
+                        if diferencia > 0:
+                            prod_atomic.reducir_inventario(diferencia)
+                        else:
+                            prod_atomic.incrementar_inventario(-diferencia)
+    except ObjectDoesNotExist:
+        logger.warning(f"Producto not found when updating inventory for ReservaProducto {instance.pk}.")
+    except Exception as e:
+        logger.error(f"Error updating inventory in actualizar_inventario signal for ReservaProducto {instance.pk}: {e}")
 
-@receiver(m2m_changed, sender=VentaReserva.productos.through)
-def actualizar_inventario_m2m(sender, instance, action, **kwargs):
-    if action == 'post_add':
-        for pk in kwargs['pk_set']:
-            producto = Producto.objects.get(pk=pk)
-            cantidad = ReservaProducto.objects.get(venta_reserva=instance, producto=producto).cantidad
-            producto.reducir_inventario(cantidad)
-    elif action == 'post_remove':  # Restaurar inventario al eliminar productos
-        for pk in kwargs['pk_set']:
-            producto = Producto.objects.get(pk=pk)
-            cantidad = ReservaProducto.objects.filter(venta_reserva=instance, producto=producto).first().cantidad
-            producto.cantidad_disponible += cantidad
-            producto.save()
-    elif action == 'post_clear':  # Restaurar inventario al borrar todos los productos
-        for reserva_producto in ReservaProducto.objects.filter(venta_reserva=instance):
-            reserva_producto.producto.cantidad_disponible += reserva_producto.cantidad
-            reserva_producto.producto.save()
+# Keep m2m disabled for now due to complexity/potential issues
+# @receiver(m2m_changed, sender=VentaReserva.productos.through) # Keep commented out
+# def actualizar_inventario_m2m(sender, instance, action, pk_set, **kwargs):
+#     pass
 
-@receiver(pre_save, sender=ReservaProducto)
+@receiver(pre_save, sender=ReservaProducto) # Keep this signal for inventory updates
 def guardar_cantidad_anterior(sender, instance, **kwargs):
     if instance.pk:
         try:
@@ -314,88 +468,76 @@ def guardar_cantidad_anterior(sender, instance, **kwargs):
     else:
         instance._cantidad_anterior = 0
 
-@receiver(post_delete, sender=ReservaProducto)
+@receiver(post_delete, sender=ReservaProducto) # Keep this signal for inventory updates
 def restaurar_inventario_al_eliminar_producto(sender, instance, **kwargs):
-    with transaction.atomic():
-        instance.producto.cantidad_disponible += instance.cantidad
-        instance.producto.save()
+    try:
+        producto = instance.producto
+        if producto:
+            with transaction.atomic():
+                # Re-fetch product to be safe and lock
+                producto_obj = Producto.objects.select_for_update().get(pk=producto.pk)
+                producto_obj.incrementar_inventario(instance.cantidad)
+    except ObjectDoesNotExist:
+        logger.warning(f"Producto not found when restoring inventory for deleted ReservaProducto {instance.pk}.")
+    except Exception as e:
+        logger.error(f"Error restoring inventory for deleted ReservaProducto {instance.pk}: {e}")
 
 
-logger = logging.getLogger(__name__)
+# Compra/DetalleCompra Signals (Keep these active)
 
 @receiver(post_save, sender=DetalleCompra)
 @receiver(post_delete, sender=DetalleCompra)
 def update_compra_total(sender, instance, **kwargs):
-    compra = instance.compra
-    if compra:
-        total_detalles = compra.detalles.aggregate(
-            total=Sum(F('precio_unitario') * F('cantidad'), output_field=DecimalField())
-        )['total'] or 0
-        Compra.objects.filter(pk=compra.pk).update(total=total_detalles)
-        logger.debug(f"Actualizando Compra ID {compra.pk}: Total Detalles = {total_detalles}")
+    try:
+        compra = instance.compra
+        if compra:
+            total_detalles = compra.detalles.aggregate(
+                total=Sum(F('precio_unitario') * F('cantidad'), output_field=DecimalField())
+            )['total'] or 0
+            Compra.objects.filter(pk=compra.pk).update(total=total_detalles)
+            logger.debug(f"Actualizando Compra ID {compra.pk}: Total Detalles = {total_detalles}")
+    except ObjectDoesNotExist:
+         logger.warning(f"Compra not found when updating total after DetalleCompra {instance.pk} change.")
+    except Exception as e:
+        logger.error(f"Error updating Compra total after DetalleCompra {instance.pk} change: {e}")
 
-@receiver(post_save, sender=Pago)
-def crear_movimiento_cliente_pago(sender, instance, created, **kwargs):
-    if created:
-        MovimientoCliente.objects.create(
-            cliente=instance.venta_reserva.cliente,
-            tipo_movimiento='Pago',
-            comentarios=f'Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id} - Monto: ${instance.monto}',
-            usuario=instance.usuario,
-            venta_reserva=instance.venta_reserva
-        )
 
-@receiver(post_delete, sender=Pago)
-def crear_movimiento_cliente_pago_eliminado(sender, instance, **kwargs):
-    usuario = get_current_user()
-    # If user is AnonymousUser, use system user
-    if usuario and isinstance(usuario, AnonymousUser):
-        usuario = get_or_create_system_user()
-    # If still no user, use system user
-    if not usuario:
-        usuario = get_or_create_system_user()
-        
-    MovimientoCliente.objects.create(
-        cliente=instance.venta_reserva.cliente,
-        tipo_movimiento='Anulación de Pago',
-        comentarios=f'Anulación de Pago #{instance.id} para Venta/Reserva #{instance.venta_reserva.id} - Monto: ${instance.monto}',
-        usuario=usuario,
-        venta_reserva=instance.venta_reserva
-    )
+# Pago User Signal (Keep this active)
 
 @receiver(pre_save, sender=Pago)
 def set_pago_user(sender, instance, **kwargs):
-    if not instance.pk and not instance.usuario:  # If this is a new instance and no user is set
-        from .middleware import get_current_user
+    # Only set user if it's a new instance and user is not already set
+    if not instance.pk and not instance.usuario:
         usuario = get_current_user()
-        # If user is AnonymousUser, use system user
-        if usuario and isinstance(usuario, AnonymousUser):
+        # Ensure we always have a user, defaulting to system user
+        if not usuario or isinstance(usuario, AnonymousUser):
             usuario = get_or_create_system_user()
-        # If still no user, use system user
-        if not usuario:
-            usuario = get_or_create_system_user()
-            
         instance.usuario = usuario
 
-@receiver(post_save, sender=ReservaServicio)
-@receiver(post_delete, sender=ReservaServicio)
-def actualizar_total_venta(sender, instance, **kwargs):
-    if instance.venta_reserva:
-        instance.venta_reserva.calcular_total()
-        
+# Availability Signal (Keep this active)
+
 @receiver(pre_save, sender=ReservaServicio)
 def validar_disponibilidad_admin(sender, instance, **kwargs):
-    # Pass the instance itself to verificar_disponibilidad to exclude it from checks if it exists
-    if not verificar_disponibilidad(
-        servicio=instance.servicio,
-        fecha_propuesta=instance.fecha_agendamiento,
-        hora_propuesta=instance.hora_inicio,
-        cantidad_personas=instance.cantidad_personas,
-        reserva_actual=instance, # Pass the current instance to exclude itself
-        proveedor_asignado=instance.proveedor_asignado # Pass the provider being assigned
-    ):
-        # Customize error message if provider is the issue
-        error_msg = f"Slot {instance.hora_inicio} no disponible para {instance.servicio.nombre}"
-        if instance.servicio.tipo_servicio == 'masaje' and instance.proveedor_asignado:
-            error_msg += f" con el proveedor {instance.proveedor_asignado.nombre}"
-        raise ValidationError(error_msg)
+    # Check if servicio exists before accessing attributes
+    if hasattr(instance, 'servicio') and instance.servicio:
+        try:
+            # Pass the instance itself to verificar_disponibilidad to exclude it from checks if it exists
+            if not verificar_disponibilidad(
+                servicio=instance.servicio,
+                fecha_propuesta=instance.fecha_agendamiento,
+                hora_propuesta=instance.hora_inicio,
+                cantidad_personas=instance.cantidad_personas,
+                reserva_actual=instance, # Pass the current instance to exclude itself
+                proveedor_asignado=instance.proveedor_asignado # Pass the provider being assigned
+            ):
+                # Customize error message if provider is the issue
+                error_msg = f"Slot {instance.hora_inicio} no disponible para {instance.servicio.nombre}"
+                if instance.servicio.tipo_servicio == 'masaje' and instance.proveedor_asignado:
+                    error_msg += f" con el proveedor {instance.proveedor_asignado.nombre}"
+                raise ValidationError(error_msg)
+        except ObjectDoesNotExist:
+             logger.warning(f"Related object (Servicio?) missing during availability check for ReservaServicio {instance.pk}.")
+             # raise ValidationError("Servicio relacionado no encontrado.") # Optionally raise error
+        except Exception as e:
+             logger.error(f"Error during availability check for ReservaServicio {instance.pk}: {e}")
+             # raise ValidationError("Error inesperado al verificar disponibilidad.") # Optionally raise error

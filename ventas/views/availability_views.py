@@ -103,9 +103,7 @@ def check_slot_availability(request):
 
         return JsonResponse({'available': slot_is_available})
 
-    except Servicio.DoesNotExist:
-        # Handled by get_object_or_404
-        return JsonResponse({'available': False, 'error': 'Servicio no encontrado'}, status=404)
+    # Note: Servicio.DoesNotExist is handled by get_object_or_404 raising Http404
     except ValueError:
         return JsonResponse({'available': False, 'error': 'Formato de fecha inválido'}, status=400)
     except Exception as e:

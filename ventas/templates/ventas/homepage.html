@@ -158,10 +158,10 @@
 <section class="hero-section">
     <div class="container">
             <div class="hero-content">
-                <h1>Tu Escapada Perfecta: Masajes, Tinas y Alojamiento</h1> {# New heading #}
-                <p>Desconectate y recargate energías con nuestros masajes relajantes, tinas calientes y preciosas opciones de alojamiento.</p> {# New text #}
+                <h1>Desconecta y Renueva Tus Sentidos en Aremko Spa</h1>
+                <p>Sumérgete en un oasis de tranquilidad en Puerto Varas. Descubre experiencias únicas de masajes, tinas calientes y alojamiento diseñadas para tu bienestar total.</p>
                 <a href="#servicios" class="btn btn-primary btn-lg">
-                    <i class="fas fa-concierge-bell me-2"></i>Explorar Experiencias {# New icon and text #}
+                    <i class="fas fa-gift me-2"></i>Descubre Tu Experiencia Ideal
                 </a>
             </div>
         </div>
@@ -175,34 +175,12 @@
                 <img src="https://images.unsplash.com/photo-1515377905703-c478cb051af4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow" alt="Tina Caliente Relajante Aremko"> {# Changed image to hot tub focus #}
             </div>
             <div class="col-md-6">
-                <h2 class="section-title mb-3">Tu Refugio de Relajación en Puerto Varas</h2> {# Added location #}
-                <p class="lead">En Aremko Spa Puerto Varas, combinamos la serenidad del alojamiento confortable con la terapia rejuvenecedora de masajes expertos y la calidez de nuestras tinajas calientes en la Región de Los Lagos.</p> {# Added keywords #}
-                <p>Nuestro objetivo es ofrecerte una experiencia completa de desconexión. Ya sea que busques aliviar tensiones con un masaje, sumergirte en nuestras tinajas bajo las estrellas o simplemente descansar en un entorno tranquilo, aquí encontrarás tu espacio ideal.</p> {# Adjusted 'tina caliente' to 'tinajas' #}
-                <a href="#caracteristicas" class="btn btn-outline-primary mt-3">Descubre los Beneficios</a>
+                <h2 class="section-title mb-3">Vive la Experiencia Aremko en Puerto Varas</h2>
+                <p class="lead">Más que un spa, Aremko es tu santuario personal en el corazón de la Región de Los Lagos. Fusionamos el confort de nuestro alojamiento con el arte de la relajación a través de masajes terapéuticos y la magia de nuestras tinajas calientes.</p>
+                <p>Cada detalle está pensado para transportarte a un estado de paz profunda. ¿Buscas liberar el estrés, reconectar contigo mismo bajo las estrellas o simplemente regalarte una pausa? Tu momento de renovación comienza aquí.</p>
+                <a href="#caracteristicas" class="btn btn-outline-primary mt-3">Explora Nuestras Experiencias Únicas</a>
             </div>
         </div>
-    </div>
-</section>
-
-<!-- Service Categories Section -->
-<section class="container my-5" id="categorias-servicios">
-    <h2 class="section-title mb-4">Explora Nuestros Servicios</h2>
-    <div class="row">
-        {% for categoria in categorias %}
-        <div class="col-md-4 mb-4">
-            <div class="card h-100 text-center">
-                <div class="card-body d-flex flex-column justify-content-center">
-                    <h5 class="card-title">{{ categoria.nombre }}</h5>
-                    {# Link to the category detail page #}
-                    <a href="{% url 'categoria_detail' categoria.id %}" class="btn btn-outline-primary mt-auto">Ver Servicios</a>
-                </div>
-            </div>
-        </div>
-        {% empty %}
-        <div class="col-12">
-            <p class="text-center">No hay categorías de servicios disponibles en este momento.</p>
-        </div>
-        {% endfor %}
     </div>
 </section>
 
@@ -231,8 +209,8 @@
                 <div class="col-lg-4 col-md-6 service-card" data-category="{{ servicio.categoria.id }}">
                     <div class="card h-100">
                         {% if servicio.imagen %}
-                            {# Use the URL directly from the 'imagen' field #}
-                            <img src="{{ servicio.imagen }}" class="card-img-top" alt="{{ servicio.nombre }}">
+                            {# Use the .url attribute for ImageField #}
+                            <img src="{{ servicio.imagen.url }}" class="card-img-top" alt="{{ servicio.nombre }}">
                         {% else %}
                             {# Optional: Add a default placeholder image if needed #}
                             {# <img src="{% static 'path/to/default/placeholder.png' %}" class="card-img-top" alt="{{ servicio.nombre }}"> #}
@@ -275,15 +253,15 @@
 <!-- Features Section -->
 <section class="features-section" id="caracteristicas">
     <div class="container">
-        <h2 class="section-title mb-5">Experiencias Aremko</h2> {# Updated section title #}
+        <h2 class="section-title mb-5">Crea Tu Momento Perfecto</h2>
         <div class="row">
                 <div class="col-lg-3 col-md-6">
                     <div class="feature-box">
                         <div class="feature-icon">
                             <i class="fas fa-hand-sparkles"></i> {# Massage icon #}
                         </div>
-                        <h4 class="feature-title">Masajes Terapéuticos</h4>
-                        <p>Libera tensiones y revitaliza tu cuerpo con nuestras técnicas de masaje expertas en nuestro spa de Puerto Varas.</p> {# Added keyword context #}
+                        <h4 class="feature-title">Masajes que Sanan</h4>
+                        <p>Siente cómo el estrés se disuelve con cada caricia experta. Una experiencia revitalizante para cuerpo y alma.</p>
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-6">
@@ -291,8 +269,8 @@
                         <div class="feature-icon">
                             <i class="fas fa-hot-tub"></i> {# Hot tub icon #}
                         </div>
-                        <h4 class="feature-title">Tinajas Calientes Puerto Varas</h4> {# Added keyword #}
-                        <p>Sumérgete en la calidez y relájate profundamente en nuestras tinajas privadas en la Región de Los Lagos.</p> {# Added keyword context #}
+                        <h4 class="feature-title">Tinajas Bajo las Estrellas</h4>
+                        <p>Desconecta del mundo en la calidez burbujeante de nuestras tinajas privadas. Pura magia en Puerto Varas.</p>
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-6">
@@ -300,17 +278,17 @@
                         <div class="feature-icon">
                             <i class="fas fa-bed"></i> {# Accommodation icon #}
                         </div>
-                        <h4 class="feature-title">Alojamiento De Lujo</h4>
-                        <p>Descansa en nuestros espacios acogedores diseñados para tu tranquilidad cerca de Puerto Varas.</p> {# Added location context #}
+                        <h4 class="feature-title">Descanso Reparador</h4>
+                        <p>Nuestras acogedoras habitaciones son el refugio perfecto para completar tu experiencia de bienestar.</p>
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-6">
                     <div class="feature-box">
                         <div class="feature-icon">
-                            <i class="fas fa-calendar-alt"></i> {# Booking icon (kept) #}
+                            <i class="fas fa-calendar-check"></i> {# Changed icon slightly #}
                         </div>
-                        <h4 class="feature-title">Reserva Fácil</h4>
-                        <p>Agenda tu escapada de relajación en Aremko Spa de forma rápida y sencilla online.</p> {# Added brand/keyword #}
+                        <h4 class="feature-title">Reserva Tu Bienestar</h4>
+                        <p>Asegura tu momento de paz. Reserva tu experiencia Aremko fácilmente en línea.</p>
                     </div>
                 </div>
             </div>
@@ -371,10 +349,10 @@
 <!-- Final CTA Section -->
 <section class="cta-section text-center py-5 bg-primary text-white">
     <div class="container">
-        <h2 class="mb-3">Reserva Tu Experiencia Aremko</h2> {# Updated title #}
-        <p class="lead mb-4">Disfruta de nuestros masajes, sumérgete en las tinas calientes o quédate en nuestro tranquilo alojamiento. ¡Tu escapada ideal te espera!</p> {# Updated text #}
+        <h2 class="mb-3">¿Listo para Vivir la Experiencia Aremko?</h2>
+        <p class="lead mb-4">Regálate el descanso que mereces. Elige tu masaje ideal, sumérgete en nuestras tinajas o planifica tu estancia completa. ¡Tu momento de paz te espera!</p>
         <a href="#servicios" class="btn btn-light btn-lg">
-            <i class="fas fa-calendar-check me-2"></i>Ver Disponibilidad y Reservar {# Updated button text #}
+            <i class="fas fa-calendar-check me-2"></i>Reservar Mi Experiencia Ahora
         </a>
     </div>
 </section>
