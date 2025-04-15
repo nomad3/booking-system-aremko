@@ -1,9 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-# Import view modules instead of individual views
+# Import view modules including the new admin_views
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
-    flow_views, import_export_views, misc_views, public_views, reporting_views
+    flow_views, import_export_views, misc_views, public_views, reporting_views,
+    admin_views # Import the new admin views module
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -39,6 +40,7 @@ urlpatterns = [
     path('exportar-clientes/', import_export_views.exportar_clientes_excel, name='exportar_clientes_excel'),
     path('clientes/', crud_views.lista_clientes, name='lista_clientes'),
     path('importar-clientes/', import_export_views.importar_clientes_excel, name='importar_clientes_excel'),
+    # Removed Custom admin action URL for select_campaign_for_remarketing
     # Keep existing api paths using the api module
     path('api/cliente/create/', api.create_cliente, name='create_cliente'),
     path('api/cliente/update/<str:telefono>/', api.update_cliente, name='update_cliente'),
@@ -61,6 +63,13 @@ urlpatterns = [
     path('api/get-client-details/', api_views.get_client_details_by_phone, name='get_client_details_by_phone'),
     # Removed URL for get_service_providers as it's no longer needed
     # path('api/get-service-providers/<int:servicio_id>/', api_views.get_service_providers, name='get_service_providers'),
+
+    # --- Remarketing/Automation API URLs ---
+    path('api/campaigns/<int:campaign_id>/details/', api_views.get_campaign_details, name='get_campaign_details'), # Added campaign details endpoint
+    path('api/campaigns/<int:campaign_id>/targets/', api_views.get_campaign_targets, name='get_campaign_targets'),
+    path('api/activities/log/', api_views.log_external_activity, name='log_external_activity'),
+    # --- End Remarketing URLs ---
+
     # API Router (Keep this last if possible, or ensure specific paths come first)
     path('', include(router.urls)),
 ]

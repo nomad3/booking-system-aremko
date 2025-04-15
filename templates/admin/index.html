@@ -60,24 +60,25 @@
                     <i class="fas fa-bullhorn me-2"></i>CRM y Marketing
                 </div>
                 <div class="card-body d-grid gap-2">
-                    <a href="{% url 'admin:ventas_lead_changelist' %}" class="btn btn-modern btn-primary-modern">
-                        <i class="fas fa-filter me-2"></i>Gestionar Leads (Prospectos)
-                    </a>
-                    <a href="{% url 'admin:ventas_contact_changelist' %}" class="btn btn-modern btn-primary-modern">
-                        <i class="fas fa-address-book me-2"></i>Gestionar Contactos
-                    </a>
-                    <a href="{% url 'admin:ventas_company_changelist' %}" class="btn btn-modern btn-secondary-modern">
-                        <i class="fas fa-building me-2"></i>Gestionar Compañías
-                    </a>
-                    <a href="{% url 'admin:ventas_deal_changelist' %}" class="btn btn-modern btn-primary-modern">
-                        <i class="fas fa-handshake me-2"></i>Gestionar Oportunidades
-                    </a>
-                    <a href="{% url 'admin:ventas_campaign_changelist' %}" class="btn btn-modern btn-secondary-modern">
+                     <a href="{% url 'admin:ventas_campaign_changelist' %}" class="btn btn-modern btn-primary-modern">
                         <i class="fas fa-bullseye me-2"></i>Gestionar Campañas
                     </a>
-                    <a href="{% url 'admin:ventas_activity_changelist' %}" class="btn btn-modern btn-secondary-modern">
+                     <a href="{% url 'admin:ventas_lead_changelist' %}" class="btn btn-modern btn-secondary-modern">
+                        <i class="fas fa-filter me-2"></i>Gestionar Leads (Prospectos)
+                    </a>
+                    <a href="{% url 'admin:ventas_contact_changelist' %}" class="btn btn-modern btn-secondary-modern">
+                        <i class="fas fa-address-book me-2"></i>Gestionar Contactos
+                    </a>
+                     <a href="{% url 'admin:ventas_deal_changelist' %}" class="btn btn-modern btn-secondary-modern">
+                        <i class="fas fa-handshake me-2"></i>Gestionar Oportunidades
+                    </a>
+                     <a href="{% url 'admin:ventas_company_changelist' %}" class="btn btn-modern btn-info-modern">
+                        <i class="fas fa-building me-2"></i>Gestionar Compañías
+                    </a>
+                    <a href="{% url 'admin:ventas_activity_changelist' %}" class="btn btn-modern btn-info-modern">
                         <i class="fas fa-tasks me-2"></i>Ver Actividades
                     </a>
+                    {# Removed links related to old admin actions #}
                 </div>
             </div>
         </div>

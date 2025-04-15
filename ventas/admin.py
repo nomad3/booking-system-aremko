@@ -8,7 +8,12 @@ from django.db.models import Sum
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.forms import DateInput, TimeInput, Select
-from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, GiftCard
+# Updated model imports to include HomepageConfig
+from .models import (
+    Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto,
+    Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio,
+    MovimientoCliente, Compra, DetalleCompra, GiftCard, HomepageConfig # Added HomepageConfig
+)
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.contrib import messages
@@ -17,10 +22,18 @@ import json # Import json module
 import xlwt # Added for Excel export
 from django.core.paginator import Paginator
 from openpyxl import load_workbook
+from solo.admin import SingletonModelAdmin # Import SingletonModelAdmin
 
 # Import CRM models & messages framework
 from .models import Lead, Company, Contact, Activity, Campaign, Deal
-from django.contrib import messages # Import messages
+from django.contrib import messages
+# Import communication utils
+from . import communication_utils
+from .models import Contact, Company
+from django.urls import path # Import path for custom URL
+from .views import admin_views # Import the admin views module
+from django.http import HttpResponseRedirect # Import for redirect
+from django.urls import reverse # Import reverse
 
 # Personalización del título de la administración
 admin.site.site_header = _("Sistema de Gestión de Ventas")
@@ -63,14 +76,16 @@ class PagoInline(admin.TabularInline):
     fields = ['fecha_pago', 'monto', 'metodo_pago', 'giftcard']
     autocomplete_fields = ['giftcard']
 
-    def save_model(self, request, obj, form, change):
-        if not change:  # If this is a new instance
-            obj.usuario = request.user
-        super().save_model(request, obj, form, change)
-        if db_field.name == "producto":
-            kwargs["queryset"] = Producto.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    # Removed duplicate save_model method
+    # def save_model(self, request, obj, form, change):
+    #     if not change:  # If this is a new instance
+    #         obj.usuario = request.user
+    #     super().save_model(request, obj, form, change)
+    #     if db_field.name == "producto": # This block was incorrectly placed here
+    #         kwargs["queryset"] = Producto.objects.order_by('nombre')
+    #     return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+# Corrected PagoInline definition
 class PagoInline(admin.TabularInline):
     model = Pago
     form = PagoInlineForm
@@ -78,10 +93,8 @@ class PagoInline(admin.TabularInline):
     fields = ['fecha_pago', 'monto', 'metodo_pago', 'giftcard']
     autocomplete_fields = ['giftcard']
 
-    def save_model(self, request, obj, form, change):
-        if not change:  # If this is a new instance
-            obj.usuario = request.user
-        super().save_model(request, obj, form, change)
+    # Corrected save_model - it should not be in the inline definition
+    # The logic to assign user should be in the main ModelAdmin (VentaReservaAdmin or PagoAdmin)
 
 # Método para registrar movimientos en el sistema
 def registrar_movimiento(cliente, tipo_movimiento, descripcion, usuario):
@@ -93,12 +106,12 @@ def registrar_movimiento(cliente, tipo_movimiento, descripcion, usuario):
     )
 
 class VentaReservaAdmin(admin.ModelAdmin):
-    list_per_page = 50  
+    list_per_page = 50
     autocomplete_fields = ['cliente']
     list_display = (
-        'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago', 
-        'estado_reserva', 'servicios_y_cantidades', 
-        'productos_y_cantidades', 'total_servicios', 
+        'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago',
+        'estado_reserva', 'servicios_y_cantidades',
+        'productos_y_cantidades', 'total_servicios',
         'total_productos', 'total', 'pagado', 'saldo_pendiente'
     )
     # Restore the date filter
@@ -135,13 +148,14 @@ class VentaReservaAdmin(admin.ModelAdmin):
         }),
     )
     def changelist_view(self, request, extra_context=None):
+        # Add logic here if needed for changelist view
         return super().changelist_view(request, extra_context=extra_context)
-    
+
     # Guardar cambios con registro de movimiento
     def save_model(self, request, obj, form, change):
         # First save the object without checking for usuario
         super().save_model(request, obj, form, change)
-        
+
         # Then create the movement record
         if not change:  # Only for new instances
             MovimientoCliente.objects.create(
@@ -161,7 +175,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
     # Mostrar servicios junto con cantidades en la misma fila
     def servicios_y_cantidades(self, obj):
         servicios_list = [
-            f"{reserva_servicio.servicio.nombre} (x{reserva_servicio.cantidad_personas})" 
+            f"{reserva_servicio.servicio.nombre} (x{reserva_servicio.cantidad_personas})"
             for reserva_servicio in obj.reservaservicios.all()
         ]
         return ", ".join(servicios_list)
@@ -170,7 +184,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
     # Mostrar productos junto con cantidades en la misma fila
     def productos_y_cantidades(self, obj):
         productos_list = [
-            f"{reserva_producto.producto.nombre} (x{reserva_producto.cantidad})" 
+            f"{reserva_producto.producto.nombre} (x{reserva_producto.cantidad})"
             for reserva_producto in obj.reservaproductos.all()
         ]
         return ", ".join(productos_list)
@@ -179,20 +193,23 @@ class VentaReservaAdmin(admin.ModelAdmin):
     # Calcular total de servicios
     def total_servicios(self, obj):
         total = sum(
-            reserva_servicio.servicio.precio_base * reserva_servicio.cantidad_personas 
+            reserva_servicio.servicio.precio_base * reserva_servicio.cantidad_personas
             for reserva_servicio in obj.reservaservicios.all()
         )
-        return f"{total} CLP"
+        # Format as integer CLP
+        return f"{int(total):,} CLP".replace(",", ".")
     total_servicios.short_description = 'Total de Servicios'
 
     # Calcular total de productos
     def total_productos(self, obj):
         total = sum(
-            reserva_producto.producto.precio_base * reserva_producto.cantidad 
+            reserva_producto.producto.precio_base * reserva_producto.cantidad
             for reserva_producto in obj.reservaproductos.all()
         )
-        return f"{total} CLP"
+        # Format as integer CLP
+        return f"{int(total):,} CLP".replace(",", ".")
     total_productos.short_description = 'Total de Productos'
+
 
     # Optimización de consultas con prefetch_related
     def get_queryset(self, request):
@@ -200,6 +217,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         queryset = queryset.prefetch_related(
             'reservaproductos__producto',
             'reservaservicios__servicio',
+            'pagos', # Prefetch pagos for efficiency
         ).select_related('cliente')
         return queryset
 
@@ -222,19 +240,9 @@ class VentaReservaAdmin(admin.ModelAdmin):
         super().save_related(request, form, formsets, change)
         instance = form.instance
         instance.calcular_total()  # Recalcular total después de guardar relaciones
-        
-        # Validar disponibilidad para reservas nuevas
-        if not change:
-            for reserva_servicio in instance.reservaservicios.all():
-                if not verificar_disponibilidad(
-                    servicio=reserva_servicio.servicio,
-                    fecha_propuesta=reserva_servicio.fecha_agendamiento,
-                    hora_propuesta=reserva_servicio.hora_inicio,
-                    cantidad_personas=reserva_servicio.cantidad_personas
-                ):
-                    messages.error(request, 
-                        f"Slot {reserva_servicio.hora_inicio} no disponible para {reserva_servicio.servicio.nombre}")
-                    reserva_servicio.delete()
+
+        # Removed availability check from here - should be done before saving if needed
+        # or handled by model validation/signals
 
     class Media:
         css = {
@@ -268,6 +276,12 @@ class CompraAdmin(admin.ModelAdmin):
     autocomplete_fields = ['proveedor']
     list_select_related = ('proveedor',)
 
+    # Recalculate total when saving CompraAdmin
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        form.instance.calcular_total()
+        form.instance.save()
+
 @admin.register(GiftCard)
 class GiftCardAdmin(admin.ModelAdmin):
     list_display = ('codigo', 'cliente_comprador', 'cliente_destinatario', 'monto_inicial', 'monto_disponible', 'fecha_emision', 'fecha_vencimiento', 'estado')
@@ -284,7 +298,7 @@ class ProductoAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'precio_base', 'cantidad_disponible', 'proveedor', 'categoria')
     search_fields = ('nombre', 'categoria__nombre')
     list_filter = ('categoria', 'proveedor')
-    autocomplete_fields = ['proveedor', 'categoria'] 
+    autocomplete_fields = ['proveedor', 'categoria']
 
 class ClienteAdmin(admin.ModelAdmin):
     search_fields = ('nombre', 'telefono', 'email')
@@ -319,44 +333,29 @@ class ClienteAdmin(admin.ModelAdmin):
         return response
 
     exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
+    # Removed iniciar_remarketing_clientes action and get_urls override
+
 
 class ServicioAdminForm(forms.ModelForm):
-    # We removed the extra 'slots_input' field. We now directly use the 'slots_disponibles' field.
-
     class Meta:
         model = Servicio
-        fields = '__all__' # Include the actual model field
+        fields = '__all__'
         widgets = {
-            # Use a Textarea for the JSONField for easier editing
             'slots_disponibles': forms.Textarea(attrs={'rows': 10, 'cols': 60, 'placeholder': '{\n    "monday": ["16:00", "18:00"],\n    "tuesday": [],\n    ...\n}'}),
         }
-    
-    # No custom __init__ needed for this approach
 
     def clean_slots_disponibles(self):
-        """Validate the JSON input directly from the slots_disponibles field."""
-        slots_data = self.cleaned_data.get('slots_disponibles') 
-        
-        # The default JSONField widget might already return a dict if input is valid JSON,
-        # but we should handle the case where it might be a string if invalid.
+        slots_data = self.cleaned_data.get('slots_disponibles')
         if isinstance(slots_data, str):
             try:
-                # Try parsing if it's still a string (e.g., invalid JSON submitted)
                 if not slots_data.strip():
                      slots_data = {}
                 else:
                      slots_data = json.loads(slots_data)
             except json.JSONDecodeError as e:
                 raise ValidationError(f"JSON inválido: {e}")
-        
-        # Ensure it's a dictionary after potential parsing
         if not isinstance(slots_data, dict):
-            # Provide a default empty dict if it's None or not a dict somehow
-            slots_data = {} 
-            # Optionally raise an error if you require a dict structure
-            # raise ValidationError("La entrada debe ser un diccionario JSON válido.")
-
-        # Proceed with validation if we have a dictionary
+            slots_data = {}
         valid_days = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
         for day, slots in slots_data.items():
             if day not in valid_days:
@@ -370,50 +369,54 @@ class ServicioAdminForm(forms.ModelForm):
                     datetime.strptime(slot, "%H:%M")
                 except ValueError:
                     raise ValidationError(f"Formato de horario inválido: '{slot}' en '{day}'. Use HH:MM (ej: \"10:00\", \"14:30\").")
-
         for day in valid_days:
             slots_data.setdefault(day, [])
-
-        # Return the validated dictionary. This will be stored in cleaned_data['slots_disponibles']
         return slots_data
-
-    # No custom clean or save method needed anymore. 
-    # clean_slots_disponibles handles validation, and default save handles persistence.
 
 @admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
     form = ServicioAdminForm
-    list_display = ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima', 'activo', 'publicado_web', 'imagen') # Added capacity fields
+    list_display = ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima', 'activo', 'publicado_web', 'imagen')
     list_filter = ('categoria', 'activo', 'publicado_web', 'tipo_servicio')
-    search_fields = ('nombre', 'categoria__nombre', 'proveedores__nombre') # Added proveedores to search
-    filter_horizontal = ('proveedores',) # Use a nice widget for ManyToMany
+    search_fields = ('nombre', 'categoria__nombre', 'proveedores__nombre')
+    filter_horizontal = ('proveedores',)
     fieldsets = (
         (None, {
-            # Changed 'proveedor' to 'proveedores', added 'descripcion_web'
             'fields': ('nombre', 'categoria', 'tipo_servicio', 'descripcion_web', 'precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima', 'imagen', 'proveedores', 'activo', 'publicado_web')
         }),
         ('Configuración Horaria', {
             'fields': (
                 'horario_apertura',
                 'horario_cierre',
-                # 'capacidad_maxima', # Moved to main fieldset
                 'slots_disponibles'
             )
         }),
     )
 
-    # Remove slots_preview as the default widget shows the JSON now
-    # def slots_preview(self, obj): ...
-    # slots_preview.short_description = 'Slots Disponibles' # Keep description if needed, but method is removed
-
-    # Removed get_urls and get_slots as they are no longer needed
-
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
-    list_display = ('venta_reserva', 'monto', 'metodo_pago', 'fecha_pago')
+    list_display = ('id', 'venta_reserva_link', 'monto_formateado', 'metodo_pago', 'fecha_pago', 'usuario') # Added ID and formatted amount
+    list_filter = ('metodo_pago', 'fecha_pago', 'usuario')
+    search_fields = ('venta_reserva__id', 'venta_reserva__cliente__nombre', 'usuario__username')
+    autocomplete_fields = ['venta_reserva', 'usuario', 'giftcard'] # Add giftcard here
+    readonly_fields = ('venta_reserva_link',) # Make link read-only
+
+    def venta_reserva_link(self, obj):
+        from django.urls import reverse
+        from django.utils.html import format_html
+        link = reverse("admin:ventas_ventareserva_change", args=[obj.venta_reserva.id])
+        return format_html('<a href="{}">Venta/Reserva #{}</a>', link, obj.venta_reserva.id)
+    venta_reserva_link.short_description = 'Venta/Reserva'
+
+    def monto_formateado(self, obj):
+         # Format as integer CLP
+        return f"{int(obj.monto):,} CLP".replace(",", ".")
+    monto_formateado.short_description = 'Monto'
+    monto_formateado.admin_order_field = 'monto'
+
 
     def save_model(self, request, obj, form, change):
-        if not obj.usuario:
+        if not obj.usuario_id: # Check if usuario is not set
             obj.usuario = request.user
         if change:
             tipo = "Actualización de Pago"
@@ -422,18 +425,36 @@ class PagoAdmin(admin.ModelAdmin):
             tipo = "Registro de Pago"
             descripcion = f"Se ha registrado un nuevo pago de {obj.monto} para la venta/reserva #{obj.venta_reserva.id}."
         super().save_model(request, obj, form, change)
-        registrar_movimiento(obj.venta_reserva.cliente, tipo, descripcion, request.user)
+        # Ensure venta_reserva has a client before registering movement
+        if obj.venta_reserva and obj.venta_reserva.cliente:
+             registrar_movimiento(obj.venta_reserva.cliente, tipo, descripcion, request.user)
+        # Recalculate total on the related VentaReserva after saving Pago
+        if obj.venta_reserva:
+            obj.venta_reserva.calcular_total()
+
 
     def delete_model(self, request, obj):
-        descripcion = f"Se ha eliminado el pago de {obj.monto} de la venta/reserva #{obj.venta_reserva.id}."
-        registrar_movimiento(obj.venta_reserva.cliente, "Eliminación de Pago", descripcion, request.user)
+        # Ensure venta_reserva has a client before registering movement
+        if obj.venta_reserva and obj.venta_reserva.cliente:
+            descripcion = f"Se ha eliminado el pago de {obj.monto} de la venta/reserva #{obj.venta_reserva.id}."
+            registrar_movimiento(obj.venta_reserva.cliente, "Eliminación de Pago", descripcion, request.user)
+        venta_reserva_temp = obj.venta_reserva # Store related object before deleting
         super().delete_model(request, obj)
+        # Recalculate total on the related VentaReserva after deleting Pago
+        if venta_reserva_temp:
+            venta_reserva_temp.calcular_total()
+
 
 # Custom Admin for CategoriaServicio to show image field
 @admin.register(CategoriaServicio)
 class CategoriaServicioAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'imagen')
     search_fields = ('nombre',)
+
+# Register HomepageConfig using SingletonModelAdmin
+@admin.register(HomepageConfig)
+class HomepageConfigAdmin(SingletonModelAdmin):
+    pass # Basic registration is enough for now
 
 admin.site.register(CategoriaProducto, CategoriaProductoAdmin)
 admin.site.register(Producto, ProductoAdmin)
@@ -580,16 +601,27 @@ class ActivityAdmin(admin.ModelAdmin):
 
 @admin.register(Campaign)
 class CampaignAdmin(admin.ModelAdmin):
-    list_display = ('name', 'status', 'start_date', 'end_date', 'budget', 'get_associated_leads_count', 'get_won_deals_count', 'get_won_deals_value')
+    list_display = ('name', 'status', 'start_date', 'end_date', 'target_min_visits', 'target_min_spend', 'budget', 'get_associated_leads_count', 'get_won_deals_count', 'get_won_deals_value') # Added target fields
     list_filter = ('status', 'start_date', 'end_date')
     search_fields = ('name', 'description', 'goal')
     inlines = [LeadInline]
     fieldsets = (
         (None, {'fields': ('name', 'status', 'description', 'goal')}),
         ('Fechas y Presupuesto', {'fields': ('start_date', 'end_date', 'budget')}),
+        ('Criterios de Segmentación (Clientes)', {
+            'fields': ('target_min_visits', 'target_min_spend'),
+            'description': 'Definir criterios para seleccionar Clientes existentes para esta campaña (usado por API/automatización).'
+        }),
+        ('Plantillas de Contenido (para n8n)', { # New fieldset for templates
+            'fields': ('email_subject_template', 'email_body_template', 'sms_template', 'whatsapp_template'),
+            'classes': ('collapse',), # Collapsed by default
+            'description': 'Escriba las plantillas de mensajes aquí. Use {nombre_cliente}, {apellido_cliente} como placeholders que n8n reemplazará.'
+        }),
         ('Marcas de Tiempo', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
     readonly_fields = ('created_at', 'updated_at')
+    # Ensure no actions list is defined here anymore
+    # actions = [] # Or just remove the line entirely
 
     def get_associated_leads_count(self, obj):
         return obj.get_associated_leads_count()
@@ -601,7 +633,8 @@ class CampaignAdmin(admin.ModelAdmin):
 
     def get_won_deals_value(self, obj):
         value = obj.get_won_deals_value()
-        return f"${value:,.0f}" if value else "$0" # Format as currency without decimals
+        # Format as integer CLP
+        return f"${int(value):,} CLP".replace(",", ".") if value else "$0 CLP"
     get_won_deals_value.short_description = 'Valor Ganado'
 
 

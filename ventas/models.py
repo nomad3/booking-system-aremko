@@ -9,6 +9,7 @@ from django.db import transaction
 import random
 import string
 from django.db.models import Sum, F, DecimalField, FloatField # Added DecimalField, FloatField
+from solo.models import SingletonModel # Added import for django-solo
 
 class Proveedor(models.Model):
     nombre = models.CharField(max_length=100)
@@ -247,6 +248,15 @@ class Cliente(models.Model):
 
     def __str__(self):
         return f"{self.nombre} - {self.telefono}"
+
+    def numero_visitas(self):
+        """Calcula el número de visitas (VentaReserva) asociadas a este cliente."""
+        return self.ventareserva_set.count() # Assumes default related_name
+
+    def gasto_total(self):
+        """Calcula el gasto total de este cliente basado en VentaReserva."""
+        total = self.ventareserva_set.aggregate(total_gastado=Sum('total'))['total_gastado']
+        return total or 0
 
 class VentaReserva(models.Model):
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE)
@@ -541,6 +551,15 @@ class Campaign(models.Model):
     budget = DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Presupuesto")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Fecha de Actualización")
+    # Targeting Criteria
+    target_min_visits = models.PositiveIntegerField(null=True, blank=True, default=0, verbose_name="Visitas Mínimas Cliente")
+    target_min_spend = models.DecimalField(max_digits=10, decimal_places=0, null=True, blank=True, default=0, verbose_name="Gasto Mínimo Cliente (CLP)")
+    # Content Templates
+    email_subject_template = models.CharField(max_length=255, blank=True, verbose_name="Plantilla Asunto Email")
+    email_body_template = models.TextField(blank=True, verbose_name="Plantilla Cuerpo Email", help_text="Usar {nombre_cliente}, {apellido_cliente} como placeholders.")
+    sms_template = models.TextField(blank=True, verbose_name="Plantilla SMS", help_text="Usar {nombre_cliente}, {apellido_cliente} como placeholders.")
+    whatsapp_template = models.TextField(blank=True, verbose_name="Plantilla WhatsApp", help_text="Usar {nombre_cliente}, {apellido_cliente} como placeholders.")
+
 
     class Meta:
         verbose_name = "Campaña"
@@ -558,6 +577,24 @@ class Campaign(models.Model):
 
     def get_won_deals_value(self):
         return self.deals.filter(stage='Closed Won').aggregate(total_value=Sum('amount'))['total_value'] or 0
+
+    def get_target_clientes(self):
+        """
+        Retorna un QuerySet de Clientes que cumplen los criterios de la campaña.
+        """
+        clientes_qs = Cliente.objects.annotate(
+            num_visits=models.Count('ventareserva'),
+            total_spend=Sum('ventareserva__total')
+        )
+
+        if self.target_min_visits is not None and self.target_min_visits > 0:
+            clientes_qs = clientes_qs.filter(num_visits__gte=self.target_min_visits)
+
+        if self.target_min_spend is not None and self.target_min_spend > 0:
+            # Ensure total_spend is not null before filtering
+            clientes_qs = clientes_qs.filter(total_spend__isnull=False, total_spend__gte=self.target_min_spend)
+
+        return clientes_qs
 
 
 class Lead(models.Model):
@@ -701,6 +738,15 @@ class Activity(models.Model):
         related_name='created_activities',
         verbose_name="Creado por"
     )
+    # Add campaign link to log which campaign triggered the activity
+    campaign = models.ForeignKey(
+        Campaign,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='activities',
+        verbose_name="Campaña Asociada"
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Fecha de Actualización")
 
@@ -737,3 +783,45 @@ class Activity(models.Model):
     #             name='crm_activity_single_relation'
     #         )
     #     ]
+
+
+# --- Singleton Model for Homepage Configuration ---
+
+class HomepageConfig(SingletonModel):
+    hero_background_image = models.ImageField(
+        upload_to='homepage/',
+        blank=True,
+        null=True,
+        help_text="Imagen de fondo para la sección principal (hero)."
+    )
+    philosophy_image = models.ImageField(
+        upload_to='homepage/',
+        blank=True,
+        null=True,
+        help_text="Imagen para la sección 'Vive la Experiencia Aremko'."
+    )
+    gallery_image_1 = models.ImageField(
+        upload_to='homepage/gallery/',
+        blank=True,
+        null=True,
+        help_text="Primera imagen para la galería 'Nuestros Espacios'."
+    )
+    gallery_image_2 = models.ImageField(
+        upload_to='homepage/gallery/',
+        blank=True,
+        null=True,
+        help_text="Segunda imagen para la galería 'Nuestros Espacios'."
+    )
+    gallery_image_3 = models.ImageField(
+        upload_to='homepage/gallery/',
+        blank=True,
+        null=True,
+        help_text="Tercera imagen para la galería 'Nuestros Espacios'."
+    )
+
+    def __str__(self):
+        return "Configuración de la Página Principal"
+
+    class Meta:
+        verbose_name = "Configuración de la Página Principal"
+        verbose_name_plural = "Configuración de la Página Principal"

@@ -20,6 +20,12 @@ from ..serializers import ( # Relative imports
     CategoriaServicioSerializer
 )
 from ..utils import verificar_disponibilidad # Relative import
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated # Or custom permission
+from rest_framework import status
+from ..models import Campaign, Contact, Activity # Import CRM models
+from .. import communication_utils # Import communication utils
+from django.conf import settings # To get placeholder API key
 
 class ProveedorViewSet(viewsets.ModelViewSet):
     queryset = Proveedor.objects.all()
@@ -312,3 +318,140 @@ def get_client_details_by_phone(request):
         return JsonResponse({'error': 'Error interno del servidor'}, status=500)
 
 # Removed get_service_providers view as it's no longer needed for admin JS
+
+
+# --- API Endpoints for Remarketing & Automation ---
+
+# Placeholder for API Key Authentication (Replace with a proper method)
+def is_valid_api_key(request):
+    provided_key = request.headers.get('X-API-KEY')
+    expected_key = getattr(settings, 'AUTOMATION_API_KEY', None) # Get key from settings
+    if not expected_key or not provided_key:
+        return False
+    return provided_key == expected_key
+
+@api_view(['GET'])
+# @permission_classes([IsAuthenticated]) # Or a custom permission class
+def get_campaign_targets(request, campaign_id):
+    """
+    API endpoint to get a list of target Cliente IDs for a specific campaign
+    based on its defined criteria (min_visits, min_spend).
+    Requires authentication (e.g., API Key in header).
+    """
+    # --- Authentication (Placeholder - Replace with robust method) ---
+    if not is_valid_api_key(request):
+         return Response({"error": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
+    # --- End Authentication ---
+
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    target_clientes_qs = campaign.get_target_clientes()
+
+    # Serialize the required client data for n8n
+    target_data = []
+    for cliente in target_clientes_qs:
+        target_data.append({
+            'id': cliente.id,
+            'nombre': cliente.nombre,
+            'email': cliente.email,
+            'telefono': cliente.telefono,
+            # Add any other fields n8n might need for personalization
+        })
+
+    return Response({'campaign_id': campaign.id, 'targets': target_data})
+
+@api_view(['GET'])
+# @permission_classes([IsAuthenticated]) # Or a custom permission class
+def get_campaign_details(request, campaign_id):
+    """
+    API endpoint to get details for a specific campaign, including templates.
+    Requires authentication (e.g., API Key in header).
+    """
+    # --- Authentication (Placeholder - Replace with robust method) ---
+    if not is_valid_api_key(request):
+         return Response({"error": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
+    # --- End Authentication ---
+
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+
+    data = {
+        'id': campaign.id,
+        'name': campaign.name,
+        'status': campaign.status,
+        'goal': campaign.goal,
+        'email_subject_template': campaign.email_subject_template,
+        'email_body_template': campaign.email_body_template,
+        'sms_template': campaign.sms_template,
+        'whatsapp_template': campaign.whatsapp_template,
+        # Add other campaign fields if needed by n8n
+    }
+    return Response(data)
+
+
+@api_view(['POST'])
+# @permission_classes([IsAuthenticated]) # Or a custom permission class
+def log_external_activity(request):
+    """
+    API endpoint for external tools (like n8n) to log a communication activity.
+    Expects data like:
+    {
+        "contact_identifier_type": "email" or "phone",
+        "contact_identifier": "user@example.com" or "+123456789",
+        "campaign_id": 123,
+        "activity_type": "SMS Sent", # Or "WhatsApp Sent", "Call Attempted", etc.
+        "subject": "Subject of the communication",
+        "notes": "Optional notes about the interaction."
+    }
+    Requires authentication (e.g., API Key in header).
+    """
+    # --- Authentication (Placeholder - Replace with robust method) ---
+    if not is_valid_api_key(request):
+         return Response({"error": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
+    # --- End Authentication ---
+
+    data = request.data
+    identifier_type = data.get('contact_identifier_type')
+    identifier = data.get('contact_identifier')
+    campaign_id = data.get('campaign_id')
+    activity_type = data.get('activity_type')
+    subject = data.get('subject')
+    notes = data.get('notes', '')
+
+    if not all([identifier_type, identifier, campaign_id, activity_type, subject]):
+        return Response({"error": "Missing required fields: contact_identifier_type, contact_identifier, campaign_id, activity_type, subject"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Find Contact based on identifier
+    contact = None
+    try:
+        if identifier_type == 'email':
+            contact = Contact.objects.get(email=identifier)
+        elif identifier_type == 'phone':
+            # Add potential phone number cleaning/normalization if needed here
+            contact = Contact.objects.get(phone=identifier)
+        else:
+            return Response({"error": "Invalid contact_identifier_type. Use 'email' or 'phone'."}, status=status.HTTP_400_BAD_REQUEST)
+    except Contact.DoesNotExist:
+        # Optionally create a Contact/Lead here if desired, or just fail
+        logger.warning(f"Contact not found for identifier {identifier_type}={identifier} during external activity logging.")
+        return Response({"error": f"Contact not found for {identifier_type} '{identifier}'."}, status=status.HTTP_404_NOT_FOUND)
+    except Contact.MultipleObjectsReturned:
+         logger.error(f"Multiple contacts found for identifier {identifier_type}={identifier}. Cannot log activity.")
+         return Response({"error": f"Multiple contacts found for {identifier_type} '{identifier}'. Ambiguous."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+    # Find Campaign
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+
+    # Log the activity using the utility function (without sending anything from here)
+    activity = communication_utils.log_communication_activity(
+        contact=contact,
+        campaign=campaign,
+        activity_type=activity_type,
+        subject=subject,
+        notes=f"(Logged via API) {notes}",
+        created_by=None # Activity logged by the system/automation
+    )
+
+    if activity:
+        return Response({"success": True, "activity_id": activity.id}, status=status.HTTP_201_CREATED)
+    else:
+        return Response({"error": "Failed to log activity."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

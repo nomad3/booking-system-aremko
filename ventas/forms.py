@@ -73,3 +73,15 @@ class PagoInlineForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+from .models import Campaign # Import Campaign model
+
+class SelectCampaignForm(forms.Form):
+    campaign = forms.ModelChoiceField(
+        queryset=Campaign.objects.filter(status='Active').order_by('name'), # Show only active campaigns
+        label="Seleccionar Campaña",
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-control'}) # Optional: Add styling
+    )
+    # Hidden field to pass selected client IDs
+    selected_clients = forms.CharField(widget=forms.HiddenInput())
