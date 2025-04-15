@@ -139,12 +139,41 @@ class CampaignInteractionInline(admin.TabularInline):
     ordering = ('-timestamp',)
     max_num = 10 # Show recent interactions
 
-# --- Standard ModelAdmins ---
+# --- ModelAdmins ---
+# Define ClienteAdmin first as it's referenced by others
+
+@admin.register(Cliente)
+class ClienteAdmin(admin.ModelAdmin):
+    search_fields = ('nombre', 'telefono', 'email')
+    list_display = ('nombre', 'telefono', 'email')
+    actions = ['exportar_a_excel']
+
+    def exportar_a_excel(self, request, queryset):
+        response = HttpResponse(content_type='application/ms-excel')
+        response['Content-Disposition'] = 'attachment; filename="clientes_{}.xls"'.format(
+            datetime.now().strftime('%Y%m%d_%H%M%S')
+        )
+        wb = xlwt.Workbook(encoding='utf-8')
+        ws = wb.add_sheet('Clientes')
+        header_style = xlwt.easyxf('font: bold on; pattern: pattern solid, fore_colour gray25;')
+        headers = ['Nombre', 'Teléfono', 'Email']
+        for col, header in enumerate(headers):
+            ws.write(0, col, header, header_style)
+            ws.col(col).width = 256 * 20
+        for row, cliente in enumerate(queryset, 1):
+            ws.write(row, 0, cliente.nombre)
+            ws.write(row, 1, cliente.telefono)
+            ws.write(row, 2, cliente.email)
+        wb.save(response)
+        return response
+    exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
+
+# --- Other Standard ModelAdmins ---
 
 @admin.register(VentaReserva)
 class VentaReservaAdmin(admin.ModelAdmin):
     list_per_page = 50
-    autocomplete_fields = ['cliente']
+    autocomplete_fields = ['cliente'] # Now ClienteAdmin is defined
     list_display = (
         'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago',
         'estado_reserva', 'servicios_y_cantidades',
@@ -274,7 +303,7 @@ class GiftCardAdmin(admin.ModelAdmin):
     search_fields = ('codigo', 'cliente_comprador__nombre', 'cliente_destinatario__nombre')
     list_filter = ('estado', 'fecha_emision', 'fecha_vencimiento')
     readonly_fields = ('codigo', 'monto_disponible')
-    autocomplete_fields = ['cliente_comprador', 'cliente_destinatario']
+    autocomplete_fields = ['cliente_comprador', 'cliente_destinatario'] # ClienteAdmin is now defined before this
 
 class CategoriaProductoAdmin(admin.ModelAdmin):
     list_display = ('nombre',)
@@ -285,31 +314,6 @@ class ProductoAdmin(admin.ModelAdmin):
     search_fields = ('nombre', 'categoria__nombre')
     list_filter = ('categoria', 'proveedor')
     autocomplete_fields = ['proveedor', 'categoria']
-
-class ClienteAdmin(admin.ModelAdmin):
-    search_fields = ('nombre', 'telefono', 'email')
-    list_display = ('nombre', 'telefono', 'email')
-    actions = ['exportar_a_excel']
-
-    def exportar_a_excel(self, request, queryset):
-        response = HttpResponse(content_type='application/ms-excel')
-        response['Content-Disposition'] = 'attachment; filename="clientes_{}.xls"'.format(
-            datetime.now().strftime('%Y%m%d_%H%M%S')
-        )
-        wb = xlwt.Workbook(encoding='utf-8')
-        ws = wb.add_sheet('Clientes')
-        header_style = xlwt.easyxf('font: bold on; pattern: pattern solid, fore_colour gray25;')
-        headers = ['Nombre', 'Teléfono', 'Email']
-        for col, header in enumerate(headers):
-            ws.write(0, col, header, header_style)
-            ws.col(col).width = 256 * 20
-        for row, cliente in enumerate(queryset, 1):
-            ws.write(row, 0, cliente.nombre)
-            ws.write(row, 1, cliente.telefono)
-            ws.write(row, 2, cliente.email)
-        wb.save(response)
-        return response
-    exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
 
 class ServicioAdminForm(forms.ModelForm):
     class Meta:
@@ -460,6 +464,7 @@ class ContactAdmin(admin.ModelAdmin):
         (None, {'fields': ('first_name', 'last_name', 'email', 'phone', 'job_title')}),
         ('Asociación', {'fields': ('company', 'linked_user')}),
         ('Detalles', {'fields': ('notes',)}),
+        ('Interacciones Recientes', {'fields': (), 'classes': ('collapse',)}), # Placeholder for inline
         ('Marcas de Tiempo', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
     readonly_fields = ('created_at', 'updated_at')
@@ -500,6 +505,7 @@ class CampaignAdmin(admin.ModelAdmin):
             'fields': ('automation_notes',),
             'classes': ('collapse',),
         }),
+        ('Interacciones Recientes', {'fields': (), 'classes': ('collapse',)}), # Placeholder for inline
         ('Marcas de Tiempo', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
     readonly_fields = ('created_at', 'updated_at')
