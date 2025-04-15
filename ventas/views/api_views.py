@@ -23,9 +23,10 @@ from ..utils import verificar_disponibilidad # Relative import
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated # Or custom permission
 from rest_framework import status
-from ..models import Campaign, Contact, Activity # Import CRM models
+from ..models import Campaign, Contact, Activity, CampaignInteraction # Import CRM models including Interaction
 from .. import communication_utils # Import communication utils
 from django.conf import settings # To get placeholder API key
+from django.utils.dateparse import parse_datetime # For parsing timestamp if provided
 
 class ProveedorViewSet(viewsets.ModelViewSet):
     queryset = Proveedor.objects.all()
@@ -455,3 +456,122 @@ def log_external_activity(request):
         return Response({"success": True, "activity_id": activity.id}, status=status.HTTP_201_CREATED)
     else:
         return Response({"error": "Failed to log activity."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+# @permission_classes([IsAuthenticated]) # Or a custom permission class
+def log_campaign_interaction(request):
+    """
+    API endpoint for external systems (email platforms, SMS gateways, n8n)
+    to log customer interactions related to a campaign.
+    Expects data like:
+    {
+        "contact_identifier_type": "email" or "phone",
+        "contact_identifier": "user@example.com" or "+123456789",
+        "campaign_id": 123,
+        "interaction_type": "EMAIL_OPEN", # e.g., EMAIL_OPEN, EMAIL_CLICK, SMS_REPLY
+        "timestamp": "2024-04-15T10:30:00Z", # Optional ISO 8601 format
+        "details": { ... } # Optional JSON object (e.g., {"clicked_url": "..."})
+        "activity_id": 456 # Optional: ID of the original Activity that led to this interaction
+    }
+    Requires authentication (e.g., API Key in header).
+    """
+    # --- Authentication (Placeholder - Replace with robust method) ---
+    if not is_valid_api_key(request):
+         return Response({"error": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
+    # --- End Authentication ---
+
+    data = request.data
+    identifier_type = data.get('contact_identifier_type')
+    identifier = data.get('contact_identifier')
+    campaign_id = data.get('campaign_id')
+    interaction_type = data.get('interaction_type')
+    timestamp_str = data.get('timestamp') # Optional timestamp
+    details = data.get('details') # Optional details
+    activity_id = data.get('activity_id') # Optional originating activity
+
+    if not all([identifier_type, identifier, campaign_id, interaction_type]):
+        return Response({"error": "Missing required fields: contact_identifier_type, contact_identifier, campaign_id, interaction_type"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate interaction_type
+    valid_interaction_types = [choice[0] for choice in CampaignInteraction.INTERACTION_TYPES]
+    if interaction_type not in valid_interaction_types:
+         return Response({"error": f"Invalid interaction_type. Valid types are: {', '.join(valid_interaction_types)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Find Contact
+    contact = None
+    try:
+        if identifier_type == 'email':
+            contact = Contact.objects.get(email=identifier)
+        elif identifier_type == 'phone':
+            contact = Contact.objects.get(phone=identifier) # Add normalization if needed
+        else:
+            return Response({"error": "Invalid contact_identifier_type. Use 'email' or 'phone'."}, status=status.HTTP_400_BAD_REQUEST)
+    except Contact.DoesNotExist:
+        logger.warning(f"Contact not found for identifier {identifier_type}={identifier} during interaction logging.")
+        return Response({"error": f"Contact not found for {identifier_type} '{identifier}'."}, status=status.HTTP_404_NOT_FOUND)
+    except Contact.MultipleObjectsReturned:
+         logger.error(f"Multiple contacts found for identifier {identifier_type}={identifier}. Cannot log interaction.")
+         return Response({"error": f"Multiple contacts found for {identifier_type} '{identifier}'. Ambiguous."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Find Campaign
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+
+    # Find original Activity if ID provided
+    activity = None
+    if activity_id:
+        try:
+            activity = Activity.objects.get(pk=activity_id)
+        except Activity.DoesNotExist:
+             logger.warning(f"Originating Activity ID {activity_id} not found when logging interaction.")
+             # Decide whether to proceed without linking or return an error
+
+    # Parse timestamp or use current time
+    timestamp = timezone.now()
+    if timestamp_str:
+        parsed_time = parse_datetime(timestamp_str)
+        if parsed_time:
+            timestamp = parsed_time
+        else:
+             logger.warning(f"Could not parse provided timestamp '{timestamp_str}'. Using current time.")
+
+
+    # Create the interaction record
+    try:
+        interaction = CampaignInteraction.objects.create(
+            contact=contact,
+            campaign=campaign,
+            activity=activity, # Link to original activity if found
+            interaction_type=interaction_type,
+            timestamp=timestamp,
+            details=details # Store extra JSON data if provided
+        )
+
+        # --- Optional: Trigger n8n Webhook ---
+        # If you want n8n to react immediately to interactions, you could
+        # make an HTTP POST request to a specific n8n webhook URL here.
+        # Example (requires 'requests' library and n8n webhook URL in settings):
+        # n8n_webhook_url = getattr(settings, 'N8N_INTERACTION_WEBHOOK_URL', None)
+        # if n8n_webhook_url:
+        #     try:
+        #         interaction_data = { # Send relevant data to n8n
+        #             "interaction_id": interaction.id,
+        #             "contact_id": contact.id,
+        #             "campaign_id": campaign.id,
+        #             "interaction_type": interaction.interaction_type,
+        #             "timestamp": interaction.timestamp.isoformat(),
+        #             "details": interaction.details
+        #         }
+        #         # Consider running this asynchronously (e.g., with Celery) to avoid blocking the API response
+        #         response = requests.post(n8n_webhook_url, json=interaction_data, timeout=5)
+        #         response.raise_for_status() # Raise an exception for bad status codes
+        #         logger.info(f"Successfully triggered n8n webhook for interaction {interaction.id}")
+        #     except requests.exceptions.RequestException as e:
+        #         logger.error(f"Failed to trigger n8n webhook for interaction {interaction.id}: {e}")
+        # --- End Optional n8n Trigger ---
+
+
+        return Response({"success": True, "interaction_id": interaction.id}, status=status.HTTP_201_CREATED)
+    except Exception as e:
+        logger.error(f"Error creating CampaignInteraction for contact {contact.id}, campaign {campaign.id}: {e}")
+        return Response({"error": "Failed to log interaction."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

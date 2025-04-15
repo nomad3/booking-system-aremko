@@ -559,6 +559,8 @@ class Campaign(models.Model):
     email_body_template = models.TextField(blank=True, verbose_name="Plantilla Cuerpo Email", help_text="Usar {nombre_cliente}, {apellido_cliente} como placeholders.")
     sms_template = models.TextField(blank=True, verbose_name="Plantilla SMS", help_text="Usar {nombre_cliente}, {apellido_cliente} como placeholders.")
     whatsapp_template = models.TextField(blank=True, verbose_name="Plantilla WhatsApp", help_text="Usar {nombre_cliente}, {apellido_cliente} como placeholders.")
+    # Automation Notes
+    automation_notes = models.TextField(blank=True, verbose_name="Notas de Automatización", help_text="Describe el flujo de n8n u otra automatización asociada (ej. 'Enviar SMS 3 días después', 'Llamada AI si no abre email').")
 
 
     class Meta:
@@ -825,3 +827,34 @@ class HomepageConfig(SingletonModel):
     class Meta:
         verbose_name = "Configuración de la Página Principal"
         verbose_name_plural = "Configuración de la Página Principal"
+
+
+# --- Model for Tracking Campaign Interactions ---
+
+class CampaignInteraction(models.Model):
+    INTERACTION_TYPES = [
+        ('EMAIL_OPEN', 'Email Abierto'),
+        ('EMAIL_CLICK', 'Email Click'),
+        ('SMS_REPLY', 'Respuesta SMS'),
+        ('WHATSAPP_REPLY', 'Respuesta WhatsApp'),
+        ('CALL_ANSWERED', 'Llamada Contestada'),
+        ('CALL_VOICEMAIL', 'Llamada a Buzón de Voz'),
+        ('FORM_SUBMIT', 'Formulario Enviado'), # Example
+        ('OTHER', 'Otro'),
+    ]
+
+    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='interactions', verbose_name="Contacto")
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name='interactions', verbose_name="Campaña")
+    # Optional link back to the specific Activity that led to this interaction
+    activity = models.ForeignKey(Activity, on_delete=models.SET_NULL, null=True, blank=True, related_name='interactions', verbose_name="Actividad Origen")
+    interaction_type = models.CharField(max_length=50, choices=INTERACTION_TYPES, verbose_name="Tipo de Interacción")
+    timestamp = models.DateTimeField(default=timezone.now, verbose_name="Fecha y Hora")
+    details = models.JSONField(null=True, blank=True, verbose_name="Detalles Adicionales", help_text="Ej: URL clickeada, contenido de respuesta SMS, etc.")
+
+    class Meta:
+        verbose_name = "Interacción de Campaña"
+        verbose_name_plural = "Interacciones de Campaña"
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.get_interaction_type_display()} de {self.contact} en Campaña '{self.campaign.name}' ({self.timestamp.strftime('%Y-%m-%d %H:%M')})"

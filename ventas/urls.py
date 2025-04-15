@@ -40,7 +40,10 @@ urlpatterns = [
     path('exportar-clientes/', import_export_views.exportar_clientes_excel, name='exportar_clientes_excel'),
     path('clientes/', crud_views.lista_clientes, name='lista_clientes'),
     path('importar-clientes/', import_export_views.importar_clientes_excel, name='importar_clientes_excel'),
-    # Removed Custom admin action URL for select_campaign_for_remarketing
+    # Custom Views for CRM/Reporting
+    path('reportes/segmentacion-clientes/', reporting_views.cliente_segmentation_view, name='cliente_segmentation'),
+    path('admin/campaign/setup/', admin_views.campaign_setup_view, name='campaign_setup_add'), # For adding new
+    path('admin/campaign/setup/<int:campaign_id>/', admin_views.campaign_setup_view, name='campaign_setup_change'), # For editing existing
     # Keep existing api paths using the api module
     path('api/cliente/create/', api.create_cliente, name='create_cliente'),
     path('api/cliente/update/<str:telefono>/', api.update_cliente, name='update_cliente'),
@@ -67,7 +70,8 @@ urlpatterns = [
     # --- Remarketing/Automation API URLs ---
     path('api/campaigns/<int:campaign_id>/details/', api_views.get_campaign_details, name='get_campaign_details'), # Added campaign details endpoint
     path('api/campaigns/<int:campaign_id>/targets/', api_views.get_campaign_targets, name='get_campaign_targets'),
-    path('api/activities/log/', api_views.log_external_activity, name='log_external_activity'),
+    path('api/activities/log/', api_views.log_external_activity, name='log_external_activity'), # Logs outgoing activities
+    path('api/interactions/log/', api_views.log_campaign_interaction, name='log_campaign_interaction'), # Logs incoming interactions
     # --- End Remarketing URLs ---
 
     # API Router (Keep this last if possible, or ensure specific paths come first)

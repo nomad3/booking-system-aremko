@@ -522,3 +522,82 @@ def auditoria_movimientos_view(request):
     }
 
     return render(request, 'ventas/auditoria_movimientos.html', context)
+
+
+@login_required
+# @user_passes_test(es_administrador) # Optional: Restrict to admins if needed
+def cliente_segmentation_view(request):
+    """
+    Displays client segmentation based on visit count and total spend.
+    """
+    # Define Segmentation Thresholds (adjust as needed)
+    VISIT_THRESHOLD_REGULAR = 2
+    VISIT_THRESHOLD_VIP = 6 # Example: 6 or more visits
+    SPEND_THRESHOLD_MEDIUM = 50000 # Example: 50,000 CLP
+    SPEND_THRESHOLD_HIGH = 150000 # Example: 150,000 CLP
+
+    # Annotate clients with visit count and total spend
+    # Use Coalesce to handle clients with no spending (Sum returns None)
+    clientes_annotated = Cliente.objects.annotate(
+        num_visits=Count('ventareserva'),
+        total_spend=models.Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField())
+    ).order_by('-total_spend') # Order for potential display
+
+    # --- Categorize Clients ---
+    segments = {
+        'new_low_spend': {'count': 0, 'label': 'Nuevos (0-1 Visita, Bajo Gasto)'},
+        'new_medium_spend': {'count': 0, 'label': 'Nuevos (0-1 Visita, Gasto Medio)'},
+        'new_high_spend': {'count': 0, 'label': 'Nuevos (0-1 Visita, Alto Gasto)'},
+        'regular_low_spend': {'count': 0, 'label': f'Regulares ({VISIT_THRESHOLD_REGULAR}-{VISIT_THRESHOLD_VIP-1} Visitas, Bajo Gasto)'},
+        'regular_medium_spend': {'count': 0, 'label': f'Regulares ({VISIT_THRESHOLD_REGULAR}-{VISIT_THRESHOLD_VIP-1} Visitas, Gasto Medio)'},
+        'regular_high_spend': {'count': 0, 'label': f'Regulares ({VISIT_THRESHOLD_REGULAR}-{VISIT_THRESHOLD_VIP-1} Visitas, Alto Gasto)'},
+        'vip_low_spend': {'count': 0, 'label': f'VIP (>{VISIT_THRESHOLD_VIP-1} Visitas, Bajo Gasto)'},
+        'vip_medium_spend': {'count': 0, 'label': f'VIP (>{VISIT_THRESHOLD_VIP-1} Visitas, Gasto Medio)'},
+        'vip_high_spend': {'count': 0, 'label': f'VIP (>{VISIT_THRESHOLD_VIP-1} Visitas, Alto Gasto)'},
+        'zero_spend': {'count': 0, 'label': 'Clientes Sin Gasto Registrado'}, # Clients with no VentaReserva
+    }
+
+    for cliente in clientes_annotated:
+        visits = cliente.num_visits
+        spend = cliente.total_spend
+
+        if visits == 0 and spend == 0:
+             segments['zero_spend']['count'] += 1
+             continue # Skip further categorization if no visits/spend
+
+        # Categorize by Visits
+        if visits < VISIT_THRESHOLD_REGULAR: # 0-1 visits
+            visit_category = 'new'
+        elif visits < VISIT_THRESHOLD_VIP: # 2-5 visits (example)
+            visit_category = 'regular'
+        else: # 6+ visits
+            visit_category = 'vip'
+
+        # Categorize by Spend
+        if spend < SPEND_THRESHOLD_MEDIUM:
+            spend_category = 'low_spend'
+        elif spend < SPEND_THRESHOLD_HIGH:
+            spend_category = 'medium_spend'
+        else:
+            spend_category = 'high_spend'
+
+        # Increment the combined segment count
+        segment_key = f"{visit_category}_{spend_category}"
+        if segment_key in segments:
+            segments[segment_key]['count'] += 1
+        else:
+             # This case shouldn't happen with the current logic, but good for safety
+             logger.warning(f"Unexpected segment key generated: {segment_key} for client {cliente.id}")
+
+
+    context = {
+        'segments': segments,
+        'total_clients': clientes_annotated.count(),
+        # Pass thresholds for display/info
+        'visit_threshold_regular': VISIT_THRESHOLD_REGULAR,
+        'visit_threshold_vip': VISIT_THRESHOLD_VIP,
+        'spend_threshold_medium': SPEND_THRESHOLD_MEDIUM,
+        'spend_threshold_high': SPEND_THRESHOLD_HIGH,
+    }
+
+    return render(request, 'ventas/cliente_segmentation.html', context)

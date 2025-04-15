@@ -78,7 +78,12 @@
                     <a href="{% url 'admin:ventas_activity_changelist' %}" class="btn btn-modern btn-info-modern">
                         <i class="fas fa-tasks me-2"></i>Ver Actividades
                     </a>
-                    {# Removed links related to old admin actions #}
+                     <a href="{% url 'cliente_segmentation' %}" class="btn btn-modern btn-info-modern"> {# New Link #}
+                        <i class="fas fa-chart-pie me-2"></i>Ver Segmentación Clientes
+                    </a>
+                     <a href="{% url 'campaign_setup_add' %}" class="btn btn-modern btn-success-modern"> {# New Link #}
+                        <i class="fas fa-plus-circle me-2"></i>Crear Nueva Campaña (Setup)
+                    </a>
                 </div>
             </div>
         </div>
