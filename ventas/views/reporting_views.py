@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator
 from django.contrib.auth.models import User
 from django.db import models # Re-adding import just in case
-from ..models import ReservaServicio, CategoriaServicio, Pago, VentaReserva, MovimientoCliente, ReservaProducto, Proveedor, Producto # Relative imports
+from ..models import ReservaServicio, CategoriaServicio, Pago, VentaReserva, MovimientoCliente, ReservaProducto, Proveedor, Producto, Cliente # Relative imports, Added Cliente
 
 # Helper function to check if the user is an administrator
 def es_administrador(user):
