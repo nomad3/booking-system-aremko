@@ -101,14 +101,33 @@
 .gallery-section {
     background-color: #f8f9fa; /* Light gray background */
 }
-.gallery-section img {
+
+/* Base styles for all gallery images */
+.gallery-section .row > div img { /* Target images inside direct children divs of the row */
     transition: transform 0.3s ease;
-    width: 100%;
-    height: 250px;
-    object-fit: cover;
-    object-position: center;
+    width: 100%; /* Make image fill the column width */
+    object-fit: cover; /* Cover the area, maintain aspect ratio, crop if needed */
+    object-position: center; /* Center the image within the frame */
+    display: block; /* Ensure image behaves like a block element */
 }
-.gallery-section img:hover {
+
+/* Style for the first image (vertical) */
+.gallery-section .row > div:first-child img {
+    height: 350px; /* Taller height for vertical */
+}
+
+/* Style for the second (middle) image (horizontal) */
+.gallery-section .row > div:nth-child(2) img {
+    height: 250px; /* Shorter height for horizontal */
+}
+
+/* Style for the third (last) image (vertical) */
+.gallery-section .row > div:last-child img {
+    height: 350px; /* Taller height for vertical */
+}
+
+/* Keep the hover effect */
+.gallery-section .row > div img:hover {
     transform: scale(1.05);
 }
 
