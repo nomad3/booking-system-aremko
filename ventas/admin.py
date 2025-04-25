@@ -13,7 +13,7 @@ from .models import (
     Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto,
     Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio,
     MovimientoCliente, Compra, DetalleCompra, GiftCard, HomepageConfig,
-    Lead, Company, Contact, Activity, Campaign, Deal, CampaignInteraction # Added CRM models
+    Lead, Company, Contact, Activity, Campaign, Deal, CampaignInteraction, HomepageSettings # Added HomepageSettings
 )
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
@@ -516,3 +516,10 @@ class CampaignInteractionAdmin(admin.ModelAdmin):
     readonly_fields = ('timestamp',) # Only timestamp should be read-only by default
     list_select_related = ('contact', 'campaign', 'activity') # Optimize queries
     date_hierarchy = 'timestamp'
+
+@admin.register(HomepageSettings)
+class HomepageSettingsAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'hero_background_image')
+    # Prevent adding more than one instance from the admin list view
+    def has_add_permission(self, request):
+        return not HomepageSettings.objects.exists()

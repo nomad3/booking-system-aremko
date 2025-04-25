@@ -858,3 +858,30 @@ class CampaignInteraction(models.Model):
 
     def __str__(self):
         return f"{self.get_interaction_type_display()} de {self.contact} en Campaña '{self.campaign.name}' ({self.timestamp.strftime('%Y-%m-%d %H:%M')})"
+
+class HomepageSettings(models.Model):
+    """
+    Stores settings specific to the homepage, like the hero image.
+    Intended to have only one instance (singleton pattern).
+    """
+    hero_background_image = models.ImageField(
+        upload_to='homepage/',
+        blank=True,
+        null=True,
+        help_text="Imagen de fondo para la sección principal (hero) de la página de inicio."
+    )
+    # Add other homepage-specific fields here if needed later
+
+    class Meta:
+        verbose_name = "Configuración de Inicio"
+        verbose_name_plural = "Configuraciones de Inicio"
+
+    def __str__(self):
+        return "Configuración de la Página de Inicio"
+
+    # Optional: Enforce singleton pattern (only allow one instance)
+    def save(self, *args, **kwargs):
+        if not self.pk and HomepageSettings.objects.exists():
+            # Prevent creation of a new instance if one already exists
+            raise ValidationError('Solo puede existir una instancia de HomepageSettings.')
+        return super().save(*args, **kwargs)
