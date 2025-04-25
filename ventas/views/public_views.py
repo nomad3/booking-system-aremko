@@ -18,8 +18,8 @@ def homepage_view(request):
     try:
         # HomepageConfig is a singleton, get the instance
         config = HomepageConfig.get_solo()
-        if config.hero_image: # Check if an image is set
-            hero_image_url = config.hero_image.url
+        if config.hero_background_image: # Check if an image is set
+            hero_image_url = config.hero_background_image.url
     except HomepageConfig.DoesNotExist:
         # Handle case where the config hasn't been created yet
         pass
