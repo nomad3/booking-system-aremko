@@ -13,17 +13,22 @@
 <style>
 /* Homepage specific styles */
 .hero-section {
-    background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), 
+    background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
         {% if hero_image_url %}
             url('{{ hero_image_url }}')
         {% else %}
-            url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80')
+            url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80') /* Default fallback */
         {% endif %};
     background-size: cover;
     background-position: center;
     color: white;
-    padding: 100px 0;
-    margin-bottom: 50px;
+    display: flex; /* Added to enable flexbox centering */
+    align-items: center; /* Vertically center content */
+    justify-content: center; /* Horizontally center content */
+    text-align: center; /* Ensure text inside is centered */
+    min-height: 80vh; /* Set minimum height to 80% of viewport height */
+    padding: 60px 20px; /* Adjusted padding for content spacing within the 80vh */
+    margin-bottom: 50px; /* Keep bottom margin if needed */
 }
 
 .hero-content {
