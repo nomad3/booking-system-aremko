@@ -237,6 +237,29 @@
         </div>
     </section>
 
+<!-- Philosophy Section -->
+<section class="philosophy-section py-5">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6 mb-4 mb-lg-0">
+                <h2 class="section-title text-start mb-3" style="text-align: left !important;">Vive la Experiencia Aremko</h2>
+                <p class="lead">Más que un spa, somos un refugio para el alma. En Aremko, creemos en el poder sanador de la naturaleza y la desconexión. Nuestra filosofía se centra en ofrecerte un espacio de paz donde puedas renovar tu energía, cuidar tu cuerpo y calmar tu mente.</p>
+                <p>Desde masajes terapéuticos hasta la inmersión en nuestras tinajas calientes bajo las estrellas, cada detalle está pensado para tu máximo bienestar. Ven y descubre por qué nuestros visitantes nos eligen como su escape perfecto en Puerto Varas.</p>
+                <a href="#servicios" class="btn btn-outline-primary">Explora Nuestros Servicios</a>
+            </div>
+            <div class="col-lg-6">
+                {# Use philosophy_image_url context variable #}
+                {% if philosophy_image_url %}
+                    <img src="{{ philosophy_image_url }}" class="img-fluid rounded shadow-sm" alt="Ambiente relajante en Aremko Spa">
+                {% else %}
+                    {# Fallback image if none is uploaded #}
+                    <img src="https://images.unsplash.com/photo-1540541338287-41700207dee6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Ambiente relajante en Aremko Spa">
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- Features Section -->
 <section class="features-section" id="caracteristicas">
     <div class="container">
@@ -282,19 +305,37 @@
         </div>
     </section>
 
-<!-- Image Gallery Section -->
+<!-- Gallery Section -->
 <section class="gallery-section py-5 bg-light">
     <div class="container">
-        <h2 class="section-title mb-5 text-center">Nuestros Espacios</h2> {# Updated title #}
+        <h2 class="section-title mb-5">Nuestros Espacios</h2>
         <div class="row">
             <div class="col-md-4 mb-4">
-                <img src="https://images.unsplash.com/photo-1519823551278-64ac92734fb1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Sala de Masajes Relajante"> {# Massage focus #}
+                {# Use gallery_image_1_url context variable #}
+                {% if gallery_image_1_url %}
+                    <img src="{{ gallery_image_1_url }}" class="img-fluid rounded shadow-sm" alt="Espacio de masajes Aremko">
+                {% else %}
+                    {# Fallback image 1 #}
+                    <img src="https://images.unsplash.com/photo-1600334129128-689c9abc74fa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Espacio de masajes Aremko">
+                {% endif %}
             </div>
             <div class="col-md-4 mb-4">
-                <img src="https://images.unsplash.com/photo-1584592487903-6d47417a141f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Tina Caliente Privada"> {# Hot tub focus #}
+                {# Use gallery_image_2_url context variable #}
+                {% if gallery_image_2_url %}
+                    <img src="{{ gallery_image_2_url }}" class="img-fluid rounded shadow-sm" alt="Tina Caliente Privada Aremko">
+                {% else %}
+                    {# Fallback image 2 #}
+                    <img src="https://images.unsplash.com/photo-1584592487903-6d47417a141f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Tina Caliente Privada">
+                {% endif %}
             </div>
             <div class="col-md-4 mb-4">
-                <img src="https://images.unsplash.com/photo-1560185893-a55ec67692d9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Habitación Acogedora"> {# Accommodation focus #}
+                {# Use gallery_image_3_url context variable #}
+                {% if gallery_image_3_url %}
+                    <img src="{{ gallery_image_3_url }}" class="img-fluid rounded shadow-sm" alt="Habitación Acogedora Aremko">
+                {% else %}
+                    {# Fallback image 3 #}
+                    <img src="https://images.unsplash.com/photo-1560185893-a55ec67692d9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Habitación Acogedora">
+                {% endif %}
             </div>
         </div>
     </div>
