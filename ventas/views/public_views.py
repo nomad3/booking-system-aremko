@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404
-from ..models import Servicio, CategoriaServicio # Relative import
+from ..models import Servicio, CategoriaServicio, HomepageConfig # Relative import, ADD HomepageConfig
 
 def homepage_view(request):
     """
@@ -13,10 +13,23 @@ def homepage_view(request):
     # Obtener carrito de compras de la sesión o crear uno nuevo
     cart = request.session.get('cart', {'servicios': [], 'total': 0})
 
+    # --- Fetch Homepage Config ---
+    hero_image_url = None
+    try:
+        # HomepageConfig is a singleton, get the instance
+        config = HomepageConfig.get_solo()
+        if config.hero_image: # Check if an image is set
+            hero_image_url = config.hero_image.url
+    except HomepageConfig.DoesNotExist:
+        # Handle case where the config hasn't been created yet
+        pass
+    # --- End Fetch Homepage Config ---
+
     context = {
         'servicios': servicios,
         'categorias': categorias,
-        'cart': cart
+        'cart': cart,
+        'hero_image_url': hero_image_url, # Add the URL to the context
     }
     return render(request, 'ventas/homepage.html', context)
 
