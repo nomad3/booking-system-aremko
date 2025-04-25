@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'corsheaders',
     'storages', # Add django-storages
+    'solo',     # Add django-solo
 ]
 
 # MIDDLEWARE
@@ -116,9 +117,10 @@ if os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
         # For now, we'll rely on the environment variable being set.
         pass # GS_CREDENTIALS = str(GS_CREDENTIALS_PATH) # Uncomment if needed
 
-    # Make uploaded files publicly readable by default
-    GS_DEFAULT_ACL = 'publicRead'
+    # Make uploaded files publicly readable by default - REMOVE OR COMMENT OUT THIS LINE
+    # GS_DEFAULT_ACL = 'publicRead' # REMOVE THIS LINE
     GS_FILE_OVERWRITE = False # Prevent overwriting files with the same name
+    GS_QUERYSTRING_AUTH = False # Keep this: Generate plain public URLs
 
     # Update MEDIA_URL for GCS
     MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/media/'
