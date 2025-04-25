@@ -118,7 +118,7 @@ if os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
         pass # GS_CREDENTIALS = str(GS_CREDENTIALS_PATH) # Uncomment if needed
 
     # Make uploaded files publicly readable by default - REMOVE OR COMMENT OUT THIS LINE
-    # GS_DEFAULT_ACL = 'publicRead'
+    GS_DEFAULT_ACL = 'publicRead'
     GS_FILE_OVERWRITE = False # Prevent overwriting files with the same name
 
     # Update MEDIA_URL for GCS
