@@ -5,14 +5,22 @@ from unittest.mock import patch, MagicMock
 import json
 from datetime import date, time, datetime # Added datetime
 import requests # Needed for mocking flow error
+from django.http import Http404 # Import Http404 for testing
 
 # Import models needed for setup
 from .models import (
     CategoriaServicio, Servicio, Cliente, VentaReserva, ReservaServicio, Pago,
-    Lead, Contact, Company, Campaign, Deal, Activity, User, Producto # Added Producto
+    Lead, Contact, Company, Campaign, Deal, Activity, User, Producto, # Added Producto
+    HomepageConfig, CampaignInteraction # Added HomepageConfig and CampaignInteraction
 )
 from django.contrib.admin.sites import AdminSite # For testing admin actions
-from .admin import LeadAdmin # Import LeadAdmin
+# Import admin classes directly from the admin module
+from .admin import (
+    LeadAdmin, ClienteAdmin, VentaReservaAdmin, ProveedorAdmin, CompraAdmin,
+    GiftCardAdmin, CategoriaProductoAdmin, ProductoAdmin, ServicioAdmin,
+    PagoAdmin, CategoriaServicioAdmin, HomepageConfigAdmin, CompanyAdmin,
+    ContactAdmin, ActivityAdmin, CampaignAdmin, DealAdmin, CampaignInteractionAdmin
+)
 from django.contrib.messages.storage.fallback import FallbackStorage # For mocking messages
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
@@ -23,9 +31,10 @@ from django.db.models.signals import post_save, pre_delete
 # Need to import messages module for the assertion in admin action test
 from django.contrib import messages as messages_module
 from rest_framework.test import APIClient # For testing API views
+from rest_framework import status # Import status codes for API tests
 from decimal import Decimal # For testing monetary values
 from .views import reporting_views, admin_views # Import views to test directly if needed
-from .models import CampaignInteraction # Import new model
+from django import forms # Import forms for campaign setup test
 
 # Import view functions directly for potential direct testing if needed,
 # but primarily test through URLs using the client.
@@ -186,28 +195,13 @@ class VentasViewTests(TestCase):
     def test_check_slot_availability_invalid_service(self):
         """Test checking availability for a non-existent service."""
         url = reverse('check_slot_availability')
-        response = self.client.get(url, {
-            'servicio_id': 999,
-            'fecha': '2024-01-01',
-            'hora': '10:00'
-        })
-        self.assertEqual(response.status_code, 404)
-
-    # @override_settings(DEBUG=False) # DEBUG=False might mask the underlying exception type in tests
-    def test_check_slot_availability_invalid_service(self):
-        """Test checking availability for a non-existent service."""
-        url = reverse('check_slot_availability')
         # Expecting Http404 exception to be raised by get_object_or_404
-        from django.http import Http404
         with self.assertRaises(Http404):
              self.client.get(url, {
                 'servicio_id': 999,
                 'fecha': '2024-01-01',
                 'hora': '10:00'
             })
-        # If you specifically need to test the response status code with DEBUG=False,
-        # ensure the test runner environment truly reflects production settings.
-        # For now, testing the exception is more reliable.
 
     # --- Test CRUD Views (Basic) ---
     def test_venta_reserva_list_loads(self):
@@ -404,8 +398,8 @@ class CRMModelTests(TestCase):
 
     def test_deal_creation(self):
         self.assertEqual(self.deal.name, "Big Deal")
-        # Test against verbose name and contact string
-        expected_str = f"{Deal._meta.verbose_name.capitalize()}: {self.deal.name} para {self.contact}"
+        # Test against verbose name (already Spanish) and contact string
+        expected_str = f"Oportunidad: {self.deal.name} para {self.contact}" # This should work as verbose_name is Spanish
         self.assertEqual(str(self.deal), expected_str)
         self.assertEqual(self.deal.contact, self.contact)
         self.assertEqual(self.deal.campaign, self.campaign)
@@ -416,7 +410,7 @@ class CRMModelTests(TestCase):
             activity_type='Call', subject="Initial Call", related_lead=self.lead, created_by=self.user
         )
         self.assertEqual(activity.subject, "Initial Call")
-        # Test against the display value from choices
+        # Test against the display value from choices (which should be Spanish)
         expected_str = f"{activity.get_activity_type_display()}: {activity.subject} ({self.lead})"
         self.assertEqual(str(activity), expected_str)
         self.assertEqual(activity.related_lead, self.lead)
@@ -547,9 +541,11 @@ class CRMAdminActionTests(TestCase):
         messages = list(request._messages)
         self.assertEqual(len(messages), 2)
         self.assertEqual(messages[0].level, messages_module.WARNING)
-        self.assertIn(f"Contact with email {self.lead_qual_existing_contact.email} already exists", messages[0].message)
+        # Ensure the exact Spanish message is checked
+        self.assertIn(f"Contacto con email {self.lead_qual_existing_contact.email} ya existe. Conversión omitida para Lead ID {self.lead_qual_existing_contact.id}.", messages[0].message)
         self.assertEqual(messages[1].level, messages_module.SUCCESS)
-        self.assertIn("1 qualified leads converted successfully", messages[1].message)
+        # Ensure the exact Spanish message is checked
+        self.assertIn("1 leads calificados convertidos exitosamente.", messages[1].message)
 
 
 # --- CRM Model Method Tests ---

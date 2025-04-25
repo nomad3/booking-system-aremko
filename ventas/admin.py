@@ -2,7 +2,7 @@ from django.contrib import admin
 from django import forms
 from .forms import PagoInlineForm
 from django.forms import DateTimeInput
-from datetime import date, datetime, timedelta  # Importa date, datetime, y timedelta
+from datetime import date, datetime, timedelta
 from django.utils import timezone
 from django.db.models import Sum
 from django.utils.safestring import mark_safe
@@ -18,24 +18,15 @@ from .models import (
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.contrib import messages
-from django.urls import path
-import json # Import json module
-import xlwt # Added for Excel export
+from django.urls import path, reverse
+import json
+import xlwt
 from django.core.paginator import Paginator
 from openpyxl import load_workbook
-from solo.admin import SingletonModelAdmin # Import SingletonModelAdmin
-
-# Import communication utils (if needed, though likely not in admin directly anymore)
-# from . import communication_utils
-# from .models import Contact, Company # Already imported above
-from django.urls import path # Import path for custom URL
-from .views import admin_views # Import the admin views module
-from django.http import HttpResponseRedirect # Import for redirect
-from django.urls import reverse # Import reverse
-
-# Personalización del título de la administración
-admin.site.site_header = _("Sistema de Gestión de Ventas")
-admin.site.site_title = _("Panel de Administración")
+from solo.admin import SingletonModelAdmin
+from .views import admin_views
+from django.http import HttpResponseRedirect
+from django.utils.html import format_html # Import format_html
 
 # --- Standard Model Inlines ---
 
@@ -95,12 +86,12 @@ class ActivityInline(admin.TabularInline):
     model = Activity
     verbose_name = "Actividad"
     verbose_name_plural = "Actividades Recientes"
-    fields = ('activity_date', 'activity_type', 'subject', 'created_by', 'notes', 'campaign') # Added campaign
+    fields = ('activity_date', 'activity_type', 'subject', 'created_by', 'notes', 'campaign')
     readonly_fields = ('created_at', 'updated_at', 'activity_date')
-    extra = 0 # Usually don't add activities directly here
-    autocomplete_fields = ['created_by', 'campaign'] # Added campaign
+    extra = 0
+    autocomplete_fields = ['created_by', 'campaign']
     ordering = ('-activity_date',)
-    max_num = 5 # Show only recent ones inline
+    max_num = 5
 
 class DealInline(admin.TabularInline):
     model = Deal
@@ -117,7 +108,7 @@ class LeadInline(admin.TabularInline):
     verbose_name_plural = "Leads (Prospectos) Asociados"
     fields = ('first_name', 'last_name', 'email', 'status', 'source')
     readonly_fields = ('created_at', 'updated_at')
-    extra = 0 # Don't add leads from campaign view usually
+    extra = 0
     autocomplete_fields = []
 
 class ContactInline(admin.TabularInline):
@@ -134,15 +125,14 @@ class CampaignInteractionInline(admin.TabularInline):
     verbose_name_plural = "Interacciones Recientes"
     fields = ('timestamp', 'interaction_type', 'campaign', 'activity', 'details')
     readonly_fields = ('timestamp',)
-    extra = 0 # Interactions are logged via API
+    extra = 0
     autocomplete_fields = ['campaign', 'activity']
     ordering = ('-timestamp',)
-    max_num = 10 # Show recent interactions
+    max_num = 10
 
 # --- ModelAdmins ---
-# Define ClienteAdmin first as it's referenced by others
+# Registration happens in apps.py
 
-@admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
     search_fields = ('nombre', 'telefono', 'email')
     list_display = ('nombre', 'telefono', 'email')
@@ -168,12 +158,9 @@ class ClienteAdmin(admin.ModelAdmin):
         return response
     exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
 
-# --- Other Standard ModelAdmins ---
-
-@admin.register(VentaReserva)
 class VentaReservaAdmin(admin.ModelAdmin):
     list_per_page = 50
-    autocomplete_fields = ['cliente'] # Now ClienteAdmin is defined
+    autocomplete_fields = ['cliente']
     list_display = (
         'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago',
         'estado_reserva', 'servicios_y_cantidades',
@@ -276,12 +263,10 @@ class VentaReservaAdmin(admin.ModelAdmin):
             'all': ('admin/css/custom.css',)
         }
 
-@admin.register(Proveedor)
 class ProveedorAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'direccion', 'telefono', 'email')
     search_fields = ('nombre',)
 
-@admin.register(Compra)
 class CompraAdmin(admin.ModelAdmin):
     list_display = ('id', 'fecha_compra', 'proveedor', 'metodo_pago', 'numero_documento', 'total')
     list_filter = ('fecha_compra', 'metodo_pago', 'proveedor')
@@ -297,13 +282,12 @@ class CompraAdmin(admin.ModelAdmin):
         form.instance.calcular_total()
         form.instance.save()
 
-@admin.register(GiftCard)
 class GiftCardAdmin(admin.ModelAdmin):
     list_display = ('codigo', 'cliente_comprador', 'cliente_destinatario', 'monto_inicial', 'monto_disponible', 'fecha_emision', 'fecha_vencimiento', 'estado')
     search_fields = ('codigo', 'cliente_comprador__nombre', 'cliente_destinatario__nombre')
     list_filter = ('estado', 'fecha_emision', 'fecha_vencimiento')
     readonly_fields = ('codigo', 'monto_disponible')
-    autocomplete_fields = ['cliente_comprador', 'cliente_destinatario'] # ClienteAdmin is now defined before this
+    autocomplete_fields = ['cliente_comprador', 'cliente_destinatario']
 
 class CategoriaProductoAdmin(admin.ModelAdmin):
     list_display = ('nombre',)
@@ -342,7 +326,6 @@ class ServicioAdminForm(forms.ModelForm):
         for day in valid_days: slots_data.setdefault(day, [])
         return slots_data
 
-@admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
     form = ServicioAdminForm
     list_display = ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima', 'activo', 'publicado_web', 'imagen')
@@ -354,7 +337,6 @@ class ServicioAdmin(admin.ModelAdmin):
         ('Configuración Horaria', {'fields': ('horario_apertura', 'horario_cierre', 'slots_disponibles')}),
     )
 
-@admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
     list_display = ('id', 'venta_reserva_link', 'monto_formateado', 'metodo_pago', 'fecha_pago', 'usuario')
     list_filter = ('metodo_pago', 'fecha_pago', 'usuario')
@@ -382,24 +364,15 @@ class PagoAdmin(admin.ModelAdmin):
         super().delete_model(request, obj)
         if venta_reserva_temp: venta_reserva_temp.calcular_total()
 
-@admin.register(CategoriaServicio)
 class CategoriaServicioAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'imagen')
     search_fields = ('nombre',)
 
-@admin.register(HomepageConfig)
 class HomepageConfigAdmin(SingletonModelAdmin):
     pass
 
-admin.site.register(CategoriaProducto, CategoriaProductoAdmin)
-admin.site.register(Producto, ProductoAdmin)
-# VentaReserva, Cliente, Servicio, Pago, etc. are registered above with decorators
-
 # --- Configuraciones Admin CRM & Marketing ---
 
-# ModelAdmins (CRM)
-
-@admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
     def convert_to_contact(self, request, queryset):
         """Acción Admin para convertir prospectos calificados a contactos y oportunidades."""
@@ -446,14 +419,12 @@ class LeadAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'updated_at')
     actions = [convert_to_contact]
 
-@admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
     list_display = ('name', 'website', 'created_at')
     search_fields = ('name', 'website')
     inlines = [ContactInline]
     readonly_fields = ('created_at', 'updated_at')
 
-@admin.register(Contact)
 class ContactAdmin(admin.ModelAdmin):
     list_display = ('email', 'first_name', 'last_name', 'company', 'job_title', 'linked_user', 'created_at')
     list_filter = ('company', 'created_at')
@@ -469,7 +440,6 @@ class ContactAdmin(admin.ModelAdmin):
     )
     readonly_fields = ('created_at', 'updated_at')
 
-@admin.register(Activity)
 class ActivityAdmin(admin.ModelAdmin):
     list_display = ('subject', 'activity_type', 'activity_date', 'related_lead', 'related_contact', 'related_deal', 'created_by', 'campaign') # Added campaign
     list_filter = ('activity_type', 'activity_date', 'created_by', 'campaign') # Added campaign
@@ -483,7 +453,6 @@ class ActivityAdmin(admin.ModelAdmin):
         ('Marcas de Tiempo', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
 
-@admin.register(Campaign)
 class CampaignAdmin(admin.ModelAdmin):
     list_display = ('name', 'status', 'start_date', 'end_date', 'target_min_visits', 'target_min_spend', 'budget', 'get_associated_leads_count', 'get_won_deals_count', 'get_won_deals_value')
     list_filter = ('status', 'start_date', 'end_date')
@@ -524,7 +493,6 @@ class CampaignAdmin(admin.ModelAdmin):
     get_won_deals_value.short_description = 'Valor Ganado'
 
 
-@admin.register(Deal)
 class DealAdmin(admin.ModelAdmin):
     list_display = ('name', 'contact', 'stage', 'amount', 'expected_close_date', 'probability', 'campaign', 'related_booking')
     list_filter = ('stage', 'campaign', 'expected_close_date')
@@ -540,8 +508,6 @@ class DealAdmin(admin.ModelAdmin):
     )
     readonly_fields = ('created_at', 'updated_at')
 
-# Register the new CampaignInteraction model
-@admin.register(CampaignInteraction)
 class CampaignInteractionAdmin(admin.ModelAdmin):
     list_display = ('timestamp', 'contact', 'campaign', 'interaction_type', 'activity', 'details') # Added details
     list_filter = ('interaction_type', 'campaign', 'timestamp')
