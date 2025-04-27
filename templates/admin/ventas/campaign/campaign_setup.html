@@ -27,45 +27,10 @@
             {% if to_field %}<input type="hidden" name="{{ to_field_var }}" value="{{ to_field }}">{% endif %}
 
             {% block field_sets %}
-                {# Use admin fieldset rendering logic if possible, or manually structure #}
-                {# Manual Structure Example: #}
-                <fieldset class="module aligned">
-                    <h2>Detalles de la Campaña</h2>
-                    {% include "admin/includes/form_field.html" with field=form.name %}
-                    {% include "admin/includes/form_field.html" with field=form.status %}
-                    {% include "admin/includes/form_field.html" with field=form.description %}
-                    {% include "admin/includes/form_field.html" with field=form.goal %}
-                </fieldset>
-
-                <fieldset class="module aligned">
-                    <h2>Fechas y Presupuesto</h2>
-                    {% include "admin/includes/form_field.html" with field=form.start_date %}
-                    {% include "admin/includes/form_field.html" with field=form.end_date %}
-                    {% include "admin/includes/form_field.html" with field=form.budget %}
-                </fieldset>
-
-                 <fieldset class="module aligned">
-                    <h2>Criterios de Segmentación (Clientes)</h2>
-                    <p class="description">Definir criterios para seleccionar Clientes existentes para esta campaña (usado por API/automatización).</p>
-                    {% include "admin/includes/form_field.html" with field=form.target_min_visits %}
-                    {% include "admin/includes/form_field.html" with field=form.target_min_spend %}
-                </fieldset>
-
-                 <fieldset class="module aligned collapse"> {# Collapsed by default #}
-                    <h2>Plantillas de Contenido (para n8n)</h2>
-                    <p class="description">Escriba las plantillas de mensajes aquí. Use {nombre_cliente}, {apellido_cliente} como placeholders que n8n reemplazará.</p>
-                    {% include "admin/includes/form_field.html" with field=form.email_subject_template %}
-                    {% include "admin/includes/form_field.html" with field=form.email_body_template %}
-                    {% include "admin/includes/form_field.html" with field=form.sms_template %}
-                    {% include "admin/includes/form_field.html" with field=form.whatsapp_template %}
-                </fieldset>
-
-                 <fieldset class="module aligned collapse"> {# Collapsed by default #}
-                    <h2>Notas de Automatización</h2>
-                     <p class="description">Describe el flujo de n8n u otra automatización asociada (ej. 'Enviar SMS 3 días después', 'Llamada AI si no abre email').</p>
-                    {% include "admin/includes/form_field.html" with field=form.automation_notes %}
-                </fieldset>
-
+                {# Use the standard admin fieldset rendering logic #}
+                {% for fieldset in adminform %}
+                    {% include "admin/includes/fieldset.html" %}
+                {% endfor %}
             {% endblock %}
 
             {% block after_field_sets %}{% endblock %}
