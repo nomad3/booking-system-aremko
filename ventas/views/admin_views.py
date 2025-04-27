@@ -79,7 +79,11 @@ def campaign_setup_view(request, campaign_id=None):
         'show_save_and_continue': True,
         'show_save_and_add_another': True, # Control visibility as needed
         'show_delete_link': campaign_admin.has_delete_permission(request, campaign) if campaign else False,
-        'has_file_field': any(isinstance(field.field.widget, forms.FileInput) for fieldset in admin_form for line in fieldset for field in line), # Check for file fields
+        # Correctly check for file input by accessing admin_field.field.field.widget
+        'has_file_field': any(isinstance(admin_field.field.field.widget, forms.FileInput)
+                              for fieldset in admin_form
+                              for line in fieldset
+                              for admin_field in line), # Check for file fields
         'form_url': '', # form action url - typically handled by template logic or passed explicitly if needed
     }
     # Use a specific template for this view
