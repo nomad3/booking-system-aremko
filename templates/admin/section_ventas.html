@@ -1,0 +1,127 @@
+{% extends "admin/base_site.html" %}
+{% load static i18n %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+    <style>
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card-title {
+            font-weight: 600;
+        }
+        .card-icon {
+            font-size: 2rem; /* Smaller icon size for model cards */
+            margin-bottom: 0.75rem;
+        }
+        .card-link-container {
+            margin-top: 1rem;
+        }
+    </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+&rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4">
+    <div class="page-header mb-4">
+        <h1>{{ title }}</h1>
+        <p>Gestionar modelos relacionados con Ventas, Reservas, Pagos y Gift Cards.</p>
+    </div>
+
+    <div class="row g-4">
+        {# VentaReserva Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-shopping-cart card-icon text-success-modern"></i>
+                    <h5 class="card-title">Ventas / Reservas</h5>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_ventareserva_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_ventareserva_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Pago Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-money-bill-wave card-icon text-success-modern"></i>
+                    <h5 class="card-title">Pagos</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_pago_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_pago_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# GiftCard Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-gift card-icon text-success-modern"></i>
+                    <h5 class="card-title">Gift Cards</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_giftcard_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_giftcard_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+         {# Caja Diaria Admin Card (Custom View) #}
+         <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-cash-register card-icon text-success-modern"></i>
+                    <h5 class="card-title">Caja Diaria (Admin)</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:caja_diaria' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Caja</a>
+                        {# No 'Add' link for this view #}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+         {# Caja Diaria Recepcionistas Card (Custom View) #}
+         <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-user-tie card-icon text-success-modern"></i>
+                    <h5 class="card-title">Caja Diaria (Recepción)</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:caja_diaria_recepcionistas' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Caja</a>
+                        {# No 'Add' link for this view #}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+         {# Auditoría Movimientos Card (Custom View) #}
+         <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-history card-icon text-success-modern"></i>
+                    <h5 class="card-title">Auditoría Movimientos</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:auditoria_movimientos' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Auditoría</a>
+                        {# No 'Add' link for this view #}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

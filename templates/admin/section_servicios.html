@@ -1,0 +1,99 @@
+{% extends "admin/base_site.html" %}
+{% load static i18n %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+    <style>
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card-title {
+            font-weight: 600;
+        }
+        .card-icon {
+            font-size: 2rem; /* Smaller icon size for model cards */
+            margin-bottom: 0.75rem;
+        }
+        .card-link-container {
+            margin-top: 1rem;
+        }
+    </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+&rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4">
+    <div class="page-header mb-4">
+        <h1>{{ title }}</h1>
+        <p>Gestionar modelos relacionados con Servicios y Proveedores.</p>
+    </div>
+
+    <div class="row g-4">
+        {# Servicio Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-concierge-bell card-icon text-info-modern"></i>
+                    <h5 class="card-title">Servicios</h5>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_servicio_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_servicio_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# CategoriaServicio Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-tags card-icon text-info-modern"></i>
+                    <h5 class="card-title">Categorías de Servicio</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_categoriaservicio_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_categoriaservicio_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Proveedor Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-truck card-icon text-info-modern"></i>
+                    <h5 class="card-title">Proveedores</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_proveedor_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_proveedor_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+         {# Servicios Vendidos Card (Custom View) #}
+         <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-chart-line card-icon text-info-modern"></i>
+                    <h5 class="card-title">Reporte Servicios Vendidos</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:servicios_vendidos' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Reporte</a>
+                        {# No 'Add' link for this view #}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

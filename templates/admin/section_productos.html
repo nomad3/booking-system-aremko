@@ -1,0 +1,99 @@
+{% extends "admin/base_site.html" %}
+{% load static i18n %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+    <style>
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card-title {
+            font-weight: 600;
+        }
+        .card-icon {
+            font-size: 2rem; /* Smaller icon size for model cards */
+            margin-bottom: 0.75rem;
+        }
+        .card-link-container {
+            margin-top: 1rem;
+        }
+    </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+&rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4">
+    <div class="page-header mb-4">
+        <h1>{{ title }}</h1>
+        <p>Gestionar modelos relacionados con Productos y Compras.</p>
+    </div>
+
+    <div class="row g-4">
+        {# Producto Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-box-open card-icon text-warning-modern"></i>
+                    <h5 class="card-title">Productos</h5>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_producto_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_producto_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# CategoriaProducto Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-tags card-icon text-warning-modern"></i>
+                    <h5 class="card-title">Categorías de Producto</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_categoriaproducto_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_categoriaproducto_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Compra Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-shopping-basket card-icon text-warning-modern"></i>
+                    <h5 class="card-title">Compras</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_compra_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_compra_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+         {# Productos Vendidos Card (Custom View) #}
+         <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-chart-bar card-icon text-warning-modern"></i>
+                    <h5 class="card-title">Reporte Productos Vendidos</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:productos_vendidos' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Reporte</a>
+                        {# No 'Add' link for this view #}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

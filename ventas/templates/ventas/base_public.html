@@ -307,7 +307,7 @@
                             <li><a class="dropdown-item" href="{% url 'homepage' %}#servicios">Todos los Servicios</a></li>
                             <li><hr class="dropdown-divider"></li>
                             {% for cat in todas_las_categorias %}
-                            <li><a class="dropdown-item" href="{% url 'categoria_detail' cat.id %}">{{ cat.nombre }}</a></li>
+                            <li><a class="dropdown-item" href="{% url 'ventas:categoria_detail' cat.id %}">{{ cat.nombre }}</a></li> {# Added ventas: namespace #}
                             {% endfor %}
                         </ul>
                     </li>
@@ -325,7 +325,7 @@
                 <div class="d-flex align-items-center">
                     {% block nav_extra %}
                     <div class="cart-icon me-4" id="cartIconWrapper">
-                        <a href="{% url 'cart' %}" class="text-decoration-none text-dark">
+                        <a href="{% url 'ventas:cart' %}" class="text-decoration-none text-dark"> {# Added ventas: namespace #}
                             <i class="fas fa-shopping-cart"></i>
                             <span class="cart-count" id="cartCount">
                                 {{ request.session.cart.servicios|length|default:0 }}
@@ -342,7 +342,7 @@
                         {% endif %}
                     {% else %}
                          <a href="{% url 'login' %}" class="btn btn-outline-secondary btn-sm me-2">Ingresar</a>
-                         <a href="{% url 'inicio_sistema' %}" class="btn btn-primary btn-sm">
+                         <a href="{% url 'ventas:inicio_sistema' %}" class="btn btn-primary btn-sm"> {# Added ventas: namespace #}
                             <i class="fas fa-user me-1"></i>Acceso Admin/Staff
                          </a>
                     {% endif %}
@@ -547,9 +547,9 @@
             formData.append('telefono', telefono);
             formData.append('documento_identidad', documento_identidad);
             
-            console.log("Sending checkout request to:", '{% url "complete_checkout" %}'); 
+            console.log("Sending checkout request to:", '{% url "ventas:complete_checkout" %}'); {# Added ventas: namespace #}
             // Enviar petición AJAX
-            fetch('{% url "complete_checkout" %}', { 
+            fetch('{% url "ventas:complete_checkout" %}', { {# Added ventas: namespace #}
                 method: 'POST',
                 body: formData,
                 headers: {
@@ -636,8 +636,8 @@
             const formData = new FormData();
             formData.append('index', index);
 
-            console.log("Sending remove request to:", '{% url "remove_from_cart" %}');
-            fetch('{% url "remove_from_cart" %}', {
+            console.log("Sending remove request to:", '{% url "ventas:remove_from_cart" %}'); {# Added ventas: namespace #}
+            fetch('{% url "ventas:remove_from_cart" %}', { {# Added ventas: namespace #}
                 method: 'POST',
                 body: formData,
                 headers: {
@@ -693,7 +693,7 @@
                         if(loadingIndicator) loadingIndicator.style.display = 'block'; // Show loading
 
                         // Construct the API URL
-                        const lookupUrl = `{% url 'get_client_details_by_phone' %}?telefono=${encodeURIComponent(phoneNumber)}`;
+                        const lookupUrl = `{% url 'ventas:get_client_details_by_phone' %}?telefono=${encodeURIComponent(phoneNumber)}`; {# Added ventas: namespace #}
                         console.log("Looking up client:", lookupUrl);
 
                         fetch(lookupUrl)

@@ -1,0 +1,169 @@
+{% extends "admin/base_site.html" %}
+{% load static i18n %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+    <style>
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card-title {
+            font-weight: 600;
+        }
+        .card-icon {
+            font-size: 2rem; /* Smaller icon size for model cards */
+            margin-bottom: 0.75rem;
+        }
+        .card-link-container {
+            margin-top: 1rem;
+        }
+    </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+&rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4">
+    <div class="page-header mb-4">
+        <h1>{{ title }}</h1>
+        <p>Gestionar modelos relacionados con CRM y Marketing.</p>
+    </div>
+
+    <div class="row g-4">
+        {# Cliente Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-user-friends card-icon text-primary-modern"></i>
+                    <h5 class="card-title">Clientes</h5>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_cliente_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_cliente_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Lead Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-filter card-icon text-primary-modern"></i>
+                    <h5 class="card-title">Leads (Prospectos)</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_lead_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_lead_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Contact Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-address-book card-icon text-primary-modern"></i>
+                    <h5 class="card-title">Contactos</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_contact_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_contact_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Company Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-building card-icon text-primary-modern"></i>
+                    <h5 class="card-title">Compañías</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_company_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_company_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Deal Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-handshake card-icon text-primary-modern"></i>
+                    <h5 class="card-title">Oportunidades (Deals)</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_deal_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_deal_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Activity Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-tasks card-icon text-primary-modern"></i>
+                    <h5 class="card-title">Actividades</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_activity_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_activity_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Campaign Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-bullseye card-icon text-primary-modern"></i>
+                    <h5 class="card-title">Campañas</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_campaign_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'ventas:campaign_setup_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo (Setup)</a> {# Link to custom setup view #}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Campaign Interaction Card #}
+         <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-comments card-icon text-primary-modern"></i>
+                    <h5 class="card-title">Interacciones Campaña</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_campaigninteraction_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_campaigninteraction_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+         {# Segmentación Clientes Card (Custom View) #}
+         <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-chart-pie card-icon text-primary-modern"></i>
+                    <h5 class="card-title">Segmentación Clientes</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:cliente_segmentation' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Segmentación</a>
+                        {# No 'Add' link for this view #}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
