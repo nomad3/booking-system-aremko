@@ -728,7 +728,7 @@
 
         console.log("Adding to cart with data:", { servicioId, fecha, hora, cantidadPersonas });
 
-        fetch('{% url "add_to_cart" %}', {
+        fetch('{% url "ventas:add_to_cart" %}', {
             method: 'POST',
             body: formData,
             headers: {
