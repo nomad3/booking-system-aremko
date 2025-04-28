@@ -43,13 +43,13 @@ def add_to_cart(request):
             # Ensure minimum capacity is met
             if cantidad_personas < servicio.capacidad_minima:
                  messages.error(request, f"La cantidad mínima de personas para '{servicio.nombre}' es {servicio.capacidad_minima}.")
-                 referer_url = request.META.get('HTTP_REFERER', reverse('homepage'))
+                 referer_url = request.META.get('HTTP_REFERER', reverse('ventas:homepage')) # Added namespace
                  return redirect(referer_url)
 
             # Ensure maximum capacity is not exceeded
             if cantidad_personas > servicio.capacidad_maxima:
                  messages.error(request, f"La capacidad máxima para '{servicio.nombre}' es {servicio.capacidad_maxima} personas.")
-                 referer_url = request.META.get('HTTP_REFERER', reverse('homepage'))
+                 referer_url = request.META.get('HTTP_REFERER', reverse('ventas:homepage')) # Added namespace
                  return redirect(referer_url)
 
             # --- Cabin Specific Logic (Price is fixed, quantity handled by general capacity check) ---
@@ -88,20 +88,20 @@ def add_to_cart(request):
             print(f"Updated cart: {cart}")
 
             # Redirigir a la página del carrito
-            return redirect('cart') # Redirect to cart view
+            return redirect('ventas:cart') # Redirect to cart view with namespace
         except Servicio.DoesNotExist:
             # Handle error appropriately, maybe redirect back with a message
             messages.error(request, "El servicio seleccionado no existe.")
-            referer_url = request.META.get('HTTP_REFERER', reverse('homepage'))
+            referer_url = request.META.get('HTTP_REFERER', reverse('ventas:homepage')) # Added namespace
             return redirect(referer_url)
         except Exception as e:
             messages.error(request, f"Ocurrió un error al agregar al carrito: {e}")
-            referer_url = request.META.get('HTTP_REFERER', reverse('homepage'))
+            referer_url = request.META.get('HTTP_REFERER', reverse('ventas:homepage')) # Added namespace
             return redirect(referer_url)
 
     # If not POST, redirect or show an error
     messages.error(request, "Método no permitido.")
-    return redirect(reverse('homepage')) # Redirect to homepage or appropriate page
+    return redirect(reverse('ventas:homepage')) # Redirect to homepage or appropriate page with namespace
 
 def remove_from_cart(request):
     if request.method == 'POST':
