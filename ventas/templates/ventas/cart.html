@@ -174,7 +174,7 @@
                         </div>
 
                         <div class="cart-actions">
-                            <a href="{% url 'homepage' %}#servicios" class="btn btn-outline-secondary">Seguir Comprando</a>
+                            <a href="{% url 'ventas:homepage' %}#servicios" class="btn btn-outline-secondary">Seguir Comprando</a>
                             <a href="{% url 'ventas:checkout' %}" class="btn btn-primary">Finalizar Reserva</a>
                         </div>
                     </div>
@@ -187,7 +187,7 @@
                         </div>
                         <h3>Tu carrito está vacío</h3>
                         <p>Parece que aún no has agregado ningún servicio a tu carrito.</p>
-                        <a href="{% url 'homepage' %}#servicios" class="btn btn-primary mt-3">
+                        <a href="{% url 'ventas:homepage' %}#servicios" class="btn btn-primary mt-3">
                             Ver Servicios
                         </a>
                     </div>

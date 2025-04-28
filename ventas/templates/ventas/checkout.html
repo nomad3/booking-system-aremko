@@ -279,7 +279,7 @@ Email para comprobante: pagos@ejemplo.com</pre>
                 </div>
                 <h3>Tu carrito está vacío</h3>
                 <p>Parece que aún no has agregado ningún servicio a tu carrito.</p>
-                <a href="{% url 'homepage' %}#servicios" class="btn btn-primary mt-3">
+                <a href="{% url ventas:'homepage' %}#servicios" class="btn btn-primary mt-3">
                     Ver Servicios
                 </a>
             </div>
@@ -308,7 +308,7 @@ Email para comprobante: pagos@ejemplo.com</pre>
             <div class="modal-footer justify-content-between"> 
                 {# Placeholder for the detail button - JS will add it here #}
                 <div id="detailButtonPlaceholder"></div> 
-                <a href="{% url 'homepage' %}" class="btn btn-primary">Volver al Inicio</a>
+                <a href="{% url 'ventas:homepage' %}" class="btn btn-primary">Volver al Inicio</a>
             </div>
         </div>
     </div>
@@ -345,7 +345,7 @@ Email para comprobante: pagos@ejemplo.com</pre>
         console.log(`Fetching client data for phone: ${cleanedTelefono}`);
         try {
             // Corrected API endpoint URL name
-            const lookupUrl = `{% url 'get_client_details_by_phone' %}?telefono=${encodeURIComponent(cleanedTelefono)}`;
+            const lookupUrl = `{% url 'ventas:get_client_details_by_phone' %}?telefono=${encodeURIComponent(cleanedTelefono)}`;
             const response = await fetch(lookupUrl); 
             if (response.ok) {
                 const data = await response.json();
@@ -471,7 +471,7 @@ Email para comprobante: pagos@ejemplo.com</pre>
     async function handleBankTransferCheckout(formData, overlay, button) {
         const csrfToken = getCookie('csrftoken');
         try {
-            const response = await fetch('{% url "complete_checkout" %}', {
+            const response = await fetch('{% url "ventas:complete_checkout" %}', {
                 method: 'POST',
                 body: formData,
                 headers: { 'X-CSRFToken': csrfToken }
@@ -494,7 +494,7 @@ Email para comprobante: pagos@ejemplo.com</pre>
         try {
             // 1. Create Reservation (Pending)
             console.log("Creating reservation before Flow payment...");
-            const checkoutResponse = await fetch('{% url "complete_checkout" %}', {
+            const checkoutResponse = await fetch('{% url "ventas:complete_checkout" %}', {
                 method: 'POST',
                 body: formData,
                 headers: { 'X-CSRFToken': csrfToken }
@@ -508,7 +508,7 @@ Email para comprobante: pagos@ejemplo.com</pre>
 
             // 2. Initiate Flow Payment
             console.log("Initiating Flow payment for reserva_id:", reservaId);
-            const flowResponse = await fetch('{% url "create_flow_payment" %}', {
+            const flowResponse = await fetch('{% url "ventas:create_flow_payment" %}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
