@@ -69,11 +69,13 @@ def campaign_setup_view(request, campaign_id=None):
         'form': form, # Keep original form if needed elsewhere, but template should use adminform
         'opts': Campaign._meta, # Pass model meta options
         'has_view_permission': True, # Assuming view implies permission
-        'has_add_permission': admin.site._registry[Campaign].has_add_permission(request),
-        'has_change_permission': admin.site._registry[Campaign].has_change_permission(request, campaign) if campaign else False,
-        'has_delete_permission': admin.site._registry[Campaign].has_delete_permission(request, campaign) if campaign else False,
+        'has_add_permission': campaign_admin.has_add_permission(request),
+        'has_change_permission': campaign_admin.has_change_permission(request, campaign) if campaign else False,
+        'has_delete_permission': campaign_admin.has_delete_permission(request, campaign) if campaign else False,
         'object_id': campaign_id, # For admin template context
         'original': campaign, # For admin template context
+        'add': campaign_id is None, # Required by submit_row tag
+        'change': campaign_id is not None, # Required by submit_row tag
         'is_popup': False,
         'save_as': False,
         'show_save': True,
