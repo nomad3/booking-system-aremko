@@ -191,7 +191,7 @@
                             <span>${{ cart.total|floatformat:0|intcomma }}</span>
                         </div>
                         <div class="cart-actions">
-                            <a href="{% url 'cart' %}" class="btn btn-outline-secondary">Volver al Carrito</a>
+                            <a href="{% url 'ventas:cart' %}" class="btn btn-outline-secondary">Volver al Carrito</a>
                             <button class="btn btn-primary" id="completeCheckoutBtn">
                                 Completar Reserva
                             </button>
