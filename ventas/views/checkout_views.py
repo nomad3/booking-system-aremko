@@ -298,7 +298,7 @@ def complete_checkout(request):
                     request.session.modified = True
 
                     # Generate the detail URL
-                    detail_url = reverse('venta_reserva_detail', kwargs={'pk': venta.id})
+                    detail_url = reverse('ventas:venta_reserva_detail', kwargs={'pk': venta.id}) # Added namespace
 
                     # Return success response including the detail URL
                     response_data = {
