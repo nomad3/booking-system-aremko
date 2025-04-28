@@ -33,7 +33,7 @@
 
     <button id="start-campaign-btn" class="btn btn-primary">Start Campaign with Selected Clients</button>
 
-    <form id="start-campaign-form" method="post" action="{% url 'admin:ventas_cliente_select_campaign_for_remarketing' %}">
+    <form id="start-campaign-form" method="post" action="{% url 'ventas:select_campaign_for_clients' %}">
         {% csrf_token %}
         <input type="hidden" name="selected_clients" id="selected-clients-input">
     </form>
