@@ -9,6 +9,8 @@ from .views import (
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
 
+app_name = 'ventas'  # Define the app namespace
+
 # Registrar las vistas en el router de DRF
 router = DefaultRouter()
 router.register(r'api/proveedores', api_views.ProveedorViewSet)
