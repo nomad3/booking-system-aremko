@@ -1,0 +1,64 @@
+{% extends 'ventas/base_site.html' %}
+
+{% block title %}Clients for Segment: {{ segment_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Clients for Segment: {{ segment_name }}</h2>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th><input type="checkbox" id="select-all"> Select All</th>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Email</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for client in clients %}
+            <tr>
+                <td><input type="checkbox" class="client-select" value="{{ client.id }}"></td>
+                <td>{{ client.nombre }}</td>
+                <td>{{ client.telefono }}</td>
+                <td>{{ client.email }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4">No clients found for this segment.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <button id="start-campaign-btn" class="btn btn-primary">Start Campaign with Selected Clients</button>
+
+    <form id="start-campaign-form" method="post" action="{% url 'admin:ventas_cliente_select_campaign_for_remarketing' %}">
+        {% csrf_token %}
+        <input type="hidden" name="selected_clients" id="selected-clients-input">
+    </form>
+</div>
+
+<script>
+    document.getElementById('select-all').addEventListener('change', function(e) {
+        const checkboxes = document.querySelectorAll('.client-select');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = e.target.checked;
+        });
+    });
+
+    document.getElementById('start-campaign-btn').addEventListener('click', function() {
+        const selectedClients = Array.from(document.querySelectorAll('.client-select:checked'))
+            .map(checkbox => checkbox.value);
+
+        if (selectedClients.length > 0) {
+            // Populate the hidden input with selected client IDs
+            document.getElementById('selected-clients-input').value = selectedClients.join(',');
+            // Submit the form
+            document.getElementById('start-campaign-form').submit();
+        } else {
+            alert('Please select at least one client.');
+        }
+    });
+</script>
+{% endblock %}

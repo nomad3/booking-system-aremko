@@ -248,7 +248,7 @@ def caja_diaria_view(request):
         'usuarios': usuarios,
         'usuario_id': usuario_id, # Pass selected user ID
         'metodo_pago': metodo_pago,  # Añadir al contexto
-        'METODOS_PAGO': METODOS_PAGO,  # Añadir al contexto
+        'METODOS_PAGO': Pago.METODOS_PAGO,  # Añadir al contexto
     }
 
     return render(request, 'ventas/caja_diaria.html', context)
@@ -516,7 +516,7 @@ def auditoria_movimientos_view(request):
     context = {
         'movimientos': page_obj, # Pass the page object
         'fecha_inicio': fecha_inicio_str,
-        'fecha_fin': fecha_fin_str,
+        'fecha_fin': fecha_str,
         'tipo_movimiento': tipo_movimiento or '', # Ensure not None
         'usuario_username': usuario_username or '', # Ensure not None
         'usuarios': User.objects.filter(is_active=True).order_by('username'),  # Solo usuarios activos for filter dropdown
@@ -602,3 +602,90 @@ def cliente_segmentation_view(request):
     }
 
     return render(request, 'ventas/cliente_segmentation.html', context)
+
+# New view to list clients by segment
+@login_required
+# @user_passes_test(es_administrador) # Optional: Restrict to admins if needed
+def client_list_by_segment_view(request, segment_name):
+    """
+    Displays a list of clients for a specific segment.
+    """
+    # Define Segmentation Thresholds (adjust as needed)
+    VISIT_THRESHOLD_REGULAR = 2
+    VISIT_THRESHOLD_VIP = 6 # Example: 6 or more visits
+    SPEND_THRESHOLD_MEDIUM = 50000 # Example: 50,000 CLP
+    SPEND_THRESHOLD_HIGH = 150000 # Example: 150,000 CLP
+
+    # Annotate clients with visit count and total spend
+    clientes_annotated = Cliente.objects.annotate(
+        num_visits=Count('ventareserva'),
+        total_spend=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField())
+    )
+
+    # Filter clients based on segment_name
+    if segment_name == 'new_low_spend':
+        clients = clientes_annotated.filter(
+            num_visits__lt=VISIT_THRESHOLD_REGULAR,
+            total_spend__lt=SPEND_THRESHOLD_MEDIUM
+        )
+    elif segment_name == 'new_medium_spend':
+        clients = clientes_annotated.filter(
+            num_visits__lt=VISIT_THRESHOLD_REGULAR,
+            total_spend__gte=SPEND_THRESHOLD_MEDIUM,
+            total_spend__lt=SPEND_THRESHOLD_HIGH
+        )
+    elif segment_name == 'new_high_spend':
+        clients = clientes_annotated.filter(
+            num_visits__lt=VISIT_THRESHOLD_REGULAR,
+            total_spend__gte=SPEND_THRESHOLD_HIGH
+        )
+    elif segment_name == 'regular_low_spend':
+        clients = clientes_annotated.filter(
+            num_visits__gte=VISIT_THRESHOLD_REGULAR,
+            num_visits__lt=VISIT_THRESHOLD_VIP,
+            total_spend__lt=SPEND_THRESHOLD_MEDIUM
+        )
+    elif segment_name == 'regular_medium_spend':
+        clients = clientes_annotated.filter(
+            num_visits__gte=VISIT_THRESHOLD_REGULAR,
+            num_visits__lt=VISIT_THRESHOLD_VIP,
+            total_spend__gte=SPEND_THRESHOLD_MEDIUM,
+            total_spend__lt=SPEND_THRESHOLD_HIGH
+        )
+    elif segment_name == 'regular_high_spend':
+        clients = clientes_annotated.filter(
+            num_visits__gte=VISIT_THRESHOLD_REGULAR,
+            num_visits__lt=VISIT_THRESHOLD_VIP,
+            total_spend__gte=SPEND_THRESHOLD_HIGH
+        )
+    elif segment_name == 'vip_low_spend':
+        clients = clientes_annotated.filter(
+            num_visits__gte=VISIT_THRESHOLD_VIP,
+            total_spend__lt=SPEND_THRESHOLD_MEDIUM
+        )
+    elif segment_name == 'vip_medium_spend':
+        clients = clientes_annotated.filter(
+            num_visits__gte=VISIT_THRESHOLD_VIP,
+            total_spend__gte=SPEND_THRESHOLD_MEDIUM,
+            total_spend__lt=SPEND_THRESHOLD_HIGH
+        )
+    elif segment_name == 'vip_high_spend':
+        clients = clientes_annotated.filter(
+            num_visits__gte=VISIT_THRESHOLD_VIP,
+            total_spend__gte=SPEND_THRESHOLD_HIGH
+        )
+    elif segment_name == 'zero_spend':
+         clients = clientes_annotated.filter(
+             num_visits=0,
+             total_spend=0
+         )
+    else:
+        # Handle invalid segment name, perhaps return an empty list or an error
+        clients = Cliente.objects.none() # Return an empty queryset
+
+    context = {
+        'segment_name': segment_name,
+        'clients': clients,
+    }
+
+    return render(request, 'ventas/client_list_by_segment.html', context)

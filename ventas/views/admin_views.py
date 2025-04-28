@@ -7,8 +7,9 @@ from django.contrib import messages
 from django.http import HttpResponseRedirect
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db import transaction # Import transaction
 
-from ..models import Cliente, Contact, Campaign, Company
+from ..models import Cliente, Contact, Campaign, Company, Activity # Added Activity
 from ..forms import SelectCampaignForm # Keep this if still used elsewhere, otherwise remove
 # Import CampaignForm if needed for a custom form, or rely on ModelAdmin form
 # from ..forms import CampaignForm # Example if you create a custom Campaign form
@@ -89,3 +90,78 @@ def campaign_setup_view(request, campaign_id=None):
     }
     # Use a specific template for this view
     return render(request, 'admin/ventas/campaign/campaign_setup.html', context)
+
+@login_required
+@user_passes_test(es_administrador) # Ensure only staff/superusers can access
+def select_campaign_for_clients_view(request):
+    """
+    View to select a campaign for a list of selected clients.
+    """
+    if request.method == 'POST':
+        selected_clients_string = request.POST.get('selected_clients', '')
+        if not selected_clients_string:
+            messages.error(request, _("No clients were selected."))
+            return HttpResponseRedirect(reverse('cliente_segmentation')) # Redirect back to segmentation
+
+        # Split the string into a list of client IDs
+        try:
+            selected_client_ids = [int(client_id) for client_id in selected_clients_string.split(',') if client_id.isdigit()]
+        except ValueError:
+            messages.error(request, _("Invalid client IDs provided."))
+            return HttpResponseRedirect(reverse('cliente_segmentation')) # Redirect back to segmentation
+
+
+        # Get the form with POST data
+        form = SelectCampaignForm(request.POST)
+
+        if form.is_valid():
+            campaign = form.cleaned_data['campaign']
+            # Retrieve the selected clients
+            clients_to_add = Cliente.objects.filter(id__in=selected_client_ids)
+
+            activities_created_count = 0
+            with transaction.atomic(): # Ensure atomicity
+                for client in clients_to_add:
+                    # Try to find a matching Contact for the client
+                    # Assuming Contact can be linked by email or phone
+                    contact = Contact.objects.filter(
+                        models.Q(email=client.email) | models.Q(phone=client.telefono)
+                    ).first()
+
+                    if contact:
+                        # Create an Activity for each selected client linked to the campaign and contact
+                        Activity.objects.create(
+                            activity_type='Campaign Initiation', # Define a suitable activity type
+                            subject=f"Initiated campaign '{campaign.name}'",
+                            notes=f"Client selected from segment for campaign '{campaign.name}'.",
+                            related_contact=contact,
+                            campaign=campaign,
+                            created_by=request.user # Link the user who initiated the action
+                        )
+                        activities_created_count += 1
+                    else:
+                        # Handle cases where no matching Contact is found for a Cliente
+                        messages.warning(request, _(f"No matching Contact found for client '{client.nombre}' ({client.id}). Activity not created for this client."))
+
+
+            messages.success(request, _(f"Initiated campaign '{campaign.name}' for {activities_created_count} selected clients."))
+
+            # Redirect to the campaign detail page or changelist
+            return HttpResponseRedirect(reverse('admin:ventas_campaign_change', args=[campaign.id]))
+        else:
+            # If form is not valid, re-render the template with errors
+            # Need to pass the selected client IDs back to the template
+            context = {
+                **admin.site.each_context(request),
+                'title': _("Select Campaign for Clients"),
+                'form': form,
+                'selected_clients_string': selected_clients_string, # Pass back the string
+                'selected_clients_count': len(selected_client_ids), # Pass count for display
+                'opts': Cliente._meta, # Use Cliente meta for breadcrumbs/context
+            }
+            return render(request, 'admin/ventas/cliente/select_campaign_for_remarketing.html', context)
+
+    else:
+        # Handle GET request (e.g., direct access to this URL)
+        messages.warning(request, _("This page is accessed by selecting clients from a segment."))
+        return HttpResponseRedirect(reverse('cliente_segmentation')) # Redirect back to segmentation

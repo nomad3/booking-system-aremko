@@ -53,8 +53,7 @@
                 <div class="card-body text-center">
                     <p class="segment-count">{{ segment.count }}</p>
                     <p class="text-muted">Cliente{% if segment.count != 1 %}s{% endif %}</p>
-                    {# Optional: Add a link to filter clients based on this segment if needed later #}
-                    {# <a href="#" class="btn btn-sm btn-outline-primary mt-2">Ver Clientes</a> #}
+                    <a href="{% url 'ventas:client_list_by_segment' segment_name=key %}" class="btn btn-sm btn-outline-primary mt-2">Ver Clientes</a>
                 </div>
             </div>
         </div>
