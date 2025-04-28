@@ -4,9 +4,6 @@ FROM python:3.9-slim
     # Establecer el directorio de trabajo
     WORKDIR /app
     
-    # Add a build argument to potentially bust the cache
-    ARG CACHEBUST=1
-    
     # Instalar dependencias del sistema necesarias
     RUN apt-get update && \
     apt-get install -y build-essential libpq-dev netcat-openbsd && \
