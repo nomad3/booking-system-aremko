@@ -85,6 +85,7 @@ def campaign_setup_view(request, campaign_id=None):
         # Use the form's is_multipart() method to check for file fields
         'has_file_field': admin_form.form.is_multipart(),
         'form_url': '', # form action url - typically handled by template logic or passed explicitly if needed
+        'has_editable_inline_admin_formsets': False, # Required by submit_row tag; False as we don't have inlines here
     }
     # Use a specific template for this view
     return render(request, 'admin/ventas/campaign/campaign_setup.html', context)
