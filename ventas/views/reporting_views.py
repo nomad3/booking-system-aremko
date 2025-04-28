@@ -4,6 +4,7 @@ from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.db.models import Sum, Count, F, Q
+from django.db.models.functions import Coalesce # Added Coalesce import
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator
 from django.contrib.auth.models import User
@@ -540,7 +541,7 @@ def cliente_segmentation_view(request):
     # Use Coalesce to handle clients with no spending (Sum returns None)
     clientes_annotated = Cliente.objects.annotate(
         num_visits=Count('ventareserva'),
-        total_spend=models.Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField())
+        total_spend=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField()) # Use imported Coalesce
     ).order_by('-total_spend') # Order for potential display
 
     # --- Categorize Clients ---

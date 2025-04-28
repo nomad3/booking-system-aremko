@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.contrib.admin import helpers # Import helpers
+from django import forms # Import forms module
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib import messages
@@ -31,11 +33,13 @@ def campaign_setup_view(request, campaign_id=None):
         campaign = None
         form_title = _("Crear Nueva Campaña")
 
-    # Use the default ModelAdmin form for now, can be replaced with a custom form
-    CampaignForm = admin.site._registry[Campaign].get_form(request, obj=campaign)
+    # Get the ModelAdmin instance for Campaign
+    campaign_admin = admin.site._registry[Campaign]
+    # Get the form class from the ModelAdmin
+    CampaignForm = campaign_admin.get_form(request, obj=campaign)
 
     if request.method == 'POST':
-        form = CampaignForm(request.POST, instance=campaign)
+        form = CampaignForm(request.POST, request.FILES, instance=campaign) # Include request.FILES
         if form.is_valid():
             saved_campaign = form.save()
             messages.success(request, _(f"Campaña '{saved_campaign.name}' guardada exitosamente."))
@@ -46,23 +50,42 @@ def campaign_setup_view(request, campaign_id=None):
     else:
         form = CampaignForm(instance=campaign)
 
+    # Create the AdminForm helper object
+    admin_form = helpers.AdminForm(
+        form=form,
+        # Get fieldsets from the ModelAdmin instance
+        fieldsets=campaign_admin.get_fieldsets(request, campaign),
+        # Get prepopulated fields (if any)
+        prepopulated_fields=campaign_admin.get_prepopulated_fields(request, campaign),
+        # Get readonly fields (important for display)
+        readonly_fields=campaign_admin.get_readonly_fields(request, campaign),
+        model_admin=campaign_admin,
+    )
+
     context = {
         **admin.site.each_context(request), # Include admin context
         'title': form_title,
-        'form': form,
+        'adminform': admin_form, # Pass the AdminForm object
+        'form': form, # Keep original form if needed elsewhere, but template should use adminform
         'opts': Campaign._meta, # Pass model meta options
-        'has_view_permission': True,
-        'has_add_permission': admin.site._registry[Campaign].has_add_permission(request),
-        'has_change_permission': admin.site._registry[Campaign].has_change_permission(request, campaign) if campaign else False,
-        'has_delete_permission': admin.site._registry[Campaign].has_delete_permission(request, campaign) if campaign else False,
+        'has_view_permission': True, # Assuming view implies permission
+        'has_add_permission': campaign_admin.has_add_permission(request),
+        'has_change_permission': campaign_admin.has_change_permission(request, campaign) if campaign else False,
+        'has_delete_permission': campaign_admin.has_delete_permission(request, campaign) if campaign else False,
         'object_id': campaign_id, # For admin template context
         'original': campaign, # For admin template context
+        'add': campaign_id is None, # Required by submit_row tag
+        'change': campaign_id is not None, # Required by submit_row tag
         'is_popup': False,
         'save_as': False,
         'show_save': True,
         'show_save_and_continue': True,
-        'show_save_and_add_another': True,
-        'show_delete_link': admin.site._registry[Campaign].has_delete_permission(request, campaign) if campaign else False,
+        'show_save_and_add_another': True, # Control visibility as needed
+        'show_delete_link': campaign_admin.has_delete_permission(request, campaign) if campaign else False,
+        # Use the form's is_multipart() method to check for file fields
+        'has_file_field': admin_form.form.is_multipart(),
+        'form_url': '', # form action url - typically handled by template logic or passed explicitly if needed
+        'has_editable_inline_admin_formsets': False, # Required by submit_row tag; False as we don't have inlines here
     }
     # Use a specific template for this view
     return render(request, 'admin/ventas/campaign/campaign_setup.html', context)
