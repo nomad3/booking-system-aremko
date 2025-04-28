@@ -12,8 +12,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # Root URL pointing to the homepage view in its new location
     path('', homepage_view, name='homepage'), # Use the directly imported view
-    # Include all URLs from the ventas app under the /ventas/ prefix
-    path('ventas/', include('ventas.urls')),
+    # Include all URLs from the ventas app under the /ventas/ prefix with namespace
+    path('ventas/', include('ventas.urls', namespace='ventas')),
     # Include Django auth urls
     path('accounts/', include('django.contrib.auth.urls')), # Provides login, logout, etc.
     # Removed redundant URL patterns previously defined here,
