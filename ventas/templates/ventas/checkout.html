@@ -279,7 +279,7 @@ Email para comprobante: pagos@ejemplo.com</pre>
                 </div>
                 <h3>Tu carrito está vacío</h3>
                 <p>Parece que aún no has agregado ningún servicio a tu carrito.</p>
-                <a href="{% url ventas:'homepage' %}#servicios" class="btn btn-primary mt-3">
+                <a href="{% url 'ventas:homepage' %}#servicios" class="btn btn-primary mt-3">
                     Ver Servicios
                 </a>
             </div>
@@ -346,7 +346,7 @@ Email para comprobante: pagos@ejemplo.com</pre>
         try {
             // Corrected API endpoint URL name
             const lookupUrl = `{% url 'ventas:get_client_details_by_phone' %}?telefono=${encodeURIComponent(cleanedTelefono)}`;
-            const response = await fetch(lookupUrl); 
+            const response = await fetch(lookupUrl);
             if (response.ok) {
                 const data = await response.json();
                 // Updated to check data.found directly
