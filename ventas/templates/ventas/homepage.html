@@ -537,11 +537,11 @@
             return;
         }
         horaSelect.innerHTML = '<option value="">Cargando horas disponibles...</option>';
-        horaSelect.disabled = true; // Disable while loading
+    horaSelect.disabled = true; // Disable while loading
 
-        fetch(`{% url 'get_available_hours' %}?servicio_id=${servicioId}&fecha=${fecha}`)
-            .then(response => {
-                if (!response.ok) {
+    fetch(` {% url 'ventas:get_available_hours' %} ?servicio_id=${servicioId}&fecha=${fecha}`)
+        .then(response => {
+            if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 return response.json();
