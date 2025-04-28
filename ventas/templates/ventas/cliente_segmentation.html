@@ -20,7 +20,9 @@
             font-weight: bold;
              /* Color will be inherited from .segment-card */
         }
-        /* Keep the .text-muted class for the 'Cliente(s)' text as it provides specific styling */
+        .segment-card .text-muted {
+            color: #555 !important; /* Override Bootstrap's text-muted color */
+        }
     </style>
 {% endblock %}
 
