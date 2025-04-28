@@ -46,6 +46,12 @@ urlpatterns = [
     path('admin/campaign/setup/', admin_views.campaign_setup_view, name='campaign_setup_add'), # For adding new
     path('admin/campaign/setup/<int:campaign_id>/', admin_views.campaign_setup_view, name='campaign_setup_change'), # For editing existing
     path('admin/campaign/select-for-clients/', admin_views.select_campaign_for_clients_view, name='select_campaign_for_clients'),
+    # Admin Section URLs
+    path('admin/section/crm/', admin_views.admin_section_crm_view, name='admin_section_crm'),
+    path('admin/section/ventas/', admin_views.admin_section_ventas_view, name='admin_section_ventas'),
+    path('admin/section/servicios/', admin_views.admin_section_servicios_view, name='admin_section_servicios'),
+    path('admin/section/productos/', admin_views.admin_section_productos_view, name='admin_section_productos'),
+    path('admin/section/config/', admin_views.admin_section_config_view, name='admin_section_config'),
     # Keep existing api paths using the api module
     path('api/cliente/create/', api.create_cliente, name='create_cliente'),
     path('api/cliente/update/<str:telefono>/', api.update_cliente, name='update_cliente'),
