@@ -13,12 +13,7 @@
 <style>
 /* Homepage specific styles */
 .hero-section {
-    background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
-        {% if hero_image_url %}
-            url('{{ hero_image_url }}')
-        {% else %}
-            url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80') /* Default fallback */
-        {% endif %};
+    /* background-image is now set inline */
     background-size: cover;
     background-position: center;
     color: white;
@@ -195,7 +190,7 @@
 {% block content %}
 
 <!-- Hero Section -->
-<section class="hero-section">
+<section class="hero-section" style="background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), {% if hero_image_url %}url('{{ hero_image_url }}'){% else %}url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80'){% endif %};">
     <div class="container">
             <div class="hero-content">
                 <h1>Desconecta y Renueva Tus Sentidos en Aremko Spa</h1>
@@ -539,7 +534,7 @@
         horaSelect.innerHTML = '<option value="">Cargando horas disponibles...</option>';
     horaSelect.disabled = true; // Disable while loading
 
-    fetch(` {% url 'ventas:get_available_hours' %} ?servicio_id=${servicioId}&fecha=${fecha}`)
+    fetch(`{% url 'ventas:get_available_hours' %}?servicio_id=${servicioId}&fecha=${fecha}`)
         .then(response => {
             if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -680,7 +675,7 @@
         addToCartBtn.disabled = true; // Disable button while checking time
 
         try {
-            const response = await fetch(`{% url 'check_slot_availability' %}?servicio_id=${servicioId}&fecha=${fecha}&hora=${hora}`);
+            const response = await fetch(`{% url 'ventas:check_slot_availability' %}?servicio_id=${servicioId}&fecha=${fecha}&hora=${hora}`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
