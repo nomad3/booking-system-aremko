@@ -235,7 +235,7 @@
         const formData = new FormData();
         formData.append('index', index);
 
-        const removeUrl = '{% url "remove_from_cart" %}';
+        const removeUrl = '{% url "ventas:remove_from_cart" %}';
         console.log("Sending remove request to:", removeUrl);
 
         fetch(removeUrl, {
