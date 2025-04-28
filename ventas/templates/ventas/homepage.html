@@ -752,7 +752,7 @@
             } else {
                  // If not redirected, assume success and manually redirect (or update UI)
                  console.log("Add to cart successful, redirecting to checkout...");
-                 window.location.href = "{% url 'checkout' %}";
+                 window.location.href = "{% url 'ventas:checkout' %}";
             }
         })
         .catch(error => {
