@@ -910,6 +910,32 @@
         });
         console.log("Event listeners added for category filters");
 
+        // ---- INICIO CÓDIGO NUEVO ----
+        // Establecer el filtro inicial a 'Tinas' (ID = 1)
+        const initialCategoryId = '1'; // <-- ID de la categoría 'Tinas'
+        const initialCategoryButton = document.querySelector(`.category-filter[data-category="${initialCategoryId}"]`);
+        const allButton = document.querySelector('.category-filter[data-category="all"]');
+    
+        if (initialCategoryButton && allButton) {
+            // Activar botón 'Tinas' y desactivar 'Todos' visualmente
+            allButton.classList.remove('active');
+            initialCategoryButton.classList.add('active');
+    
+            // Filtrar las tarjetas para mostrar solo la categoría inicial
+            document.querySelectorAll('.service-card').forEach(card => {
+                if (card.getAttribute('data-category') === initialCategoryId) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+            console.log(`Initial filter set to category ID: ${initialCategoryId}`);
+        } else {
+             console.warn(`Initial category button with ID ${initialCategoryId} not found. Displaying all services.`);
+             // Si no se encuentra el botón de Tinas, dejamos que se muestren todos como antes.
+        }
+        // ---- FIN CÓDIGO NUEVO ----
+
         // Listener for the service description modal
         const serviceDescriptionModalEl = document.getElementById('serviceDescriptionModal');
         if (serviceDescriptionModalEl) {
