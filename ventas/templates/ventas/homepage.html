@@ -90,6 +90,7 @@
 .service-card .card-img-top {
     width: 100%; /* Ensure it takes the full width of the card */
     aspect-ratio: 1 / 1; /* Make it square */
+    height: auto !important; /* Override fixed height to enforce aspect-ratio */
     object-fit: cover; /* Cover the area, crop if needed */
     object-position: center; /* Center the image content */
 }
