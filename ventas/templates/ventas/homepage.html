@@ -782,7 +782,8 @@
                 if (card.getAttribute('data-category') === initialCategoryId) {
                     card.style.display = 'block';
                 } else {
-                    card.style.display = 'none';
+                    // Añadir !important para forzar la ocultación
+                    card.style.setProperty('display', 'none', 'important'); 
                 }
             });
             console.log(`Initial filter set to category ID: ${initialCategoryId}`);
