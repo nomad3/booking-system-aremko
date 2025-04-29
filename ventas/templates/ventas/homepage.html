@@ -802,7 +802,8 @@
                 // Populate options dynamically based on min/max, only if not a cabin
                 cantidadPersonasSelect.innerHTML = ''; // Clear existing options
                 if (servicioTipo !== 'cabana') {
-                    for (let i = 1; i <= 5; i++) { // Assuming max 5 is a general limit, adjust if needed
+                    // Use currentServicioMax as the upper limit for the loop
+                    for (let i = 1; i <= currentServicioMax; i++) { 
                          if (i >= currentServicioMin && i <= currentServicioMax) {
                             const option = document.createElement('option');
                             option.value = i;
@@ -811,7 +812,8 @@
                          }
                     }
                     // Set default value to minimum if possible, otherwise the first valid option
-                    cantidadPersonasSelect.value = currentServicioMin <= 5 ? currentServicioMin : (cantidadPersonasSelect.options.length > 0 ? cantidadPersonasSelect.options[0].value : '1');
+                    // Adjust the default value logic slightly to handle cases where min > currentServicioMax
+                    cantidadPersonasSelect.value = currentServicioMin <= currentServicioMax ? currentServicioMin : (cantidadPersonasSelect.options.length > 0 ? cantidadPersonasSelect.options[0].value : '1');
                     cantidadPersonasSelect.disabled = false;
                     if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'block';
                     cantidadPersonasSelect.style.display = 'block';
