@@ -4,7 +4,11 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views # Import the new admin views module
+    admin_views, # Import the new admin views module
+    homepage_views, # Import homepage_views
+    service_views, # Import service_views
+    crm_views, # Import crm_views
+    webhook_views # Import webhook_views
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -86,4 +90,38 @@ urlpatterns = [
 
     # API Router (Keep this last if possible, or ensure specific paths come first)
     path('', include(router.urls)),
+
+    # Homepage
+    path('', homepage_views.homepage_view, name='homepage'),
+    # Category Detail
+    path('categoria/<int:category_id>/', service_views.category_detail, name='category_detail'),
+
+    # Availability
+    path('get_available_hours/', availability_views.get_available_hours, name='get_available_hours'),
+    path('check_slot_availability/', availability_views.check_slot_availability, name='check_slot_availability'),
+
+    # Cart & Checkout
+    path('add_to_cart/', checkout_views.add_to_cart, name='add_to_cart'),
+    path('checkout/', checkout_views.checkout_view, name='checkout'),
+    path('remove_from_cart/<int:item_index>/', checkout_views.remove_from_cart, name='remove_from_cart'),
+    path('process_payment/', checkout_views.process_payment, name='process_payment'),
+    path('payment_success/<int:venta_id>/', checkout_views.payment_success, name='payment_success'),
+    path('payment_failure/<int:venta_id>/', checkout_views.payment_failure, name='payment_failure'),
+
+    # Webhooks
+    path('webhooks/flow/', webhook_views.flow_webhook, name='flow_webhook'),
+
+    # Admin related views (Import/Export, Calendar)
+    path('admin/importar_clientes/', admin_views.importar_clientes_view, name='importar_clientes'),
+    path('admin/exportar_clientes_excel/', admin_views.exportar_clientes_excel, name='exportar_clientes_excel'),
+    path('admin/calendar/', admin_views.calendar_view, name='calendar_view'),
+    path('admin/calendar/events/', admin_views.calendar_events, name='calendar_events'),
+    
+    # PDF Generation for Reserva
+    path('reserva/<int:reserva_id>/pdf/', admin_views.generate_reserva_pdf, name='reserva_pdf'),
+
+    # CRM API Endpoints (example)
+    path('api/crm/contacts/', crm_views.ContactListCreate.as_view(), name='crm_contact_list'),
+    path('api/crm/contacts/<int:pk>/', crm_views.ContactRetrieveUpdateDestroy.as_view(), name='crm_contact_detail'),
+    # Add other CRM API endpoints as needed...
 ]
