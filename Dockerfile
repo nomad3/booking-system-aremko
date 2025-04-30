@@ -6,7 +6,7 @@ FROM python:3.9-slim
     
     # Instalar dependencias del sistema necesarias
     RUN apt-get update && \
-    apt-get install -y build-essential libpq-dev netcat-openbsd && \
+    apt-get install -y build-essential libpq-dev netcat-openbsd libgobject-2.0-0 && \
     rm -rf /var/lib/apt/lists/*
 
 # Copiar los archivos de requerimientos e instalar dependencias de Python
