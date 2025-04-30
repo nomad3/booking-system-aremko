@@ -165,8 +165,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago',
         'estado_reserva', 'servicios_y_cantidades',
         'productos_y_cantidades', 'total_servicios',
-        'total_productos', 'total', 'pagado', 'saldo_pendiente',
-        'ver_resumen_pdf'
+        'total_productos', 'total', 'pagado', 'saldo_pendiente'
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
@@ -174,8 +173,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
         'productos_y_cantidades', 'servicios_y_cantidades',
-        'total_productos', 'total_servicios',
-        'enlace_resumen_pdf'
+        'total_productos', 'total_servicios'
     )
     fieldsets = (
         (None, {
@@ -259,21 +257,6 @@ class VentaReservaAdmin(admin.ModelAdmin):
         super().save_related(request, form, formsets, change)
         instance = form.instance
         instance.calcular_total()
-
-    def _get_pdf_url(self, obj):
-        return reverse('ventas:reserva_pdf', args=[obj.id])
-
-    def ver_resumen_pdf(self, obj):
-        url = self._get_pdf_url(obj)
-        return format_html('<a href="{}" target="_blank" class="button">Ver PDF</a>', url)
-    ver_resumen_pdf.short_description = 'Resumen PDF'
-
-    def enlace_resumen_pdf(self, obj):
-        if obj.pk:
-            url = self._get_pdf_url(obj)
-            return format_html('<a href="{}" target="_blank">Abrir Resumen PDF</a>', url)
-        return "-"
-    enlace_resumen_pdf.short_description = 'Resumen PDF'
 
     class Media:
         css = {

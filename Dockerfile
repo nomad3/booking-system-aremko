@@ -6,7 +6,7 @@ FROM python:3.9-slim
     
     # Instalar dependencias del sistema necesarias
     RUN apt-get update && \
-    apt-get install -y build-essential libpq-dev netcat-openbsd libglib2.0-0 libpango-1.0-0 libcairo2 libgdk-pixbuf2.0-0 libpangoft2-1.0-0 libpangocairo-1.0-0 libfontconfig1 --no-install-recommends && \
+    apt-get install -y build-essential libpq-dev netcat-openbsd && \
     rm -rf /var/lib/apt/lists/*
 
 # Copiar los archivos de requerimientos e instalar dependencias de Python

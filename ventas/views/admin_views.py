@@ -4,20 +4,17 @@ from django import forms # Import forms module
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib import messages
-from django.http import HttpResponseRedirect, HttpResponse
+from django.http import HttpResponseRedirect
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import transaction # Import transaction
 from django.db import models # Import models for Q lookup
-from django.template.loader import render_to_string
-from weasyprint import HTML, CSS # Importar CSS también para posibles estilos adicionales
 
-from ..models import Cliente, Contact, Campaign, Company, Activity, VentaReserva # Added Activity and VentaReserva
+from ..models import Cliente, Contact, Campaign, Company, Activity # Added Activity
 from ..forms import SelectCampaignForm # Keep this if still used elsewhere, otherwise remove
 # Import CampaignForm if needed for a custom form, or rely on ModelAdmin form
 # from ..forms import CampaignForm # Example if you create a custom Campaign form
 from .. import communication_utils
-from django.contrib.admin.views.decorators import staff_member_required # Para seguridad
 
 # Helper function (can be moved to a utils file)
 def es_administrador(user):
@@ -201,31 +198,3 @@ def admin_section_productos_view(request):
 def admin_section_config_view(request):
     context = {**admin.site.each_context(request), 'title': 'Configuración'}
     return render(request, 'admin/section_config.html', context)
-
-@staff_member_required # Asegura que solo personal logueado acceda
-def generate_reserva_pdf(request, reserva_id):
-    """Genera un PDF resumen de una VentaReserva específica."""
-    # Optimizar consulta pre-cargando datos relacionados
-    reserva = get_object_or_404(
-        VentaReserva.objects.prefetch_related(
-            'reservaservicios__servicio', 
-            'reservaservicios__proveedor_asignado',
-            'cliente' # Cargar cliente
-        ), 
-        id=reserva_id
-    )
-    
-    # Renderizar la plantilla HTML a una cadena
-    html_string = render_to_string('ventas/reserva_summary_pdf.html', {'reserva': reserva})
-    
-    # Generar PDF con WeasyPrint
-    # Pasar la URL base es importante para que WeasyPrint encuentre archivos estáticos (CSS, imágenes) si los usas en la plantilla
-    base_url = request.build_absolute_uri('/') 
-    pdf_file = HTML(string=html_string, base_url=base_url).write_pdf()
-    
-    # Crear respuesta HTTP con el PDF
-    response = HttpResponse(pdf_file, content_type='application/pdf')
-    # Mostrar inline en el navegador, pero permite guardar/descargar
-    # El nombre del archivo incluirá el ID de la reserva
-    response['Content-Disposition'] = f'inline; filename="reserva_{reserva.id}.pdf"' 
-    return response
