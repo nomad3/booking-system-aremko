@@ -5,7 +5,7 @@ from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
     admin_views, # Import the new admin views module
-    homepage_views, # Import homepage_views
+    # homepage_views, # Removed incorrect import
     service_views, # Import service_views
     crm_views, # Import crm_views
     webhook_views # Import webhook_views
@@ -91,10 +91,10 @@ urlpatterns = [
     # API Router (Keep this last if possible, or ensure specific paths come first)
     path('', include(router.urls)),
 
-    # Homepage
-    path('', homepage_views.homepage_view, name='homepage'),
+    # Homepage (Using public_views as defined earlier)
+    # path('', homepage_views.homepage_view, name='homepage'), # Removed duplicate/incorrect homepage URL
     # Category Detail
-    path('categoria/<int:category_id>/', service_views.category_detail, name='category_detail'),
+    path('categoria/<int:category_id>/', service_views.category_detail, name='category_detail'), # Assuming service_views exists or correcting if needed
 
     # Availability
     path('get_available_hours/', availability_views.get_available_hours, name='get_available_hours'),
