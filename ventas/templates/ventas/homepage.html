@@ -766,6 +766,21 @@
     document.addEventListener('DOMContentLoaded', function() {
         console.log("Homepage DOMContentLoaded");
 
+        // ---- INICIO CÓDIGO DE DIAGNÓSTICO ----
+        console.log("Attempting diagnostic hide...");
+        try {
+            const firstCard = document.querySelector('.service-card');
+            if (firstCard) {
+                firstCard.style.setProperty('display', 'none', 'important');
+                console.log("Diagnostic hide applied to first card.");
+            } else {
+                console.log("No service cards found for diagnostic hide.");
+            }
+        } catch (e) {
+            console.error("Error during diagnostic hide:", e);
+        }
+        // ---- FIN CÓDIGO DE DIAGNÓSTICO ----
+
         // Add listener for booking modal buttons
         document.querySelectorAll('.js-open-booking-modal').forEach(button => {
             button.addEventListener('click', function() {
