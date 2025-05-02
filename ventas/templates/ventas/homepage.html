@@ -12,6 +12,58 @@
 {% block extra_style %}
 <style>
 /* Homepage specific styles */
+
+/* Category Card Styles */
+.category-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    margin: 5px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: #f8f9fa; /* Light background */
+    color: var(--dark-gray);
+    width: 150px; /* Fixed width */
+    height: 150px; /* Fixed height to make it square */
+    text-decoration: none; /* Remove underline if used as link */
+}
+
+.category-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    background-color: #e9ecef; /* Slightly darker on hover */
+}
+
+.category-card.active {
+    background-color: var(--primary-color); /* Active color */
+    color: white; /* White text for active */
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.category-card.active .category-icon {
+    color: white; /* White icon for active */
+}
+
+
+.category-icon {
+    font-size: 2.5rem; /* Larger icon */
+    margin-bottom: 15px;
+    color: var(--primary-color); /* Icon color matches primary */
+    transition: color 0.3s ease;
+}
+
+.category-name {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+
 .hero-section {
     /* background-image is now set inline */
     background-size: cover;
@@ -184,7 +236,6 @@
     cursor: pointer;
     display: inline-block; /* Or block if needed */
 }
-
 </style>
 {% endblock %}
 
@@ -207,23 +258,62 @@
 <section class="container mb-5" id="servicios">
     <h2 class="section-title mb-4">Nuestras Experiencias</h2>
     
-        <!-- Category Filter -->
+        <!-- Category Filter Cards -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="d-flex justify-content-center flex-wrap">
-                    <button class="btn btn-outline-secondary m-1 category-filter active" data-category="all">
-                        Todos
-                    </button>
+                    {# Removed 'Todos' button, default will be 'Tinas' #}
+                    {# <div class="category-card category-filter active" data-category="all">
+                        <div class="category-icon"><i class="fas fa-th-large"></i></div>
+                        <div class="category-name">Todos</div>
+                    </div> #}
                     {% for categoria in categorias %}
-                        <button class="btn btn-outline-secondary m-1 category-filter" data-category="{{ categoria.id }}">
-                            {{ categoria.nombre }}
-                        </button>
+                        {% with categoria.nombre|lower as lower_nombre %}
+                            {% comment %} Assign icons based on category name {% endcomment %}
+                            {% if "tina" in lower_nombre %}
+                                {% with "fas fa-hot-tub" as icon_class %}
+                                <div class="category-card category-filter" data-category="{{ categoria.id }}" data-category-name="{{ categoria.nombre }}">
+                                    <div class="category-icon"><i class="{{ icon_class }}"></i></div>
+                                    <div class="category-name">{{ categoria.nombre }}</div>
+                                </div>
+                                {% endwith %}
+                            {% elif "masaje" in lower_nombre %}
+                                {% with "fas fa-hand-sparkles" as icon_class %}
+                                <div class="category-card category-filter" data-category="{{ categoria.id }}" data-category-name="{{ categoria.nombre }}">
+                                    <div class="category-icon"><i class="{{ icon_class }}"></i></div>
+                                    <div class="category-name">{{ categoria.nombre }}</div>
+                                </div>
+                                {% endwith %}
+                            {% elif "alojamiento" in lower_nombre or "cabaña" in lower_nombre %}
+                                {% with "fas fa-bed" as icon_class %}
+                                <div class="category-card category-filter" data-category="{{ categoria.id }}" data-category-name="{{ categoria.nombre }}">
+                                    <div class="category-icon"><i class="{{ icon_class }}"></i></div>
+                                    <div class="category-name">{{ categoria.nombre }}</div>
+                                </div>
+                                {% endwith %}
+                             {% elif "promo" in lower_nombre %}
+                                {% with "fas fa-tags" as icon_class %}
+                                <div class="category-card category-filter" data-category="{{ categoria.id }}" data-category-name="{{ categoria.nombre }}">
+                                    <div class="category-icon"><i class="{{ icon_class }}"></i></div>
+                                    <div class="category-name">{{ categoria.nombre }}</div>
+                                </div>
+                                {% endwith %}
+                            {% else %}
+                                {% comment %} Default icon {% endcomment %}
+                                {% with "fas fa-spa" as icon_class %}
+                                <div class="category-card category-filter" data-category="{{ categoria.id }}" data-category-name="{{ categoria.nombre }}">
+                                    <div class="category-icon"><i class="{{ icon_class }}"></i></div>
+                                    <div class="category-name">{{ categoria.nombre }}</div>
+                                </div>
+                                {% endwith %}
+                            {% endif %}
+                        {% endwith %}
                     {% endfor %}
                 </div>
             </div>
         </div>
-        
-        <div class="row">
+
+        <div class="row service-list"> {# Added class for easier selection #}
             {% for servicio in servicios %}
                 <div class="col-lg-4 col-md-6 service-card" data-category="{{ servicio.categoria.id }}">
                     <div class="card h-100">
@@ -890,25 +980,67 @@
              console.error("Add to cart button element not found");
         }
 
-        // Listener for category filters
-        document.querySelectorAll('.category-filter').forEach(button => {
-            button.addEventListener('click', function() {
-                const category = this.getAttribute('data-category');
-                console.log("Category filter clicked:", category);
+        // Function to filter services based on category ID
+        function filterServices(targetCategory) {
+            console.log("Filtering services for category:", targetCategory);
+            document.querySelectorAll('.service-card').forEach(card => {
+                const cardCategory = card.getAttribute('data-category');
+                // Show card if targetCategory is 'all' OR card's category matches targetCategory
+                if (targetCategory === 'all' || cardCategory === targetCategory) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
 
-                document.querySelectorAll('.category-filter').forEach(btn => btn.classList.remove('active'));
+        // Listener for category filter CARDS
+        document.querySelectorAll('.category-filter').forEach(cardElement => {
+            cardElement.addEventListener('click', function() {
+                const categoryId = this.getAttribute('data-category');
+                console.log("Category filter card clicked:", categoryId);
+
+                // Update active state
+                document.querySelectorAll('.category-filter').forEach(card => card.classList.remove('active'));
                 this.classList.add('active');
 
-                document.querySelectorAll('.service-card').forEach(card => {
-                    if (category === 'all' || card.getAttribute('data-category') === category) {
-                        card.style.display = 'block';
-                    } else {
-                        card.style.display = 'none';
-                    }
-                });
+                // Filter the services
+                filterServices(categoryId);
             });
         });
-        console.log("Event listeners added for category filters");
+        console.log("Event listeners added for category filter cards");
+
+        // --- Default Filter Logic ---
+        // Find the 'Tinas' category card and its ID
+        let defaultCategoryId = null;
+        const categoryCards = document.querySelectorAll('.category-filter');
+        categoryCards.forEach(card => {
+            // Use case-insensitive check for "Tinas" in the data-category-name attribute
+            const categoryName = card.getAttribute('data-category-name');
+            if (categoryName && categoryName.toLowerCase().includes('tinas')) {
+                defaultCategoryId = card.getAttribute('data-category');
+                card.classList.add('active'); // Set 'Tinas' card as active visually
+                console.log("Default category 'Tinas' found with ID:", defaultCategoryId);
+            }
+        });
+
+        // If 'Tinas' category was found, filter services initially
+        if (defaultCategoryId) {
+            filterServices(defaultCategoryId);
+            console.log("Initial filter applied for 'Tinas'");
+        } else {
+            // Fallback: If 'Tinas' not found, show all (or handle as needed)
+            console.warn("'Tinas' category not found for default filter. Showing all services.");
+            // Optionally activate the first category card if 'Tinas' isn't found
+            // if (categoryCards.length > 0) {
+            //     categoryCards[0].classList.add('active');
+            //     filterServices(categoryCards[0].getAttribute('data-category'));
+            // } else {
+                 filterServices('all'); // Show all if no categories exist or Tinas not found
+            // }
+        }
+        // --- End Default Filter Logic ---
+
 
         // Listener for the service description modal
         const serviceDescriptionModalEl = document.getElementById('serviceDescriptionModal');
