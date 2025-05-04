@@ -479,6 +479,15 @@ Email para comprobante: pagos@ejemplo.com</pre>
             });
             const data = await handleApiResponse(response); // Handles ok check and JSON parsing
             console.log("Bank Transfer Checkout Success:", data);
+
+            // <<< INICIO CÓDIGO NUEVO >>>
+            // Ocultar secciones del checkout antes de mostrar el modal
+            const checkoutRows = document.querySelectorAll('.checkout-section .container > .row');
+            checkoutRows.forEach(row => {
+                row.style.display = 'none';
+            });
+            // <<< FIN CÓDIGO NUEVO >>>
+
             // Show success modal instead of redirecting
             displaySuccessModal(data, 'transferencia'); 
             // Hide processing overlay after showing modal
