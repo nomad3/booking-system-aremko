@@ -437,6 +437,7 @@ Email para comprobante: pagos@ejemplo.com</pre>
              detailButtonPlaceholder.innerHTML = '';
         }
 
+        console.log("About to show success modal. Data received:", data); 
 
         if (successModalBody) {
             const existingBankInfo = successModalBody.querySelector('.bank-transfer-instructions');
@@ -637,40 +638,3 @@ Email para comprobante: pagos@ejemplo.com</pre>
 </script>
 {% endblock %}
 </final_file_content>
-
-IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including any auto-formatting (e.g., if you used single quotes but the formatter converted them to double quotes). Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.
-
-<environment_details>
-# VSCode Visible Files
-ventas/templates/ventas/checkout.html
-
-# VSCode Open Tabs
-ventas/templates/ventas/homepage.html
-ventas/admin.py
-ventas/views/flow_views.py
-ventas/views/public_views.py
-ventas/views/availability_views.py
-ventas/views/reporting_views.py
-ventas/views/crud_views.py
-ventas/views/import_export_views.py
-ventas/views.py
-aremko_project/urls.py
-ventas/views/__init__.py
-ventas/views/misc_views.py
-ventas/signals.py
-ventas/tests.py
-ventas/utils.py
-aremko_project/settings.py
-populate_fake_data.py
-ventas/views/checkout_views.py
-ventas/views/api_views.py
-ventas/urls.py
-ventas/templates/ventas/base_public.html
-ventas/templates/ventas/checkout.html
-
-# Current Time
-4/6/2025, 8:16:26 PM (America/Santiago, UTC-4:00)
-
-# Current Mode
-ACT MODE
-</environment_details>
