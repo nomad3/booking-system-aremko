@@ -262,6 +262,9 @@ class VentaReservaAdmin(admin.ModelAdmin):
         css = {
             'all': ('admin/css/custom.css',)
         }
+        js = (
+            'admin/js/reserva_servicio_inline.js',
+        )
 
 class ProveedorAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'direccion', 'telefono', 'email')
