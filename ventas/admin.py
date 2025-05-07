@@ -165,7 +165,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago',
         'estado_reserva', 'servicios_y_cantidades',
         'productos_y_cantidades', 'total_servicios',
-        'total_productos', 'total', 'pagado', 'saldo_pendiente'
+        'total_productos', 'total', 'pagado', 'saldo_pendiente', 'pdf_link'
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
@@ -257,6 +257,24 @@ class VentaReservaAdmin(admin.ModelAdmin):
         super().save_related(request, form, formsets, change)
         instance = form.instance
         instance.calcular_total()
+
+    def get_urls(self):
+        urls = super().get_urls()
+        app_label = self.model._meta.app_label
+        model_name = self.model._meta.model_name
+        custom_urls = [
+            path('<int:reserva_id>/pdf/',
+                 self.admin_site.admin_view(admin_views.generate_reserva_pdf),
+                 name=f'{app_label}_{model_name}_pdf'),
+        ]
+        return custom_urls + urls
+
+    def pdf_link(self, obj):
+        opts = obj._meta
+        url = reverse(f'admin:{opts.app_label}_{opts.model_name}_pdf', args=[obj.pk])
+        return format_html('<a class="button" href="{}" target="_blank">Ver PDF</a>', url)
+    pdf_link.short_description = 'PDF'
+    pdf_link.allow_tags = True
 
     class Media:
         css = {

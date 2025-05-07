@@ -4,13 +4,15 @@ from django import forms # Import forms module
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib import messages
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponse
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import transaction # Import transaction
 from django.db import models # Import models for Q lookup
+from django.template.loader import render_to_string
+from weasyprint import HTML
 
-from ..models import Cliente, Contact, Campaign, Company, Activity # Added Activity
+from ..models import Cliente, Contact, Campaign, Company, Activity, VentaReserva # Added Activity and VentaReserva
 from ..forms import SelectCampaignForm # Keep this if still used elsewhere, otherwise remove
 # Import CampaignForm if needed for a custom form, or rely on ModelAdmin form
 # from ..forms import CampaignForm # Example if you create a custom Campaign form
@@ -198,3 +200,14 @@ def admin_section_productos_view(request):
 def admin_section_config_view(request):
     context = {**admin.site.each_context(request), 'title': 'Configuración'}
     return render(request, 'admin/section_config.html', context)
+
+@login_required
+@user_passes_test(es_administrador)
+def generate_reserva_pdf(request, reserva_id):
+    reserva = get_object_or_404(VentaReserva, pk=reserva_id)
+    rendered = render_to_string('ventas/reserva_summary_pdf.html', {'reserva': reserva})
+    html = HTML(string=rendered, base_url=request.build_absolute_uri())
+    pdf = html.write_pdf()
+    response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="reserva_{reserva_id}.pdf"'
+    return response
