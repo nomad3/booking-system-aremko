@@ -32,25 +32,25 @@
                     <a href="{% url 'admin:ventas_ventareserva_add' %}" class="btn btn-modern btn-primary-modern w-100">
                         <i class="fas fa-plus-circle"></i>Agregar Venta/Reserva
                     </a>
-                    <a href="{% url 'venta_reserva_list' %}" class="btn btn-modern btn-primary-modern w-100">
+                    <a href="{% url 'ventas:venta_reserva_list' %}" class="btn btn-modern btn-primary-modern w-100">
                         <i class="fas fa-list"></i>Ver Ventas/Reservas
                     </a>
                     <a href="{% url 'admin:ventas_ventareserva_changelist' %}" class="btn btn-modern btn-secondary-modern w-100">
                         <i class="fas fa-edit"></i>Modificar Ventas/Reservas
                     </a>
-                    <a href="{% url 'caja_diaria' %}" class="btn btn-modern btn-secondary-modern w-100">
+                    <a href="{% url 'ventas:caja_diaria' %}" class="btn btn-modern btn-secondary-modern w-100">
                         <i class="fas fa-cash-register"></i>Caja Diaria Admin
                     </a>
-                    <a href="{% url 'caja_diaria_recepcionistas' %}" class="btn btn-modern btn-secondary-modern w-100">
+                    <a href="{% url 'ventas:caja_diaria_recepcionistas' %}" class="btn btn-modern btn-secondary-modern w-100">
                         <i class="fas fa-user-tie"></i>Caja Diaria Recepción
                     </a>
-                    <a href="{% url 'auditoria_movimientos' %}" class="btn btn-modern btn-secondary-modern w-100">
+                    <a href="{% url 'ventas:auditoria_movimientos' %}" class="btn btn-modern btn-secondary-modern w-100">
                         <i class="fas fa-history"></i>Auditoría de Movimientos
                     </a>
-                    <a href="{% url 'servicios_vendidos' %}" class="btn btn-modern btn-secondary-modern w-100">
+                    <a href="{% url 'ventas:servicios_vendidos' %}" class="btn btn-modern btn-secondary-modern w-100">
                         <i class="fas fa-concierge-bell"></i>Servicios Vendidos
                     </a>
-                    <a href="{% url 'productos_vendidos' %}" class="btn btn-modern btn-info-modern w-100">
+                    <a href="{% url 'ventas:productos_vendidos' %}" class="btn btn-modern btn-info-modern w-100">
                         <i class="fas fa-box"></i>Productos Vendidos
                     </a>
                 </div>
@@ -70,13 +70,13 @@
                     <a href="{% url 'admin:ventas_cliente_changelist' %}" class="btn btn-modern btn-secondary-modern w-100">
                         <i class="fas fa-user-edit"></i>Ver y Modificar Clientes
                     </a>
-                    <a href="{% url 'lista_clientes' %}" class="btn btn-modern btn-info-modern w-100">
+                    <a href="{% url 'ventas:lista_clientes' %}" class="btn btn-modern btn-info-modern w-100">
                         <i class="fas fa-address-book"></i>Lista de Clientes
                     </a>
-                    <a href="{% url 'exportar_clientes_excel' %}" class="btn btn-modern btn-success-modern w-100">
+                    <a href="{% url 'ventas:exportar_clientes_excel' %}" class="btn btn-modern btn-success-modern w-100">
                         <i class="fas fa-file-export"></i>Exportar Clientes
                     </a>
-                    <a href="{% url 'importar_clientes_excel' %}" class="btn btn-modern btn-warning-modern w-100">
+                    <a href="{% url 'ventas:importar_clientes_excel' %}" class="btn btn-modern btn-warning-modern w-100">
                         <i class="fas fa-file-import"></i>Importar Clientes
                     </a>
                 </div>
@@ -136,10 +136,10 @@
                     <a href="{% url 'admin:ventas_compra_changelist' %}" class="btn btn-modern btn-secondary-modern w-100">
                         <i class="fas fa-edit"></i>Ver y Modificar Compras
                     </a>
-                    <a href="{% url 'compra_list' %}" class="btn btn-modern btn-secondary-modern w-100">
+                    <a href="{% url 'ventas:compra_list' %}" class="btn btn-modern btn-secondary-modern w-100">
                         <i class="fas fa-list"></i>Lista de Compras
                     </a>
-                    <a href="{% url 'detalle_compra_list' %}" class="btn btn-modern btn-secondary-modern w-100">
+                    <a href="{% url 'ventas:detalle_compra_list' %}" class="btn btn-modern btn-secondary-modern w-100">
                         <i class="fas fa-receipt"></i>Lista de Detalle Compras
                     </a>
                 </div>
