@@ -53,6 +53,11 @@ jobs:
       - name: Update Helm dependencies
         run: helm dependency update ./charts
 
+      - name: Create gcp-creds secret for the application
+        run: |
+          echo "${{ secrets.GCP_CREDENTIALS_JSON }}" > gcp-credentials.json
+          kubectl create secret generic gcp-creds --from-file=gcp-credentials.json --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Deploy with Helm
         run: |
           helm upgrade --install aremko-${{ steps.branch-name.outputs.current_branch }} ./charts \
@@ -64,6 +69,7 @@ jobs:
             --set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
             --set secret.data.DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}" \
             --set secret.data.DATABASE_URL="postgresql://aremko_db_dev_user:${{ secrets.DB_PASSWORD }}@aremko-${{ steps.branch-name.outputs.current_branch }}-postgresql:5432/aremko_db_dev" \
+            --set postgresql.auth.password="${{ secrets.DB_PASSWORD }}" \
             --namespace default \
             --create-namespace \
             --atomic \
