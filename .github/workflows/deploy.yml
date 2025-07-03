@@ -53,6 +53,9 @@ jobs:
       - name: Update Helm dependencies
         run: helm dependency update ./charts
 
+      - name: Create namespace
+        run: kubectl create namespace reservas-${{ steps.branch-name.outputs.current_branch }} --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Create gcp-creds secret for the application
         run: |
           echo "${{ secrets.GCP_CREDENTIALS_JSON }}" > gcp-credentials.json
