@@ -63,17 +63,21 @@ jobs:
 
       - name: Deploy with Helm
         run: |
-          helm upgrade --install aremko-${{ steps.branch-name.outputs.current_branch }} ./charts \
-            --set image.repository="gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME" \
-            --set image.tag="${{ steps.branch-name.outputs.current_branch }}" \
+          helm_args="--install aremko-${{ steps.branch-name.outputs.current_branch }} ./charts \
+            --set image.repository=\"gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME\" \
+            --set image.tag=\"${{ steps.branch-name.outputs.current_branch }}\" \
             --set ingress.enabled=true \
-            --set ingress.hosts[0].host="booking-dev.aremko.cl" \
-            --set ingress.hosts[0].paths[0].path="/" \
-            --set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
-            --set secret.data.DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}" \
-            --set secret.data.DATABASE_URL="postgresql://aremko_db_dev_user:${{ secrets.DB_PASSWORD }}@aremko-${{ steps.branch-name.outputs.current_branch }}-postgresql:5432/aremko_db_dev" \
-            --set postgresql.auth.password="${{ secrets.DB_PASSWORD }}" \
+            --set ingress.hosts[0].host=\"booking-dev.aremko.cl\" \
+            --set ingress.hosts[0].paths[0].path=\"/\" \
+            --set ingress.hosts[0].paths[0].pathType=\"ImplementationSpecific\" \
+            --set secret.data.DATABASE_URL=\"postgresql://aremko_db_dev_user:${{ secrets.DB_PASSWORD }}@aremko-${{ steps.branch-name.outputs.current_branch }}-postgresql:5432/aremko_db_dev\" \
+            --set postgresql.auth.password=\"${{ secrets.DB_PASSWORD }}\" \
             --namespace reservas-${{ steps.branch-name.outputs.current_branch }} \
-            --create-namespace \
             --atomic \
-            --timeout 30m 
+            --timeout 30m"
+
+          if [ -n "${{ secrets.DJANGO_SECRET_KEY }}" ]; then
+            helm_args="$helm_args --set secret.data.DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}"
+          fi
+
+          helm upgrade $helm_args 
