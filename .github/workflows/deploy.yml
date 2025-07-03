@@ -59,7 +59,7 @@ jobs:
             --set image.repository="gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME" \
             --set image.tag="${{ steps.branch-name.outputs.current_branch }}" \
             --set ingress.enabled=true \
-            --set ingress.hosts[0].host="aremko-${{ steps.branch-name.outputs.current_branch }}.your-domain.com" \
+            --set ingress.hosts[0].host="booking-dev.aremko.cl" \
             --set ingress.hosts[0].paths[0].path="/" \
             --set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
             --set secret.data.DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}" \
