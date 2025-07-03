@@ -64,7 +64,6 @@ jobs:
             --set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
             --set secret.data.DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}" \
             --set secret.data.DATABASE_URL="postgresql://aremko_db_dev_user:${{ secrets.DB_PASSWORD }}@aremko-${{ steps.branch-name.outputs.current_branch }}-postgresql:5432/aremko_db_dev" \
-            --set postgresql.auth.password="${{ secrets.DB_PASSWORD }}" \
             --namespace default \
             --create-namespace \
             --atomic \
