@@ -8,8 +8,8 @@ on:
 
 env:
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  GKE_CLUSTER: aremko-cluster    # TODO: update to your cluster name
-  GKE_ZONE: us-central1-c  # TODO: update to your cluster zone
+  GKE_CLUSTER: devagent-gke    # TODO: update to your cluster name
+  GKE_REGION: southamerica-west1  # TODO: update to your cluster region
   IMAGE_NAME: aremko-booking-system
 
 jobs:
@@ -45,7 +45,7 @@ jobs:
         run: docker push "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:${{ steps.branch-name.outputs.current_branch }}"
 
       - name: Get GKE credentials
-        run: gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE
+        run: gcloud container clusters get-credentials $GKE_CLUSTER --region $GKE_REGION
 
       - name: Update Helm dependencies
         run: helm dependency update ./charts
