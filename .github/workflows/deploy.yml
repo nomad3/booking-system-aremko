@@ -1,0 +1,65 @@
+name: Build and Deploy to GKE
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GKE_CLUSTER: aremko-cluster    # TODO: update to your cluster name
+  GKE_ZONE: us-central1-c  # TODO: update to your cluster zone
+  IMAGE_NAME: aremko-booking-system
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker
+
+      - name: Get branch name
+        id: branch-name
+        uses: tj-actions/branch-names@v7
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --tag "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:${{ steps.branch-name.outputs.current_branch }}" \
+            --build-arg "TAG=${{ steps.branch-name.outputs.current_branch }}" \
+            .
+
+      - name: Push Docker image
+        run: docker push "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:${{ steps.branch-name.outputs.current_branch }}"
+
+      - name: Get GKE credentials
+        run: gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE
+
+      - name: Update Helm dependencies
+        run: helm dependency update ./charts
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install aremko-${{ steps.branch-name.outputs.current_branch }} ./charts \
+            --set image.repository="gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME" \
+            --set image.tag="${{ steps.branch-name.outputs.current_branch }}" \
+            --set ingress.enabled=true \
+            --set ingress.hosts[0].host="aremko-${{ steps.branch-name.outputs.current_branch }}.your-domain.com" \
+            --set secret.data.DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}" \
+            --set postgresql.auth.password="${{ secrets.DB_PASSWORD }}" \
+            --namespace default \
+            --create-namespace \
+            --atomic \
+            --timeout 15m 

@@ -256,3 +256,5 @@ Las migraciones de Django son esenciales para mantener la estructura de la base 
 - [Documentación de Render.com](https://render.com/docs)
 - [WhiteNoise Documentation](http://whitenoise.evans.io/en/stable/)
 - [Gunicorn Documentation](https://docs.gunicorn.org/en/stable/)
+
+now you can create the helm chart with the provided instructions.

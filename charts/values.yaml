@@ -1,0 +1,126 @@
+# Default values for aremko-booking-system.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: gcr.io/aremko-e51ae/aremko-booking-system
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as needed, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Environment specific variables are now managed via separate values files 
+# or --set flags, which is a more standard Helm practice.
+
+# Secret and ConfigMap values
+configMap:
+  data:
+    DJANGO_SETTINGS_MODULE: "aremko_project.settings"
+    DEBUG: "True"
+    DJANGO_SUPERUSER_EMAIL: "saguilera1608@gmail.com"
+    DJANGO_SUPERUSER_USERNAME: "admin"
+    ENVIRONMENT: "development"
+    GOOGLE_APPLICATION_CREDENTIALS: "/etc/secrets/gcp-credentials.json"
+    GS_BUCKET_NAME: "aremkoweb"
+    GS_PROJECT_ID: "aremko-e51ae"
+    PORT: "8000"
+
+secret:
+  data:
+    # It's strongly recommended to manage these secrets outside of version control,
+    # for example using GitHub secrets and passing them with --set during deployment.
+    DJANGO_SECRET_KEY: "tu_secreto_de_django"
+    DJANGO_SUPERUSER_PASSWORD: "@Sebas.2k24!!"
+    OPENAI_API_KEY: "."
+    DATABASE_URL: "" # This will be overridden if postgresql.enabled is true
+
+# Configuration for the Google Application Credentials secret
+googleApplicationCredentials:
+  # The name of the Kubernetes secret containing the gcp-credentials.json file
+  secretName: "gcp-creds"
+  # The key within the secret that holds the JSON content
+  secretKey: "gcp-credentials.json"
+
+# PostgreSQL sub-chart configuration
+postgresql:
+  enabled: true
+  auth:
+    username: aremko_db_dev_user
+    password: "fH5MkxRvwRAY78l6Eq4lC7a3zMFL2hto"
+    database: aremko_db_dev
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi 
