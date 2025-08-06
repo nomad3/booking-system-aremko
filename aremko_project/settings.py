@@ -18,7 +18,12 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
 # ALLOWED_HOSTS configurado a partir de variable de entorno
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS_ENV = os.getenv('ALLOWED_HOSTS', '')
+if ALLOWED_HOSTS_ENV:
+    ALLOWED_HOSTS = ALLOWED_HOSTS_ENV.split(',')
+else:
+    # Fallback para producción en Render
+    ALLOWED_HOSTS = ['aremko-booking-system.onrender.com', '.onrender.com', 'localhost', '127.0.0.1']
 
 # Aplicaciones instaladas
 INSTALLED_APPS = [
