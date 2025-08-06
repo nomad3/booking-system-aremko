@@ -105,7 +105,7 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files configuration (Local vs GCS)
 # Check if GOOGLE_APPLICATION_CREDENTIALS is set (indicating GCS usage)
-if os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
+if os.getenv('GOOGLE_APPLICATION_CREDENTIALS') and os.path.exists(os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '')):
     DEFAULT_FILE_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
     GS_BUCKET_NAME = os.getenv('GS_BUCKET_NAME', 'aremkoweb') # Use env var or default
     GS_PROJECT_ID = os.getenv('GS_PROJECT_ID', 'aremko-e51ae') # Use env var or default
