@@ -308,7 +308,7 @@ def test_communication_system():
         from .redvoiss_service import redvoiss_service
         
         logger.info("1. Probando conexión con Redvoiss...")
-        connection_test = redvoiss_service.test_connection()
+        connection_test = redvoiss_service.greet()
         
         if connection_test['success']:
             logger.info(f"✅ Conexión exitosa: {connection_test['message']}")

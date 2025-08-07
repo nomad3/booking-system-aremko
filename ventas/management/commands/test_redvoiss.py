@@ -87,7 +87,7 @@ class Command(BaseCommand):
         self.stdout.write("2️⃣ Probando conexión con Redvoiss...")
         
         try:
-            result = redvoiss_service.test_connection()
+            result = redvoiss_service.greet()
             
             if result['success']:
                 self.stdout.write(

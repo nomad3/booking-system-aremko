@@ -32,7 +32,7 @@ class RedvoissService:
             logger.error("Credenciales de Redvoiss no configuradas en settings")
             raise ValueError("Credenciales de Redvoiss no configuradas")
     
-    def test_connection(self):
+    def greet(self):
         """
         Prueba la conexión con la API de Redvoiss usando el endpoint greet
         Returns: dict con status y mensaje
