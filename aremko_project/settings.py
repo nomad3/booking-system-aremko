@@ -1,6 +1,9 @@
 import os
+import logging
 from pathlib import Path
 import dj_database_url
+
+logger = logging.getLogger(__name__)
 
 # Ruta base del proyecto
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -167,7 +170,12 @@ EMAIL_MONTHLY_LIMIT_PER_CLIENT = int(os.getenv('EMAIL_MONTHLY_LIMIT_PER_CLIENT',
 # Configuración mejorada de Email
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'comunicaciones@aremko.cl')
 VENTAS_FROM_EMAIL = os.getenv('VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# Email Backend - usar console para desarrollo si no hay credenciales
+if not os.getenv('EMAIL_HOST_USER') or not os.getenv('EMAIL_HOST_PASSWORD'):
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Muestra emails en logs
+    logger.warning("⚠️ EMAIL_HOST_USER/PASSWORD no configurados - usando console backend")
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
