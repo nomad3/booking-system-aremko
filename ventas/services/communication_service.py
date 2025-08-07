@@ -48,8 +48,12 @@ class CommunicationService:
             
             if reserva_servicio:
                 servicio_nombre = reserva_servicio.servicio.nombre
+                
+                # fecha_agendamiento es datetime.date
                 fecha_str = reserva_servicio.fecha_agendamiento.strftime('%d/%m/%Y')
-                hora_str = reserva_servicio.hora_inicio.strftime('%H:%M')
+                
+                # hora_inicio es string (ej: "14:30")
+                hora_str = str(reserva_servicio.hora_inicio)
             else:
                 servicio_nombre = 'tu servicio'
                 fecha_str = booking.fecha_reserva.strftime('%d/%m/%Y')
@@ -117,13 +121,23 @@ class CommunicationService:
             reserva_servicio = ReservaServicio.objects.filter(venta_reserva=booking).first()
             
             if reserva_servicio:
-                # Verificar si es momento de enviar (X horas antes)
-                booking_datetime = timezone.make_aware(
-                    datetime.combine(reserva_servicio.fecha_agendamiento, reserva_servicio.hora_inicio)
-                )
                 servicio_nombre = reserva_servicio.servicio.nombre
+                
+                # fecha_agendamiento es datetime.date
                 fecha_str = reserva_servicio.fecha_agendamiento.strftime('%d/%m/%Y')
-                hora_str = reserva_servicio.hora_inicio.strftime('%H:%M')
+                fecha_date = reserva_servicio.fecha_agendamiento
+                
+                # hora_inicio es string (ej: "14:30"), convertir a time
+                hora_str = str(reserva_servicio.hora_inicio)
+                try:
+                    hora_time = datetime.strptime(str(reserva_servicio.hora_inicio), '%H:%M').time()
+                except:
+                    hora_time = datetime.strptime(str(reserva_servicio.hora_inicio), '%H:%M:%S').time()
+                
+                # Crear datetime para comparación
+                booking_datetime = timezone.make_aware(
+                    datetime.combine(fecha_date, hora_time)
+                )
             else:
                 # Fallback a fecha de venta si no hay servicio específico
                 booking_datetime = booking.fecha_reserva
@@ -326,11 +340,21 @@ class CommunicationService:
             reserva_servicio = ReservaServicio.objects.filter(venta_reserva=booking).first()
             
             if reserva_servicio:
-                # Verificar si ya pasó el tiempo necesario después del servicio
-                booking_datetime = timezone.make_aware(
-                    datetime.combine(reserva_servicio.fecha_agendamiento, reserva_servicio.hora_inicio)
-                )
                 servicio_nombre = reserva_servicio.servicio.nombre
+                
+                # fecha_agendamiento es datetime.date
+                fecha_date = reserva_servicio.fecha_agendamiento
+                
+                # hora_inicio es string (ej: "14:30"), convertir a time
+                try:
+                    hora_time = datetime.strptime(str(reserva_servicio.hora_inicio), '%H:%M').time()
+                except:
+                    hora_time = datetime.strptime(str(reserva_servicio.hora_inicio), '%H:%M:%S').time()
+                
+                # Crear datetime para comparación
+                booking_datetime = timezone.make_aware(
+                    datetime.combine(fecha_date, hora_time)
+                )
             else:
                 # Fallback a fecha de venta si no hay servicio específico
                 booking_datetime = booking.fecha_reserva
