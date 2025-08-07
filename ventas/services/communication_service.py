@@ -149,7 +149,7 @@ class CommunicationService:
             # Preparar contexto para el template
             context = {
                 'nombre': cliente.nombre,
-                'apellido': cliente.apellido,
+                'apellido': getattr(cliente, 'apellido', ''),  # Apellido opcional
                 'telefono': cliente.telefono,
                 'servicio': servicio_nombre,
                 'fecha': fecha_str,
