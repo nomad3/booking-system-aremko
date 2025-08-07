@@ -42,6 +42,19 @@ class CommunicationService:
             if not self._can_send_communication(cliente, 'SMS', 'BOOKING_CONFIRMATION'):
                 return {'success': False, 'reason': 'blocked_by_limits_or_preferences'}
             
+            # Obtener el primer servicio reservado
+            from ..models import ReservaServicio
+            reserva_servicio = ReservaServicio.objects.filter(venta_reserva=booking).first()
+            
+            if reserva_servicio:
+                servicio_nombre = reserva_servicio.servicio.nombre
+                fecha_str = reserva_servicio.fecha_agendamiento.strftime('%d/%m/%Y')
+                hora_str = reserva_servicio.hora_inicio.strftime('%H:%M')
+            else:
+                servicio_nombre = 'tu servicio'
+                fecha_str = booking.fecha_reserva.strftime('%d/%m/%Y')
+                hora_str = booking.fecha_reserva.strftime('%H:%M')
+            
             # Obtener plantilla
             template = SMSTemplate.objects.filter(
                 message_type='BOOKING_CONFIRMATION',
@@ -49,13 +62,13 @@ class CommunicationService:
             ).first()
             
             if not template:
-                message = f"✅ Reserva confirmada para {booking.fecha_reserva.strftime('%d/%m/%Y')} a las {booking.hora_reserva}. ¡Te esperamos! - Aremko"
+                message = f"✅ Reserva confirmada para {fecha_str} a las {hora_str}. ¡Te esperamos! - Aremko"
             else:
                 message = template.render_message(
                     cliente,
-                    servicio=booking.servicio.nombre if hasattr(booking, 'servicio') else 'servicio',
-                    fecha=booking.fecha_reserva.strftime('%d/%m/%Y'),
-                    hora=booking.hora_reserva
+                    servicio=servicio_nombre,
+                    fecha=fecha_str,
+                    hora=hora_str
                 )
             
             # Enviar SMS
@@ -99,10 +112,25 @@ class CommunicationService:
             booking = VentaReserva.objects.get(id=booking_id)
             cliente = booking.cliente
             
-            # Verificar si es momento de enviar (X horas antes)
-            booking_datetime = timezone.make_aware(
-                datetime.combine(booking.fecha_reserva, booking.hora_reserva)
-            )
+            # Obtener el primer servicio reservado
+            from ..models import ReservaServicio
+            reserva_servicio = ReservaServicio.objects.filter(venta_reserva=booking).first()
+            
+            if reserva_servicio:
+                # Verificar si es momento de enviar (X horas antes)
+                booking_datetime = timezone.make_aware(
+                    datetime.combine(reserva_servicio.fecha_agendamiento, reserva_servicio.hora_inicio)
+                )
+                servicio_nombre = reserva_servicio.servicio.nombre
+                fecha_str = reserva_servicio.fecha_agendamiento.strftime('%d/%m/%Y')
+                hora_str = reserva_servicio.hora_inicio.strftime('%H:%M')
+            else:
+                # Fallback a fecha de venta si no hay servicio específico
+                booking_datetime = booking.fecha_reserva
+                servicio_nombre = 'tu servicio'
+                fecha_str = booking.fecha_reserva.strftime('%d/%m/%Y')
+                hora_str = booking.fecha_reserva.strftime('%H:%M')
+            
             reminder_time = booking_datetime - timedelta(hours=hours_before)
             
             if timezone.now() < reminder_time:
@@ -119,13 +147,13 @@ class CommunicationService:
             ).first()
             
             if not template:
-                message = f"🔔 Recordatorio: Tienes una cita mañana {booking.fecha_reserva.strftime('%d/%m/%Y')} a las {booking.hora_reserva}. ¡No olvides! - Aremko"
+                message = f"🔔 Recordatorio: Tienes una cita mañana {fecha_str} a las {hora_str}. ¡No olvides! - Aremko"
             else:
                 message = template.render_message(
                     cliente,
-                    servicio=booking.servicio.nombre if hasattr(booking, 'servicio') else 'servicio',
-                    fecha=booking.fecha_reserva.strftime('%d/%m/%Y'),
-                    hora=booking.hora_reserva
+                    servicio=servicio_nombre,
+                    fecha=fecha_str,
+                    hora=hora_str
                 )
             
             # Enviar SMS
@@ -293,10 +321,21 @@ class CommunicationService:
             booking = VentaReserva.objects.get(id=booking_id)
             cliente = booking.cliente
             
-            # Verificar si ya pasó el tiempo necesario después del servicio
-            booking_datetime = timezone.make_aware(
-                datetime.combine(booking.fecha_reserva, booking.hora_reserva)
-            )
+            # Obtener el primer servicio reservado
+            from ..models import ReservaServicio
+            reserva_servicio = ReservaServicio.objects.filter(venta_reserva=booking).first()
+            
+            if reserva_servicio:
+                # Verificar si ya pasó el tiempo necesario después del servicio
+                booking_datetime = timezone.make_aware(
+                    datetime.combine(reserva_servicio.fecha_agendamiento, reserva_servicio.hora_inicio)
+                )
+                servicio_nombre = reserva_servicio.servicio.nombre
+            else:
+                # Fallback a fecha de venta si no hay servicio específico
+                booking_datetime = booking.fecha_reserva
+                servicio_nombre = 'tu servicio'
+            
             survey_time = booking_datetime + timedelta(hours=hours_after)
             
             if timezone.now() < survey_time:
@@ -308,7 +347,7 @@ class CommunicationService:
             
             # Mensaje con link a encuesta
             survey_link = f"https://aremko-booking-system.onrender.com/encuesta/{booking_id}"
-            message = f"¡Hola {cliente.nombre}! ¿Cómo fue tu experiencia? Tu opinión es muy importante: {survey_link} - Aremko"
+            message = f"¡Hola {cliente.nombre}! ¿Cómo fue tu experiencia con {servicio_nombre}? Tu opinión es muy importante: {survey_link} - Aremko"
             
             # Enviar SMS con respuesta habilitada
             result = self.sms_service.send_sms_with_reply(
