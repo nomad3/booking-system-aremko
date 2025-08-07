@@ -166,6 +166,7 @@ EMAIL_MONTHLY_LIMIT_PER_CLIENT = int(os.getenv('EMAIL_MONTHLY_LIMIT_PER_CLIENT',
 
 # Configuración mejorada de Email
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'comunicaciones@aremko.cl')
+VENTAS_FROM_EMAIL = os.getenv('VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))

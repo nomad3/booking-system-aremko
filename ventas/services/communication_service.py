@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.db import transaction
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
 
@@ -28,6 +28,170 @@ class CommunicationService:
     
     def __init__(self):
         self.sms_service = redvoiss_service
+    
+    def send_booking_confirmation_dual(self, booking_id, cliente_id=None):
+        """
+        Envía SMS Y EMAIL de confirmación de reserva
+        """
+        try:
+            # Obtener reserva y cliente
+            booking = VentaReserva.objects.get(id=booking_id)
+            cliente = booking.cliente if not cliente_id else Cliente.objects.get(id=cliente_id)
+            
+            # Verificar si se puede enviar SMS
+            sms_allowed = self._can_send_communication(cliente, 'SMS', 'BOOKING_CONFIRMATION')
+            # Verificar si se puede enviar EMAIL
+            email_allowed = self._can_send_communication(cliente, 'EMAIL', 'BOOKING_CONFIRMATION')
+            
+            if not sms_allowed and not email_allowed:
+                return {'success': False, 'reason': 'blocked_by_limits_or_preferences'}
+            
+            # Obtener el primer servicio reservado
+            from ..models import ReservaServicio
+            reserva_servicio = ReservaServicio.objects.filter(venta_reserva=booking).first()
+            
+            if reserva_servicio:
+                servicio_nombre = reserva_servicio.servicio.nombre
+                fecha_str = reserva_servicio.fecha_agendamiento.strftime('%d/%m/%Y')
+                hora_str = str(reserva_servicio.hora_inicio)
+            else:
+                servicio_nombre = 'tu servicio'
+                fecha_str = booking.fecha_reserva.strftime('%d/%m/%Y')
+                hora_str = booking.fecha_reserva.strftime('%H:%M')
+            
+            results = {'sms': None, 'email': None}
+            
+            # 1. ENVIAR SMS
+            if sms_allowed:
+                results['sms'] = self._send_confirmation_sms(
+                    cliente, booking, servicio_nombre, fecha_str, hora_str
+                )
+            
+            # 2. ENVIAR EMAIL  
+            if email_allowed and cliente.email:
+                results['email'] = self._send_confirmation_email(
+                    cliente, booking, servicio_nombre, fecha_str, hora_str
+                )
+            
+            # Determinar éxito general
+            sms_success = results['sms'] and results['sms'].get('success', False)
+            email_success = results['email'] and results['email'].get('success', False)
+            
+            return {
+                'success': sms_success or email_success,
+                'sms_result': results['sms'],
+                'email_result': results['email'],
+                'channels_sent': [
+                    'SMS' if sms_success else None,
+                    'EMAIL' if email_success else None
+                ]
+            }
+                
+        except Exception as e:
+            logger.error(f"Error en send_booking_confirmation_dual: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def _send_confirmation_sms(self, cliente, booking, servicio_nombre, fecha_str, hora_str):
+        """Envía SMS de confirmación"""
+        try:
+            # Obtener plantilla SMS
+            template = SMSTemplate.objects.filter(
+                message_type='BOOKING_CONFIRMATION',
+                is_active=True
+            ).first()
+            
+            if not template:
+                message = f"✅ Reserva confirmada para {fecha_str} a las {hora_str}. ¡Te esperamos! - Aremko"
+            else:
+                message = template.render_message(
+                    cliente,
+                    servicio=servicio_nombre,
+                    fecha=fecha_str,
+                    hora=hora_str
+                )
+            
+            # Enviar SMS
+            result = self.sms_service.send_sms(
+                destination=cliente.telefono,
+                message=message,
+                bulk_name=f"Confirmación Reserva {booking.id}"
+            )
+            
+            if result['success']:
+                # Registrar comunicación
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='SMS',
+                    message_type='BOOKING_CONFIRMATION',
+                    content=message,
+                    destination=cliente.telefono,
+                    external_id=result['batch_id'],
+                    booking_id=booking.id,
+                    cost=12
+                )
+                
+                # Actualizar límites
+                self._update_communication_limits(cliente, 'SMS')
+                
+                logger.info(f"SMS confirmación enviado a {cliente.nombre} para booking {booking.id}")
+                return {'success': True, 'batch_id': result['batch_id']}
+            else:
+                logger.error(f"Error enviando SMS confirmación: {result['error']}")
+                return {'success': False, 'error': result['error']}
+                
+        except Exception as e:
+            logger.error(f"Error en _send_confirmation_sms: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def _send_confirmation_email(self, cliente, booking, servicio_nombre, fecha_str, hora_str):
+        """Envía Email de confirmación"""
+        try:
+            # Preparar contexto para el template
+            context = {
+                'nombre': cliente.nombre,
+                'apellido': cliente.apellido,
+                'telefono': cliente.telefono,
+                'servicio': servicio_nombre,
+                'fecha': fecha_str,
+                'hora': hora_str,
+            }
+            
+            # Renderizar email HTML
+            html_content = render_to_string('emails/booking_confirmation_email.html', context)
+            
+            # Crear email
+            email = EmailMultiAlternatives(
+                subject=f'✅ Confirmación de Reserva - {servicio_nombre}',
+                body=f'Estimado/a {cliente.nombre}, su reserva para {servicio_nombre} el {fecha_str} a las {hora_str} ha sido confirmada.',
+                from_email=getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                to=[cliente.email],
+            )
+            email.attach_alternative(html_content, "text/html")
+            
+            # Enviar email
+            email.send()
+            
+            # Registrar comunicación
+            self._log_communication(
+                cliente=cliente,
+                communication_type='EMAIL',
+                message_type='BOOKING_CONFIRMATION',
+                subject=f'✅ Confirmación de Reserva - {servicio_nombre}',
+                content=html_content,
+                destination=cliente.email,
+                booking_id=booking.id,
+                cost=0  # Email es gratis
+            )
+            
+            # Actualizar límites
+            self._update_communication_limits(cliente, 'EMAIL')
+            
+            logger.info(f"Email confirmación enviado a {cliente.nombre} ({cliente.email}) para booking {booking.id}")
+            return {'success': True}
+                
+        except Exception as e:
+            logger.error(f"Error en _send_confirmation_email: {str(e)}")
+            return {'success': False, 'error': str(e)}
     
     def send_booking_confirmation_sms(self, booking_id, cliente_id=None):
         """

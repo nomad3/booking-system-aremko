@@ -26,16 +26,24 @@ def handle_booking_confirmation(sender, instance, created, **kwargs):
         try:
             logger.info(f"Enviando confirmación automática para reserva {instance.id}")
             
-            # Enviar confirmación inmediatamente
-            result = communication_service.send_booking_confirmation_sms(
+            # Enviar confirmación inmediatamente (SMS + EMAIL)
+            result = communication_service.send_booking_confirmation_dual(
                 booking_id=instance.id,
                 cliente_id=instance.cliente.id
             )
             
             if result['success']:
-                logger.info(f"SMS confirmación enviado para reserva {instance.id}")
+                channels = [ch for ch in result.get('channels_sent', []) if ch]
+                channels_str = ' + '.join(channels)
+                logger.info(f"✅ Confirmación automática enviada para reserva {instance.id} por {channels_str}")
+                
+                # Log específico por canal
+                if result.get('sms_result', {}).get('success'):
+                    logger.info(f"📱 SMS confirmación enviado para reserva {instance.id}")
+                if result.get('email_result', {}).get('success'):
+                    logger.info(f"📧 Email confirmación enviado para reserva {instance.id}")
             else:
-                logger.warning(f"No se pudo enviar SMS confirmación: {result.get('reason', 'unknown')}")
+                logger.warning(f"⚠️ No se pudo enviar confirmación para reserva {instance.id}: {result.get('reason', 'unknown')}")
                 
         except Exception as e:
             logger.error(f"Error en trigger confirmación reserva: {str(e)}")
