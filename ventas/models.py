@@ -885,3 +885,377 @@ class HomepageSettings(models.Model):
             # Prevent creation of a new instance if one already exists
             raise ValidationError('Solo puede existir una instancia de HomepageSettings.')
         return super().save(*args, **kwargs)
+
+
+# --- Modelos para Comunicación Inteligente y Anti-Spam ---
+
+class CommunicationLimit(models.Model):
+    """
+    Modelo para controlar los límites de comunicación por cliente
+    y evitar spam según las reglas de negocio definidas
+    """
+    cliente = models.OneToOneField(Cliente, on_delete=models.CASCADE, related_name='communication_limit')
+    
+    # Contadores de SMS
+    sms_count_daily = models.IntegerField(default=0, verbose_name="SMS enviados hoy")
+    sms_count_monthly = models.IntegerField(default=0, verbose_name="SMS enviados este mes")
+    last_sms_date = models.DateField(null=True, blank=True, verbose_name="Fecha último SMS")
+    last_sms_reset_daily = models.DateField(auto_now_add=True, verbose_name="Última reset daily")
+    last_sms_reset_monthly = models.DateField(auto_now_add=True, verbose_name="Última reset monthly")
+    
+    # Contadores de Email
+    email_count_weekly = models.IntegerField(default=0, verbose_name="Emails enviados esta semana")
+    email_count_monthly = models.IntegerField(default=0, verbose_name="Emails enviados este mes")
+    last_email_date = models.DateTimeField(null=True, blank=True, verbose_name="Fecha último email")
+    last_email_reset_weekly = models.DateField(auto_now_add=True, verbose_name="Última reset weekly")
+    last_email_reset_monthly = models.DateField(auto_now_add=True, verbose_name="Última reset monthly")
+    
+    # Contadores especiales
+    birthday_sms_sent_this_year = models.BooleanField(default=False, verbose_name="SMS cumpleaños enviado este año")
+    last_birthday_sms_year = models.IntegerField(null=True, blank=True, verbose_name="Año último SMS cumpleaños")
+    
+    reactivation_emails_this_quarter = models.IntegerField(default=0, verbose_name="Emails reactivación este trimestre")
+    last_reactivation_quarter = models.CharField(max_length=7, blank=True, verbose_name="Último trimestre reactivación (YYYY-Q)")
+    
+    # Metadatos
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Límite de Comunicación"
+        verbose_name_plural = "Límites de Comunicación"
+    
+    def __str__(self):
+        return f"Límites {self.cliente.nombre} - SMS: {self.sms_count_daily}/día, Email: {self.email_count_weekly}/semana"
+    
+    def can_send_sms(self):
+        """
+        Verifica si se puede enviar SMS según los límites configurados
+        """
+        from django.conf import settings
+        
+        daily_limit = getattr(settings, 'SMS_DAILY_LIMIT_PER_CLIENT', 2)
+        monthly_limit = getattr(settings, 'SMS_MONTHLY_LIMIT_PER_CLIENT', 8)
+        
+        # Reset contadores si es necesario
+        self._reset_counters_if_needed()
+        
+        return (self.sms_count_daily < daily_limit and 
+                self.sms_count_monthly < monthly_limit)
+    
+    def can_send_email(self):
+        """
+        Verifica si se puede enviar email según los límites configurados
+        """
+        from django.conf import settings
+        
+        weekly_limit = getattr(settings, 'EMAIL_WEEKLY_LIMIT_PER_CLIENT', 1)
+        monthly_limit = getattr(settings, 'EMAIL_MONTHLY_LIMIT_PER_CLIENT', 4)
+        
+        # Reset contadores si es necesario
+        self._reset_counters_if_needed()
+        
+        return (self.email_count_weekly < weekly_limit and 
+                self.email_count_monthly < monthly_limit)
+    
+    def can_send_birthday_sms(self):
+        """
+        Verifica si se puede enviar SMS de cumpleaños (máximo 1 por año)
+        """
+        current_year = timezone.now().year
+        return not self.birthday_sms_sent_this_year or self.last_birthday_sms_year != current_year
+    
+    def can_send_reactivation_email(self):
+        """
+        Verifica si se puede enviar email de reactivación (máximo 1 por trimestre)
+        """
+        current_quarter = self._get_current_quarter()
+        return (self.last_reactivation_quarter != current_quarter or 
+                self.reactivation_emails_this_quarter == 0)
+    
+    def record_sms_sent(self):
+        """
+        Registra el envío de un SMS y actualiza contadores
+        """
+        self._reset_counters_if_needed()
+        self.sms_count_daily += 1
+        self.sms_count_monthly += 1
+        self.last_sms_date = timezone.now().date()
+        self.save()
+    
+    def record_email_sent(self):
+        """
+        Registra el envío de un email y actualiza contadores
+        """
+        self._reset_counters_if_needed()
+        self.email_count_weekly += 1
+        self.email_count_monthly += 1
+        self.last_email_date = timezone.now()
+        self.save()
+    
+    def record_birthday_sms_sent(self):
+        """
+        Registra el envío de SMS de cumpleaños
+        """
+        current_year = timezone.now().year
+        self.birthday_sms_sent_this_year = True
+        self.last_birthday_sms_year = current_year
+        self.record_sms_sent()
+    
+    def record_reactivation_email_sent(self):
+        """
+        Registra el envío de email de reactivación
+        """
+        current_quarter = self._get_current_quarter()
+        if self.last_reactivation_quarter != current_quarter:
+            self.reactivation_emails_this_quarter = 0
+        self.reactivation_emails_this_quarter += 1
+        self.last_reactivation_quarter = current_quarter
+        self.record_email_sent()
+    
+    def _reset_counters_if_needed(self):
+        """
+        Reset contadores según el período correspondiente
+        """
+        today = timezone.now().date()
+        current_week_start = today - timezone.timedelta(days=today.weekday())
+        current_month = today.replace(day=1)
+        current_year = today.year
+        
+        # Reset diario SMS
+        if self.last_sms_reset_daily != today:
+            self.sms_count_daily = 0
+            self.last_sms_reset_daily = today
+        
+        # Reset mensual SMS
+        if self.last_sms_reset_monthly < current_month:
+            self.sms_count_monthly = 0
+            self.last_sms_reset_monthly = current_month
+        
+        # Reset semanal Email
+        if self.last_email_reset_weekly < current_week_start:
+            self.email_count_weekly = 0
+            self.last_email_reset_weekly = current_week_start
+        
+        # Reset mensual Email
+        if self.last_email_reset_monthly < current_month:
+            self.email_count_monthly = 0
+            self.last_email_reset_monthly = current_month
+        
+        # Reset anual cumpleaños
+        if self.last_birthday_sms_year and self.last_birthday_sms_year < current_year:
+            self.birthday_sms_sent_this_year = False
+    
+    def _get_current_quarter(self):
+        """
+        Obtiene el trimestre actual en formato YYYY-Q
+        """
+        now = timezone.now()
+        quarter = (now.month - 1) // 3 + 1
+        return f"{now.year}-{quarter}"
+
+
+class ClientPreferences(models.Model):
+    """
+    Preferencias de comunicación del cliente para opt-out granular
+    """
+    cliente = models.OneToOneField(Cliente, on_delete=models.CASCADE, related_name='preferences')
+    
+    # Preferencias generales
+    accepts_sms = models.BooleanField(default=True, verbose_name="Acepta SMS")
+    accepts_email = models.BooleanField(default=True, verbose_name="Acepta Email")
+    accepts_whatsapp = models.BooleanField(default=True, verbose_name="Acepta WhatsApp")
+    
+    # Preferencias específicas
+    accepts_booking_confirmations = models.BooleanField(default=True, verbose_name="Acepta confirmaciones de reserva")
+    accepts_booking_reminders = models.BooleanField(default=True, verbose_name="Acepta recordatorios de cita")
+    accepts_birthday_messages = models.BooleanField(default=True, verbose_name="Acepta mensajes de cumpleaños")
+    accepts_promotional = models.BooleanField(default=True, verbose_name="Acepta mensajes promocionales")
+    accepts_newsletters = models.BooleanField(default=True, verbose_name="Acepta newsletters")
+    accepts_reactivation = models.BooleanField(default=True, verbose_name="Acepta mensajes de reactivación")
+    
+    # Preferencias de horario
+    preferred_contact_hour_start = models.TimeField(default=timezone.datetime.strptime('09:00', '%H:%M').time(), verbose_name="Hora inicio contacto")
+    preferred_contact_hour_end = models.TimeField(default=timezone.datetime.strptime('20:00', '%H:%M').time(), verbose_name="Hora fin contacto")
+    
+    # Metadatos
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    opt_out_date = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de opt-out general")
+    
+    class Meta:
+        verbose_name = "Preferencia del Cliente"
+        verbose_name_plural = "Preferencias de los Clientes"
+    
+    def __str__(self):
+        status = "Activo" if self.accepts_sms or self.accepts_email else "Opt-out"
+        return f"Preferencias {self.cliente.nombre} - {status}"
+    
+    def can_contact_now(self):
+        """
+        Verifica si se puede contactar al cliente en el horario actual
+        """
+        now = timezone.now().time()
+        return self.preferred_contact_hour_start <= now <= self.preferred_contact_hour_end
+    
+    def set_opt_out_all(self):
+        """
+        Configura opt-out completo del cliente
+        """
+        self.accepts_sms = False
+        self.accepts_email = False
+        self.accepts_whatsapp = False
+        self.accepts_promotional = False
+        self.accepts_newsletters = False
+        self.opt_out_date = timezone.now()
+        self.save()
+
+
+class CommunicationLog(models.Model):
+    """
+    Log detallado de todas las comunicaciones enviadas para auditoría y análisis
+    """
+    COMMUNICATION_TYPES = [
+        ('SMS', 'SMS'),
+        ('EMAIL', 'Email'),
+        ('WHATSAPP', 'WhatsApp'),
+        ('CALL', 'Llamada'),
+    ]
+    
+    MESSAGE_TYPES = [
+        ('BOOKING_CONFIRMATION', 'Confirmación de reserva'),
+        ('BOOKING_REMINDER', 'Recordatorio de cita'),
+        ('BIRTHDAY', 'Felicitación cumpleaños'),
+        ('PROMOTIONAL', 'Promocional'),
+        ('NEWSLETTER', 'Newsletter'),
+        ('REACTIVATION', 'Reactivación'),
+        ('FOLLOW_UP', 'Seguimiento'),
+        ('SATISFACTION_SURVEY', 'Encuesta satisfacción'),
+        ('OTHER', 'Otro'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('PENDING', 'Pendiente'),
+        ('SENT', 'Enviado'),
+        ('DELIVERED', 'Entregado'),
+        ('READ', 'Leído'),
+        ('REPLIED', 'Respondido'),
+        ('FAILED', 'Falló'),
+        ('BLOCKED', 'Bloqueado por límites'),
+    ]
+    
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='communication_logs')
+    campaign = models.ForeignKey(Campaign, on_delete=models.SET_NULL, null=True, blank=True, related_name='communication_logs')
+    
+    # Detalles del mensaje
+    communication_type = models.CharField(max_length=20, choices=COMMUNICATION_TYPES, verbose_name="Tipo comunicación")
+    message_type = models.CharField(max_length=30, choices=MESSAGE_TYPES, verbose_name="Tipo mensaje")
+    subject = models.CharField(max_length=255, blank=True, verbose_name="Asunto")
+    content = models.TextField(verbose_name="Contenido")
+    destination = models.CharField(max_length=100, verbose_name="Destino (teléfono/email)")
+    
+    # Estado y tracking
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING', verbose_name="Estado")
+    external_id = models.CharField(max_length=100, blank=True, verbose_name="ID externo (batch_id, etc.)")
+    
+    # Metadatos
+    sent_at = models.DateTimeField(null=True, blank=True, verbose_name="Enviado en")
+    delivered_at = models.DateTimeField(null=True, blank=True, verbose_name="Entregado en")
+    read_at = models.DateTimeField(null=True, blank=True, verbose_name="Leído en")
+    replied_at = models.DateTimeField(null=True, blank=True, verbose_name="Respondido en")
+    
+    cost = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, verbose_name="Costo")
+    
+    # Contexto adicional
+    booking_id = models.IntegerField(null=True, blank=True, verbose_name="ID Reserva relacionada")
+    triggered_by = models.CharField(max_length=100, blank=True, verbose_name="Disparado por")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Log de Comunicación"
+        verbose_name_plural = "Logs de Comunicación"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.get_communication_type_display()} a {self.cliente.nombre} - {self.get_status_display()}"
+    
+    def mark_as_sent(self, external_id=None):
+        """
+        Marca el mensaje como enviado
+        """
+        self.status = 'SENT'
+        self.sent_at = timezone.now()
+        if external_id:
+            self.external_id = external_id
+        self.save()
+    
+    def mark_as_delivered(self):
+        """
+        Marca el mensaje como entregado
+        """
+        self.status = 'DELIVERED'
+        self.delivered_at = timezone.now()
+        self.save()
+    
+    def mark_as_failed(self):
+        """
+        Marca el mensaje como fallido
+        """
+        self.status = 'FAILED'
+        self.save()
+
+
+class SMSTemplate(models.Model):
+    """
+    Plantillas predefinidas para diferentes tipos de SMS
+    """
+    MESSAGE_TYPES = [
+        ('BOOKING_CONFIRMATION', 'Confirmación de reserva'),
+        ('BOOKING_REMINDER', 'Recordatorio de cita'),
+        ('BIRTHDAY', 'Felicitación cumpleaños'),
+        ('REACTIVATION', 'Reactivación'),
+        ('SATISFACTION_SURVEY', 'Encuesta satisfacción'),
+        ('PROMOTIONAL', 'Promocional'),
+    ]
+    
+    name = models.CharField(max_length=100, verbose_name="Nombre plantilla")
+    message_type = models.CharField(max_length=30, choices=MESSAGE_TYPES, verbose_name="Tipo mensaje")
+    content = models.TextField(verbose_name="Contenido", help_text="Usar {nombre}, {apellido}, {servicio}, {fecha}, {hora} como variables")
+    
+    is_active = models.BooleanField(default=True, verbose_name="Activa")
+    requires_approval = models.BooleanField(default=False, verbose_name="Requiere aprobación")
+    
+    # Límites específicos de la plantilla
+    max_uses_per_client_per_day = models.IntegerField(default=1, verbose_name="Máximo usos por cliente por día")
+    max_uses_per_client_per_month = models.IntegerField(default=4, verbose_name="Máximo usos por cliente por mes")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Creado por")
+    
+    class Meta:
+        verbose_name = "Plantilla SMS"
+        verbose_name_plural = "Plantillas SMS"
+        unique_together = ['name', 'message_type']
+    
+    def __str__(self):
+        return f"{self.name} ({self.get_message_type_display()})"
+    
+    def render_message(self, cliente, **kwargs):
+        """
+        Renderiza la plantilla con los datos del cliente y contexto adicional
+        """
+        context = {
+            'nombre': cliente.nombre,
+            'apellido': getattr(cliente, 'apellido', ''),
+            'telefono': cliente.telefono,
+        }
+        context.update(kwargs)
+        
+        try:
+            return self.content.format(**context)
+        except KeyError as e:
+            logger.warning(f"Variable faltante en plantilla {self.name}: {e}")
+            return self.content  # Devolver sin procesar si falta alguna variable
