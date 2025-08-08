@@ -11,7 +11,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.conf import settings
 
-from ..models import VentaReserva, Cliente
+from ..models import VentaReserva, Cliente, ReservaServicio, CommunicationLog
 from .communication_service import communication_service
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,13 @@ def handle_booking_confirmation(sender, instance, created, **kwargs):
     if created and instance.cliente:
         try:
             logger.info(f"Enviando confirmación automática para reserva {instance.id}")
-            
+            # Si aún no existen servicios asociados, esperar a que se creen
+            if not ReservaServicio.objects.filter(venta_reserva=instance).exists():
+                logger.info(
+                    f"Reserva {instance.id} creada sin servicios aún. Se enviará confirmación cuando se agregue el primer servicio."
+                )
+                return
+
             # Enviar confirmación inmediatamente (SMS + EMAIL)
             result = communication_service.send_booking_confirmation_dual(
                 booking_id=instance.id,
@@ -47,6 +53,37 @@ def handle_booking_confirmation(sender, instance, created, **kwargs):
                 
         except Exception as e:
             logger.error(f"Error en trigger confirmación reserva: {str(e)}")
+
+
+@receiver(post_save, sender=ReservaServicio)
+def handle_service_added(sender, instance, created, **kwargs):
+    """
+    Cuando se agrega el primer ReservaServicio a una VentaReserva, enviar confirmación si no se envió.
+    """
+    if created and instance.venta_reserva and instance.venta_reserva.cliente:
+        booking = instance.venta_reserva
+        try:
+            already_sent = CommunicationLog.objects.filter(
+                booking_id=booking.id,
+                communication_type='EMAIL',
+                message_type='BOOKING_CONFIRMATION',
+                status__in=['SENT', 'PENDING']
+            ).exists()
+            if already_sent:
+                return
+            logger.info(
+                f"Primer servicio agregado a reserva {booking.id}. Enviando confirmación ahora."
+            )
+            result = communication_service.send_booking_confirmation_dual(
+                booking_id=booking.id,
+                cliente_id=booking.cliente.id
+            )
+            if result.get('success'):
+                logger.info(f"✅ Confirmación enviada tras agregar servicio para reserva {booking.id}")
+            else:
+                logger.warning(f"⚠️ No se pudo enviar confirmación tras agregar servicio {booking.id}: {result}")
+        except Exception as e:
+            logger.error(f"Error en handle_service_added: {str(e)}")
 
 
 def schedule_booking_reminders():
