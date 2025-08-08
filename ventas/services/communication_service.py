@@ -521,6 +521,93 @@ class CommunicationService:
         except Exception as e:
             logger.error(f"Error en send_full_payment_notification_dual: {str(e)}")
             return {'success': False, 'error': str(e)}
+
+    # ======================================
+    #  REACTIVACIÓN 90 DÍAS (GIFT CARD $10K)
+    # ======================================
+    def send_reactivation_giftcard_email(self, cliente_id, last_visit_date, expiry_date):
+        """Email de reactivación con Gift Card $10.000 (90 días desde última visita)"""
+        try:
+            cliente = Cliente.objects.get(id=cliente_id)
+            if not self._can_send_communication(cliente, 'EMAIL', 'REACTIVATION'):
+                return {'success': False, 'reason': 'blocked_by_limits_or_preferences'}
+
+            context = {
+                'nombre': cliente.nombre,
+                'fecha_ultima_visita': last_visit_date.strftime('%d/%m/%Y'),
+                'fecha_limite': expiry_date.strftime('%d/%m/%Y'),
+            }
+            html_content = render_to_string('emails/reactivation_90_email.html', context)
+            subject = 'Regalo para tu próxima visita - Gift Card $10.000'
+
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=(
+                    f"Hola {cliente.nombre},\n\n"
+                    f"Gracias por tu última visita a Aremko el {context['fecha_ultima_visita']}. "
+                    f"Te regalamos una Gift Card de $10.000 para cualquier servicio (vigente hasta {context['fecha_limite']}).\n"
+                    f"Para activarla, escríbenos por WhatsApp al +56 9 5790 2525 indicando 'cobro de Gift Card por visita de hace 90 días a Aremko'."
+                ),
+                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                to=[cliente.email] if cliente.email else [],
+                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+            )
+            if cliente.email:
+                email.attach_alternative(html_content, "text/html")
+                email.send()
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='EMAIL',
+                    message_type='REACTIVATION',
+                    subject=subject,
+                    content=html_content,
+                    destination=cliente.email,
+                )
+                self._update_communication_limits(cliente, 'EMAIL')
+                return {'success': True}
+            return {'success': False, 'reason': 'no_email'}
+        except Exception as e:
+            logger.error(f"Error en send_reactivation_giftcard_email: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def send_reactivation_giftcard_sms(self, cliente_id, last_visit_date, expiry_date):
+        """SMS largo de reactivación con Gift Card $10.000 (90 días)"""
+        try:
+            cliente = Cliente.objects.get(id=cliente_id)
+            if not self._can_send_communication(cliente, 'SMS', 'REACTIVATION'):
+                return {'success': False, 'reason': 'blocked_by_limits_or_preferences'}
+
+            from django.conf import settings as djsettings
+            if not getattr(djsettings, 'COMMUNICATION_SMS_ENABLED', True):
+                return {'success': False, 'reason': 'sms_disabled'}
+
+            msg = (
+                f"Hola {cliente.nombre}, gracias por tu visita a Aremko hace 90 días. "
+                f"Queremos verte de vuelta y te regalamos una Gift Card de $10.000 para usar en cualquier servicio. "
+                f"Vigencia: hasta {expiry_date.strftime('%d/%m/%Y')}. "
+                f"Para activarla, escríbenos por WhatsApp al +56 9 5790 2525 indicando 'cobro de Gift Card por visita de hace 90 días a Aremko'. "
+                f"Si no deseas recibir mensajes, responde STOP."
+            )
+            result = self.sms_service.send_sms(
+                destination=cliente.telefono,
+                message=msg,
+                bulk_name='Reactivación 90 días'
+            )
+            if result.get('success'):
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='SMS',
+                    message_type='REACTIVATION',
+                    content=msg,
+                    destination=cliente.telefono,
+                    external_id=result.get('batch_id', ''),
+                )
+                self._update_communication_limits(cliente, 'SMS')
+                return {'success': True}
+            return {'success': False, 'error': result.get('error')}
+        except Exception as e:
+            logger.error(f"Error en send_reactivation_giftcard_sms: {str(e)}")
+            return {'success': False, 'error': str(e)}
     
     def send_booking_confirmation_sms(self, booking_id, cliente_id=None):
         """

@@ -274,34 +274,40 @@ def schedule_reactivation_campaigns():
     try:
         from django.db.models import Q, Max
         
-        # Buscar clientes inactivos (sin reservas en 90+ días)
-        inactive_cutoff = timezone.now().date() - timedelta(days=90)
-        
-        # Clientes con última reserva hace más de 90 días
+        # Target: clientes que cumplieron HOY 90 días desde su última visita (exact match de día)
+        today = timezone.now().date()
+        ninety_days_ago = today - timedelta(days=90)
+
         inactive_clients = Cliente.objects.annotate(
             last_booking_date=Max('ventareserva__fecha_reserva')
         ).filter(
-            Q(last_booking_date__lt=inactive_cutoff) | Q(last_booking_date__isnull=True)
+            last_booking_date__date=ninety_days_ago
         ).exclude(
-            # Excluir los que ya recibieron email de reactivación este trimestre
+            # Evitar duplicados si ya enviamos reactivación recientemente
             communication_logs__message_type='REACTIVATION',
-            communication_logs__created_at__gte=timezone.now() - timedelta(days=90)
+            communication_logs__created_at__date=today
         )
         
         logger.info(f"Procesando {inactive_clients.count()} clientes para reactivación")
         
         for cliente in inactive_clients[:50]:  # Limitar a 50 por ejecución para no saturar
             try:
-                # Verificar que tenga email
-                if not cliente.email:
-                    continue
-                
-                result = communication_service.send_reactivation_email(cliente.id)
-                
-                if result['success']:
-                    logger.info(f"Email reactivación enviado a {cliente.nombre}")
-                else:
-                    logger.debug(f"Email reactivación no enviado a {cliente.nombre}: {result.get('reason', 'unknown')}")
+                last_date = cliente.last_booking_date.date() if cliente.last_booking_date else ninety_days_ago
+                expiry = today + timedelta(days=30)
+                # Email
+                if cliente.email:
+                    communication_service.send_reactivation_giftcard_email(
+                        cliente_id=cliente.id,
+                        last_visit_date=last_date,
+                        expiry_date=expiry
+                    )
+                # SMS (si habilitado y con teléfono)
+                if cliente.telefono:
+                    communication_service.send_reactivation_giftcard_sms(
+                        cliente_id=cliente.id,
+                        last_visit_date=last_date,
+                        expiry_date=expiry
+                    )
                     
             except Exception as e:
                 logger.error(f"Error enviando reactivación a cliente {cliente.id}: {str(e)}")
