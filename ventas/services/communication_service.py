@@ -310,6 +310,7 @@ class CommunicationService:
                 'fecha': fecha_str,
                 'hora': hora_str,
                 'numero_reserva': booking.id,
+                'numero_reserva': booking.id,
                 'servicios': servicios_list,
                 'total_monto': format_clp(total),
                 'pagado_monto': format_clp(pagado),
