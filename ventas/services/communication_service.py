@@ -219,7 +219,7 @@ class CommunicationService:
             
             # Crear email
             email = EmailMultiAlternatives(
-                subject=f'✅ Confirmación de Reserva - {subject_service_name}',
+                subject=f'Reserva por confirmar - {subject_service_name}',
                 body=f'Estimado/a {cliente.nombre}, su reserva para {servicio_nombre} el {fecha_str} a las {hora_str} ha sido confirmada.',
                 # Usamos el usuario autenticado en SMTP para máxima entregabilidad
                 from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
