@@ -139,6 +139,28 @@
             Por favor, llega 10 minutos antes de tu cita para el check-in.
         </div>
 
+        <div class="details">
+            <div class="detail-row">
+                <span class="label">💳 Monto total:</span>
+                <span class="value">{{ total_monto }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">✅ Pagado/Abonado:</span>
+                <span class="value">{{ pagado_monto }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">💼 Saldo pendiente:</span>
+                <span class="value">{{ saldo_monto }}</span>
+            </div>
+        </div>
+
+        {% if monto_pagado_cero %}
+        <div class="message" style="background:#fff3cd;border-left-color:#ffc107;">
+            <strong>⚠️ Pago pendiente</strong><br>
+            Por favor pague el 100% de su reserva al banco Mercado Pago número <strong>12345678</strong>, RUT <strong>76.485.192-7</strong>. Enviar comprobante a <strong>ventas@aremko.cl</strong>.
+        </div>
+        {% endif %}
+
         <p><strong>Importante:</strong></p>
         <ul>
             <li>Si necesitas reprogramar, contáctanos con al menos 24 horas de anticipación</li>

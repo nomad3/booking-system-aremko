@@ -183,6 +183,21 @@ class CommunicationService:
                 subject_service_name = servicio_nombre
 
             # Preparar contexto para el template
+            # Resumen de pagos
+            try:
+                total_bruto = float(getattr(booking, 'total', 0) or 0)
+                pagado_bruto = float(getattr(booking, 'pagado', 0) or 0)
+            except Exception:
+                total_bruto = 0.0
+                pagado_bruto = 0.0
+            saldo_bruto = max(total_bruto - pagado_bruto, 0.0)
+
+            def format_clp(value: float) -> str:
+                try:
+                    return ("$" + f"{value:,.0f}").replace(",", ".")
+                except Exception:
+                    return f"${int(value)}"
+
             context = {
                 'nombre': cliente.nombre,
                 'apellido': getattr(cliente, 'apellido', ''),  # Apellido opcional
@@ -192,6 +207,11 @@ class CommunicationService:
                 'hora': hora_str,
                 'numero_reserva': booking.id,
                 'servicios': servicios_list,
+                # Pagos
+                'total_monto': format_clp(total_bruto),
+                'pagado_monto': format_clp(pagado_bruto),
+                'saldo_monto': format_clp(saldo_bruto),
+                'monto_pagado_cero': pagado_bruto <= 0.0,
             }
             
             # Renderizar email HTML
