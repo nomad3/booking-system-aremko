@@ -147,6 +147,35 @@ class CommunicationService:
     def _send_confirmation_email(self, cliente, booking, servicio_nombre, fecha_str, hora_str):
         """Envía Email de confirmación"""
         try:
+            # Construir lista de servicios contratados para este booking
+            try:
+                from ..models import ReservaServicio
+                servicios_qs = ReservaServicio.objects.filter(venta_reserva=booking).select_related('servicio')
+            except Exception:
+                servicios_qs = []
+
+            servicios_list = []
+            for rs in servicios_qs:
+                nombre = getattr(getattr(rs, 'servicio', None), 'nombre', 'Servicio')
+                fecha_fmt = getattr(rs, 'fecha_agendamiento', None)
+                fecha_fmt = fecha_fmt.strftime('%d/%m/%Y') if hasattr(fecha_fmt, 'strftime') else str(fecha_fmt) if fecha_fmt else ''
+                hora_fmt = str(getattr(rs, 'hora_inicio', '') or '')
+                personas = getattr(rs, 'cantidad_personas', None)
+                servicios_list.append({
+                    'nombre': nombre,
+                    'fecha': fecha_fmt,
+                    'hora': hora_fmt,
+                    'personas': personas,
+                })
+
+            # Ajustar asunto cuando hay múltiples servicios
+            if len(servicios_list) > 1:
+                subject_service_name = f"{servicios_list[0]['nombre']} + {len(servicios_list) - 1} más"
+            elif len(servicios_list) == 1:
+                subject_service_name = servicios_list[0]['nombre']
+            else:
+                subject_service_name = servicio_nombre
+
             # Preparar contexto para el template
             context = {
                 'nombre': cliente.nombre,
@@ -155,6 +184,7 @@ class CommunicationService:
                 'servicio': servicio_nombre,
                 'fecha': fecha_str,
                 'hora': hora_str,
+                'servicios': servicios_list,
             }
             
             # Renderizar email HTML
@@ -162,7 +192,7 @@ class CommunicationService:
             
             # Crear email
             email = EmailMultiAlternatives(
-                subject=f'✅ Confirmación de Reserva - {servicio_nombre}',
+                subject=f'✅ Confirmación de Reserva - {subject_service_name}',
                 body=f'Estimado/a {cliente.nombre}, su reserva para {servicio_nombre} el {fecha_str} a las {hora_str} ha sido confirmada.',
                 # Usamos el usuario autenticado en SMTP para máxima entregabilidad
                 from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),

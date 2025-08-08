@@ -103,10 +103,26 @@
                 <span class="label">🕐 Hora:</span>
                 <span class="value">{{ hora }}</span>
             </div>
+            {% if servicios and servicios|length > 0 %}
+            <div class="detail-row">
+                <span class="label">🏷️ Servicios:</span>
+                <span class="value">{{ servicios|length }} reservados</span>
+            </div>
+            </div>
+
+            <div class="details" style="margin-top: 10px;">
+                {% for s in servicios %}
+                <div class="detail-row">
+                    <span class="label">• {{ s.nombre }}</span>
+                    <span class="value">{{ s.fecha }} {{ s.hora }}{% if s.personas %} · {{ s.personas }} pers.{% endif %}</span>
+                </div>
+                {% endfor %}
+            {% else %}
             <div class="detail-row">
                 <span class="label">🏷️ Servicio:</span>
                 <span class="value">{{ servicio }}</span>
             </div>
+            {% endif %}
             <div class="detail-row">
                 <span class="label">👤 Cliente:</span>
                 <span class="value">{{ nombre }}{% if apellido %} {{ apellido }}{% endif %}</span>
