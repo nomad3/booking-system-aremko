@@ -150,7 +150,13 @@ class CommunicationService:
             # Construir lista de servicios contratados para este booking
             try:
                 from ..models import ReservaServicio
-                servicios_qs = ReservaServicio.objects.filter(venta_reserva=booking).select_related('servicio')
+                # Ordenar por fecha y hora ascendente
+                servicios_qs = (
+                    ReservaServicio.objects
+                    .filter(venta_reserva=booking)
+                    .select_related('servicio')
+                    .order_by('fecha_agendamiento', 'hora_inicio')
+                )
             except Exception:
                 servicios_qs = []
 

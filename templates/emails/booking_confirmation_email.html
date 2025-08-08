@@ -99,10 +99,7 @@
                 <span class="label">📅 Fecha:</span>
                 <span class="value">{{ fecha }}</span>
             </div>
-            <div class="detail-row">
-                <span class="label">🕐 Hora:</span>
-                <span class="value">{{ hora }}</span>
-            </div>
+            {# La hora general se omite; cada servicio lista su propia hora #}
             <div class="detail-row">
                 <span class="label">#️⃣ Número de reserva:</span>
                 <span class="value">{{ numero_reserva }}</span>
@@ -118,7 +115,7 @@
                 {% for s in servicios %}
                 <div class="detail-row">
                     <span class="label">• {{ s.nombre }}</span>
-                    <span class="value">{{ s.fecha }} {{ s.hora }}{% if s.personas %} · {{ s.personas }} pers.{% endif %}</span>
+                    <span class="value">{{ s.fecha }}{% if s.hora %} {{ s.hora }}{% endif %}{% if s.personas %} · {{ s.personas }} pers.{% endif %}</span>
                 </div>
                 {% endfor %}
             {% else %}
