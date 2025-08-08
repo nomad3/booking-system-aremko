@@ -13,7 +13,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.conf import settings
 
-from ..models import VentaReserva, Cliente, ReservaServicio, CommunicationLog
+from ..models import VentaReserva, Cliente, ReservaServicio, CommunicationLog, Pago
 from .communication_service import communication_service
 
 logger = logging.getLogger(__name__)
@@ -109,6 +109,38 @@ def handle_service_added(sender, instance, created, **kwargs):
             threading.Timer(60.0, _send_if_stable).start()
         except Exception as e:
             logger.error(f"Error en handle_service_added: {str(e)}")
+
+
+@receiver(post_save, sender=Pago)
+def handle_full_payment(sender, instance, created, **kwargs):
+    """
+    Cuando se registra un pago, si la reserva queda con saldo cero, enviar notificación de pago completo.
+    """
+    try:
+        booking = getattr(instance, 'venta_reserva', None) or getattr(instance, 'reserva', None)
+        if not booking:
+            return
+        # Recalcular total y pagado por seguridad
+        total = float(getattr(booking, 'total', 0) or 0)
+        pagado = float(getattr(booking, 'pagado', 0) or 0)
+        if total > 0 and pagado >= total:
+            # Evitar duplicados si ya se envió
+            already = CommunicationLog.objects.filter(
+                booking_id=booking.id,
+                communication_type='EMAIL',
+                message_type='BOOKING_CONFIRMATION',
+                subject__icontains='Pago recibido',
+                status__in=['SENT', 'PENDING']
+            ).exists()
+            if already:
+                return
+            result = communication_service.send_full_payment_notification_dual(booking_id=booking.id)
+            if result.get('success'):
+                logger.info(f"✅ Notificación de pago completo enviada para reserva {booking.id}")
+            else:
+                logger.warning(f"⚠️ No se envió notificación pago completo para reserva {booking.id}: {result}")
+    except Exception as e:
+        logger.error(f"Error en handle_full_payment: {str(e)}")
 
 
 def schedule_booking_reminders():

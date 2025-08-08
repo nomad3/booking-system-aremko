@@ -393,6 +393,134 @@ class CommunicationService:
         except Exception as e:
             logger.error(f"Error en send_booking_reminder_dual: {str(e)}")
             return {'success': False, 'error': str(e)}
+
+    # =====================
+    #  PAGO 100% CONFIRMADO
+    # =====================
+    def _send_payment_email(self, cliente, booking):
+        """Email cuando la reserva queda pagada al 100%"""
+        try:
+            from ..models import ReservaServicio
+            servicios_qs = (
+                ReservaServicio.objects
+                .filter(venta_reserva=booking)
+                .select_related('servicio')
+                .order_by('fecha_agendamiento', 'hora_inicio')
+            )
+            servicios_list = []
+            for rs in servicios_qs:
+                nombre = getattr(getattr(rs, 'servicio', None), 'nombre', 'Servicio')
+                fecha_fmt = getattr(rs, 'fecha_agendamiento', None)
+                fecha_fmt = fecha_fmt.strftime('%d/%m/%Y') if hasattr(fecha_fmt, 'strftime') else str(fecha_fmt) if fecha_fmt else ''
+                hora_fmt = str(getattr(rs, 'hora_inicio', '') or '')
+                personas = getattr(rs, 'cantidad_personas', None)
+                servicios_list.append({'nombre': nombre, 'fecha': fecha_fmt, 'hora': hora_fmt, 'personas': personas})
+
+            def format_clp(v: float) -> str:
+                try:
+                    return ("$" + f"{v:,.0f}").replace(",", ".")
+                except Exception:
+                    return f"${int(v)}"
+
+            total = float(getattr(booking, 'total', 0) or 0)
+            pagado = float(getattr(booking, 'pagado', 0) or 0)
+
+            context = {
+                'nombre': cliente.nombre,
+                'apellido': getattr(cliente, 'apellido', ''),
+                'telefono': cliente.telefono,
+                'numero_reserva': booking.id,
+                'servicios': servicios_list,
+                'total_monto': format_clp(total),
+                'pagado_monto': format_clp(pagado),
+            }
+
+            html_content = render_to_string('emails/payment_complete_email.html', context)
+
+            subject = f"Pago recibido - Reserva #{booking.id} pagada 100%"
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=f"Hola {cliente.nombre}, registramos tu pago y tu reserva quedó pagada al 100%.",
+                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                to=[cliente.email],
+                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+            )
+            email.attach_alternative(html_content, "text/html")
+            email.send()
+
+            # Usamos el tipo BOOKING_CONFIRMATION para evitar migraciones en choices
+            self._log_communication(
+                cliente=cliente,
+                communication_type='EMAIL',
+                message_type='BOOKING_CONFIRMATION',
+                subject=subject,
+                content=html_content,
+                destination=cliente.email,
+                booking_id=booking.id,
+                cost=0
+            )
+
+            self._update_communication_limits(cliente, 'EMAIL')
+            return {'success': True}
+        except Exception as e:
+            logger.error(f"Error en _send_payment_email: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def _send_payment_sms(self, cliente, booking):
+        """SMS cuando la reserva queda pagada al 100%"""
+        try:
+            message = f"Pago recibido ✅ Reserva #{booking.id} pagada 100%. ¡Gracias! - Aremko"
+            result = self.sms_service.send_sms(
+                destination=cliente.telefono,
+                message=message,
+                bulk_name=f"Pago 100% {booking.id}"
+            )
+            if result.get('success'):
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='SMS',
+                    message_type='BOOKING_CONFIRMATION',
+                    content=message,
+                    destination=cliente.telefono,
+                    external_id=result.get('batch_id', ''),
+                    booking_id=booking.id,
+                    cost=12
+                )
+                self._update_communication_limits(cliente, 'SMS')
+                return {'success': True}
+            return {'success': False, 'error': result.get('error')}
+        except Exception as e:
+            logger.error(f"Error en _send_payment_sms: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def send_full_payment_notification_dual(self, booking_id):
+        """Envía Email + SMS (si habilitado) cuando la reserva queda pagada al 100%"""
+        try:
+            booking = VentaReserva.objects.get(id=booking_id)
+            cliente = booking.cliente
+            total = float(getattr(booking, 'total', 0) or 0)
+            pagado = float(getattr(booking, 'pagado', 0) or 0)
+
+            if total <= 0 or pagado < total:
+                return {'success': False, 'reason': 'not_fully_paid'}
+
+            results = {'email': None, 'sms': None}
+            # Email
+            if self._can_send_communication(cliente, 'EMAIL', 'BOOKING_CONFIRMATION'):
+                results['email'] = self._send_payment_email(cliente, booking)
+
+            # SMS
+            from django.conf import settings as djsettings
+            if self._can_send_communication(cliente, 'SMS', 'BOOKING_CONFIRMATION') and getattr(djsettings, 'COMMUNICATION_SMS_ENABLED', True):
+                results['sms'] = self._send_payment_sms(cliente, booking)
+
+            return {
+                'success': (results['email'] and results['email'].get('success')) or (results['sms'] and results['sms'].get('success')),
+                'results': results,
+            }
+        except Exception as e:
+            logger.error(f"Error en send_full_payment_notification_dual: {str(e)}")
+            return {'success': False, 'error': str(e)}
     
     def send_booking_confirmation_sms(self, booking_id, cliente_id=None):
         """
