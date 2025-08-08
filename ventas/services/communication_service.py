@@ -62,7 +62,8 @@ class CommunicationService:
             results = {'sms': None, 'email': None}
             
             # 1. ENVIAR SMS
-            if sms_allowed:
+            from django.conf import settings as djsettings
+            if sms_allowed and getattr(djsettings, 'COMMUNICATION_SMS_ENABLED', True):
                 results['sms'] = self._send_confirmation_sms(
                     cliente, booking, servicio_nombre, fecha_str, hora_str
                 )
