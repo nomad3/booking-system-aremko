@@ -7,6 +7,8 @@ Maneja el envío automático de mensajes basado en eventos del sistema
 import logging
 from datetime import datetime, timedelta
 from django.utils import timezone
+from django.core.cache import cache
+import threading
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.conf import settings
@@ -63,6 +65,7 @@ def handle_service_added(sender, instance, created, **kwargs):
     if created and instance.venta_reserva and instance.venta_reserva.cliente:
         booking = instance.venta_reserva
         try:
+            # Si ya se envió, no hacer nada
             already_sent = CommunicationLog.objects.filter(
                 booking_id=booking.id,
                 communication_type='EMAIL',
@@ -71,17 +74,39 @@ def handle_service_added(sender, instance, created, **kwargs):
             ).exists()
             if already_sent:
                 return
-            logger.info(
-                f"Primer servicio agregado a reserva {booking.id}. Enviando confirmación ahora."
-            )
-            result = communication_service.send_booking_confirmation_dual(
-                booking_id=booking.id,
-                cliente_id=booking.cliente.id
-            )
-            if result.get('success'):
-                logger.info(f"✅ Confirmación enviada tras agregar servicio para reserva {booking.id}")
-            else:
-                logger.warning(f"⚠️ No se pudo enviar confirmación tras agregar servicio {booking.id}: {result}")
+
+            # Debounce: enviar 60s después del último servicio agregado
+            cache_key = f"booking_confirm_debounce_{booking.id}"
+            token = timezone.now().isoformat()
+            cache.set(cache_key, token, timeout=300)
+
+            def _send_if_stable():
+                try:
+                    current = cache.get(cache_key)
+                    if current != token:
+                        return  # llegó otro servicio, se reprograma con el nuevo token
+                    # Re-chequear que existan servicios y que no se haya enviado aún
+                    if not ReservaServicio.objects.filter(venta_reserva=booking).exists():
+                        return
+                    already = CommunicationLog.objects.filter(
+                        booking_id=booking.id,
+                        communication_type='EMAIL',
+                        message_type='BOOKING_CONFIRMATION',
+                        status__in=['SENT', 'PENDING']
+                    ).exists()
+                    if already:
+                        return
+                    logger.info(
+                        f"Enviando confirmación consolidada (debounce) para reserva {booking.id}"
+                    )
+                    communication_service.send_booking_confirmation_dual(
+                        booking_id=booking.id,
+                        cliente_id=booking.cliente.id
+                    )
+                except Exception as ex:
+                    logger.error(f"Error en debounce confirmación reserva {booking.id}: {ex}")
+
+            threading.Timer(60.0, _send_if_stable).start()
         except Exception as e:
             logger.error(f"Error en handle_service_added: {str(e)}")
 
