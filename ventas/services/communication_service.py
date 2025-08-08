@@ -163,8 +163,10 @@ class CommunicationService:
             email = EmailMultiAlternatives(
                 subject=f'✅ Confirmación de Reserva - {servicio_nombre}',
                 body=f'Estimado/a {cliente.nombre}, su reserva para {servicio_nombre} el {fecha_str} a las {hora_str} ha sido confirmada.',
-                from_email=getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                # Usamos el usuario autenticado en SMTP para máxima entregabilidad
+                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
                 to=[cliente.email],
+                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
             )
             email.attach_alternative(html_content, "text/html")
             
