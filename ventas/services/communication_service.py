@@ -375,6 +375,16 @@ class CommunicationService:
             if timezone.now() < reminder_time:
                 return {'success': False, 'reason': 'too_early'}
 
+            # Evitar duplicados: si ya existe un log de recordatorio para este booking hoy, no reenviar
+            from ..models import CommunicationLog
+            already_sent = CommunicationLog.objects.filter(
+                booking_id=booking.id,
+                message_type='BOOKING_REMINDER',
+                status__in=['SENT', 'PENDING']
+            ).exists()
+            if already_sent:
+                return {'success': False, 'reason': 'already_sent'}
+
             results = {'email': None, 'sms': None}
 
             # EMAIL

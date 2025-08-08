@@ -178,6 +178,15 @@ def schedule_booking_reminders():
         
         for reserva in reservas_mañana:
             try:
+                # Evitar reenvíos si ya existe un log para este booking
+                already = CommunicationLog.objects.filter(
+                    booking_id=reserva.id,
+                    message_type='BOOKING_REMINDER',
+                    status__in=['SENT', 'PENDING']
+                ).exists()
+                if already:
+                    continue
+
                 result = communication_service.send_booking_reminder_dual(
                     booking_id=reserva.id,
                     hours_before=24
