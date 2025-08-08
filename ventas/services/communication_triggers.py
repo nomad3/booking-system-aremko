@@ -7,6 +7,8 @@ Maneja el envío automático de mensajes basado en eventos del sistema
 import logging
 from datetime import datetime, timedelta
 from django.utils import timezone
+from django.db import transaction
+from django.db.models import Sum
 from django.core.cache import cache
 import threading
 from django.db.models.signals import post_save, pre_save
@@ -120,25 +122,34 @@ def handle_full_payment(sender, instance, created, **kwargs):
         booking = getattr(instance, 'venta_reserva', None) or getattr(instance, 'reserva', None)
         if not booking:
             return
-        # Recalcular total y pagado por seguridad
-        total = float(getattr(booking, 'total', 0) or 0)
-        pagado = float(getattr(booking, 'pagado', 0) or 0)
-        if total > 0 and pagado >= total:
-            # Evitar duplicados si ya se envió
-            already = CommunicationLog.objects.filter(
-                booking_id=booking.id,
-                communication_type='EMAIL',
-                message_type='BOOKING_CONFIRMATION',
-                subject__icontains='Pago recibido',
-                status__in=['SENT', 'PENDING']
-            ).exists()
-            if already:
-                return
-            result = communication_service.send_full_payment_notification_dual(booking_id=booking.id)
-            if result.get('success'):
-                logger.info(f"✅ Notificación de pago completo enviada para reserva {booking.id}")
-            else:
-                logger.warning(f"⚠️ No se envió notificación pago completo para reserva {booking.id}: {result}")
+
+        def _after_commit():
+            try:
+                # Recalcular total pagado por suma de pagos (evita depender de campos no actualizados aún)
+                pagos_sum = booking.pagos.aggregate(total=Sum('monto')).get('total') if hasattr(booking, 'pagos') else None
+                pagado_calc = float(pagos_sum or 0)
+                total = float(getattr(booking, 'total', 0) or 0)
+                if total > 0 and pagado_calc >= total:
+                    # Evitar duplicados si ya se envió
+                    already = CommunicationLog.objects.filter(
+                        booking_id=booking.id,
+                        communication_type='EMAIL',
+                        message_type='BOOKING_CONFIRMATION',
+                        subject__icontains='Pago recibido',
+                        status__in=['SENT', 'PENDING']
+                    ).exists()
+                    if already:
+                        return
+                    result = communication_service.send_full_payment_notification_dual(booking_id=booking.id)
+                    if result.get('success'):
+                        logger.info(f"✅ Notificación de pago completo enviada para reserva {booking.id}")
+                    else:
+                        logger.warning(f"⚠️ No se envió notificación pago completo para reserva {booking.id}: {result}")
+            except Exception as ex:
+                logger.error(f"Error post-commit en handle_full_payment: {str(ex)}")
+
+        # Asegurar que corra después de que el pago quede persistido
+        transaction.on_commit(_after_commit)
     except Exception as e:
         logger.error(f"Error en handle_full_payment: {str(e)}")
 
