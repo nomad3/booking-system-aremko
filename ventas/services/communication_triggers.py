@@ -124,9 +124,10 @@ def schedule_booking_reminders():
         window_end = now + timedelta(hours=25)
 
         # VentaReserva con al menos un servicio cuya fecha esté entre window_start y window_end
+        # Nota: el related_name correcto es 'reservaservicios'
         reservas_mañana = (
             VentaReserva.objects.filter(
-                reservaservicio__fecha_agendamiento__range=(window_start.date(), window_end.date())
+                reservaservicios__fecha_agendamiento__range=(window_start.date(), window_end.date())
             ).distinct()
         )
         
