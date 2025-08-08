@@ -252,6 +252,147 @@ class CommunicationService:
         except Exception as e:
             logger.error(f"Error en _send_confirmation_email: {str(e)}")
             return {'success': False, 'error': str(e)}
+
+    def _send_reminder_email(self, cliente, booking):
+        """Envía Email de recordatorio 24h antes con los mismos datos del correo de reserva"""
+        try:
+            # Reutilizar el armado de contexto igual que confirmación
+            # Encontrar primer servicio para fecha/hora de encabezado
+            from ..models import ReservaServicio
+            rs_first = (
+                ReservaServicio.objects
+                .filter(venta_reserva=booking)
+                .select_related('servicio')
+                .order_by('fecha_agendamiento', 'hora_inicio')
+            ).first()
+
+            if rs_first:
+                servicio_nombre = rs_first.servicio.nombre
+                fecha_str = rs_first.fecha_agendamiento.strftime('%d/%m/%Y') if hasattr(rs_first.fecha_agendamiento, 'strftime') else str(rs_first.fecha_agendamiento)
+                hora_str = str(rs_first.hora_inicio)
+            else:
+                servicio_nombre = 'tu servicio'
+                fecha_str = booking.fecha_reserva.strftime('%d/%m/%Y')
+                hora_str = booking.fecha_reserva.strftime('%H:%M')
+
+            # Construir el mismo contexto que confirmación
+            # Lista de servicios
+            servicios_qs = (
+                ReservaServicio.objects
+                .filter(venta_reserva=booking)
+                .select_related('servicio')
+                .order_by('fecha_agendamiento', 'hora_inicio')
+            )
+            servicios_list = []
+            for rs in servicios_qs:
+                nombre = getattr(getattr(rs, 'servicio', None), 'nombre', 'Servicio')
+                fecha_fmt = getattr(rs, 'fecha_agendamiento', None)
+                fecha_fmt = fecha_fmt.strftime('%d/%m/%Y') if hasattr(fecha_fmt, 'strftime') else str(fecha_fmt) if fecha_fmt else ''
+                hora_fmt = str(getattr(rs, 'hora_inicio', '') or '')
+                personas = getattr(rs, 'cantidad_personas', None)
+                servicios_list.append({'nombre': nombre, 'fecha': fecha_fmt, 'hora': hora_fmt, 'personas': personas})
+
+            # Montos
+            total = float(getattr(booking, 'total', 0) or 0)
+            pagado = float(getattr(booking, 'pagado', 0) or 0)
+            saldo = max(total - pagado, 0.0)
+            def format_clp(v: float) -> str:
+                try:
+                    return ("$" + f"{v:,.0f}").replace(",", ".")
+                except Exception:
+                    return f"${int(v)}"
+
+            context = {
+                'nombre': cliente.nombre,
+                'apellido': getattr(cliente, 'apellido', ''),
+                'telefono': cliente.telefono,
+                'servicio': servicio_nombre,
+                'fecha': fecha_str,
+                'hora': hora_str,
+                'numero_reserva': booking.id,
+                'servicios': servicios_list,
+                'total_monto': format_clp(total),
+                'pagado_monto': format_clp(pagado),
+                'saldo_monto': format_clp(saldo),
+                'monto_pagado_cero': pagado <= 0.0,
+            }
+
+            html_content = render_to_string('emails/booking_reminder_email.html', context)
+
+            # Asunto
+            subject_service_name = servicios_list[0]['nombre'] if servicios_list else servicio_nombre
+            email = EmailMultiAlternatives(
+                subject=f"Recordatorio: tu reserva es mañana - {subject_service_name}",
+                body=f"Hola {cliente.nombre}, te recordamos tu reserva de mañana.",
+                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                to=[cliente.email],
+                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+            )
+            email.attach_alternative(html_content, "text/html")
+            email.send()
+
+            # Log
+            self._log_communication(
+                cliente=cliente,
+                communication_type='EMAIL',
+                message_type='BOOKING_REMINDER',
+                subject=f"Recordatorio: tu reserva es mañana - {subject_service_name}",
+                content=html_content,
+                destination=cliente.email,
+                booking_id=booking.id,
+                cost=0
+            )
+
+            # Actualizar límites
+            self._update_communication_limits(cliente, 'EMAIL')
+
+            return {'success': True}
+        except Exception as e:
+            logger.error(f"Error en _send_reminder_email: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def send_booking_reminder_dual(self, booking_id, hours_before=24):
+        """Envía recordatorio (EMAIL + SMS) 24h antes del primer servicio"""
+        try:
+            booking = VentaReserva.objects.get(id=booking_id)
+            cliente = booking.cliente
+
+            # Encontrar primer servicio para determinar la hora
+            from ..models import ReservaServicio
+            rs_first = (
+                ReservaServicio.objects
+                .filter(venta_reserva=booking)
+                .order_by('fecha_agendamiento', 'hora_inicio')
+            ).first()
+
+            if rs_first:
+                from datetime import datetime as dt
+                booking_dt = timezone.make_aware(dt.combine(rs_first.fecha_agendamiento, dt.strptime(str(rs_first.hora_inicio), '%H:%M').time())) if hasattr(rs_first, 'fecha_agendamiento') else booking.fecha_reserva
+            else:
+                booking_dt = booking.fecha_reserva
+
+            reminder_time = booking_dt - timedelta(hours=hours_before)
+            if timezone.now() < reminder_time:
+                return {'success': False, 'reason': 'too_early'}
+
+            results = {'email': None, 'sms': None}
+
+            # EMAIL
+            if self._can_send_communication(cliente, 'EMAIL', 'BOOKING_REMINDER'):
+                results['email'] = self._send_reminder_email(cliente, booking)
+
+            # SMS (respetar flag global)
+            from django.conf import settings as djsettings
+            if self._can_send_communication(cliente, 'SMS', 'BOOKING_REMINDER') and getattr(djsettings, 'COMMUNICATION_SMS_ENABLED', True):
+                results['sms'] = self.send_booking_reminder_sms(booking_id)
+
+            return {
+                'success': (results['email'] and results['email'].get('success')) or (results['sms'] and results['sms'].get('success')),
+                'results': results,
+            }
+        except Exception as e:
+            logger.error(f"Error en send_booking_reminder_dual: {str(e)}")
+            return {'success': False, 'error': str(e)}
     
     def send_booking_confirmation_sms(self, booking_id, cliente_id=None):
         """

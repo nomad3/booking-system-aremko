@@ -117,24 +117,24 @@ def schedule_booking_reminders():
     Busca reservas que necesitan recordatorio (24h antes)
     """
     try:
-        # Buscar reservas para mañana (24h de diferencia aprox)
-        tomorrow = timezone.now().date() + timedelta(days=1)
-        
-        # Obtener reservas de mañana que aún no han recibido recordatorio
-        reservas_mañana = VentaReserva.objects.filter(
-            fecha_reserva=tomorrow
-        ).exclude(
-            # Excluir las que ya tienen un log de recordatorio
-            cliente__communication_logs__message_type='BOOKING_REMINDER',
-            cliente__communication_logs__booking_id=models.F('id'),
-            cliente__communication_logs__status='SENT'
+        # Buscar reservas cuyo primer servicio ocurre en ~24h
+        from ..models import ReservaServicio
+        now = timezone.now()
+        window_start = now + timedelta(hours=23)
+        window_end = now + timedelta(hours=25)
+
+        # VentaReserva con al menos un servicio cuya fecha esté entre window_start y window_end
+        reservas_mañana = (
+            VentaReserva.objects.filter(
+                reservaservicio__fecha_agendamiento__range=(window_start.date(), window_end.date())
+            ).distinct()
         )
         
         logger.info(f"Procesando {reservas_mañana.count()} recordatorios de reserva")
         
         for reserva in reservas_mañana:
             try:
-                result = communication_service.send_booking_reminder_sms(
+                result = communication_service.send_booking_reminder_dual(
                     booking_id=reserva.id,
                     hours_before=24
                 )
