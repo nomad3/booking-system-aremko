@@ -23,6 +23,7 @@ Sistema integral para la gestión de reservas de servicios y productos, compleme
 - [Uso](#uso)
 - [Buenas Prácticas](#buenas-prácticas)
 - [Recursos Adicionales](#recursos-adicionales)
+ - [Módulo IA](#módulo-ia)
 
 ---
 
@@ -258,3 +259,13 @@ Las migraciones de Django son esenciales para mantener la estructura de la base 
 - [Gunicorn Documentation](https://docs.gunicorn.org/en/stable/)
 
 now you can create the helm chart with the provided instructions.
+
+---
+
+## Módulo IA
+
+Consulta el diseño funcional y técnico del Módulo IA (Fase 1: Chat IA de negocio, Recomendaciones por cliente y Copiloto de campañas) en el documento dedicado:
+
+- `docs/modulo_ia.md`
+
+Este módulo está planificado para añadir capacidades de análisis, personalización y apoyo a marketing, con foco en seguridad (solo lectura para consultas) y control de costos.
