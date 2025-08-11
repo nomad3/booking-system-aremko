@@ -1162,8 +1162,8 @@ class CommunicationService:
             return False
         
         # Verificar límites de frecuencia
-        # Los mensajes transaccionales (confirmación y recordatorio) NO deben bloquearse por límite
-        transactional_types = ['BOOKING_CONFIRMATION', 'BOOKING_REMINDER']
+        # Los mensajes transaccionales NO deben bloquearse por límite
+        transactional_types = ['BOOKING_CONFIRMATION', 'BOOKING_REMINDER', 'SATISFACTION_SURVEY']
         if message_type not in transactional_types:
             limit, created = CommunicationLimit.objects.get_or_create(cliente=cliente)
             if communication_type == 'SMS' and not limit.can_send_sms():
