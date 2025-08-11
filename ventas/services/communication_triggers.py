@@ -214,31 +214,31 @@ def schedule_satisfaction_surveys():
         today = timezone.now().date()
         yesterday = today - timedelta(days=1)
 
-        # Tomar clientes que tuvieron alguna reserva AYER (sin duplicar)
-        reservas_ayer = (
-            VentaReserva.objects
-            .filter(fecha_reserva__date=yesterday)
-            .select_related('cliente')
+        # Tomar clientes cuya ÚLTIMA fecha de servicio (ReservaServicio.fecha_agendamiento) fue AYER
+        servicios_ayer = (
+            ReservaServicio.objects
+            .filter(fecha_agendamiento=yesterday)
+            .select_related('venta_reserva__cliente')
         )
-        cliente_ids = {r.cliente_id for r in reservas_ayer}
-        logger.info(f"Procesando encuestas para {len(cliente_ids)} clientes con reservas el {yesterday}")
+        cliente_ids = {s.venta_reserva.cliente_id for s in servicios_ayer if s.venta_reserva and s.venta_reserva.cliente_id}
+        logger.info(f"Procesando encuestas para {len(cliente_ids)} clientes con servicios el {yesterday}")
 
         procesados = 0
         for cid in cliente_ids:
             try:
-                # Última reserva del cliente
-                last_booking = (
-                    VentaReserva.objects
-                    .filter(cliente_id=cid)
-                    .order_by('-fecha_reserva')
+                # Última fecha de servicio del cliente
+                last_service = (
+                    ReservaServicio.objects
+                    .filter(venta_reserva__cliente_id=cid)
+                    .order_by('-fecha_agendamiento', '-hora_inicio')
                     .first()
                 )
-                if not last_booking or last_booking.fecha_reserva.date() != yesterday:
+                if not last_service or last_service.fecha_agendamiento != yesterday:
                     continue
 
                 # Evitar duplicados por booking
                 already = CommunicationLog.objects.filter(
-                    booking_id=last_booking.id,
+                    booking_id=last_service.venta_reserva_id,
                     message_type='SATISFACTION_SURVEY',
                     status__in=['SENT', 'PENDING']
                 ).exists()
@@ -246,7 +246,7 @@ def schedule_satisfaction_surveys():
                     continue
 
                 communication_service.send_satisfaction_survey(
-                    cliente_id=last_booking.cliente_id,
+                    cliente_id=cid,
                     last_stay_date=yesterday
                 )
                 procesados += 1

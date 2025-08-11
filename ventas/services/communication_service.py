@@ -358,7 +358,7 @@ class CommunicationService:
             booking = VentaReserva.objects.get(id=booking_id)
             cliente = booking.cliente
 
-            # Encontrar primer servicio para determinar la hora
+            # Encontrar primer servicio para determinar la hora (no usar fecha de creación de la reserva)
             from ..models import ReservaServicio
             rs_first = (
                 ReservaServicio.objects
