@@ -619,6 +619,81 @@ class CommunicationService:
         except Exception as e:
             logger.error(f"Error en send_reactivation_giftcard_sms: {str(e)}")
             return {'success': False, 'error': str(e)}
+
+    # =============================
+    #  ENCUESTA DE SATISFACCION 24h
+    # =============================
+    def send_satisfaction_survey(self, cliente_id, last_stay_date):
+        """Envía email (y SMS opcional) de encuesta el día siguiente a la última estadía a las 09:00"""
+        try:
+            cliente = Cliente.objects.get(id=cliente_id)
+            if not self._can_send_communication(cliente, 'EMAIL', 'SATISFACTION_SURVEY'):
+                return {'success': False, 'reason': 'blocked_by_limits_or_preferences'}
+
+            from django.conf import settings as djsettings
+            survey_base = getattr(djsettings, 'SURVEY_PUBLIC_BASE_URL', '')
+            trip_url = getattr(djsettings, 'TRIPADVISOR_URL', '')
+            survey_url = f"{survey_base}?cliente={cliente.id}"
+
+            context = {
+                'nombre': cliente.nombre,
+                'fecha_ultima_estadia': last_stay_date.strftime('%d/%m/%Y'),
+                'survey_url': survey_url,
+                'tripadvisor_url': trip_url,
+            }
+            html_content = render_to_string('emails/satisfaction_survey_email.html', context)
+            subject = '¿Cómo estuvo tu experiencia en Aremko?'
+
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=(
+                    f"Hola {cliente.nombre}, esperamos que tu experiencia en Aremko haya sido excelente. "
+                    f"Cuéntanos cómo te fue respondiendo esta encuesta: {survey_url}. "
+                    f"Si quieres, también puedes dejarnos tu opinión en TripAdvisor: {trip_url}."
+                ),
+                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                to=[cliente.email] if cliente.email else [],
+                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+            )
+            if cliente.email:
+                email.attach_alternative(html_content, "text/html")
+                email.send()
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='EMAIL',
+                    message_type='SATISFACTION_SURVEY',
+                    subject=subject,
+                    content=html_content,
+                    destination=cliente.email,
+                )
+                self._update_communication_limits(cliente, 'EMAIL')
+
+            # SMS opcional
+            if self._can_send_communication(cliente, 'SMS', 'SATISFACTION_SURVEY') and getattr(djsettings, 'COMMUNICATION_SMS_ENABLED', True):
+                msg = (
+                    f"Hola {cliente.nombre}, ¿cómo estuvo tu experiencia en Aremko? Cuéntanos aquí: {survey_url}. "
+                    f"También puedes opinar en TripAdvisor: {trip_url}. Gracias!"
+                )
+                result = self.sms_service.send_sms(
+                    destination=cliente.telefono,
+                    message=msg,
+                    bulk_name='Encuesta Satisfacción'
+                )
+                if result.get('success'):
+                    self._log_communication(
+                        cliente=cliente,
+                        communication_type='SMS',
+                        message_type='SATISFACTION_SURVEY',
+                        content=msg,
+                        destination=cliente.telefono,
+                        external_id=result.get('batch_id', ''),
+                    )
+                    self._update_communication_limits(cliente, 'SMS')
+
+            return {'success': True}
+        except Exception as e:
+            logger.error(f"Error en send_satisfaction_survey: {str(e)}")
+            return {'success': False, 'error': str(e)}
     
     def send_booking_confirmation_sms(self, booking_id, cliente_id=None):
         """

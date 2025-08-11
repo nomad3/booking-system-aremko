@@ -210,34 +210,42 @@ def schedule_satisfaction_surveys():
     Busca reservas que terminaron hace 24h y aún no tienen encuesta
     """
     try:
-        # Buscar reservas que terminaron ayer (24h después del servicio)
-        yesterday = timezone.now().date() - timedelta(days=1)
-        
-        # Obtener reservas de ayer que no han recibido encuesta
-        reservas_ayer = VentaReserva.objects.filter(
-            fecha_reserva=yesterday
-        ).exclude(
-            cliente__communication_logs__message_type='SATISFACTION_SURVEY',
-            cliente__communication_logs__booking_id=models.F('id'),
-            cliente__communication_logs__status='SENT'
-        )
-        
-        logger.info(f"Procesando {reservas_ayer.count()} encuestas de satisfacción")
-        
+        # Encuesta al día siguiente de la ÚLTIMA fecha de estadía por cliente
+        today = timezone.now().date()
+        yesterday = today - timedelta(days=1)
+
+        # Por performance, tomamos reservas cuya fecha == ayer
+        reservas_ayer = VentaReserva.objects.filter(fecha_reserva=yesterday)
+        logger.info(f"Procesando encuestas para reservas con fecha {yesterday}: {reservas_ayer.count()} posibles")
+
+        procesados = 0
         for reserva in reservas_ayer:
             try:
-                result = communication_service.send_satisfaction_survey_sms(
+                cliente = reserva.cliente
+                # Verificar que esta reserva sea la última del cliente
+                last_booking = VentaReserva.objects.filter(cliente=cliente).order_by('-fecha_reserva').first()
+                if not last_booking or last_booking.id != reserva.id:
+                    continue
+
+                # Evitar duplicados
+                already = CommunicationLog.objects.filter(
                     booking_id=reserva.id,
-                    hours_after=24
+                    message_type='SATISFACTION_SURVEY',
+                    status__in=['SENT', 'PENDING']
+                ).exists()
+                if already:
+                    continue
+
+                # Enviar encuesta (usa email + sms dentro del servicio)
+                communication_service.send_satisfaction_survey(
+                    cliente_id=cliente.id,
+                    last_stay_date=yesterday
                 )
-                
-                if result['success']:
-                    logger.info(f"Encuesta enviada para reserva {reserva.id}")
-                else:
-                    logger.debug(f"Encuesta no enviada para reserva {reserva.id}: {result.get('reason', 'unknown')}")
-                    
+                procesados += 1
             except Exception as e:
                 logger.error(f"Error enviando encuesta para reserva {reserva.id}: {str(e)}")
+
+        logger.info(f"Encuestas de satisfacción enviadas: {procesados}")
                 
     except Exception as e:
         logger.error(f"Error en schedule_satisfaction_surveys: {str(e)}")
