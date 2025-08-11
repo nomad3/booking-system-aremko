@@ -215,7 +215,8 @@ def schedule_satisfaction_surveys():
         yesterday = today - timedelta(days=1)
 
         # Por performance, tomamos reservas cuya fecha == ayer
-        reservas_ayer = VentaReserva.objects.filter(fecha_reserva=yesterday)
+        # Evita advertencia de timezone y asegura comparación por fecha
+        reservas_ayer = VentaReserva.objects.filter(fecha_reserva__date=yesterday)
         logger.info(f"Procesando encuestas para reservas con fecha {yesterday}: {reservas_ayer.count()} posibles")
 
         procesados = 0
