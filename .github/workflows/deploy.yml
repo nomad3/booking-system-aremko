@@ -1,0 +1,83 @@
+name: Build and Deploy to GKE
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GKE_CLUSTER: devagent-gke    # TODO: update to your cluster name
+  GKE_REGION: southamerica-west1  # TODO: update to your cluster region
+  IMAGE_NAME: aremko-booking-system
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Install gke-gcloud-auth-plugin
+        run: gcloud components install gke-gcloud-auth-plugin --quiet
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker
+
+      - name: Get branch name
+        id: branch-name
+        uses: tj-actions/branch-names@v7
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --tag "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:${{ steps.branch-name.outputs.current_branch }}" \
+            --build-arg "TAG=${{ steps.branch-name.outputs.current_branch }}" \
+            .
+
+      - name: Push Docker image
+        run: docker push "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:${{ steps.branch-name.outputs.current_branch }}"
+
+      - name: Get GKE credentials
+        run: gcloud container clusters get-credentials $GKE_CLUSTER --region $GKE_REGION
+
+      - name: Update Helm dependencies
+        run: helm dependency update ./charts
+
+      - name: Create namespace
+        run: kubectl create namespace reservas-${{ steps.branch-name.outputs.current_branch }} --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create gcp-creds secret for the application
+        run: |
+          echo "${{ secrets.GCP_CREDENTIALS_JSON }}" > gcp-credentials.json
+          kubectl create secret generic gcp-creds --from-file=gcp-credentials.json --namespace reservas-${{ steps.branch-name.outputs.current_branch }} --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy with Helm
+        run: |
+          helm_args="--install aremko-${{ steps.branch-name.outputs.current_branch }} ./charts \
+            --set image.repository=\"gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME\" \
+            --set image.tag=\"${{ steps.branch-name.outputs.current_branch }}\" \
+            --set ingress.enabled=true \
+            --set ingress.hosts[0].host=\"booking-dev.aremko.cl\" \
+            --set ingress.hosts[0].paths[0].path=\"/\" \
+            --set ingress.hosts[0].paths[0].pathType=\"ImplementationSpecific\" \
+            --set secret.data.DATABASE_URL=\"postgresql://aremko_db_dev_user:${{ secrets.DB_PASSWORD }}@aremko-${{ steps.branch-name.outputs.current_branch }}-postgresql:5432/aremko_db_dev\" \
+            --set postgresql.auth.password=\"${{ secrets.DB_PASSWORD }}\" \
+            --namespace reservas-${{ steps.branch-name.outputs.current_branch }} \
+            --atomic \
+            --timeout 30m"
+
+          if [ -n "${{ secrets.DJANGO_SECRET_KEY }}" ]; then
+            helm_args="$helm_args --set secret.data.DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}"
+          fi
+
+          helm upgrade $helm_args 

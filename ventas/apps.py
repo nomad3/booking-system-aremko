@@ -8,8 +8,17 @@ class VentasConfig(AppConfig):
     verbose_name = 'Ventas y CRM' # Optional: Set a more descriptive name for the admin
 
     def ready(self):
-        # Import signals first (if they don't depend on admin classes)
-        import ventas.signals
+        # Importar triggers de comunicación para registrar señales (post_save VentaReserva)
+        # Nota: mantener este import aquí para garantizar el registro en arranque
+        try:
+            import ventas.services.communication_triggers  # noqa: F401
+        except Exception as exc:
+            # Loguear, pero no romper el arranque del proyecto
+            from django.conf import settings
+            import logging
+            logging.getLogger(__name__).warning(
+                f"No se pudo importar communication_triggers: {exc}"
+            )
 
         # Import admin classes and models here to avoid circular imports
         from django.contrib import admin

@@ -1,6 +1,9 @@
 import os
+import logging
 from pathlib import Path
 import dj_database_url
+
+logger = logging.getLogger(__name__)
 
 # Ruta base del proyecto
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -18,7 +21,12 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
 # ALLOWED_HOSTS configurado a partir de variable de entorno
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS_ENV = os.getenv('ALLOWED_HOSTS', '')
+if ALLOWED_HOSTS_ENV:
+    ALLOWED_HOSTS = ALLOWED_HOSTS_ENV.split(',')
+else:
+    # Fallback para producción en Render
+    ALLOWED_HOSTS = ['aremko-booking-system.onrender.com', '.onrender.com', 'localhost', '127.0.0.1']
 
 # Aplicaciones instaladas
 INSTALLED_APPS = [
@@ -100,7 +108,7 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files configuration (Local vs GCS)
 # Check if GOOGLE_APPLICATION_CREDENTIALS is set (indicating GCS usage)
-if os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
+if os.getenv('GOOGLE_APPLICATION_CREDENTIALS') and os.path.exists(os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '')):
     DEFAULT_FILE_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
     GS_BUCKET_NAME = os.getenv('GS_BUCKET_NAME', 'aremkoweb') # Use env var or default
     GS_PROJECT_ID = os.getenv('GS_PROJECT_ID', 'aremko-e51ae') # Use env var or default
@@ -147,3 +155,78 @@ CORS_ALLOW_ALL_ORIGINS = True  # Only use this in development!
 #     "http://127.0.0.1:8000",
 #     "https://your-production-domain.com",
 # ]
+
+# --- Configuración SMS Redvoiss ---
+REDVOISS_API_URL = os.getenv('REDVOISS_API_URL', 'https://sms.lanube.cl/services/rest')
+REDVOISS_USERNAME = os.getenv('REDVOISS_USERNAME', '')
+REDVOISS_PASSWORD = os.getenv('REDVOISS_PASSWORD', '')
+
+# --- Límites Anti-Spam Comunicación ---
+SMS_DAILY_LIMIT_PER_CLIENT = int(os.getenv('SMS_DAILY_LIMIT_PER_CLIENT', '2'))
+SMS_MONTHLY_LIMIT_PER_CLIENT = int(os.getenv('SMS_MONTHLY_LIMIT_PER_CLIENT', '8'))
+EMAIL_WEEKLY_LIMIT_PER_CLIENT = int(os.getenv('EMAIL_WEEKLY_LIMIT_PER_CLIENT', '1'))
+EMAIL_MONTHLY_LIMIT_PER_CLIENT = int(os.getenv('EMAIL_MONTHLY_LIMIT_PER_CLIENT', '4'))
+
+# Configuración mejorada de Email
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'comunicaciones@aremko.cl')
+VENTAS_FROM_EMAIL = os.getenv('VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
+# Email Backend - usar console para desarrollo si no hay credenciales
+if not os.getenv('EMAIL_HOST_USER') or not os.getenv('EMAIL_HOST_PASSWORD'):
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Muestra emails en logs
+    logger.warning("⚠️ EMAIL_HOST_USER/PASSWORD no configurados - usando console backend")
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+
+# Flags globales de comunicación
+COMMUNICATION_SMS_ENABLED = os.getenv('COMMUNICATION_SMS_ENABLED', 'true').lower() == 'true'
+COMMUNICATION_EMAIL_ENABLED = os.getenv('COMMUNICATION_EMAIL_ENABLED', 'true').lower() == 'true'
+
+# URLs externas para encuestas/opiniones
+SURVEY_PUBLIC_BASE_URL = os.getenv('SURVEY_PUBLIC_BASE_URL', 'https://aremko-booking-system.onrender.com/encuesta')
+TRIPADVISOR_URL = os.getenv('TRIPADVISOR_URL', 'https://www.tripadvisor.com/')
+
+# --- Logging Configuration ---
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'aremko.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'loggers': {
+        'ventas': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'ventas.services': {
+            'handlers': ['file', 'console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': True,
+        },
+    },
+}

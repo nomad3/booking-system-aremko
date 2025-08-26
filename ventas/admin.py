@@ -13,7 +13,9 @@ from .models import (
     Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto,
     Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio,
     MovimientoCliente, Compra, DetalleCompra, GiftCard, HomepageConfig,
-    Lead, Company, Contact, Activity, Campaign, Deal, CampaignInteraction, HomepageSettings # Added HomepageSettings
+    Lead, Company, Contact, Activity, Campaign, Deal, CampaignInteraction, HomepageSettings,
+    # Communication models
+    CommunicationLimit, ClientPreferences, CommunicationLog, SMSTemplate
 )
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
@@ -165,7 +167,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago',
         'estado_reserva', 'servicios_y_cantidades',
         'productos_y_cantidades', 'total_servicios',
-        'total_productos', 'total', 'pagado', 'saldo_pendiente'
+        'total_productos', 'total', 'pagado', 'saldo_pendiente', 'pdf_link'
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
@@ -258,10 +260,31 @@ class VentaReservaAdmin(admin.ModelAdmin):
         instance = form.instance
         instance.calcular_total()
 
+    def get_urls(self):
+        urls = super().get_urls()
+        app_label = self.model._meta.app_label
+        model_name = self.model._meta.model_name
+        custom_urls = [
+            path('<int:reserva_id>/pdf/',
+                 self.admin_site.admin_view(admin_views.generate_reserva_pdf),
+                 name=f'{app_label}_{model_name}_pdf'),
+        ]
+        return custom_urls + urls
+
+    def pdf_link(self, obj):
+        opts = obj._meta
+        url = reverse(f'admin:{opts.app_label}_{opts.model_name}_pdf', args=[obj.pk])
+        return format_html('<a class="button" href="{}" target="_blank">Ver PDF</a>', url)
+    pdf_link.short_description = 'PDF'
+    pdf_link.allow_tags = True
+
     class Media:
         css = {
             'all': ('admin/css/custom.css',)
         }
+        js = (
+            'admin/js/reserva_servicio_inline.js',
+        )
 
 class ProveedorAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'direccion', 'telefono', 'email')
@@ -523,3 +546,237 @@ class HomepageSettingsAdmin(admin.ModelAdmin):
     # Prevent adding more than one instance from the admin list view
     def has_add_permission(self, request):
         return not HomepageSettings.objects.exists()
+
+
+# --- Admin para Modelos de Comunicación Inteligente ---
+
+@admin.register(CommunicationLimit)
+class CommunicationLimitAdmin(admin.ModelAdmin):
+    list_display = (
+        'cliente', 'sms_count_daily', 'sms_count_monthly', 
+        'email_count_weekly', 'birthday_sms_sent_this_year',
+        'reactivation_emails_this_quarter', 'updated_at'
+    )
+    list_filter = (
+        'birthday_sms_sent_this_year', 'last_sms_date', 'last_email_date',
+        'created_at', 'updated_at'
+    )
+    search_fields = ('cliente__nombre', 'cliente__telefono', 'cliente__email')
+    readonly_fields = ('created_at', 'updated_at')
+    
+    fieldsets = (
+        ('Cliente', {
+            'fields': ('cliente',)
+        }),
+        ('Límites SMS', {
+            'fields': (
+                'sms_count_daily', 'sms_count_monthly', 'last_sms_date',
+                'last_sms_reset_daily', 'last_sms_reset_monthly'
+            )
+        }),
+        ('Límites Email', {
+            'fields': (
+                'email_count_weekly', 'email_count_monthly', 'last_email_date',
+                'last_email_reset_weekly', 'last_email_reset_monthly'
+            )
+        }),
+        ('Límites Especiales', {
+            'fields': (
+                'birthday_sms_sent_this_year', 'last_birthday_sms_year',
+                'reactivation_emails_this_quarter', 'last_reactivation_quarter'
+            )
+        }),
+        ('Metadatos', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('cliente')
+
+
+@admin.register(ClientPreferences)
+class ClientPreferencesAdmin(admin.ModelAdmin):
+    list_display = (
+        'cliente', 'accepts_sms', 'accepts_email', 'accepts_promotional',
+        'accepts_newsletters', 'opt_out_date'
+    )
+    list_filter = (
+        'accepts_sms', 'accepts_email', 'accepts_promotional', 
+        'accepts_newsletters', 'accepts_birthday_messages',
+        'accepts_booking_confirmations', 'accepts_booking_reminders',
+        'opt_out_date'
+    )
+    search_fields = ('cliente__nombre', 'cliente__telefono', 'cliente__email')
+    readonly_fields = ('created_at', 'updated_at')
+    
+    fieldsets = (
+        ('Cliente', {
+            'fields': ('cliente',)
+        }),
+        ('Preferencias Generales', {
+            'fields': ('accepts_sms', 'accepts_email', 'accepts_whatsapp')
+        }),
+        ('Preferencias Específicas', {
+            'fields': (
+                'accepts_booking_confirmations', 'accepts_booking_reminders',
+                'accepts_birthday_messages', 'accepts_promotional',
+                'accepts_newsletters', 'accepts_reactivation'
+            )
+        }),
+        ('Horarios de Contacto', {
+            'fields': ('preferred_contact_hour_start', 'preferred_contact_hour_end')
+        }),
+        ('Opt-out', {
+            'fields': ('opt_out_date',),
+            'classes': ('collapse',)
+        }),
+        ('Metadatos', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    actions = ['set_opt_out_all']
+    
+    def set_opt_out_all(self, request, queryset):
+        """Acción para marcar clientes como opt-out completo"""
+        for preference in queryset:
+            preference.set_opt_out_all()
+        self.message_user(
+            request,
+            f"Se configuró opt-out completo para {queryset.count()} cliente(s)."
+        )
+    set_opt_out_all.short_description = "Configurar opt-out completo"
+
+
+@admin.register(CommunicationLog)
+class CommunicationLogAdmin(admin.ModelAdmin):
+    list_display = (
+        'cliente', 'communication_type', 'message_type', 'status',
+        'destination', 'sent_at', 'cost'
+    )
+    list_filter = (
+        'communication_type', 'message_type', 'status',
+        'sent_at', 'delivered_at', 'created_at'
+    )
+    search_fields = (
+        'cliente__nombre', 'cliente__telefono', 'destination',
+        'subject', 'external_id'
+    )
+    readonly_fields = (
+        'created_at', 'updated_at', 'sent_at', 'delivered_at',
+        'read_at', 'replied_at'
+    )
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Cliente y Campaña', {
+            'fields': ('cliente', 'campaign')
+        }),
+        ('Detalles del Mensaje', {
+            'fields': (
+                'communication_type', 'message_type', 'subject',
+                'content', 'destination'
+            )
+        }),
+        ('Estado y Tracking', {
+            'fields': (
+                'status', 'external_id', 'sent_at', 'delivered_at',
+                'read_at', 'replied_at'
+            )
+        }),
+        ('Contexto', {
+            'fields': ('booking_id', 'triggered_by', 'cost'),
+            'classes': ('collapse',)
+        }),
+        ('Metadatos', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    actions = ['mark_as_delivered', 'mark_as_failed']
+    
+    def mark_as_delivered(self, request, queryset):
+        """Acción para marcar mensajes como entregados"""
+        updated = 0
+        for log in queryset.filter(status='SENT'):
+            log.mark_as_delivered()
+            updated += 1
+        self.message_user(
+            request,
+            f"Se marcaron {updated} mensaje(s) como entregados."
+        )
+    mark_as_delivered.short_description = "Marcar como entregado"
+    
+    def mark_as_failed(self, request, queryset):
+        """Acción para marcar mensajes como fallidos"""
+        updated = 0
+        for log in queryset.exclude(status='FAILED'):
+            log.mark_as_failed()
+            updated += 1
+        self.message_user(
+            request,
+            f"Se marcaron {updated} mensaje(s) como fallidos."
+        )
+    mark_as_failed.short_description = "Marcar como fallido"
+
+
+@admin.register(SMSTemplate)
+class SMSTemplateAdmin(admin.ModelAdmin):
+    list_display = (
+        'name', 'message_type', 'is_active', 'requires_approval',
+        'max_uses_per_client_per_day', 'created_by', 'created_at'
+    )
+    list_filter = (
+        'message_type', 'is_active', 'requires_approval', 'created_at'
+    )
+    search_fields = ('name', 'content')
+    readonly_fields = ('created_at', 'updated_at')
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('name', 'message_type', 'content')
+        }),
+        ('Configuración', {
+            'fields': ('is_active', 'requires_approval')
+        }),
+        ('Límites de Uso', {
+            'fields': (
+                'max_uses_per_client_per_day',
+                'max_uses_per_client_per_month'
+            )
+        }),
+        ('Metadatos', {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def save_model(self, request, obj, form, change):
+        """Asignar usuario creador automáticamente"""
+        if not change:  # Solo al crear
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+    
+    actions = ['activate_templates', 'deactivate_templates']
+    
+    def activate_templates(self, request, queryset):
+        """Acción para activar plantillas"""
+        updated = queryset.update(is_active=True)
+        self.message_user(
+            request,
+            f"Se activaron {updated} plantilla(s)."
+        )
+    activate_templates.short_description = "Activar plantillas seleccionadas"
+    
+    def deactivate_templates(self, request, queryset):
+        """Acción para desactivar plantillas"""
+        updated = queryset.update(is_active=False)
+        self.message_user(
+            request,
+            f"Se desactivaron {updated} plantilla(s)."
+        )
+    deactivate_templates.short_description = "Desactivar plantillas seleccionadas"
