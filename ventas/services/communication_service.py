@@ -368,11 +368,15 @@ class CommunicationService:
 
             if rs_first:
                 from datetime import datetime as dt
-                booking_dt = timezone.make_aware(dt.combine(rs_first.fecha_agendamiento, dt.strptime(str(rs_first.hora_inicio), '%H:%M').time())) if hasattr(rs_first, 'fecha_agendamiento') else booking.fecha_reserva
+                import pytz
+                # Usar zona horaria de Chile
+                chile_tz = pytz.timezone('America/Santiago')
+                booking_dt = chile_tz.localize(dt.combine(rs_first.fecha_agendamiento, dt.strptime(str(rs_first.hora_inicio), '%H:%M').time()))
             else:
                 booking_dt = booking.fecha_reserva
 
             reminder_time = booking_dt - timedelta(hours=hours_before)
+            # Comparar ambas en UTC
             if timezone.now() < reminder_time:
                 return {'success': False, 'reason': 'too_early'}
 
