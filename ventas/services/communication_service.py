@@ -224,6 +224,7 @@ class CommunicationService:
                 # Usamos el usuario autenticado en SMTP para máxima entregabilidad
                 from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
                 to=[cliente.email],
+                bcc=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copia a ventas@aremko.cl
                 reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
             )
             email.attach_alternative(html_content, "text/html")
