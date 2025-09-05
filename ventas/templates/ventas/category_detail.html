@@ -131,6 +131,7 @@
             </div>
             <div class="modal-body">
                 <form id="bookingForm" class="booking-form">
+                    {% csrf_token %}
                     <input type="hidden" id="servicioId" name="servicio_id">
 
                     <div class="mb-3">
