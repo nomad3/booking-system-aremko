@@ -7,7 +7,10 @@ FROM python:3.9-slim
     # Instalar dependencias del sistema necesarias
     RUN apt-get update && \
     apt-get install -y build-essential libpq-dev netcat-openbsd \
-        libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info libglib2.0-0 && \
+        libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libffi-dev shared-mime-info && \
+    apt-get install -y --no-install-recommends libgdk-pixbuf2.0-dev libglib2.0-0 || \
+    apt-get install -y --no-install-recommends libgdk-pixbuf-2.0-0 libglib2.0-0 || \
+    echo "Skipping optional graphics libraries" && \
     rm -rf /var/lib/apt/lists/*
 
 # Copiar los archivos de requerimientos e instalar dependencias de Python
