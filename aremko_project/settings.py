@@ -28,6 +28,13 @@ else:
     # Fallback para producción en Render
     ALLOWED_HOSTS = ['aremko-booking-system.onrender.com', '.onrender.com', 'localhost', '127.0.0.1']
 
+# CSRF_TRUSTED_ORIGINS para HTTPS
+CSRF_TRUSTED_ORIGINS_ENV = os.getenv('CSRF_TRUSTED_ORIGINS', '')
+if CSRF_TRUSTED_ORIGINS_ENV:
+    CSRF_TRUSTED_ORIGINS = CSRF_TRUSTED_ORIGINS_ENV.split(',')
+else:
+    CSRF_TRUSTED_ORIGINS = []
+
 # Aplicaciones instaladas
 INSTALLED_APPS = [
     # ... aplicaciones de Django ...
