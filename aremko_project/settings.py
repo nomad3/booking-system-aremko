@@ -133,7 +133,7 @@ if os.getenv('GOOGLE_APPLICATION_CREDENTIALS') and os.path.exists(os.getenv('GOO
         pass # GS_CREDENTIALS = str(GS_CREDENTIALS_PATH) # Uncomment if needed
 
     # Make uploaded files publicly readable by default
-    GS_DEFAULT_ACL = 'publicRead'
+    # GS_DEFAULT_ACL = 'publicRead'  # Temporarily disabled to test
     GS_FILE_OVERWRITE = False # Prevent overwriting files with the same name
     GS_QUERYSTRING_AUTH = False # Keep this: Generate plain public URLs
 
