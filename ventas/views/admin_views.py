@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.contrib.admin import helpers # Import helpers
 from django import forms # Import forms module
 from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.http import require_http_methods
+from django.core.cache import cache
 from django.urls import reverse
 from django.contrib import messages
 from django.http import HttpResponseRedirect, HttpResponse
@@ -13,6 +15,9 @@ from django.template.loader import render_to_string
 from weasyprint import HTML
 
 from ..models import Cliente, Contact, Campaign, Company, Activity, VentaReserva # Added Activity and VentaReserva
+from django.core.mail import EmailMultiAlternatives
+from django.conf import settings
+import csv, io, threading
 from ..forms import SelectCampaignForm # Keep this if still used elsewhere, otherwise remove
 # Import CampaignForm if needed for a custom form, or rely on ModelAdmin form
 # from ..forms import CampaignForm # Example if you create a custom Campaign form
@@ -176,6 +181,104 @@ def select_campaign_for_clients_view(request):
 def admin_section_crm_view(request):
     context = {**admin.site.each_context(request), 'title': 'CRM y Marketing'}
     return render(request, 'admin/section_crm.html', context)
+
+
+# =============== CSV Campaign Uploader (Beta) ===============
+
+@login_required
+@user_passes_test(es_administrador)
+@require_http_methods(["GET", "POST"])
+def csv_campaign_uploader(request):
+    cache_key = 'csv_campaign_progress'
+    if request.method == 'POST':
+        asunto = request.POST.get('subject', '').strip()
+        cuerpo = request.POST.get('body', '').strip()
+        file = request.FILES.get('csv_file')
+        send_test = request.POST.get('send_test') == 'on'
+        test_email = request.POST.get('test_email', '').strip()
+
+        if not asunto or not cuerpo or not file:
+            messages.error(request, 'Asunto, cuerpo y archivo CSV son obligatorios.')
+        else:
+            try:
+                data = file.read().decode('utf-8')
+                reader = csv.DictReader(io.StringIO(data))
+                rows = list(reader)
+                total = len(rows)
+                cache.set(cache_key, {'status': 'queued', 'total': total, 'sent': 0, 'failed': 0}, 3600)
+
+                def worker():
+                    progress = {'status': 'running', 'total': total, 'sent': 0, 'failed': 0}
+                    cache.set(cache_key, progress, 3600)
+
+                    def val(row, *keys):
+                        for k in keys:
+                            if k in row and row[k] not in (None, ''):
+                                return str(row[k]).strip()
+                        return ''
+
+                    def norm_email(v):
+                        v = (v or '').strip().lower()
+                        return v if v and '@' in v else ''
+
+                    def norm_phone(v):
+                        d = ''.join(filter(str.isdigit, str(v or '')))
+                        if d.startswith('56') and len(d) >= 11:
+                            d = d[-9:]
+                        if len(d) == 8:
+                            d = '9' + d
+                        return f'+56{d}' if len(d) == 9 and d.startswith('9') else ''
+
+                    # Envío de prueba si corresponde
+                    if send_test and test_email:
+                        body = cuerpo.replace('[Nombre]', 'Jorge')
+                        from_email = getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
+                        m = EmailMultiAlternatives(subject=asunto, body=body, from_email=from_email, to=[test_email], reply_to=[getattr(settings,'VENTAS_FROM_EMAIL','ventas@aremko.cl')])
+                        m.attach_alternative(body, 'text/html')
+                        try:
+                            m.send(); progress['sent'] += 1
+                        except Exception:
+                            progress['failed'] += 1
+                        cache.set(cache_key, progress, 3600)
+
+                    # Sembrar cola
+                    for row in rows:
+                        email = norm_email(val(row, 'email'))
+                        if not email:
+                            progress['failed'] += 1; cache.set(cache_key, progress, 3600); continue
+                        nombre = val(row, 'nombre', 'first_name') or '-'
+                        apellido = val(row, 'apellido', 'last_name')
+                        phone = norm_phone(val(row, 'celular', 'phone')) or None
+                        empresa = val(row, 'empresa', 'company_name')
+                        rubro = val(row, 'rubro', 'industry')
+                        ciudad = val(row, 'ciudad', 'city')
+
+                        company = None
+                        if empresa:
+                            company, _ = Company.objects.get_or_create(name=empresa)
+                            if rubro and hasattr(company, 'industry') and (company.industry or '') != rubro:
+                                company.industry = rubro; company.save(update_fields=['industry'])
+
+                        c, _ = Contact.objects.get_or_create(email=email, defaults={
+                            'first_name': nombre, 'last_name': apellido, 'phone': phone, 'company': company,
+                            'notes': '; '.join([p for p in [f"Ciudad: {ciudad}" if ciudad else '', f"Rubro: {rubro}" if rubro else ''] if p])
+                        })
+
+                        CommunicationLog.objects.create(
+                            cliente=None, campaign=None, communication_type='EMAIL',
+                            message_type='PROMOTIONAL' if 'PROMOTIONAL' in dict(CommunicationLog.MESSAGE_TYPES) else 'PROMOCIONAL',
+                            subject=asunto, content=cuerpo, destination=email, status='PENDING')
+
+                    progress['status'] = 'done_seed'; cache.set(cache_key, progress, 3600)
+
+                threading.Thread(target=worker, daemon=True).start()
+                messages.success(request, 'Archivo recibido. Sembrando cola y enviando prueba...')
+            except Exception as e:
+                messages.error(request, f'Error procesando CSV: {e}')
+
+    context = {**admin.site.each_context(request), 'title': 'Campaña por CSV (beta)'}
+    context['progress'] = cache.get(cache_key)
+    return render(request, 'admin/csv_campaign_uploader.html', context)
 
 @login_required
 @user_passes_test(es_administrador)

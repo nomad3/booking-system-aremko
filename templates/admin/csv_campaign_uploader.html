@@ -1,0 +1,71 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4">
+  <div class="page-header mb-4">
+    <h1>{{ title }}</h1>
+    <p>Sube un CSV con columnas: nombre,email,celular,rubro,ciudad,empresa. Envía prueba y si todo bien, se preparan los envíos (goteo 1/10min).</p>
+  </div>
+
+  {% if messages %}
+  <div class="mb-3">
+    {% for m in messages %}
+      <div class="alert alert-{{ m.tags }}">{{ m }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">Asunto</label>
+          <input class="form-control" type="text" name="subject" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Cuerpo (HTML)</label>
+          <textarea class="form-control" name="body" rows="10" placeholder="Use [Nombre] para personalizar" required></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Archivo CSV</label>
+          <input class="form-control" type="file" name="csv_file" accept=".csv" required>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" name="send_test" id="send_test" checked>
+          <label class="form-check-label" for="send_test">Enviar prueba a</label>
+          <input class="form-control" type="email" name="test_email" value="ecolonco@gmail.com" style="max-width:320px; display:inline-block; margin-left:8px;">
+        </div>
+        <button class="btn btn-modern btn-primary-modern" type="submit">Subir y preparar</button>
+        <a class="btn btn-modern btn-secondary-modern" href="{% url 'ventas:admin_section_crm' %}">Volver</a>
+      </form>
+    </div>
+  </div>
+
+  {% if progress %}
+  <div class="card">
+    <div class="card-body">
+      <h5>Progreso</h5>
+      <p>Estado: <strong>{{ progress.status }}</strong></p>
+      <div class="progress" style="height: 20px;">
+        {% with total=progress.total sent=progress.sent %}
+        {% if total %}
+          {% with pct=sent|divisibleby:total %}{% endwith %}
+        {% endif %}
+        <div class="progress-bar" role="progressbar" style="width: {{ progress.sent|add:0 }}%" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+      <p class="mt-2">Total: {{ progress.total }} • Enviados prueba: {{ progress.sent }} • Fallidos: {{ progress.failed }}</p>
+      <small>El goteo 1/10min se configura con el cron job.</small>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+

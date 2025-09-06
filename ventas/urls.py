@@ -42,6 +42,9 @@ urlpatterns = [
     path('exportar-clientes/', import_export_views.exportar_clientes_excel, name='exportar_clientes_excel'),
     path('clientes/', crud_views.lista_clientes, name='lista_clientes'),
     path('importar-clientes/', import_export_views.importar_clientes_excel, name='importar_clientes_excel'),
+    # Importadores CRM
+    path('importar-companies/', import_export_views.importar_companies_csv, name='importar_companies_csv'),
+    path('importar-contacts/', import_export_views.importar_contacts_csv, name='importar_contacts_csv'),
     # Custom Views for CRM/Reporting
     path('reportes/segmentacion-clientes/', reporting_views.cliente_segmentation_view, name='cliente_segmentation'),
     path('reportes/segmentacion-clientes/<str:segment_name>/', reporting_views.client_list_by_segment_view, name='client_list_by_segment'),
@@ -50,6 +53,7 @@ urlpatterns = [
     path('admin/campaign/select-for-clients/', admin_views.select_campaign_for_clients_view, name='select_campaign_for_clients'),
     # Admin Section URLs
     path('admin/section/crm/', admin_views.admin_section_crm_view, name='admin_section_crm'),
+    path('admin/section/crm/csv-campaign/', admin_views.csv_campaign_uploader, name='csv_campaign_uploader'),
     path('admin/section/ventas/', admin_views.admin_section_ventas_view, name='admin_section_ventas'),
     path('admin/section/servicios/', admin_views.admin_section_servicios_view, name='admin_section_servicios'),
     path('admin/section/productos/', admin_views.admin_section_productos_view, name='admin_section_productos'),
