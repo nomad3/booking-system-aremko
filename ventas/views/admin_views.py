@@ -273,16 +273,17 @@ def csv_campaign_uploader(request):
                         except Exception:
                             cliente_obj = Cliente.objects.filter(email=email).first()
 
-                        CommunicationLog.objects.create(
-                            cliente=None, campaign=None, communication_type='EMAIL',
-                            message_type='PROMOTIONAL' if 'PROMOTIONAL' in dict(CommunicationLog.MESSAGE_TYPES) else 'PROMOCIONAL',
-                            subject=asunto, content=cuerpo, destination=email, status='PENDING')
-                        # Si BD exige cliente, actualizar el registro recién creado con cliente
+                        # Solo crear log si tenemos un cliente válido
                         if cliente_obj:
-                            last_log = CommunicationLog.objects.filter(destination=email, status='PENDING').order_by('-created_at','-id').first()
-                            if last_log and last_log.cliente_id is None:
-                                last_log.cliente = cliente_obj
-                                last_log.save(update_fields=['cliente'])
+                            CommunicationLog.objects.create(
+                                cliente=cliente_obj, campaign=None, communication_type='EMAIL',
+                                message_type='PROMOTIONAL' if 'PROMOTIONAL' in dict(CommunicationLog.MESSAGE_TYPES) else 'PROMOCIONAL',
+                                subject=asunto, content=cuerpo, destination=email, status='PENDING')
+                            progress['sent'] += 1
+                        else:
+                            progress['failed'] += 1
+                        
+                        cache.set(cache_key, progress, 3600)
 
                     progress['status'] = 'done_seed'; cache.set(cache_key, progress, 3600)
 
