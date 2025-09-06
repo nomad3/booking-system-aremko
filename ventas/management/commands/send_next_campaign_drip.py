@@ -77,4 +77,21 @@ class Command(BaseCommand):
         log.content = body
         log.mark_as_sent()
         self.stdout.write(self.style.SUCCESS(f"Enviado a: {log.destination}"))
+        
+        # Actualizar progreso en cache
+        from django.core.cache import cache
+        cache_key = 'csv_campaign_progress'
+        progress = cache.get(cache_key, {})
+        if progress and isinstance(progress, dict):
+            progress['sent'] = progress.get('sent', 0) + 1
+            # Contar pendientes restantes
+            pending_count = CommunicationLog.objects.filter(
+                communication_type='EMAIL',
+                message_type=promo_key,
+                status='PENDING'
+            ).count()
+            progress['pending'] = pending_count
+            if pending_count == 0:
+                progress['status'] = 'completed'
+            cache.set(cache_key, progress, 3600)
 
