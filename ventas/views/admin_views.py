@@ -14,7 +14,7 @@ from django.db import models # Import models for Q lookup
 from django.template.loader import render_to_string
 from weasyprint import HTML
 
-from ..models import Cliente, Contact, Campaign, Company, Activity, VentaReserva # Added Activity and VentaReserva
+from ..models import Cliente, Contact, Campaign, Company, Activity, VentaReserva, CommunicationLog # Added CommunicationLog
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
 import csv, io, threading
