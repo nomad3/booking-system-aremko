@@ -263,11 +263,26 @@ def csv_campaign_uploader(request):
                             'first_name': nombre, 'last_name': apellido, 'phone': phone, 'company': company,
                             'notes': '; '.join([p for p in [f"Ciudad: {ciudad}" if ciudad else '', f"Rubro: {rubro}" if rubro else ''] if p])
                         })
+                        # Asegurar Cliente (CommunicationLog requiere cliente no nulo en BD prod)
+                        try:
+                            display_name = f"{nombre} {apellido}".strip() or (email.split('@')[0])
+                            cliente_obj, _ = Cliente.objects.get_or_create(
+                                email=email,
+                                defaults={'nombre': display_name, 'telefono': phone}
+                            )
+                        except Exception:
+                            cliente_obj = Cliente.objects.filter(email=email).first()
 
                         CommunicationLog.objects.create(
                             cliente=None, campaign=None, communication_type='EMAIL',
                             message_type='PROMOTIONAL' if 'PROMOTIONAL' in dict(CommunicationLog.MESSAGE_TYPES) else 'PROMOCIONAL',
                             subject=asunto, content=cuerpo, destination=email, status='PENDING')
+                        # Si BD exige cliente, actualizar el registro recién creado con cliente
+                        if cliente_obj:
+                            last_log = CommunicationLog.objects.filter(destination=email, status='PENDING').order_by('-created_at','-id').first()
+                            if last_log and last_log.cliente_id is None:
+                                last_log.cliente = cliente_obj
+                                last_log.save(update_fields=['cliente'])
 
                     progress['status'] = 'done_seed'; cache.set(cache_key, progress, 3600)
 
