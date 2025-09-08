@@ -268,7 +268,7 @@
                         <div class="category-name">Todos</div>
                     </div> #}
                     {% for categoria in categorias %}
-                        {% if not categoria.nombre|startswith:"Empresarial-" %}
+                        {% if "Empresarial-" not in categoria.nombre %}
                         {% with categoria.nombre|lower as lower_nombre %}
                             {% comment %} Assign icons based on category name {% endcomment %}
                             {% if "tina" in lower_nombre %}
