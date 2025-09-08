@@ -73,7 +73,7 @@
 .service-card {
     background: white;
     border-radius: 20px;
-    padding: 40px 30px;
+    padding: 0;
     text-align: center;
     box-shadow: 0 10px 30px rgba(0,0,0,0.1);
     transition: all 0.3s ease;
@@ -81,6 +81,17 @@
     border: none;
     position: relative;
     overflow: hidden;
+}
+
+.service-image {
+    width: 100%;
+    height: 250px;
+    object-fit: cover;
+    border-radius: 20px 20px 0 0;
+}
+
+.service-content {
+    padding: 30px 25px 40px;
 }
 
 .service-card::before {
@@ -272,16 +283,20 @@
             <!-- Servicio 1: Sala de Reuniones -->
             <div class="col-lg-4 col-md-6">
                 <div class="service-card">
-                    <div class="service-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <h3 class="service-title">Sala de Reuniones Premium</h3>
-                    <p class="service-description">
-                        Espacio para 20 personas con aire acondicionado, TV de 60" y vista al bosque nativo. 
-                        El ambiente perfecto para sesiones de coaching, reuniones de directorio y brainstorming.
-                    </p>
-                    <div class="d-flex justify-content-center">
-                        <span class="badge bg-primary fs-6">Hasta 20 personas</span>
+                    <img src="https://storage.googleapis.com/aremko-media-2025/categorias/charla_empresas_aremko.jpg" 
+                         alt="Sala de Reuniones Premium" class="service-image">
+                    <div class="service-content">
+                        <div class="service-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h3 class="service-title">Sala de Reuniones Premium</h3>
+                        <p class="service-description">
+                            Espacio para 20 personas con aire acondicionado, TV de 60" y vista al bosque nativo. 
+                            El ambiente perfecto para sesiones de coaching, reuniones de directorio y brainstorming.
+                        </p>
+                        <div class="d-flex justify-content-center">
+                            <span class="badge bg-primary fs-6">Hasta 20 personas</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -289,16 +304,20 @@
             <!-- Servicio 2: Desayuno Sureño -->
             <div class="col-lg-4 col-md-6">
                 <div class="service-card">
-                    <div class="service-icon">
-                        <i class="fas fa-utensils"></i>
-                    </div>
-                    <h3 class="service-title">Desayuno Gourmet Sureño</h3>
-                    <p class="service-description">
-                        Productos locales premium: quesos artesanales, cecinas, mermeladas caseras, 
-                        café orgánico e infusiones. Una experiencia gastronómica que energiza y conecta.
-                    </p>
-                    <div class="d-flex justify-content-center">
-                        <span class="badge bg-success fs-6">Productos locales</span>
+                    <img src="https://storage.googleapis.com/aremko-media-2025/categorias/desayuno_empresas_aremko.jpg" 
+                         alt="Desayuno Gourmet Sureño" class="service-image">
+                    <div class="service-content">
+                        <div class="service-icon">
+                            <i class="fas fa-utensils"></i>
+                        </div>
+                        <h3 class="service-title">Desayuno Gourmet Sureño</h3>
+                        <p class="service-description">
+                            Productos locales premium: quesos artesanales, cecinas, mermeladas caseras, 
+                            café orgánico e infusiones. Una experiencia gastronómica que energiza y conecta.
+                        </p>
+                        <div class="d-flex justify-content-center">
+                            <span class="badge bg-success fs-6">Productos locales</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -306,16 +325,20 @@
             <!-- Servicio 3: Tinas Calientes -->
             <div class="col-lg-4 col-md-6">
                 <div class="service-card">
-                    <div class="service-icon">
-                        <i class="fas fa-spa"></i>
-                    </div>
-                    <h3 class="service-title">Relajación en Tinas Calientes</h3>
-                    <p class="service-description">
-                        Cierre de jornada en tinas termales a orillas del Río Pescado. 
-                        El momento perfecto para fortalecer vínculos, relajar tensiones y inspirar creatividad.
-                    </p>
-                    <div class="d-flex justify-content-center">
-                        <span class="badge bg-info fs-6">Junto al río</span>
+                    <img src="https://storage.googleapis.com/aremko-media-2025/categorias/4_amigas_en_la_calbuco.PNG" 
+                         alt="Relajación en Tinas Calientes" class="service-image">
+                    <div class="service-content">
+                        <div class="service-icon">
+                            <i class="fas fa-spa"></i>
+                        </div>
+                        <h3 class="service-title">Relajación en Tinas Calientes</h3>
+                        <p class="service-description">
+                            Cierre de jornada en tinas termales a orillas del Río Pescado. 
+                            El momento perfecto para fortalecer vínculos, relajar tensiones y inspirar creatividad.
+                        </p>
+                        <div class="d-flex justify-content-center">
+                            <span class="badge bg-info fs-6">Junto al río</span>
+                        </div>
                     </div>
                 </div>
             </div>
