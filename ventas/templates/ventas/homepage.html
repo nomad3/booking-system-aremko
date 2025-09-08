@@ -268,6 +268,7 @@
                         <div class="category-name">Todos</div>
                     </div> #}
                     {% for categoria in categorias %}
+                        {% if not categoria.nombre|startswith:"Empresarial-" %}
                         {% with categoria.nombre|lower as lower_nombre %}
                             {% comment %} Assign icons based on category name {% endcomment %}
                             {% if "tina" in lower_nombre %}
@@ -308,7 +309,14 @@
                                 {% endwith %}
                             {% endif %}
                         {% endwith %}
+                        {% endif %}
                     {% endfor %}
+                    
+                    {# Botón especial para Empresas que lleva a la landing page #}
+                    <a href="{% url 'ventas:empresas' %}" class="category-card" style="text-decoration: none; color: inherit;">
+                        <div class="category-icon"><i class="fas fa-building"></i></div>
+                        <div class="category-name">Empresas</div>
+                    </a>
                 </div>
             </div>
         </div>
