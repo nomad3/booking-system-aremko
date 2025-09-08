@@ -70,3 +70,14 @@ def categoria_detail_view(request, categoria_id):
         'cart': request.session.get('cart', {'servicios': [], 'total': 0}) # Include cart context
     }
     return render(request, 'ventas/category_detail.html', context)
+
+
+def empresas_view(request):
+    """
+    Vista para la landing page de servicios empresariales
+    """
+    context = {
+        'page_title': 'Reuniones con Resultados: Productividad + Bienestar',
+        'meta_description': 'Espacios únicos para reuniones empresariales en Puerto Varas. Sala de reuniones, desayuno sureño y tinas calientes para tu equipo.',
+    }
+    return render(request, 'ventas/empresas.html', context)

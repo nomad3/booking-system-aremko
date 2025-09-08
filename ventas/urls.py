@@ -27,6 +27,7 @@ urlpatterns = [
     path('admin-dashboard/', misc_views.inicio_sistema_view, name='inicio_sistema'),  # Vista de inicio del sistema admin
     path('', public_views.homepage_view, name='homepage'),  # Nueva vista de inicio pública
     path('categoria/<int:categoria_id>/', public_views.categoria_detail_view, name='categoria_detail'), # New category detail URL
+    path('empresas/', public_views.empresas_view, name='empresas'),  # Landing page empresarial
     path('servicios-vendidos/', reporting_views.servicios_vendidos_view, name='servicios_vendidos'),
     path('caja-diaria/', reporting_views.caja_diaria_view, name='caja_diaria'),  # Nueva vista de caja diaria
     path('caja-diaria-recepcionistas/', reporting_views.caja_diaria_recepcionistas_view, name='caja_diaria_recepcionistas'), # Added path if needed
