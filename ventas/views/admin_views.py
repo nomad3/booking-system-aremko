@@ -208,7 +208,7 @@ def csv_campaign_uploader(request):
                 cache.set(cache_key, {'status': 'queued', 'total': total, 'sent': 0, 'failed': 0}, 3600)
 
                 def worker():
-                    progress = {'status': 'running', 'total': total, 'sent': 0, 'failed': 0}
+                    progress = {'status': 'running', 'total': total, 'queued': 0, 'failed': 0, 'test_sent': False}
                     cache.set(cache_key, progress, 3600)
 
                     def val(row, *keys):
@@ -234,18 +234,26 @@ def csv_campaign_uploader(request):
                         body = cuerpo.replace('[Nombre]', 'Jorge')
                         from_email = getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
                         m = EmailMultiAlternatives(subject=asunto, body=body, from_email=from_email, to=[test_email], reply_to=[getattr(settings,'VENTAS_FROM_EMAIL','ventas@aremko.cl')])
-                        m.attach_alternative(body, 'text/html')
+                        if '<' in body and '>' in body:
+                            m.attach_alternative(body, 'text/html')
                         try:
-                            m.send(); progress['sent'] += 1
-                        except Exception:
-                            progress['failed'] += 1
+                            m.send()
+                            progress['test_sent'] = True
+                        except Exception as e:
+                            progress['test_sent'] = f'Error: {str(e)}'
                         cache.set(cache_key, progress, 3600)
 
                     # Sembrar cola
+                    msg_types = dict(CommunicationLog.MESSAGE_TYPES)
+                    promo_key = 'PROMOTIONAL' if 'PROMOTIONAL' in msg_types else 'PROMOCIONAL'
+                    
                     for row in rows:
                         email = norm_email(val(row, 'email'))
                         if not email:
-                            progress['failed'] += 1; cache.set(cache_key, progress, 3600); continue
+                            progress['failed'] += 1
+                            cache.set(cache_key, progress, 3600)
+                            continue
+                            
                         nombre = val(row, 'nombre', 'first_name') or '-'
                         apellido = val(row, 'apellido', 'last_name')
                         phone = norm_phone(val(row, 'celular', 'phone')) or None
@@ -253,17 +261,21 @@ def csv_campaign_uploader(request):
                         rubro = val(row, 'rubro', 'industry')
                         ciudad = val(row, 'ciudad', 'city')
 
+                        # Crear/actualizar Company si aplica
                         company = None
                         if empresa:
                             company, _ = Company.objects.get_or_create(name=empresa)
                             if rubro and hasattr(company, 'industry') and (company.industry or '') != rubro:
-                                company.industry = rubro; company.save(update_fields=['industry'])
+                                company.industry = rubro
+                                company.save(update_fields=['industry'])
 
+                        # Crear/actualizar Contact
                         c, _ = Contact.objects.get_or_create(email=email, defaults={
                             'first_name': nombre, 'last_name': apellido, 'phone': phone, 'company': company,
                             'notes': '; '.join([p for p in [f"Ciudad: {ciudad}" if ciudad else '', f"Rubro: {rubro}" if rubro else ''] if p])
                         })
-                        # Asegurar Cliente (CommunicationLog requiere cliente no nulo en BD prod)
+                        
+                        # Crear/actualizar Cliente (requerido por CommunicationLog)
                         try:
                             display_name = f"{nombre} {apellido}".strip() or (email.split('@')[0])
                             cliente_obj, _ = Cliente.objects.get_or_create(
@@ -273,19 +285,59 @@ def csv_campaign_uploader(request):
                         except Exception:
                             cliente_obj = Cliente.objects.filter(email=email).first()
 
-                        # Solo crear log si tenemos un cliente válido
+                        # Crear CommunicationLog PENDING solo si no existe ya uno pendiente
                         if cliente_obj:
-                            CommunicationLog.objects.create(
-                                cliente=cliente_obj, campaign=None, communication_type='EMAIL',
-                                message_type='PROMOTIONAL' if 'PROMOTIONAL' in dict(CommunicationLog.MESSAGE_TYPES) else 'PROMOCIONAL',
-                                subject=asunto, content=cuerpo, destination=email, status='PENDING')
-                            progress['sent'] += 1
+                            existing = CommunicationLog.objects.filter(
+                                destination=email,
+                                communication_type='EMAIL',
+                                message_type=promo_key,
+                                status='PENDING'
+                            ).exists()
+                            
+                            if not existing:
+                                CommunicationLog.objects.create(
+                                    cliente=cliente_obj, 
+                                    campaign=None, 
+                                    communication_type='EMAIL',
+                                    message_type=promo_key,
+                                    subject=asunto, 
+                                    content=cuerpo, 
+                                    destination=email, 
+                                    status='PENDING'
+                                )
+                                progress['queued'] += 1
+                            else:
+                                progress['queued'] += 1  # Ya existía, pero lo contamos como exitoso
                         else:
                             progress['failed'] += 1
                         
                         cache.set(cache_key, progress, 3600)
 
-                    progress['status'] = 'done_seed'; cache.set(cache_key, progress, 3600)
+                    # Actualizar progreso final
+                    total_pending = CommunicationLog.objects.filter(
+                        communication_type='EMAIL',
+                        message_type=promo_key,
+                        status='PENDING'
+                    ).count()
+                    
+                    progress.update({
+                        'status': 'completed_seeding',
+                        'pending': total_pending,
+                        'message': f'Cola preparada con {total_pending} emails. El goteo automático los enviará cada 10 minutos.'
+                    })
+                    cache.set(cache_key, progress, 3600)
+                    
+                    # Iniciar el proceso de envío automático inmediatamente
+                    try:
+                        from django.core.management import call_command
+                        # Usar el contenido almacenado en los CommunicationLog en lugar de template externo
+                        call_command('send_next_campaign_drip', 
+                                   use_stored_content=True,
+                                   batch_size=5)  # Enviar 5 por vez en lugar de 1
+                        progress['auto_start'] = 'Primer lote enviado automáticamente'
+                    except Exception as e:
+                        progress['auto_send_error'] = f'Error iniciando envío: {str(e)}'
+                        cache.set(cache_key, progress, 3600)
 
                 threading.Thread(target=worker, daemon=True).start()
                 messages.success(request, 'Archivo recibido. Sembrando cola y enviando prueba...')

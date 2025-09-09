@@ -52,17 +52,79 @@
   <div class="card">
     <div class="card-body">
       <h5>Progreso de Campaña</h5>
-      <p>Estado: <strong>{{ progress.status }}</strong></p>
-      <div class="progress" style="height: 20px;">
+      <p>Estado: <strong>
+        {% if progress.status == 'running' %}
+          🔄 Procesando CSV...
+        {% elif progress.status == 'completed_seeding' %}
+          ✅ Cola preparada - Enviando automáticamente
+        {% elif progress.status == 'done_seed' %}
+          ✅ Completado
+        {% else %}
+          {{ progress.status }}
+        {% endif %}
+      </strong></p>
+      
+      {% if progress.message %}
+        <div class="alert alert-info">{{ progress.message }}</div>
+      {% endif %}
+      
+      {% if progress.test_sent %}
+        <div class="alert alert-success">
+          {% if progress.test_sent == True %}
+            📧 Email de prueba enviado correctamente
+          {% else %}
+            ⚠️ {{ progress.test_sent }}
+          {% endif %}
+        </div>
+      {% endif %}
+      
+      <div class="progress mb-3" style="height: 20px;">
         {% if progress.total and progress.total > 0 %}
-          {% widthratio progress.sent progress.total 100 as percentage %}
-          <div class="progress-bar" role="progressbar" style="width: {{ percentage }}%;" aria-valuemin="0" aria-valuemax="100">{{ percentage }}%</div>
+          {% widthratio progress.queued progress.total 100 as percentage %}
+          <div class="progress-bar bg-success" role="progressbar" style="width: {{ percentage }}%;" aria-valuemin="0" aria-valuemax="100">{{ percentage }}%</div>
         {% else %}
           <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuemin="0" aria-valuemax="100">0%</div>
         {% endif %}
       </div>
-      <p class="mt-2">Total: {{ progress.total }} • Enviados: {{ progress.sent }} • Fallidos: {{ progress.failed }}{% if progress.pending %} • Pendientes: {{ progress.pending }}{% endif %}</p>
-      <small>El goteo automático envía 1 email cada 10 minutos. <a href="javascript:location.reload()">🔄 Actualizar</a></small>
+      
+      <div class="row">
+        <div class="col-md-3">
+          <strong>Total CSV:</strong><br>
+          <span class="badge bg-primary">{{ progress.total|default:0 }}</span>
+        </div>
+        <div class="col-md-3">
+          <strong>En Cola:</strong><br>
+          <span class="badge bg-success">{{ progress.queued|default:0 }}</span>
+        </div>
+        <div class="col-md-3">
+          <strong>Pendientes:</strong><br>
+          <span class="badge bg-warning">{{ progress.pending|default:0 }}</span>
+        </div>
+        <div class="col-md-3">
+          <strong>Fallidos:</strong><br>
+          <span class="badge bg-danger">{{ progress.failed|default:0 }}</span>
+        </div>
+      </div>
+      
+      {% if progress.auto_send_error %}
+        <div class="alert alert-warning mt-3">
+          ⚠️ {{ progress.auto_send_error }}
+        </div>
+      {% endif %}
+      
+      <div class="mt-3">
+        <small class="text-muted">
+          💡 El goteo automático envía emails cada 10 minutos. 
+          <a href="javascript:location.reload()" class="btn btn-sm btn-outline-primary">🔄 Actualizar Estado</a>
+        </small>
+      </div>
+      
+      {% if progress.status == 'completed_seeding' and progress.pending > 0 %}
+        <div class="alert alert-info mt-3">
+          <strong>🚀 Campaña Activa:</strong> Se están enviando {{ progress.pending }} emails automáticamente cada 10 minutos.
+          <br><small>Tiempo estimado: ~{{ progress.pending|floatformat:0 }} × 10 min = {% widthratio progress.pending 1 10 %} minutos total</small>
+        </div>
+      {% endif %}
     </div>
   </div>
   {% endif %}
