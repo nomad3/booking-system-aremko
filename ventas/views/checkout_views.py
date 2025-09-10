@@ -146,7 +146,7 @@ def checkout_view(request):
     # Filter Pago.METODOS_PAGO to only include public-facing options
     public_payment_methods = [
         choice for choice in Pago.METODOS_PAGO
-        if choice[0] in ['transferencia', 'flow'] # Explicitly define public methods for now
+        if choice[0] in ['transferencia', 'flow', 'mercadopago_link'] # Include Mercado Pago Link
     ]
 
     context = {

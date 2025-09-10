@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views # Import the new admin views module
+    admin_views, mercadopago_views # Import the new admin views module and mercadopago views
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -78,6 +78,13 @@ urlpatterns = [
     path('api/flow/create/', flow_views.create_flow_payment, name='create_flow_payment'),
     path('payment/confirmation/', flow_views.flow_confirmation, name='flow_confirmation'), # Adjust path as needed
     path('payment/return/', flow_views.flow_return, name='flow_return'), # Adjust path as needed
+    # Mercado Pago URLs
+    path('api/mercadopago/create/', mercadopago_views.create_mercadopago_payment, name='create_mercadopago_payment'),
+    path('payment/mercadopago/webhook/', mercadopago_views.mercadopago_webhook, name='mercadopago_webhook'),
+    path('payment/mercadopago/success/', mercadopago_views.mercadopago_success, name='mercadopago_success'),
+    path('payment/mercadopago/failure/', mercadopago_views.mercadopago_failure, name='mercadopago_failure'),
+    path('payment/mercadopago/pending/', mercadopago_views.mercadopago_pending, name='mercadopago_pending'),
+    path('api/mercadopago/status/<int:reserva_id>/', mercadopago_views.mercadopago_payment_status, name='mercadopago_payment_status'),
     # New API endpoint for client lookup by phone
     path('api/get-client-details/', api_views.get_client_details_by_phone, name='get_client_details_by_phone'),
     # Removed URL for get_service_providers as it's no longer needed

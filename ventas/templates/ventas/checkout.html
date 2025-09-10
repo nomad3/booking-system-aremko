@@ -246,10 +246,18 @@
                                         {% if value == 'flow' %}
                                             <span class="badge bg-secondary">Próximamente</span>
                                         {% endif %}
+                                        {% if value == 'mercadopago_link' %}
+                                            <span class="badge bg-primary">Recomendado</span>
+                                        {% endif %}
                                     </label>
                                     {% if value == 'transferencia' %}
                                         <div class="form-text mt-1">
                                             Selecciona esta opción para ver los detalles de la cuenta. Tu reserva quedará pendiente hasta confirmar el pago.
+                                        </div>
+                                    {% endif %}
+                                    {% if value == 'mercadopago_link' %}
+                                        <div class="form-text mt-1">
+                                            Paga de forma segura con tarjeta de crédito, débito o transferencia bancaria. Aprobación inmediata.
                                         </div>
                                     {% endif %}
                                 </div>
@@ -542,6 +550,48 @@ Email para comprobante: ventas@aremko.cl</pre>
         // No finally block needed here as redirection or error handling covers state reset.
     }
 
+    async function handleMercadoPagoCheckout(formData, overlay, button) {
+        const csrfToken = getCookie('csrftoken');
+        try {
+            // 1. Create Reservation (Pending)
+            console.log("Creating reservation before Mercado Pago payment...");
+            const checkoutResponse = await fetch('{% url "ventas:complete_checkout" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            });
+            const checkoutData = await handleApiResponse(checkoutResponse);
+            if (!checkoutData.success || !checkoutData.reserva_id) {
+                throw new Error(checkoutData.error || 'Error al crear la reserva antes del pago con Mercado Pago.');
+            }
+            const reservaId = checkoutData.reserva_id;
+            console.log("Reservation created for Mercado Pago, ID:", reservaId);
+
+            // 2. Create Mercado Pago Payment Link
+            console.log("Creating Mercado Pago payment link for reserva_id:", reservaId);
+            const mpResponse = await fetch('{% url "ventas:create_mercadopago_payment" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ reserva_id: reservaId })
+            });
+            const mpData = await handleApiResponse(mpResponse);
+
+            // 3. Redirect to Mercado Pago
+            if (mpData.payment_link) {
+                console.log("Redirecting to Mercado Pago:", mpData.payment_link);
+                window.location.href = mpData.payment_link;
+                // Don't hide processing here, redirection handles it.
+            } else {
+                throw new Error(mpData.error || 'No se recibió link de pago de Mercado Pago.');
+            }
+        } catch (error) {
+            handleCheckoutError(error, overlay, button);
+        }
+    }
+
     // --- Event Listeners ---
     document.addEventListener('DOMContentLoaded', function() {
         const completeCheckoutBtn = document.getElementById('completeCheckoutBtn');
@@ -605,6 +655,8 @@ Email para comprobante: ventas@aremko.cl</pre>
                     handleBankTransferCheckout(formData, processingOverlay, completeCheckoutBtn);
                 } else if (paymentMethod === 'flow') {
                     handleFlowCheckout(formData, processingOverlay, completeCheckoutBtn);
+                } else if (paymentMethod === 'mercadopago_link') {
+                    handleMercadoPagoCheckout(formData, processingOverlay, completeCheckoutBtn);
                 } else {
                     alert('Método de pago no soportado.');
                     hideProcessing(processingOverlay, completeCheckoutBtn);

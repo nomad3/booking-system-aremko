@@ -61,6 +61,7 @@ class Compra(models.Model):
         ('giftcard', 'GiftCard'),
         ('flow', 'FLOW'),
         ('mercadopago', 'MercadoPago'),
+        ('mercadopago_link', 'Mercado Pago Link'),
         ('scotiabank', 'Transferencia ScotiaBank'), # Keep specific ones for admin use
         ('bancoestado', 'Transferencia BancoEstado'),
         ('cuentarut', 'Transferencia CuentaRut'),
@@ -393,6 +394,7 @@ class Pago(models.Model):
         ('giftcard', 'GiftCard'),
         ('flow', 'FLOW'),
         ('mercadopago', 'MercadoPago'),
+        ('mercadopago_link', 'Mercado Pago Link'),
         ('scotiabank', 'Transferencia ScotiaBank'), # Keep specific ones for admin use
         ('bancoestado', 'Transferencia BancoEstado'),
         ('cuentarut', 'Transferencia CuentaRut'),
