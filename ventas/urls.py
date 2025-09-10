@@ -55,6 +55,7 @@ urlpatterns = [
     # Admin Section URLs
     path('admin/section/crm/', admin_views.admin_section_crm_view, name='admin_section_crm'),
     path('admin/section/crm/csv-campaign/', admin_views.csv_campaign_uploader, name='csv_campaign_uploader'),
+    path('admin/section/crm/mail-csv/', admin_views.mail_csv_uploader, name='mail_csv_uploader'),
     path('admin/section/ventas/', admin_views.admin_section_ventas_view, name='admin_section_ventas'),
     path('admin/section/servicios/', admin_views.admin_section_servicios_view, name='admin_section_servicios'),
     path('admin/section/productos/', admin_views.admin_section_productos_view, name='admin_section_productos'),

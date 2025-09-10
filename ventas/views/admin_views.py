@@ -348,6 +348,81 @@ def csv_campaign_uploader(request):
     context['progress'] = cache.get(cache_key)
     return render(request, 'admin/csv_campaign_uploader.html', context)
 
+
+@login_required
+@user_passes_test(es_administrador)
+@require_http_methods(["GET", "POST"])
+def mail_csv_uploader(request):
+    """Subir CSV a la tabla MailParaEnviar"""
+    if request.method == 'POST':
+        asunto = request.POST.get('subject', '').strip()
+        contenido = request.POST.get('body', '').strip()
+        file = request.FILES.get('csv_file')
+        campana = request.POST.get('campaign', '').strip()
+
+        if not asunto or not contenido or not file:
+            messages.error(request, 'Asunto, contenido y archivo CSV son obligatorios.')
+        else:
+            try:
+                from ventas.models import MailParaEnviar
+                data = file.read().decode('utf-8')
+                reader = csv.DictReader(io.StringIO(data))
+                rows = list(reader)
+                
+                def val(row, *keys):
+                    for k in keys:
+                        if k in row and row[k]:
+                            return str(row[k]).strip()
+                    return ''
+
+                def norm_email(v):
+                    v = (v or '').strip().lower()
+                    return v if v and '@' in v else ''
+
+                creados = 0
+                saltados = 0
+                
+                for row in rows:
+                    email = norm_email(val(row, 'email'))
+                    if not email:
+                        saltados += 1
+                        continue
+                        
+                    nombre = val(row, 'nombre', 'empresa') or 'Sin nombre'
+                    ciudad = val(row, 'ciudad')
+                    rubro = val(row, 'rubro')
+                    
+                    # Verificar si ya existe
+                    if MailParaEnviar.objects.filter(email=email, estado='PENDIENTE').exists():
+                        saltados += 1
+                        continue
+                    
+                    # Crear registro
+                    MailParaEnviar.objects.create(
+                        nombre=nombre,
+                        email=email,
+                        ciudad=ciudad,
+                        rubro=rubro,
+                        asunto=asunto,
+                        contenido_html=contenido,
+                        estado='PENDIENTE',
+                        prioridad=1,
+                        campana=campana or 'Sin campaña'
+                    )
+                    creados += 1
+                
+                messages.success(request, f'✅ Importación completada: {creados} emails creados, {saltados} saltados.')
+                
+                # Mostrar total pendientes
+                total_pendientes = MailParaEnviar.objects.filter(estado='PENDIENTE').count()
+                messages.info(request, f'📊 Total emails PENDIENTES: {total_pendientes}')
+                
+            except Exception as e:
+                messages.error(request, f'Error procesando CSV: {e}')
+
+    context = {**admin.site.each_context(request), 'title': 'Importar Emails desde CSV'}
+    return render(request, 'admin/mail_csv_uploader.html', context)
+
 @login_required
 @user_passes_test(es_administrador)
 def admin_section_ventas_view(request):

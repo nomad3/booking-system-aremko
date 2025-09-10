@@ -15,7 +15,7 @@ from .models import (
     MovimientoCliente, Compra, DetalleCompra, GiftCard, HomepageConfig,
     Lead, Company, Contact, Activity, Campaign, Deal, CampaignInteraction, HomepageSettings,
     # Communication models
-    CommunicationLimit, ClientPreferences, CommunicationLog, SMSTemplate
+    CommunicationLimit, ClientPreferences, CommunicationLog, SMSTemplate, MailParaEnviar
 )
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
@@ -780,3 +780,51 @@ class SMSTemplateAdmin(admin.ModelAdmin):
             f"Se desactivaron {updated} plantilla(s)."
         )
     deactivate_templates.short_description = "Desactivar plantillas seleccionadas"
+
+
+@admin.register(MailParaEnviar)
+class MailParaEnviarAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'email', 'ciudad', 'estado', 'prioridad', 'campana', 'creado_en', 'enviado_en']
+    list_filter = ['estado', 'prioridad', 'campana', 'ciudad', 'rubro', 'creado_en']
+    search_fields = ['nombre', 'email', 'asunto']
+    readonly_fields = ['enviado_en']
+    list_editable = ['estado', 'prioridad']
+    
+    fieldsets = (
+        ('Destinatario', {
+            'fields': ('nombre', 'email', 'ciudad', 'rubro')
+        }),
+        ('Contenido', {
+            'fields': ('asunto', 'contenido_html')
+        }),
+        ('Control de Envío', {
+            'fields': ('estado', 'prioridad', 'campana', 'notas')
+        }),
+        ('Timestamps', {
+            'fields': ('creado_en', 'enviado_en'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    actions = ['marcar_como_pendiente', 'marcar_como_pausado', 'duplicar_emails']
+    
+    def marcar_como_pendiente(self, request, queryset):
+        updated = queryset.update(estado='PENDIENTE')
+        self.message_user(request, f'{updated} emails marcados como PENDIENTE.')
+    marcar_como_pendiente.short_description = "Marcar como PENDIENTE"
+    
+    def marcar_como_pausado(self, request, queryset):
+        updated = queryset.update(estado='PAUSADO')
+        self.message_user(request, f'{updated} emails marcados como PAUSADO.')
+    marcar_como_pausado.short_description = "Marcar como PAUSADO"
+    
+    def duplicar_emails(self, request, queryset):
+        count = 0
+        for obj in queryset:
+            obj.pk = None
+            obj.estado = 'PENDIENTE'
+            obj.enviado_en = None
+            obj.save()
+            count += 1
+        self.message_user(request, f'{count} emails duplicados como PENDIENTE.')
+    duplicar_emails.short_description = "Duplicar emails como PENDIENTE"

@@ -1,0 +1,124 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4">
+  <div class="page-header mb-4">
+    <h1>{{ title }}</h1>
+    <p>Sube un CSV con columnas: <strong>nombre, email, ciudad, rubro</strong>. Los emails se agregarán a la cola de envío programado.</p>
+  </div>
+
+  {% if messages %}
+  <div class="mb-3">
+    {% for m in messages %}
+      <div class="alert alert-{{ m.tags }}">{{ m }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">Asunto del Email</label>
+          <input class="form-control" type="text" name="subject" 
+                 value="🌿 Reuniones con Resultados: Productividad + Bienestar en un solo lugar" required>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Contenido HTML del Email</label>
+          <textarea class="form-control" name="body" rows="15" required><!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f6f8;">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f4f6f8;">
+      <tr>
+        <td align="center" style="padding:24px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="width:600px;max-width:100%;background:#ffffff;border-radius:8px;overflow:hidden;">
+            <tr>
+              <td style="padding:28px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+                <h1 style="margin:0 0 16px 0;font-size:22px;line-height:1.3;font-weight:700;">
+                  🌿 Reuniones con Resultados: Productividad + Bienestar en un solo lugar
+                </h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 28px 12px 28px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:15px;line-height:1.6;">
+                <p style="margin:0 0 12px 0;">Hola [Nombre],</p>
+                <p style="margin:0 0 12px 0;">
+                  ¿Tus reuniones de equipo se sienten rutinarias y poco inspiradoras?
+                  En <strong>Aremko Aguas Calientes &amp; Spa</strong> creamos un espacio único en Puerto Varas
+                  donde las empresas de la Región de Los Lagos pueden combinar:
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 28px 4px 28px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:15px;line-height:1.6;">
+                <ul style="padding-left:20px;margin:0 0 12px 0;">
+                  <li style="margin-bottom:8px;">✅ <strong>Sala de reuniones</strong> para 20 personas, con aire acondicionado y TV de 60'' con vista al bosque nativo.</li>
+                  <li style="margin-bottom:8px;">✅ <strong>Desayuno gourmet sureño</strong> con productos locales (quesos, cecinas, mermeladas, café orgánico, infusiones).</li>
+                  <li style="margin-bottom:8px;">✅ <strong>Sesiones de coaching o directorio</strong> en un ambiente natural que estimula la creatividad y concentración.</li>
+                  <li style="margin-bottom:8px;">✅ <strong>Cierre de la jornada en tinas calientes</strong> a orillas del Río Pescado para fortalecer vínculos y relajar al equipo.</li>
+                </ul>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 28px 16px 28px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:15px;line-height:1.6;">
+                <p style="margin:0 0 16px 0;">Más que una reunión, es una <strong>experiencia que inspira, motiva y conecta a tu equipo</strong>.</p>
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="background:#10b981;border-radius:6px;">
+                      <a href="https://wa.me/56957902525" style="display:inline-block;padding:12px 18px;color:#ffffff;text-decoration:none;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:700;">📅 Agenda por WhatsApp</a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 28px 26px 28px;font-family:Arial,Helvetica,sans-serif;color:#334155;font-size:13px;line-height:1.6;border-top:1px solid #e5e7eb;">
+                <p style="margin:0 0 6px 0;">También puedes responder a este correo y te contactaremos para resolver dudas o agendar.</p>
+                <p style="margin:0;">✉️ ventas@aremko.cl &nbsp;|&nbsp; 💬 WhatsApp +56 9 5790 2525 &nbsp;|&nbsp; 🌐 www.aremko.cl</p>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:10px 0 0 0;font-family:Arial,Helvetica,sans-serif;color:#94a3b8;font-size:12px;">Si no deseas recibir más mensajes, responde con "BAJA".</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html></textarea>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Archivo CSV</label>
+          <input class="form-control" type="file" name="csv_file" accept=".csv" required>
+          <small class="text-muted">Debe contener columnas: nombre, email, ciudad, rubro</small>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Nombre de Campaña (opcional)</label>
+          <input class="form-control" type="text" name="campaign" value="Colegios Los Lagos 2024">
+        </div>
+        
+        <button class="btn btn-modern btn-primary-modern" type="submit">📧 Importar Emails</button>
+        <a class="btn btn-modern btn-secondary-modern" href="{% url 'ventas:admin_section_crm' %}">Volver</a>
+      </form>
+    </div>
+  </div>
+
+  <div class="alert alert-info">
+    <h5>📋 Instrucciones:</h5>
+    <ol>
+      <li>Tu CSV debe tener exactamente estas columnas: <strong>nombre, email, ciudad, rubro</strong></li>
+      <li>Los emails se agregarán a la tabla "Mails para Enviar" con estado PENDIENTE</li>
+      <li>El cron automático enviará 3 emails cada 10 minutos entre 8:00-18:00</li>
+      <li>Puedes personalizar el contenido usando <code>[Nombre]</code> que será reemplazado por el nombre de cada destinatario</li>
+    </ol>
+  </div>
+</div>
+{% endblock %}

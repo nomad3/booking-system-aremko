@@ -1207,6 +1207,60 @@ class CommunicationLog(models.Model):
         self.save()
 
 
+class MailParaEnviar(models.Model):
+    """
+    Cola de emails para envío programado con control de horarios
+    """
+    ESTADO_CHOICES = [
+        ('PENDIENTE', 'Pendiente'),
+        ('ENVIADO', 'Enviado'),
+        ('FALLIDO', 'Fallido'),
+        ('PAUSADO', 'Pausado'),
+    ]
+    
+    # Datos del destinatario
+    nombre = models.CharField(max_length=255, verbose_name="Nombre/Empresa")
+    email = models.EmailField(verbose_name="Email")
+    ciudad = models.CharField(max_length=100, blank=True, verbose_name="Ciudad")
+    rubro = models.CharField(max_length=100, blank=True, verbose_name="Rubro")
+    
+    # Contenido del email
+    asunto = models.CharField(max_length=255, verbose_name="Asunto")
+    contenido_html = models.TextField(verbose_name="Contenido HTML")
+    
+    # Control de envío
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='PENDIENTE', verbose_name="Estado")
+    prioridad = models.IntegerField(default=1, verbose_name="Prioridad (1=alta, 5=baja)")
+    
+    # Timestamps
+    creado_en = models.DateTimeField(auto_now_add=True, verbose_name="Creado en")
+    enviado_en = models.DateTimeField(null=True, blank=True, verbose_name="Enviado en")
+    
+    # Metadatos
+    campana = models.CharField(max_length=100, blank=True, verbose_name="Campaña")
+    notas = models.TextField(blank=True, verbose_name="Notas")
+    
+    class Meta:
+        verbose_name = "Mail para Enviar"
+        verbose_name_plural = "Mails para Enviar"
+        ordering = ['prioridad', 'creado_en']
+    
+    def __str__(self):
+        return f"{self.nombre} ({self.email}) - {self.estado}"
+    
+    def marcar_como_enviado(self):
+        """Marca el email como enviado"""
+        from django.utils import timezone
+        self.estado = 'ENVIADO'
+        self.enviado_en = timezone.now()
+        self.save()
+    
+    def marcar_como_fallido(self):
+        """Marca el email como fallido"""
+        self.estado = 'FALLIDO'
+        self.save()
+
+
 class SMSTemplate(models.Model):
     """
     Plantillas predefinidas para diferentes tipos de SMS
