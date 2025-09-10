@@ -224,7 +224,7 @@ class CommunicationService:
                 # Usamos el usuario autenticado en SMTP para máxima entregabilidad
                 from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
                 to=[cliente.email],
-                bcc=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copia a ventas@aremko.cl
+                bcc=['aremkospa@gmail.com', getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copias a aremkospa@gmail.com y ventas@aremko.cl
                 reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
             )
             email.attach_alternative(html_content, "text/html")
@@ -328,6 +328,7 @@ class CommunicationService:
                 body=f"Hola {cliente.nombre}, te recordamos tu reserva de mañana.",
                 from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
                 to=[cliente.email],
+                bcc=['aremkospa@gmail.com', getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copias a aremkospa@gmail.com y ventas@aremko.cl
                 reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
             )
             email.attach_alternative(html_content, "text/html")
@@ -459,6 +460,7 @@ class CommunicationService:
                 body=f"Hola {cliente.nombre}, registramos tu pago y tu reserva quedó pagada al 100%.",
                 from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
                 to=[cliente.email],
+                bcc=['aremkospa@gmail.com', getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copias a aremkospa@gmail.com y ventas@aremko.cl
                 reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
             )
             email.attach_alternative(html_content, "text/html")
