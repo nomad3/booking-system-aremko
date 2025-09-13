@@ -60,6 +60,7 @@ urlpatterns = [
     path('admin/section/crm/create-giftcard-campaign/', giftcard_campaign_views.create_giftcard_campaign, name='create_giftcard_campaign'),
     path('admin/section/crm/send-test-giftcard-email/', giftcard_campaign_views.send_test_giftcard_email, name='send_test_giftcard_email'),
     path('admin/section/crm/preview-giftcard-email/', giftcard_campaign_views.preview_giftcard_email, name='preview_giftcard_email'),
+    path('admin/section/crm/save-email-template/', giftcard_campaign_views.save_email_template, name='save_email_template'),
     path('admin/section/ventas/', admin_views.admin_section_ventas_view, name='admin_section_ventas'),
     path('admin/section/servicios/', admin_views.admin_section_servicios_view, name='admin_section_servicios'),
     path('admin/section/productos/', admin_views.admin_section_productos_view, name='admin_section_productos'),

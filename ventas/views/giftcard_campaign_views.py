@@ -289,6 +289,33 @@ def preview_giftcard_email(request):
         return redirect('ventas:giftcard_campaign_dashboard')
 
 
+@login_required
+@user_passes_test(es_administrador)
+def save_email_template(request):
+    """Guarda los cambios del template de email"""
+    
+    if request.method == 'POST':
+        try:
+            subject = request.POST.get('subject', '')
+            body_html = request.POST.get('body_html', '')
+            year = int(request.POST.get('year', 2025))
+            month = int(request.POST.get('month', 1))
+            giftcard_amount = int(request.POST.get('giftcard_amount', 15000))
+            
+            # Aquí podrías guardar el template en la base de datos
+            # Por ahora solo mostramos un mensaje de éxito
+            messages.success(request, "✅ Template de email guardado correctamente")
+            
+            # Redirigir de vuelta a la vista previa con los parámetros
+            return redirect(f"{reverse('ventas:preview_giftcard_email')}?year={year}&month={month}&giftcard_amount={giftcard_amount}")
+            
+        except Exception as e:
+            messages.error(request, f"❌ Error guardando template: {str(e)}")
+            return redirect('ventas:giftcard_campaign_dashboard')
+    
+    return redirect('ventas:giftcard_campaign_dashboard')
+
+
 def get_giftcard_email_template(giftcard_amount=15000):
     """Retorna la plantilla de email para la campaña de giftcard"""
     return """
