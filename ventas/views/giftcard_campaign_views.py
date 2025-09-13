@@ -199,19 +199,22 @@ def send_test_giftcard_email(request):
             return redirect('ventas:giftcard_campaign_dashboard')
         
         try:
-            # Crear cliente temporal para la prueba
-            test_cliente = Cliente(
-                nombre="Cliente de Prueba",
-                email=test_email,
-                telefono="+56912345678"
-            )
-            
-            # Obtener plantilla
-            template = get_giftcard_email_template()
-            subject = f"🎁 ¡Tu giftcard de ${giftcard_amount:,} te espera en Aremko!"
-            
-            # Personalizar plantilla con el monto correcto
-            body_html = template.replace('$15,000', f'${giftcard_amount:,}')
+            # Intentar cargar el template guardado
+            try:
+                saved_template = EmailTemplate.objects.get(
+                    name=f"Giftcard {year}/{month:02d} - ${giftcard_amount:,}",
+                    year=year, month=month, giftcard_amount=giftcard_amount,
+                    campaign_type='giftcard', is_active=True
+                )
+                subject = saved_template.subject
+                body_html = saved_template.body_html
+                print(f"✅ Usando template guardado: {saved_template.name}")
+            except EmailTemplate.DoesNotExist:
+                # Usar template por defecto si no hay guardado
+                template = get_giftcard_email_template()
+                subject = f"🎁 ¡Tu giftcard de ${giftcard_amount:,} te espera en Aremko!"
+                body_html = template.replace('$15,000', f'${giftcard_amount:,}')
+                print("⚠️ Usando template por defecto (no hay guardado)")
             
             # Enviar email de prueba
             from django.core.mail import EmailMultiAlternatives
@@ -234,6 +237,7 @@ def send_test_giftcard_email(request):
             print(f"DEBUG: Enviando email de prueba a {test_email}")
             print(f"DEBUG: From: {from_email}")
             print(f"DEBUG: Subject: {subject}")
+            print(f"DEBUG: Usando template guardado: {saved_template.name if 'saved_template' in locals() else 'No'}")
             
             email.send()
             
