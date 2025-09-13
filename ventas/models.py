@@ -1315,3 +1315,29 @@ class SMSTemplate(models.Model):
         except KeyError as e:
             logger.warning(f"Variable faltante en plantilla {self.name}: {e}")
             return self.content  # Devolver sin procesar si falta alguna variable
+
+
+class EmailTemplate(models.Model):
+    """Template personalizado de emails para campañas"""
+    name = models.CharField(max_length=200, verbose_name="Nombre del Template")
+    subject = models.CharField(max_length=500, verbose_name="Asunto")
+    body_html = models.TextField(verbose_name="Cuerpo HTML")
+    campaign_type = models.CharField(max_length=50, choices=[
+        ('giftcard', 'Campaña Giftcard'),
+        ('promocional', 'Promocional'),
+        ('recordatorio', 'Recordatorio'),
+    ], default='giftcard')
+    year = models.IntegerField(verbose_name="Año", default=2025)
+    month = models.IntegerField(verbose_name="Mes", default=1)
+    giftcard_amount = models.IntegerField(verbose_name="Monto Giftcard", default=15000)
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Template de Email"
+        verbose_name_plural = "Templates de Email"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.name} - {self.year}/{self.month:02d}"

@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.urls import reverse
 from datetime import date
 from django.db.models import Q, Count, Sum
-from ventas.models import Cliente, VentaReserva, ReservaServicio, MailParaEnviar, Campaign
+from ventas.models import Cliente, VentaReserva, ReservaServicio, MailParaEnviar, Campaign, EmailTemplate
 from ventas.views.admin_views import es_administrador
 
 
@@ -265,12 +265,24 @@ def preview_giftcard_email(request):
         import calendar
         month_name = calendar.month_name[month]
         
-        # Obtener plantilla
-        template = get_giftcard_email_template()
-        subject = f"🎁 ¡Tu giftcard de ${giftcard_amount:,} te espera en Aremko!"
-        
-        # Personalizar plantilla
-        body_html = template.replace('$15,000', f'${giftcard_amount:,}')
+        # Buscar template guardado o usar el por defecto
+        template_name = f"Giftcard {year}/{month:02d} - ${giftcard_amount:,}"
+        try:
+            saved_template = EmailTemplate.objects.get(
+                name=template_name,
+                year=year,
+                month=month,
+                giftcard_amount=giftcard_amount,
+                campaign_type='giftcard',
+                is_active=True
+            )
+            subject = saved_template.subject
+            body_html = saved_template.body_html
+        except EmailTemplate.DoesNotExist:
+            # Usar template por defecto
+            template = get_giftcard_email_template()
+            subject = f"🎁 ¡Tu giftcard de ${giftcard_amount:,} te espera en Aremko!"
+            body_html = template.replace('$15,000', f'${giftcard_amount:,}')
         
         context = {
             'title': f'Vista Previa - Campaña Giftcard {month_name} {year}',
@@ -302,14 +314,39 @@ def save_email_template(request):
             month = int(request.POST.get('month', 1))
             giftcard_amount = int(request.POST.get('giftcard_amount', 15000))
             
-            # Aquí podrías guardar el template en la base de datos
-            # Por ahora solo mostramos un mensaje de éxito
-            messages.success(request, "✅ Template de email guardado correctamente")
+            # Crear o actualizar el template
+            template_name = f"Giftcard {year}/{month:02d} - ${giftcard_amount:,}"
+            
+            template, created = EmailTemplate.objects.get_or_create(
+                name=template_name,
+                year=year,
+                month=month,
+                giftcard_amount=giftcard_amount,
+                campaign_type='giftcard',
+                defaults={
+                    'subject': subject,
+                    'body_html': body_html,
+                    'is_active': True
+                }
+            )
+            
+            if not created:
+                # Actualizar template existente
+                template.subject = subject
+                template.body_html = body_html
+                template.updated_at = timezone.now()
+                template.save()
+            
+            if created:
+                messages.success(request, f"✅ Template creado: {template_name}")
+            else:
+                messages.success(request, f"✅ Template actualizado: {template_name}")
             
             # Redirigir de vuelta a la vista previa con los parámetros
             return redirect(f"{reverse('ventas:preview_giftcard_email')}?year={year}&month={month}&giftcard_amount={giftcard_amount}")
             
         except Exception as e:
+            print(f"ERROR: Error guardando template: {str(e)}")
             messages.error(request, f"❌ Error guardando template: {str(e)}")
             return redirect('ventas:giftcard_campaign_dashboard')
     
