@@ -7,6 +7,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import datetime, date
 from ventas.models import Cliente, VentaReserva, ReservaServicio
+from django.db import models
 from django.db.models import Q, Count, Sum
 import calendar
 
