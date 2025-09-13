@@ -21,62 +21,84 @@ from ventas.views.admin_views import es_administrador
 def giftcard_campaign_dashboard(request):
     """Dashboard para la campaña de giftcard flexible por mes/año"""
     
-    # Obtener parámetros de la URL o usar defaults
-    year = int(request.GET.get('year', 2025))
-    month = int(request.GET.get('month', 1))
-    giftcard_amount = int(request.GET.get('giftcard_amount', 15000))
-    
-    # Validar mes
-    if month < 1 or month > 12:
-        month = 1
+    try:
+        # Obtener parámetros de la URL o usar defaults
+        year = int(request.GET.get('year', 2025))
+        month = int(request.GET.get('month', 1))
+        giftcard_amount = int(request.GET.get('giftcard_amount', 15000))
+        
+        # Validar mes
+        if month < 1 or month > 12:
+            month = 1
+            year = 2025
+        
+        # Obtener estadísticas de clientes del mes/año especificado
+        import calendar
+        month_start = date(year, month, 1)
+        last_day = calendar.monthrange(year, month)[1]
+        month_end = date(year, month, last_day)
+        month_name = calendar.month_name[month]
+    except Exception as e:
+        # Si hay error en parámetros, usar defaults
         year = 2025
+        month = 1
+        giftcard_amount = 15000
+        import calendar
+        month_start = date(2025, 1, 1)
+        month_end = date(2025, 1, 31)
+        month_name = "Enero"
     
-    # Obtener estadísticas de clientes del mes/año especificado
-    import calendar
-    month_start = date(year, month, 1)
-    last_day = calendar.monthrange(year, month)[1]
-    month_end = date(year, month, last_day)
-    month_name = calendar.month_name[month]
+    try:
+        # Clientes que visitaron en el mes/año especificado
+        clientes_mes = Cliente.objects.filter(
+            ventareserva__reservaservicios__fecha_agendamiento__range=(month_start, month_end)
+        ).annotate(
+            num_visitas_mes=Count('ventareserva__reservaservicios', 
+                                filter=Q(ventareserva__reservaservicios__fecha_agendamiento__range=(month_start, month_end))),
+            gasto_mes=Sum('ventareserva__total', 
+                        filter=Q(ventareserva__reservaservicios__fecha_agendamiento__range=(month_start, month_end)))
+        ).distinct()
+        
+        # Clientes con email válido
+        clientes_con_email = clientes_mes.filter(
+            email__isnull=False,
+            email__gt=''
+        ).exclude(email='')
+    except Exception as e:
+        # Si hay error en la consulta, usar valores por defecto
+        clientes_mes = Cliente.objects.none()
+        clientes_con_email = Cliente.objects.none()
     
-    # Clientes que visitaron en el mes/año especificado
-    clientes_mes = Cliente.objects.filter(
-        ventareserva__reservaservicios__fecha_agendamiento__range=(month_start, month_end)
-    ).annotate(
-        num_visitas_mes=Count('ventareserva__reservaservicios', 
-                            filter=Q(ventareserva__reservaservicios__fecha_agendamiento__range=(month_start, month_end))),
-        gasto_mes=Sum('ventareserva__total', 
-                    filter=Q(ventareserva__reservaservicios__fecha_agendamiento__range=(month_start, month_end)))
-    ).distinct()
-    
-    # Clientes con email válido
-    clientes_con_email = clientes_mes.filter(
-        email__isnull=False,
-        email__gt=''
-    ).exclude(email='')
-    
-    # Estadísticas de emails enviados
-    emails_enviados = MailParaEnviar.objects.filter(
-        asunto__icontains='giftcard',
-        estado='ENVIADO'
-    ).count()
-    
-    emails_pendientes = MailParaEnviar.objects.filter(
-        asunto__icontains='giftcard',
-        estado='PENDIENTE'
-    ).count()
-    
-    emails_fallidos = MailParaEnviar.objects.filter(
-        asunto__icontains='giftcard',
-        estado='FALLIDO'
-    ).count()
-    
-    # Clientes que aún no han recibido el email
-    clientes_sin_email = clientes_con_email.exclude(
-        id__in=MailParaEnviar.objects.filter(
+    try:
+        # Estadísticas de emails enviados
+        emails_enviados = MailParaEnviar.objects.filter(
             asunto__icontains='giftcard',
-            estado__in=['ENVIADO', 'PENDIENTE']
-        ).values_list('cliente_id', flat=True)
-    )
+            estado='ENVIADO'
+        ).count()
+        
+        emails_pendientes = MailParaEnviar.objects.filter(
+            asunto__icontains='giftcard',
+            estado='PENDIENTE'
+        ).count()
+        
+        emails_fallidos = MailParaEnviar.objects.filter(
+            asunto__icontains='giftcard',
+            estado='FALLIDO'
+        ).count()
+        
+        # Clientes que aún no han recibido el email
+        clientes_sin_email = clientes_con_email.exclude(
+            id__in=MailParaEnviar.objects.filter(
+                asunto__icontains='giftcard',
+                estado__in=['ENVIADO', 'PENDIENTE']
+            ).values_list('cliente_id', flat=True)
+        )
+    except Exception as e:
+        # Si hay error en las estadísticas, usar valores por defecto
+        emails_enviados = 0
+        emails_pendientes = 0
+        emails_fallidos = 0
+        clientes_sin_email = clientes_con_email
     
     # Top clientes del mes
     top_clientes = clientes_con_email.order_by('-gasto_mes')[:10]
