@@ -9,9 +9,10 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import user_passes_test
 from django.http import JsonResponse
 from django.utils import timezone
+from django.urls import reverse
 from datetime import date
 from django.db.models import Q, Count, Sum
-from ventas.models import Cliente, VentaReserva, ReservaServicio, CommunicationLog, Campaign
+from ventas.models import Cliente, VentaReserva, ReservaServicio, MailParaEnviar, Campaign
 from ventas.views.admin_views import es_administrador
 
 
@@ -54,30 +55,26 @@ def giftcard_campaign_dashboard(request):
     ).exclude(email='')
     
     # Estadísticas de emails enviados
-    emails_enviados = CommunicationLog.objects.filter(
-        message_type='PROMOCIONAL',
-        subject__icontains='giftcard',
-        status='SENT'
+    emails_enviados = MailParaEnviar.objects.filter(
+        asunto__icontains='giftcard',
+        estado='ENVIADO'
     ).count()
     
-    emails_pendientes = CommunicationLog.objects.filter(
-        message_type='PROMOCIONAL',
-        subject__icontains='giftcard',
-        status='PENDING'
+    emails_pendientes = MailParaEnviar.objects.filter(
+        asunto__icontains='giftcard',
+        estado='PENDIENTE'
     ).count()
     
-    emails_fallidos = CommunicationLog.objects.filter(
-        message_type='PROMOCIONAL',
-        subject__icontains='giftcard',
-        status='FAILED'
+    emails_fallidos = MailParaEnviar.objects.filter(
+        asunto__icontains='giftcard',
+        estado='FALLIDO'
     ).count()
     
     # Clientes que aún no han recibido el email
     clientes_sin_email = clientes_con_email.exclude(
-        id__in=CommunicationLog.objects.filter(
-            message_type='PROMOCIONAL',
-            subject__icontains='giftcard',
-            status__in=['SENT', 'PENDING']
+        id__in=MailParaEnviar.objects.filter(
+            asunto__icontains='giftcard',
+            estado__in=['ENVIADO', 'PENDIENTE']
         ).values_list('cliente_id', flat=True)
     )
     
@@ -156,7 +153,12 @@ def create_giftcard_campaign(request):
             messages.error(request, f"❌ Error creando campaña: {str(e)}")
             return redirect('ventas:giftcard_campaign_dashboard')
     
-    return redirect('ventas:giftcard_campaign_dashboard')
+    # Si es GET, redirigir al dashboard con parámetros
+    year = request.GET.get('year', 2025)
+    month = request.GET.get('month', 1)
+    giftcard_amount = request.GET.get('giftcard_amount', 15000)
+    
+    return redirect(f"{reverse('ventas:giftcard_campaign_dashboard')}?year={year}&month={month}&giftcard_amount={giftcard_amount}")
 
 
 @login_required
