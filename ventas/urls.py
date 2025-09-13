@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views # Import the new admin views module and mercadopago views
+    admin_views, mercadopago_views, giftcard_campaign_views # Import the new admin views module and mercadopago views
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -56,6 +56,9 @@ urlpatterns = [
     path('admin/section/crm/', admin_views.admin_section_crm_view, name='admin_section_crm'),
     path('admin/section/crm/csv-campaign/', admin_views.csv_campaign_uploader, name='csv_campaign_uploader'),
     path('admin/section/crm/mail-csv/', admin_views.mail_csv_uploader, name='mail_csv_uploader'),
+    path('admin/section/crm/giftcard-campaign/', giftcard_campaign_views.giftcard_campaign_dashboard, name='giftcard_campaign_dashboard'),
+    path('admin/section/crm/create-giftcard-campaign/', giftcard_campaign_views.create_giftcard_campaign, name='create_giftcard_campaign'),
+    path('admin/section/crm/send-test-giftcard-email/', giftcard_campaign_views.send_test_giftcard_email, name='send_test_giftcard_email'),
     path('admin/section/ventas/', admin_views.admin_section_ventas_view, name='admin_section_ventas'),
     path('admin/section/servicios/', admin_views.admin_section_servicios_view, name='admin_section_servicios'),
     path('admin/section/productos/', admin_views.admin_section_productos_view, name='admin_section_productos'),

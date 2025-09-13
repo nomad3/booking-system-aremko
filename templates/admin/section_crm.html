@@ -191,6 +191,20 @@
             </div>
         </div>
 
+        {# Giftcard Campaign #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-gift card-icon text-warning"></i>
+                    <h5 class="card-title">Campaña Giftcard</h5>
+                    <p class="card-text small">Clientes Enero 2025</p>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:giftcard_campaign_dashboard' %}" class="btn btn-sm btn-modern btn-warning-modern">🎁 Ver Campaña</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 {% endblock %}

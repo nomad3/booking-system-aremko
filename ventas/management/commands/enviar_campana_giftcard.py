@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+"""
+Comando para enviar campaña de giftcard cada 6 minutos
+Envía 2 emails por ejecución
+"""
+
 from django.core.management.base import BaseCommand
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
@@ -7,7 +13,7 @@ import pytz
 
 
 class Command(BaseCommand):
-    help = "Envía emails programados con control de horarios (8:00-18:00) y límite por lote"
+    help = "Envía campaña de giftcard cada 6 minutos (2 emails por ejecución)"
 
     def add_arguments(self, parser):
         parser.add_argument("--batch-size", type=int, default=2,
@@ -29,13 +35,14 @@ class Command(BaseCommand):
                 self.stdout.write(f"Fuera de horario de envío (8:00-18:00). Hora actual: {hour:02d}:{now_chile.minute:02d}")
                 return
 
-        # Buscar emails pendientes
+        # Buscar emails de campaña de giftcard pendientes
         emails_pendientes = MailParaEnviar.objects.filter(
-            estado='PENDIENTE'
+            estado='PENDIENTE',
+            asunto__icontains='giftcard'
         ).order_by('prioridad', 'creado_en')[:batch_size]
 
         if not emails_pendientes:
-            self.stdout.write("Sin emails pendientes para enviar.")
+            self.stdout.write("Sin emails de campaña giftcard pendientes para enviar.")
             return
 
         sent_count = 0
@@ -55,31 +62,45 @@ class Command(BaseCommand):
                     from_email=from_email,
                     to=[mail_obj.email],
                     reply_to=reply_to,
+                    bcc=['aremkospa@gmail.com', getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')]
                 )
                 
-                # Adjuntar HTML
-                if '<' in contenido and '>' in contenido:
-                    email.attach_alternative(contenido, 'text/html')
-
-                # Enviar
+                # Agregar contenido HTML
+                email.attach_alternative(contenido, "text/html")
+                
+                # Enviar email
                 email.send()
                 
                 # Marcar como enviado
-                mail_obj.marcar_como_enviado()
+                mail_obj.estado = 'ENVIADO'
+                mail_obj.fecha_envio = timezone.now()
+                mail_obj.save()
                 
                 sent_count += 1
-                self.stdout.write(self.style.SUCCESS(f"✅ Enviado a: {mail_obj.nombre} ({mail_obj.email})"))
+                self.stdout.write(f"✅ Email enviado a {mail_obj.email} - {mail_obj.nombre}")
                 
             except Exception as e:
-                mail_obj.marcar_como_fallido()
+                # Marcar como fallido
+                mail_obj.estado = 'FALLIDO'
+                mail_obj.observaciones = f"Error: {str(e)}"
+                mail_obj.save()
+                
                 failed_count += 1
-                self.stderr.write(self.style.ERROR(f"❌ Error enviando a {mail_obj.email}: {e}"))
+                self.stdout.write(f"❌ Error enviando a {mail_obj.email}: {str(e)}")
 
-        # Contar pendientes restantes
-        pendientes_restantes = MailParaEnviar.objects.filter(estado='PENDIENTE').count()
-        
         # Resumen
-        self.stdout.write(f"📊 Lote completado: {sent_count} enviados, {failed_count} fallidos. Pendientes restantes: {pendientes_restantes}")
+        self.stdout.write(f"\n📊 Resumen de envío:")
+        self.stdout.write(f"   ✅ Enviados: {sent_count}")
+        self.stdout.write(f"   ❌ Fallidos: {failed_count}")
+        self.stdout.write(f"   📧 Total procesados: {sent_count + failed_count}")
         
-        if pendientes_restantes == 0:
-            self.stdout.write(self.style.SUCCESS("🎉 ¡Campaña completada! No quedan emails pendientes."))
+        # Mostrar próximos emails en cola
+        pendientes_restantes = MailParaEnviar.objects.filter(
+            estado='PENDIENTE',
+            asunto__icontains='giftcard'
+        ).count()
+        
+        if pendientes_restantes > 0:
+            self.stdout.write(f"   ⏳ Pendientes en cola: {pendientes_restantes}")
+        else:
+            self.stdout.write(f"   🎉 ¡Campaña completada! No hay más emails pendientes.")
