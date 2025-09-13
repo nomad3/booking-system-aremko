@@ -207,11 +207,11 @@ def send_test_giftcard_email(request):
             )
             
             # Obtener plantilla
-            template = get_giftcard_email_template(giftcard_amount)
+            template = get_giftcard_email_template()
             subject = f"🎁 ¡Tu giftcard de ${giftcard_amount:,} te espera en Aremko!"
             
-            # Personalizar plantilla
-            body_html = template.replace('{nombre_cliente}', test_cliente.nombre)
+            # Personalizar plantilla con el monto correcto
+            body_html = template.replace('$15,000', f'${giftcard_amount:,}')
             
             # Enviar email de prueba
             from django.core.mail import EmailMultiAlternatives
@@ -248,7 +248,7 @@ def send_test_giftcard_email(request):
 
 def get_giftcard_email_template(giftcard_amount=15000):
     """Retorna la plantilla de email para la campaña de giftcard"""
-    return f"""
+    return """
 <!DOCTYPE html>
 <html>
 <head>
@@ -282,7 +282,7 @@ def get_giftcard_email_template(giftcard_amount=15000):
             
             <div class="giftcard">
                 <h3>🎁 Tu Giftcard Especial</h3>
-                <div class="giftcard-amount">${giftcard_amount:,}</div>
+                <div class="giftcard-amount">$15,000</div>
                 <p><strong>Para usar durante todo septiembre 2025</strong></p>
                 <p style="color: #666; font-size: 0.9em;">Válida para cualquier servicio de nuestro spa</p>
             </div>
