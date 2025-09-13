@@ -563,7 +563,7 @@ def get_giftcard_email_template(giftcard_amount=15000):
             </div>
             
             <div style="text-align: center;">
-                <a href="https://wa.me/56957902525" class="cta-button">
+                <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20mi%20cita%20para%20septiembre%20mencionando%20%22Giftcard%20Enero%202025%22" class="cta-button">
                     🗓️ Reservar Ahora
                 </a>
             </div>
