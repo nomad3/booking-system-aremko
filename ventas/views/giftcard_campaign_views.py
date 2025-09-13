@@ -366,25 +366,170 @@ def get_giftcard_email_template(giftcard_amount=15000):
     <meta charset="UTF-8">
     <title>Giftcard Especial - Aremko Hotel Spa</title>
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-        .container { max-width: 600px; margin: 0 auto; background: #fff; }
-        .header { background: #667eea; color: white; padding: 30px; text-align: center; }
-        .content { padding: 30px; background: #f8f9fa; }
-        .giftcard { background: #fff; border: 3px dashed #28a745; padding: 20px; margin: 20px 0; text-align: center; }
-        .giftcard-amount { font-size: 2.5em; font-weight: bold; color: #28a745; margin: 10px 0; }
-        .cta-button { background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; font-weight: bold; }
-        .highlight { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
-        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 0.9em; padding: 20px; background: #f8f9fa; }
-        .services-list { background: #e9ecef; padding: 20px; margin: 20px 0; }
-        .services-list ul { margin: 0; padding-left: 20px; }
-        .services-list li { margin: 10px 0; }
+        body { 
+            font-family: Arial, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #f5f5f5;
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background: #fff; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header { 
+            background: #4a90e2; 
+            color: white; 
+            padding: 40px 30px; 
+            text-align: center; 
+        }
+        .header h1 { 
+            margin: 0; 
+            font-size: 2.2em; 
+            font-weight: bold; 
+        }
+        .header h2 { 
+            margin: 10px 0 5px 0; 
+            font-size: 1.4em; 
+            font-weight: normal; 
+        }
+        .header p { 
+            margin: 0; 
+            font-size: 1.1em; 
+            opacity: 0.9; 
+        }
+        .content { 
+            padding: 40px 30px; 
+            background: #fff; 
+        }
+        .giftcard { 
+            background: #fff; 
+            border: 3px dashed #28a745; 
+            padding: 30px 20px; 
+            margin: 30px 0; 
+            text-align: center; 
+            border-radius: 8px;
+        }
+        .giftcard h3 { 
+            margin: 0 0 15px 0; 
+            font-size: 1.3em; 
+            color: #333; 
+        }
+        .giftcard-amount { 
+            font-size: 3.5em; 
+            font-weight: bold; 
+            color: #28a745; 
+            margin: 15px 0; 
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        .giftcard-validity { 
+            font-size: 1.2em; 
+            font-weight: bold; 
+            color: #6f42c1; 
+            margin: 10px 0; 
+        }
+        .giftcard-conditions { 
+            color: #666; 
+            font-size: 0.95em; 
+            margin: 10px 0; 
+        }
+        .highlight { 
+            background: #fff3cd; 
+            padding: 25px; 
+            border-left: 4px solid #ffc107; 
+            margin: 30px 0; 
+            border-radius: 0 8px 8px 0;
+        }
+        .highlight h4 { 
+            margin: 0 0 15px 0; 
+            font-size: 1.2em; 
+            color: #333; 
+        }
+        .highlight ul { 
+            margin: 0; 
+            padding-left: 20px; 
+        }
+        .highlight li { 
+            margin: 8px 0; 
+            color: #555; 
+        }
+        .instructions { 
+            background: #f8f9fa; 
+            padding: 25px; 
+            margin: 30px 0; 
+            border-radius: 8px; 
+        }
+        .instructions h4 { 
+            margin: 0 0 15px 0; 
+            font-size: 1.2em; 
+            color: #333; 
+        }
+        .instructions ol { 
+            margin: 0; 
+            padding-left: 20px; 
+        }
+        .instructions li { 
+            margin: 10px 0; 
+            color: #555; 
+        }
+        .cta-button { 
+            background: #28a745; 
+            color: white; 
+            padding: 18px 35px; 
+            text-decoration: none; 
+            border-radius: 8px; 
+            display: inline-block; 
+            margin: 25px 0; 
+            font-weight: bold; 
+            font-size: 1.1em;
+            box-shadow: 0 2px 4px rgba(40,167,69,0.3);
+        }
+        .cta-button:hover { 
+            background: #218838; 
+        }
+        .services-list { 
+            background: #e9ecef; 
+            padding: 25px; 
+            margin: 30px 0; 
+            border-radius: 8px; 
+        }
+        .services-list h4 { 
+            margin: 0 0 15px 0; 
+            font-size: 1.2em; 
+            color: #333; 
+        }
+        .services-list ul { 
+            margin: 0; 
+            padding-left: 20px; 
+        }
+        .services-list li { 
+            margin: 10px 0; 
+            color: #555; 
+        }
+        .footer { 
+            text-align: center; 
+            margin-top: 40px; 
+            color: #666; 
+            font-size: 0.9em; 
+            padding: 30px; 
+            background: #f8f9fa; 
+        }
+        .footer p { 
+            margin: 5px 0; 
+        }
+        .footer strong { 
+            color: #333; 
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🏨 Aremko Hotel Spa</h1>
-            <h2>¡Hola Cliente de Prueba!</h2>
+            <h2>¡Hola {nombre_cliente}!</h2>
             <p>Esperamos que hayas disfrutado tu visita en enero</p>
         </div>
         
@@ -394,40 +539,40 @@ def get_giftcard_email_template(giftcard_amount=15000):
             <div class="giftcard">
                 <h3>🎁 Tu Giftcard Especial</h3>
                 <div class="giftcard-amount">$15,000</div>
-                <p><strong>Para usar durante todo septiembre 2025</strong></p>
-                <p style="color: #666; font-size: 0.9em;">Válida para cualquier servicio de nuestro spa</p>
+                <div class="giftcard-validity">Para usar durante todo septiembre 2025</div>
+                <div class="giftcard-conditions">Válida para servicio de Tinas Calientes y Cabañas de nuestro spa</div>
             </div>
             
             <div class="highlight">
                 <h4>✨ ¿Cómo funciona?</h4>
                 <ul>
-                    <li>Válida para cualquier servicio de nuestro spa</li>
-                    <li>Se puede combinar con otras promociones</li>
-                    <li>No tiene restricciones de horario</li>
+                    <li>Válida para servicio de Tinas y Cabañas</li>
+                    <li>No se puede combinar con otras promociones</li>
+                    <li>No tiene restricciones de horario, solo de disponibilidad.</li>
                     <li>Válida solo durante septiembre 2025</li>
                 </ul>
             </div>
             
-            <p><strong>Para reclamar tu giftcard, simplemente:</strong></p>
-            <ol>
-                <li>Reserva tu cita para septiembre</li>
-                <li>Menciona "Giftcard Enero 2025" al hacer tu reserva</li>
-                <li>¡Disfruta de $15.000 de descuento!</li>
-            </ol>
+            <div class="instructions">
+                <h4>Para reclamar tu giftcard, simplemente:</h4>
+                <ol>
+                    <li>Reserva tu cita para septiembre por whatsapp</li>
+                    <li>Menciona "Giftcard Enero 2025" al hacer tu reserva</li>
+                    <li>¡Disfruta de $15.000 de descuento!</li>
+                </ol>
+            </div>
             
             <div style="text-align: center;">
-                <a href="https://tu-dominio.com/servicios" class="cta-button">
+                <a href="https://wa.me/56957902525" class="cta-button">
                     🗓️ Reservar Ahora
                 </a>
             </div>
             
             <div class="services-list">
-                <h4>🛁 Servicios disponibles:</h4>
+                <h4>🛀 Servicios disponibles:</h4>
                 <ul>
-                    <li>💆‍♀️ Masajes relajantes y descontracturantes</li>
-                    <li>🛁 Tina Tronador con vista al lago</li>
-                    <li>🏠 Cabañas privadas</li>
-                    <li>🧘‍♀️ Tratamientos de bienestar</li>
+                    <li>🧖‍♀️ Tinas Calientes con o sin hidromasajes</li>
+                    <li>🏡 Cabañas para dos personas</li>
                 </ul>
             </div>
             
