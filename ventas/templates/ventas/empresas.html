@@ -239,6 +239,54 @@ img.service-image {
     margin-right: 10px;
 }
 
+.corporate-agreement-section {
+    position: relative;
+    overflow: hidden;
+}
+
+.corporate-agreement-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="2" fill="rgba(255,255,255,0.1)"/></svg>') repeat;
+    background-size: 50px 50px;
+    animation: float 20s infinite linear;
+}
+
+@keyframes float {
+    0% { transform: translateY(0px); }
+    100% { transform: translateY(-50px); }
+}
+
+.service-card .btn {
+    transition: all 0.3s ease;
+    border-radius: 25px;
+    padding: 8px 20px;
+    font-weight: 600;
+}
+
+.service-card .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,123,255,0.3);
+}
+
+.badge {
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 15px;
+}
+
+.corporate-agreement-section .card {
+    transition: all 0.3s ease;
+}
+
+.corporate-agreement-section .card:hover {
+    transform: translateY(-5px);
+}
+
 @media (max-width: 768px) {
     .hero-title {
         font-size: 2.5rem;
@@ -252,6 +300,14 @@ img.service-image {
         flex-direction: column;
         align-items: center;
         gap: 20px;
+    }
+    
+    .service-card {
+        margin-bottom: 30px;
+    }
+    
+    .corporate-agreement-section .col-lg-6:first-child {
+        margin-bottom: 30px;
     }
 }
 </style>
@@ -277,73 +333,167 @@ img.service-image {
 <!-- Services Section -->
 <section id="servicios" class="services-section">
     <div class="container">
-        <h2 class="section-title">Tres experiencias que transforman tu reunión</h2>
+        <h2 class="section-title">Tres experiencias corporativas</h2>
         <p class="section-subtitle">
-            Más que una reunión, es una experiencia que inspira, motiva y conecta a tu equipo
+            Elige la experiencia que mejor se adapte a las necesidades de tu equipo
         </p>
         
-        <div class="row g-4 justify-content-center">
-            <!-- Servicio 1: Desayuno Sureño -->
-            <div class="col-lg-8 col-md-10">
+        <div class="row g-4">
+            <!-- Producto 1: Experiencia Completa -->
+            <div class="col-lg-4 col-md-6">
                 <div class="service-card">
-                <img src="https://storage.googleapis.com/aremko-media-2025/categorias/desayuno_empresas_aremko.jpg" 
-                     alt="Desayuno Gourmet Sureño" class="service-image" 
-                     style="width: 100%; max-width: 600px; height: auto; border-radius: 20px 20px 0 0; display: block; margin: 0 auto;">
+                    <img src="https://storage.googleapis.com/aremko-media-2025/categorias/desayuno_empresas_aremko.jpg" 
+                         alt="Experiencia Completa Empresarial" class="service-image">
                     <div class="service-content">
                         <div class="service-icon">
-                            <i class="fas fa-utensils"></i>
+                            <i class="fas fa-crown"></i>
                         </div>
-                        <h3 class="service-title">Desayuno Gourmet Sureño</h3>
+                        <h3 class="service-title">Experiencia Completa</h3>
                         <p class="service-description">
-                            Productos locales premium: quesos artesanales, cecinas, mermeladas caseras, 
-                            café orgánico e infusiones. Una experiencia gastronómica que energiza y conecta.
+                            <strong>Desayuno + Reunión + Tinas Calientes</strong><br>
+                            La experiencia integral para tu equipo: desayuno gourmet sureño, sala de reuniones premium 
+                            y relajación en tinas calientes junto al río.
                         </p>
-                        <div class="d-flex justify-content-center">
-                            <span class="badge bg-success fs-6">Productos locales</span>
+                        <div class="d-flex justify-content-center flex-wrap gap-2 mb-3">
+                            <span class="badge bg-primary fs-6">Desayuno</span>
+                            <span class="badge bg-success fs-6">Reunión</span>
+                            <span class="badge bg-info fs-6">Tinas</span>
+                        </div>
+                        <div class="text-center">
+                            <button class="btn btn-outline-primary btn-sm">Consultar Precio</button>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Servicio 2: Sala de Reuniones -->
-            <div class="col-lg-8 col-md-10">
+            <!-- Producto 2: Desayuno + Tinas -->
+            <div class="col-lg-4 col-md-6">
                 <div class="service-card">
-                <img src="https://storage.googleapis.com/aremko-media-2025/categorias/charla_empresas_aremko.jpg" 
-                     alt="Sala de Reuniones Premium" class="service-image"
-                     style="width: 100%; max-width: 600px; height: auto; border-radius: 20px 20px 0 0; display: block; margin: 0 auto;">
+                    <img src="https://storage.googleapis.com/aremko-media-2025/categorias/4_amigas_en_la_calbuco.PNG" 
+                         alt="Desayuno y Tinas Calientes" class="service-image">
                     <div class="service-content">
                         <div class="service-icon">
-                            <i class="fas fa-users"></i>
+                            <i class="fas fa-coffee"></i>
                         </div>
-                        <h3 class="service-title">Sala de Reuniones Premium</h3>
+                        <h3 class="service-title">Desayuno & Relax</h3>
                         <p class="service-description">
-                            Espacio para 20 personas con aire acondicionado, TV de 60" y vista al bosque nativo. 
-                            El ambiente perfecto para sesiones de coaching, reuniones de directorio y brainstorming.
+                            <strong>Desayuno + Tinas Calientes</strong><br>
+                            Combina un delicioso desayuno con productos locales premium y la relajación 
+                            en nuestras tinas calientes junto al Río Pescado.
                         </p>
-                        <div class="d-flex justify-content-center">
-                            <span class="badge bg-primary fs-6">Hasta 20 personas</span>
+                        <div class="d-flex justify-content-center flex-wrap gap-2 mb-3">
+                            <span class="badge bg-primary fs-6">Desayuno</span>
+                            <span class="badge bg-info fs-6">Tinas</span>
+                        </div>
+                        <div class="text-center">
+                            <button class="btn btn-outline-primary btn-sm">Consultar Precio</button>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Servicio 3: Tinas Calientes -->
-            <div class="col-lg-8 col-md-10">
+            <!-- Producto 3: Solo Tinas -->
+            <div class="col-lg-4 col-md-6">
                 <div class="service-card">
-                <img src="https://storage.googleapis.com/aremko-media-2025/categorias/4_amigas_en_la_calbuco.PNG" 
-                     alt="Relajación en Tinas Calientes" class="service-image"
-                     style="width: 100%; max-width: 600px; height: auto; border-radius: 20px 20px 0 0; display: block; margin: 0 auto;">
+                    <img src="https://storage.googleapis.com/aremko-media-2025/categorias/charla_empresas_aremko.jpg" 
+                         alt="Solo Tinas Calientes" class="service-image">
                     <div class="service-content">
                         <div class="service-icon">
                             <i class="fas fa-spa"></i>
                         </div>
-                        <h3 class="service-title">Relajación en Tinas Calientes</h3>
+                        <h3 class="service-title">Solo Tinas</h3>
                         <p class="service-description">
-                            Cierre de jornada en tinas calientes a orillas del Río Pescado. 
-                            El momento perfecto para fortalecer vínculos, relajar tensiones y inspirar creatividad.
+                            <strong>Tinas Calientes Exclusivamente</strong><br>
+                            Enfócate en el bienestar y la relajación del equipo. Ideal para celebraciones, 
+                            team building o simplemente desconectar del estrés laboral.
                         </p>
-                        <div class="d-flex justify-content-center">
-                            <span class="badge bg-info fs-6">Junto al río</span>
+                        <div class="d-flex justify-content-center flex-wrap gap-2 mb-3">
+                            <span class="badge bg-info fs-6">Solo Tinas</span>
+                            <span class="badge bg-warning fs-6">Team Building</span>
+                        </div>
+                        <div class="text-center">
+                            <button class="btn btn-outline-primary btn-sm">Consultar Precio</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Corporate Agreement Section -->
+<section class="corporate-agreement-section" style="padding: 80px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6 text-white">
+                <h2 class="section-title text-white mb-4">
+                    <i class="fas fa-handshake me-3"></i>
+                    Convenios Empresariales
+                </h2>
+                <p class="lead mb-4">
+                    ¿Tu empresa busca beneficios permanentes para sus colaboradores?
+                </p>
+                <p class="mb-4">
+                    Nuestros convenios empresariales ofrecen descuentos exclusivos y beneficios especiales 
+                    para los trabajadores de tu empresa durante todo el año.
+                </p>
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-percentage text-warning me-3" style="font-size: 1.5rem;"></i>
+                            <span><strong>Descuentos permanentes</strong><br>Para todos los colaboradores</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-calendar-alt text-warning me-3" style="font-size: 1.5rem;"></i>
+                            <span><strong>Reservas preferenciales</strong><br>Horarios exclusivos</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-gift text-warning me-3" style="font-size: 1.5rem;"></i>
+                            <span><strong>Beneficios especiales</strong><br>Promociones exclusivas</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-users text-warning me-3" style="font-size: 1.5rem;"></i>
+                            <span><strong>Eventos corporativos</strong><br>Tarifas preferenciales</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-lg" style="background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);">
+                    <div class="card-body p-5 text-center">
+                        <i class="fas fa-building text-primary mb-4" style="font-size: 4rem;"></i>
+                        <h4 class="card-title mb-4">¿Interesado en un Convenio?</h4>
+                        <p class="card-text mb-4">
+                            Contáctanos para conocer los beneficios específicos según el tamaño de tu empresa 
+                            y las necesidades de tus colaboradores.
+                        </p>
+                        
+                        <div class="d-grid gap-3">
+                            <a href="https://wa.me/56957902525?text=Hola%2C%20me%20interesa%20conocer%20los%20convenios%20empresariales%20de%20Aremko" 
+                               class="btn btn-primary btn-lg" target="_blank">
+                                <i class="fab fa-whatsapp me-2"></i>
+                                Consultar Convenio
+                            </a>
+                            <a href="mailto:ventas@aremko.cl?subject=Consulta%20Convenio%20Empresarial" 
+                               class="btn btn-outline-primary">
+                                <i class="fas fa-envelope me-2"></i>
+                                Enviar Email
+                            </a>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>
+                                Respuesta en menos de 24 horas
+                            </small>
                         </div>
                     </div>
                 </div>
