@@ -257,14 +257,14 @@ def get_giftcard_email_template(giftcard_amount=15000):
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
         .container { max-width: 600px; margin: 0 auto; background: #fff; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+        .header { background: #667eea; color: white; padding: 30px; text-align: center; }
         .content { padding: 30px; background: #f8f9fa; }
-        .giftcard { background: #fff; border: 3px dashed #28a745; padding: 20px; margin: 20px 0; text-align: center; border-radius: 10px; }
+        .giftcard { background: #fff; border: 3px dashed #28a745; padding: 20px; margin: 20px 0; text-align: center; }
         .giftcard-amount { font-size: 2.5em; font-weight: bold; color: #28a745; margin: 10px 0; }
         .cta-button { background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; font-weight: bold; }
-        .highlight { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; border-radius: 5px; }
+        .highlight { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
         .footer { text-align: center; margin-top: 30px; color: #666; font-size: 0.9em; padding: 20px; background: #f8f9fa; }
-        .services-list { background: #e9ecef; padding: 20px; border-radius: 10px; margin: 20px 0; }
+        .services-list { background: #e9ecef; padding: 20px; margin: 20px 0; }
         .services-list ul { margin: 0; padding-left: 20px; }
         .services-list li { margin: 10px 0; }
     </style>
@@ -273,7 +273,7 @@ def get_giftcard_email_template(giftcard_amount=15000):
     <div class="container">
         <div class="header">
             <h1>🏨 Aremko Hotel Spa</h1>
-            <h2>¡Hola {nombre_cliente}!</h2>
+            <h2>¡Hola Cliente de Prueba!</h2>
             <p>Esperamos que hayas disfrutado tu visita en enero</p>
         </div>
         
