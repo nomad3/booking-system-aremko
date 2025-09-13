@@ -217,21 +217,30 @@ def send_test_giftcard_email(request):
             from django.core.mail import EmailMultiAlternatives
             from django.conf import settings
             
+            from_email = getattr(settings, 'EMAIL_HOST_USER', 'ventas@aremko.cl')
+            
             email = EmailMultiAlternatives(
                 subject=subject,
                 body=body_html,
-                from_email=getattr(settings, 'EMAIL_HOST_USER', 'ventas@aremko.cl'),
+                from_email=from_email,
                 to=[test_email],
                 bcc=['aremkospa@gmail.com', 'ventas@aremko.cl'],
                 reply_to=['ventas@aremko.cl']
             )
             
             email.attach_alternative(body_html, "text/html")
+            
+            # Log para debugging
+            print(f"DEBUG: Enviando email de prueba a {test_email}")
+            print(f"DEBUG: From: {from_email}")
+            print(f"DEBUG: Subject: {subject}")
+            
             email.send()
             
             messages.success(request, f"✅ Email de prueba enviado a {test_email}")
             
         except Exception as e:
+            print(f"ERROR: Error enviando email de prueba: {str(e)}")
             messages.error(request, f"❌ Error enviando email de prueba: {str(e)}")
     
     return redirect('ventas:giftcard_campaign_dashboard')
