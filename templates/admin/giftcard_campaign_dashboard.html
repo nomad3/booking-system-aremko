@@ -189,6 +189,10 @@
         <a href="{% url 'ventas:giftcard_campaign_dashboard' %}?year={{ year }}&month={{ month }}&giftcard_amount={{ giftcard_amount }}&action=export_csv" class="btn btn-info">
             📄 Exportar CSV
         </a>
+        
+        <a href="{% url 'ventas:preview_giftcard_email' %}?year={{ year }}&month={{ month }}&giftcard_amount={{ giftcard_amount }}" class="btn btn-warning">
+            👁️ Vista Previa del Email
+        </a>
     </div>
     
     <div class="test-email-form">

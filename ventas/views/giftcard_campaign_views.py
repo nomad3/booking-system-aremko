@@ -246,6 +246,49 @@ def send_test_giftcard_email(request):
     return redirect('ventas:giftcard_campaign_dashboard')
 
 
+@login_required
+@user_passes_test(es_administrador)
+def preview_giftcard_email(request):
+    """Muestra una vista previa del email de la campaña de giftcard"""
+    
+    try:
+        # Obtener parámetros
+        year = int(request.GET.get('year', 2025))
+        month = int(request.GET.get('month', 1))
+        giftcard_amount = int(request.GET.get('giftcard_amount', 15000))
+        
+        # Validar mes
+        if month < 1 or month > 12:
+            month = 1
+            year = 2025
+        
+        import calendar
+        month_name = calendar.month_name[month]
+        
+        # Obtener plantilla
+        template = get_giftcard_email_template()
+        subject = f"🎁 ¡Tu giftcard de ${giftcard_amount:,} te espera en Aremko!"
+        
+        # Personalizar plantilla
+        body_html = template.replace('$15,000', f'${giftcard_amount:,}')
+        
+        context = {
+            'title': f'Vista Previa - Campaña Giftcard {month_name} {year}',
+            'subject': subject,
+            'body_html': body_html,
+            'year': year,
+            'month': month,
+            'month_name': month_name,
+            'giftcard_amount': giftcard_amount,
+        }
+        
+        return render(request, 'admin/giftcard_email_preview.html', context)
+        
+    except Exception as e:
+        messages.error(request, f"❌ Error generando vista previa: {str(e)}")
+        return redirect('ventas:giftcard_campaign_dashboard')
+
+
 def get_giftcard_email_template(giftcard_amount=15000):
     """Retorna la plantilla de email para la campaña de giftcard"""
     return """
