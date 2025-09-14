@@ -252,9 +252,9 @@ Responde SOLO con el contenido procesado.
             'model': self.model,
             'api_key_configured': bool(self.api_key),
             'cache_stats': {
-                'subject_variations_cached': len([k for k in cache._cache.keys() if 'ai_subject_variations' in str(k)]),
-                'body_variations_cached': len([k for k in cache._cache.keys() if 'ai_body_variation' in str(k)])
-            } if hasattr(cache, '_cache') else {}
+                'subject_variations_cached': len([k for k in cache._cache.keys() if 'ai_subject_variations' in str(k)]) if hasattr(cache, '_cache') else 0,
+                'body_variations_cached': len([k for k in cache._cache.keys() if 'ai_body_variation' in str(k)]) if hasattr(cache, '_cache') else 0
+            }
         }
 
 
