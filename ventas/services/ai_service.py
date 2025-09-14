@@ -8,7 +8,7 @@ import os
 import json
 import requests
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 from django.conf import settings
 from django.core.cache import cache
 
@@ -174,7 +174,7 @@ Responde SOLO con el contenido procesado.
             logger.error(f"Error aplicando técnicas anti-spam: {e}")
             return content
     
-    def _call_ai_api(self, prompt: str, return_string: bool = False) -> Optional[List[str] | str]:
+    def _call_ai_api(self, prompt: str, return_string: bool = False) -> Optional[Union[List[str], str]]:
         """
         Llama a la API de DeepSeek
         
