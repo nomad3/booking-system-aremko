@@ -1009,10 +1009,17 @@ class EmailTemplateAdmin(admin.ModelAdmin):
 @admin.register(EmailDeliveryLog)
 class EmailDeliveryLogAdmin(admin.ModelAdmin):
     """Administrador para logs de entrega de email"""
-    list_display = ['recipient', 'status', 'sent_at', 'delivered_at', 'provider_response']
-    list_filter = ['status', 'sent_at', 'campaign']
-    search_fields = ['recipient__email', 'recipient__name', 'provider_response']
-    readonly_fields = ['sent_at', 'delivered_at', 'opened_at', 'clicked_at']
+    list_display = ['recipient', 'log_type', 'timestamp', 'error_code', 'smtp_response_short']
+    list_filter = ['log_type', 'timestamp', 'campaign', 'error_code']
+    search_fields = ['recipient__email', 'recipient__name', 'smtp_response', 'error_message']
+    readonly_fields = ['timestamp']
+    
+    def smtp_response_short(self, obj):
+        """Muestra una versión corta de la respuesta SMTP"""
+        if obj.smtp_response:
+            return obj.smtp_response[:50] + "..." if len(obj.smtp_response) > 50 else obj.smtp_response
+        return "-"
+    smtp_response_short.short_description = "Respuesta SMTP"
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('campaign', 'recipient')
@@ -1021,7 +1028,20 @@ class EmailDeliveryLogAdmin(admin.ModelAdmin):
 @admin.register(EmailBlacklist)
 class EmailBlacklistAdmin(admin.ModelAdmin):
     """Administrador para lista negra de emails"""
-    list_display = ['email', 'reason', 'created_at', 'is_active']
-    list_filter = ['reason', 'is_active', 'created_at']
-    search_fields = ['email', 'reason']
-    readonly_fields = ['created_at']
+    list_display = ['email', 'reason', 'added_at', 'is_active', 'domain']
+    list_filter = ['reason', 'is_active', 'added_at', 'domain']
+    search_fields = ['email', 'reason', 'notes', 'domain']
+    readonly_fields = ['added_at', 'domain']
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('email', 'reason', 'is_active')
+        }),
+        ('Detalles', {
+            'fields': ('notes', 'domain', 'expires_at')
+        }),
+        ('Metadatos', {
+            'fields': ('added_at', 'added_by'),
+            'classes': ('collapse',)
+        })
+    )
