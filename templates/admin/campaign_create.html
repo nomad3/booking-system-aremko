@@ -1,0 +1,472 @@
+{% extends 'admin/base_site.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - Aremko Admin{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+.campaign-form {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.form-section {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.form-section h3 {
+    margin-top: 0;
+    color: #417690;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 10px;
+}
+
+.form-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 15px;
+    align-items: end;
+}
+
+.form-group {
+    flex: 1;
+}
+
+.form-group.half {
+    flex: 0.5;
+}
+
+.form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #333;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-group textarea {
+    height: 100px;
+    resize: vertical;
+}
+
+.form-group input[type="checkbox"] {
+    width: auto;
+    margin-right: 8px;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.checkbox-group label {
+    margin-bottom: 0;
+    font-weight: normal;
+}
+
+.multiple-select {
+    height: 120px;
+}
+
+.range-inputs {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.range-inputs input {
+    flex: 1;
+}
+
+.range-separator {
+    padding: 0 10px;
+    font-weight: bold;
+    color: #666;
+}
+
+.preview-section {
+    background: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.preview-button {
+    background: #17a2b8;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 15px;
+}
+
+.preview-button:hover {
+    background: #138496;
+}
+
+.preview-result {
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 15px;
+    display: none;
+}
+
+.preview-result.success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.preview-result.error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.submit-buttons {
+    text-align: center;
+    padding: 30px;
+}
+
+.btn {
+    padding: 12px 30px;
+    border-radius: 4px;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    margin: 0 10px;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-primary {
+    background: #417690;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #2e5a6e;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.help-text {
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+}
+
+.loading {
+    display: none;
+    color: #17a2b8;
+}
+
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .range-inputs {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .range-separator {
+        padding: 5px 0;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="campaign-form">
+    <h1>{{ title }}</h1>
+    
+    <form method="post" id="campaign-form">
+        {% csrf_token %}
+        
+        <!-- Información Básica -->
+        <div class="form-section">
+            <h3>📝 Información Básica</h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="name">Nombre de la Campaña *</label>
+                    <input type="text" id="name" name="name" required 
+                           placeholder="Ej: Campaña Giftcard Febrero 2025">
+                    <div class="help-text">Nombre descriptivo para identificar la campaña</div>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="description">Descripción</label>
+                    <textarea id="description" name="description" 
+                              placeholder="Describe el objetivo y características de esta campaña..."></textarea>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Criterios de Selección -->
+        <div class="form-section">
+            <h3>🎯 Criterios de Selección de Clientes</h3>
+            
+            <div class="form-row">
+                <div class="form-group half">
+                    <label for="month">Mes de Reserva *</label>
+                    <select id="month" name="month" required>
+                        {% for month_num, month_name in months %}
+                        <option value="{{ month_num }}" {% if month_num == current_month %}selected{% endif %}>
+                            {{ month_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group half">
+                    <label for="year">Año de Reserva *</label>
+                    <select id="year" name="year" required>
+                        {% for year_option in years %}
+                        <option value="{{ year_option }}" {% if year_option == current_year %}selected{% endif %}>
+                            {{ year_option }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Rango de Gasto Total (opcional)</label>
+                    <div class="range-inputs">
+                        <input type="number" name="spend_min" placeholder="Mínimo" step="1000">
+                        <span class="range-separator">a</span>
+                        <input type="number" name="spend_max" placeholder="Máximo" step="1000">
+                    </div>
+                    <div class="help-text">Filtrar por gasto total del cliente en pesos chilenos</div>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Rango de Número de Visitas (opcional)</label>
+                    <div class="range-inputs">
+                        <input type="number" name="visit_count_min" placeholder="Mínimo" min="1">
+                        <span class="range-separator">a</span>
+                        <input type="number" name="visit_count_max" placeholder="Máximo" min="1">
+                    </div>
+                    <div class="help-text">Filtrar por número total de visitas del cliente</div>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="cities">Ciudades (opcional)</label>
+                    <select id="cities" name="cities" multiple class="multiple-select">
+                        {% for city in cities %}
+                        <option value="{{ city }}">{{ city }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="help-text">Mantén presionado Ctrl (Cmd en Mac) para seleccionar múltiples ciudades</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Vista Previa de Destinatarios -->
+        <div class="preview-section">
+            <button type="button" class="preview-button" onclick="previewRecipients()">
+                👁️ Vista Previa de Destinatarios
+            </button>
+            <div class="loading">⏳ Calculando...</div>
+            <div id="preview-result" class="preview-result"></div>
+        </div>
+        
+        <!-- Configuración de Envío -->
+        <div class="form-section">
+            <h3>⏰ Configuración de Envío</h3>
+            
+            <div class="form-row">
+                <div class="form-group half">
+                    <label for="start_time">Hora de Inicio</label>
+                    <input type="time" id="start_time" name="start_time" value="08:00">
+                </div>
+                
+                <div class="form-group half">
+                    <label for="end_time">Hora de Fin</label>
+                    <input type="time" id="end_time" name="end_time" value="18:00">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group half">
+                    <label for="batch_size">Emails por Lote</label>
+                    <input type="number" id="batch_size" name="batch_size" value="2" min="1" max="10">
+                    <div class="help-text">Número de emails a enviar por cada ejecución</div>
+                </div>
+                
+                <div class="form-group half">
+                    <label for="interval_minutes">Intervalo (minutos)</label>
+                    <input type="number" id="interval_minutes" name="interval_minutes" value="6" min="1" max="60">
+                    <div class="help-text">Tiempo entre cada lote de envío</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Template de Email -->
+        <div class="form-section">
+            <h3>📧 Template de Email</h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="email_subject">Asunto del Email *</label>
+                    <input type="text" id="email_subject" name="email_subject" required
+                           placeholder="🎁 ¡Tu giftcard especial te espera!"
+                           value="🎁 ¡Tu giftcard de $15,000 te espera en Aremko!">
+                    <div class="help-text">Puedes usar {nombre_cliente} como placeholder para personalización</div>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="email_body">Cuerpo del Email (HTML) *</label>
+                    <textarea id="email_body" name="email_body" required style="height: 200px;"
+                              placeholder="Contenido HTML del email..."><!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Giftcard Especial - Aremko</title>
+</head>
+<body>
+    <h1>¡Hola {nombre_cliente}!</h1>
+    <p>Tenemos una sorpresa especial para ti...</p>
+    <div style="background: #f0f8ff; padding: 20px; border-radius: 8px; text-align: center;">
+        <h2>🎁 Tu Giftcard Especial</h2>
+        <h3 style="color: #28a745;">$15,000</h3>
+        <p>Para usar durante todo septiembre 2025</p>
+    </div>
+</body>
+</html></textarea>
+                    <div class="help-text">Usa {nombre_cliente} para personalizar con el nombre del destinatario</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Configuración Avanzada -->
+        <div class="form-section">
+            <h3>⚙️ Configuración Avanzada</h3>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="ai_variation" name="ai_variation" checked>
+                <label for="ai_variation">🤖 Usar IA para variar contenido (prevenir spam)</label>
+            </div>
+            <div class="help-text">Genera variaciones automáticas del asunto y contenido para cada destinatario</div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="anti_spam" name="anti_spam" checked>
+                <label for="anti_spam">🛡️ Medidas anti-spam activas</label>
+            </div>
+            <div class="help-text">Aplica técnicas avanzadas para evitar filtros de spam</div>
+        </div>
+        
+        <!-- Botones de Envío -->
+        <div class="submit-buttons">
+            <button type="submit" class="btn btn-primary">
+                ✅ Crear Campaña y Revisar Lista
+            </button>
+            <a href="{% url 'ventas:campaign_list' %}" class="btn btn-secondary">
+                ❌ Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+<script>
+function previewRecipients() {
+    const form = document.getElementById('campaign-form');
+    const formData = new FormData(form);
+    const loading = document.querySelector('.loading');
+    const resultDiv = document.getElementById('preview-result');
+    
+    loading.style.display = 'block';
+    resultDiv.style.display = 'none';
+    
+    fetch('{% url "ventas:campaign_preview_recipients_ajax" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        loading.style.display = 'none';
+        
+        if (data.success) {
+            resultDiv.className = 'preview-result success';
+            resultDiv.innerHTML = `
+                <strong>✅ ${data.recipient_count} destinatarios encontrados</strong><br>
+                ${data.message}
+            `;
+        } else {
+            resultDiv.className = 'preview-result error';
+            resultDiv.innerHTML = `
+                <strong>❌ Error:</strong> ${data.error}
+            `;
+        }
+        
+        resultDiv.style.display = 'block';
+    })
+    .catch(error => {
+        loading.style.display = 'none';
+        resultDiv.className = 'preview-result error';
+        resultDiv.innerHTML = `<strong>❌ Error de conexión:</strong> ${error.message}`;
+        resultDiv.style.display = 'block';
+    });
+}
+
+// Auto-preview cuando cambien los criterios
+document.addEventListener('DOMContentLoaded', function() {
+    const criteriaInputs = ['month', 'year', 'spend_min', 'spend_max', 'visit_count_min', 'visit_count_max', 'cities'];
+    
+    criteriaInputs.forEach(inputName => {
+        const input = document.querySelector(`[name="${inputName}"]`);
+        if (input) {
+            input.addEventListener('change', function() {
+                // Auto-preview después de un pequeño delay
+                setTimeout(previewRecipients, 500);
+            });
+        }
+    });
+    
+    // Preview inicial
+    setTimeout(previewRecipients, 1000);
+});
+</script>
+{% endblock %}

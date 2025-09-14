@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views # Import the new admin views module and mercadopago views
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views # Import the new admin views module and mercadopago views
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -101,6 +101,13 @@ urlpatterns = [
     path('api/activities/log/', api_views.log_external_activity, name='log_external_activity'), # Logs outgoing activities
     path('api/interactions/log/', api_views.log_campaign_interaction, name='log_campaign_interaction'), # Logs incoming interactions
     # --- End Remarketing URLs ---
+    
+    # === ADVANCED EMAIL CAMPAIGN SYSTEM ===
+    path('admin/campaigns/', campaign_views.campaign_list_view, name='campaign_list'),
+    path('admin/campaigns/create/', campaign_views.campaign_create_view, name='campaign_create'),
+    path('admin/campaigns/<int:campaign_id>/review/', campaign_views.campaign_review_view, name='campaign_review'),
+    path('admin/campaigns/<int:campaign_id>/', campaign_views.campaign_detail_view, name='campaign_detail'),
+    path('admin/campaigns/preview-recipients/', campaign_views.campaign_preview_recipients_ajax, name='campaign_preview_recipients_ajax'),
 
     # API Router (Keep this last if possible, or ensure specific paths come first)
     path('', include(router.urls)),

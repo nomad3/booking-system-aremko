@@ -191,13 +191,28 @@
             </div>
         </div>
 
-        {# Giftcard Campaign #}
+        {# Advanced Email Campaigns #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-rocket card-icon text-success"></i>
+                    <h5 class="card-title">Campañas Avanzadas</h5>
+                    <p class="card-text small">Sistema completo de email marketing</p>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:campaign_list' %}" class="btn btn-sm btn-modern btn-success-modern">📧 Ver Campañas</a>
+                        <a href="{% url 'ventas:campaign_create' %}" class="btn btn-sm btn-modern btn-primary-modern">➕ Nueva Campaña</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Giftcard Campaign (Legacy) #}
         <div class="col-lg-3 col-md-4 col-sm-6">
             <div class="card h-100 text-center card-hover">
                 <div class="card-body">
                     <i class="fas fa-gift card-icon text-warning"></i>
                     <h5 class="card-title">Campaña Giftcard</h5>
-                    <p class="card-text small">Clientes Enero 2025</p>
+                    <p class="card-text small">Clientes Enero 2025 (Legacy)</p>
                     <div class="card-link-container d-grid gap-2">
                         <a href="{% url 'ventas:giftcard_campaign_dashboard' %}" class="btn btn-sm btn-modern btn-warning-modern">🎁 Ver Campaña</a>
                     </div>
