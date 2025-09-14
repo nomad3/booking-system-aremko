@@ -168,6 +168,13 @@ REDVOISS_API_URL = os.getenv('REDVOISS_API_URL', 'https://sms.lanube.cl/services
 REDVOISS_USERNAME = os.getenv('REDVOISS_USERNAME', '')
 REDVOISS_PASSWORD = os.getenv('REDVOISS_PASSWORD', '')
 
+# --- Configuración IA para Campañas de Email ---
+DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
+DEEPSEEK_MODEL = os.getenv('DEEPSEEK_MODEL', 'deepseek-chat')
+AI_VARIATION_PROVIDER = os.getenv('AI_VARIATION_PROVIDER', 'deepseek')
+AI_VARIATION_ENABLED = os.getenv('AI_VARIATION_ENABLED', 'true').lower() == 'true'
+AI_ANTI_SPAM_ENABLED = os.getenv('AI_ANTI_SPAM_ENABLED', 'true').lower() == 'true'
+
 # --- Límites Anti-Spam Comunicación ---
 SMS_DAILY_LIMIT_PER_CLIENT = int(os.getenv('SMS_DAILY_LIMIT_PER_CLIENT', '2'))
 SMS_MONTHLY_LIMIT_PER_CLIENT = int(os.getenv('SMS_MONTHLY_LIMIT_PER_CLIENT', '8'))

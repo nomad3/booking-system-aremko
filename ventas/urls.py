@@ -108,6 +108,7 @@ urlpatterns = [
     path('admin/campaigns/<int:campaign_id>/review/', campaign_views.campaign_review_view, name='campaign_review'),
     path('admin/campaigns/<int:campaign_id>/', campaign_views.campaign_detail_view, name='campaign_detail'),
     path('admin/campaigns/preview-recipients/', campaign_views.campaign_preview_recipients_ajax, name='campaign_preview_recipients_ajax'),
+    path('admin/campaigns/test-ai/', campaign_views.test_ai_service_ajax, name='campaign_test_ai_ajax'),
 
     # API Router (Keep this last if possible, or ensure specific paths come first)
     path('', include(router.urls)),

@@ -393,6 +393,16 @@
                 <label for="anti_spam">🛡️ Medidas anti-spam activas</label>
             </div>
             <div class="help-text">Aplica técnicas avanzadas para evitar filtros de spam</div>
+            
+            <!-- Sección de Prueba de IA -->
+            <div style="margin-top: 20px; padding: 15px; border: 2px dashed #28a745; border-radius: 8px; background: #f8fff8;">
+                <h4 style="color: #28a745; margin-bottom: 10px;">🧪 Probar Servicio de IA</h4>
+                <button type="button" class="preview-button" style="background: #28a745;" onclick="testAIService()">
+                    🤖 Probar Variaciones de IA
+                </button>
+                <div class="loading" id="ai-loading">⏳ Generando variaciones con DeepSeek...</div>
+                <div id="ai-test-result" class="preview-result"></div>
+            </div>
         </div>
         
         <!-- Botones de Envío -->
@@ -438,6 +448,71 @@ function previewRecipients() {
             resultDiv.className = 'preview-result error';
             resultDiv.innerHTML = `
                 <strong>❌ Error:</strong> ${data.error}
+            `;
+        }
+        
+        resultDiv.style.display = 'block';
+    })
+    .catch(error => {
+        loading.style.display = 'none';
+        resultDiv.className = 'preview-result error';
+        resultDiv.innerHTML = `<strong>❌ Error de conexión:</strong> ${error.message}`;
+        resultDiv.style.display = 'block';
+    });
+}
+
+function testAIService() {
+    const formData = new FormData();
+    formData.append('subject', document.getElementById('email_subject').value);
+    formData.append('body', document.getElementById('email_body').value);
+    formData.append('client_name', 'María González');
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    const loading = document.getElementById('ai-loading');
+    const resultDiv = document.getElementById('ai-test-result');
+    
+    loading.style.display = 'block';
+    resultDiv.style.display = 'none';
+    
+    fetch('{% url "ventas:campaign_test_ai_ajax" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        loading.style.display = 'none';
+        
+        if (data.success) {
+            const results = data.results;
+            const status = data.service_status;
+            
+            resultDiv.className = 'preview-result success';
+            resultDiv.innerHTML = `
+                <div style="text-align: left;">
+                    <strong>🤖 Estado del Servicio de IA:</strong><br>
+                    • Proveedor: ${status.provider}<br>
+                    • Modelo: ${status.model}<br>
+                    • Estado: ✅ Funcionando<br><br>
+                    
+                    <strong>📧 Variaciones de Asunto:</strong><br>
+                    • Original: "${results.original_subject}"<br>
+                    ${results.subject_variations.map((v, i) => `• Variación ${i+1}: "${v}"`).join('<br>')}<br><br>
+                    
+                    <strong>📄 Variación de Cuerpo:</strong><br>
+                    • Original: "${results.original_body.substring(0, 100)}..."<br>
+                    • Variado: "${results.body_variation.substring(0, 100)}..."<br><br>
+                    
+                    <strong>✨ Resultado Final:</strong><br>
+                    • Asunto: "${results.final_subject}"<br>
+                    • Cuerpo: "${results.final_body.substring(0, 100)}..."
+                </div>
+            `;
+        } else {
+            resultDiv.className = 'preview-result error';
+            resultDiv.innerHTML = `
+                <strong>❌ Error en el Servicio de IA:</strong><br>
+                ${data.error}<br><br>
+                <strong>Estado:</strong> ${JSON.stringify(data.service_status, null, 2)}
             `;
         }
         

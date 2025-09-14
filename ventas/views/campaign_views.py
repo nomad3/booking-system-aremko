@@ -20,6 +20,7 @@ from ventas.models import (
     EmailCampaign, EmailRecipient, Cliente, VentaReserva, 
     ReservaServicio, EmailBlacklist
 )
+from ventas.services.ai_service import generate_personalized_content, ai_service
 from ventas.views.admin_views import es_administrador
 
 
@@ -347,14 +348,32 @@ def generate_campaign_recipients(campaign):
             last_date=Max('fecha_agendamiento')
         )['last_date']
         
+        # Generar contenido personalizado con IA si está habilitado
+        if campaign.ai_variation_enabled and ai_service.enabled:
+            personalized_subject, personalized_body = generate_personalized_content(
+                campaign.email_subject_template,
+                campaign.email_body_template,
+                client.nombre,
+                {
+                    'total_spend': client_spend,
+                    'visit_count': client_visits,
+                    'last_visit': last_visit,
+                    'city': client.ciudad or ''
+                }
+            )
+        else:
+            # Personalización básica sin IA
+            personalized_subject = campaign.email_subject_template.replace('{nombre_cliente}', client.nombre)
+            personalized_body = campaign.email_body_template.replace('{nombre_cliente}', client.nombre)
+
         # Crear destinatario
         EmailRecipient.objects.create(
             campaign=campaign,
             client=client,
             email=client.email,
             name=client.nombre,
-            personalized_subject=campaign.email_subject_template,
-            personalized_body=campaign.email_body_template,
+            personalized_subject=personalized_subject,
+            personalized_body=personalized_body,
             send_enabled=True,
             priority=1,
             client_total_spend=client_spend,
@@ -480,3 +499,55 @@ def preview_campaign_recipients(campaign):
     clients_query = clients_query.exclude(email__in=blacklisted_emails)
     
     return clients_query.count()
+
+
+@login_required
+@user_passes_test(es_administrador)
+def test_ai_service_ajax(request):
+    """Vista AJAX para probar el servicio de IA"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    
+    try:
+        test_subject = request.POST.get('subject', '🎁 ¡Tu giftcard de $15,000 te espera!')
+        test_body = request.POST.get('body', 'Hola {nombre_cliente}, tenemos una sorpresa especial para ti...')
+        client_name = request.POST.get('client_name', 'María González')
+        
+        # Verificar estado del servicio
+        status = ai_service.get_status()
+        
+        if not status['enabled'] or not status['api_key_configured']:
+            return JsonResponse({
+                'success': False,
+                'error': 'Servicio de IA no configurado correctamente',
+                'status': status
+            })
+        
+        # Generar variaciones
+        subject_variations = ai_service.generate_subject_variations(test_subject, 3)
+        body_variation = ai_service.generate_body_variations(test_body, client_name)
+        
+        # Generar contenido personalizado completo
+        final_subject, final_body = generate_personalized_content(
+            test_subject, test_body, client_name
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'service_status': status,
+            'results': {
+                'original_subject': test_subject,
+                'subject_variations': subject_variations,
+                'original_body': test_body,
+                'body_variation': body_variation,
+                'final_subject': final_subject,
+                'final_body': final_body
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'service_status': ai_service.get_status()
+        }, status=500)
