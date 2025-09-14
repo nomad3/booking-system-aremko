@@ -78,7 +78,7 @@ class ConditionalAlterUniqueTogether(migrations.AlterUniqueTogether):
                 # Check if table has constraints on these fields already
                 with connection.cursor() as cursor:
                     cursor.execute("""
-                        SELECT constraint_name FROM information_schema.table_constraints tc
+                        SELECT tc.constraint_name FROM information_schema.table_constraints tc
                         JOIN information_schema.constraint_column_usage ccu 
                         ON tc.constraint_name = ccu.constraint_name
                         WHERE tc.table_name = %s 
