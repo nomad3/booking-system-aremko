@@ -20,6 +20,32 @@ def check_table_exists(table_name):
         return cursor.fetchone()[0]
 
 
+def check_constraint_exists(constraint_name):
+    """Check if a constraint exists in the database"""
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.table_constraints 
+                WHERE constraint_schema = 'public' 
+                AND constraint_name = %s
+            );
+        """, [constraint_name])
+        return cursor.fetchone()[0]
+
+
+def check_index_exists(index_name):
+    """Check if an index exists in the database"""
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM pg_indexes 
+                WHERE schemaname = 'public' 
+                AND indexname = %s
+            );
+        """, [index_name])
+        return cursor.fetchone()[0]
+
+
 class ConditionalCreateModel(migrations.CreateModel):
     """Custom CreateModel operation that checks if table exists first"""
     
@@ -33,6 +59,42 @@ class ConditionalCreateModel(migrations.CreateModel):
         else:
             # Table exists, just add to Django's migration history
             pass
+
+
+class ConditionalAlterUniqueTogether(migrations.AlterUniqueTogether):
+    """Custom AlterUniqueTogether that checks if constraint exists first"""
+    
+    def database_forwards(self, app_label, schema_editor, from_state, to_state):
+        # Generate the constraint name that Django would use
+        model = to_state.apps.get_model(app_label, self.name)
+        table_name = model._meta.db_table
+        
+        if self.unique_together:
+            for fields in self.unique_together:
+                # Django generates constraint names like "appname_modelname_field1_field2_hash_uniq"
+                field_names = "_".join(fields)
+                # Django uses a hash for the constraint name - we'll check if any constraint exists on these fields
+                
+                # Check if table has constraints on these fields already
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT constraint_name FROM information_schema.table_constraints tc
+                        JOIN information_schema.constraint_column_usage ccu 
+                        ON tc.constraint_name = ccu.constraint_name
+                        WHERE tc.table_name = %s 
+                        AND tc.constraint_type = 'UNIQUE'
+                        AND tc.constraint_schema = 'public'
+                    """, [table_name])
+                    
+                    existing_constraints = [row[0] for row in cursor.fetchall()]
+                    
+                    # If there are any unique constraints, skip creating new ones
+                    if any(field_names.replace('_', '') in constraint.replace('_', '') 
+                           for constraint in existing_constraints):
+                        return
+        
+        # If no existing constraints found, proceed normally
+        super().database_forwards(app_label, schema_editor, from_state, to_state)
 
 
 class Migration(migrations.Migration):
@@ -314,11 +376,11 @@ class Migration(migrations.Migration):
         ),
         
         # Add constraints and indexes
-        migrations.AlterUniqueTogether(
+        ConditionalAlterUniqueTogether(
             name='emailrecipient',
             unique_together={('campaign', 'email')},
         ),
-        migrations.AlterUniqueTogether(
+        ConditionalAlterUniqueTogether(
             name='smstemplate',
             unique_together={('name', 'message_type')},
         ),
