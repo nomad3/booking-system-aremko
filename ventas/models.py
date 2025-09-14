@@ -1341,3 +1341,294 @@ class EmailTemplate(models.Model):
     
     def __str__(self):
         return f"{self.name} - {self.year}/{self.month:02d}"
+
+
+# =============================================================================
+# MODELOS PARA SISTEMA DE CAMPAÑAS AVANZADO
+# =============================================================================
+
+class EmailCampaign(models.Model):
+    """Campaña de email marketing con criterios avanzados"""
+    
+    CAMPAIGN_STATUS_CHOICES = [
+        ('draft', 'Borrador'),
+        ('ready', 'Lista para envío'),
+        ('sending', 'Enviando'),
+        ('paused', 'Pausada'),
+        ('completed', 'Completada'),
+        ('cancelled', 'Cancelada'),
+    ]
+    
+    # Información básica
+    name = models.CharField(max_length=200, verbose_name="Nombre de la campaña")
+    description = models.TextField(blank=True, verbose_name="Descripción")
+    status = models.CharField(max_length=20, choices=CAMPAIGN_STATUS_CHOICES, default='draft', verbose_name="Estado")
+    
+    # Criterios de selección (almacenados en JSON)
+    criteria = models.JSONField(default=dict, verbose_name="Criterios de selección")
+    # Estructura del JSON criteria:
+    # {
+    #     "month": 1, "year": 2025,
+    #     "spend_min": 50000, "spend_max": 100000,  # opcional
+    #     "visit_count_min": 2, "visit_count_max": 10,  # opcional
+    #     "cities": ["Puerto Varas", "Osorno"],  # opcional
+    # }
+    
+    # Configuración de envío
+    schedule_config = models.JSONField(default=dict, verbose_name="Configuración de horarios")
+    # Estructura del JSON schedule_config:
+    # {
+    #     "start_time": "08:00", "end_time": "18:00",
+    #     "batch_size": 2, "interval_minutes": 6,
+    #     "timezone": "America/Santiago"
+    # }
+    
+    # Template de email
+    email_subject_template = models.CharField(max_length=500, verbose_name="Template de asunto")
+    email_body_template = models.TextField(verbose_name="Template de cuerpo")
+    
+    # Configuración avanzada
+    ai_variation_enabled = models.BooleanField(default=True, verbose_name="Usar IA para variar contenido")
+    anti_spam_enabled = models.BooleanField(default=True, verbose_name="Medidas anti-spam activas")
+    
+    # Metadatos
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Creado por")
+    
+    # Estadísticas calculadas
+    total_recipients = models.IntegerField(default=0, verbose_name="Total de destinatarios")
+    emails_sent = models.IntegerField(default=0, verbose_name="Emails enviados")
+    emails_delivered = models.IntegerField(default=0, verbose_name="Emails entregados")
+    emails_opened = models.IntegerField(default=0, verbose_name="Emails abiertos")
+    emails_clicked = models.IntegerField(default=0, verbose_name="Clicks en emails")
+    emails_bounced = models.IntegerField(default=0, verbose_name="Emails rebotados")
+    spam_complaints = models.IntegerField(default=0, verbose_name="Quejas de spam")
+    
+    class Meta:
+        verbose_name = "Campaña de Email"
+        verbose_name_plural = "Campañas de Email"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.name} ({self.get_status_display()})"
+    
+    @property
+    def progress_percentage(self):
+        """Calcula el porcentaje de progreso de la campaña"""
+        if self.total_recipients == 0:
+            return 0
+        return (self.emails_sent / self.total_recipients) * 100
+    
+    @property
+    def delivery_rate(self):
+        """Calcula la tasa de entrega"""
+        if self.emails_sent == 0:
+            return 0
+        return (self.emails_delivered / self.emails_sent) * 100
+    
+    @property
+    def open_rate(self):
+        """Calcula la tasa de apertura"""
+        if self.emails_delivered == 0:
+            return 0
+        return (self.emails_opened / self.emails_delivered) * 100
+    
+    @property
+    def click_rate(self):
+        """Calcula la tasa de clicks"""
+        if self.emails_delivered == 0:
+            return 0
+        return (self.emails_clicked / self.emails_delivered) * 100
+
+
+class EmailRecipient(models.Model):
+    """Destinatario individual de una campaña con email personalizado"""
+    
+    RECIPIENT_STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('sending', 'Enviando'),
+        ('sent', 'Enviado'),
+        ('delivered', 'Entregado'),
+        ('opened', 'Abierto'),
+        ('clicked', 'Click realizado'),
+        ('bounced', 'Rebotado'),
+        ('failed', 'Fallido'),
+        ('spam_complaint', 'Queja de spam'),
+        ('unsubscribed', 'Desuscrito'),
+        ('excluded', 'Excluido'),
+    ]
+    
+    # Relaciones
+    campaign = models.ForeignKey(EmailCampaign, on_delete=models.CASCADE, related_name='recipients')
+    client = models.ForeignKey(Cliente, on_delete=models.CASCADE, verbose_name="Cliente")
+    
+    # Información del destinatario
+    email = models.EmailField(verbose_name="Email")
+    name = models.CharField(max_length=200, verbose_name="Nombre")
+    
+    # Contenido personalizado (generado por IA o personalización)
+    personalized_subject = models.CharField(max_length=500, verbose_name="Asunto personalizado")
+    personalized_body = models.TextField(verbose_name="Cuerpo personalizado")
+    
+    # Control de envío
+    send_enabled = models.BooleanField(default=True, verbose_name="Habilitado para envío")
+    priority = models.IntegerField(default=1, verbose_name="Prioridad")
+    
+    # Estado y tracking
+    status = models.CharField(max_length=20, choices=RECIPIENT_STATUS_CHOICES, default='pending', verbose_name="Estado")
+    
+    # Metadatos de envío
+    scheduled_at = models.DateTimeField(null=True, blank=True, verbose_name="Programado para")
+    sent_at = models.DateTimeField(null=True, blank=True, verbose_name="Enviado en")
+    delivered_at = models.DateTimeField(null=True, blank=True, verbose_name="Entregado en")
+    opened_at = models.DateTimeField(null=True, blank=True, verbose_name="Abierto en")
+    clicked_at = models.DateTimeField(null=True, blank=True, verbose_name="Click en")
+    
+    # Información adicional
+    error_message = models.TextField(blank=True, verbose_name="Mensaje de error")
+    bounce_reason = models.CharField(max_length=200, blank=True, verbose_name="Razón del rebote")
+    user_agent = models.CharField(max_length=500, blank=True, verbose_name="User Agent")
+    ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name="IP Address")
+    
+    # Datos del cliente para análisis
+    client_total_spend = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Gasto total del cliente")
+    client_visit_count = models.IntegerField(default=0, verbose_name="Número de visitas")
+    client_last_visit = models.DateField(null=True, blank=True, verbose_name="Última visita")
+    client_city = models.CharField(max_length=100, blank=True, verbose_name="Ciudad del cliente")
+    
+    class Meta:
+        verbose_name = "Destinatario de Email"
+        verbose_name_plural = "Destinatarios de Email"
+        ordering = ['priority', 'scheduled_at', 'id']
+        unique_together = ['campaign', 'email']  # Un email por campaña
+    
+    def __str__(self):
+        return f"{self.name} ({self.email}) - {self.campaign.name}"
+    
+    def mark_as_sent(self):
+        """Marca el email como enviado"""
+        self.status = 'sent'
+        self.sent_at = timezone.now()
+        self.save()
+        
+        # Actualizar estadísticas de la campaña
+        self.campaign.emails_sent += 1
+        self.campaign.save()
+    
+    def mark_as_delivered(self):
+        """Marca el email como entregado"""
+        if self.status == 'sent':
+            self.status = 'delivered'
+            self.delivered_at = timezone.now()
+            self.save()
+            
+            # Actualizar estadísticas de la campaña
+            self.campaign.emails_delivered += 1
+            self.campaign.save()
+    
+    def mark_as_opened(self):
+        """Marca el email como abierto"""
+        if self.status in ['delivered', 'opened']:
+            if self.status != 'opened':
+                self.campaign.emails_opened += 1
+            self.status = 'opened'
+            self.opened_at = timezone.now()
+            self.save()
+            self.campaign.save()
+    
+    def mark_as_clicked(self):
+        """Marca el email como clicked"""
+        if self.status in ['delivered', 'opened', 'clicked']:
+            if self.status != 'clicked':
+                self.campaign.emails_clicked += 1
+            self.status = 'clicked'
+            self.clicked_at = timezone.now()
+            self.save()
+            self.campaign.save()
+
+
+class EmailDeliveryLog(models.Model):
+    """Log detallado de entregas de email para análisis y debugging"""
+    
+    LOG_TYPE_CHOICES = [
+        ('send_attempt', 'Intento de envío'),
+        ('delivery_success', 'Entrega exitosa'),
+        ('delivery_failure', 'Falla en entrega'),
+        ('bounce_hard', 'Rebote duro'),
+        ('bounce_soft', 'Rebote suave'),
+        ('spam_complaint', 'Queja de spam'),
+        ('unsubscribe', 'Desuscripción'),
+        ('open_tracking', 'Seguimiento de apertura'),
+        ('click_tracking', 'Seguimiento de clicks'),
+    ]
+    
+    # Relaciones
+    recipient = models.ForeignKey(EmailRecipient, on_delete=models.CASCADE, related_name='delivery_logs')
+    campaign = models.ForeignKey(EmailCampaign, on_delete=models.CASCADE, related_name='delivery_logs')
+    
+    # Información del log
+    log_type = models.CharField(max_length=20, choices=LOG_TYPE_CHOICES, verbose_name="Tipo de log")
+    timestamp = models.DateTimeField(auto_now_add=True, verbose_name="Timestamp")
+    
+    # Detalles técnicos
+    smtp_response = models.TextField(blank=True, verbose_name="Respuesta SMTP")
+    error_code = models.CharField(max_length=10, blank=True, verbose_name="Código de error")
+    error_message = models.TextField(blank=True, verbose_name="Mensaje de error")
+    
+    # Información adicional
+    user_agent = models.CharField(max_length=500, blank=True, verbose_name="User Agent")
+    ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name="IP Address")
+    country_code = models.CharField(max_length=2, blank=True, verbose_name="Código de país")
+    
+    # Metadatos del servidor
+    server_response_time = models.FloatField(null=True, blank=True, verbose_name="Tiempo de respuesta (ms)")
+    retry_count = models.IntegerField(default=0, verbose_name="Número de reintentos")
+    
+    class Meta:
+        verbose_name = "Log de Entrega de Email"
+        verbose_name_plural = "Logs de Entrega de Email"
+        ordering = ['-timestamp']
+    
+    def __str__(self):
+        return f"{self.get_log_type_display()} - {self.recipient.email} ({self.timestamp})"
+
+
+class EmailBlacklist(models.Model):
+    """Lista negra de emails para prevención de spam"""
+    
+    BLACKLIST_REASON_CHOICES = [
+        ('hard_bounce', 'Rebote duro'),
+        ('spam_complaint', 'Queja de spam'),
+        ('unsubscribe', 'Desuscripción'),
+        ('invalid_email', 'Email inválido'),
+        ('domain_blocked', 'Dominio bloqueado'),
+        ('manual_block', 'Bloqueo manual'),
+        ('suspicious_activity', 'Actividad sospechosa'),
+    ]
+    
+    email = models.EmailField(unique=True, verbose_name="Email")
+    reason = models.CharField(max_length=20, choices=BLACKLIST_REASON_CHOICES, verbose_name="Razón del bloqueo")
+    added_at = models.DateTimeField(auto_now_add=True, verbose_name="Agregado en")
+    added_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Agregado por")
+    
+    # Información adicional
+    notes = models.TextField(blank=True, verbose_name="Notas")
+    domain = models.CharField(max_length=100, verbose_name="Dominio")
+    
+    # Control de reactivación
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    expires_at = models.DateTimeField(null=True, blank=True, verbose_name="Expira en")
+    
+    class Meta:
+        verbose_name = "Email en Lista Negra"
+        verbose_name_plural = "Emails en Lista Negra"
+        ordering = ['-added_at']
+    
+    def __str__(self):
+        return f"{self.email} ({self.get_reason_display()})"
+    
+    def save(self, *args, **kwargs):
+        if '@' in self.email:
+            self.domain = self.email.split('@')[1].lower()
+        super().save(*args, **kwargs)

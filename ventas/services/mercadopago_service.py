@@ -25,9 +25,14 @@ class MercadoPagoService:
         self.webhook_secret = getattr(settings, 'MERCADOPAGO_WEBHOOK_SECRET', None)
         self.base_url = 'https://api.mercadopago.com'
         self.sandbox = getattr(settings, 'MERCADOPAGO_SANDBOX', True)
-        
-        if not self.access_token:
-            logger.warning("MERCADOPAGO_ACCESS_TOKEN no configurado")
+        self._config_checked = False
+    
+    def _check_config(self):
+        """Verifica la configuración solo cuando se use el servicio"""
+        if not self._config_checked:
+            if not self.access_token:
+                logger.warning("MERCADOPAGO_ACCESS_TOKEN no configurado")
+            self._config_checked = True
     
     def create_payment_link(self, reserva_id, amount, description, customer_email, customer_name):
         """
@@ -43,6 +48,7 @@ class MercadoPagoService:
         Returns:
             dict: Respuesta de la API con el link de pago
         """
+        self._check_config()
         try:
             if not self.access_token:
                 return {'success': False, 'error': 'Mercado Pago no configurado'}
@@ -162,6 +168,7 @@ class MercadoPagoService:
         Returns:
             dict: Resultado del procesamiento
         """
+        self._check_config()
         try:
             # Verificar que es un webhook válido
             if data.get('type') != 'payment':
