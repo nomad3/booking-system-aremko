@@ -48,6 +48,11 @@ class Command(BaseCommand):
             action='store_true',
             help='Simular envío sin enviar emails reales'
         )
+        parser.add_argument(
+            '--ignore-schedule',
+            action='store_true',
+            help='Ignorar restricciones de horario'
+        )
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS('\n🚀 INICIANDO ENVÍO DE CAMPAÑAS EMAIL'))
@@ -55,13 +60,15 @@ class Command(BaseCommand):
         batch_size = options['batch_size']
         interval_minutes = options['interval']
         dry_run = options['dry_run']
+        ignore_schedule = options['ignore_schedule']
         
         if dry_run:
             self.stdout.write(self.style.WARNING('⚠️ MODO DRY-RUN: No se enviarán emails reales'))
         
-        # Verificar horario de envío
-        if not self.is_sending_time():
-            self.stdout.write(self.style.WARNING('⏰ Fuera del horario de envío (8:00-18:00). Saliendo.'))
+        # Para modo auto, verificar horario general
+        if options['auto'] and not ignore_schedule and not self.is_sending_time():
+            self.stdout.write(self.style.WARNING('⏰ Fuera del horario de envío general. Saliendo.'))
+            self.stdout.write('💡 Use --ignore-schedule para enviar fuera del horario')
             return
         
         if options['auto']:
@@ -70,7 +77,7 @@ class Command(BaseCommand):
             self.stdout.write(f'📊 Encontradas {campaigns.count()} campañas listas para envío')
             
             for campaign in campaigns:
-                self.process_campaign(campaign, batch_size, interval_minutes, dry_run)
+                self.process_campaign(campaign, batch_size, interval_minutes, dry_run, ignore_schedule)
         
         elif options['campaign_id']:
             # Modo manual: procesar campaña específica
@@ -79,23 +86,51 @@ class Command(BaseCommand):
                 if campaign.status != 'ready':
                     raise CommandError(f'❌ Campaña {campaign.id} no está lista para envío (estado: {campaign.status})')
                 
-                self.process_campaign(campaign, batch_size, interval_minutes, dry_run)
+                self.process_campaign(campaign, batch_size, interval_minutes, dry_run, ignore_schedule)
                 
             except EmailCampaign.DoesNotExist:
                 raise CommandError(f'❌ Campaña con ID {options["campaign_id"]} no encontrada')
         else:
             raise CommandError('❌ Debe especificar --campaign-id o --auto')
 
-    def is_sending_time(self):
-        """Verifica si estamos en horario de envío (8:00 - 18:00)"""
+    def is_sending_time(self, campaign=None):
+        """Verifica si estamos en horario de envío según configuración de campaña"""
         now = timezone.now()
         chile_time = now.astimezone(timezone.get_fixed_timezone(-180))  # UTC-3
-        current_hour = chile_time.hour
-        return 8 <= current_hour <= 18
+        current_time = chile_time.time()
+        
+        # Horarios por defecto si no hay campaña específica
+        start_time = "08:00"
+        end_time = "21:00"
+        
+        # Usar horarios de la campaña si están configurados
+        if campaign and campaign.schedule_config:
+            start_time = campaign.schedule_config.get('start_time', start_time)
+            end_time = campaign.schedule_config.get('end_time', end_time)
+        
+        # Convertir strings a time objects
+        from datetime import time
+        try:
+            start_hour, start_min = map(int, start_time.split(':'))
+            end_hour, end_min = map(int, end_time.split(':'))
+            start_time_obj = time(start_hour, start_min)
+            end_time_obj = time(end_hour, end_min)
+            
+            return start_time_obj <= current_time <= end_time_obj
+        except (ValueError, AttributeError):
+            # Fallback a horarios por defecto si hay error
+            return 8 <= chile_time.hour <= 21
 
-    def process_campaign(self, campaign, batch_size, interval_minutes, dry_run):
+    def process_campaign(self, campaign, batch_size, interval_minutes, dry_run, ignore_schedule=False):
         """Procesa una campaña específica"""
         self.stdout.write(f'\n📧 Procesando campaña: {campaign.name}')
+        
+        # Verificar horario específico de la campaña
+        if not ignore_schedule and not self.is_sending_time(campaign):
+            start_time = campaign.schedule_config.get('start_time', '08:00') if campaign.schedule_config else '08:00'
+            end_time = campaign.schedule_config.get('end_time', '21:00') if campaign.schedule_config else '21:00'
+            self.stdout.write(self.style.WARNING(f'⏰ Campaña fuera de horario ({start_time}-{end_time}). Saltando.'))
+            return
         
         # Obtener destinatarios pendientes
         pending_recipients = EmailRecipient.objects.filter(
