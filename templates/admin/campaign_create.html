@@ -187,6 +187,69 @@
     color: #17a2b8;
 }
 
+/* Estilos del Editor WYSIWYG */
+.editor-toolbar {
+    background: #f8f9fa;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+}
+
+.editor-toolbar button {
+    background: white;
+    border: 1px solid #ddd;
+    padding: 5px 10px;
+    margin: 2px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.editor-toolbar button:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.editor-toolbar button.special {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+
+.editor-toolbar button.special:hover {
+    background: #218838;
+}
+
+.editor-toolbar button.whatsapp {
+    background: #25d366;
+    color: white;
+    border-color: #25d366;
+}
+
+.editor-toolbar button.whatsapp:hover {
+    background: #1db954;
+}
+
+#email_editor {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+}
+
+#email_editor:focus {
+    outline: 2px solid #007bff;
+    outline-offset: -2px;
+}
+
+.preview-panel {
+    border-left: 3px solid #007bff;
+}
+
+.preview-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    color: #495057;
+}
+
 @media (max-width: 768px) {
     .form-row {
         flex-direction: column;
@@ -200,6 +263,18 @@
     
     .range-separator {
         padding: 5px 0;
+    }
+    
+    /* Editor responsive */
+    .form-group div[style*="display: flex"] {
+        flex-direction: column !important;
+        gap: 15px !important;
+    }
+    
+    .editor-toolbar button {
+        margin: 1px;
+        padding: 8px 12px;
+        font-size: 12px;
     }
 }
 </style>
@@ -355,25 +430,80 @@
             
             <div class="form-row">
                 <div class="form-group">
-                    <label for="email_body">Cuerpo del Email (HTML) *</label>
-                    <textarea id="email_body" name="email_body" required style="height: 200px;"
-                              placeholder="Contenido HTML del email..."><!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Giftcard Especial - Aremko</title>
-</head>
-<body>
-    <h1>¡Hola {nombre_cliente}!</h1>
-    <p>Tenemos una sorpresa especial para ti...</p>
-    <div style="background: #f0f8ff; padding: 20px; border-radius: 8px; text-align: center;">
-        <h2>🎁 Tu Giftcard Especial</h2>
-        <h3 style="color: #28a745;">$15,000</h3>
-        <p>Para usar durante todo septiembre 2025</p>
-    </div>
-</body>
-</html></textarea>
-                    <div class="help-text">Usa {nombre_cliente} para personalizar con el nombre del destinatario</div>
+                    <label for="email_body">Cuerpo del Email *</label>
+                    <div style="display: flex; gap: 20px; align-items: start;">
+                        <!-- Editor Visual -->
+                        <div style="flex: 1;">
+                            <div class="editor-toolbar">
+                                <button type="button" onclick="formatText('bold')" title="Negrita">
+                                    <strong>B</strong>
+                                </button>
+                                <button type="button" onclick="formatText('italic')" title="Cursiva">
+                                    <em>I</em>
+                                </button>
+                                <button type="button" onclick="formatText('underline')" title="Subrayado">
+                                    <u>U</u>
+                                </button>
+                                <button type="button" onclick="formatText('insertOrderedList')" title="Lista numerada">
+                                    1. Lista
+                                </button>
+                                <button type="button" onclick="formatText('insertUnorderedList')" title="Lista con viñetas">
+                                    • Lista
+                                </button>
+                                <button type="button" onclick="insertGiftcardSection()" class="special" title="Insertar sección giftcard">
+                                    🎁 Giftcard
+                                </button>
+                                <button type="button" onclick="insertWhatsAppButton()" class="whatsapp" title="Insertar botón WhatsApp">
+                                    📱 WhatsApp
+                                </button>
+                            </div>
+                            
+                            <div id="email_editor" 
+                                 contenteditable="true" 
+                                 style="border: 1px solid #ddd; min-height: 300px; padding: 15px; border-radius: 4px; background: white; overflow-y: auto;"
+                                 onInput="updatePreview()">
+                                <h1>¡Hola {nombre_cliente}!</h1>
+                                <p>Nos complace invitarte a una experiencia única en <strong>Aremko Spa</strong>.</p>
+                                
+                                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 25px; border-radius: 12px; text-align: center; margin: 20px 0; color: white;">
+                                    <h2 style="margin: 0 0 15px 0; color: white;">🎁 Oferta Especial</h2>
+                                    <h3 style="margin: 0 0 10px 0; font-size: 2.5em; color: #ffd700;">$15,000</h3>
+                                    <p style="margin: 0; font-size: 1.1em;">Giftcard válida durante septiembre 2025</p>
+                                </div>
+                                
+                                <p>Esta oferta especial está disponible solo para nuestros clientes más valorados.</p>
+                                
+                                <div style="text-align: center; margin: 30px 0;">
+                                    <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20mi%20cita%20mencionando%20mi%20giftcard" 
+                                       style="background: #25d366; color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">
+                                        📱 Reservar Ahora por WhatsApp
+                                    </a>
+                                </div>
+                                
+                                <p>¡Esperamos verte pronto!</p>
+                                <p><strong>Equipo Aremko Spa</strong><br>
+                                   📍 Río Pescado Km 4, Puerto Varas<br>
+                                   📞 +56 9 5790 2525</p>
+                            </div>
+                            
+                            <textarea id="email_body" name="email_body" required style="display: none;">
+                            </textarea>
+                        </div>
+                        
+                        <!-- Vista Previa -->
+                        <div class="preview-panel" style="flex: 1; border: 1px solid #ddd; border-radius: 4px;">
+                            <div class="preview-header" style="background: #f8f9fa; padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold;">
+                                👁️ Vista Previa en Tiempo Real
+                            </div>
+                            <div id="email_preview" style="padding: 15px; min-height: 300px; background: white; overflow-y: auto;">
+                                <!-- Preview content will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="help-text">
+                        ✏️ Edita el contenido en el lado izquierdo y ve la vista previa en tiempo real. 
+                        Usa <strong>{nombre_cliente}</strong> para personalizar con el nombre del destinatario.
+                    </div>
                 </div>
             </div>
         </div>
@@ -526,6 +656,51 @@ function testAIService() {
     });
 }
 
+// === FUNCIONES DEL EDITOR WYSIWYG ===
+
+function formatText(command) {
+    document.execCommand(command, false, null);
+    updatePreview();
+}
+
+function insertGiftcardSection() {
+    const giftcardHTML = `
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 25px; border-radius: 12px; text-align: center; margin: 20px 0; color: white;">
+            <h2 style="margin: 0 0 15px 0; color: white;">🎁 Oferta Especial</h2>
+            <h3 style="margin: 0 0 10px 0; font-size: 2.5em; color: #ffd700;">$15,000</h3>
+            <p style="margin: 0; font-size: 1.1em;">Giftcard válida durante septiembre 2025</p>
+        </div>
+    `;
+    document.execCommand('insertHTML', false, giftcardHTML);
+    updatePreview();
+}
+
+function insertWhatsAppButton() {
+    const buttonHTML = `
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20mi%20cita%20mencionando%20mi%20giftcard" 
+               style="background: #25d366; color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">
+                📱 Reservar Ahora por WhatsApp
+            </a>
+        </div>
+    `;
+    document.execCommand('insertHTML', false, buttonHTML);
+    updatePreview();
+}
+
+function updatePreview() {
+    const editor = document.getElementById('email_editor');
+    const preview = document.getElementById('email_preview');
+    const hiddenTextarea = document.getElementById('email_body');
+    
+    // Actualizar el contenido
+    const content = editor.innerHTML;
+    preview.innerHTML = content.replace(/{nombre_cliente}/g, '<span style="background: yellow; padding: 2px 4px; border-radius: 3px;">María González</span>');
+    
+    // Actualizar el textarea oculto para el envío del formulario
+    hiddenTextarea.value = content;
+}
+
 // Auto-preview cuando cambien los criterios
 document.addEventListener('DOMContentLoaded', function() {
     const criteriaInputs = ['month', 'year', 'spend_min', 'spend_max', 'visit_count_min', 'visit_count_max', 'cities'];
@@ -539,6 +714,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+    
+    // Inicializar el editor WYSIWYG
+    updatePreview();
     
     // Preview inicial
     setTimeout(previewRecipients, 1000);
