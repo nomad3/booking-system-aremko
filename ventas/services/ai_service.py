@@ -22,7 +22,8 @@ class AIContentVariationService:
         self.api_key = os.getenv('DEEPSEEK_API_KEY')
         self.model = os.getenv('DEEPSEEK_MODEL', 'deepseek-chat')
         self.provider = os.getenv('AI_VARIATION_PROVIDER', 'deepseek')
-        self.enabled = os.getenv('AI_VARIATION_ENABLED', 'true').lower() == 'true'
+        # TEMPORALMENTE DESHABILITADO por timeouts
+        self.enabled = False  # os.getenv('AI_VARIATION_ENABLED', 'true').lower() == 'true'
         self.base_url = "https://api.deepseek.com/v1"
         
         if not self.api_key and self.enabled:
