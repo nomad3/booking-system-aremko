@@ -2,9 +2,37 @@
 # Date: 2025-09-14
 
 from django.conf import settings
-from django.db import migrations, models
+from django.db import migrations, models, connection
 import django.db.models.deletion
 import django.utils.timezone
+
+
+def check_table_exists(table_name):
+    """Check if a table exists in the database"""
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = %s
+            );
+        """, [table_name])
+        return cursor.fetchone()[0]
+
+
+class ConditionalCreateModel(migrations.CreateModel):
+    """Custom CreateModel operation that checks if table exists first"""
+    
+    def database_forwards(self, app_label, schema_editor, from_state, to_state):
+        table_name = self.name.lower()
+        full_table_name = f"{app_label}_{table_name}"
+        
+        if not check_table_exists(full_table_name):
+            # Table doesn't exist, create it normally
+            super().database_forwards(app_label, schema_editor, from_state, to_state)
+        else:
+            # Table exists, just add to Django's migration history
+            pass
 
 
 class Migration(migrations.Migration):
@@ -16,7 +44,7 @@ class Migration(migrations.Migration):
 
     operations = [
         # Communication Limits
-        migrations.CreateModel(
+        ConditionalCreateModel(
             name='CommunicationLimit',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -45,7 +73,7 @@ class Migration(migrations.Migration):
         ),
         
         # Client Preferences
-        migrations.CreateModel(
+        ConditionalCreateModel(
             name='ClientPreferences',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -72,7 +100,7 @@ class Migration(migrations.Migration):
         ),
         
         # Communication Log
-        migrations.CreateModel(
+        ConditionalCreateModel(
             name='CommunicationLog',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -103,7 +131,7 @@ class Migration(migrations.Migration):
         ),
         
         # Mail Para Enviar
-        migrations.CreateModel(
+        ConditionalCreateModel(
             name='MailParaEnviar',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -128,7 +156,7 @@ class Migration(migrations.Migration):
         ),
         
         # SMS Template
-        migrations.CreateModel(
+        ConditionalCreateModel(
             name='SMSTemplate',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -150,7 +178,7 @@ class Migration(migrations.Migration):
         ),
         
         # Email Template
-        migrations.CreateModel(
+        ConditionalCreateModel(
             name='EmailTemplate',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -173,7 +201,7 @@ class Migration(migrations.Migration):
         ),
         
         # Email Campaign (Main model)
-        migrations.CreateModel(
+        ConditionalCreateModel(
             name='EmailCampaign',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -205,7 +233,7 @@ class Migration(migrations.Migration):
         ),
         
         # Email Recipient
-        migrations.CreateModel(
+        ConditionalCreateModel(
             name='EmailRecipient',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -240,7 +268,7 @@ class Migration(migrations.Migration):
         ),
         
         # Email Delivery Log
-        migrations.CreateModel(
+        ConditionalCreateModel(
             name='EmailDeliveryLog',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -265,7 +293,7 @@ class Migration(migrations.Migration):
         ),
         
         # Email Blacklist
-        migrations.CreateModel(
+        ConditionalCreateModel(
             name='EmailBlacklist',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
