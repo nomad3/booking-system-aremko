@@ -68,11 +68,11 @@ class Command(BaseCommand):
         ultimos_enviados = MailParaEnviar.objects.filter(
             estado='ENVIADO',
             asunto__icontains='giftcard'
-        ).order_by('-fecha_envio')[:10]
+        ).order_by('-enviado_en')[:10]
         
         if ultimos_enviados:
             for email in ultimos_enviados:
-                fecha_envio = email.fecha_envio.astimezone(chile_tz) if email.fecha_envio else "N/A"
+                fecha_envio = email.enviado_en.astimezone(chile_tz) if email.enviado_en else "N/A"
                 self.stdout.write(f"   ✅ {email.email} - {email.nombre} - {fecha_envio}")
         else:
             self.stdout.write(f"   📭 No hay emails enviados aún")
@@ -96,10 +96,10 @@ class Command(BaseCommand):
             fallidos = MailParaEnviar.objects.filter(
                 estado='FALLIDO',
                 asunto__icontains='giftcard'
-            ).order_by('-fecha_envio')[:5]
+            ).order_by('-enviado_en')[:5]
             
             for email in fallidos:
-                observaciones = email.observaciones or "Sin detalles"
+                observaciones = email.notas or "Sin detalles"
                 self.stdout.write(f"   ❌ {email.email} - {email.nombre} - Error: {observaciones}")
         
         # 6. Recomendaciones
