@@ -369,19 +369,24 @@ def generate_campaign_recipients(campaign):
             last_date=Max('fecha_agendamiento')
         )['last_date']
         
-        # Generar contenido personalizado con IA si está habilitado
+        # Generar contenido personalizado con IA si está habilitado (timeout corto)
         if campaign.ai_variation_enabled and ai_service.enabled:
-            personalized_subject, personalized_body = generate_personalized_content(
-                campaign.email_subject_template,
-                campaign.email_body_template,
-                client.nombre,
-                {
-                    'total_spend': client_spend,
-                    'visit_count': client_visits,
-                    'last_visit': last_visit,
-                    'city': client.ciudad or ''
-                }
-            )
+            try:
+                personalized_subject, personalized_body = generate_personalized_content(
+                    campaign.email_subject_template,
+                    campaign.email_body_template,
+                    client.nombre,
+                    {
+                        'total_spend': client_spend,
+                        'visit_count': client_visits,
+                        'last_visit': last_visit,
+                        'city': client.ciudad or ''
+                    }
+                )
+            except Exception as e:
+                # Si falla IA, usar personalización básica
+                personalized_subject = campaign.email_subject_template.replace('{nombre_cliente}', client.nombre)
+                personalized_body = campaign.email_body_template.replace('{nombre_cliente}', client.nombre)
         else:
             # Personalización básica sin IA
             personalized_subject = campaign.email_subject_template.replace('{nombre_cliente}', client.nombre)

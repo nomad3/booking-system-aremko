@@ -214,7 +214,7 @@ Responde SOLO con el contenido procesado.
                 f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=data,
-                timeout=30
+                timeout=15  # Reducir timeout a 15 segundos
             )
             
             if response.status_code == 200:
@@ -283,17 +283,27 @@ def generate_personalized_content(subject_template: str, body_template: str, cli
     
     # Aplicar variaciones de IA si está habilitado
     if ai_service.enabled:
-        # Generar una variación del asunto
-        subject_variations = ai_service.generate_subject_variations(personalized_subject, 1)
-        if subject_variations:
-            personalized_subject = subject_variations[0]
-        
-        # Generar variación del cuerpo
-        personalized_body = ai_service.generate_body_variations(personalized_body, client_name)
-        
-        # Aplicar técnicas anti-spam si está configurado
-        if os.getenv('AI_ANTI_SPAM_ENABLED', 'true').lower() == 'true':
-            personalized_body = ai_service.apply_anti_spam_techniques(personalized_body)
+        try:
+            # Generar una variación del asunto con timeout
+            subject_variations = ai_service.generate_subject_variations(personalized_subject, 1)
+            if subject_variations:
+                personalized_subject = subject_variations[0]
+            
+            # Generar variación del cuerpo con timeout
+            ai_body = ai_service.generate_body_variations(personalized_body, client_name)
+            if ai_body:  # Solo usar si la IA devolvió algo
+                personalized_body = ai_body
+            
+            # Aplicar técnicas anti-spam si está configurado
+            if os.getenv('AI_ANTI_SPAM_ENABLED', 'true').lower() == 'true':
+                anti_spam_body = ai_service.apply_anti_spam_techniques(personalized_body)
+                if anti_spam_body:  # Solo usar si la IA devolvió algo
+                    personalized_body = anti_spam_body
+                    
+        except Exception as e:
+            # Si falla la IA, continuar sin personalización avanzada
+            logger.warning(f"IA no disponible, usando contenido básico: {e}")
+            pass
     
     return personalized_subject, personalized_body
 
