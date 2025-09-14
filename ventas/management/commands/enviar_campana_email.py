@@ -125,6 +125,16 @@ class Command(BaseCommand):
         """Procesa una campaña específica"""
         self.stdout.write(f'\n📧 Procesando campaña: {campaign.name}')
         
+        # Usar configuración de la campaña si está disponible
+        if campaign.schedule_config:
+            campaign_batch_size = campaign.schedule_config.get('batch_size', batch_size)
+            campaign_interval = campaign.schedule_config.get('interval_minutes', interval_minutes)
+            self.stdout.write(f'📊 Usando configuración de campaña: {campaign_batch_size} emails cada {campaign_interval} minutos')
+        else:
+            campaign_batch_size = batch_size
+            campaign_interval = interval_minutes
+            self.stdout.write(f'📊 Usando configuración por defecto: {campaign_batch_size} emails cada {campaign_interval} minutos')
+        
         # Verificar horario específico de la campaña
         if not ignore_schedule and not self.is_sending_time(campaign):
             start_time = campaign.schedule_config.get('start_time', '08:00') if campaign.schedule_config else '08:00'
@@ -153,10 +163,10 @@ class Command(BaseCommand):
         
         # Procesar en lotes
         processed = 0
-        for i in range(0, total_pending, batch_size):
-            batch = pending_recipients[i:i + batch_size]
+        for i in range(0, total_pending, campaign_batch_size):
+            batch = pending_recipients[i:i + campaign_batch_size]
             
-            self.stdout.write(f'\n📤 Enviando lote {i//batch_size + 1}: {len(batch)} emails')
+            self.stdout.write(f'\n📤 Enviando lote {i//campaign_batch_size + 1}: {len(batch)} emails')
             
             for recipient in batch:
                 try:
@@ -173,10 +183,10 @@ class Command(BaseCommand):
                         recipient.save()
             
             # Pausa entre lotes (excepto el último)
-            if i + batch_size < total_pending:
-                self.stdout.write(f'⏸️ Pausa de {interval_minutes} minutos...')
+            if i + campaign_batch_size < total_pending:
+                self.stdout.write(f'⏸️ Pausa de {campaign_interval} minutos...')
                 if not dry_run:
-                    time.sleep(interval_minutes * 60)
+                    time.sleep(campaign_interval * 60)
         
         # Actualizar estado final de la campaña
         if not dry_run:

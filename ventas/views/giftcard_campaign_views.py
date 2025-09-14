@@ -539,17 +539,17 @@ def get_giftcard_email_template(giftcard_amount=15000):
             <div class="giftcard">
                 <h3>🎁 Tu Giftcard Especial</h3>
                 <div class="giftcard-amount">$15,000</div>
-                <div class="giftcard-validity">Para usar durante todo septiembre 2025</div>
-                <div class="giftcard-conditions">Válida para servicio de Tinas Calientes y Cabañas de nuestro spa</div>
+                <div class="giftcard-validity">⏰ Válida solo durante septiembre 2025</div>
+                <div class="giftcard-conditions">🏊‍♀️ Válida únicamente para Tinas Calientes y Cabañas</div>
             </div>
             
             <div class="highlight">
-                <h4>✨ ¿Cómo funciona?</h4>
+                <h4>📋 Términos y Condiciones:</h4>
                 <ul>
-                    <li>Válida para servicio de Tinas y Cabañas</li>
-                    <li>No se puede combinar con otras promociones</li>
-                    <li>No tiene restricciones de horario, solo de disponibilidad.</li>
-                    <li>Válida solo durante septiembre 2025</li>
+                    <li><strong>🏊‍♀️ Servicios:</strong> Válida únicamente para Tinas Calientes y Cabañas</li>
+                    <li><strong>📅 Validez:</strong> Solo durante septiembre 2025</li>
+                    <li><strong>🚫 No acumulable:</strong> No se puede sumar a otras promociones</li>
+                    <li><strong>👤 Intransferible:</strong> Solo la puede usar el titular de la reserva</li>
                 </ul>
             </div>
             
@@ -569,11 +569,15 @@ def get_giftcard_email_template(giftcard_amount=15000):
             </div>
             
             <div class="services-list">
-                <h4>🛀 Servicios disponibles:</h4>
+                <h4>🛀 Servicios incluidos en la giftcard:</h4>
                 <ul>
-                    <li>🧖‍♀️ Tinas Calientes con o sin hidromasajes</li>
-                    <li>🏡 Cabañas para dos personas</li>
+                    <li><strong>🔥 Tinas Calientes:</strong> Con o sin hidromasajes</li>
+                    <li><strong>🏡 Cabañas:</strong> Para dos personas</li>
                 </ul>
+                <p style="color: #666; font-size: 0.9em; margin: 15px 0 0 0;">
+                    <strong>Importante:</strong> Esta giftcard es intransferible y solo puede ser utilizada por el titular de la reserva. 
+                    No es acumulable con otras promociones vigentes.
+                </p>
             </div>
             
             <p>¡No dejes pasar esta oportunidad especial! Tu bienestar nos importa y queremos verte de vuelta en septiembre.</p>
