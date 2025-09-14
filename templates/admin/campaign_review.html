@@ -1,0 +1,367 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .campaign-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+    }
+    
+    .stats-card {
+        background: white;
+        border: 1px solid #e0e6ed;
+        border-radius: 8px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .stats-number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #2d3748;
+    }
+    
+    .stats-label {
+        color: #718096;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .recipient-card {
+        background: white;
+        border: 1px solid #e0e6ed;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .recipient-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    .recipient-name {
+        font-weight: bold;
+        color: #2d3748;
+    }
+    
+    .recipient-email {
+        color: #718096;
+        font-size: 0.875rem;
+    }
+    
+    .recipient-status {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    
+    .status-enabled {
+        background: #c6f6d5;
+        color: #22543d;
+    }
+    
+    .status-disabled {
+        background: #fed7d7;
+        color: #742a2a;
+    }
+    
+    .btn-action {
+        margin: 0.25rem;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.2s;
+    }
+    
+    .btn-primary {
+        background: #4299e1;
+        color: white;
+        border: none;
+    }
+    
+    .btn-primary:hover {
+        background: #3182ce;
+        color: white;
+    }
+    
+    .btn-success {
+        background: #48bb78;
+        color: white;
+        border: none;
+    }
+    
+    .btn-success:hover {
+        background: #38a169;
+        color: white;
+    }
+    
+    .btn-warning {
+        background: #ed8936;
+        color: white;
+        border: none;
+    }
+    
+    .filters-section {
+        background: #f7fafc;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+    }
+    
+    .no-recipients {
+        text-align: center;
+        padding: 3rem;
+        color: #718096;
+    }
+    
+    .no-recipients i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        color: #cbd5e0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header de la Campaña -->
+    <div class="campaign-header">
+        <h1><i class="fas fa-envelope-open-text"></i> {{ campaign.name }}</h1>
+        <p class="mb-0">{{ campaign.description|default:"Sin descripción" }}</p>
+        <small>Estado: <strong>{{ campaign.get_status_display }}</strong> | Creada: {{ campaign.created_at|date:"d/m/Y H:i" }}</small>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stats-card">
+                <div class="stats-number text-primary">{{ stats.total }}</div>
+                <div class="stats-label">Total Destinatarios</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card">
+                <div class="stats-number text-success">{{ stats.enabled }}</div>
+                <div class="stats-label">Habilitados</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card">
+                <div class="stats-number text-danger">{{ stats.disabled }}</div>
+                <div class="stats-label">Deshabilitados</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Acciones Principales -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5><i class="fas fa-cogs"></i> Acciones de Campaña</h5>
+                    
+                    {% if stats.total == 0 %}
+                        <form method="post" style="display: inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="generate_recipients">
+                            <button type="submit" class="btn-action btn-primary">
+                                <i class="fas fa-magic"></i> Generar Lista de Destinatarios
+                            </button>
+                        </form>
+                    {% else %}
+                        <form method="post" style="display: inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="generate_recipients">
+                            <button type="submit" class="btn-action btn-warning">
+                                <i class="fas fa-sync"></i> Regenerar Lista
+                            </button>
+                        </form>
+                        
+                        <form method="post" style="display: inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="finalize_campaign">
+                            <button type="submit" class="btn-action btn-success" 
+                                    onclick="return confirm('¿Finalizar campaña y marcar como lista para envío?')">
+                                <i class="fas fa-check-circle"></i> Finalizar Campaña
+                            </button>
+                        </form>
+                    {% endif %}
+                    
+                    <a href="{% url 'ventas:campaign_create' %}" class="btn-action" style="background: #718096; color: white;">
+                        <i class="fas fa-arrow-left"></i> Volver a Crear
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if stats.total > 0 %}
+        <!-- Filtros -->
+        <div class="filters-section">
+            <h6><i class="fas fa-filter"></i> Filtros</h6>
+            <form method="get" class="row">
+                <div class="col-md-4">
+                    <select name="enabled" class="form-control">
+                        <option value="all" {% if enabled_filter == 'all' %}selected{% endif %}>Todos</option>
+                        <option value="enabled" {% if enabled_filter == 'enabled' %}selected{% endif %}>Solo Habilitados</option>
+                        <option value="disabled" {% if enabled_filter == 'disabled' %}selected{% endif %}>Solo Deshabilitados</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <select name="status" class="form-control">
+                        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Todos los Estados</option>
+                        <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pendientes</option>
+                        <option value="sent" {% if status_filter == 'sent' %}selected{% endif %}>Enviados</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Lista de Destinatarios -->
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-users"></i> Lista de Destinatarios</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="recipients-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_recipients">
+                    
+                    {% for recipient in recipients %}
+                        <div class="recipient-card">
+                            <div class="recipient-header">
+                                <div>
+                                    <div class="form-check" style="display: inline-block; margin-right: 1rem;">
+                                        <input type="checkbox" name="enabled_recipients" value="{{ recipient.id }}" 
+                                               {% if recipient.send_enabled %}checked{% endif %}
+                                               class="form-check-input">
+                                    </div>
+                                    <span class="recipient-name">{{ recipient.name }}</span>
+                                    <div class="recipient-email">{{ recipient.email }}</div>
+                                </div>
+                                <div>
+                                    <span class="recipient-status {% if recipient.send_enabled %}status-enabled{% else %}status-disabled{% endif %}">
+                                        {% if recipient.send_enabled %}Habilitado{% else %}Deshabilitado{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <!-- Datos del Cliente -->
+                            <div class="row mt-2">
+                                <div class="col-md-3">
+                                    <small><strong>Gasto Total:</strong> ${{ recipient.client_total_spend|floatformat:0 }}</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <small><strong>Visitas:</strong> {{ recipient.client_visit_count }}</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <small><strong>Última Visita:</strong> {{ recipient.client_last_visit|date:"d/m/Y"|default:"N/A" }}</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <small><strong>Ciudad:</strong> {{ recipient.client_city|default:"N/A" }}</small>
+                                </div>
+                            </div>
+                            
+                            <!-- Vista Previa del Email -->
+                            <div class="mt-2">
+                                <details>
+                                    <summary style="cursor: pointer; color: #4299e1;">
+                                        <small><i class="fas fa-eye"></i> Ver vista previa del email</small>
+                                    </summary>
+                                    <div class="mt-2 p-3" style="background: #f7fafc; border-radius: 6px;">
+                                        <div><strong>Asunto:</strong> {{ recipient.personalized_subject }}</div>
+                                        <div class="mt-2"><strong>Cuerpo:</strong></div>
+                                        <div class="mt-1" style="border: 1px solid #e2e8f0; padding: 1rem; background: white; border-radius: 4px;">
+                                            {{ recipient.personalized_body|safe }}
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+                    {% endfor %}
+                    
+                    <div class="text-center mt-4">
+                        <button type="submit" class="btn-action btn-primary">
+                            <i class="fas fa-save"></i> Actualizar Selección
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Paginación -->
+        {% if recipients.has_other_pages %}
+            <nav class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if recipients.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ recipients.previous_page_number }}&enabled={{ enabled_filter }}&status={{ status_filter }}">Anterior</a>
+                        </li>
+                    {% endif %}
+                    
+                    {% for num in recipients.paginator.page_range %}
+                        {% if recipients.number == num %}
+                            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                        {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}&enabled={{ enabled_filter }}&status={{ status_filter }}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if recipients.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ recipients.next_page_number }}&enabled={{ enabled_filter }}&status={{ status_filter }}">Siguiente</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+
+    {% else %}
+        <!-- No hay destinatarios -->
+        <div class="no-recipients">
+            <i class="fas fa-inbox"></i>
+            <h4>No hay destinatarios generados</h4>
+            <p>Haz clic en "Generar Lista de Destinatarios" para crear la lista basada en los criterios de tu campaña.</p>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+// Auto-submit form when checkboxes change
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('input[name="enabled_recipients"]');
+    const form = document.getElementById('recipients-form');
+    
+    // Optional: Auto-save on checkbox change
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            // You can enable auto-save here if desired
+            // form.submit();
+        });
+    });
+});
+</script>
+{% endblock %}
