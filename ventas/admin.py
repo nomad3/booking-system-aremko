@@ -15,7 +15,9 @@ from .models import (
     MovimientoCliente, Compra, DetalleCompra, GiftCard, HomepageConfig,
     Lead, Company, Contact, Activity, Campaign, Deal, CampaignInteraction, HomepageSettings,
     # Communication models
-    CommunicationLimit, ClientPreferences, CommunicationLog, SMSTemplate, MailParaEnviar
+    CommunicationLimit, ClientPreferences, CommunicationLog, SMSTemplate, MailParaEnviar,
+    # Advanced Email Campaign models
+    EmailCampaign, EmailRecipient, EmailDeliveryLog, EmailBlacklist, EmailTemplate
 )
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
@@ -828,3 +830,198 @@ class MailParaEnviarAdmin(admin.ModelAdmin):
             count += 1
         self.message_user(request, f'{count} emails duplicados como PENDIENTE.')
     duplicar_emails.short_description = "Duplicar emails como PENDIENTE"
+
+
+# =============================================================================
+# ADMIN PARA SISTEMA DE CAMPAÑAS AVANZADO
+# =============================================================================
+
+class EmailRecipientInline(admin.TabularInline):
+    """Inline para mostrar destinatarios de una campaña"""
+    model = EmailRecipient
+    fields = ['email', 'name', 'status', 'send_enabled', 'priority', 'sent_at']
+    readonly_fields = ['sent_at']
+    extra = 0
+    can_delete = False
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('client')
+
+
+@admin.register(EmailCampaign)
+class EmailCampaignAdmin(admin.ModelAdmin):
+    """Administrador para campañas de email"""
+    list_display = [
+        'name', 'status', 'total_recipients', 'emails_sent', 
+        'progress_display', 'created_at', 'created_by'
+    ]
+    list_filter = ['status', 'created_at', 'ai_variation_enabled']
+    search_fields = ['name', 'description']
+    readonly_fields = [
+        'created_at', 'updated_at', 'total_recipients', 'emails_sent',
+        'emails_delivered', 'emails_opened', 'emails_clicked', 
+        'emails_bounced', 'spam_complaints'
+    ]
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('name', 'description', 'status', 'created_by')
+        }),
+        ('Criterios de Selección', {
+            'fields': ('criteria',),
+            'classes': ('collapse',)
+        }),
+        ('Configuración de Envío', {
+            'fields': ('schedule_config',),
+            'classes': ('collapse',)
+        }),
+        ('Template de Email', {
+            'fields': ('email_subject_template', 'email_body_template'),
+            'classes': ('collapse',)
+        }),
+        ('Configuración Avanzada', {
+            'fields': ('ai_variation_enabled',),
+            'classes': ('collapse',)
+        }),
+        ('Estadísticas', {
+            'fields': (
+                'total_recipients', 'emails_sent', 'emails_delivered',
+                'emails_opened', 'emails_clicked', 'emails_bounced',
+                'spam_complaints'
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Metadatos', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    inlines = [EmailRecipientInline]
+    
+    def progress_display(self, obj):
+        """Muestra el progreso de la campaña"""
+        if obj.total_recipients == 0:
+            return "0%"
+        progress = obj.progress_percentage
+        color = "red" if progress < 25 else "orange" if progress < 75 else "green"
+        return format_html(
+            '<span style="color: {};">{:.1f}%</span>',
+            color, progress
+        )
+    progress_display.short_description = "Progreso"
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('created_by')
+
+
+@admin.register(EmailRecipient)
+class EmailRecipientAdmin(admin.ModelAdmin):
+    """Administrador para destinatarios de email"""
+    list_display = [
+        'email', 'name', 'campaign', 'status', 'send_enabled',
+        'priority', 'sent_at', 'delivered_at'
+    ]
+    list_filter = ['status', 'send_enabled', 'campaign', 'sent_at']
+    search_fields = ['email', 'name', 'campaign__name']
+    readonly_fields = [
+        'sent_at', 'delivered_at', 'opened_at', 'clicked_at',
+        'client_total_spend', 'client_visit_count', 'client_last_visit'
+    ]
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('campaign', 'client', 'email', 'name')
+        }),
+        ('Contenido Personalizado', {
+            'fields': ('personalized_subject', 'personalized_body'),
+            'classes': ('collapse',)
+        }),
+        ('Control de Envío', {
+            'fields': ('send_enabled', 'priority', 'status')
+        }),
+        ('Tracking', {
+            'fields': (
+                'scheduled_at', 'sent_at', 'delivered_at', 
+                'opened_at', 'clicked_at'
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Información del Cliente', {
+            'fields': (
+                'client_total_spend', 'client_visit_count', 
+                'client_last_visit', 'client_city'
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Diagnósticos', {
+            'fields': ('error_message', 'bounce_reason', 'user_agent', 'ip_address'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    actions = ['marcar_como_pendiente', 'deshabilitar_envio', 'habilitar_envio']
+    
+    def marcar_como_pendiente(self, request, queryset):
+        updated = queryset.update(status='pending')
+        self.message_user(request, f'{updated} destinatarios marcados como pendientes.')
+    marcar_como_pendiente.short_description = "Marcar como pendiente"
+    
+    def deshabilitar_envio(self, request, queryset):
+        updated = queryset.update(send_enabled=False)
+        self.message_user(request, f'{updated} destinatarios deshabilitados para envío.')
+    deshabilitar_envio.short_description = "Deshabilitar envío"
+    
+    def habilitar_envio(self, request, queryset):
+        updated = queryset.update(send_enabled=True)
+        self.message_user(request, f'{updated} destinatarios habilitados para envío.')
+    habilitar_envio.short_description = "Habilitar envío"
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('campaign', 'client')
+
+
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(admin.ModelAdmin):
+    """Administrador para templates de email"""
+    list_display = ['name', 'campaign_type', 'year', 'month', 'giftcard_amount', 'is_active', 'created_at']
+    list_filter = ['campaign_type', 'year', 'month', 'is_active']
+    search_fields = ['name', 'subject']
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('name', 'campaign_type', 'is_active')
+        }),
+        ('Configuración', {
+            'fields': ('year', 'month', 'giftcard_amount')
+        }),
+        ('Contenido', {
+            'fields': ('subject', 'body_html')
+        }),
+        ('Metadatos', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+    readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(EmailDeliveryLog)
+class EmailDeliveryLogAdmin(admin.ModelAdmin):
+    """Administrador para logs de entrega de email"""
+    list_display = ['recipient', 'status', 'sent_at', 'delivered_at', 'provider_response']
+    list_filter = ['status', 'sent_at', 'campaign']
+    search_fields = ['recipient__email', 'recipient__name', 'provider_response']
+    readonly_fields = ['sent_at', 'delivered_at', 'opened_at', 'clicked_at']
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('campaign', 'recipient')
+
+
+@admin.register(EmailBlacklist)
+class EmailBlacklistAdmin(admin.ModelAdmin):
+    """Administrador para lista negra de emails"""
+    list_display = ['email', 'reason', 'created_at', 'is_active']
+    list_filter = ['reason', 'is_active', 'created_at']
+    search_fields = ['email', 'reason']
+    readonly_fields = ['created_at']

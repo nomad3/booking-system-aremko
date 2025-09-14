@@ -554,11 +554,15 @@ def get_giftcard_email_template(giftcard_amount=15000):
             </div>
             
             <div class="instructions">
-                <h4>Para reclamar tu giftcard, simplemente:</h4>
+                <h4>📞 ¿Cómo cobrar la Gift Card?</h4>
+                <p style="margin: 0 0 15px 0; color: #555; font-size: 1.1em;">
+                    <strong>Escribe por WhatsApp al +56 9 5790 2525 o por correo a ventas@aremko.cl</strong> 
+                    para solicitar tu reserva y hacer uso de esta gift card.
+                </p>
                 <ol>
-                    <li>Reserva tu cita para septiembre por whatsapp</li>
+                    <li>Contacta por WhatsApp o email para reservar tu cita en septiembre</li>
                     <li>Menciona "Giftcard Enero 2025" al hacer tu reserva</li>
-                    <li>¡Disfruta de $15.000 de descuento!</li>
+                    <li>¡Disfruta de $15.000 de descuento en tu servicio!</li>
                 </ol>
             </div>
             
