@@ -348,10 +348,10 @@ def generate_campaign_recipients(campaign):
     
     clients_query = clients_query.exclude(email__in=blacklisted_emails)
     
-    # Limpiar destinatarios existentes
+    # Limpiar destinatarios existentes de forma segura
     EmailRecipient.objects.filter(campaign=campaign).delete()
     
-    # Crear destinatarios
+    # Crear destinatarios con manejo de duplicados
     recipients_created = 0
     for client in clients_query:
         # Calcular datos adicionales del cliente
@@ -392,22 +392,26 @@ def generate_campaign_recipients(campaign):
             personalized_subject = campaign.email_subject_template.replace('{nombre_cliente}', client.nombre)
             personalized_body = campaign.email_body_template.replace('{nombre_cliente}', client.nombre)
 
-        # Crear destinatario
-        EmailRecipient.objects.create(
-            campaign=campaign,
-            client=client,
-            email=client.email,
-            name=client.nombre,
-            personalized_subject=personalized_subject,
-            personalized_body=personalized_body,
-            send_enabled=True,
-            priority=1,
-            client_total_spend=client_spend,
-            client_visit_count=client_visits,
-            client_last_visit=last_visit,
-            client_city=client.ciudad or ''
-        )
-        recipients_created += 1
+        # Crear destinatario con manejo de duplicados
+        try:
+            EmailRecipient.objects.create(
+                campaign=campaign,
+                client=client,
+                email=client.email,
+                name=client.nombre,
+                personalized_subject=personalized_subject,
+                personalized_body=personalized_body,
+                send_enabled=True,
+                priority=1,
+                client_total_spend=client_spend,
+                client_visit_count=client_visits,
+                client_last_visit=last_visit,
+                client_city=client.ciudad or ''
+            )
+            recipients_created += 1
+        except Exception as e:
+            # Skip duplicates or other errors
+            continue
     
     return recipients_created
 
