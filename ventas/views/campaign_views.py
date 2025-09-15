@@ -300,11 +300,14 @@ def generate_campaign_recipients(campaign):
         email__gt=''
     ).exclude(email='').distinct()
     
-    # Filtros opcionales por gasto
+    # Filtros opcionales por gasto (SOLO del mes específico)
     if 'spend_min' in criteria or 'spend_max' in criteria:
-        # Calcular gasto total por cliente
+        # Calcular gasto total por cliente SOLO en el mes especificado
         clients_with_spend = clients_query.annotate(
-            total_spend=Sum('ventareserva__total')
+            total_spend=Sum(
+                'ventareserva__total',
+                filter=Q(ventareserva__reservaservicios__fecha_agendamiento__range=(month_start, month_end))
+            )
         )
         
         if 'spend_min' in criteria:
@@ -465,10 +468,13 @@ def preview_campaign_recipients(campaign):
         email__gt=''
     ).exclude(email='').distinct()
     
-    # Aplicar filtros opcionales
+    # Aplicar filtros opcionales (SOLO del mes específico)
     if 'spend_min' in criteria or 'spend_max' in criteria:
         clients_with_spend = clients_query.annotate(
-            total_spend=Sum('ventareserva__total')
+            total_spend=Sum(
+                'ventareserva__total',
+                filter=Q(ventareserva__reservaservicios__fecha_agendamiento__range=(month_start, month_end))
+            )
         )
         
         if 'spend_min' in criteria:
