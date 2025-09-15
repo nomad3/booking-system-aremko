@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404
 from ..models import Servicio, CategoriaServicio, HomepageConfig # Relative import, ADD HomepageConfig
 
+
 def homepage_view(request):
     """
     Vista que renderiza la página de inicio pública de Aremko.cl
@@ -42,6 +43,9 @@ def homepage_view(request):
         pass
     # --- End Fetch Homepage Config ---
 
+    # Canonical URL for SEO
+    canonical_url = request.build_absolute_uri(request.path)
+
     context = {
         'servicios': servicios,
         'categorias': categorias,
@@ -51,8 +55,10 @@ def homepage_view(request):
         'gallery_image_1_url': gallery_image_1_url,   # Add gallery 1 URL to context
         'gallery_image_2_url': gallery_image_2_url,   # Add gallery 2 URL to context
         'gallery_image_3_url': gallery_image_3_url,   # Add gallery 3 URL to context
+        'canonical_url': canonical_url,
     }
     return render(request, 'ventas/homepage.html', context)
+
 
 def categoria_detail_view(request, categoria_id):
     """
@@ -63,10 +69,15 @@ def categoria_detail_view(request, categoria_id):
     servicios = Servicio.objects.filter(categoria=categoria, activo=True, publicado_web=True)
     categorias = CategoriaServicio.objects.all() # For potential navigation/filtering
 
+    canonical_url = request.build_absolute_uri(request.path)
+    category_hero_image = categoria.imagen.url if categoria.imagen else None
+
     context = {
         'categoria_actual': categoria,
         'servicios': servicios,
         'categorias': categorias,
-        'cart': request.session.get('cart', {'servicios': [], 'total': 0}) # Include cart context
+        'cart': request.session.get('cart', {'servicios': [], 'total': 0}), # Include cart context
+        'canonical_url': canonical_url,
+        'category_hero_image': category_hero_image,
     }
     return render(request, 'ventas/category_detail.html', context)

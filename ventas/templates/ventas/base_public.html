@@ -5,22 +5,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Aremko{% endblock %}</title>
-    
+    {% block meta_description %}{% endblock %}
+    {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
+    {% block meta_og %}{% endblock %}
+    {% block meta_twitter %}{% endblock %}
+    {% block structured_data %}{% endblock %}
+
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
+
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet">
-    
+
     <!-- Flatpickr for date picker -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
     <!-- Link to your custom modern CSS -->
     <link rel="stylesheet" href="{% static 'css/modern.css' %}">
-    
+
     <!-- Custom CSS (Inline styles - consider moving more to modern.css) -->
     <style>
         :root {
@@ -32,7 +37,7 @@
             --background: #FAF0E6;     /* Linen (Off-white/Beige) */
             --white: #ffffff;          /* White (Keep for high contrast) */
         }
-        
+
         body {
             font-family: 'Nunito', sans-serif;
             background-color: var(--background);
@@ -42,22 +47,40 @@
             min-height: 100vh;
         }
 
+        .whatsapp-fab {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: #25D366;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 1050;
+            text-decoration: none;
+        }
+        .whatsapp-fab:hover { opacity: 0.9; }
+
         main {
             flex: 1;
         }
-        
+
         .navbar-brand {
             font-weight: 700;
             color: var(--primary-color) !important;
         }
-        
+
         .section-title {
             text-align: center;
             margin-bottom: 40px;
             font-weight: 700;
             color: var(--dark-gray);
         }
-        
+
         .card {
             border-radius: 12px;
             overflow: hidden;
@@ -66,38 +89,38 @@
             margin-bottom: 30px;
             border: none;
         }
-        
+
         .card:hover {
             transform: translateY(-5px);
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
         }
-        
+
         .card-img-top {
             height: 200px;
             object-fit: cover;
         }
-        
+
         .card-body {
             padding: 20px;
         }
-        
+
         .card-title {
             font-weight: 700;
             margin-bottom: 10px;
         }
-        
+
         .card-text {
             color: var(--light-gray);
             margin-bottom: 15px;
         }
-        
+
         .price {
             font-weight: 700;
             color: var(--primary-color);
             font-size: 1.2rem;
             margin-bottom: 15px;
         }
-        
+
         .btn-primary {
             background-color: var(--primary-color);
             border-color: var(--primary-color);
@@ -105,12 +128,12 @@
             font-weight: 600;
             padding: 10px 20px;
         }
-        
+
         .btn-primary:hover {
             background-color: #ff3a40;
             border-color: #ff3a40;
         }
-        
+
         .btn-secondary {
             background-color: var(--secondary-color);
             border-color: var(--secondary-color);
@@ -118,7 +141,7 @@
             font-weight: 600;
             padding: 10px 20px;
         }
-        
+
         .btn-secondary:hover {
             background-color: #008f86;
             border-color: #008f86;
@@ -133,55 +156,55 @@
              background-color: var(--secondary-color);
              color: var(--white);
         }
-        
+
         .footer {
             background-color: var(--dark-gray);
             color: white;
             padding: 50px 0 20px;
             margin-top: auto; /* Push footer to bottom */
         }
-        
+
         .footer h5 {
             font-weight: 700;
             margin-bottom: 20px;
         }
-        
+
         .footer ul {
             list-style: none;
             padding-left: 0;
         }
-        
+
         .footer ul li {
             margin-bottom: 10px;
         }
-        
+
         .footer ul li a {
             color: #ddd;
             text-decoration: none;
         }
-        
+
         .footer ul li a:hover {
             color: white;
         }
-        
+
         .social-icons {
             font-size: 1.5rem;
             margin-right: 15px;
         }
-        
+
         .copyright {
             margin-top: 30px;
             padding-top: 20px;
             border-top: 1px solid #666;
             text-align: center;
         }
-        
+
         /* Shopping Cart Styles */
         .cart-icon {
             position: relative;
             cursor: pointer;
         }
-        
+
         .cart-count {
             position: absolute;
             top: -8px;
@@ -197,7 +220,7 @@
             font-size: 0.7rem;
             font-weight: 700;
         }
-        
+
         .cart-dropdown {
             position: absolute;
             right: 0;
@@ -210,11 +233,11 @@
             z-index: 1000;
             display: none; /* Hidden by default, shown via JS */
         }
-        
+
         .cart-dropdown.show {
             display: block;
         }
-        
+
         .cart-item {
             display: flex;
             justify-content: space-between;
@@ -222,37 +245,37 @@
             padding: 10px 0;
             border-bottom: 1px solid #eee;
         }
-        
+
         .cart-item-details {
             flex: 1;
             margin-right: 10px;
         }
-        
+
         .cart-item-title {
             font-weight: 600;
             margin-bottom: 5px;
         }
-        
+
         .cart-item-info {
             font-size: 0.8rem;
             color: var(--light-gray);
         }
-        
+
         .cart-item-price {
             font-weight: 700;
             color: var(--primary-color);
         }
-        
+
         .cart-item-remove {
             color: var(--light-gray);
             cursor: pointer;
             margin-left: 10px;
         }
-        
+
         .cart-item-remove:hover {
             color: var(--primary-color);
         }
-        
+
         .cart-total {
             display: flex;
             justify-content: space-between;
@@ -260,23 +283,23 @@
             padding: 15px 0;
             font-weight: 700;
         }
-        
+
         .modal-body {
             padding: 30px;
         }
-        
+
         .booking-form label {
             font-weight: 600;
             margin-bottom: 5px;
         }
-        
+
         .booking-form .form-control,
         .booking-form .form-select {
             border-radius: 8px;
             padding: 10px 15px;
             margin-bottom: 20px;
         }
-        
+
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .cart-dropdown {
@@ -333,7 +356,7 @@
                         </a>
                         <!-- Cart Dropdown can be added here if needed globally, or kept page-specific -->
                     </div>
-                    
+
                     {% if user.is_authenticated %}
                         <span class="navbar-text me-3">Hola, {{ user.username }}</span>
                         <a href="{% url 'logout' %}" class="btn btn-outline-secondary btn-sm">Salir</a>
@@ -444,7 +467,7 @@
                             <label for="checkoutDocumento" class="form-label">ID/DNI/Passport/RUT (opcional)</label>
                             <input type="text" class="form-control" id="checkoutDocumento" name="documento_identidad">
                         </div>
-                        
+
                         <div class="mb-4">
                             <h6>Resumen de la Reserva</h6>
                             <div id="checkoutModalItems">
@@ -488,9 +511,13 @@
     </div>
     {% endblock modals %}
 
+    <a href="https://wa.me/5697902525?text=Hola%20Aremko%2C%20quisiera%20informaci%C3%B3n%20y%20reservar" class="whatsapp-fab" target="_blank" rel="noopener" aria-label="Contactar por WhatsApp">
+        <i class="fab fa-whatsapp" style="font-size: 28px;"></i>
+    </a>
+
     <!-- Bootstrap JS Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <!-- Flatpickr JS -->
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script> <!-- Spanish locale -->
@@ -521,14 +548,14 @@
 
         // Function to complete checkout (now global)
         function completeCheckout() {
-            console.log("Attempting checkout..."); 
+            console.log("Attempting checkout...");
             const nombre = document.getElementById('checkoutNombre').value; // Use updated ID
             const email = document.getElementById('checkoutEmail').value;   // Use updated ID
             const telefono = document.getElementById('checkoutTelefono').value; // Use updated ID
             const documento_identidad = document.getElementById('checkoutDocumento').value; // Use updated ID
             const csrfToken = getCookie('csrftoken');
-            console.log("CSRF Token for checkout:", csrfToken); 
-            
+            console.log("CSRF Token for checkout:", csrfToken);
+
             if (!csrfToken) {
                 console.error("CSRF Token not found!");
                 alert("Error de seguridad. Intenta recargar la página.");
@@ -539,14 +566,14 @@
                 alert('Por favor, completa todos los campos obligatorios.');
                 return;
             }
-            
+
             // Crear FormData para enviar
             const formData = new FormData();
             formData.append('nombre', nombre);
             formData.append('email', email);
             formData.append('telefono', telefono);
             formData.append('documento_identidad', documento_identidad);
-            
+
             console.log("Sending checkout request to:", '{% url "ventas:complete_checkout" %}'); {# Added ventas: namespace #}
             // Enviar petición AJAX
             fetch('{% url "ventas:complete_checkout" %}', { {# Added ventas: namespace #}
@@ -557,7 +584,7 @@
                 }
             })
             .then(response => {
-                 console.log("Checkout response status:", response.status); 
+                 console.log("Checkout response status:", response.status);
                  if (!response.ok) {
                     // Log error response text
                     return response.text().then(text => {
@@ -567,14 +594,14 @@
                  return response.json();
             })
             .then(data => {
-                console.log("Checkout response data:", data); 
+                console.log("Checkout response data:", data);
                 if (data && data.success) { // Check if data and data.success exist
                     // Cerrar modal de checkout
                     const checkoutModalEl = document.getElementById('checkoutModal');
                     if (checkoutModalEl) {
                         const checkoutModalInstance = bootstrap.Modal.getInstance(checkoutModalEl);
                         // Check if instance exists before hiding
-                        if (checkoutModalInstance) { 
+                        if (checkoutModalInstance) {
                             checkoutModalInstance.hide();
                             console.log("Checkout modal hidden.");
                         } else {
@@ -583,17 +610,17 @@
                     } else {
                          console.error("Checkout modal element not found.");
                     }
-                    
+
                     // Actualizar ID de reserva en el modal de éxito
                     const reservaIdSpan = document.getElementById('reservaId');
                     if(reservaIdSpan) {
                         // Check if reserva_id exists in data
-                        reservaIdSpan.textContent = data.reserva_id ? data.reserva_id : 'N/A'; 
+                        reservaIdSpan.textContent = data.reserva_id ? data.reserva_id : 'N/A';
                         console.log("Reserva ID set in success modal:", data.reserva_id);
                     } else {
                          console.error("Reserva ID span element not found in success modal.");
                     }
-                    
+
                     // Mostrar modal de éxito
                     const successModalEl = document.getElementById('successModal');
                      if (successModalEl) {
@@ -610,7 +637,7 @@
                      }
                      // Optionally clear cart display if needed here
                      const cartCount = document.getElementById('cartCount');
-                     if (cartCount) cartCount.textContent = '0'; 
+                     if (cartCount) cartCount.textContent = '0';
 
                 } else {
                     alert('Error al procesar la reserva: ' + (data ? data.error : 'Respuesta inválida del servidor')); // Improved error message
@@ -689,7 +716,7 @@
                 phoneInput.addEventListener('blur', function() { // Trigger on blur (losing focus)
                     const phoneNumber = this.value.trim();
                     // Basic validation - adjust length check as needed for Chilean numbers
-                    if (phoneNumber.length >= 9) { 
+                    if (phoneNumber.length >= 9) {
                         if(loadingIndicator) loadingIndicator.style.display = 'block'; // Show loading
 
                         // Construct the API URL
@@ -732,7 +759,6 @@
                  console.error("One or more checkout form fields not found for phone lookup.");
             }
             // --- End Client Lookup ---
-
         });
     </script>
     {# Page specific script goes here, outside the main script tag #}

@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize', # Add humanize app
+    'django.contrib.sitemaps', # Enable sitemaps
     'ventas',
     'rest_framework',
     'rest_framework.authtoken',

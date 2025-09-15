@@ -1,0 +1,5 @@
+# ai.txt - Metadata for AI crawlers
+site: {{ request.scheme }}://{{ request.get_host }}
+owner: AREMKO Spa
+contact: aremkospa@gmail.com
+sitemap: {{ request.scheme }}://{{ request.get_host }}{% url 'django.contrib.sitemaps.views.sitemap' %}

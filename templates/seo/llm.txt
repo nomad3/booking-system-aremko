@@ -1,0 +1,5 @@
+# llm.txt - Guidance for LLM crawlers
+site: {{ request.scheme }}://{{ request.get_host }}
+policy: index,follow
+rate-limit: 5rps
+sitemap: {{ request.scheme }}://{{ request.get_host }}{% url 'django.contrib.sitemaps.views.sitemap' %}
