@@ -1378,9 +1378,10 @@ class EmailCampaign(models.Model):
     schedule_config = models.JSONField(default=dict, verbose_name="Configuración de horarios")
     # Estructura del JSON schedule_config:
     # {
-    #     "start_time": "08:00", "end_time": "18:00",
-    #     "batch_size": 2, "interval_minutes": 6,
-    #     "timezone": "America/Santiago"
+    #     "start_time": "08:00", "end_time": "21:00",
+    #     "batch_size": 1, "interval_minutes": 3,
+    #     "timezone": "America/Santiago",
+    #     "ai_enabled": true, "ai_timeout": 5
     # }
     
     # Template de email

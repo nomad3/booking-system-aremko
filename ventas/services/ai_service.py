@@ -22,8 +22,8 @@ class AIContentVariationService:
         self.api_key = os.getenv('DEEPSEEK_API_KEY')
         self.model = os.getenv('DEEPSEEK_MODEL', 'deepseek-chat')
         self.provider = os.getenv('AI_VARIATION_PROVIDER', 'deepseek')
-        # TEMPORALMENTE DESHABILITADO por timeouts
-        self.enabled = False  # os.getenv('AI_VARIATION_ENABLED', 'true').lower() == 'true'
+        # Habilitar IA con configuración mejorada
+        self.enabled = os.getenv('AI_VARIATION_ENABLED', 'true').lower() == 'true'
         self.base_url = "https://api.deepseek.com/v1"
         
         if not self.api_key and self.enabled:
@@ -215,7 +215,7 @@ Responde SOLO con el contenido procesado.
                 f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=data,
-                timeout=15  # Reducir timeout a 15 segundos
+                timeout=5  # Timeout ultra corto para envío en tiempo real
             )
             
             if response.status_code == 200:
@@ -243,6 +243,47 @@ Responde SOLO con el contenido procesado.
         except Exception as e:
             logger.error(f"Error inesperado en _call_ai_api: {e}")
             return None
+    
+    def generate_realtime_variations(self, subject_template: str, body_template: str, 
+                                   client_name: str, client_data: Dict = None) -> Tuple[str, str]:
+        """
+        Genera variaciones únicas en tiempo real para cada email individual
+        Optimizado para envío uno por uno con timeout corto
+        """
+        client_data = client_data or {}
+        
+        # Personalización básica como fallback
+        personalized_subject = subject_template.replace('{nombre_cliente}', client_name)
+        personalized_body = body_template.replace('{nombre_cliente}', client_name)
+        
+        if not self.enabled:
+            return personalized_subject, personalized_body
+        
+        try:
+            # IA rápida con timeout de 5s - solo variación de asunto
+            subject_variations = self.generate_subject_variations(personalized_subject, 1)
+            if subject_variations and subject_variations[0]:
+                personalized_subject = subject_variations[0]
+            
+            # Solo aplicar variación de cuerpo si el asunto fue exitoso
+            if subject_variations:
+                ai_body = self.generate_body_variations(personalized_body, client_name)
+                if ai_body:
+                    personalized_body = ai_body
+                    
+                    # Anti-spam solo si todo fue exitoso
+                    if os.getenv('AI_ANTI_SPAM_ENABLED', 'true').lower() == 'true':
+                        anti_spam_body = self.apply_anti_spam_techniques(personalized_body)
+                        if anti_spam_body:
+                            personalized_body = anti_spam_body
+            
+            logger.info(f"✅ IA exitosa para {client_name}")
+            
+        except Exception as e:
+            logger.warning(f"IA falló para {client_name}, usando contenido básico: {e}")
+            # Usar personalización básica sin fallar
+        
+        return personalized_subject, personalized_body
     
     def get_status(self) -> Dict:
         """Retorna el estado del servicio de IA"""

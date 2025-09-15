@@ -206,35 +206,81 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'✅ Procesados {processed} emails de la campaña {campaign.name}'))
 
     def send_email(self, recipient, dry_run=False):
-        """Envía un email individual"""
+        """Envía un email individual con IA en tiempo real"""
+        
+        # NUEVA ARQUITECTURA: Generar variaciones únicas con IA en tiempo real
+        from ventas.services.ai_service import ai_service
+        
+        # Verificar si la campaña tiene IA habilitada
+        ai_enabled = (
+            recipient.campaign.ai_variation_enabled and 
+            ai_service.enabled and
+            recipient.campaign.schedule_config.get('ai_enabled', True)
+        )
+        
+        if ai_enabled:
+            # IA en tiempo real con timeout de 5s
+            try:
+                final_subject, final_body = ai_service.generate_realtime_variations(
+                    recipient.personalized_subject,  # Template crudo
+                    recipient.personalized_body,     # Template crudo  
+                    recipient.name,
+                    {
+                        'total_spend': recipient.client_total_spend,
+                        'visit_count': recipient.client_visit_count,
+                        'last_visit': recipient.client_last_visit,
+                        'city': recipient.client_city
+                    }
+                )
+                ai_used = True
+                self.stdout.write(f'🤖 IA aplicada: {recipient.email}')
+            except Exception as e:
+                # Fallback a personalización básica
+                final_subject = recipient.personalized_subject.replace('{nombre_cliente}', recipient.name)
+                final_body = recipient.personalized_body.replace('{nombre_cliente}', recipient.name)
+                ai_used = False
+                self.stdout.write(f'⚠️ IA falló, usando básico: {recipient.email} - {e}')
+        else:
+            # Sin IA - solo personalización básica
+            final_subject = recipient.personalized_subject.replace('{nombre_cliente}', recipient.name)
+            final_body = recipient.personalized_body.replace('{nombre_cliente}', recipient.name)
+            ai_used = False
+        
         if dry_run:
-            self.stdout.write(f'📧 [DRY-RUN] {recipient.email}: {recipient.personalized_subject[:50]}...')
+            indicator = "🤖" if ai_used else "📧"
+            self.stdout.write(f'{indicator} [DRY-RUN] {recipient.email}: {final_subject[:50]}...')
             return True
         
         try:
-            # Crear email
+            # Crear email con contenido final
             msg = EmailMultiAlternatives(
-                subject=recipient.personalized_subject,
-                body=recipient.personalized_body,  # Fallback text
+                subject=final_subject,
+                body=final_body,  # Fallback text
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[recipient.email]
             )
             
             # Agregar contenido HTML
-            msg.attach_alternative(recipient.personalized_body, "text/html")
+            msg.attach_alternative(final_body, "text/html")
             
             # Enviar
             result = msg.send()
             
             if result:
-                self.stdout.write(f'✅ {recipient.email}')
+                indicator = "🤖✅" if ai_used else "📧✅"
+                self.stdout.write(f'{indicator} {recipient.email}')
+                
+                # Actualizar contenido enviado en el recipient
+                recipient.personalized_subject = final_subject
+                recipient.personalized_body = final_body
+                recipient.save()
                 
                 # Log de entrega
                 EmailDeliveryLog.objects.create(
                     recipient=recipient,
                     campaign=recipient.campaign,
                     log_type='send_attempt',
-                    smtp_response='Email sent successfully'
+                    smtp_response=f'Email sent successfully (AI: {ai_used})'
                 )
                 
                 return True
