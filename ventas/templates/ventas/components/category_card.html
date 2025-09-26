@@ -1,0 +1,38 @@
+{% with categoria.nombre|lower as lower_nombre %}
+    {% if "tina" in lower_nombre %}
+        {% with "fas fa-hot-tub" as icon_class %}
+            <div class="category-card category-filter {% if active %}active{% endif %}" data-category="{{ categoria.id }}" data-category-name="{{ categoria.nombre }}">
+                <div class="category-icon"><i class="{{ icon_class }}"></i></div>
+                <div class="category-name">{{ categoria.nombre }}</div>
+            </div>
+        {% endwith %}
+    {% elif "masaje" in lower_nombre %}
+        {% with "fas fa-hand-sparkles" as icon_class %}
+            <div class="category-card category-filter {% if active %}active{% endif %}" data-category="{{ categoria.id }}" data-category-name="{{ categoria.nombre }}">
+                <div class="category-icon"><i class="{{ icon_class }}"></i></div>
+                <div class="category-name">{{ categoria.nombre }}</div>
+            </div>
+        {% endwith %}
+    {% elif "alojamiento" in lower_nombre or "cabaña" in lower_nombre %}
+        {% with "fas fa-bed" as icon_class %}
+            <div class="category-card category-filter {% if active %}active{% endif %}" data-category="{{ categoria.id }}" data-category-name="{{ categoria.nombre }}">
+                <div class="category-icon"><i class="{{ icon_class }}"></i></div>
+                <div class="category-name">{{ categoria.nombre }}</div>
+            </div>
+        {% endwith %}
+    {% elif "promo" in lower_nombre %}
+        {% with "fas fa-tags" as icon_class %}
+            <div class="category-card category-filter {% if active %}active{% endif %}" data-category="{{ categoria.id }}" data-category-name="{{ categoria.nombre }}">
+                <div class="category-icon"><i class="{{ icon_class }}"></i></div>
+                <div class="category-name">{{ categoria.nombre }}</div>
+            </div>
+        {% endwith %}
+    {% else %}
+        {% with "fas fa-spa" as icon_class %}
+            <div class="category-card category-filter {% if active %}active{% endif %}" data-category="{{ categoria.id }}" data-category-name="{{ categoria.nombre }}">
+                <div class="category-icon"><i class="{{ icon_class }}"></i></div>
+                <div class="category-name">{{ categoria.nombre }}</div>
+            </div>
+        {% endwith %}
+    {% endif %}
+{% endwith %}

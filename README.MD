@@ -12,6 +12,8 @@ Sistema integral para la gestión de reservas de servicios y productos, compleme
 - [Características Principales](#características-principales)
   - [Sistema de Reservas](#sistema-de-reservas)
   - [Funcionalidades CRM](#funcionalidades-crm)
+  - [Comunicaciones Inteligentes (SMS + Email)](#comunicaciones-inteligentes-sms--email)
+  - [Reportes y Exportaciones](#reportes-y-exportaciones)
 - [Tecnologías Utilizadas](#tecnologías-utilizadas)
 - [Prerequisitos](#prerequisitos)
 - [Instalación Local](#instalación-local)
@@ -21,9 +23,13 @@ Sistema integral para la gestión de reservas de servicios y productos, compleme
 - [Creación de Superusuario](#creación-de-superusuario)
 - [Migraciones de Base de Datos](#migraciones-de-base-de-datos)
 - [Uso](#uso)
+- [Integraciones](#integraciones)
+- [API y Automatización](#api-y-automatización)
+- [Comandos de Gestión](#comandos-de-gestión)
 - [Buenas Prácticas](#buenas-prácticas)
 - [Recursos Adicionales](#recursos-adicionales)
  - [Módulo IA](#módulo-ia)
+- [Variables de Entorno Clave](#variables-de-entorno-clave)
 
 ---
 
@@ -66,6 +72,25 @@ Sistema integral para la gestión de reservas de servicios y productos, compleme
 - **Gestión de Actividades:** Seguimiento de actividades relacionadas con contactos, leads o deals (llamadas, reuniones, tareas).
 - **Integraciones:** (Mencionar si existen, ej: ManyChat, Google Calendar, N8N para automatizaciones).
 - **Reportes CRM:** (Mencionar si existen reportes específicos de CRM).
+
+### Comunicaciones Inteligentes (SMS + Email)
+- **Confirmaciones de reserva (dual):** Envío automático de SMS y Email al crear la reserva, con plantilla y datos del servicio/fecha/hora.
+- **Recordatorios de cita (24h antes):** Envío automático (Email + SMS opcional) evitando duplicados.
+- **Pago 100% confirmado:** Notificación dual cuando la reserva queda pagada al 100%.
+- **Encuesta de satisfacción (D+1):** Email y SMS opcional con link a encuesta y referencia TripAdvisor.
+- **Reactivación 90 días:** Email y SMS con Gift Card de CLP $10.000 y control de frecuencia trimestral.
+- **Cumpleaños:** SMS de saludo 1 vez/año por cliente.
+- **Newsletter segmentado:** Envío de emails personalizados por segmento (ej. VIP mensual).
+- **Anti‑Spam y preferencias:** Límites por cliente (diario/mensual/semana), horarios preferidos y opt‑out granular por tipo de mensaje.
+- **Logs y auditoría:** `CommunicationLog` con estados, costos y trazabilidad por reserva/campaña.
+- **Plantillas SMS:** `SMSTemplate` con variables dinámicas y activación por tipo.
+
+### Reportes y Exportaciones
+- **Servicios vendidos:** Filtros por fecha/categoría/venta y exportación a Excel.
+- **Productos vendidos:** Totales por proveedor/producto y exportación a Excel.
+- **Caja diaria:** Totales por método de pago y usuario; vista especial para recepcionistas.
+- **Auditoría de movimientos:** Historial filtrable de `MovimientoCliente` con paginación.
+- **Segmentación de clientes:** Tablero por segmentos (nuevo, regular, VIP; bajo/medio/alto gasto) y lista por segmento.
 
 ---
 
@@ -235,7 +260,50 @@ Las migraciones de Django son esenciales para mantener la estructura de la base 
 
 - **Panel de Administración:** `https://<tu_dominio>/admin/` (Gestiona productos, servicios, clientes, campañas, etc.)
 - **Interfaz Pública:** `https://<tu_dominio>/` (Portal para clientes, reservas)
-- **API Endpoints:** (Si existen, listar las rutas base, ej: `https://<tu_dominio>/api/`)
+- **Reportes:**
+  - `https://<tu_dominio>/servicios-vendidos/`
+  - `https://<tu_dominio>/productos-vendidos/`
+  - `https://<tu_dominio>/caja-diaria/` y `.../caja-diaria-recepcionistas/`
+  - `https://<tu_dominio>/auditoria-movimientos/`
+  - `https://<tu_dominio>/reportes/segmentacion-clientes/` y `.../<segment_name>/`
+- **API Endpoints (DRF base):** `https://<tu_dominio>/` + router (ver sección API y Automatización)
+
+---
+
+## Integraciones
+
+- **Flow.cl (Pagos):** Creación de órdenes, webhook de confirmación y página de retorno. Al confirmar pago (status=2) se crea `Pago` y se actualiza `VentaReserva`.
+- **Redvoiss (SMS):** Envío individual y masivo, mensajes con respuesta, consulta de estado de lote y respuestas. Limpieza/validación de teléfonos chilenos.
+- **Google Calendar:** Creación de eventos en calendario a partir de reservas.
+- **ManyChat:** Punto de integración preparado para notificaciones de reserva.
+- **n8n/Automatización:** Endpoints para obtener targets de campaña y registrar actividades/interacciones externas.
+
+---
+
+## API y Automatización
+
+- **Router DRF:**
+  - `api/proveedores`, `api/categorias`, `api/productos`, `api/ventasreservas`, `api/pagos`, `api/clientes`, `api/servicios`, `api/categorias-servicio`, `api/reservaproductos`, `api/reservaservicios`.
+- **Búsqueda/Utilidades:**
+  - `api/get-client-details/?telefono=<numero>`
+- **Pagos Flow:**
+  - `api/flow/create/` (POST) — inicia pago.
+  - `payment/confirmation/` (POST webhook) — confirma pago.
+  - `payment/return/` (GET) — retorno usuario.
+- **Remarketing/Automación (proteger con `X-API-KEY`):**
+  - `api/campaigns/<id>/details/` (GET)
+  - `api/campaigns/<id>/targets/` (GET)
+  - `api/activities/log/` (POST)
+  - `api/interactions/log/` (POST)
+
+---
+
+## Comandos de Gestión
+
+- `python manage.py create_default_sms_templates` — Crea plantillas base de SMS.
+- `python manage.py send_communication_triggers` — Ejecuta tareas programadas (recordatorios, encuestas, cumpleaños, reactivación, newsletter VIP).
+- `python manage.py normalize_and_merge_clients` — Normaliza/mergea clientes desde fuentes externas.
+- `python manage.py test_redvoiss` — Pruebas de conectividad/flujo con Redvoiss.
 
 ---
 
@@ -269,3 +337,20 @@ Consulta el diseño funcional y técnico del Módulo IA (Fase 1: Chat IA de nego
 - `docs/modulo_ia.md`
 
 Este módulo está planificado para añadir capacidades de análisis, personalización y apoyo a marketing, con foco en seguridad (solo lectura para consultas) y control de costos.
+
+---
+
+## Variables de Entorno Clave
+
+- **SMS/Email (Anti‑Spam y Preferencias):**
+  - `COMMUNICATION_SMS_ENABLED=true`
+  - `SMS_DAILY_LIMIT_PER_CLIENT=2`, `SMS_MONTHLY_LIMIT_PER_CLIENT=8`
+  - `EMAIL_WEEKLY_LIMIT_PER_CLIENT=1`, `EMAIL_MONTHLY_LIMIT_PER_CLIENT=4`
+  - `SURVEY_PUBLIC_BASE_URL`, `TRIPADVISOR_URL`
+- **Redvoiss:**
+  - `REDVOISS_API_URL`, `REDVOISS_USERNAME`, `REDVOISS_PASSWORD`
+- **Flow:**
+  - `FLOW_API_KEY`, `FLOW_SECRET_KEY`, `FLOW_CREATE_API_URL`, `FLOW_STATUS_API_URL`, `FLOW_CONFIRMATION_URL`, `FLOW_RETURN_URL`
+- **Automatización:**
+  - `AUTOMATION_API_KEY` (protege endpoints n8n)
+- **IA (si aplica):** ver sección `Módulo IA` para `DEEPSEEK_API_KEY` y límites de costo.

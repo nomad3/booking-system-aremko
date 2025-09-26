@@ -1,0 +1,19 @@
+<section class="philosophy-section py-5">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6 mb-4 mb-lg-0">
+                <h2 class="section-title text-start mb-3" style="text-align: left !important;">Vive la Experiencia Aremko</h2>
+                <p class="lead">Más que un spa, somos un refugio para el alma. En Aremko, creemos en el poder sanador de la naturaleza y la desconexión. Nuestra filosofía se centra en ofrecerte un espacio de paz donde puedas renovar tu energía, cuidar tu cuerpo y calmar tu mente.</p>
+                <p>Desde masajes terapéuticos hasta la inmersión en nuestras tinajas calientes bajo las estrellas, cada detalle está pensado para tu máximo bienestar. Ven y descubre por qué nuestros visitantes nos eligen como su escape perfecto en Puerto Varas.</p>
+                <a href="#servicios" class="btn btn-outline-primary">Explora Nuestros Servicios</a>
+            </div>
+            <div class="col-lg-6">
+                {% if philosophy_image_url %}
+                    <img src="{{ philosophy_image_url }}" class="img-fluid rounded shadow-sm" alt="Ambiente relajante en Aremko Spa" loading="lazy">
+                {% else %}
+                    <img src="https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=1740&q=80" class="img-fluid rounded shadow-sm" alt="Ambiente relajante en Aremko Spa" loading="lazy">
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
