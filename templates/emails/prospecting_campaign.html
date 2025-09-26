@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aremko Hotel Spa - Espacios Empresariales</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .tagline {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px 25px;
+        }
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        .main-text {
+            font-size: 16px;
+            margin-bottom: 25px;
+            line-height: 1.7;
+        }
+        .highlight {
+            background-color: #e8f4fd;
+            padding: 20px;
+            border-left: 4px solid #3498db;
+            margin: 25px 0;
+            border-radius: 5px;
+        }
+        .services {
+            margin: 25px 0;
+        }
+        .service-item {
+            display: flex;
+            align-items: center;
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .service-icon {
+            width: 40px;
+            height: 40px;
+            background-color: #3498db;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            color: white;
+            font-weight: bold;
+        }
+        .cta-section {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 16px;
+            transition: transform 0.3s ease;
+        }
+        .contact-info {
+            background-color: #2c3e50;
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        .contact-item {
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .footer {
+            background-color: #34495e;
+            color: #bdc3c7;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+        }
+        .location {
+            color: #3498db;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">AREMKO HOTEL SPA</div>
+            <div class="tagline">Reuniones con Resultados: Productividad + Bienestar</div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content">
+            <div class="greeting">
+                Estimad@ {{ nombre }}{% if empresa %} de {{ empresa }}{% endif %},
+            </div>
+
+            <div class="main-text">
+                ¿Sabías que las mejores decisiones empresariales se toman en espacios que inspiran creatividad y bienestar? 
+                En <strong>Aremko Hotel Spa</strong>, ubicado en pleno corazón de Puerto Varas, hemos creado el ambiente 
+                perfecto para que tu equipo alcance su máximo potencial.
+            </div>
+
+            <div class="highlight">
+                <strong>🎯 Oferta Especial Los Lagos:</strong> Para empresas de la región de Los Lagos, 
+                ofrecemos paquetes personalizados que combinan productividad empresarial con el poder 
+                regenerador de la naturaleza patagónica.
+            </div>
+
+            <!-- Services -->
+            <div class="services">
+                <div class="service-item">
+                    <div class="service-icon">🍽️</div>
+                    <div>
+                        <strong>Desayuno Gourmet Sureño:</strong> Productos locales premium que energizan 
+                        y conectan a tu equipo con la esencia de la región.
+                    </div>
+                </div>
+                
+                <div class="service-item">
+                    <div class="service-icon">💼</div>
+                    <div>
+                        <strong>Sala de Reuniones Premium:</strong> Espacio para 20 personas con tecnología 
+                        de vanguardia y vista al bosque nativo que estimula la creatividad.
+                    </div>
+                </div>
+                
+                <div class="service-item">
+                    <div class="service-icon">🛁</div>
+                    <div>
+                        <strong>Tinas Calientes al Río:</strong> El cierre perfecto para fortalecer vínculos, 
+                        liberar tensiones y generar esas conversaciones que transforman equipos.
+                    </div>
+                </div>
+            </div>
+
+            <div class="main-text">
+                <strong>¿Por qué elegir Aremko para tu próxima reunión empresarial?</strong>
+                <br><br>
+                ✅ <strong>Productividad comprobada:</strong> Nuestros clientes reportan un 40% más de engagement en reuniones<br>
+                ✅ <strong>Ubicación estratégica:</strong> A solo 20 minutos del centro de Puerto Varas<br>
+                ✅ <strong>Experiencia integral:</strong> Desde la llegada hasta la despedida, cuidamos cada detalle<br>
+                ✅ <strong>ROI inmediato:</strong> Equipos más motivados, decisiones más claras, resultados excepcionales
+            </div>
+
+            <!-- CTA -->
+            <div class="cta-section">
+                <a href="https://aremko.cl/empresas" class="cta-button">
+                    📅 Reservar mi Reunión Empresarial
+                </a>
+                <div style="margin-top: 15px; font-size: 14px; color: #666;">
+                    O responde este email para una propuesta personalizada
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Info -->
+        <div class="contact-info">
+            <div class="contact-item">
+                <strong>📧 ventas@aremko.cl</strong>
+            </div>
+            <div class="contact-item">
+                <strong>📱 +56 9 5790 2525</strong>
+            </div>
+            <div class="contact-item">
+                <span class="location">📍 Camino Ensenada Km 6, Puerto Varas - Región de Los Lagos</span>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div>
+                Aremko Hotel Spa | RUT: 76.485.192-7<br>
+                Este email fue enviado porque consideramos que nuestros servicios empresariales 
+                pueden ser de valor para {{ empresa|default:"su organización" }}.
+            </div>
+            <div style="margin-top: 10px; font-size: 11px;">
+                Si no deseas recibir más emails como este, 
+                <a href="mailto:ventas@aremko.cl?subject=Dar de baja email {{ email }}" style="color: #3498db;">
+                    haz clic aquí para darte de baja
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
