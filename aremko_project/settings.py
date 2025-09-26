@@ -26,7 +26,14 @@ if ALLOWED_HOSTS_ENV:
     ALLOWED_HOSTS = ALLOWED_HOSTS_ENV.split(',')
 else:
     # Fallback para producción en Render
-    ALLOWED_HOSTS = ['aremko-booking-system.onrender.com', '.onrender.com', 'localhost', '127.0.0.1']
+    ALLOWED_HOSTS = [
+        'aremko-booking-system.onrender.com', 
+        'aremko-booking-system-prod.onrender.com',  # Dominio de producción actual
+        '.onrender.com', 
+        'localhost', 
+        '127.0.0.1',
+        'testserver'  # Para testing
+    ]
 
 # CSRF_TRUSTED_ORIGINS para HTTPS
 CSRF_TRUSTED_ORIGINS_ENV = os.getenv('CSRF_TRUSTED_ORIGINS', '')

@@ -43,8 +43,11 @@ def homepage_view(request):
         pass
     # --- End Fetch Homepage Config ---
 
-    # Canonical URL for SEO
-    canonical_url = request.build_absolute_uri(request.path)
+    # Canonical URL for SEO (build safely)
+    try:
+        canonical_url = request.build_absolute_uri(request.path)
+    except Exception:
+        canonical_url = request.path
 
     context = {
         'servicios': servicios,
@@ -69,7 +72,12 @@ def categoria_detail_view(request, categoria_id):
     servicios = Servicio.objects.filter(categoria=categoria, activo=True, publicado_web=True)
     categorias = CategoriaServicio.objects.all() # For potential navigation/filtering
 
-    canonical_url = request.build_absolute_uri(request.path)
+    # Build canonical URL safely
+    try:
+        canonical_url = request.build_absolute_uri(request.path)
+    except Exception:
+        canonical_url = request.path
+    
     category_hero_image = categoria.imagen.url if categoria.imagen else None
 
     context = {

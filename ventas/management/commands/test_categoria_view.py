@@ -64,11 +64,12 @@ class Command(BaseCommand):
             categoria = CategoriaServicio.objects.get(id=categoria_id)
             self.stdout.write(f"✅ Categoría encontrada: {categoria.nombre}")
             
-            # Crear request simulado
+            # Crear request simulado con host válido
             factory = RequestFactory()
-            request = factory.get(f'/categoria/{categoria_id}/')
+            request = factory.get(f'/categoria/{categoria_id}/', SERVER_NAME='localhost')
             request.user = AnonymousUser()
             request.session = {}
+            request.META['HTTP_HOST'] = 'localhost'
             
             # Probar la vista
             self.stdout.write("🧪 Ejecutando vista categoria_detail_view...")
