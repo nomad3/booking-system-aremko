@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 import dj_database_url
 
+# Configuración para despliegue en Render
 logger = logging.getLogger(__name__)
 
 # Ruta base del proyecto
