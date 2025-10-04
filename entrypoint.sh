@@ -84,6 +84,7 @@ EOF
 echo "Recolectando archivos estáticos..."
 python manage.py collectstatic --noinput
 
-# Iniciar Gunicorn para servir la aplicación, binding explicitly to port 8000, 1 worker, optimized logging
-echo "Iniciando Gunicorn en 0.0.0.0:8000 con 1 worker, timeout 120s, log-level warning..."
-exec gunicorn aremko_project.wsgi:application --bind 0.0.0.0:8000 --workers 1 --timeout 120 --log-level warning
+# Iniciar Gunicorn para servir la aplicación, usando el puerto asignado por Render
+PORT=${PORT:-8000}
+echo "Iniciando Gunicorn en 0.0.0.0:$PORT con 1 worker, timeout 120s, log-level warning..."
+exec gunicorn aremko_project.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level warning
