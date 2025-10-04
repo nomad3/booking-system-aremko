@@ -30,6 +30,8 @@ else:
     ALLOWED_HOSTS = [
         'aremko-booking-system.onrender.com', 
         'aremko-booking-system-prod.onrender.com',  # Dominio de producción actual
+        'www.aremko.cl',  # Dominio personalizado
+        'aremko.cl',  # Dominio personalizado sin www
         '.onrender.com', 
         'localhost', 
         '127.0.0.1',
@@ -41,7 +43,12 @@ CSRF_TRUSTED_ORIGINS_ENV = os.getenv('CSRF_TRUSTED_ORIGINS', '')
 if CSRF_TRUSTED_ORIGINS_ENV:
     CSRF_TRUSTED_ORIGINS = CSRF_TRUSTED_ORIGINS_ENV.split(',')
 else:
-    CSRF_TRUSTED_ORIGINS = []
+    # Fallback para producción en Render
+    CSRF_TRUSTED_ORIGINS = [
+        'https://www.aremko.cl',
+        'https://aremko.cl',
+        'https://aremko-booking-system-prod.onrender.com',
+    ]
 
 # Aplicaciones instaladas
 INSTALLED_APPS = [
