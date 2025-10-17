@@ -9,6 +9,203 @@
 <meta name="description" content="Descubre Aremko, tu spa en Puerto Varas. Ofrecemos masajes relajantes, tinajas calientes privadas y alojamiento confortable en la Región de Los Lagos. ¡Reserva tu escapada!">
 {% endblock %}
 
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SpaOrSalon",
+      "@id": "{{ request.scheme }}://{{ request.get_host }}/#business",
+      "name": "Aremko Spa Puerto Varas",
+      "alternateName": "AREMKO Spa",
+      "url": "{{ request.scheme }}://{{ request.get_host }}",
+      "logo": "{{ request.scheme }}://{{ request.get_host }}/static/images/logo.png",
+      "image": [
+        "{{ request.scheme }}://{{ request.get_host }}/static/images/aremko-spa.jpg",
+        "{{ request.scheme }}://{{ request.get_host }}/static/images/tinajas-calientes.jpg"
+      ],
+      "description": "Spa boutique en Puerto Varas ofreciendo masajes relajantes, tinajas calientes privadas con vista al lago y alojamiento confortable. Escapadas románticas y experiencias de wellness en el corazón de la Región de Los Lagos.",
+      "telephone": "+56-9-1234-5678",
+      "email": "aremkospa@gmail.com",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "",
+        "addressLocality": "Puerto Varas",
+        "addressRegion": "Región de Los Lagos",
+        "postalCode": "",
+        "addressCountry": "CL"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "-41.3190",
+        "longitude": "-72.9797"
+      },
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday"
+          ],
+          "opens": "09:00",
+          "closes": "21:00"
+        }
+      ],
+      "priceRange": "$$-$$$",
+      "currenciesAccepted": "CLP",
+      "paymentAccepted": "Transferencia Bancaria, Mercado Pago, Flow",
+      "amenityFeature": [
+        {
+          "@type": "LocationFeatureSpecification",
+          "name": "Tinajas Calientes Privadas",
+          "value": true
+        },
+        {
+          "@type": "LocationFeatureSpecification",
+          "name": "Vista al Lago",
+          "value": true
+        },
+        {
+          "@type": "LocationFeatureSpecification",
+          "name": "Alojamiento",
+          "value": true
+        },
+        {
+          "@type": "LocationFeatureSpecification",
+          "name": "Estacionamiento",
+          "value": true
+        }
+      ],
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Servicios de Spa y Alojamiento",
+        "itemListElement": [
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Masajes Relajantes",
+              "description": "Masajes terapéuticos y relajantes con aceites esenciales"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Tinajas Calientes",
+              "description": "Tinajas calientes privadas con vista panorámica al lago"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Alojamiento en Cabañas",
+              "description": "Cabañas equipadas para estadía confortable"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Paquetes Románticos",
+              "description": "Experiencias especiales para parejas"
+            }
+          }
+        ]
+      },
+      "sameAs": [
+        "https://www.instagram.com/aremkospa",
+        "https://www.facebook.com/aremkospa"
+      ],
+      "areaServed": {
+        "@type": "GeoCircle",
+        "geoMidpoint": {
+          "@type": "GeoCoordinates",
+          "latitude": "-41.3190",
+          "longitude": "-72.9797"
+        },
+        "geoRadius": "100000"
+      },
+      "slogan": "Tu escapada de relax en Puerto Varas"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "{{ request.scheme }}://{{ request.get_host }}/#website",
+      "url": "{{ request.scheme }}://{{ request.get_host }}",
+      "name": "Aremko Spa Puerto Varas",
+      "description": "Sistema de reservas online para Aremko Spa",
+      "publisher": {
+        "@id": "{{ request.scheme }}://{{ request.get_host }}/#business"
+      },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "{{ request.scheme }}://{{ request.get_host }}/?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      },
+      "inLanguage": "es-CL"
+    },
+    {
+      "@type": "TouristAttraction",
+      "name": "Aremko Spa Experience",
+      "description": "Experiencia única de spa y wellness en Puerto Varas con tinajas calientes, masajes y alojamiento",
+      "touristType": [
+        "Parejas",
+        "Familias",
+        "Turistas de Wellness"
+      ],
+      "isAccessibleForFree": false,
+      "publicAccess": true,
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Puerto Varas",
+        "addressRegion": "Región de Los Lagos",
+        "addressCountry": "CL"
+      }
+    },
+    {
+      "@type": "LodgingBusiness",
+      "name": "Aremko Alojamiento",
+      "description": "Cabañas y alojamiento confortable integrado con servicios de spa",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Puerto Varas",
+        "addressRegion": "Región de Los Lagos",
+        "addressCountry": "CL"
+      },
+      "checkinTime": "15:00",
+      "checkoutTime": "12:00",
+      "petsAllowed": "false",
+      "starRating": {
+        "@type": "Rating",
+        "ratingValue": "4.5"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Inicio",
+          "item": "{{ request.scheme }}://{{ request.get_host }}"
+        }
+      ]
+    }
+  ]
+}
+</script>
+{% endblock %}
+
 {% block extra_style %}
 <style>
 /* Homepage specific styles */
