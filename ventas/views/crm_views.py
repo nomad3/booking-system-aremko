@@ -120,9 +120,15 @@ def generar_propuesta(request, cliente_id):
         except:
             estilo = request.POST.get('estilo', 'formal')
 
+        # Log para debugging
+        logger.info(f"Generando propuesta para cliente {cliente_id} con estilo: {estilo}")
+
         # Usar servicio de IA local
         ai_service = get_ai_service()
         propuesta = ai_service.generar_propuesta(cliente_id, estilo=estilo)
+
+        # Log de confirmación
+        logger.info(f"Propuesta generada exitosamente con estilo: {estilo}")
 
         return JsonResponse({
             'success': True,

@@ -203,6 +203,8 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
         Genera propuesta básica basada en reglas de negocio (fallback)
         Soporta dos estilos: formal y cálido
         """
+        logger.info(f"_generar_propuesta_basica llamada con estilo: {estilo}")
+
         cliente = perfil['cliente']
         metricas = perfil['metricas']
         segmentacion = perfil['segmentacion']
@@ -260,7 +262,9 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
             }
 
         # Email HTML según estilo
+        logger.info(f"Generando email con estilo: {estilo}")
         if estilo == "calido":
+            logger.info("→ Usando template CÁLIDO")
             # Email cálido y emocional con storytelling - estilo muy personal
             # Construir narrativa de servicios específicos
             servicios_narrativa = ""
@@ -336,6 +340,7 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
             </html>
             """
         else:
+            logger.info("→ Usando template FORMAL")
             # Email formal y profesional
             email_body = f"""
             <html>
