@@ -261,45 +261,75 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
 
         # Email HTML según estilo
         if estilo == "calido":
-            # Email cálido y emocional con storytelling
-            servicios_texto = "".join([f"· {cat['service_type']}" for cat in categorias[:2]])
+            # Email cálido y emocional con storytelling - estilo muy personal
+            # Construir narrativa de servicios específicos
+            servicios_narrativa = ""
+            if categorias:
+                for cat in categorias[:2]:
+                    if 'Cabaña' in cat['service_type'] or 'cabaña' in cat['service_type'].lower():
+                        veces = cat['cantidad']
+                        servicios_narrativa += f"las {veces} escapadas inolvidables que viviste en nuestras cabañas rodeadas de naturaleza"
+                    elif 'Tina' in cat['service_type'] or 'tinaja' in cat['service_type'].lower():
+                        veces = cat['cantidad']
+                        if servicios_narrativa:
+                            servicios_narrativa += f", y los momentos de relajo que disfrutaste en nuestras tinajas calientes privadas en {veces} ocasiones"
+                        else:
+                            servicios_narrativa += f"los {veces} momentos de relajo en nuestras tinajas calientes privadas"
+                    elif 'Masaje' in cat['service_type']:
+                        veces = cat['cantidad']
+                        if servicios_narrativa:
+                            servicios_narrativa += f", además de {veces} sesiones de masajes relajantes"
+                        else:
+                            servicios_narrativa += f"las {veces} sesiones de masajes que tanto disfrutaste"
+
+            if not servicios_narrativa:
+                servicios_narrativa = f"las {metricas['total_servicios']} veces que nos has visitado"
+
+            # Ofertas diferenciadas por categoría
+            ofertas_texto = """<strong>15% de descuento</strong> en tu próxima experiencia en tinaja caliente privada o en una estadía en nuestras cabañas (¡tú eliges la forma de relajarte!).<br><br>
+                    <strong>10% de descuento</strong> en cualquier masaje de nuestro spa, para que complementes tu descanso como te mereces."""
+
             email_body = f"""
             <html>
-            <body style="font-family: 'Georgia', serif; line-height: 1.8; color: #444;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(to bottom, #f9f7f4 0%, #ffffff 100%);">
-                    <h2 style="color: #8B4513; font-weight: 300; margin-bottom: 5px;">Hola {nombre_cliente},</h2>
-                    <p style="color: #999; font-size: 14px; font-style: italic; margin-top: 0;">Un saludo cálido desde Puerto Varas 🌿</p>
+            <body style="font-family: 'Georgia', serif; line-height: 1.8; color: #333; background-color: #fafafa;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 30px 20px; background-color: #ffffff;">
+                    <h2 style="color: #2c5530; font-weight: 400; margin-bottom: 20px;">Hola {nombre_cliente},</h2>
 
-                    <p>Recordamos cada visita que nos has hecho... Esas {metricas['total_servicios']} ocasiones en las que decidiste regalarte tiempo para ti. Nos emociona ver que has encontrado en Aremko tu refugio de bienestar.</p>
-
-                    <p>Sabemos lo mucho que disfrutas {servicios_texto}. Cada vez que te vemos relajarte en nuestras instalaciones, confirmamos que estamos cumpliendo nuestra misión: crear momentos inolvidables.</p>
-
-                    <div style="background: #fff8f0; padding: 20px; margin: 25px 0; border-left: 4px solid #d2691e; border-radius: 0 8px 8px 0;">
-                        <h3 style="color: #8B4513; font-weight: 300; margin-top: 0;">Pensamos en ti y creamos esto:</h3>
-                        {"".join([f'''
-                        <div style="margin: 20px 0;">
-                            <p style="font-size: 18px; color: #8B4513; margin-bottom: 8px;"><strong>{rec["service_name"]}</strong></p>
-                            <p style="color: #666; font-style: italic; margin: 5px 0;">{rec["reason"]}</p>
-                            <p style="color: #999; font-size: 14px;">Valor estimado: ${rec["estimated_price"]:,}</p>
-                        </div>
-                        ''' for rec in recommendations])}
-                    </div>
-
-                    <div style="background: linear-gradient(135deg, #8B4513 0%, #d2691e 100%); color: white; padding: 25px; margin: 25px 0; border-radius: 8px; text-align: center;">
-                        <h3 style="margin-top: 0; font-weight: 300;">✨ Este mes, algo especial para ti</h3>
-                        <p style="font-size: 16px; line-height: 1.6;">{offer["description"]}</p>
-                        <p style="font-size: 24px; margin: 15px 0; font-weight: bold;">{offer["discount"]}</p>
-                        <p style="font-size: 14px; opacity: 0.9;">Válido durante noviembre 2024</p>
-                    </div>
-
-                    <p style="text-align: center; margin: 30px 0;">
-                        <a href="https://www.aremko.cl/reservas" style="display: inline-block; background: #8B4513; color: white; padding: 15px 35px; text-decoration: none; border-radius: 30px; font-size: 16px; box-shadow: 0 4px 10px rgba(139, 69, 19, 0.3);">Reservar Mi Momento Especial</a>
+                    <p style="font-size: 16px; line-height: 1.8; margin-bottom: 20px;">
+                        Espero que te encuentres muy bien. Nos llena de alegría recordar {servicios_narrativa}.
+                        Cada visita tuya nos ha permitido conocerte mejor y saber lo que más te hace feliz.
                     </p>
 
-                    <p style="color: #666; font-size: 15px; line-height: 1.7; margin-top: 40px;">
-                        Te esperamos con los brazos abiertos en tu segundo hogar de descanso. Queremos seguir siendo parte de esos momentos que te hacen bien.<br><br>
+                    <p style="font-size: 16px; line-height: 1.8; margin-bottom: 25px;">
+                        Por eso, en agradecimiento a tu lealtad, <strong>este mes de noviembre</strong> queremos tener un detalle especial contigo:
+                    </p>
+
+                    <div style="background-color: #f8f5f0; border-left: 4px solid #8B7355; padding: 20px; margin: 25px 0;">
+                        <p style="font-size: 16px; line-height: 1.8; margin: 0;">
+                            {ofertas_texto}
+                        </p>
+                    </div>
+
+                    <p style="font-size: 16px; line-height: 1.8; margin-bottom: 20px;">
+                        Estos beneficios son válidos durante <strong>todo el mes de noviembre</strong>. Aprovecha esta oportunidad para regalarte el descanso que tanto necesitas antes de que termine el año.
+                    </p>
+
+                    <p style="font-size: 16px; line-height: 1.8; margin-bottom: 25px;">
+                        Sabes que para nosotros <strong>no eres un cliente más; eres parte de la familia Aremko</strong>. Nos encantaría volver a verte pronto disfrutando y relajándote como en tus visitas anteriores.
+                    </p>
+
+                    <p style="font-size: 16px; line-height: 1.8; margin-bottom: 30px;">
+                        Si te animas a otra escapada, aquí te estaremos esperando con los brazos abiertos, listos para brindarte una vez más una experiencia inolvidable.
+                    </p>
+
+                    <div style="text-align: center; margin: 35px 0;">
+                        <a href="https://www.aremko.cl" style="display: inline-block; background-color: #2c5530; color: white; padding: 14px 40px; text-decoration: none; border-radius: 4px; font-size: 16px; font-weight: 500;">Reservar Ahora</a>
+                    </div>
+
+                    <p style="font-size: 15px; line-height: 1.7; color: #666; margin-top: 40px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
                         Con cariño,<br>
-                        <strong style="color: #8B4513;">Todo el equipo de Aremko</strong> 💚
+                        <strong style="color: #2c5530;">El equipo de Aremko</strong><br>
+                        <span style="font-size: 14px; color: #999;">Puerto Varas, Chile</span>
                     </p>
                 </div>
             </body>
