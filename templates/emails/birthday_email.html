@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡Feliz Cumpleaños! - Aremko</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        .confetti {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="50" font-size="20">🎊</text></svg>') repeat;
+            opacity: 0.1;
+            top: 0;
+            left: 0;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 20px;
+            position: relative;
+            z-index: 2;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        .title {
+            color: #e91e63;
+            font-size: 32px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        .birthday-message {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a6f);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            margin: 25px 0;
+            font-size: 18px;
+            position: relative;
+            z-index: 2;
+        }
+        .gift-box {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 25px 0;
+            position: relative;
+            z-index: 2;
+        }
+        .gift-code {
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 25px;
+            display: inline-block;
+            margin-top: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+        .cake {
+            text-align: center;
+            font-size: 40px;
+            margin: 20px 0;
+            position: relative;
+            z-index: 2;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+            position: relative;
+            z-index: 2;
+        }
+        .contact-info {
+            margin-top: 15px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="confetti"></div>
+        
+        <div class="header">
+            <div class="logo">🏨 AREMKO</div>
+            <h1 class="title">🎉 ¡FELIZ CUMPLEAÑOS!</h1>
+        </div>
+
+        <div class="cake">🎂</div>
+
+        <div class="birthday-message">
+            <h2 style="margin: 0 0 15px 0;">¡Feliz cumpleaños, {{ nombre }}! 🎈</h2>
+            <p style="margin: 0; font-size: 16px;">
+                En este día tan especial, queremos celebrar contigo y agradecerte por ser parte de la familia Aremko.
+            </p>
+        </div>
+
+        <div class="gift-box">
+            <h3 style="margin: 0 0 15px 0;">🎁 ¡Tenemos un regalo para ti!</h3>
+            <p style="margin: 0 0 15px 0;">Disfruta de un descuento especial en tu próxima reserva:</p>
+            <div class="gift-code">CUMPLE{{ nombre|upper }}25</div>
+            <p style="margin: 15px 0 0 0; font-size: 14px;">*Válido por 30 días - 25% de descuento</p>
+        </div>
+
+        <p style="text-align: center; font-size: 16px; margin: 25px 0; position: relative; z-index: 2;">
+            <strong>Esperamos verte pronto para celebrar juntos</strong><br>
+            ¡Que tengas un día lleno de alegría y momentos especiales! 🌟
+        </p>
+
+        <div style="text-align: center; margin: 25px 0; position: relative; z-index: 2;">
+            <span style="font-size: 24px;">🎊 🎈 🎂 🎁 🎉</span>
+        </div>
+
+        <div class="footer">
+            <strong>Con cariño,</strong><br>
+            <strong>Todo el equipo de Aremko</strong><br>
+            <div class="contact-info">
+                📧 ventas@aremko.cl | 📞 +56 9 5865 5810<br>
+                🌐 www.aremko.cl
+            </div>
+            <p style="margin-top: 15px; font-size: 12px; color: #adb5bd;">
+                ¡Esperamos que tengas un cumpleaños increíble! 🎂✨
+            </p>
+        </div>
+    </div>
+</body>
+</html>

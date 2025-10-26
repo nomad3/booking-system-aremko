@@ -1,0 +1,134 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4">
+  <div class="page-header mb-4">
+    <h1>{{ title }}</h1>
+    <p>Sube un CSV con columnas: nombre,email,celular,rubro,ciudad,empresa. Envía prueba y si todo bien, se preparan los envíos (goteo 1/10min).</p>
+  </div>
+
+  {% if messages %}
+  <div class="mb-3">
+    {% for m in messages %}
+      <div class="alert alert-{{ m.tags }}">{{ m }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">Asunto</label>
+          <input class="form-control" type="text" name="subject" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Cuerpo (HTML)</label>
+          <textarea class="form-control" name="body" rows="10" placeholder="Use [Nombre] para personalizar" required></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Archivo CSV</label>
+          <input class="form-control" type="file" name="csv_file" accept=".csv" required>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" name="send_test" id="send_test" checked>
+          <label class="form-check-label" for="send_test">Enviar prueba a</label>
+          <input class="form-control" type="email" name="test_email" value="ecolonco@gmail.com" style="max-width:320px; display:inline-block; margin-left:8px;">
+        </div>
+        <button class="btn btn-modern btn-primary-modern" type="submit">Subir y preparar</button>
+        <a class="btn btn-modern btn-secondary-modern" href="{% url 'ventas:admin_section_crm' %}">Volver</a>
+      </form>
+    </div>
+  </div>
+
+  {% if progress %}
+  <div class="card">
+    <div class="card-body">
+      <h5>Progreso de Campaña</h5>
+      <p>Estado: <strong>
+        {% if progress.status == 'running' %}
+          🔄 Procesando CSV...
+        {% elif progress.status == 'completed_seeding' %}
+          ✅ Cola preparada - Enviando automáticamente
+        {% elif progress.status == 'done_seed' %}
+          ✅ Completado
+        {% else %}
+          {{ progress.status }}
+        {% endif %}
+      </strong></p>
+      
+      {% if progress.message %}
+        <div class="alert alert-info">{{ progress.message }}</div>
+      {% endif %}
+      
+      {% if progress.test_sent %}
+        <div class="alert alert-success">
+          {% if progress.test_sent == True %}
+            📧 Email de prueba enviado correctamente
+          {% else %}
+            ⚠️ {{ progress.test_sent }}
+          {% endif %}
+        </div>
+      {% endif %}
+      
+      <div class="progress mb-3" style="height: 20px;">
+        {% if progress.total and progress.total > 0 %}
+          {% widthratio progress.queued progress.total 100 as percentage %}
+          <div class="progress-bar bg-success" role="progressbar" style="width: {{ percentage }}%;" aria-valuemin="0" aria-valuemax="100">{{ percentage }}%</div>
+        {% else %}
+          <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuemin="0" aria-valuemax="100">0%</div>
+        {% endif %}
+      </div>
+      
+      <div class="row">
+        <div class="col-md-3">
+          <strong>Total CSV:</strong><br>
+          <span class="badge bg-primary">{{ progress.total|default:0 }}</span>
+        </div>
+        <div class="col-md-3">
+          <strong>En Cola:</strong><br>
+          <span class="badge bg-success">{{ progress.queued|default:0 }}</span>
+        </div>
+        <div class="col-md-3">
+          <strong>Pendientes:</strong><br>
+          <span class="badge bg-warning">{{ progress.pending|default:0 }}</span>
+        </div>
+        <div class="col-md-3">
+          <strong>Fallidos:</strong><br>
+          <span class="badge bg-danger">{{ progress.failed|default:0 }}</span>
+        </div>
+      </div>
+      
+      {% if progress.auto_send_error %}
+        <div class="alert alert-warning mt-3">
+          ⚠️ {{ progress.auto_send_error }}
+        </div>
+      {% endif %}
+      
+      <div class="mt-3">
+        <small class="text-muted">
+          💡 El goteo automático envía emails cada 10 minutos. 
+          <a href="javascript:location.reload()" class="btn btn-sm btn-outline-primary">🔄 Actualizar Estado</a>
+        </small>
+      </div>
+      
+      {% if progress.status == 'completed_seeding' and progress.pending > 0 %}
+        <div class="alert alert-info mt-3">
+          <strong>🚀 Campaña Activa:</strong> Se están enviando {{ progress.pending }} emails automáticamente cada 10 minutos.
+          <br><small>Tiempo estimado: ~{{ progress.pending|floatformat:0 }} × 10 min = {% widthratio progress.pending 1 10 %} minutos total</small>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+

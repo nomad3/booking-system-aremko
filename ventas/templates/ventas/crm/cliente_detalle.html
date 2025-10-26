@@ -1,0 +1,450 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ cliente.nombre }} - Perfil Cliente{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header con Acciones -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2 mb-1">{{ cliente.nombre }}</h1>
+                    <p class="text-muted mb-0">
+                        Perfil 360° del Cliente
+                        {% if perfil.segmentacion.rfm_segment %}
+                        <span class="badge
+                            {% if perfil.segmentacion.is_vip %}bg-warning
+                            {% elif perfil.segmentacion.en_riesgo %}bg-danger
+                            {% else %}bg-info
+                            {% endif %}
+                        ">
+                            {{ perfil.segmentacion.rfm_segment }}
+                        </span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    <a href="{% url 'crm_buscar' %}" class="btn btn-outline-secondary me-2">
+                        <i class="fas fa-arrow-left"></i> Volver
+                    </a>
+                    <button
+                        type="button"
+                        class="btn btn-primary"
+                        onclick="generarPropuesta()"
+                        id="btnGenerar"
+                    >
+                        <i class="fas fa-magic"></i> Generar Propuesta
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-success"
+                        onclick="enviarPropuesta()"
+                        id="btnEnviar"
+                    >
+                        <i class="fas fa-envelope"></i> Enviar por Email
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información del Cliente -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-user"></i> Información de Contacto</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="text-muted small">Teléfono</label>
+                        <div>
+                            <i class="fas fa-phone text-primary"></i>
+                            <strong>{{ cliente.telefono|default:"No registrado" }}</strong>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted small">Email</label>
+                        <div>
+                            <i class="fas fa-envelope text-primary"></i>
+                            {{ cliente.email|default:"No registrado" }}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted small">Ciudad</label>
+                        <div>
+                            <i class="fas fa-map-marker-alt text-primary"></i>
+                            {{ cliente.ciudad|default:"No registrado" }}
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-muted small">País</label>
+                        <div>
+                            <i class="fas fa-flag text-primary"></i>
+                            {{ cliente.pais|default:"No registrado" }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Métricas del Cliente -->
+        <div class="col-md-8">
+            <div class="row">
+                <!-- Total Servicios -->
+                <div class="col-md-4 mb-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-shopping-bag fa-2x text-primary mb-2"></i>
+                            <h3 class="mb-0">{{ perfil.metricas.total_servicios }}</h3>
+                            <small class="text-muted">Total Servicios</small>
+                            <div class="mt-2">
+                                <small class="text-info d-block">
+                                    <i class="fas fa-history"></i> {{ perfil.metricas.servicios_historicos }} históricos
+                                </small>
+                                <small class="text-success d-block">
+                                    <i class="fas fa-calendar-check"></i> {{ perfil.metricas.servicios_actuales }} actuales
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gasto Total -->
+                <div class="col-md-4 mb-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-dollar-sign fa-2x text-success mb-2"></i>
+                            <h3 class="mb-0">${{ perfil.metricas.gasto_total|floatformat:0 }}</h3>
+                            <small class="text-muted">Gasto Total</small>
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    Ticket promedio: ${{ perfil.metricas.ticket_promedio|floatformat:0 }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cliente Desde -->
+                <div class="col-md-4 mb-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-calendar-alt fa-2x text-info mb-2"></i>
+                            <h3 class="mb-0">{{ perfil.metricas.dias_como_cliente }}</h3>
+                            <small class="text-muted">Días como Cliente</small>
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    Desde: {{ perfil.metricas.primer_servicio|date:"d/m/Y" }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categorías Favoritas -->
+            {% if perfil.categorias_favoritas %}
+            <div class="card border-0 shadow-sm mt-3">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-star"></i> Categorías Favoritas</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for cat in perfil.categorias_favoritas %}
+                        <div class="col-md-4 mb-2">
+                            <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                <div>
+                                    <strong>{{ cat.service_type }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ cat.cantidad }} servicios</small>
+                                </div>
+                                <div class="text-end">
+                                    <small>${{ cat.gasto|floatformat:0 }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Área de Propuesta Personalizada -->
+    <div class="row mb-4" id="propuestaArea" style="display: none;">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-magic"></i> Propuesta Personalizada con IA
+                    </h5>
+                </div>
+                <div class="card-body" id="propuestaContent">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Generando propuesta...</span>
+                        </div>
+                        <p class="mt-3 text-muted">Generando propuesta personalizada...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historial Reciente -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-history"></i> Historial Reciente</h5>
+                        <small class="text-muted">
+                            Último servicio: {{ perfil.metricas.ultimo_servicio|date:"d/m/Y" }}
+                        </small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if perfil.historial_reciente %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Servicio</th>
+                                    <th>Tipo</th>
+                                    <th class="text-center">Cantidad</th>
+                                    <th class="text-end">Precio</th>
+                                    <th class="text-center">Fuente</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for servicio in perfil.historial_reciente %}
+                                <tr>
+                                    <td>{{ servicio.fecha|date:"d/m/Y" }}</td>
+                                    <td>{{ servicio.servicio }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ servicio.tipo }}</span>
+                                    </td>
+                                    <td class="text-center">{{ servicio.cantidad }}</td>
+                                    <td class="text-end">
+                                        <strong>${{ servicio.precio|floatformat:0 }}</strong>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if servicio.fuente == 'histórico' %}
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-history"></i> Histórico
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-calendar-check"></i> Actual
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">No hay historial de servicios disponible.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const clienteId = {{ cliente.id }};
+
+    // Generar propuesta con IA
+    function generarPropuesta() {
+        const btnGenerar = document.getElementById('btnGenerar');
+        const propuestaArea = document.getElementById('propuestaArea');
+        const propuestaContent = document.getElementById('propuestaContent');
+
+        // Mostrar área de propuesta con loading
+        propuestaArea.style.display = 'block';
+        propuestaContent.innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Generando...</span>
+                </div>
+                <p class="mt-3 text-muted">Analizando perfil del cliente y generando propuesta personalizada...</p>
+            </div>
+        `;
+
+        // Deshabilitar botón
+        btnGenerar.disabled = true;
+        btnGenerar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
+
+        // Hacer request al API
+        fetch(`/ventas/crm/cliente/${clienteId}/propuesta/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                mostrarPropuesta(data.propuesta);
+            } else {
+                throw new Error(data.error || 'Error generando propuesta');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            propuestaContent.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <strong>Error:</strong> ${error.message}
+                </div>
+            `;
+        })
+        .finally(() => {
+            btnGenerar.disabled = false;
+            btnGenerar.innerHTML = '<i class="fas fa-magic"></i> Generar Propuesta';
+        });
+    }
+
+    // Mostrar propuesta generada
+    function mostrarPropuesta(propuesta) {
+        const propuestaContent = document.getElementById('propuestaContent');
+
+        let html = `
+            <div class="mb-4">
+                <h6 class="text-primary"><i class="fas fa-lightbulb"></i> Insights del Cliente</h6>
+                <div class="bg-light p-3 rounded">
+                    ${propuesta.insights ? formatInsights(propuesta.insights) : '<p class="mb-0">No hay insights disponibles</p>'}
+                </div>
+            </div>
+        `;
+
+        if (propuesta.recommendations && propuesta.recommendations.length > 0) {
+            html += `
+                <div class="mb-4">
+                    <h6 class="text-primary"><i class="fas fa-star"></i> Servicios Recomendados</h6>
+                    <div class="row">
+            `;
+            propuesta.recommendations.forEach(rec => {
+                html += `
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-success">
+                            <div class="card-body">
+                                <h6 class="card-title">${rec.service_name}</h6>
+                                <p class="card-text small">${rec.reason}</p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="badge bg-success">Confianza: ${(rec.confidence * 100).toFixed(0)}%</span>
+                                    ${rec.estimated_price ? `<strong class="text-success">$${rec.estimated_price.toLocaleString()}</strong>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `
+                    </div>
+                </div>
+            `;
+        }
+
+        if (propuesta.offer) {
+            html += `
+                <div class="mb-4">
+                    <h6 class="text-primary"><i class="fas fa-gift"></i> Oferta Especial</h6>
+                    <div class="alert alert-success">
+                        <h5>${propuesta.offer.title}</h5>
+                        <p>${propuesta.offer.description}</p>
+                        ${propuesta.offer.discount ? `<p class="mb-0"><strong>Descuento: ${propuesta.offer.discount}</strong></p>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        if (propuesta.email_body) {
+            html += `
+                <div>
+                    <h6 class="text-primary"><i class="fas fa-envelope"></i> Vista Previa del Email</h6>
+                    <div class="border rounded p-3 bg-white">
+                        ${propuesta.email_body}
+                    </div>
+                </div>
+            `;
+        }
+
+        propuestaContent.innerHTML = html;
+    }
+
+    function formatInsights(insights) {
+        let html = '<ul class="mb-0">';
+        for (const [key, value] of Object.entries(insights)) {
+            html += `<li><strong>${key}:</strong> ${value}</li>`;
+        }
+        html += '</ul>';
+        return html;
+    }
+
+    // Enviar propuesta por email
+    function enviarPropuesta() {
+        if (!confirm('¿Estás seguro de enviar la propuesta por email a {{ cliente.nombre }}?')) {
+            return;
+        }
+
+        const btnEnviar = document.getElementById('btnEnviar');
+        btnEnviar.disabled = true;
+        btnEnviar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+
+        fetch(`/ventas/crm/cliente/${clienteId}/enviar/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`✅ Propuesta enviada exitosamente a ${data.email}`);
+                // Opcionalmente mostrar la propuesta enviada
+                if (document.getElementById('propuestaArea').style.display === 'none') {
+                    generarPropuesta();
+                }
+            } else {
+                throw new Error(data.error || 'Error enviando propuesta');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('❌ Error enviando propuesta: ' + error.message);
+        })
+        .finally(() => {
+            btnEnviar.disabled = false;
+            btnEnviar.innerHTML = '<i class="fas fa-envelope"></i> Enviar por Email';
+        });
+    }
+
+    // Helper para obtener CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}

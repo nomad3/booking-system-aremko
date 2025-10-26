@@ -1,0 +1,701 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+{% load humanize %} {# Load humanize template tags #}
+
+{% block title %}Aremko - Finalizar Reserva{% endblock %}
+
+{% block extra_style %}
+<style>
+    .checkout-section {
+        padding: 50px 0;
+    }
+
+    .checkout-title {
+        font-weight: 700;
+        margin-bottom: 30px;
+        color: var(--dark-gray);
+    }
+
+    .checkout-form {
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+        margin-bottom: 30px; /* Keep margin for spacing between rows */
+    }
+
+    .checkout-form label {
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .checkout-form .form-control {
+        border-radius: 8px;
+        padding: 10px 15px;
+        margin-bottom: 20px;
+    }
+
+    /* Reusing cart item styles from base */
+    .cart-item {
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .cart-item-title {
+        font-weight: 700;
+        font-size: 1.1rem; /* Slightly smaller for summary */
+        margin-bottom: 5px;
+    }
+    .cart-item-info {
+        color: var(--light-gray);
+        font-size: 0.9rem;
+    }
+    .cart-item-price {
+        font-weight: 700;
+        color: var(--primary-color);
+        font-size: 1.1rem; /* Slightly smaller for summary */
+    }
+
+    .cart-summary { /* Added from cart.html */
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 25px;
+        margin-bottom: 30px; /* Match checkout-form margin */
+    }
+    .cart-summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px; /* Match cart.html */
+    }
+    .cart-summary-total {
+        font-weight: 700; /* Match cart.html */
+        font-size: 1.3rem; /* Match cart.html */
+        color: var(--primary-color); /* Match cart.html */
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+    }
+    .cart-actions { /* Added from cart.html */
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+    }
+
+    .empty-cart {
+        text-align: center;
+        padding: 50px 0;
+    }
+
+    .empty-cart-icon {
+        font-size: 5rem;
+        color: var(--light-gray);
+        margin-bottom: 20px;
+    }
+
+    /* Processing button styles */
+    .btn-processing {
+        position: relative;
+        pointer-events: none;
+        background-color: var(--secondary-color) !important;
+    }
+
+    .processing-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        display: none;
+    }
+
+    .processing-content {
+        background-color: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        text-align: center;
+    }
+
+    .processing-spinner {
+        font-size: 2rem;
+        color: var(--primary-color);
+        margin-bottom: 15px;
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Processing Overlay -->
+<div id="processingOverlay" class="processing-overlay">
+    <div class="processing-content">
+        <div class="processing-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+        </div>
+        <h4>Procesando</h4>
+        <p>Estamos procesando tu reserva...</p>
+    </div>
+</div>
+
+<!-- Checkout Section -->
+<section class="checkout-section">
+    <div class="container">
+        <h1 class="checkout-title">Finalizar Reserva</h1>
+
+        {% if cart.servicios %}
+            <!-- Row 1: Contact Info & Order Summary -->
+            <div class="row mb-4">
+                <div class="col-lg-7"> {# Contact Info takes more space #}
+                    <div class="checkout-form">
+                        <h4 class="mb-4">Información de Contacto</h4>
+                        <form id="checkoutForm">
+                            <div class="mb-3">
+                                <label for="checkoutTelefono" class="form-label">Teléfono</label>
+                                <input type="tel" class="form-control" id="checkoutTelefono" name="telefono" required placeholder="+56912345678">
+                                <div class="form-text">Ingresa tu número para buscar tus datos.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="checkoutNombre" class="form-label">Nombre Completo</label>
+                                <input type="text" class="form-control" id="checkoutNombre" name="nombre" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="checkoutEmail" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="checkoutEmail" name="email" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="checkoutDocumento" class="form-label">ID/DNI/Passport/RUT (opcional)</label>
+                                <input type="text" class="form-control" id="checkoutDocumento" name="documento_identidad">
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-lg-5"> {# Order Summary takes less space #}
+                    <div class="cart-summary">
+                        <h3 class="cart-summary-title">Resumen del Pedido</h3>
+                        {% for item in cart.servicios %}
+                            <div class="cart-summary-row">
+                                <span>{{ item.nombre }} ({{ item.cantidad_personas }} persona(s))</span>
+                                <span>${{ item.subtotal|floatformat:0|intcomma }}</span>
+                            </div>
+                        {% endfor %}
+                        <div class="cart-summary-row cart-summary-total">
+                            <span>Total:</span>
+                            <span>${{ cart.total|floatformat:0|intcomma }}</span>
+                        </div>
+                        <div class="cart-actions">
+                            <a href="{% url 'ventas:cart' %}" class="btn btn-outline-secondary">Volver al Carrito</a>
+                            <button class="btn btn-primary" id="completeCheckoutBtn">
+                                Completar Reserva
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 2: Reservation Details (Left) & Payment Method (Right) -->
+            <div class="row">
+                <div class="col-lg-6">
+                    <!-- Reservation Details -->
+                    <div class="checkout-form"> {# Use checkout-form for consistent padding/shadow #}
+                        <h4 class="mb-3">Detalles de la Reserva</h4>
+                        {% for item in cart.servicios %}
+                        <div class="cart-item mb-3"> {# Reduced bottom margin slightly #}
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h5 class="cart-item-title mb-1">{{ item.nombre }}</h5> {# Slightly smaller heading #}
+                                    <p class="cart-item-info mb-0"> {# Remove bottom margin #}
+                                        <i class="far fa-calendar-alt me-1"></i>{{ item.fecha }} |
+                                        <i class="far fa-clock ms-2 me-1"></i>{{ item.hora }} |
+                                        <i class="fas fa-user ms-2 me-1"></i>{{ item.cantidad_personas }} persona(s)
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <p class="cart-item-price mb-0">${{ item.subtotal|floatformat:0|intcomma }}</p> {# Remove bottom margin #}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <!-- End Reservation Details -->
+                </div>
+                <div class="col-lg-6">
+                    <!-- Payment Method Selection -->
+                    <div class="checkout-form">
+                        <h4 class="mb-4">Método de Pago</h4>
+                        {% if payment_methods %}
+                            {% for value, name in payment_methods %}
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input"
+                                           type="radio"
+                                           name="paymentMethod"
+                                           id="payment_{{ value }}"
+                                           value="{{ value }}"
+                                           {% if value == 'transferencia' %}checked{% endif %}
+                                           {% if value == 'flow' %}disabled{% endif %}
+                                           >
+                                    <label class="form-check-label" for="payment_{{ value }}">
+                                        {{ name }}
+                                        {% if value == 'flow' %}
+                                            <span class="badge bg-secondary">Próximamente</span>
+                                        {% endif %}
+                                        {% if value == 'mercadopago_link' %}
+                                            <span class="badge bg-primary">Recomendado</span>
+                                        {% endif %}
+                                    </label>
+                                    {% if value == 'transferencia' %}
+                                        <div class="form-text mt-1">
+                                            Selecciona esta opción para ver los detalles de la cuenta. Tu reserva quedará pendiente hasta confirmar el pago.
+                                        </div>
+                                    {% endif %}
+                                    {% if value == 'mercadopago_link' %}
+                                        <div class="form-text mt-1">
+                                            Paga de forma segura con tarjeta de crédito, débito o transferencia bancaria. Aprobación inmediata.
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                            <div id="bankDetailsSection" class="alert alert-info mt-3" style="display: none;">
+                                <h5>Instrucciones para Transferencia Bancaria</h5>
+                                <p>Para confirmar tu reserva (que se creará en estado pendiente), por favor realiza la transferencia a la siguiente cuenta:</p>
+                                <pre>Titular: Aremko Hotel Spa
+RUT: 76.485.192-7
+Banco: Mercado Pago
+Tipo de Cuenta: Cuenta Vista
+Número de Cuenta: 1016006859
+Email para comprobante: ventas@aremko.cl</pre>
+                                <p><strong>Importante:</strong> Tu reserva se mantendrá como pendiente hasta que confirmemos la recepción del pago.</p>
+                            </div>
+                        {% else %}
+                            <p>No hay métodos de pago disponibles en este momento.</p>
+                        {% endif %}
+                    </div>
+                    <!-- End Payment Method Selection -->
+                </div>
+            </div>
+        {% else %}
+            <div class="empty-cart">
+                <div class="empty-cart-icon">
+                    <i class="fas fa-shopping-cart"></i>
+                </div>
+                <h3>Tu carrito está vacío</h3>
+                <p>Parece que aún no has agregado ningún servicio a tu carrito.</p>
+                <a href="{% url 'ventas:homepage' %}#servicios" class="btn btn-primary mt-3">
+                    Ver Servicios
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block modals %}
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="successModalLabel">¡Reserva Exitosa!</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-4">
+                    <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+                </div>
+                <p class="text-center">Tu reserva ha sido creada exitosamente.</p>
+                <p class="text-center">Hemos enviado un correo electrónico con los detalles de tu reserva.</p>
+                <p class="text-center" id="reservaIdText">ID de Reserva: <span id="reservaId"></span></p>
+            </div>
+            <div class="modal-footer justify-content-between"> 
+                {# Placeholder for the detail button - JS will add it here #}
+                <div id="detailButtonPlaceholder"></div> 
+                <a href="{% url 'ventas:homepage' %}" class="btn btn-primary">Volver al Inicio</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+    // --- Global Variables ---
+    let isProcessingCheckout = false; // Flag to prevent double submission
+
+    // --- Helper Functions ---
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    async function fetchClientData(telefono) {
+        const cleanedTelefono = telefono.replace(/\s+/g, '');
+        if (cleanedTelefono.length < 9) {
+             console.log("Phone number too short to fetch data.");
+             return;
+        }
+        console.log(`Fetching client data for phone: ${cleanedTelefono}`);
+        try {
+            // Corrected API endpoint URL name
+            const lookupUrl = `{% url 'ventas:get_client_details_by_phone' %}?telefono=${encodeURIComponent(cleanedTelefono)}`;
+            const response = await fetch(lookupUrl);
+            if (response.ok) {
+                const data = await response.json();
+                // Updated to check data.found directly
+                if (data.found) { 
+                    console.log("Client found:", data);
+                    const nombreInput = document.getElementById('checkoutNombre');
+                    const emailInput = document.getElementById('checkoutEmail');
+                    const documentoInput = document.getElementById('checkoutDocumento');
+                    if (nombreInput) nombreInput.value = data.nombre || '';
+                    if (emailInput) emailInput.value = data.email || '';
+                    if (documentoInput) documentoInput.value = data.documento_identidad || '';
+                } else {
+                    console.log("Client not found for this phone number.");
+                     // Optionally clear fields if client not found
+                    // document.getElementById('checkoutNombre').value = '';
+                    // document.getElementById('checkoutEmail').value = '';
+                    // document.getElementById('checkoutDocumento').value = '';
+                }
+            } else {
+                console.error(`Error fetching client data: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('Error during fetchClientData:', error);
+        }
+    }
+
+    function showProcessing(overlay, button) {
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+        }
+        if (overlay) overlay.style.display = 'flex';
+    }
+
+    function hideProcessing(overlay, button) {
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = 'Completar Reserva';
+        }
+        if (overlay) overlay.style.display = 'none';
+        isProcessingCheckout = false;
+        console.log("Checkout processing finished/reset.");
+    }
+
+    async function handleApiResponse(response) {
+        if (!response.ok) {
+            let errorData = { error: `Error del servidor (${response.status})` };
+            try {
+                const text = await response.text();
+                console.error("Error response text:", text);
+                errorData = JSON.parse(text);
+            } catch (e) {
+                console.error("Failed to parse error response as JSON:", e);
+            }
+            throw new Error(errorData.error || errorData.details || `Error del servidor (${response.status})`);
+        }
+        return response.json();
+    }
+
+    function displaySuccessModal(data, paymentMethod) {
+        const reservaIdSpan = document.getElementById('reservaId');
+        const successModalEl = document.getElementById('successModal');
+        const successModalBody = successModalEl ? successModalEl.querySelector('.modal-body') : null;
+        const modalFooter = successModalEl ? successModalEl.querySelector('.modal-footer') : null;
+        const detailButtonPlaceholder = document.getElementById('detailButtonPlaceholder');
+
+        // Set Reserva ID
+        if (reservaIdSpan && data.reserva_id) {
+            reservaIdSpan.textContent = data.reserva_id;
+        }
+
+        // Add "Ver Detalle" button if URL exists and placeholder is found
+        if (data.redirect_url && detailButtonPlaceholder) {
+            // Remove any existing detail button first
+            const existingDetailBtn = detailButtonPlaceholder.querySelector('.btn-view-detail');
+            if (existingDetailBtn) {
+                existingDetailBtn.remove();
+            }
+
+            // Create new detail button
+            const detailBtn = document.createElement('a');
+            detailBtn.href = data.redirect_url;
+            detailBtn.textContent = 'Ver Detalle de Reserva';
+            detailBtn.className = 'btn btn-secondary btn-view-detail'; // Add specific class
+            detailButtonPlaceholder.appendChild(detailBtn); // Add the button
+        } else if (detailButtonPlaceholder) {
+             // Clear placeholder if no URL
+             detailButtonPlaceholder.innerHTML = '';
+        }
+
+        console.log("About to show success modal. Data received:", data); 
+
+        if (successModalBody) {
+            const existingBankInfo = successModalBody.querySelector('.bank-transfer-instructions');
+            if (existingBankInfo) {
+                existingBankInfo.remove();
+            }
+
+            // Bank details are shown on the page now, not needed in the modal.
+            // if (paymentMethod === 'transferencia' && data.bank_details) { ... } // Ensure this logic is removed or commented out if present
+
+        }
+
+        if (successModalEl) {
+            const successModal = new bootstrap.Modal(successModalEl);
+            successModal.show();
+        } else {
+            console.error("Success modal element not found");
+            alert("¡Reserva creada exitosamente!"); // Fallback alert
+            // Consider redirecting only if modal fails completely
+            // window.location.href = "{% url 'homepage' %}";
+        }
+    }
+
+    function handleCheckoutError(error, overlay, button) {
+        console.error('Error durante el checkout:', error);
+        alert(`Error al procesar la reserva: ${error.message}. Por favor, intenta nuevamente.`);
+        hideProcessing(overlay, button); // Hide overlay and reset button on error
+    }
+
+    // --- Checkout Logic Functions ---
+
+    async function handleBankTransferCheckout(formData, overlay, button) {
+        const csrfToken = getCookie('csrftoken');
+        try {
+            const response = await fetch('{% url "ventas:complete_checkout" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            });
+            const data = await handleApiResponse(response); // Handles ok check and JSON parsing
+            console.log("Bank Transfer Checkout Success:", data);
+
+            // <<< INICIO CÓDIGO NUEVO >>>
+            // Ocultar secciones del checkout antes de mostrar el modal
+            const checkoutRows = document.querySelectorAll('.checkout-section .container > .row');
+            checkoutRows.forEach(row => {
+                row.style.display = 'none';
+            });
+            // <<< FIN CÓDIGO NUEVO >>>
+
+            // Show success modal instead of redirecting
+            displaySuccessModal(data, 'transferencia'); 
+            // Hide processing overlay after showing modal
+            hideProcessing(overlay, button); 
+        } catch (error) {
+            // Handle errors and ensure processing is hidden
+            handleCheckoutError(error, overlay, button); 
+        } 
+        // Removed the finally block here, hideProcessing is called within catch or fallback else
+    }
+
+    async function handleFlowCheckout(formData, overlay, button) {
+        const csrfToken = getCookie('csrftoken');
+        try {
+            // 1. Create Reservation (Pending)
+            console.log("Creating reservation before Flow payment...");
+            const checkoutResponse = await fetch('{% url "ventas:complete_checkout" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            });
+            const checkoutData = await handleApiResponse(checkoutResponse); // Handles ok check and JSON parsing
+            if (!checkoutData.success || !checkoutData.reserva_id) {
+                throw new Error(checkoutData.error || 'Error al crear la reserva antes del pago con Flow.');
+            }
+            const reservaId = checkoutData.reserva_id;
+            console.log("Reservation created for Flow, ID:", reservaId);
+
+            // 2. Initiate Flow Payment
+            console.log("Initiating Flow payment for reserva_id:", reservaId);
+            const flowResponse = await fetch('{% url "ventas:create_flow_payment" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ reserva_id: reservaId })
+            });
+            const flowData = await handleApiResponse(flowResponse); // Handles ok check and JSON parsing
+
+            // 3. Redirect to Flow
+            if (flowData.url) {
+                console.log("Redirecting to Flow:", flowData.url);
+                window.location.href = flowData.url;
+                // Don't hide processing here, redirection handles it.
+            } else {
+                throw new Error(flowData.error || 'No se recibió URL de Flow.');
+            }
+        } catch (error) {
+            handleCheckoutError(error, overlay, button); // Show error and reset button/overlay
+        }
+        // No finally block needed here as redirection or error handling covers state reset.
+    }
+
+    async function handleMercadoPagoCheckout(formData, overlay, button) {
+        const csrfToken = getCookie('csrftoken');
+        try {
+            // 1. Create Reservation (Pending)
+            console.log("Creating reservation before Mercado Pago payment...");
+            const checkoutResponse = await fetch('{% url "ventas:complete_checkout" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            });
+            const checkoutData = await handleApiResponse(checkoutResponse);
+            if (!checkoutData.success || !checkoutData.reserva_id) {
+                throw new Error(checkoutData.error || 'Error al crear la reserva antes del pago con Mercado Pago.');
+            }
+            const reservaId = checkoutData.reserva_id;
+            console.log("Reservation created for Mercado Pago, ID:", reservaId);
+
+            // 2. Create Mercado Pago Payment Link
+            console.log("Creating Mercado Pago payment link for reserva_id:", reservaId);
+            const mpResponse = await fetch('{% url "ventas:create_mercadopago_payment" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ reserva_id: reservaId })
+            });
+            const mpData = await handleApiResponse(mpResponse);
+
+            // 3. Redirect to Mercado Pago
+            if (mpData.payment_link) {
+                console.log("Redirecting to Mercado Pago:", mpData.payment_link);
+                window.location.href = mpData.payment_link;
+                // Don't hide processing here, redirection handles it.
+            } else {
+                throw new Error(mpData.error || 'No se recibió link de pago de Mercado Pago.');
+            }
+        } catch (error) {
+            handleCheckoutError(error, overlay, button);
+        }
+    }
+
+    // --- Event Listeners ---
+    document.addEventListener('DOMContentLoaded', function() {
+        const completeCheckoutBtn = document.getElementById('completeCheckoutBtn');
+        const processingOverlay = document.getElementById('processingOverlay');
+        const telefonoInput = document.getElementById('checkoutTelefono');
+
+        if (completeCheckoutBtn) {
+            completeCheckoutBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                if (isProcessingCheckout) return;
+                isProcessingCheckout = true;
+
+                // --- Form Validation ---
+                const nombre = document.getElementById('checkoutNombre').value;
+                const email = document.getElementById('checkoutEmail').value;
+                const telefono = document.getElementById('checkoutTelefono').value;
+                const documento = document.getElementById('checkoutDocumento').value;
+                const paymentMethodInput = document.querySelector('input[name="paymentMethod"]:checked');
+
+                if (!nombre || !email || !telefono) {
+                    alert('Por favor completa todos los campos requeridos de contacto.');
+                    hideProcessing(null, completeCheckoutBtn); // Reset button, keep overlay hidden
+                    return;
+                }
+                if (!paymentMethodInput) {
+                    alert('Por favor selecciona un método de pago.');
+                     hideProcessing(null, completeCheckoutBtn);
+                    return;
+                }
+                const paymentMethod = paymentMethodInput.value;
+
+                // Check if Flow is selected but disabled
+                 if (paymentMethod === 'flow' && paymentMethodInput.disabled) {
+                    alert('El pago con Flow no está habilitado en este momento.');
+                    hideProcessing(null, completeCheckoutBtn);
+                    return;
+                 }
+
+
+                const csrfToken = getCookie('csrftoken');
+                if (!csrfToken) {
+                    alert("Error de seguridad. Intenta recargar la página.");
+                    hideProcessing(null, completeCheckoutBtn);
+                    return;
+                }
+
+                // --- Show Processing ---
+                showProcessing(processingOverlay, completeCheckoutBtn);
+
+                // --- Prepare Form Data ---
+                const formData = new FormData();
+                formData.append('nombre', nombre);
+                formData.append('email', email);
+                formData.append('telefono', telefono);
+                formData.append('documento_identidad', documento);
+                formData.append('metodo_pago', paymentMethod);
+
+                // --- Call Appropriate Handler ---
+                if (paymentMethod === 'transferencia') {
+                    handleBankTransferCheckout(formData, processingOverlay, completeCheckoutBtn);
+                } else if (paymentMethod === 'flow') {
+                    handleFlowCheckout(formData, processingOverlay, completeCheckoutBtn);
+                } else if (paymentMethod === 'mercadopago_link') {
+                    handleMercadoPagoCheckout(formData, processingOverlay, completeCheckoutBtn);
+                } else {
+                    alert('Método de pago no soportado.');
+                    hideProcessing(processingOverlay, completeCheckoutBtn);
+                }
+            });
+        } else {
+            console.error("Complete checkout button not found");
+        }
+
+        if (telefonoInput) {
+            telefonoInput.addEventListener('blur', function() {
+                fetchClientData(this.value);
+            });
+        } else {
+            console.error("Telefono input not found");
+        }
+
+        // --- Add listener for payment method change ---
+        const paymentMethodRadios = document.querySelectorAll('input[name="paymentMethod"]');
+        const bankDetailsSection = document.getElementById('bankDetailsSection');
+
+        function toggleBankDetails() {
+            const selectedPaymentMethod = document.querySelector('input[name="paymentMethod"]:checked');
+            if (selectedPaymentMethod && selectedPaymentMethod.value === 'transferencia' && bankDetailsSection) {
+                bankDetailsSection.style.display = 'block';
+            } else if (bankDetailsSection) {
+                bankDetailsSection.style.display = 'none';
+            }
+        }
+
+        paymentMethodRadios.forEach(radio => {
+            radio.addEventListener('change', toggleBankDetails);
+        });
+
+        // Initial check in case 'transferencia' is pre-selected on page load
+        toggleBankDetails();
+        // --- End listener for payment method change ---
+
+    });
+</script>
+{% endblock %}
+</final_file_content>

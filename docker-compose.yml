@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    command: >
+      bash -c "python manage.py migrate &&
+               python manage.py collectstatic --noinput &&
+               python manage.py shell -c \"
+                 from django.contrib.auth import get_user_model;
+                 User = get_user_model();
+                 import os;
+                 username = os.environ.get('DJANGO_SUPERUSER_USERNAME');
+                 email = os.environ.get('DJANGO_SUPERUSER_EMAIL');
+                 password = os.environ.get('DJANGO_SUPERUSER_PASSWORD');
+                 if username and email and password and not User.objects.filter(username=username).exists():
+                   User.objects.create_superuser(username, email, password);
+                   print('Superuser created successfully');
+                 else:
+                   print('Superuser already exists or environment variables not set');
+               \" &&
+               python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      # Mount the credentials file into the container
+      - ./aremko-e51ae-0912defb776b.json:/app/aremko-e51ae-0912defb776b.json:ro # Mount as read-only
+    ports:
+      - "8002:8000" # Changed host port from 8001 to 8002
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Google Cloud Storage settings
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/aremko-e51ae-0912defb776b.json
+      - GS_BUCKET_NAME=aremkoweb
+      - GS_PROJECT_ID=aremko-e51ae
+
+  db:
+    image: postgres:13
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5435:5432" # Changed host port from 5434 to 5435 to avoid conflict
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # pgAdmin web interface available at http://localhost:5051 (changed port)
+  # Login with admin@example.com / admin
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5052:80" # Changed host port from 5051 to 5052 to avoid conflict
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
+  static_volume:
+  # media_volume is no longer needed as files are stored in GCS

@@ -1,0 +1,34 @@
+{% load humanize %}
+<div class="col-lg-4 col-md-6 service-card" data-category="{{ servicio.categoria.id }}">
+    <div class="card h-100">
+        {% if servicio.imagen %}
+            <img src="{{ servicio.imagen.url }}" class="card-img-top" alt="{{ servicio.nombre }}" loading="lazy">
+        {% endif %}
+        <div class="card-body">
+            <h5 class="card-title">{{ servicio.nombre }}</h5>
+            <p class="card-text text-muted"><small>{{ servicio.categoria.nombre }}</small></p>
+            {% if servicio.descripcion_web %}
+            <div class="service-description-wrapper mb-2">
+                <p class="card-text service-description-truncated">
+                    {{ servicio.descripcion_web|linebreaksbr }}
+                </p>
+                <a href="#" class="ver-mas-link small" data-bs-toggle="modal" data-bs-target="#serviceDescriptionModal" data-description="{{ servicio.descripcion_web|linebreaksbr }}" data-title="{{ servicio.nombre|escapejs }}">Ver más</a>
+            </div>
+            {% endif %}
+            {% if servicio.tipo_servicio == 'cabana' %}
+                <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
+            {% else %}
+                <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
+            {% endif %}
+            <button class="btn btn-primary w-100 js-open-booking-modal"
+                    data-servicio-id="{{ servicio.id }}"
+                    data-servicio-nombre="{{ servicio.nombre|escapejs }}"
+                    data-servicio-precio="{{ servicio.precio_base }}"
+                    data-servicio-tipo="{{ servicio.tipo_servicio }}"
+                    data-servicio-min="{{ servicio.capacidad_minima }}"
+                    data-servicio-max="{{ servicio.capacidad_maxima }}">
+                <i class="fas fa-calendar-plus me-2"></i>Reservar
+            </button>
+        </div>
+    </div>
+</div>

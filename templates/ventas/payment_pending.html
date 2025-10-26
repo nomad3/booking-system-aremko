@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Pago Pendiente - Aremko{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark text-center">
+                    <h3 class="mb-0">⏳ Pago Pendiente</h3>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-clock text-warning" style="font-size: 4rem;"></i>
+                    </div>
+                    
+                    <h4 class="text-warning mb-3">Tu pago está siendo procesado</h4>
+                    
+                    {% if reserva %}
+                    <div class="alert alert-info">
+                        <h5>Detalles de tu reserva:</h5>
+                        <p><strong>Número de reserva:</strong> #{{ reserva.id }}</p>
+                        <p><strong>Cliente:</strong> {{ reserva.cliente.nombre }}</p>
+                        <p><strong>Total a pagar:</strong> ${{ reserva.total|floatformat:0 }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mt-4">
+                        <p class="text-muted">
+                            Tu pago está siendo procesado por Mercado Pago. Te notificaremos por email una vez que se confirme.
+                        </p>
+                        <p class="text-muted">
+                            Este proceso puede tomar unos minutos.
+                        </p>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <div class="alert alert-light">
+                            <h6>¿Qué hacer ahora?</h6>
+                            <ul class="list-unstyled mb-0">
+                                <li>✅ Revisa tu email para confirmación</li>
+                                <li>✅ Tu reserva se confirmará automáticamente</li>
+                                <li>✅ Te enviaremos un recordatorio 24h antes</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <a href="{% url 'ventas:servicios' %}" class="btn btn-primary me-2">
+                            <i class="fas fa-calendar-plus"></i> Hacer otra reserva
+                        </a>
+                        <a href="{% url 'ventas:checkout' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-home"></i> Volver al inicio
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

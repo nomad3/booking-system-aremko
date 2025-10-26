@@ -1,0 +1,42 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4">
+    <div class="page-header mb-4">
+        <h1>Importar Empresas desde CSV</h1>
+        <p class="text-muted">Formato: name, industry, city, website. Descarga un ejemplo <a href="{% static 'templates/csv/companies_example.csv' %}">aquí</a>.</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">Subir CSV</div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="archivo_csv" class="form-label">Archivo CSV (.csv)</label>
+                    <input type="file" class="form-control" id="archivo_csv" name="archivo_csv" accept=".csv" required>
+                </div>
+                <button type="submit" class="btn btn-modern btn-primary-modern">Importar Empresas</button>
+                <a href="{% url 'ventas:admin_section_crm' %}" class="btn btn-modern btn-secondary-modern">Volver</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

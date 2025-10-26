@@ -1,0 +1,143 @@
+{% extends "admin/base_site.html" %}
+{% load static humanize %} {# Added humanize #}
+
+{% block extrahead %}
+    {{ block.super }}
+    <!-- Modern Airbnb-style CSS -->
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+    {# Font Awesome is loaded in admin/base_site.html #}
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4"> {# Use modern-container #}
+    <div class="page-header mb-4"> {# Use page-header #}
+        <h1>Detalle de Venta/Reserva #{{ venta.id }}</h1>
+    </div>
+
+    <!-- Main Details Card -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-info-circle me-2"></i>Información General
+        </div>
+        <div class="card-body">
+            <dl class="row">
+                <dt class="col-sm-3 text-muted">Cliente:</dt>
+                <dd class="col-sm-9">{{ venta.cliente.nombre }}</dd>
+
+                <dt class="col-sm-3 text-muted">Fecha Reserva:</dt>
+                <dd class="col-sm-9">{{ venta.fecha_reserva|date:"Y-m-d H:i" }}</dd>
+
+                <dt class="col-sm-3 text-muted">Estado:</dt> {# Changed from Estado de Pago #}
+                <dd class="col-sm-9">{{ venta.estado }}</dd>
+
+                <dt class="col-sm-3 text-muted">Total:</dt>
+                <dd class="col-sm-9 fw-bold">${{ venta.total|intcomma }} CLP</dd>
+
+                <dt class="col-sm-3 text-muted">Pagado:</dt>
+                <dd class="col-sm-9 text-success fw-bold">${{ venta.pagado|intcomma }} CLP</dd>
+
+                <dt class="col-sm-3 text-muted">Saldo Pendiente:</dt>
+                <dd class="col-sm-9 text-danger fw-bold">${{ venta.saldo_pendiente|intcomma }} CLP</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Services Card -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-concierge-bell me-2"></i>Servicios
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        {% for reserva_servicio in venta.reservaservicios.all %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    {{ reserva_servicio.servicio.nombre }} {% if reserva_servicio.servicio.categoria %}({{ reserva_servicio.servicio.categoria.nombre }}){% endif %} (x{{ reserva_servicio.cantidad_personas }})<br>
+                                    {# Format DateField without time specifiers #}
+                                    <small class="text-muted">{{ reserva_servicio.fecha_agendamiento|date:"Y-m-d" }} {{ reserva_servicio.hora_inicio }}</small>
+                                </div>
+                                {# Assuming subtotal is calculated correctly elsewhere or add it here #}
+                                <span class="badge bg-primary rounded-pill">${{ reserva_servicio.calcular_precio|intcomma }}</span>
+                            </li>
+                        {% empty %}
+                            <li class="list-group-item">No hay servicios</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                 <div class="card-footer text-end">
+                    <strong>Total Servicios: ${{ venta.total_servicios|intcomma }} CLP</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Products Card -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-box me-2"></i>Productos
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        {% for reserva_producto in venta.reservaproductos.all %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ reserva_producto.producto.nombre }} (x{{ reserva_producto.cantidad }})
+                                <span class="badge bg-info rounded-pill">${{ reserva_producto.subtotal|intcomma }}</span>
+                            </li>
+                        {% empty %}
+                            <li class="list-group-item">No hay productos</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                 <div class="card-footer text-end">
+                    <strong>Total Productos: ${{ venta.total_productos|intcomma }} CLP</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payments Card -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-money-bill-wave me-2"></i>Pagos Registrados
+        </div>
+        <div class="card-body p-0">
+             <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th class="px-4 py-3">Fecha Pago</th>
+                            <th class="px-4 py-3">Método</th>
+                            <th class="px-4 py-3 text-end">Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pago in venta.pagos.all %}
+                            <tr>
+                                <td class="px-4 py-3">{{ pago.fecha_pago|date:"Y-m-d H:i" }}</td>
+                                <td class="px-4 py-3">{{ pago.metodo_pago }}</td>
+                                <td class="px-4 py-3 text-end">${{ pago.monto|intcomma }} CLP</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center py-4">No hay pagos registrados</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="text-center mt-4">
+        <a href="{% url 'venta_reserva_list' %}" class="btn btn-modern btn-secondary-modern"> {# Use modern button #}
+            <i class="fas fa-arrow-left me-2"></i>Volver a la lista
+        </a>
+         <a href="{% url 'admin:ventas_ventareserva_change' venta.id %}" class="btn btn-modern btn-primary-modern ms-2"> {# Use modern button #}
+            <i class="fas fa-edit me-2"></i>Editar en Admin
+        </a>
+    </div>
+</div>
+{% endblock %}

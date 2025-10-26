@@ -1,0 +1,102 @@
+{% extends "admin/base_site.html" %}
+{% load static i18n %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <!-- Modern Airbnb-style CSS -->
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+    {# Font Awesome is loaded in admin/base_site.html #}
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4"> {# Use modern-container #}
+    <!-- Header Section -->
+    <div class="page-header mb-4"> {# Use page-header #}
+        <h1>Sistema de Gestión Aremko</h1>
+        <p>Bienvenido a la plataforma de administración. Seleccione una sección para gestionar.</p>
+    </div>
+
+    <!-- Main Content - Section Cards -->
+    <div class="row g-4">
+
+        <!-- CRM Section Card -->
+        <div class="col-lg-4 col-md-6 col-sm-12">
+            <a href="{% url 'ventas:admin_section_crm' %}" class="text-decoration-none"> {# Link to the new section view URL #}
+                <div class="card h-100 text-center card-hover">
+                    <div class="card-body">
+                        <i class="fas fa-users-cog fa-3x mb-3 text-primary-modern"></i>
+                        <h5 class="card-title">CRM y Marketing</h5>
+                        <p class="card-text text-muted">Gestionar Clientes, Leads, Contactos, Campañas, etc.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Ventas/Reservas Section Card -->
+        <div class="col-lg-4 col-md-6 col-sm-12">
+             <a href="{% url 'ventas:admin_section_ventas' %}" class="text-decoration-none"> {# Link to the new section view URL #}
+                <div class="card h-100 text-center card-hover">
+                    <div class="card-body">
+                        <i class="fas fa-calendar-alt fa-3x mb-3 text-success-modern"></i>
+                        <h5 class="card-title">Ventas y Reservas</h5>
+                        <p class="card-text text-muted">Gestionar Ventas, Reservas, Pagos, Gift Cards.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Servicios Section Card -->
+        <div class="col-lg-4 col-md-6 col-sm-12">
+             <a href="{% url 'ventas:admin_section_servicios' %}" class="text-decoration-none"> {# Link to the new section view URL #}
+                <div class="card h-100 text-center card-hover">
+                    <div class="card-body">
+                        <i class="fas fa-concierge-bell fa-3x mb-3 text-info-modern"></i>
+                        <h5 class="card-title">Servicios y Proveedores</h5>
+                        <p class="card-text text-muted">Gestionar Servicios, Categorías, Proveedores.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Productos/Compras Section Card -->
+        <div class="col-lg-4 col-md-6 col-sm-12">
+             <a href="{% url 'ventas:admin_section_productos' %}" class="text-decoration-none"> {# Link to the new section view URL #}
+                <div class="card h-100 text-center card-hover">
+                    <div class="card-body">
+                        <i class="fas fa-boxes fa-3x mb-3 text-warning-modern"></i>
+                        <h5 class="card-title">Productos y Compras</h5>
+                        <p class="card-text text-muted">Gestionar Productos, Categorías, Compras.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Configuración Section Card -->
+        <div class="col-lg-4 col-md-6 col-sm-12">
+             <a href="{% url 'ventas:admin_section_config' %}" class="text-decoration-none"> {# Link to the new section view URL #}
+                <div class="card h-100 text-center card-hover">
+                    <div class="card-body">
+                        <i class="fas fa-cogs fa-3x mb-3 text-danger-modern"></i>
+                        <h5 class="card-title">Configuración</h5>
+                        <p class="card-text text-muted">Gestionar Usuarios, Grupos, Configuración Web.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Add more section cards if needed -->
+
+    </div>
+</div>
+
+<style>
+    .card-hover:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .card-title {
+        font-weight: 600;
+    }
+</style>
+{% endblock %}

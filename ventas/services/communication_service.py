@@ -1,0 +1,1264 @@
+# -*- coding: utf-8 -*-
+"""
+Servicio de Comunicación Inteligente con Anti-Spam
+Gestiona el envío de SMS y emails respetando límites y preferencias del cliente
+"""
+
+import logging
+from datetime import datetime, timedelta
+from django.utils import timezone
+from django.db import transaction
+from django.core.mail import send_mail, EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.conf import settings
+
+from ..models import (
+    Cliente, Campaign, CommunicationLimit, ClientPreferences, 
+    CommunicationLog, SMSTemplate, VentaReserva
+)
+from .redvoiss_service import redvoiss_service
+
+logger = logging.getLogger(__name__)
+
+
+class CommunicationService:
+    """
+    Servicio principal para comunicación inteligente con clientes
+    """
+    
+    def __init__(self):
+        self.sms_service = redvoiss_service
+    
+    def send_booking_confirmation_dual(self, booking_id, cliente_id=None):
+        """
+        Envía SMS Y EMAIL de confirmación de reserva
+        """
+        try:
+            # Obtener reserva y cliente
+            booking = VentaReserva.objects.get(id=booking_id)
+            cliente = booking.cliente if not cliente_id else Cliente.objects.get(id=cliente_id)
+            
+            # Verificar si se puede enviar SMS
+            sms_allowed = self._can_send_communication(cliente, 'SMS', 'BOOKING_CONFIRMATION')
+            # Verificar si se puede enviar EMAIL
+            email_allowed = self._can_send_communication(cliente, 'EMAIL', 'BOOKING_CONFIRMATION')
+            
+            if not sms_allowed and not email_allowed:
+                return {'success': False, 'reason': 'blocked_by_limits_or_preferences'}
+            
+            # Obtener el primer servicio reservado
+            from ..models import ReservaServicio
+            reserva_servicio = ReservaServicio.objects.filter(venta_reserva=booking).first()
+            
+            if reserva_servicio:
+                servicio_nombre = reserva_servicio.servicio.nombre
+                fecha_str = reserva_servicio.fecha_agendamiento.strftime('%d/%m/%Y')
+                hora_str = str(reserva_servicio.hora_inicio)
+            else:
+                servicio_nombre = 'tu servicio'
+                fecha_str = booking.fecha_reserva.strftime('%d/%m/%Y')
+                hora_str = booking.fecha_reserva.strftime('%H:%M')
+            
+            results = {'sms': None, 'email': None}
+            
+            # 1. ENVIAR SMS
+            from django.conf import settings as djsettings
+            if sms_allowed and getattr(djsettings, 'COMMUNICATION_SMS_ENABLED', True):
+                results['sms'] = self._send_confirmation_sms(
+                    cliente, booking, servicio_nombre, fecha_str, hora_str
+                )
+            
+            # 2. ENVIAR EMAIL  
+            if email_allowed and cliente.email:
+                results['email'] = self._send_confirmation_email(
+                    cliente, booking, servicio_nombre, fecha_str, hora_str
+                )
+            
+            # Determinar éxito general
+            sms_success = results['sms'] and results['sms'].get('success', False)
+            email_success = results['email'] and results['email'].get('success', False)
+            
+            return {
+                'success': sms_success or email_success,
+                'sms_result': results['sms'],
+                'email_result': results['email'],
+                'channels_sent': [
+                    'SMS' if sms_success else None,
+                    'EMAIL' if email_success else None
+                ]
+            }
+                
+        except Exception as e:
+            logger.error(f"Error en send_booking_confirmation_dual: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def _send_confirmation_sms(self, cliente, booking, servicio_nombre, fecha_str, hora_str):
+        """Envía SMS de confirmación"""
+        try:
+            # Obtener plantilla SMS
+            template = SMSTemplate.objects.filter(
+                message_type='BOOKING_CONFIRMATION',
+                is_active=True
+            ).first()
+            
+            if not template:
+                message = f"✅ Reserva confirmada para {fecha_str} a las {hora_str}. ¡Te esperamos! - Aremko"
+            else:
+                message = template.render_message(
+                    cliente,
+                    servicio=servicio_nombre,
+                    fecha=fecha_str,
+                    hora=hora_str
+                )
+            
+            # Enviar SMS
+            result = self.sms_service.send_sms(
+                destination=cliente.telefono,
+                message=message,
+                bulk_name=f"Confirmación Reserva {booking.id}"
+            )
+            
+            if result['success']:
+                # Registrar comunicación
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='SMS',
+                    message_type='BOOKING_CONFIRMATION',
+                    content=message,
+                    destination=cliente.telefono,
+                    external_id=result['batch_id'],
+                    booking_id=booking.id,
+                    cost=12
+                )
+                
+                # Actualizar límites
+                self._update_communication_limits(cliente, 'SMS')
+                
+                logger.info(f"SMS confirmación enviado a {cliente.nombre} para booking {booking.id}")
+                return {'success': True, 'batch_id': result['batch_id']}
+            else:
+                logger.error(f"Error enviando SMS confirmación: {result['error']}")
+                return {'success': False, 'error': result['error']}
+                
+        except Exception as e:
+            logger.error(f"Error en _send_confirmation_sms: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def _send_confirmation_email(self, cliente, booking, servicio_nombre, fecha_str, hora_str):
+        """Envía Email de confirmación"""
+        try:
+            # Construir lista de servicios contratados para este booking
+            try:
+                from ..models import ReservaServicio
+                # Ordenar por fecha y hora ascendente
+                servicios_qs = (
+                    ReservaServicio.objects
+                    .filter(venta_reserva=booking)
+                    .select_related('servicio')
+                    .order_by('fecha_agendamiento', 'hora_inicio')
+                )
+            except Exception:
+                servicios_qs = []
+
+            servicios_list = []
+            for rs in servicios_qs:
+                nombre = getattr(getattr(rs, 'servicio', None), 'nombre', 'Servicio')
+                fecha_fmt = getattr(rs, 'fecha_agendamiento', None)
+                fecha_fmt = fecha_fmt.strftime('%d/%m/%Y') if hasattr(fecha_fmt, 'strftime') else str(fecha_fmt) if fecha_fmt else ''
+                hora_fmt = str(getattr(rs, 'hora_inicio', '') or '')
+                personas = getattr(rs, 'cantidad_personas', None)
+                servicios_list.append({
+                    'nombre': nombre,
+                    'fecha': fecha_fmt,
+                    'hora': hora_fmt,
+                    'personas': personas,
+                })
+
+            # Ajustar asunto cuando hay múltiples servicios
+            if len(servicios_list) > 1:
+                subject_service_name = f"{servicios_list[0]['nombre']} + {len(servicios_list) - 1} más"
+            elif len(servicios_list) == 1:
+                subject_service_name = servicios_list[0]['nombre']
+            else:
+                subject_service_name = servicio_nombre
+
+            # Preparar contexto para el template
+            # Resumen de pagos
+            try:
+                total_bruto = float(getattr(booking, 'total', 0) or 0)
+                pagado_bruto = float(getattr(booking, 'pagado', 0) or 0)
+            except Exception:
+                total_bruto = 0.0
+                pagado_bruto = 0.0
+            saldo_bruto = max(total_bruto - pagado_bruto, 0.0)
+
+            def format_clp(value: float) -> str:
+                try:
+                    return ("$" + f"{value:,.0f}").replace(",", ".")
+                except Exception:
+                    return f"${int(value)}"
+
+            context = {
+                'nombre': cliente.nombre,
+                'apellido': getattr(cliente, 'apellido', ''),  # Apellido opcional
+                'telefono': cliente.telefono,
+                'servicio': servicio_nombre,
+                'fecha': fecha_str,
+                'hora': hora_str,
+                'numero_reserva': booking.id,
+                'servicios': servicios_list,
+                # Pagos
+                'total_monto': format_clp(total_bruto),
+                'pagado_monto': format_clp(pagado_bruto),
+                'saldo_monto': format_clp(saldo_bruto),
+                'monto_pagado_cero': pagado_bruto <= 0.0,
+            }
+            
+            # Renderizar email HTML
+            html_content = render_to_string('emails/booking_confirmation_email.html', context)
+            
+            # Crear email
+            email = EmailMultiAlternatives(
+                subject=f'Reserva por confirmar - {subject_service_name}',
+                body=f'Estimado/a {cliente.nombre}, su reserva para {servicio_nombre} el {fecha_str} a las {hora_str} ha sido confirmada.',
+                # Usamos el usuario autenticado en SMTP para máxima entregabilidad
+                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                to=[cliente.email],
+                bcc=['aremkospa@gmail.com', getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copias a aremkospa@gmail.com y ventas@aremko.cl
+                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+            )
+            email.attach_alternative(html_content, "text/html")
+            
+            # Enviar email
+            email.send()
+            
+            # Registrar comunicación
+            self._log_communication(
+                cliente=cliente,
+                communication_type='EMAIL',
+                message_type='BOOKING_CONFIRMATION',
+                subject=f'✅ Confirmación de Reserva - {servicio_nombre}',
+                content=html_content,
+                destination=cliente.email,
+                booking_id=booking.id,
+                cost=0  # Email es gratis
+            )
+            
+            # Actualizar límites
+            self._update_communication_limits(cliente, 'EMAIL')
+            
+            logger.info(f"Email confirmación enviado a {cliente.nombre} ({cliente.email}) para booking {booking.id}")
+            return {'success': True}
+                
+        except Exception as e:
+            logger.error(f"Error en _send_confirmation_email: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def _send_reminder_email(self, cliente, booking):
+        """Envía Email de recordatorio 24h antes con los mismos datos del correo de reserva"""
+        try:
+            # Reutilizar el armado de contexto igual que confirmación
+            # Encontrar primer servicio para fecha/hora de encabezado
+            from ..models import ReservaServicio
+            rs_first = (
+                ReservaServicio.objects
+                .filter(venta_reserva=booking)
+                .select_related('servicio')
+                .order_by('fecha_agendamiento', 'hora_inicio')
+            ).first()
+
+            if rs_first:
+                servicio_nombre = rs_first.servicio.nombre
+                fecha_str = rs_first.fecha_agendamiento.strftime('%d/%m/%Y') if hasattr(rs_first.fecha_agendamiento, 'strftime') else str(rs_first.fecha_agendamiento)
+                hora_str = str(rs_first.hora_inicio)
+            else:
+                servicio_nombre = 'tu servicio'
+                fecha_str = booking.fecha_reserva.strftime('%d/%m/%Y')
+                hora_str = booking.fecha_reserva.strftime('%H:%M')
+
+            # Construir el mismo contexto que confirmación
+            # Lista de servicios
+            servicios_qs = (
+                ReservaServicio.objects
+                .filter(venta_reserva=booking)
+                .select_related('servicio')
+                .order_by('fecha_agendamiento', 'hora_inicio')
+            )
+            servicios_list = []
+            for rs in servicios_qs:
+                nombre = getattr(getattr(rs, 'servicio', None), 'nombre', 'Servicio')
+                fecha_fmt = getattr(rs, 'fecha_agendamiento', None)
+                fecha_fmt = fecha_fmt.strftime('%d/%m/%Y') if hasattr(fecha_fmt, 'strftime') else str(fecha_fmt) if fecha_fmt else ''
+                hora_fmt = str(getattr(rs, 'hora_inicio', '') or '')
+                personas = getattr(rs, 'cantidad_personas', None)
+                servicios_list.append({'nombre': nombre, 'fecha': fecha_fmt, 'hora': hora_fmt, 'personas': personas})
+
+            # Montos
+            total = float(getattr(booking, 'total', 0) or 0)
+            pagado = float(getattr(booking, 'pagado', 0) or 0)
+            saldo = max(total - pagado, 0.0)
+            def format_clp(v: float) -> str:
+                try:
+                    return ("$" + f"{v:,.0f}").replace(",", ".")
+                except Exception:
+                    return f"${int(v)}"
+
+            context = {
+                'nombre': cliente.nombre,
+                'apellido': getattr(cliente, 'apellido', ''),
+                'telefono': cliente.telefono,
+                'servicio': servicio_nombre,
+                'fecha': fecha_str,
+                'hora': hora_str,
+                'numero_reserva': booking.id,
+                'numero_reserva': booking.id,
+                'servicios': servicios_list,
+                'total_monto': format_clp(total),
+                'pagado_monto': format_clp(pagado),
+                'saldo_monto': format_clp(saldo),
+                'monto_pagado_cero': pagado <= 0.0,
+            }
+
+            html_content = render_to_string('emails/booking_reminder_email.html', context)
+
+            # Asunto
+            subject_service_name = servicios_list[0]['nombre'] if servicios_list else servicio_nombre
+            email = EmailMultiAlternatives(
+                subject=f"Recordatorio: tu reserva es mañana - {subject_service_name}",
+                body=f"Hola {cliente.nombre}, te recordamos tu reserva de mañana.",
+                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                to=[cliente.email],
+                bcc=['aremkospa@gmail.com', getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copias a aremkospa@gmail.com y ventas@aremko.cl
+                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+            )
+            email.attach_alternative(html_content, "text/html")
+            email.send()
+
+            # Log
+            self._log_communication(
+                cliente=cliente,
+                communication_type='EMAIL',
+                message_type='BOOKING_REMINDER',
+                subject=f"Recordatorio: tu reserva es mañana - {subject_service_name}",
+                content=html_content,
+                destination=cliente.email,
+                booking_id=booking.id,
+                cost=0
+            )
+
+            # Actualizar límites
+            self._update_communication_limits(cliente, 'EMAIL')
+
+            return {'success': True}
+        except Exception as e:
+            logger.error(f"Error en _send_reminder_email: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def send_booking_reminder_dual(self, booking_id, hours_before=24):
+        """Envía recordatorio (EMAIL + SMS) 24h antes del primer servicio"""
+        try:
+            booking = VentaReserva.objects.get(id=booking_id)
+            cliente = booking.cliente
+
+            # Encontrar primer servicio para determinar la hora (no usar fecha de creación de la reserva)
+            from ..models import ReservaServicio
+            rs_first = (
+                ReservaServicio.objects
+                .filter(venta_reserva=booking)
+                .order_by('fecha_agendamiento', 'hora_inicio')
+            ).first()
+
+            if rs_first:
+                from datetime import datetime as dt
+                import pytz
+                # Usar zona horaria de Chile
+                chile_tz = pytz.timezone('America/Santiago')
+                booking_dt = chile_tz.localize(dt.combine(rs_first.fecha_agendamiento, dt.strptime(str(rs_first.hora_inicio), '%H:%M').time()))
+            else:
+                booking_dt = booking.fecha_reserva
+
+            reminder_time = booking_dt - timedelta(hours=hours_before)
+            # Comparar ambas en UTC
+            if timezone.now() < reminder_time:
+                return {'success': False, 'reason': 'too_early'}
+
+            # Evitar duplicados: si ya existe un log de recordatorio para este booking hoy, no reenviar
+            from ..models import CommunicationLog
+            already_sent = CommunicationLog.objects.filter(
+                booking_id=booking.id,
+                message_type='BOOKING_REMINDER',
+                status__in=['SENT', 'PENDING']
+            ).exists()
+            if already_sent:
+                return {'success': False, 'reason': 'already_sent'}
+
+            results = {'email': None, 'sms': None}
+
+            # EMAIL
+            if self._can_send_communication(cliente, 'EMAIL', 'BOOKING_REMINDER'):
+                results['email'] = self._send_reminder_email(cliente, booking)
+
+            # SMS (respetar flag global)
+            from django.conf import settings as djsettings
+            if self._can_send_communication(cliente, 'SMS', 'BOOKING_REMINDER') and getattr(djsettings, 'COMMUNICATION_SMS_ENABLED', True):
+                results['sms'] = self.send_booking_reminder_sms(booking_id)
+
+            return {
+                'success': (results['email'] and results['email'].get('success')) or (results['sms'] and results['sms'].get('success')),
+                'results': results,
+            }
+        except Exception as e:
+            logger.error(f"Error en send_booking_reminder_dual: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    # =====================
+    #  PAGO 100% CONFIRMADO
+    # =====================
+    def _send_payment_email(self, cliente, booking):
+        """Email cuando la reserva queda pagada al 100%"""
+        try:
+            from ..models import ReservaServicio
+            servicios_qs = (
+                ReservaServicio.objects
+                .filter(venta_reserva=booking)
+                .select_related('servicio')
+                .order_by('fecha_agendamiento', 'hora_inicio')
+            )
+            servicios_list = []
+            for rs in servicios_qs:
+                nombre = getattr(getattr(rs, 'servicio', None), 'nombre', 'Servicio')
+                fecha_fmt = getattr(rs, 'fecha_agendamiento', None)
+                fecha_fmt = fecha_fmt.strftime('%d/%m/%Y') if hasattr(fecha_fmt, 'strftime') else str(fecha_fmt) if fecha_fmt else ''
+                hora_fmt = str(getattr(rs, 'hora_inicio', '') or '')
+                personas = getattr(rs, 'cantidad_personas', None)
+                servicios_list.append({'nombre': nombre, 'fecha': fecha_fmt, 'hora': hora_fmt, 'personas': personas})
+
+            def format_clp(v: float) -> str:
+                try:
+                    return ("$" + f"{v:,.0f}").replace(",", ".")
+                except Exception:
+                    return f"${int(v)}"
+
+            total = float(getattr(booking, 'total', 0) or 0)
+            pagado = float(getattr(booking, 'pagado', 0) or 0)
+
+            context = {
+                'nombre': cliente.nombre,
+                'apellido': getattr(cliente, 'apellido', ''),
+                'telefono': cliente.telefono,
+                'numero_reserva': booking.id,
+                'servicios': servicios_list,
+                'total_monto': format_clp(total),
+                'pagado_monto': format_clp(pagado),
+            }
+
+            html_content = render_to_string('emails/payment_complete_email.html', context)
+
+            subject = f"Pago recibido - Reserva #{booking.id} pagada 100%"
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=f"Hola {cliente.nombre}, registramos tu pago y tu reserva quedó pagada al 100%.",
+                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                to=[cliente.email],
+                bcc=['aremkospa@gmail.com', getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copias a aremkospa@gmail.com y ventas@aremko.cl
+                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+            )
+            email.attach_alternative(html_content, "text/html")
+            email.send()
+
+            # Usamos el tipo BOOKING_CONFIRMATION para evitar migraciones en choices
+            self._log_communication(
+                cliente=cliente,
+                communication_type='EMAIL',
+                message_type='BOOKING_CONFIRMATION',
+                subject=subject,
+                content=html_content,
+                destination=cliente.email,
+                booking_id=booking.id,
+                cost=0
+            )
+
+            self._update_communication_limits(cliente, 'EMAIL')
+            return {'success': True}
+        except Exception as e:
+            logger.error(f"Error en _send_payment_email: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def _send_payment_sms(self, cliente, booking):
+        """SMS cuando la reserva queda pagada al 100%"""
+        try:
+            message = f"Pago recibido ✅ Reserva #{booking.id} pagada 100%. ¡Gracias! - Aremko"
+            result = self.sms_service.send_sms(
+                destination=cliente.telefono,
+                message=message,
+                bulk_name=f"Pago 100% {booking.id}"
+            )
+            if result.get('success'):
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='SMS',
+                    message_type='BOOKING_CONFIRMATION',
+                    content=message,
+                    destination=cliente.telefono,
+                    external_id=result.get('batch_id', ''),
+                    booking_id=booking.id,
+                    cost=12
+                )
+                self._update_communication_limits(cliente, 'SMS')
+                return {'success': True}
+            return {'success': False, 'error': result.get('error')}
+        except Exception as e:
+            logger.error(f"Error en _send_payment_sms: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def send_full_payment_notification_dual(self, booking_id):
+        """Envía Email + SMS (si habilitado) cuando la reserva queda pagada al 100%"""
+        try:
+            booking = VentaReserva.objects.get(id=booking_id)
+            cliente = booking.cliente
+            total = float(getattr(booking, 'total', 0) or 0)
+            pagado = float(getattr(booking, 'pagado', 0) or 0)
+
+            if total <= 0 or pagado < total:
+                return {'success': False, 'reason': 'not_fully_paid'}
+
+            results = {'email': None, 'sms': None}
+            # Email
+            if self._can_send_communication(cliente, 'EMAIL', 'BOOKING_CONFIRMATION'):
+                results['email'] = self._send_payment_email(cliente, booking)
+
+            # SMS
+            from django.conf import settings as djsettings
+            if self._can_send_communication(cliente, 'SMS', 'BOOKING_CONFIRMATION') and getattr(djsettings, 'COMMUNICATION_SMS_ENABLED', True):
+                results['sms'] = self._send_payment_sms(cliente, booking)
+
+            return {
+                'success': (results['email'] and results['email'].get('success')) or (results['sms'] and results['sms'].get('success')),
+                'results': results,
+            }
+        except Exception as e:
+            logger.error(f"Error en send_full_payment_notification_dual: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    # ======================================
+    #  REACTIVACIÓN 90 DÍAS (GIFT CARD $10K)
+    # ======================================
+    def send_reactivation_giftcard_email(self, cliente_id, last_visit_date, expiry_date):
+        """Email de reactivación con Gift Card $10.000 (90 días desde última visita)"""
+        try:
+            cliente = Cliente.objects.get(id=cliente_id)
+            if not self._can_send_communication(cliente, 'EMAIL', 'REACTIVATION'):
+                return {'success': False, 'reason': 'blocked_by_limits_or_preferences'}
+
+            context = {
+                'nombre': cliente.nombre,
+                'fecha_ultima_visita': last_visit_date.strftime('%d/%m/%Y'),
+                'fecha_limite': expiry_date.strftime('%d/%m/%Y'),
+            }
+            html_content = render_to_string('emails/reactivation_90_email.html', context)
+            subject = 'Regalo para tu próxima visita - Gift Card $10.000'
+
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=(
+                    f"Hola {cliente.nombre},\n\n"
+                    f"Gracias por tu última visita a Aremko el {context['fecha_ultima_visita']}. "
+                    f"Te regalamos una Gift Card de $10.000 para cualquier servicio (vigente hasta {context['fecha_limite']}).\n"
+                    f"Para activarla, escríbenos por WhatsApp al +56 9 5790 2525 indicando 'cobro de Gift Card por visita de hace 90 días a Aremko'."
+                ),
+                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                to=[cliente.email] if cliente.email else [],
+                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+            )
+            if cliente.email:
+                email.attach_alternative(html_content, "text/html")
+                email.send()
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='EMAIL',
+                    message_type='REACTIVATION',
+                    subject=subject,
+                    content=html_content,
+                    destination=cliente.email,
+                )
+                self._update_communication_limits(cliente, 'EMAIL')
+                return {'success': True}
+            return {'success': False, 'reason': 'no_email'}
+        except Exception as e:
+            logger.error(f"Error en send_reactivation_giftcard_email: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def send_reactivation_giftcard_sms(self, cliente_id, last_visit_date, expiry_date):
+        """SMS largo de reactivación con Gift Card $10.000 (90 días)"""
+        try:
+            cliente = Cliente.objects.get(id=cliente_id)
+            if not self._can_send_communication(cliente, 'SMS', 'REACTIVATION'):
+                return {'success': False, 'reason': 'blocked_by_limits_or_preferences'}
+
+            from django.conf import settings as djsettings
+            if not getattr(djsettings, 'COMMUNICATION_SMS_ENABLED', True):
+                return {'success': False, 'reason': 'sms_disabled'}
+
+            msg = (
+                f"Hola {cliente.nombre}, gracias por tu visita a Aremko hace 90 días. "
+                f"Queremos verte de vuelta y te regalamos una Gift Card de $10.000 para usar en cualquier servicio. "
+                f"Vigencia: hasta {expiry_date.strftime('%d/%m/%Y')}. "
+                f"Para activarla, escríbenos por WhatsApp al +56 9 5790 2525 indicando 'cobro de Gift Card por visita de hace 90 días a Aremko'. "
+                f"Si no deseas recibir mensajes, responde STOP."
+            )
+            result = self.sms_service.send_sms(
+                destination=cliente.telefono,
+                message=msg,
+                bulk_name='Reactivación 90 días'
+            )
+            if result.get('success'):
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='SMS',
+                    message_type='REACTIVATION',
+                    content=msg,
+                    destination=cliente.telefono,
+                    external_id=result.get('batch_id', ''),
+                )
+                self._update_communication_limits(cliente, 'SMS')
+                return {'success': True}
+            return {'success': False, 'error': result.get('error')}
+        except Exception as e:
+            logger.error(f"Error en send_reactivation_giftcard_sms: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    # =============================
+    #  ENCUESTA DE SATISFACCION 24h
+    # =============================
+    def send_satisfaction_survey(self, cliente_id, last_stay_date):
+        """Envía email (y SMS opcional) de encuesta el día siguiente a la última estadía a las 09:00"""
+        try:
+            cliente = Cliente.objects.get(id=cliente_id)
+            if not self._can_send_communication(cliente, 'EMAIL', 'SATISFACTION_SURVEY'):
+                return {'success': False, 'reason': 'blocked_by_limits_or_preferences'}
+
+            from django.conf import settings as djsettings
+            survey_base = getattr(djsettings, 'SURVEY_PUBLIC_BASE_URL', '')
+            trip_url = getattr(djsettings, 'TRIPADVISOR_URL', '')
+            survey_url = f"{survey_base}?cliente={cliente.id}"
+
+            context = {
+                'nombre': cliente.nombre,
+                'fecha_ultima_estadia': last_stay_date.strftime('%d/%m/%Y'),
+                'survey_url': survey_url,
+                'tripadvisor_url': trip_url,
+            }
+            html_content = render_to_string('emails/satisfaction_survey_email.html', context)
+            subject = '¿Cómo estuvo tu experiencia en Aremko?'
+
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=(
+                    f"Hola {cliente.nombre}, esperamos que tu experiencia en Aremko haya sido excelente. "
+                    f"Cuéntanos cómo te fue respondiendo esta encuesta: {survey_url}. "
+                    f"Si quieres, también puedes dejarnos tu opinión en TripAdvisor: {trip_url}."
+                ),
+                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                to=[cliente.email] if cliente.email else [],
+                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+            )
+            if cliente.email:
+                email.attach_alternative(html_content, "text/html")
+                email.send()
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='EMAIL',
+                    message_type='SATISFACTION_SURVEY',
+                    subject=subject,
+                    content=html_content,
+                    destination=cliente.email,
+                )
+                self._update_communication_limits(cliente, 'EMAIL')
+
+            # SMS opcional
+            if self._can_send_communication(cliente, 'SMS', 'SATISFACTION_SURVEY') and getattr(djsettings, 'COMMUNICATION_SMS_ENABLED', True):
+                msg = (
+                    f"Hola {cliente.nombre}, ¿cómo estuvo tu experiencia en Aremko? Cuéntanos aquí: {survey_url}. "
+                    f"También puedes opinar en TripAdvisor: {trip_url}. Gracias!"
+                )
+                result = self.sms_service.send_sms(
+                    destination=cliente.telefono,
+                    message=msg,
+                    bulk_name='Encuesta Satisfacción'
+                )
+                if result.get('success'):
+                    self._log_communication(
+                        cliente=cliente,
+                        communication_type='SMS',
+                        message_type='SATISFACTION_SURVEY',
+                        content=msg,
+                        destination=cliente.telefono,
+                        external_id=result.get('batch_id', ''),
+                    )
+                    self._update_communication_limits(cliente, 'SMS')
+
+            return {'success': True}
+        except Exception as e:
+            logger.error(f"Error en send_satisfaction_survey: {str(e)}")
+            return {'success': False, 'error': str(e)}
+    
+    def send_booking_confirmation_sms(self, booking_id, cliente_id=None):
+        """
+        Envía SMS de confirmación de reserva
+        """
+        try:
+            # Obtener reserva y cliente
+            booking = VentaReserva.objects.get(id=booking_id)
+            cliente = booking.cliente if not cliente_id else Cliente.objects.get(id=cliente_id)
+            
+            # Verificar si se puede enviar
+            if not self._can_send_communication(cliente, 'SMS', 'BOOKING_CONFIRMATION'):
+                return {'success': False, 'reason': 'blocked_by_limits_or_preferences'}
+            
+            # Obtener el primer servicio reservado
+            from ..models import ReservaServicio
+            reserva_servicio = ReservaServicio.objects.filter(venta_reserva=booking).first()
+            
+            if reserva_servicio:
+                servicio_nombre = reserva_servicio.servicio.nombre
+                
+                # fecha_agendamiento es datetime.date
+                fecha_str = reserva_servicio.fecha_agendamiento.strftime('%d/%m/%Y')
+                
+                # hora_inicio es string (ej: "14:30")
+                hora_str = str(reserva_servicio.hora_inicio)
+            else:
+                servicio_nombre = 'tu servicio'
+                fecha_str = booking.fecha_reserva.strftime('%d/%m/%Y')
+                hora_str = booking.fecha_reserva.strftime('%H:%M')
+            
+            # Obtener plantilla
+            template = SMSTemplate.objects.filter(
+                message_type='BOOKING_CONFIRMATION',
+                is_active=True
+            ).first()
+            
+            if not template:
+                message = f"✅ Reserva confirmada para {fecha_str} a las {hora_str}. ¡Te esperamos! - Aremko"
+            else:
+                message = template.render_message(
+                    cliente,
+                    servicio=servicio_nombre,
+                    fecha=fecha_str,
+                    hora=hora_str
+                )
+            
+            # Enviar SMS
+            result = self.sms_service.send_sms(
+                destination=cliente.telefono,
+                message=message,
+                bulk_name=f"Confirmación Reserva {booking_id}"
+            )
+            
+            if result['success']:
+                # Registrar comunicación
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='SMS',
+                    message_type='BOOKING_CONFIRMATION',
+                    content=message,
+                    destination=cliente.telefono,
+                    external_id=result['batch_id'],
+                    booking_id=booking_id,
+                    cost=12  # Costo por SMS según cotización
+                )
+                
+                # Actualizar límites
+                self._update_communication_limits(cliente, 'SMS')
+                
+                logger.info(f"SMS confirmación enviado a {cliente.nombre} para booking {booking_id}")
+                return {'success': True, 'batch_id': result['batch_id']}
+            else:
+                logger.error(f"Error enviando SMS confirmación: {result['error']}")
+                return {'success': False, 'error': result['error']}
+                
+        except Exception as e:
+            logger.error(f"Error en send_booking_confirmation_sms: {str(e)}")
+            return {'success': False, 'error': str(e)}
+    
+    def send_booking_reminder_sms(self, booking_id, hours_before=24):
+        """
+        Envía SMS recordatorio de cita
+        """
+        try:
+            booking = VentaReserva.objects.get(id=booking_id)
+            cliente = booking.cliente
+            
+            # Obtener el primer servicio reservado
+            from ..models import ReservaServicio
+            reserva_servicio = ReservaServicio.objects.filter(venta_reserva=booking).first()
+            
+            if reserva_servicio:
+                servicio_nombre = reserva_servicio.servicio.nombre
+                
+                # fecha_agendamiento es datetime.date
+                fecha_str = reserva_servicio.fecha_agendamiento.strftime('%d/%m/%Y')
+                fecha_date = reserva_servicio.fecha_agendamiento
+                
+                # hora_inicio es string (ej: "14:30"), convertir a time
+                hora_str = str(reserva_servicio.hora_inicio)
+                try:
+                    hora_time = datetime.strptime(str(reserva_servicio.hora_inicio), '%H:%M').time()
+                except:
+                    hora_time = datetime.strptime(str(reserva_servicio.hora_inicio), '%H:%M:%S').time()
+                
+                # Crear datetime para comparación
+                booking_datetime = timezone.make_aware(
+                    datetime.combine(fecha_date, hora_time)
+                )
+            else:
+                # Fallback a fecha de venta si no hay servicio específico
+                booking_datetime = booking.fecha_reserva
+                servicio_nombre = 'tu servicio'
+                fecha_str = booking.fecha_reserva.strftime('%d/%m/%Y')
+                hora_str = booking.fecha_reserva.strftime('%H:%M')
+            
+            reminder_time = booking_datetime - timedelta(hours=hours_before)
+            
+            if timezone.now() < reminder_time:
+                return {'success': False, 'reason': 'too_early'}
+            
+            # Verificar límites y preferencias
+            if not self._can_send_communication(cliente, 'SMS', 'BOOKING_REMINDER'):
+                return {'success': False, 'reason': 'blocked_by_limits_or_preferences'}
+            
+            # Plantilla de recordatorio
+            template = SMSTemplate.objects.filter(
+                message_type='BOOKING_REMINDER',
+                is_active=True
+            ).first()
+            
+            if not template:
+                message = f"🔔 Recordatorio: Tienes una cita mañana {fecha_str} a las {hora_str}. ¡No olvides! - Aremko"
+            else:
+                message = template.render_message(
+                    cliente,
+                    servicio=servicio_nombre,
+                    fecha=fecha_str,
+                    hora=hora_str
+                )
+            
+            # Enviar SMS
+            result = self.sms_service.send_sms(
+                destination=cliente.telefono,
+                message=message,
+                bulk_name=f"Recordatorio {booking_id}"
+            )
+            
+            if result['success']:
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='SMS',
+                    message_type='BOOKING_REMINDER',
+                    content=message,
+                    destination=cliente.telefono,
+                    external_id=result['batch_id'],
+                    booking_id=booking_id,
+                    cost=12
+                )
+                
+                self._update_communication_limits(cliente, 'SMS')
+                
+                logger.info(f"SMS recordatorio enviado a {cliente.nombre} para booking {booking_id}")
+                return {'success': True, 'batch_id': result['batch_id']}
+            else:
+                return {'success': False, 'error': result['error']}
+                
+        except Exception as e:
+            logger.error(f"Error en send_booking_reminder_sms: {str(e)}")
+            return {'success': False, 'error': str(e)}
+    
+    def send_birthday_sms(self, cliente_id):
+        """
+        Envía SMS de felicitación de cumpleaños (máximo 1 por año)
+        """
+        try:
+            cliente = Cliente.objects.get(id=cliente_id)
+            
+            # Verificar límites especiales de cumpleaños
+            limit, created = CommunicationLimit.objects.get_or_create(cliente=cliente)
+            if not limit.can_send_birthday_sms():
+                return {'success': False, 'reason': 'birthday_sms_already_sent_this_year'}
+            
+            # Verificar preferencias generales
+            if not self._can_send_communication(cliente, 'SMS', 'BIRTHDAY'):
+                return {'success': False, 'reason': 'blocked_by_preferences'}
+            
+            # Plantilla de cumpleaños
+            template = SMSTemplate.objects.filter(
+                message_type='BIRTHDAY',
+                is_active=True
+            ).first()
+            
+            if not template:
+                message = f"🎉 ¡Feliz cumpleaños {cliente.nombre}! Esperamos que tengas un día maravilloso. ¡Te deseamos lo mejor! - Aremko"
+            else:
+                message = template.render_message(cliente)
+            
+            # Enviar SMS
+            result = self.sms_service.send_sms(
+                destination=cliente.telefono,
+                message=message,
+                bulk_name=f"Cumpleaños {cliente.nombre}"
+            )
+            
+            if result['success']:
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='SMS',
+                    message_type='BIRTHDAY',
+                    content=message,
+                    destination=cliente.telefono,
+                    external_id=result['batch_id'],
+                    cost=12
+                )
+                
+                # Registrar cumpleaños enviado
+                limit.record_birthday_sms_sent()
+                
+                logger.info(f"SMS cumpleaños enviado a {cliente.nombre}")
+                return {'success': True, 'batch_id': result['batch_id']}
+            else:
+                return {'success': False, 'error': result['error']}
+                
+        except Exception as e:
+            logger.error(f"Error en send_birthday_sms: {str(e)}")
+            return {'success': False, 'error': str(e)}
+    
+    def send_reactivation_email(self, cliente_id, campaign=None):
+        """
+        Envía email de reactivación para clientes inactivos (máximo 1 por trimestre)
+        """
+        try:
+            cliente = Cliente.objects.get(id=cliente_id)
+            
+            # Verificar límites de reactivación
+            limit, created = CommunicationLimit.objects.get_or_create(cliente=cliente)
+            if not limit.can_send_reactivation_email():
+                return {'success': False, 'reason': 'reactivation_limit_reached'}
+            
+            # Verificar límites generales de email
+            if not self._can_send_communication(cliente, 'EMAIL', 'REACTIVATION'):
+                return {'success': False, 'reason': 'blocked_by_limits_or_preferences'}
+            
+            # Verificar que realmente esté inactivo (90+ días)
+            if not self._is_client_inactive(cliente, days=90):
+                return {'success': False, 'reason': 'client_not_inactive'}
+            
+            # Preparar email personalizado
+            subject = f"Te extrañamos, {cliente.nombre} 💙"
+            
+            # Obtener último servicio para personalizar
+            last_booking = VentaReserva.objects.filter(cliente=cliente).order_by('-fecha_reserva').first()
+            last_service = last_booking.servicio.nombre if last_booking and hasattr(last_booking, 'servicio') else 'nuestros servicios'
+            
+            context = {
+                'cliente': cliente,
+                'last_service': last_service,
+                'special_offer': '20% de descuento',  # Oferta especial para reactivación
+                'company_name': 'Aremko'
+            }
+            
+            # Renderizar template HTML
+            html_content = render_to_string('emails/reactivation_email.html', context)
+            
+            # Enviar email
+            success = send_mail(
+                subject=subject,
+                message='',  # Texto plano vacío, usamos HTML
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[cliente.email],
+                html_message=html_content,
+                fail_silently=False
+            )
+            
+            if success:
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='EMAIL',
+                    message_type='REACTIVATION',
+                    subject=subject,
+                    content=html_content,
+                    destination=cliente.email,
+                    campaign=campaign
+                )
+                
+                # Registrar email de reactivación enviado
+                limit.record_reactivation_email_sent()
+                
+                logger.info(f"Email reactivación enviado a {cliente.nombre}")
+                return {'success': True}
+            else:
+                return {'success': False, 'error': 'email_send_failed'}
+                
+        except Exception as e:
+            logger.error(f"Error en send_reactivation_email: {str(e)}")
+            return {'success': False, 'error': str(e)}
+    
+    def send_satisfaction_survey_sms(self, booking_id, hours_after=24):
+        """
+        Envía SMS con encuesta de satisfacción después del servicio
+        """
+        try:
+            booking = VentaReserva.objects.get(id=booking_id)
+            cliente = booking.cliente
+            
+            # Obtener el primer servicio reservado
+            from ..models import ReservaServicio
+            reserva_servicio = ReservaServicio.objects.filter(venta_reserva=booking).first()
+            
+            if reserva_servicio:
+                servicio_nombre = reserva_servicio.servicio.nombre
+                
+                # fecha_agendamiento es datetime.date
+                fecha_date = reserva_servicio.fecha_agendamiento
+                
+                # hora_inicio es string (ej: "14:30"), convertir a time
+                try:
+                    hora_time = datetime.strptime(str(reserva_servicio.hora_inicio), '%H:%M').time()
+                except:
+                    hora_time = datetime.strptime(str(reserva_servicio.hora_inicio), '%H:%M:%S').time()
+                
+                # Crear datetime para comparación
+                booking_datetime = timezone.make_aware(
+                    datetime.combine(fecha_date, hora_time)
+                )
+            else:
+                # Fallback a fecha de venta si no hay servicio específico
+                booking_datetime = booking.fecha_reserva
+                servicio_nombre = 'tu servicio'
+            
+            survey_time = booking_datetime + timedelta(hours=hours_after)
+            
+            if timezone.now() < survey_time:
+                return {'success': False, 'reason': 'too_early'}
+            
+            # Verificar límites
+            if not self._can_send_communication(cliente, 'SMS', 'SATISFACTION_SURVEY'):
+                return {'success': False, 'reason': 'blocked_by_limits_or_preferences'}
+            
+            # Mensaje con link a encuesta
+            survey_link = f"https://aremko-booking-system.onrender.com/encuesta/{booking_id}"
+            message = f"¡Hola {cliente.nombre}! ¿Cómo fue tu experiencia con {servicio_nombre}? Tu opinión es muy importante: {survey_link} - Aremko"
+            
+            # Enviar SMS con respuesta habilitada
+            result = self.sms_service.send_sms_with_reply(
+                destination=cliente.telefono,
+                message=message,
+                bulk_name=f"Encuesta {booking_id}"
+            )
+            
+            if result['success']:
+                self._log_communication(
+                    cliente=cliente,
+                    communication_type='SMS',
+                    message_type='SATISFACTION_SURVEY',
+                    content=message,
+                    destination=cliente.telefono,
+                    external_id=result['batch_id'],
+                    booking_id=booking_id,
+                    cost=12
+                )
+                
+                self._update_communication_limits(cliente, 'SMS')
+                
+                logger.info(f"SMS encuesta enviado a {cliente.nombre} para booking {booking_id}")
+                return {'success': True, 'batch_id': result['batch_id']}
+            else:
+                return {'success': False, 'error': result['error']}
+                
+        except Exception as e:
+            logger.error(f"Error en send_satisfaction_survey_sms: {str(e)}")
+            return {'success': False, 'error': str(e)}
+    
+    def send_segmented_newsletter(self, segment_filter, subject, content, campaign=None):
+        """
+        Envía newsletter segmentado respetando límites de frecuencia
+        """
+        results = {'sent': 0, 'blocked': 0, 'errors': 0}
+        
+        try:
+            # Obtener clientes del segmento
+            clientes = Cliente.objects.filter(**segment_filter)
+            
+            for cliente in clientes:
+                # Verificar límites de email semanal/mensual
+                if not self._can_send_communication(cliente, 'EMAIL', 'NEWSLETTER'):
+                    results['blocked'] += 1
+                    continue
+                
+                # Verificar que tenga email
+                if not cliente.email:
+                    results['errors'] += 1
+                    continue
+                
+                try:
+                    # Personalizar contenido
+                    personalized_content = content.replace('{nombre}', cliente.nombre)
+                    
+                    # Enviar email
+                    success = send_mail(
+                        subject=subject,
+                        message=personalized_content,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[cliente.email],
+                        fail_silently=False
+                    )
+                    
+                    if success:
+                        self._log_communication(
+                            cliente=cliente,
+                            communication_type='EMAIL',
+                            message_type='NEWSLETTER',
+                            subject=subject,
+                            content=personalized_content,
+                            destination=cliente.email,
+                            campaign=campaign
+                        )
+                        
+                        self._update_communication_limits(cliente, 'EMAIL')
+                        results['sent'] += 1
+                    else:
+                        results['errors'] += 1
+                        
+                except Exception as e:
+                    logger.error(f"Error enviando newsletter a {cliente.email}: {str(e)}")
+                    results['errors'] += 1
+            
+            logger.info(f"Newsletter enviado: {results['sent']} enviados, {results['blocked']} bloqueados, {results['errors']} errores")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error en send_segmented_newsletter: {str(e)}")
+            return results
+    
+    def _can_send_communication(self, cliente, communication_type, message_type):
+        """
+        Verifica si se puede enviar una comunicación según límites y preferencias
+        """
+        # Verificar preferencias del cliente
+        preferences, created = ClientPreferences.objects.get_or_create(cliente=cliente)
+        
+        # Verificaciones generales
+        if communication_type == 'SMS' and not preferences.accepts_sms:
+            return False
+        if communication_type == 'EMAIL' and not preferences.accepts_email:
+            return False
+        
+        # Verificaciones específicas por tipo de mensaje
+        message_type_checks = {
+            'BOOKING_CONFIRMATION': preferences.accepts_booking_confirmations,
+            'BOOKING_REMINDER': preferences.accepts_booking_reminders,
+            'BIRTHDAY': preferences.accepts_birthday_messages,
+            'PROMOTIONAL': preferences.accepts_promotional,
+            'NEWSLETTER': preferences.accepts_newsletters,
+            'REACTIVATION': preferences.accepts_reactivation,
+        }
+        
+        if message_type in message_type_checks and not message_type_checks[message_type]:
+            return False
+        
+        # Verificar horario preferido (solo para no-urgentes)
+        non_urgent_types = ['NEWSLETTER', 'PROMOTIONAL', 'BIRTHDAY']
+        if message_type in non_urgent_types and not preferences.can_contact_now():
+            return False
+        
+        # Verificar límites de frecuencia
+        # Los mensajes transaccionales NO deben bloquearse por límite
+        transactional_types = ['BOOKING_CONFIRMATION', 'BOOKING_REMINDER', 'SATISFACTION_SURVEY']
+        if message_type not in transactional_types:
+            limit, created = CommunicationLimit.objects.get_or_create(cliente=cliente)
+            if communication_type == 'SMS' and not limit.can_send_sms():
+                return False
+            if communication_type == 'EMAIL' and not limit.can_send_email():
+                return False
+        
+        return True
+    
+    def _is_client_inactive(self, cliente, days=90):
+        """
+        Verifica si un cliente está inactivo (sin reservas en X días)
+        """
+        cutoff_date = timezone.now().date() - timedelta(days=days)
+        recent_bookings = VentaReserva.objects.filter(
+            cliente=cliente,
+            fecha_reserva__gte=cutoff_date
+        ).exists()
+        
+        return not recent_bookings
+    
+    def _log_communication(self, cliente, communication_type, message_type, content, 
+                          destination, subject='', external_id='', campaign=None, 
+                          booking_id=None, cost=None):
+        """
+        Registra la comunicación en el log para auditoría
+        """
+        try:
+            log = CommunicationLog.objects.create(
+                cliente=cliente,
+                campaign=campaign,
+                communication_type=communication_type,
+                message_type=message_type,
+                subject=subject,
+                content=content,
+                destination=destination,
+                external_id=external_id,
+                booking_id=booking_id,
+                cost=cost,
+                triggered_by='communication_service'
+            )
+            log.mark_as_sent(external_id)
+            
+        except Exception as e:
+            logger.error(f"Error registrando comunicación: {str(e)}")
+    
+    def _update_communication_limits(self, cliente, communication_type):
+        """
+        Actualiza los contadores de límites de comunicación
+        """
+        try:
+            limit, created = CommunicationLimit.objects.get_or_create(cliente=cliente)
+            
+            if communication_type == 'SMS':
+                limit.record_sms_sent()
+            elif communication_type == 'EMAIL':
+                limit.record_email_sent()
+                
+        except Exception as e:
+            logger.error(f"Error actualizando límites: {str(e)}")
+    
+    def get_communication_stats(self, days=30):
+        """
+        Obtiene estadísticas de comunicación de los últimos X días
+        """
+        cutoff_date = timezone.now() - timedelta(days=days)
+        
+        logs = CommunicationLog.objects.filter(created_at__gte=cutoff_date)
+        
+        stats = {
+            'total_sent': logs.filter(status='SENT').count(),
+            'total_delivered': logs.filter(status='DELIVERED').count(),
+            'total_failed': logs.filter(status='FAILED').count(),
+            'total_blocked': logs.filter(status='BLOCKED').count(),
+            'sms_sent': logs.filter(communication_type='SMS', status='SENT').count(),
+            'emails_sent': logs.filter(communication_type='EMAIL', status='SENT').count(),
+            'total_cost': sum(log.cost or 0 for log in logs if log.cost),
+            'by_message_type': {},
+        }
+        
+        # Estadísticas por tipo de mensaje
+        for msg_type, _ in CommunicationLog.MESSAGE_TYPES:
+            count = logs.filter(message_type=msg_type, status='SENT').count()
+            if count > 0:
+                stats['by_message_type'][msg_type] = count
+        
+        return stats
+
+
+# Instancia global del servicio
+communication_service = CommunicationService()

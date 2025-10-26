@@ -1,0 +1,802 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Aremko{% endblock %}</title>
+    {% block meta_description %}{% endblock %}
+    {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
+
+    {% block meta_og %}
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+    <meta property="og:title" content="{% block og_title %}Aremko Spa Puerto Varas - Masajes, Tinajas y Alojamiento{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Spa boutique en Puerto Varas. Masajes relajantes, tinajas calientes con vista al lago y alojamiento. Tu escapada perfecta en la Región de Los Lagos.{% endblock %}">
+    <meta property="og:image" content="{% block og_image %}{{ request.scheme }}://{{ request.get_host }}/static/images/aremko-og-image.jpg{% endblock %}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Aremko Spa Puerto Varas">
+    <meta property="og:site_name" content="Aremko Spa">
+    <meta property="og:locale" content="es_CL">
+    {% endblock %}
+
+    {% block meta_twitter %}
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+    <meta name="twitter:title" content="{% block twitter_title %}Aremko Spa Puerto Varas - Masajes, Tinajas y Alojamiento{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}Spa boutique en Puerto Varas. Masajes relajantes, tinajas calientes con vista al lago y alojamiento. Tu escapada perfecta en la Región de Los Lagos.{% endblock %}">
+    <meta name="twitter:image" content="{% block twitter_image %}{{ request.scheme }}://{{ request.get_host }}/static/images/aremko-twitter-image.jpg{% endblock %}">
+    <meta name="twitter:image:alt" content="Aremko Spa Puerto Varas">
+    {% endblock %}
+
+    {% block structured_data %}{% endblock %}
+
+    <!-- Google tag (gtag.js) - Google Ads -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-1015703959"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'AW-1015703959');
+    </script>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Flatpickr for date picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+    <!-- Link to your custom modern CSS -->
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+
+    <!-- Custom CSS (Inline styles - consider moving more to modern.css) -->
+    <style>
+        :root {
+            /* Wooden/Coffee Theme */
+            --primary-color: #A0522D;    /* Sienna (Reddish-Brown) */
+            --secondary-color: #D2B48C; /* Tan */
+            --dark-gray: #5C4033;       /* Dark Brown */
+            --light-gray: #A9A9A9;      /* Dark Gray (for text) */
+            --background: #FAF0E6;     /* Linen (Off-white/Beige) */
+            --white: #ffffff;          /* White (Keep for high contrast) */
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: var(--background);
+            color: var(--dark-gray);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .whatsapp-fab {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: #25D366;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 1050;
+            text-decoration: none;
+        }
+        .whatsapp-fab:hover { opacity: 0.9; }
+
+        main {
+            flex: 1;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            color: var(--primary-color) !important;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 40px;
+            font-weight: 700;
+            color: var(--dark-gray);
+        }
+
+        .card {
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            margin-bottom: 30px;
+            border: none;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-img-top {
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        .card-title {
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .card-text {
+            color: var(--light-gray);
+            margin-bottom: 15px;
+        }
+
+        .price {
+            font-weight: 700;
+            color: var(--primary-color);
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 10px 20px;
+        }
+
+        .btn-primary:hover {
+            background-color: #ff3a40;
+            border-color: #ff3a40;
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 10px 20px;
+        }
+
+        .btn-secondary:hover {
+            background-color: #008f86;
+            border-color: #008f86;
+        }
+
+        .btn-outline-secondary {
+             border-color: var(--secondary-color);
+             color: var(--secondary-color);
+        }
+
+        .btn-outline-secondary:hover {
+             background-color: var(--secondary-color);
+             color: var(--white);
+        }
+
+        .footer {
+            background-color: var(--dark-gray);
+            color: white;
+            padding: 50px 0 20px;
+            margin-top: auto; /* Push footer to bottom */
+        }
+
+        .footer h5 {
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .footer ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .footer ul li {
+            margin-bottom: 10px;
+        }
+
+        .footer ul li a {
+            color: #ddd;
+            text-decoration: none;
+        }
+
+        .footer ul li a:hover {
+            color: white;
+        }
+
+        .social-icons {
+            font-size: 1.5rem;
+            margin-right: 15px;
+        }
+
+        .copyright {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #666;
+            text-align: center;
+        }
+
+        /* Shopping Cart Styles */
+        .cart-icon {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .cart-count {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .cart-dropdown {
+            position: absolute;
+            right: 0;
+            top: 100%;
+            width: 350px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            z-index: 1000;
+            display: none; /* Hidden by default, shown via JS */
+        }
+
+        .cart-dropdown.show {
+            display: block;
+        }
+
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .cart-item-details {
+            flex: 1;
+            margin-right: 10px;
+        }
+
+        .cart-item-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .cart-item-info {
+            font-size: 0.8rem;
+            color: var(--light-gray);
+        }
+
+        .cart-item-price {
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .cart-item-remove {
+            color: var(--light-gray);
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .cart-item-remove:hover {
+            color: var(--primary-color);
+        }
+
+        .cart-total {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            font-weight: 700;
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        .booking-form label {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .booking-form .form-control,
+        .booking-form .form-select {
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-bottom: 20px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .cart-dropdown {
+                width: 300px;
+            }
+        }
+    </style>
+    {% block extra_style %}{% endblock %} {# Moved block outside style tags #}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white py-3 sticky-top shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'homepage' %}">
+                AREMKO
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    {% block nav_items %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownServicios" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Servicios
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="navbarDropdownServicios">
+                            <li><a class="dropdown-item" href="{% url 'homepage' %}#servicios">Todos los Servicios</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            {% for cat in todas_las_categorias %}
+                            <li><a class="dropdown-item" href="{% url 'ventas:categoria_detail' cat.id %}">{{ cat.nombre }}</a></li> {# Added ventas: namespace #}
+                            {% endfor %}
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'homepage' %}#caracteristicas">Características</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'homepage' %}#testimonios">Testimonios</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'homepage' %}#contacto">Contacto</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'ventas:empresas' %}">Empresas</a>
+                    </li>
+                    {% endblock nav_items %}
+                </ul>
+                <div class="d-flex align-items-center">
+                    {% block nav_extra %}
+                    <div class="cart-icon me-4" id="cartIconWrapper">
+                        <a href="{% url 'ventas:cart' %}" class="text-decoration-none text-dark"> {# Added ventas: namespace #}
+                            <i class="fas fa-shopping-cart"></i>
+                            <span class="cart-count" id="cartCount">
+                                {{ request.session.cart.servicios|length|default:0 }}
+                            </span>
+                        </a>
+                        <!-- Cart Dropdown can be added here if needed globally, or kept page-specific -->
+                    </div>
+
+                    {% if user.is_authenticated %}
+                        <span class="navbar-text me-3">Hola, {{ user.username }}</span>
+                        <a href="{% url 'logout' %}" class="btn btn-outline-secondary btn-sm">Salir</a>
+                        {% if user.is_staff %}
+                         <a href="{% url 'admin:index' %}" class="btn btn-outline-primary btn-sm ms-2">Admin</a>
+                        {% endif %}
+                    {% else %}
+                         <a href="{% url 'login' %}" class="btn btn-outline-secondary btn-sm me-2">Ingresar</a>
+                         <a href="{% url 'ventas:inicio_sistema' %}" class="btn btn-primary btn-sm"> {# Added ventas: namespace #}
+                            <i class="fas fa-user me-1"></i>Acceso Admin/Staff
+                         </a>
+                    {% endif %}
+                    {% endblock nav_extra %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="py-4">
+        {% block content %}
+        <!-- Page specific content goes here -->
+        {% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer" id="contacto">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <h5>Aremko</h5>
+                    <p>Ofrecemos los mejores servicios para tu bienestar y comodidad. Reserva ahora y disfruta de una experiencia única.</p>
+                    <div class="mt-3">
+                        <a href="#" class="text-white social-icons"><i class="fab fa-facebook"></i></a>
+                        <a href="#" class="text-white social-icons"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="text-white social-icons"><i class="fab fa-twitter"></i></a>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-md-6 mb-4">
+                    <h5>Enlaces</h5>
+                    <ul>
+                        <li><a href="{% url 'homepage' %}#servicios">Servicios</a></li>
+                        <li><a href="{% url 'homepage' %}#caracteristicas">Características</a></li>
+                        <li><a href="{% url 'homepage' %}#testimonios">Testimonios</a></li>
+                        <li><a href="#contacto">Contacto</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <h5>Servicios Populares</h5>
+                     <ul>
+                        {% comment %} Consider fetching top categories/services dynamically if needed {% endcomment %}
+                        <li><a href="{% url 'homepage' %}#servicios">Masajes</a></li>
+                        <li><a href="{% url 'homepage' %}#servicios">Terapias</a></li>
+                        <li><a href="{% url 'homepage' %}#servicios">Bienestar</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <h5>Contacto</h5>
+                    <ul>
+                        <li><i class="fas fa-map-marker-alt me-2"></i> Rio Pescado Km 4 Puerto Varas, Chile</li>
+                        <li><i class="fas fa-phone me-2"></i> +56 9 5790 2525</li>
+                        <li><i class="fas fa-envelope me-2"></i> aremkospa@gmail.com</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="copyright">
+                <p>&copy; {% now "Y" %} Aremko. Todos los derechos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modals defined globally -->
+    {% block modals %}
+    <!-- Checkout Modal -->
+    <div class="modal fade" id="checkoutModal" tabindex="-1" aria-labelledby="checkoutModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="checkoutModalLabel">Finalizar Reserva</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Add a spinner/loading indicator (optional) -->
+                    <div id="checkoutLoading" class="text-center mb-3" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Buscando...</span>
+                        </div>
+                    </div>
+                    <form id="checkoutForm" class="booking-form">
+                        <!-- Moved Telefono field first -->
+                        <div class="mb-3">
+                            <label for="checkoutTelefono" class="form-label">Teléfono</label>
+                            <input type="tel" class="form-control" id="checkoutTelefono" name="telefono" required placeholder="+56912345678">
+                            <div class="form-text">Ingresa tu número para buscar tus datos.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="checkoutNombre" class="form-label">Nombre Completo</label>
+                            <input type="text" class="form-control" id="checkoutNombre" name="nombre" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="checkoutEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="checkoutEmail" name="email" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="checkoutDocumento" class="form-label">ID/DNI/Passport/RUT (opcional)</label>
+                            <input type="text" class="form-control" id="checkoutDocumento" name="documento_identidad">
+                        </div>
+
+                        <div class="mb-4">
+                            <h6>Resumen de la Reserva</h6>
+                            <div id="checkoutModalItems">
+                                <!-- Items will be populated dynamically if needed, or rely on cart page -->
+                                <p class="text-center text-muted">Revisa tu carrito para ver los detalles.</p>
+                            </div>
+                            <div class="cart-total">
+                                <span>Total:</span>
+                                <span id="checkoutModalTotal">${{ request.session.cart.total|default:0 }}</span> {# Display total from session #}
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="completeCheckoutBtn">Completar Reserva</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="successModalLabel">¡Reserva Exitosa!</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <i class="fas fa-check-circle text-success" style="font-size: 4rem; margin-bottom: 20px;"></i>
+                    <h4>¡Gracias por tu reserva!</h4>
+                    <p>Tu reserva ha sido procesada exitosamente. Hemos enviado un correo electrónico con los detalles de tu reserva.</p>
+                    <p>ID de Reserva: <span id="reservaId"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <a href="{% url 'homepage' %}" class="btn btn-primary">Volver al Inicio</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endblock modals %}
+
+    <a href="https://wa.me/5697902525?text=Hola%20Aremko%2C%20quisiera%20informaci%C3%B3n%20y%20reservar" class="whatsapp-fab" target="_blank" rel="noopener" aria-label="Contactar por WhatsApp">
+        <i class="fab fa-whatsapp" style="font-size: 28px;"></i>
+    </a>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script> <!-- Spanish locale -->
+
+    <!-- Custom JS -->
+    <script>
+        // Global helper function
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+          return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
+        // Function to complete checkout (now global)
+        function completeCheckout() {
+            console.log("Attempting checkout...");
+            const nombre = document.getElementById('checkoutNombre').value; // Use updated ID
+            const email = document.getElementById('checkoutEmail').value;   // Use updated ID
+            const telefono = document.getElementById('checkoutTelefono').value; // Use updated ID
+            const documento_identidad = document.getElementById('checkoutDocumento').value; // Use updated ID
+            const csrfToken = getCookie('csrftoken');
+            console.log("CSRF Token for checkout:", csrfToken);
+
+            if (!csrfToken) {
+                console.error("CSRF Token not found!");
+                alert("Error de seguridad. Intenta recargar la página.");
+                return;
+            }
+            // Validar campos
+            if (!nombre || !email || !telefono) {
+                alert('Por favor, completa todos los campos obligatorios.');
+                return;
+            }
+
+            // Crear FormData para enviar
+            const formData = new FormData();
+            formData.append('nombre', nombre);
+            formData.append('email', email);
+            formData.append('telefono', telefono);
+            formData.append('documento_identidad', documento_identidad);
+
+            console.log("Sending checkout request to:", '{% url "ventas:complete_checkout" %}'); {# Added ventas: namespace #}
+            // Enviar petición AJAX
+            fetch('{% url "ventas:complete_checkout" %}', { {# Added ventas: namespace #}
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            })
+            .then(response => {
+                 console.log("Checkout response status:", response.status);
+                 if (!response.ok) {
+                    // Log error response text
+                    return response.text().then(text => {
+                        throw new Error(`Server responded with ${response.status}: ${text || 'No additional error info'}`);
+                    });
+                 }
+                 return response.json();
+            })
+            .then(data => {
+                console.log("Checkout response data:", data);
+                if (data && data.success) { // Check if data and data.success exist
+                    // Cerrar modal de checkout
+                    const checkoutModalEl = document.getElementById('checkoutModal');
+                    if (checkoutModalEl) {
+                        const checkoutModalInstance = bootstrap.Modal.getInstance(checkoutModalEl);
+                        // Check if instance exists before hiding
+                        if (checkoutModalInstance) {
+                            checkoutModalInstance.hide();
+                            console.log("Checkout modal hidden.");
+                        } else {
+                             console.warn("Checkout modal instance not found to hide.");
+                        }
+                    } else {
+                         console.error("Checkout modal element not found.");
+                    }
+
+                    // Actualizar ID de reserva en el modal de éxito
+                    const reservaIdSpan = document.getElementById('reservaId');
+                    if(reservaIdSpan) {
+                        // Check if reserva_id exists in data
+                        reservaIdSpan.textContent = data.reserva_id ? data.reserva_id : 'N/A';
+                        console.log("Reserva ID set in success modal:", data.reserva_id);
+                    } else {
+                         console.error("Reserva ID span element not found in success modal.");
+                    }
+
+                    // Mostrar modal de éxito
+                    const successModalEl = document.getElementById('successModal');
+                     if (successModalEl) {
+                        // Ensure we get or create an instance correctly
+                        let successModalInstance = bootstrap.Modal.getInstance(successModalEl);
+                        if (!successModalInstance) {
+                             successModalInstance = new bootstrap.Modal(successModalEl);
+                             console.log("New success modal instance created.");
+                        }
+                        successModalInstance.show();
+                        console.log("Success modal shown.");
+                     } else {
+                          console.error("Success modal element not found.");
+                     }
+                     // Optionally clear cart display if needed here
+                     const cartCount = document.getElementById('cartCount');
+                     if (cartCount) cartCount.textContent = '0';
+
+                } else {
+                    alert('Error al procesar la reserva: ' + (data ? data.error : 'Respuesta inválida del servidor')); // Improved error message
+                }
+            })
+            .catch(error => {
+                console.error('Error al procesar la reserva:', error);
+                alert(`Error al procesar la reserva: ${error.message}. Por favor, intenta nuevamente.`);
+            });
+        }
+
+        // Function to remove from cart (now global)
+        function removeFromCart(index) {
+            console.log("Attempting to remove item at index:", index);
+            const csrfToken = getCookie('csrftoken');
+            console.log("CSRF Token for remove:", csrfToken);
+            if (!csrfToken) {
+                console.error("CSRF Token not found!");
+                alert("Error de seguridad. Intenta recargar la página.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('index', index);
+
+            console.log("Sending remove request to:", '{% url "ventas:remove_from_cart" %}'); {# Added ventas: namespace #}
+            fetch('{% url "ventas:remove_from_cart" %}', { {# Added ventas: namespace #}
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            })
+            .then(response => {
+                console.log("Remove response status:", response.status);
+                if (!response.ok) {
+                    // Log error response text
+                    return response.text().then(text => {
+                        throw new Error(`Server responded with ${response.status}: ${text || 'No additional error info'}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Remove response data:", data);
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error al eliminar del carrito: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error al eliminar del carrito:', error);
+                alert('Error al eliminar del carrito. Por favor, intenta nuevamente.');
+            });
+        }
+
+        // Attach event listener after DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            const completeCheckoutBtn = document.getElementById('completeCheckoutBtn');
+            if (completeCheckoutBtn) {
+                completeCheckoutBtn.addEventListener('click', completeCheckout);
+                console.log("Event listener added for #completeCheckoutBtn click");
+            } else {
+                console.error("Complete checkout button not found");
+            }
+
+            // --- Client Lookup via Phone ---
+            const phoneInput = document.getElementById('checkoutTelefono');
+            const nameInput = document.getElementById('checkoutNombre');
+            const emailInput = document.getElementById('checkoutEmail');
+            const docInput = document.getElementById('checkoutDocumento');
+            const loadingIndicator = document.getElementById('checkoutLoading'); // Optional loading indicator
+
+            if (phoneInput && nameInput && emailInput && docInput) {
+                phoneInput.addEventListener('blur', function() { // Trigger on blur (losing focus)
+                    const phoneNumber = this.value.trim();
+                    // Basic validation - adjust length check as needed for Chilean numbers
+                    if (phoneNumber.length >= 9) {
+                        if(loadingIndicator) loadingIndicator.style.display = 'block'; // Show loading
+
+                        // Construct the API URL
+                        const lookupUrl = `{% url 'ventas:get_client_details_by_phone' %}?telefono=${encodeURIComponent(phoneNumber)}`; {# Added ventas: namespace #}
+                        console.log("Looking up client:", lookupUrl);
+
+                        fetch(lookupUrl)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                console.log("Lookup response:", data);
+                                if (data.found) {
+                                    nameInput.value = data.nombre;
+                                    emailInput.value = data.email;
+                                    docInput.value = data.documento_identidad;
+                                    console.log("Client data populated.");
+                                } else {
+                                    // Optional: Clear fields if client not found, or leave them as is
+                                    // nameInput.value = '';
+                                    // emailInput.value = '';
+                                    // docInput.value = '';
+                                    console.log("Client not found.");
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error looking up client:', error);
+                                // Optionally inform the user, but avoid annoying alerts
+                            })
+                            .finally(() => {
+                                if(loadingIndicator) loadingIndicator.style.display = 'none'; // Hide loading
+                            });
+                    }
+                });
+                console.log("Event listener added for #checkoutTelefono blur");
+            } else {
+                 console.error("One or more checkout form fields not found for phone lookup.");
+            }
+            // --- End Client Lookup ---
+        });
+    </script>
+    {# Page specific script goes here, outside the main script tag #}
+    {% block extra_script %}{% endblock %}
+</body>
+</html>

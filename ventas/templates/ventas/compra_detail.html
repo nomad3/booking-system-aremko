@@ -1,0 +1,91 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% load humanize %} {# Load humanize for number formatting if needed #}
+
+{% block extrahead %}
+    {{ block.super }}
+    <!-- Modern Airbnb-style CSS -->
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4"> {# Use modern-container #}
+    <!-- Header Section -->
+    <div class="page-header mb-4"> {# Use page-header #}
+        <h1>Detalle de Compra #{{ compra.id }}</h1>
+        <p>Información detallada de la compra realizada a {{ compra.proveedor.nombre }}.</p>
+    </div>
+
+    <!-- Compra Information Card -->
+    <div class="card mb-4"> {# Standard card #}
+        <div class="card-header"> {# Standard card header #}
+            <i class="fas fa-info-circle me-2"></i>Información de la Compra
+        </div>
+        <div class="card-body">
+            <dl class="row"> {# Use definition list for better semantics #}
+                <dt class="col-sm-3 text-muted">Proveedor:</dt>
+                <dd class="col-sm-9">{{ compra.proveedor.nombre }}</dd>
+
+                <dt class="col-sm-3 text-muted">Fecha de Compra:</dt>
+                <dd class="col-sm-9">{{ compra.fecha_compra }}</dd>
+
+                <dt class="col-sm-3 text-muted">Método de Pago:</dt>
+                <dd class="col-sm-9">{{ compra.get_metodo_pago_display }}</dd>
+
+                <dt class="col-sm-3 text-muted">Número de Documento:</dt>
+                <dd class="col-sm-9">{{ compra.numero_documento|default:"No especificado" }}</dd>
+
+                <dt class="col-sm-3 text-muted">Total de la Compra:</dt>
+                <dd class="col-sm-9 fs-5 fw-bold text-primary">${{ compra.total|intcomma }} CLP</dd> {# Use Bootstrap classes and humanize #}
+            </dl>
+        </div>
+    </div>
+
+    <!-- Detalles de Compra Table -->
+    <div class="card"> {# Standard card #}
+        <div class="card-header"> {# Standard card header #}
+            <i class="fas fa-list-alt me-2"></i>Detalles de la Compra
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead> {# Removed inline style #}
+                        <tr>
+                            <th scope="col" class="px-4 py-3">ID</th>
+                            <th scope="col" class="px-4 py-3">Producto</th>
+                            <th scope="col" class="px-4 py-3 text-end">Cantidad</th> {# Align right #}
+                            <th scope="col" class="px-4 py-3 text-end">Precio Unitario</th> {# Align right #}
+                            <th scope="col" class="px-4 py-3 text-end">Subtotal</th> {# Align right #}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for detalle in detalles %}
+                            <tr>
+                                <td class="px-4 py-3">{{ detalle.id }}</td>
+                                <td class="px-4 py-3">{{ detalle.producto.nombre }}</td>
+                                <td class="px-4 py-3 text-end">{{ detalle.cantidad }}</td> {# Align right #}
+                                <td class="px-4 py-3 text-end">${{ detalle.precio_unitario|intcomma }}</td> {# Align right & humanize #}
+                                <td class="px-4 py-3 text-end fw-bold text-primary">${{ detalle.subtotal|intcomma }}</td> {# Use subtotal field & humanize #}
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4">No hay detalles para esta compra.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="text-center mt-4">
+        <a href="{% url 'compra_list' %}" class="btn btn-modern btn-secondary-modern me-2"> {# Use modern button #}
+            <i class="fas fa-arrow-left me-2"></i>Volver a la Lista
+        </a>
+        <a href="{% url 'admin:ventas_compra_change' compra.id %}" class="btn btn-modern btn-primary-modern"> {# Use modern button #}
+            <i class="fas fa-edit me-2"></i>Editar Compra
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,651 @@
+{% extends 'ventas/base_public.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} - Aremko{% endblock %}
+
+{% block meta_description %}{{ meta_description }}{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+    --corporate-primary: #2c5aa0;
+    --corporate-secondary: #f8f9fa;
+    --corporate-accent: #28a745;
+    --text-dark: #2d3748;
+    --text-light: #718096;
+}
+
+.hero-section {
+    background: linear-gradient(135deg, rgba(44, 90, 160, 0.9), rgba(40, 167, 69, 0.8)), 
+                url('{% static "images/corporate-hero-bg.jpg" %}') center/cover;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    color: white;
+    text-align: center;
+    position: relative;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+}
+
+.hero-title {
+    font-size: 3.5rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.hero-subtitle {
+    font-size: 1.4rem;
+    margin-bottom: 2rem;
+    opacity: 0.95;
+    font-weight: 300;
+}
+
+.cta-button {
+    background: linear-gradient(45deg, var(--corporate-accent), #34d058);
+    border: none;
+    padding: 15px 40px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border-radius: 50px;
+    color: white;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.cta-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+    color: white;
+}
+
+.services-section {
+    padding: 100px 0;
+    background: var(--corporate-secondary);
+}
+
+.service-card {
+    background: white;
+    border-radius: 20px;
+    padding: 0;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    height: 100%;
+    border: none;
+    position: relative;
+    overflow: hidden;
+}
+
+img.service-image {
+    width: 100% !important;
+    height: 120px !important;
+    object-fit: cover !important;
+    border-radius: 20px 20px 0 0 !important;
+    aspect-ratio: unset !important;
+    max-height: 120px !important;
+    min-height: 120px !important;
+}
+
+.service-content {
+    padding: 25px 20px 35px;
+}
+
+.service-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(45deg, var(--corporate-primary), var(--corporate-accent));
+}
+
+.service-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+}
+
+.service-icon {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(45deg, var(--corporate-primary), var(--corporate-accent));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.service-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 12px;
+}
+
+.service-description {
+    color: var(--text-light);
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-align: center;
+    color: var(--text-dark);
+    margin-bottom: 20px;
+}
+
+.section-subtitle {
+    font-size: 1.2rem;
+    text-align: center;
+    color: var(--text-light);
+    margin-bottom: 60px;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.benefits-section {
+    padding: 100px 0;
+    background: white;
+}
+
+.benefit-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: var(--corporate-secondary);
+    border-radius: 15px;
+    transition: all 0.3s ease;
+}
+
+.benefit-item:hover {
+    background: #e9ecef;
+    transform: translateX(10px);
+}
+
+.benefit-icon {
+    width: 60px;
+    height: 60px;
+    background: var(--corporate-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 20px;
+    font-size: 1.5rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.benefit-text {
+    font-size: 1.1rem;
+    color: var(--text-dark);
+    font-weight: 500;
+}
+
+.contact-section {
+    padding: 100px 0;
+    background: linear-gradient(135deg, var(--corporate-primary), var(--corporate-accent));
+    color: white;
+    text-align: center;
+}
+
+.contact-card {
+    background: rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 40px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.contact-methods {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+}
+
+.contact-method {
+    display: flex;
+    align-items: center;
+    color: white;
+    text-decoration: none;
+    font-size: 1.1rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.contact-method:hover {
+    color: #fff;
+    transform: scale(1.05);
+}
+
+.contact-method i {
+    font-size: 1.5rem;
+    margin-right: 10px;
+}
+
+.corporate-agreement-section {
+    position: relative;
+    overflow: hidden;
+}
+
+.corporate-agreement-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="2" fill="rgba(255,255,255,0.1)"/></svg>') repeat;
+    background-size: 50px 50px;
+    animation: float 20s infinite linear;
+}
+
+@keyframes float {
+    0% { transform: translateY(0px); }
+    100% { transform: translateY(-50px); }
+}
+
+.service-card .btn {
+    transition: all 0.3s ease;
+    border-radius: 25px;
+    padding: 8px 20px;
+    font-weight: 600;
+}
+
+.service-card .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,123,255,0.3);
+}
+
+.badge {
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 15px;
+}
+
+.corporate-agreement-section .card {
+    transition: all 0.3s ease;
+}
+
+.corporate-agreement-section .card:hover {
+    transform: translateY(-5px);
+}
+
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2.5rem;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.2rem;
+    }
+    
+    .contact-methods {
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+    }
+    
+    .service-card {
+        margin-bottom: 30px;
+    }
+    
+    .corporate-agreement-section .col-lg-6:first-child {
+        margin-bottom: 30px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
+        <div class="hero-content">
+            <h1 class="hero-title">Reuniones con Resultados</h1>
+            <p class="hero-subtitle">Productividad + Bienestar en un solo lugar</p>
+            <p class="lead mb-4">¿Tus reuniones de equipo se sienten rutinarias y poco inspiradoras?<br>
+            En Aremko creamos un espacio único en Puerto Varas para empresas de la Región de Los Lagos.</p>
+            <a href="#servicios" class="cta-button">
+                <i class="fas fa-calendar-check me-2"></i>
+                Agenda tu experiencia empresarial
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Services Section -->
+<section id="servicios" class="services-section">
+    <div class="container">
+        <h2 class="section-title">Tres experiencias corporativas</h2>
+        <p class="section-subtitle">
+            Elige la experiencia que mejor se adapte a las necesidades de tu equipo
+        </p>
+        
+        <div class="row g-4">
+            <!-- Producto 1: Experiencia Completa -->
+            <div class="col-lg-4 col-md-6">
+                <div class="service-card">
+                    <img src="https://storage.googleapis.com/aremko-media-2025/categorias/desayuno_empresas_aremko.jpg" 
+                         alt="Experiencia Completa Empresarial" class="service-image">
+                    <div class="service-content">
+                        <div class="service-icon">
+                            <i class="fas fa-crown"></i>
+                        </div>
+                        <h3 class="service-title">Experiencia Completa</h3>
+                        <p class="service-description">
+                            <strong>Desayuno + Reunión + Tinas Calientes</strong><br>
+                            La experiencia integral para tu equipo: desayuno gourmet sureño, sala de reuniones premium 
+                            y relajación en tinas calientes junto al río.
+                        </p>
+                        <div class="d-flex justify-content-center flex-wrap gap-2 mb-3">
+                            <span class="badge bg-primary fs-6">Desayuno</span>
+                            <span class="badge bg-success fs-6">Reunión</span>
+                            <span class="badge bg-info fs-6">Tinas</span>
+                        </div>
+                        <div class="text-center">
+                            <button class="btn btn-outline-primary btn-sm">Consultar Precio</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Producto 2: Desayuno + Tinas -->
+            <div class="col-lg-4 col-md-6">
+                <div class="service-card">
+                    <img src="https://storage.googleapis.com/aremko-media-2025/categorias/4_amigas_en_la_calbuco.PNG" 
+                         alt="Desayuno y Tinas Calientes" class="service-image">
+                    <div class="service-content">
+                        <div class="service-icon">
+                            <i class="fas fa-coffee"></i>
+                        </div>
+                        <h3 class="service-title">Desayuno & Relax</h3>
+                        <p class="service-description">
+                            <strong>Desayuno + Tinas Calientes</strong><br>
+                            Combina un delicioso desayuno con productos locales premium y la relajación 
+                            en nuestras tinas calientes junto al Río Pescado.
+                        </p>
+                        <div class="d-flex justify-content-center flex-wrap gap-2 mb-3">
+                            <span class="badge bg-primary fs-6">Desayuno</span>
+                            <span class="badge bg-info fs-6">Tinas</span>
+                        </div>
+                        <div class="text-center">
+                            <button class="btn btn-outline-primary btn-sm">Consultar Precio</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Producto 3: Solo Tinas -->
+            <div class="col-lg-4 col-md-6">
+                <div class="service-card">
+                    <img src="https://storage.googleapis.com/aremko-media-2025/categorias/charla_empresas_aremko.jpg" 
+                         alt="Solo Tinas Calientes" class="service-image">
+                    <div class="service-content">
+                        <div class="service-icon">
+                            <i class="fas fa-spa"></i>
+                        </div>
+                        <h3 class="service-title">Solo Tinas</h3>
+                        <p class="service-description">
+                            <strong>Tinas Calientes Exclusivamente</strong><br>
+                            Enfócate en el bienestar y la relajación del equipo. Ideal para celebraciones, 
+                            team building o simplemente desconectar del estrés laboral.
+                        </p>
+                        <div class="d-flex justify-content-center flex-wrap gap-2 mb-3">
+                            <span class="badge bg-info fs-6">Solo Tinas</span>
+                            <span class="badge bg-warning fs-6">Team Building</span>
+                        </div>
+                        <div class="text-center">
+                            <button class="btn btn-outline-primary btn-sm">Consultar Precio</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Corporate Agreement Section -->
+<section class="corporate-agreement-section" style="padding: 80px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6 text-white">
+                <h2 class="section-title text-white mb-4">
+                    <i class="fas fa-handshake me-3"></i>
+                    Convenios Empresariales
+                </h2>
+                <p class="lead mb-4">
+                    ¿Tu empresa busca beneficios permanentes para sus colaboradores?
+                </p>
+                <p class="mb-4">
+                    Nuestros convenios empresariales ofrecen descuentos exclusivos y beneficios especiales 
+                    para los trabajadores de tu empresa durante todo el año.
+                </p>
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-percentage text-warning me-3" style="font-size: 1.5rem;"></i>
+                            <span><strong>Descuentos permanentes</strong><br>Para todos los colaboradores</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-calendar-alt text-warning me-3" style="font-size: 1.5rem;"></i>
+                            <span><strong>Reservas preferenciales</strong><br>Horarios exclusivos</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-gift text-warning me-3" style="font-size: 1.5rem;"></i>
+                            <span><strong>Beneficios especiales</strong><br>Promociones exclusivas</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-users text-warning me-3" style="font-size: 1.5rem;"></i>
+                            <span><strong>Eventos corporativos</strong><br>Tarifas preferenciales</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-lg" style="background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);">
+                    <div class="card-body p-5 text-center">
+                        <i class="fas fa-building text-primary mb-4" style="font-size: 4rem;"></i>
+                        <h4 class="card-title mb-4">¿Interesado en un Convenio?</h4>
+                        <p class="card-text mb-4">
+                            Contáctanos para conocer los beneficios específicos según el tamaño de tu empresa 
+                            y las necesidades de tus colaboradores.
+                        </p>
+                        
+                        <div class="d-grid gap-3">
+                            <a href="https://wa.me/56957902525?text=Hola%2C%20me%20interesa%20conocer%20los%20convenios%20empresariales%20de%20Aremko" 
+                               class="btn btn-primary btn-lg" target="_blank">
+                                <i class="fab fa-whatsapp me-2"></i>
+                                Consultar Convenio
+                            </a>
+                            <a href="mailto:ventas@aremko.cl?subject=Consulta%20Convenio%20Empresarial" 
+                               class="btn btn-outline-primary">
+                                <i class="fas fa-envelope me-2"></i>
+                                Enviar Email
+                            </a>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>
+                                Respuesta en menos de 24 horas
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Benefits Section -->
+<section class="benefits-section">
+    <div class="container">
+        <h2 class="section-title">¿Por qué elegir Aremko para tu empresa?</h2>
+        <p class="section-subtitle">
+            Nuestros clientes empresariales han experimentado resultados tangibles
+        </p>
+        
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="benefit-item">
+                    <div class="benefit-icon">
+                        <i class="fas fa-lightbulb"></i>
+                    </div>
+                    <div class="benefit-text">
+                        <strong>Mayor creatividad</strong> en sesiones de brainstorming gracias al ambiente natural
+                    </div>
+                </div>
+                
+                <div class="benefit-item">
+                    <div class="benefit-icon">
+                        <i class="fas fa-handshake"></i>
+                    </div>
+                    <div class="benefit-text">
+                        <strong>Mejor cohesión de equipo</strong> en un ambiente relajado y distendido
+                    </div>
+                </div>
+                
+                <div class="benefit-item">
+                    <div class="benefit-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="benefit-text">
+                        <strong>Decisiones más claras</strong> después del relax en aguas calientes
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6">
+                <div class="benefit-item">
+                    <div class="benefit-icon">
+                        <i class="fas fa-target"></i>
+                    </div>
+                    <div class="benefit-text">
+                        <strong>Retiros ejecutivos</strong> que combinan trabajo y bienestar
+                    </div>
+                </div>
+                
+                <div class="benefit-item">
+                    <div class="benefit-icon">
+                        <i class="fas fa-compass"></i>
+                    </div>
+                    <div class="benefit-text">
+                        <strong>Planificación estratégica</strong> en un entorno que estimula la concentración
+                    </div>
+                </div>
+                
+                <div class="benefit-item">
+                    <div class="benefit-icon">
+                        <i class="fas fa-users-cog"></i>
+                    </div>
+                    <div class="benefit-text">
+                        <strong>Team building natural</strong> que fortalece vínculos auténticos
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Contact Section -->
+<section class="contact-section">
+    <div class="container">
+        <div class="contact-card">
+            <h2 class="mb-4">¿Listo para transformar tus reuniones?</h2>
+            <p class="lead mb-4">
+                Contáctanos y descubre cómo podemos hacer que tu próxima reunión sea extraordinaria
+            </p>
+            
+            <div class="contact-methods">
+                <a href="https://wa.me/56957902525" class="contact-method" target="_blank">
+                    <i class="fab fa-whatsapp"></i>
+                    WhatsApp +56 9 5790 2525
+                </a>
+                
+                <a href="mailto:ventas@aremko.cl" class="contact-method">
+                    <i class="fas fa-envelope"></i>
+                    ventas@aremko.cl
+                </a>
+                
+                <a href="https://www.aremko.cl" class="contact-method">
+                    <i class="fas fa-globe"></i>
+                    www.aremko.cl
+                </a>
+            </div>
+            
+            <div class="mt-4">
+                <p class="mb-0">
+                    <i class="fas fa-map-marker-alt me-2"></i>
+                    Puerto Varas, Región de Los Lagos
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Smooth scrolling para enlaces internos
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            target.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        }
+    });
+});
+
+// Animaciones al hacer scroll
+const observerOptions = {
+    threshold: 0.1,
+    rootMargin: '0px 0px -50px 0px'
+};
+
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.style.opacity = '1';
+            entry.target.style.transform = 'translateY(0)';
+        }
+    });
+}, observerOptions);
+
+// Aplicar animaciones a las tarjetas de servicio
+document.querySelectorAll('.service-card, .benefit-item').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(30px)';
+    el.style.transition = 'all 0.6s ease';
+    observer.observe(el);
+});
+</script>
+{% endblock %}

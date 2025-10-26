@@ -1,0 +1,501 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extrahead %}
+<style>
+    .preview-container {
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    .preview-header {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .preview-info {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .info-card {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        border-left: 4px solid #28a745;
+    }
+    
+    .info-label {
+        font-weight: bold;
+        color: #666;
+        font-size: 0.9em;
+        margin-bottom: 5px;
+    }
+    
+    .info-value {
+        font-size: 1.1em;
+        color: #333;
+    }
+    
+    .email-preview {
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .email-header {
+        background: #667eea;
+        color: white;
+        padding: 15px 20px;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .email-subject {
+        font-size: 1.2em;
+        font-weight: bold;
+        margin: 0;
+    }
+    
+    .email-body {
+        padding: 0;
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    
+    .email-body iframe {
+        width: 100%;
+        height: 600px;
+        border: none;
+    }
+    
+    .action-buttons {
+        margin-top: 20px;
+        text-align: center;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 10px 20px;
+        margin: 0 10px;
+        text-decoration: none;
+        border-radius: 5px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary {
+        background: #007bff;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #0056b3;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background: #545b62;
+    }
+    
+    .btn-warning {
+        background: #ffc107;
+        color: #212529;
+    }
+    
+    .btn-warning:hover {
+        background: #e0a800;
+    }
+    
+    .raw-html {
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 15px;
+        margin-top: 20px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    .tabs {
+        display: flex;
+        border-bottom: 1px solid #ddd;
+        margin-bottom: 0;
+    }
+    
+    .tab {
+        padding: 10px 20px;
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-bottom: none;
+        cursor: pointer;
+        border-radius: 5px 5px 0 0;
+        margin-right: 5px;
+    }
+    
+    .tab.active {
+        background: white;
+        border-bottom: 1px solid white;
+    }
+    
+    .tab-content {
+        display: none;
+    }
+    
+    .tab-content.active {
+        display: block;
+    }
+    
+    .subject-editor {
+        margin-bottom: 15px;
+    }
+    
+    .subject-label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+        color: white;
+    }
+    
+    .subject-input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 1.1em;
+        background: white;
+    }
+    
+    .editor-container {
+        background: white;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    
+    .editor-toolbar {
+        background: #f8f9fa;
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+        display: flex;
+        gap: 5px;
+    }
+    
+    .toolbar-btn {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        background: white;
+        border-radius: 3px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.2s ease;
+    }
+    
+    .toolbar-btn:hover {
+        background: #e9ecef;
+        border-color: #adb5bd;
+    }
+    
+    .toolbar-btn.active {
+        background: #007bff;
+        color: white;
+        border-color: #007bff;
+    }
+    
+    .email-editor {
+        min-height: 400px;
+        padding: 20px;
+        border: none;
+        outline: none;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+    }
+    
+    .email-editor:focus {
+        outline: 2px solid #007bff;
+        outline-offset: -2px;
+    }
+    
+    .email-editor h1, .email-editor h2, .email-editor h3 {
+        margin-top: 0;
+    }
+    
+    .email-editor p {
+        margin-bottom: 15px;
+    }
+    
+    .email-editor ul, .email-editor ol {
+        margin-bottom: 15px;
+        padding-left: 20px;
+    }
+    
+    .email-editor li {
+        margin-bottom: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="preview-container">
+    <div class="preview-header">
+        <h1>👁️ {{ title }}</h1>
+        
+        <div class="preview-info">
+            <div class="info-card">
+                <div class="info-label">Período de la Campaña:</div>
+                <div class="info-value">{{ month_name }} {{ year }}</div>
+            </div>
+            
+            <div class="info-card">
+                <div class="info-label">Monto de la Giftcard:</div>
+                <div class="info-value">${{ giftcard_amount|floatformat:0 }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="email-preview">
+        <div class="email-header">
+            <div class="subject-editor">
+                <label for="email-subject" class="subject-label">Asunto del Email:</label>
+                <input type="text" id="email-subject" class="subject-input" value="{{ subject }}" onchange="updatePreview()">
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('preview')">📧 Vista Previa</div>
+            <div class="tab" onclick="showTab('editor')">✏️ Editor</div>
+            <div class="tab" onclick="showTab('html')">🔧 Código HTML</div>
+        </div>
+        
+        <div id="preview" class="tab-content active">
+            <div class="email-body" id="email-preview-content">
+                {{ body_html|safe }}
+            </div>
+        </div>
+        
+        <div id="editor" class="tab-content">
+            <div class="editor-container">
+                <div class="editor-toolbar">
+                    <button type="button" onclick="formatText('bold')" class="toolbar-btn" title="Negrita">B</button>
+                    <button type="button" onclick="formatText('italic')" class="toolbar-btn" title="Cursiva">I</button>
+                    <button type="button" onclick="formatText('underline')" class="toolbar-btn" title="Subrayado">U</button>
+                    <button type="button" onclick="insertGiftcardAmount()" class="toolbar-btn" title="Insertar Monto">💰</button>
+                    <button type="button" onclick="insertClientName()" class="toolbar-btn" title="Insertar Nombre">👤</button>
+                </div>
+                <div id="email-editor" class="email-editor" contenteditable="true" oninput="updatePreview()">
+                    {{ body_html|safe }}
+                </div>
+            </div>
+        </div>
+        
+        <div id="html" class="tab-content">
+            <div class="raw-html">
+                <pre id="html-code">{{ body_html|escape }}</pre>
+            </div>
+        </div>
+    </div>
+    
+    <div class="action-buttons">
+        <button type="button" onclick="saveChanges()" class="btn btn-success">
+            💾 Guardar Cambios
+        </button>
+        
+        <a href="{% url 'ventas:giftcard_campaign_dashboard' %}?year={{ year }}&month={{ month }}&giftcard_amount={{ giftcard_amount }}" class="btn btn-secondary">
+            ← Volver al Dashboard
+        </a>
+        
+        <button type="button" onclick="sendTestEmail()" class="btn btn-warning">
+            📧 Enviar Email de Prueba
+        </button>
+        
+        <a href="{% url 'ventas:create_giftcard_campaign' %}?year={{ year }}&month={{ month }}&giftcard_amount={{ giftcard_amount }}" class="btn btn-primary">
+            🚀 Crear Campaña
+        </a>
+    </div>
+</div>
+
+<script>
+function showTab(tabName) {
+    // Ocultar todos los contenidos
+    var contents = document.querySelectorAll('.tab-content');
+    contents.forEach(function(content) {
+        content.classList.remove('active');
+    });
+    
+    // Remover clase active de todos los tabs
+    var tabs = document.querySelectorAll('.tab');
+    tabs.forEach(function(tab) {
+        tab.classList.remove('active');
+    });
+    
+    // Mostrar el contenido seleccionado
+    document.getElementById(tabName).classList.add('active');
+    
+    // Activar el tab seleccionado
+    event.target.classList.add('active');
+}
+
+function updatePreview() {
+    var subject = document.getElementById('email-subject').value;
+    var editorContent = document.getElementById('email-editor').innerHTML;
+    var previewContent = document.getElementById('email-preview-content');
+    var htmlCode = document.getElementById('html-code');
+    
+    // Actualizar vista previa
+    previewContent.innerHTML = editorContent;
+    
+    // Actualizar código HTML
+    htmlCode.textContent = editorContent;
+    
+    // Actualizar asunto en el header de preview
+    var previewHeader = document.querySelector('.email-header h3');
+    if (previewHeader) {
+        previewHeader.textContent = subject;
+    }
+}
+
+function formatText(command) {
+    document.execCommand(command, false, null);
+    updatePreview();
+}
+
+function insertGiftcardAmount() {
+    var amount = '{{ giftcard_amount|floatformat:0 }}';
+    document.execCommand('insertText', false, '$' + amount);
+    updatePreview();
+}
+
+function insertClientName() {
+    document.execCommand('insertText', false, '{nombre_cliente}');
+    updatePreview();
+}
+
+function saveChanges() {
+    var subject = document.getElementById('email-subject').value;
+    var body = document.getElementById('email-editor').innerHTML;
+    
+    // Crear formulario para enviar los cambios
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{% url "ventas:save_email_template" %}';
+    
+    // Agregar campos ocultos
+    var subjectField = document.createElement('input');
+    subjectField.type = 'hidden';
+    subjectField.name = 'subject';
+    subjectField.value = subject;
+    form.appendChild(subjectField);
+    
+    var bodyField = document.createElement('input');
+    bodyField.type = 'hidden';
+    bodyField.name = 'body_html';
+    bodyField.value = body;
+    form.appendChild(bodyField);
+    
+    var yearField = document.createElement('input');
+    yearField.type = 'hidden';
+    yearField.name = 'year';
+    yearField.value = '{{ year }}';
+    form.appendChild(yearField);
+    
+    var monthField = document.createElement('input');
+    monthField.type = 'hidden';
+    monthField.name = 'month';
+    monthField.value = '{{ month }}';
+    form.appendChild(monthField);
+    
+    var amountField = document.createElement('input');
+    amountField.type = 'hidden';
+    amountField.name = 'giftcard_amount';
+    amountField.value = '{{ giftcard_amount }}';
+    form.appendChild(amountField);
+    
+    // Agregar CSRF token
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfToken) {
+        form.appendChild(csrfToken.cloneNode(true));
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function sendTestEmail() {
+    var testEmail = prompt('Ingresa el email de prueba:');
+    if (testEmail) {
+        // Crear formulario para enviar email de prueba
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{% url "ventas:send_test_giftcard_email" %}';
+        
+        // Agregar campos
+        var emailField = document.createElement('input');
+        emailField.type = 'hidden';
+        emailField.name = 'test_email';
+        emailField.value = testEmail;
+        form.appendChild(emailField);
+        
+        var subjectField = document.createElement('input');
+        subjectField.type = 'hidden';
+        subjectField.name = 'subject';
+        subjectField.value = document.getElementById('email-subject').value;
+        form.appendChild(subjectField);
+        
+        var bodyField = document.createElement('input');
+        bodyField.type = 'hidden';
+        bodyField.name = 'body_html';
+        bodyField.value = document.getElementById('email-editor').innerHTML;
+        form.appendChild(bodyField);
+        
+        var yearField = document.createElement('input');
+        yearField.type = 'hidden';
+        yearField.name = 'year';
+        yearField.value = '{{ year }}';
+        form.appendChild(yearField);
+        
+        var monthField = document.createElement('input');
+        monthField.type = 'hidden';
+        monthField.name = 'month';
+        monthField.value = '{{ month }}';
+        form.appendChild(monthField);
+        
+        var amountField = document.createElement('input');
+        amountField.type = 'hidden';
+        amountField.name = 'giftcard_amount';
+        amountField.value = '{{ giftcard_amount }}';
+        form.appendChild(amountField);
+        
+        // Agregar CSRF token
+        var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfToken) {
+            form.appendChild(csrfToken.cloneNode(true));
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Actualizar preview cuando se carga la página
+document.addEventListener('DOMContentLoaded', function() {
+    updatePreview();
+});
+</script>
+{% endblock %}

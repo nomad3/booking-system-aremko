@@ -1,0 +1,34 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_label|capfirst }}</a>
+&rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+&rsaquo; {% translate 'Select Campaign for Remarketing' %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <form method="post">
+        {% csrf_token %}
+        <h1>{% translate 'Select Campaign for Remarketing' %}</h1>
+        <p>{% blocktranslate count counter=selected_clients_count %}You have selected {{ counter }} client.{% plural %}You have selected {{ counter }} clients.{% endblocktranslate %}</p>
+
+        <fieldset class="module aligned">
+            <div class="form-row">
+                {{ form.campaign.errors }}
+                <label for="{{ form.campaign.id_for_label }}" class="required">{{ form.campaign.label }}:</label>
+                {{ form.campaign }}
+            </div>
+            {{ form.selected_clients }} {# Hidden field #}
+        </fieldset>
+
+        <div class="submit-row">
+            <input type="submit" value="{% translate 'Initiate Remarketing' %}" class="default" name="_remarketing">
+        </div>
+    </form>
+</div>
+{% endblock %}

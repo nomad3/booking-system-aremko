@@ -1,0 +1,280 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+{% load humanize %} {# Load humanize template tags #}
+
+{% block title %}Aremko - Tu Carrito{% endblock %}
+
+{% block extra_style %}
+<style>
+    .cart-section {
+        padding: 50px 0;
+    }
+
+    .cart-title {
+        font-weight: 700;
+        margin-bottom: 30px;
+        color: var(--dark-gray);
+    }
+
+    .cart-item {
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 20px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .cart-item-info {
+        flex-grow: 1;
+    }
+
+    .cart-item-title {
+        font-weight: 700;
+        font-size: 1.2rem;
+        margin-bottom: 5px;
+    }
+
+    .cart-item-details {
+        color: var(--light-gray);
+        font-size: 0.9rem;
+    }
+
+    .cart-item-price {
+        font-weight: 700;
+        color: var(--primary-color);
+        font-size: 1.3rem;
+        margin: 0 20px;
+    }
+
+    .cart-summary {
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 25px;
+    }
+
+    .cart-summary-title {
+        font-weight: 700;
+        margin-bottom: 20px;
+        color: var(--dark-gray);
+    }
+
+    .cart-summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+
+    .cart-summary-total {
+        font-weight: 700;
+        font-size: 1.3rem;
+        color: var(--primary-color);
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+    }
+
+    .btn-remove {
+        color: var(--primary-color);
+        background: none;
+        border: none;
+        cursor: pointer;
+    }
+
+    .empty-cart {
+        text-align: center;
+        padding: 50px 0;
+    }
+
+    .empty-cart-icon {
+        font-size: 5rem;
+        color: var(--light-gray);
+        margin-bottom: 20px;
+    }
+
+    .cart-actions {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+    }
+
+    @media (max-width: 768px) {
+        .cart-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .cart-item-price {
+            margin: 10px 0;
+        }
+
+        .cart-actions {
+            flex-direction: column;
+        }
+
+        .cart-actions .btn {
+            margin-bottom: 10px;
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Cart Section -->
+<section class="cart-section">
+    <div class="container">
+        <h1 class="cart-title">Tu Carrito de Compras</h1>
+
+        <div class="row">
+            {% if cart.servicios %}
+                <div class="col-lg-8">
+                    {% for item in cart.servicios %}
+                        <div class="cart-item">
+                            <div class="cart-item-info">
+                                <h3 class="cart-item-title">
+                                    {{ item.nombre }}
+                                    {# Check if tipo_servicio exists and is 'cabana' #}
+                                    {% if item.tipo_servicio == 'cabana' %}
+                                        <span class="badge bg-secondary fw-normal">Precio Fijo</span>
+                                    {% endif %}
+                                </h3>
+                                <p class="cart-item-details">
+                                    <i class="far fa-calendar-alt"></i> {{ item.fecha }} |
+                                    <i class="far fa-clock"></i> {{ item.hora }} |
+                                    <i class="fas fa-users"></i> {{ item.cantidad_personas }} persona(s)
+                                    {% if item.tipo_servicio == 'cabana' %} (Máx. 2) {% endif %}
+                                </p>
+                            </div>
+                            <div class="cart-item-price">${{ item.subtotal|floatformat:0|intcomma }}</div> {# Apply filters #}
+                            <button class="btn-remove" onclick="removeFromCart({{ forloop.counter0 }})" title="Eliminar item">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="cart-summary">
+                        <h3 class="cart-summary-title">Resumen del Pedido</h3>
+
+                        {% for item in cart.servicios %}
+                            <div class="cart-summary-row">
+                                <span>{{ item.nombre }} ({{ item.cantidad_personas }})</span>
+                                <span>${{ item.subtotal|floatformat:0|intcomma }}</span> {# Apply filters #}
+                            </div>
+                        {% endfor %}
+
+                        <div class="cart-summary-row cart-summary-total">
+                            <span>Total:</span>
+                            <span>${{ cart.total|floatformat:0|intcomma }}</span> {# Apply filters #}
+                        </div>
+
+                        <div class="cart-actions">
+                            <a href="{% url 'ventas:homepage' %}#servicios" class="btn btn-outline-secondary">Seguir Comprando</a>
+                            <a href="{% url 'ventas:checkout' %}" class="btn btn-primary">Finalizar Reserva</a>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="col-12">
+                    <div class="empty-cart">
+                        <div class="empty-cart-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <h3>Tu carrito está vacío</h3>
+                        <p>Parece que aún no has agregado ningún servicio a tu carrito.</p>
+                        <a href="{% url 'ventas:homepage' %}#servicios" class="btn btn-primary mt-3">
+                            Ver Servicios
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block modals %}
+{# Modals are now defined in base_public.html #}
+{% endblock %}
+
+{% block extra_script %}
+<script>
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Función para eliminar del carrito
+    function removeFromCart(index) {
+        console.log("Attempting to remove item at index:", index);
+        const csrfToken = getCookie('csrftoken');
+        console.log("CSRF Token for remove:", csrfToken);
+        if (!csrfToken) {
+            console.error("CSRF Token not found!");
+            alert("Error de seguridad. Intenta recargar la página.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('index', index);
+
+        const removeUrl = '{% url "ventas:remove_from_cart" %}';
+        console.log("Sending remove request to:", removeUrl);
+
+        fetch(removeUrl, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken
+                // 'Content-Type': 'application/x-www-form-urlencoded', // Not needed for FormData
+            }
+        })
+        .then(response => {
+            console.log("Remove response status:", response.status);
+            if (!response.ok) {
+                 return response.text().then(text => {
+                     // Try to parse JSON error first
+                     try {
+                         const errorJson = JSON.parse(text);
+                         throw new Error(errorJson.error || `Server responded with ${response.status}`);
+                     } catch(e) {
+                         // Fallback to text if not JSON
+                         throw new Error(`Server responded with ${response.status}: ${text || 'No additional error info'}`);
+                     }
+                 });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("Remove response data:", data);
+            if (data.success) {
+                // Recargar la página para mostrar el carrito actualizado
+                window.location.reload();
+            } else {
+                alert('Error al eliminar del carrito: ' + (data.error || 'Error desconocido'));
+            }
+        })
+        .catch(error => {
+            console.error('Error al eliminar del carrito:', error);
+            alert('Error al eliminar del carrito. Por favor, intenta nuevamente. ' + error.message);
+        });
+    }
+</script>
+{% endblock %}

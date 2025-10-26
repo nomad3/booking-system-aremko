@@ -1,0 +1,22 @@
+# Virtual Environment
+venv/
+
+# Archivos de configuración de Django
+*.pyc
+__pycache__/
+.env
+
+# Archivos sensibles y de backup
+*.json
+*backup*
+*migration*
+*secret*
+*configuracion*
+*.sql
+*.log
+
+# Archivos temporales de migración
+migration_backup_*/
+nueva_configuracion_render.txt
+render_migration_guide.md
+aremko-e51ae-0912defb776b.json

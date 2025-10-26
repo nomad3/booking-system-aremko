@@ -1,0 +1,725 @@
+{% extends 'admin/base_site.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - Aremko Admin{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+.campaign-form {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.form-section {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.form-section h3 {
+    margin-top: 0;
+    color: #417690;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 10px;
+}
+
+.form-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 15px;
+    align-items: end;
+}
+
+.form-group {
+    flex: 1;
+}
+
+.form-group.half {
+    flex: 0.5;
+}
+
+.form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #333;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-group textarea {
+    height: 100px;
+    resize: vertical;
+}
+
+.form-group input[type="checkbox"] {
+    width: auto;
+    margin-right: 8px;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.checkbox-group label {
+    margin-bottom: 0;
+    font-weight: normal;
+}
+
+.multiple-select {
+    height: 120px;
+}
+
+.range-inputs {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.range-inputs input {
+    flex: 1;
+}
+
+.range-separator {
+    padding: 0 10px;
+    font-weight: bold;
+    color: #666;
+}
+
+.preview-section {
+    background: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.preview-button {
+    background: #17a2b8;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 15px;
+}
+
+.preview-button:hover {
+    background: #138496;
+}
+
+.preview-result {
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 15px;
+    display: none;
+}
+
+.preview-result.success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.preview-result.error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.submit-buttons {
+    text-align: center;
+    padding: 30px;
+}
+
+.btn {
+    padding: 12px 30px;
+    border-radius: 4px;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    margin: 0 10px;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-primary {
+    background: #417690;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #2e5a6e;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.help-text {
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+}
+
+.loading {
+    display: none;
+    color: #17a2b8;
+}
+
+/* Estilos del Editor WYSIWYG */
+.editor-toolbar {
+    background: #f8f9fa;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+}
+
+.editor-toolbar button {
+    background: white;
+    border: 1px solid #ddd;
+    padding: 5px 10px;
+    margin: 2px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.editor-toolbar button:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.editor-toolbar button.special {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+
+.editor-toolbar button.special:hover {
+    background: #218838;
+}
+
+.editor-toolbar button.whatsapp {
+    background: #25d366;
+    color: white;
+    border-color: #25d366;
+}
+
+.editor-toolbar button.whatsapp:hover {
+    background: #1db954;
+}
+
+#email_editor {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+}
+
+#email_editor:focus {
+    outline: 2px solid #007bff;
+    outline-offset: -2px;
+}
+
+.preview-panel {
+    border-left: 3px solid #007bff;
+}
+
+.preview-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    color: #495057;
+}
+
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .range-inputs {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .range-separator {
+        padding: 5px 0;
+    }
+    
+    /* Editor responsive */
+    .form-group div[style*="display: flex"] {
+        flex-direction: column !important;
+        gap: 15px !important;
+    }
+    
+    .editor-toolbar button {
+        margin: 1px;
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="campaign-form">
+    <h1>{{ title }}</h1>
+    
+    <form method="post" id="campaign-form">
+        {% csrf_token %}
+        
+        <!-- Información Básica -->
+        <div class="form-section">
+            <h3>📝 Información Básica</h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="name">Nombre de la Campaña *</label>
+                    <input type="text" id="name" name="name" required 
+                           placeholder="Ej: Campaña Giftcard Febrero 2025">
+                    <div class="help-text">Nombre descriptivo para identificar la campaña</div>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="description">Descripción</label>
+                    <textarea id="description" name="description" 
+                              placeholder="Describe el objetivo y características de esta campaña..."></textarea>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Criterios de Selección -->
+        <div class="form-section">
+            <h3>🎯 Criterios de Selección de Clientes</h3>
+            
+            <div class="form-row">
+                <div class="form-group half">
+                    <label for="month">Mes de Reserva *</label>
+                    <select id="month" name="month" required>
+                        {% for month_num, month_name in months %}
+                        <option value="{{ month_num }}" {% if month_num == current_month %}selected{% endif %}>
+                            {{ month_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group half">
+                    <label for="year">Año de Reserva *</label>
+                    <select id="year" name="year" required>
+                        {% for year_option in years %}
+                        <option value="{{ year_option }}" {% if year_option == current_year %}selected{% endif %}>
+                            {{ year_option }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Rango de Gasto Total (opcional)</label>
+                    <div class="range-inputs">
+                        <input type="number" name="spend_min" placeholder="Mínimo" step="1000">
+                        <span class="range-separator">a</span>
+                        <input type="number" name="spend_max" placeholder="Máximo" step="1000">
+                    </div>
+                    <div class="help-text">Filtrar por gasto total del cliente en pesos chilenos</div>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Rango de Número de Visitas (opcional)</label>
+                    <div class="range-inputs">
+                        <input type="number" name="visit_count_min" placeholder="Mínimo" min="1">
+                        <span class="range-separator">a</span>
+                        <input type="number" name="visit_count_max" placeholder="Máximo" min="1">
+                    </div>
+                    <div class="help-text">Filtrar por número total de visitas del cliente</div>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="cities">Ciudades (opcional)</label>
+                    <select id="cities" name="cities" multiple class="multiple-select">
+                        {% for city in cities %}
+                        <option value="{{ city }}">{{ city }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="help-text">Mantén presionado Ctrl (Cmd en Mac) para seleccionar múltiples ciudades</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Vista Previa de Destinatarios -->
+        <div class="preview-section">
+            <button type="button" class="preview-button" onclick="previewRecipients()">
+                👁️ Vista Previa de Destinatarios
+            </button>
+            <div class="loading">⏳ Calculando...</div>
+            <div id="preview-result" class="preview-result"></div>
+        </div>
+        
+        <!-- Configuración de Envío -->
+        <div class="form-section">
+            <h3>⏰ Configuración de Envío</h3>
+            
+            <div class="form-row">
+                <div class="form-group half">
+                    <label for="start_time">Hora de Inicio</label>
+                    <input type="time" id="start_time" name="start_time" value="08:00">
+                </div>
+                
+                <div class="form-group half">
+                    <label for="end_time">Hora de Fin</label>
+                    <input type="time" id="end_time" name="end_time" value="18:00">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group half">
+                    <label for="batch_size">Emails por Lote</label>
+                    <input type="number" id="batch_size" name="batch_size" value="2" min="1" max="10">
+                    <div class="help-text">Número de emails a enviar por cada ejecución</div>
+                </div>
+                
+                <div class="form-group half">
+                    <label for="interval_minutes">Intervalo (minutos)</label>
+                    <input type="number" id="interval_minutes" name="interval_minutes" value="6" min="1" max="60">
+                    <div class="help-text">Tiempo entre cada lote de envío</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Template de Email -->
+        <div class="form-section">
+            <h3>📧 Template de Email</h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="email_subject">Asunto del Email *</label>
+                    <input type="text" id="email_subject" name="email_subject" required
+                           placeholder="🎁 ¡Tu giftcard especial te espera!"
+                           value="🎁 ¡Tu giftcard de $15,000 te espera en Aremko!">
+                    <div class="help-text">Puedes usar {nombre_cliente} como placeholder para personalización</div>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="email_body">Cuerpo del Email *</label>
+                    <div style="display: flex; gap: 20px; align-items: start;">
+                        <!-- Editor Visual -->
+                        <div style="flex: 1;">
+                            <div class="editor-toolbar">
+                                <button type="button" onclick="formatText('bold')" title="Negrita">
+                                    <strong>B</strong>
+                                </button>
+                                <button type="button" onclick="formatText('italic')" title="Cursiva">
+                                    <em>I</em>
+                                </button>
+                                <button type="button" onclick="formatText('underline')" title="Subrayado">
+                                    <u>U</u>
+                                </button>
+                                <button type="button" onclick="formatText('insertOrderedList')" title="Lista numerada">
+                                    1. Lista
+                                </button>
+                                <button type="button" onclick="formatText('insertUnorderedList')" title="Lista con viñetas">
+                                    • Lista
+                                </button>
+                                <button type="button" onclick="insertGiftcardSection()" class="special" title="Insertar sección giftcard">
+                                    🎁 Giftcard
+                                </button>
+                                <button type="button" onclick="insertWhatsAppButton()" class="whatsapp" title="Insertar botón WhatsApp">
+                                    📱 WhatsApp
+                                </button>
+                            </div>
+                            
+                            <div id="email_editor" 
+                                 contenteditable="true" 
+                                 style="border: 1px solid #ddd; min-height: 300px; padding: 15px; border-radius: 4px; background: white; overflow-y: auto;"
+                                 onInput="updatePreview()">
+                                <h1>¡Hola {nombre_cliente}!</h1>
+                                <p>Porque nos visitaste hace un tiempo, queremos regalarte una sorpresa especial en <strong>Aremko Spa</strong>.</p>
+                                
+                                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 25px; border-radius: 12px; text-align: center; margin: 20px 0; color: white;">
+                                    <h2 style="margin: 0 0 15px 0; color: white;">🎁 Gift Card de Regalo</h2>
+                                    <h3 style="margin: 0 0 10px 0; font-size: 2.5em; color: #ffd700;">$15,000</h3>
+                                    <p style="margin: 0; font-size: 1.1em;">Giftcard válida durante septiembre 2025</p>
+                                </div>
+                                
+                                <p>Esta gift card de regalo está disponible solo para nuestros clientes más valorados.</p>
+                                
+                                <div style="text-align: center; margin: 30px 0;">
+                                    <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20mi%20cita%20mencionando%20mi%20giftcard" 
+                                       style="background: #25d366; color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">
+                                        📱 Reservar Ahora por WhatsApp
+                                    </a>
+                                </div>
+                                
+                                <p>¡Esperamos verte pronto!</p>
+                                <p><strong>Equipo Aremko Spa</strong><br>
+                                   📍 Río Pescado Km 4, Puerto Varas<br>
+                                   📞 +56 9 5790 2525</p>
+                            </div>
+                            
+                            <textarea id="email_body" name="email_body" required style="display: none;">
+                            </textarea>
+                        </div>
+                        
+                        <!-- Vista Previa -->
+                        <div class="preview-panel" style="flex: 1; border: 1px solid #ddd; border-radius: 4px;">
+                            <div class="preview-header" style="background: #f8f9fa; padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold;">
+                                👁️ Vista Previa en Tiempo Real
+                            </div>
+                            <div id="email_preview" style="padding: 15px; min-height: 300px; background: white; overflow-y: auto;">
+                                <!-- Preview content will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="help-text">
+                        ✏️ Edita el contenido en el lado izquierdo y ve la vista previa en tiempo real. 
+                        Usa <strong>{nombre_cliente}</strong> para personalizar con el nombre del destinatario.
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Configuración Avanzada -->
+        <div class="form-section">
+            <h3>⚙️ Configuración Avanzada</h3>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="ai_variation" name="ai_variation" checked>
+                <label for="ai_variation">🤖 Usar IA para variar contenido (prevenir spam)</label>
+            </div>
+            <div class="help-text">Genera variaciones automáticas del asunto y contenido para cada destinatario</div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="anti_spam" name="anti_spam" checked>
+                <label for="anti_spam">🛡️ Medidas anti-spam activas</label>
+            </div>
+            <div class="help-text">Aplica técnicas avanzadas para evitar filtros de spam</div>
+            
+            <!-- Sección de Prueba de IA -->
+            <div style="margin-top: 20px; padding: 15px; border: 2px dashed #28a745; border-radius: 8px; background: #f8fff8;">
+                <h4 style="color: #28a745; margin-bottom: 10px;">🧪 Probar Servicio de IA</h4>
+                <button type="button" class="preview-button" style="background: #28a745;" onclick="testAIService()">
+                    🤖 Probar Variaciones de IA
+                </button>
+                <div class="loading" id="ai-loading">⏳ Generando variaciones con DeepSeek...</div>
+                <div id="ai-test-result" class="preview-result"></div>
+            </div>
+        </div>
+        
+        <!-- Botones de Envío -->
+        <div class="submit-buttons">
+            <button type="submit" class="btn btn-primary">
+                ✅ Crear Campaña y Revisar Lista
+            </button>
+            <a href="{% url 'ventas:campaign_list' %}" class="btn btn-secondary">
+                ❌ Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+<script>
+function previewRecipients() {
+    const form = document.getElementById('campaign-form');
+    const formData = new FormData(form);
+    const loading = document.querySelector('.loading');
+    const resultDiv = document.getElementById('preview-result');
+    
+    loading.style.display = 'block';
+    resultDiv.style.display = 'none';
+    
+    fetch('{% url "ventas:campaign_preview_recipients_ajax" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        loading.style.display = 'none';
+        
+        if (data.success) {
+            resultDiv.className = 'preview-result success';
+            resultDiv.innerHTML = `
+                <strong>✅ ${data.recipient_count} destinatarios encontrados</strong><br>
+                ${data.message}
+            `;
+        } else {
+            resultDiv.className = 'preview-result error';
+            resultDiv.innerHTML = `
+                <strong>❌ Error:</strong> ${data.error}
+            `;
+        }
+        
+        resultDiv.style.display = 'block';
+    })
+    .catch(error => {
+        loading.style.display = 'none';
+        resultDiv.className = 'preview-result error';
+        resultDiv.innerHTML = `<strong>❌ Error de conexión:</strong> ${error.message}`;
+        resultDiv.style.display = 'block';
+    });
+}
+
+function testAIService() {
+    const formData = new FormData();
+    formData.append('subject', document.getElementById('email_subject').value);
+    formData.append('body', document.getElementById('email_body').value);
+    formData.append('client_name', 'María González');
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    const loading = document.getElementById('ai-loading');
+    const resultDiv = document.getElementById('ai-test-result');
+    
+    loading.style.display = 'block';
+    resultDiv.style.display = 'none';
+    
+    fetch('{% url "ventas:campaign_test_ai_ajax" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        loading.style.display = 'none';
+        
+        if (data.success) {
+            const results = data.results;
+            const status = data.service_status;
+            
+            resultDiv.className = 'preview-result success';
+            resultDiv.innerHTML = `
+                <div style="text-align: left;">
+                    <strong>🤖 Estado del Servicio de IA:</strong><br>
+                    • Proveedor: ${status.provider}<br>
+                    • Modelo: ${status.model}<br>
+                    • Estado: ✅ Funcionando<br><br>
+                    
+                    <strong>📧 Variaciones de Asunto:</strong><br>
+                    • Original: "${results.original_subject}"<br>
+                    ${results.subject_variations.map((v, i) => `• Variación ${i+1}: "${v}"`).join('<br>')}<br><br>
+                    
+                    <strong>📄 Variación de Cuerpo:</strong><br>
+                    • Original: "${results.original_body.substring(0, 100)}..."<br>
+                    • Variado: "${results.body_variation.substring(0, 100)}..."<br><br>
+                    
+                    <strong>✨ Resultado Final:</strong><br>
+                    • Asunto: "${results.final_subject}"<br>
+                    • Cuerpo: "${results.final_body.substring(0, 100)}..."
+                </div>
+            `;
+        } else {
+            resultDiv.className = 'preview-result error';
+            resultDiv.innerHTML = `
+                <strong>❌ Error en el Servicio de IA:</strong><br>
+                ${data.error}<br><br>
+                <strong>Estado:</strong> ${JSON.stringify(data.service_status, null, 2)}
+            `;
+        }
+        
+        resultDiv.style.display = 'block';
+    })
+    .catch(error => {
+        loading.style.display = 'none';
+        resultDiv.className = 'preview-result error';
+        resultDiv.innerHTML = `<strong>❌ Error de conexión:</strong> ${error.message}`;
+        resultDiv.style.display = 'block';
+    });
+}
+
+// === FUNCIONES DEL EDITOR WYSIWYG ===
+
+function formatText(command) {
+    document.execCommand(command, false, null);
+    updatePreview();
+}
+
+function insertGiftcardSection() {
+    const giftcardHTML = `
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 25px; border-radius: 12px; text-align: center; margin: 20px 0; color: white;">
+            <h2 style="margin: 0 0 15px 0; color: white;">🎁 Gift Card de Regalo</h2>
+            <h3 style="margin: 0 0 10px 0; font-size: 2.5em; color: #ffd700;">$15,000</h3>
+            <p style="margin: 0; font-size: 1.1em;">Giftcard válida durante septiembre 2025</p>
+        </div>
+    `;
+    document.execCommand('insertHTML', false, giftcardHTML);
+    updatePreview();
+}
+
+function insertWhatsAppButton() {
+    const buttonHTML = `
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20mi%20cita%20mencionando%20mi%20giftcard" 
+               style="background: #25d366; color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">
+                📱 Reservar Ahora por WhatsApp
+            </a>
+        </div>
+    `;
+    document.execCommand('insertHTML', false, buttonHTML);
+    updatePreview();
+}
+
+function updatePreview() {
+    const editor = document.getElementById('email_editor');
+    const preview = document.getElementById('email_preview');
+    const hiddenTextarea = document.getElementById('email_body');
+    
+    // Actualizar el contenido
+    const content = editor.innerHTML;
+    preview.innerHTML = content.replace(/{nombre_cliente}/g, '<span style="background: yellow; padding: 2px 4px; border-radius: 3px;">María González</span>');
+    
+    // Actualizar el textarea oculto para el envío del formulario
+    hiddenTextarea.value = content;
+}
+
+// Auto-preview cuando cambien los criterios
+document.addEventListener('DOMContentLoaded', function() {
+    const criteriaInputs = ['month', 'year', 'spend_min', 'spend_max', 'visit_count_min', 'visit_count_max', 'cities'];
+    
+    criteriaInputs.forEach(inputName => {
+        const input = document.querySelector(`[name="${inputName}"]`);
+        if (input) {
+            input.addEventListener('change', function() {
+                // Auto-preview después de un pequeño delay
+                setTimeout(previewRecipients, 500);
+            });
+        }
+    });
+    
+    // Inicializar el editor WYSIWYG
+    updatePreview();
+    
+    // Preview inicial
+    setTimeout(previewRecipients, 1000);
+});
+</script>
+{% endblock %}

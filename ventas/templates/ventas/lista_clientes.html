@@ -1,0 +1,91 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <!-- Modern Airbnb-style CSS -->
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4"> {# Use modern-container #}
+    <div class="page-header"> {# Add page header consistent with inicio_sistema #}
+        <h1>Lista de Clientes</h1>
+    </div>
+
+    <!-- Filtros de búsqueda -->
+    <form method="GET" action="" class="form-inline mb-4">
+        <div class="form-group mx-sm-3 mb-2">
+            <input type="text" class="form-control" id="search" name="search" 
+                    value="{{ search_query }}" placeholder="Buscar por nombre, teléfono o email">
+        </div>
+        <button type="submit" class="btn btn-modern btn-primary-modern mb-2">Buscar</button> {# Use modern button #}
+        <div class="mb-3">
+            <a href="{% url 'exportar_clientes_excel' %}" class="btn btn-modern btn-success-modern"> {# Use modern button #}
+                <i class="fas fa-file-excel"></i> Exportar a Excel
+            </a>
+            <a href="{% url 'importar_clientes_excel' %}" class="btn btn-modern btn-warning-modern"> {# Use modern button (warning for import?) #}
+                <i class="fas fa-upload"></i> Importar desde Excel
+            </a>
+        </div>
+    </form>
+
+    <!-- Tabla de clientes -->
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Teléfono</th>
+                    <th>Email</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cliente in clientes %}
+                <tr>
+                    <td>{{ cliente.nombre }}</td>
+                    <td>{{ cliente.telefono|default:"-" }}</td>
+                    <td>{{ cliente.email|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" class="text-center">No se encontraron clientes</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Paginación -->
+    {% if is_paginated %}
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">
+                    Anterior
+                </a>
+            </li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+            <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}">
+                    {{ num }}
+                </a>
+            </li>
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">
+                    Siguiente
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}
+{# Removed inline style block as styles should come from base or modern.css #}
