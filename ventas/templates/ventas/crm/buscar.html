@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Buscar Cliente - CRM Aremko{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2 mb-0">Buscar Cliente</h1>
+                    <p class="text-muted mb-0">Encuentra clientes por nombre, teléfono o email</p>
+                </div>
+                <a href="{% url 'crm_dashboard' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Volver al Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulario de Búsqueda -->
+    <div class="row mb-4">
+        <div class="col-md-8 mx-auto">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <form method="GET" action="{% url 'crm_buscar' %}" id="searchForm">
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text bg-white">
+                                <i class="fas fa-search text-muted"></i>
+                            </span>
+                            <input
+                                type="text"
+                                class="form-control border-start-0"
+                                name="q"
+                                value="{{ query }}"
+                                placeholder="Ingresa nombre, teléfono o email del cliente..."
+                                autofocus
+                                minlength="3"
+                                required
+                            >
+                            <button type="submit" class="btn btn-primary px-4">
+                                Buscar
+                            </button>
+                        </div>
+                        <small class="text-muted mt-2 d-block">
+                            <i class="fas fa-info-circle"></i>
+                            Debes ingresar al menos 3 caracteres para buscar
+                        </small>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resultados de Búsqueda -->
+    {% if query %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        Resultados de búsqueda
+                        {% if resultados %}
+                            <span class="badge bg-primary">{{ resultados|length }}</span>
+                        {% endif %}
+                    </h5>
+                    {% if query %}
+                    <small class="text-muted">Búsqueda: "{{ query }}"</small>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if resultados %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Teléfono</th>
+                                    <th>Email</th>
+                                    <th class="text-center">Total Servicios</th>
+                                    <th>Último Servicio</th>
+                                    <th class="text-end">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cliente in resultados %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ cliente.nombre }}</strong>
+                                    </td>
+                                    <td>
+                                        <i class="fas fa-phone text-muted"></i>
+                                        {{ cliente.telefono|default:"-" }}
+                                    </td>
+                                    <td>
+                                        {% if cliente.email %}
+                                        <i class="fas fa-envelope text-muted"></i>
+                                        {{ cliente.email }}
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if cliente.total_servicios > 0 %}
+                                        <span class="badge bg-success">{{ cliente.total_servicios }}</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if cliente.ultimo_servicio %}
+                                        <small class="text-muted">
+                                            {{ cliente.ultimo_servicio|date:"d/m/Y" }}
+                                        </small>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <a
+                                            href="{% url 'cliente_detalle' cliente.id %}"
+                                            class="btn btn-sm btn-primary"
+                                        >
+                                            <i class="fas fa-eye"></i> Ver Perfil
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <!-- No hay resultados -->
+                    <div class="text-center py-5">
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No se encontraron resultados</h5>
+                        <p class="text-muted">
+                            No se encontraron clientes que coincidan con "{{ query }}".
+                            Intenta con otro término de búsqueda.
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- Estado inicial - Sin búsqueda -->
+    <div class="row">
+        <div class="col-md-6 mx-auto">
+            <div class="text-center py-5">
+                <i class="fas fa-users fa-4x text-muted mb-4"></i>
+                <h5 class="text-muted mb-3">Busca un cliente para comenzar</h5>
+                <p class="text-muted">
+                    Utiliza el formulario de búsqueda arriba para encontrar clientes
+                    por nombre, teléfono o email.
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Focus en el campo de búsqueda
+        const searchInput = document.querySelector('input[name="q"]');
+        if (searchInput) {
+            searchInput.focus();
+        }
+
+        // Validación del formulario
+        const searchForm = document.getElementById('searchForm');
+        searchForm.addEventListener('submit', function(e) {
+            const query = searchInput.value.trim();
+            if (query.length < 3) {
+                e.preventDefault();
+                alert('Por favor ingresa al menos 3 caracteres para buscar');
+                searchInput.focus();
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views # Import the new admin views module and mercadopago views
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views # Import the new admin views module and mercadopago views
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -65,6 +65,17 @@ urlpatterns = [
     path('admin/section/servicios/', admin_views.admin_section_servicios_view, name='admin_section_servicios'),
     path('admin/section/productos/', admin_views.admin_section_productos_view, name='admin_section_productos'),
     path('admin/section/config/', admin_views.admin_section_config_view, name='admin_section_config'),
+
+    # === CRM PROPUESTAS PERSONALIZADAS CON IA ===
+    path('crm/', crm_views.crm_dashboard, name='crm_dashboard'),
+    path('crm/buscar/', crm_views.crm_buscar, name='crm_buscar'),
+    path('crm/cliente/<int:cliente_id>/', crm_views.cliente_detalle, name='cliente_detalle'),
+    path('crm/cliente/<int:cliente_id>/propuesta/', crm_views.generar_propuesta, name='generar_propuesta'),
+    path('crm/cliente/<int:cliente_id>/enviar/', crm_views.enviar_propuesta, name='enviar_propuesta'),
+    path('crm/cliente/<int:cliente_id>/preview/', crm_views.propuesta_preview, name='propuesta_preview'),
+    path('crm/cliente/<int:cliente_id>/historial/', crm_views.historial_servicios, name='historial_servicios'),
+    # === END CRM PROPUESTAS ===
+
     # Keep existing api paths using the api module
     path('api/cliente/create/', api.create_cliente, name='create_cliente'),
     path('api/cliente/update/<str:telefono>/', api.update_cliente, name='update_cliente'),

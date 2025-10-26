@@ -1633,3 +1633,49 @@ class EmailBlacklist(models.Model):
         if '@' in self.email:
             self.domain = self.email.split('@')[1].lower()
         super().save(*args, **kwargs)
+
+
+# ============================================================================
+# MODELOS CRM - HISTORIAL DE SERVICIOS
+# ============================================================================
+
+class ServiceHistory(models.Model):
+    """
+    Historial de servicios históricos importados (2020-2024)
+    Conecta con la tabla crm_service_history en la base de datos.
+    """
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.CASCADE,
+        related_name='historial_servicios',
+        verbose_name="Cliente"
+    )
+    reserva_id = models.CharField(max_length=50, blank=True, verbose_name="ID Reserva")
+    service_type = models.CharField(max_length=100, verbose_name="Tipo de Servicio")  # Tinas, Masajes, Cabañas
+    service_name = models.CharField(max_length=200, verbose_name="Nombre del Servicio")
+    service_date = models.DateField(verbose_name="Fecha del Servicio")
+    quantity = models.IntegerField(default=1, verbose_name="Cantidad")
+    price_paid = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Precio Pagado")
+    season = models.CharField(max_length=50, blank=True, verbose_name="Estación")  # Verano, Otoño, Invierno, Primavera
+    year = models.IntegerField(null=True, blank=True, verbose_name="Año")
+
+    class Meta:
+        db_table = 'crm_service_history'  # Usa la tabla existente
+        managed = False  # Django no crea/modifica esta tabla
+        ordering = ['-service_date']
+        verbose_name = "Servicio Histórico"
+        verbose_name_plural = "Servicios Históricos"
+
+    def __str__(self):
+        return f"{self.cliente.nombre} - {self.service_name} ({self.service_date})"
+
+    def get_categoria_display(self):
+        """Retorna categoría normalizada"""
+        return self.service_type.title()
+
+    @property
+    def is_recent(self):
+        """Verifica si el servicio es de los últimos 6 meses"""
+        from datetime import datetime, timedelta
+        six_months_ago = datetime.now().date() - timedelta(days=180)
+        return self.service_date >= six_months_ago

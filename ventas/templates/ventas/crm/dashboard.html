@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}CRM Dashboard - Aremko{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h2 mb-0">CRM Dashboard</h1>
+            <p class="text-muted">Sistema de gestión de clientes y propuestas personalizadas</p>
+        </div>
+    </div>
+
+    {% if stats %}
+    <!-- Cards de Métricas Principales -->
+    <div class="row mb-4">
+        <!-- Total Clientes -->
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-muted mb-1">Total Clientes</h6>
+                            <h3 class="mb-0">{{ stats.clientes.total|default:0 }}</h3>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-users fa-2x text-primary"></i>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-success">
+                            <i class="fas fa-arrow-up"></i>
+                            {{ stats.clientes.con_historial|default:0 }} con historial
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Servicios Este Mes -->
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-muted mb-1">Servicios Este Mes</h6>
+                            <h3 class="mb-0">{{ stats.mes_actual.servicios|default:0 }}</h3>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-calendar-check fa-2x text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ingresos Este Mes -->
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-muted mb-1">Ingresos Este Mes</h6>
+                            <h3 class="mb-0">${{ stats.mes_actual.ingresos|floatformat:0|default:0 }}</h3>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-dollar-sign fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Buscar Cliente -->
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="mb-2">Buscar Cliente</h6>
+                    <a href="{% url 'crm_buscar' %}" class="btn btn-light btn-sm w-100">
+                        <i class="fas fa-search"></i> Ir a Búsqueda
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Servicios -->
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Top 5 Servicios</h5>
+                </div>
+                <div class="card-body">
+                    {% if stats.top_servicios %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Servicio</th>
+                                    <th class="text-end">Cantidad</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for servicio in stats.top_servicios %}
+                                <tr>
+                                    <td>{{ servicio.service_name|truncatewords:5 }}</td>
+                                    <td class="text-end">
+                                        <span class="badge bg-primary">{{ servicio.cantidad }}</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">No hay datos de servicios disponibles.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Por Categoría -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Servicios por Categoría</h5>
+                </div>
+                <div class="card-body">
+                    {% if stats.por_categoria %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Categoría</th>
+                                    <th class="text-end">Cantidad</th>
+                                    <th class="text-end">Ingresos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cat in stats.por_categoria %}
+                                <tr>
+                                    <td>{{ cat.service_type }}</td>
+                                    <td class="text-end">{{ cat.cantidad }}</td>
+                                    <td class="text-end">${{ cat.ingresos|floatformat:0 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">No hay datos de categorías disponibles.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Error State -->
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                No se pudieron cargar las estadísticas del dashboard.
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Aquí puedes agregar JavaScript adicional para el dashboard
+    console.log('CRM Dashboard loaded');
+</script>
+{% endblock %}
