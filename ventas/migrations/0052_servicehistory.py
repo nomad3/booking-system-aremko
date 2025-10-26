@@ -11,10 +11,15 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Step 0: Drop table if exists (to ensure clean slate)
         migrations.RunSQL(
-            # Create table
+            sql="DROP TABLE IF EXISTS crm_service_history CASCADE;",
+            reverse_sql=migrations.RunSQL.noop
+        ),
+        # Step 1: Create table with correct structure
+        migrations.RunSQL(
             sql="""
-                CREATE TABLE IF NOT EXISTS crm_service_history (
+                CREATE TABLE crm_service_history (
                     id SERIAL PRIMARY KEY,
                     cliente_id INTEGER NOT NULL REFERENCES ventas_cliente(id) ON DELETE CASCADE,
                     reserva_id VARCHAR(50) DEFAULT '',
@@ -26,15 +31,23 @@ class Migration(migrations.Migration):
                     season VARCHAR(50) DEFAULT '',
                     year INTEGER
                 );
-
+            """,
+            reverse_sql="DROP TABLE IF EXISTS crm_service_history CASCADE;"
+        ),
+        # Step 2: Create index on cliente_id
+        migrations.RunSQL(
+            sql="""
                 CREATE INDEX IF NOT EXISTS idx_crm_service_history_cliente
                     ON crm_service_history(cliente_id);
+            """,
+            reverse_sql="DROP INDEX IF EXISTS idx_crm_service_history_cliente;"
+        ),
+        # Step 3: Create index on service_date
+        migrations.RunSQL(
+            sql="""
                 CREATE INDEX IF NOT EXISTS idx_crm_service_history_date
                     ON crm_service_history(service_date);
             """,
-            # Reverse (drop table)
-            reverse_sql="""
-                DROP TABLE IF EXISTS crm_service_history CASCADE;
-            """
+            reverse_sql="DROP INDEX IF EXISTS idx_crm_service_history_date;"
         ),
     ]
