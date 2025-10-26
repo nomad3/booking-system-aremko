@@ -60,8 +60,8 @@ class CRMService:
             cantidad = rs.cantidad_personas or 1
             precio_total = precio_unitario * cantidad
 
-            # Fecha del servicio (priorizar fecha_hora, sino fecha_reserva de la venta)
-            fecha_servicio = rs.fecha_hora.date() if rs.fecha_hora else rs.venta_reserva.fecha_reserva.date()
+            # Fecha del servicio (priorizar fecha_agendamiento, sino fecha_reserva de la venta)
+            fecha_servicio = rs.fecha_agendamiento.date() if rs.fecha_agendamiento else rs.venta_reserva.fecha_reserva.date()
 
             servicios_combinados.append({
                 'fecha': fecha_servicio,
@@ -259,7 +259,7 @@ class CRMService:
 
         # Actuales este mes
         reservas_mes = ReservaServicio.objects.filter(
-            Q(fecha_hora__date__gte=inicio_mes) |
+            Q(fecha_agendamiento__date__gte=inicio_mes) |
             Q(venta_reserva__fecha_reserva__date__gte=inicio_mes),
             venta_reserva__estado_pago__in=['pagado', 'parcial']
         ).select_related('servicio')
