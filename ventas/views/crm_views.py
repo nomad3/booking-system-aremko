@@ -19,9 +19,27 @@ def crm_dashboard(request):
     """
     Dashboard principal del CRM con métricas generales
     """
-    try:
-        stats = CRMService.get_dashboard_stats()
+    from django.http import HttpResponse
+    import traceback
 
+    try:
+        # Debug: Verificar que la vista se ejecuta
+        debug_info = ["=== CRM DEBUG ==="]
+
+        # Intentar obtener stats
+        try:
+            stats = CRMService.get_dashboard_stats()
+            debug_info.append(f"✅ Stats obtenidas: {stats}")
+        except Exception as e:
+            debug_info.append(f"❌ Error obteniendo stats: {str(e)}")
+            debug_info.append(f"Traceback: {traceback.format_exc()}")
+            stats = None
+
+        # Si stats es None, devolver debug info
+        if stats is None:
+            return HttpResponse("<br>".join(debug_info), content_type="text/html")
+
+        # Intentar renderizar template
         context = {
             'stats': stats,
             'page_title': 'CRM Dashboard',
@@ -30,8 +48,8 @@ def crm_dashboard(request):
 
     except Exception as e:
         logger.error(f"Error en CRM dashboard: {e}")
-        messages.error(request, f"Error cargando dashboard: {str(e)}")
-        return render(request, 'ventas/crm/dashboard.html', {'stats': None})
+        error_trace = traceback.format_exc()
+        return HttpResponse(f"<h1>Error 500</h1><pre>{error_trace}</pre>", content_type="text/html", status=500)
 
 
 # @login_required  # TEMPORALMENTE DESHABILITADO PARA TESTING
