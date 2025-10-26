@@ -61,7 +61,8 @@ class CRMService:
             precio_total = precio_unitario * cantidad
 
             # Fecha del servicio (priorizar fecha_agendamiento, sino fecha_reserva de la venta)
-            fecha_servicio = rs.fecha_agendamiento.date() if rs.fecha_agendamiento else rs.venta_reserva.fecha_reserva.date()
+            # fecha_agendamiento ya es un DateField, no necesita .date()
+            fecha_servicio = rs.fecha_agendamiento if rs.fecha_agendamiento else rs.venta_reserva.fecha_reserva.date()
 
             servicios_combinados.append({
                 'fecha': fecha_servicio,
@@ -258,8 +259,9 @@ class CRMService:
             logger.warning(f"No se pudieron contar servicios históricos del mes: {e}")
 
         # Actuales este mes
+        # fecha_agendamiento es DateField, no necesita __date
         reservas_mes = ReservaServicio.objects.filter(
-            Q(fecha_agendamiento__date__gte=inicio_mes) |
+            Q(fecha_agendamiento__gte=inicio_mes) |
             Q(venta_reserva__fecha_reserva__date__gte=inicio_mes),
             venta_reserva__estado_pago__in=['pagado', 'parcial']
         ).select_related('servicio')
