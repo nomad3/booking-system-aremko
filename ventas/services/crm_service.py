@@ -28,19 +28,25 @@ class CRMService:
             Dict con servicios combinados y métricas agregadas
         """
         servicios_combinados = []
+        total_historicos = 0
 
         # 1. DATOS HISTÓRICOS - ServiceHistory (2020-2024)
-        historicos = ServiceHistory.objects.filter(cliente=cliente)
-        for h in historicos:
-            servicios_combinados.append({
-                'fecha': h.service_date,
-                'servicio': h.service_name,
-                'tipo': h.service_type,
-                'precio': float(h.price_paid),
-                'cantidad': h.quantity,
-                'fuente': 'histórico',
-                'id': f'hist_{h.id}'
-            })
+        try:
+            historicos = ServiceHistory.objects.filter(cliente=cliente)
+            total_historicos = historicos.count()
+            for h in historicos:
+                servicios_combinados.append({
+                    'fecha': h.service_date,
+                    'servicio': h.service_name,
+                    'tipo': h.service_type,
+                    'precio': float(h.price_paid),
+                    'cantidad': h.quantity,
+                    'fuente': 'histórico',
+                    'id': f'hist_{h.id}'
+                })
+        except Exception as e:
+            logger.warning(f"No se pudieron cargar datos históricos: {e}. Tabla crm_service_history puede no existir aún.")
+            # Continuar sin datos históricos
 
         # 2. DATOS ACTUALES - VentaReserva → ReservaServicio (2024-hoy)
         reservas_servicio = ReservaServicio.objects.filter(
@@ -72,7 +78,7 @@ class CRMService:
 
         return {
             'servicios': servicios_combinados,
-            'total_historicos': historicos.count(),
+            'total_historicos': total_historicos,
             'total_actuales': reservas_servicio.count(),
             'total_combinados': len(servicios_combinados)
         }
@@ -227,7 +233,12 @@ class CRMService:
         total_clientes = Cliente.objects.count()
 
         # Clientes con historial (histórico o actual)
-        clientes_con_hist = ServiceHistory.objects.values('cliente').distinct().count()
+        clientes_con_hist = 0
+        try:
+            clientes_con_hist = ServiceHistory.objects.values('cliente').distinct().count()
+        except Exception as e:
+            logger.warning(f"No se pudieron contar clientes con historial: {e}")
+
         clientes_con_actuales = VentaReserva.objects.values('cliente').distinct().count()
         # Unión de ambos (aproximado)
         clientes_con_historial = max(clientes_con_hist, clientes_con_actuales)
@@ -236,10 +247,15 @@ class CRMService:
         inicio_mes = datetime.now().replace(day=1).date()
 
         # Históricos este mes
-        servicios_mes_hist = ServiceHistory.objects.filter(service_date__gte=inicio_mes).count()
-        ingresos_mes_hist = ServiceHistory.objects.filter(
-            service_date__gte=inicio_mes
-        ).aggregate(total=Sum('price_paid'))['total'] or 0
+        servicios_mes_hist = 0
+        ingresos_mes_hist = 0
+        try:
+            servicios_mes_hist = ServiceHistory.objects.filter(service_date__gte=inicio_mes).count()
+            ingresos_mes_hist = ServiceHistory.objects.filter(
+                service_date__gte=inicio_mes
+            ).aggregate(total=Sum('price_paid'))['total'] or 0
+        except Exception as e:
+            logger.warning(f"No se pudieron contar servicios históricos del mes: {e}")
 
         # Actuales este mes
         reservas_mes = ReservaServicio.objects.filter(
@@ -259,15 +275,20 @@ class CRMService:
         ingresos_mes = float(ingresos_mes_hist) + ingresos_mes_actual
 
         # Top servicios (solo históricos por performance)
-        top_servicios = ServiceHistory.objects.values('service_name').annotate(
-            cantidad=Count('id')
-        ).order_by('-cantidad')[:5]
+        top_servicios = []
+        por_categoria = []
+        try:
+            top_servicios = ServiceHistory.objects.values('service_name').annotate(
+                cantidad=Count('id')
+            ).order_by('-cantidad')[:5]
 
-        # Servicios por categoría (solo históricos por performance)
-        por_categoria = ServiceHistory.objects.values('service_type').annotate(
-            cantidad=Count('id'),
-            ingresos=Sum('price_paid')
-        ).order_by('-cantidad')
+            # Servicios por categoría (solo históricos por performance)
+            por_categoria = ServiceHistory.objects.values('service_type').annotate(
+                cantidad=Count('id'),
+                ingresos=Sum('price_paid')
+            ).order_by('-cantidad')
+        except Exception as e:
+            logger.warning(f"No se pudieron cargar estadísticas de históricos: {e}")
 
         return {
             'clientes': {
@@ -337,7 +358,12 @@ class CRMService:
             Lista de customer IDs
         """
         # Obtener clientes con historial (histórico o actual)
-        clientes_hist = set(ServiceHistory.objects.values_list('cliente_id', flat=True).distinct())
+        clientes_hist = set()
+        try:
+            clientes_hist = set(ServiceHistory.objects.values_list('cliente_id', flat=True).distinct())
+        except Exception as e:
+            logger.warning(f"No se pudieron obtener clientes con historial: {e}")
+
         clientes_actual = set(VentaReserva.objects.values_list('cliente_id', flat=True).distinct())
 
         # Unión de ambos
