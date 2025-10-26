@@ -28,12 +28,13 @@ class AIProposalService:
         if not self.api_key:
             logger.warning("DEEPSEEK_API_KEY no configurada. Propuestas usarán fallback.")
 
-    def generar_propuesta(self, customer_id: int) -> Dict[str, Any]:
+    def generar_propuesta(self, customer_id: int, estilo: str = "formal") -> Dict[str, Any]:
         """
         Genera propuesta personalizada para un cliente usando IA
 
         Args:
             customer_id: ID del cliente
+            estilo: "formal" (corporativo) o "calido" (emocional/personal)
 
         Returns:
             Dict con propuesta estructurada
@@ -44,33 +45,58 @@ class AIProposalService:
 
             # Si no hay API key, usar propuesta básica
             if not self.api_key:
-                return self._generar_propuesta_basica(perfil)
+                return self._generar_propuesta_basica(perfil, estilo)
 
             # Generar propuesta con IA
-            return self._generar_propuesta_con_ia(perfil)
+            return self._generar_propuesta_con_ia(perfil, estilo)
 
         except Exception as e:
             logger.error(f"Error generando propuesta para cliente {customer_id}: {e}")
             # Fallback a propuesta básica en caso de error
             try:
                 perfil = CRMService.get_customer_360(customer_id)
-                return self._generar_propuesta_basica(perfil)
+                return self._generar_propuesta_basica(perfil, estilo)
             except:
                 raise Exception(f"Error generando propuesta: {str(e)}")
 
-    def _generar_propuesta_con_ia(self, perfil: Dict[str, Any]) -> Dict[str, Any]:
+    def _generar_propuesta_con_ia(self, perfil: Dict[str, Any], estilo: str = "formal") -> Dict[str, Any]:
         """
-        Genera propuesta usando DeepSeek API
+        Genera propuesta usando DeepSeek API con estilo específico
         """
         try:
             # Preparar contexto para la IA
             contexto = self._preparar_contexto(perfil)
+
+            # Determinar instrucciones según estilo
+            if estilo == "calido":
+                instrucciones_estilo = """
+ESTILO CÁLIDO Y EMOCIONAL:
+- Usa lenguaje cercano, como si hablaras con un amigo
+- Evoca recuerdos de visitas pasadas (menciona servicios que ha disfrutado)
+- Crea una narrativa emocional sobre su experiencia en Aremko
+- Usa frases como "recordamos que disfrutaste...", "te vimos relajarte en..."
+- Ofertas diferenciadas: 15% en alojamiento/tinas, 10% en masajes
+- Email con storytelling emocional, no solo lista de servicios
+- Saludo muy personal usando solo el nombre de pila
+"""
+            else:  # formal
+                instrucciones_estilo = """
+ESTILO FORMAL Y PROFESIONAL:
+- Tono corporativo y estructurado
+- Datos y métricas claras
+- Lenguaje profesional pero amable
+- Oferta única y clara (15% general o según segmento)
+- Email con estructura clara: saludo, recomendaciones, oferta, CTA
+- Saludo profesional con nombre completo
+"""
 
             # Prompt para DeepSeek
             prompt = f"""Eres un experto en marketing y turismo de bienestar. Analiza el siguiente perfil de cliente de Aremko (centro de bienestar y spa) y genera una propuesta personalizada.
 
 PERFIL DEL CLIENTE:
 {json.dumps(contexto, indent=2, ensure_ascii=False)}
+
+{instrucciones_estilo}
 
 TAREA:
 Genera una propuesta personalizada en JSON con la siguiente estructura:
@@ -172,14 +198,18 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
             logger.error(f"Error en generación con IA: {e}")
             return self._generar_propuesta_basica(perfil)
 
-    def _generar_propuesta_basica(self, perfil: Dict[str, Any]) -> Dict[str, Any]:
+    def _generar_propuesta_basica(self, perfil: Dict[str, Any], estilo: str = "formal") -> Dict[str, Any]:
         """
         Genera propuesta básica basada en reglas de negocio (fallback)
+        Soporta dos estilos: formal y cálido
         """
         cliente = perfil['cliente']
         metricas = perfil['metricas']
         segmentacion = perfil['segmentacion']
         categorias = perfil.get('categorias_favoritas', [])
+
+        # Nombre según estilo
+        nombre_cliente = cliente['nombre'].split()[0] if estilo == "calido" else cliente['nombre']
 
         # Insights básicos
         insights = {
@@ -229,41 +259,88 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
                 "discount": "10% descuento"
             }
 
-        # Email HTML básico
-        email_body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h2 style="color: #2c5282;">Hola {cliente['nombre']},</h2>
+        # Email HTML según estilo
+        if estilo == "calido":
+            # Email cálido y emocional con storytelling
+            servicios_texto = "".join([f"· {cat['service_type']}" for cat in categorias[:2]])
+            email_body = f"""
+            <html>
+            <body style="font-family: 'Georgia', serif; line-height: 1.8; color: #444;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(to bottom, #f9f7f4 0%, #ffffff 100%);">
+                    <h2 style="color: #8B4513; font-weight: 300; margin-bottom: 5px;">Hola {nombre_cliente},</h2>
+                    <p style="color: #999; font-size: 14px; font-style: italic; margin-top: 0;">Un saludo cálido desde Puerto Varas 🌿</p>
 
-                <p>En Aremko valoramos tu preferencia y queremos ofrecerte una experiencia única y personalizada.</p>
+                    <p>Recordamos cada visita que nos has hecho... Esas {metricas['total_servicios']} ocasiones en las que decidiste regalarte tiempo para ti. Nos emociona ver que has encontrado en Aremko tu refugio de bienestar.</p>
 
-                <h3 style="color: #2c5282;">Recomendaciones Especiales para Ti:</h3>
+                    <p>Sabemos lo mucho que disfrutas {servicios_texto}. Cada vez que te vemos relajarte en nuestras instalaciones, confirmamos que estamos cumpliendo nuestra misión: crear momentos inolvidables.</p>
 
-                {"".join([f'''
-                <div style="background-color: #f7fafc; padding: 15px; margin: 10px 0; border-left: 4px solid #4299e1;">
-                    <strong>{rec["service_name"]}</strong><br>
-                    <span style="color: #718096;">{rec["reason"]}</span><br>
-                    <span style="color: #2d3748; font-weight: bold;">Precio estimado: ${rec["estimated_price"]:,}</span>
+                    <div style="background: #fff8f0; padding: 20px; margin: 25px 0; border-left: 4px solid #d2691e; border-radius: 0 8px 8px 0;">
+                        <h3 style="color: #8B4513; font-weight: 300; margin-top: 0;">Pensamos en ti y creamos esto:</h3>
+                        {"".join([f'''
+                        <div style="margin: 20px 0;">
+                            <p style="font-size: 18px; color: #8B4513; margin-bottom: 8px;"><strong>{rec["service_name"]}</strong></p>
+                            <p style="color: #666; font-style: italic; margin: 5px 0;">{rec["reason"]}</p>
+                            <p style="color: #999; font-size: 14px;">Valor estimado: ${rec["estimated_price"]:,}</p>
+                        </div>
+                        ''' for rec in recommendations])}
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #8B4513 0%, #d2691e 100%); color: white; padding: 25px; margin: 25px 0; border-radius: 8px; text-align: center;">
+                        <h3 style="margin-top: 0; font-weight: 300;">✨ Este mes, algo especial para ti</h3>
+                        <p style="font-size: 16px; line-height: 1.6;">{offer["description"]}</p>
+                        <p style="font-size: 24px; margin: 15px 0; font-weight: bold;">{offer["discount"]}</p>
+                        <p style="font-size: 14px; opacity: 0.9;">Válido durante noviembre 2024</p>
+                    </div>
+
+                    <p style="text-align: center; margin: 30px 0;">
+                        <a href="https://www.aremko.cl/reservas" style="display: inline-block; background: #8B4513; color: white; padding: 15px 35px; text-decoration: none; border-radius: 30px; font-size: 16px; box-shadow: 0 4px 10px rgba(139, 69, 19, 0.3);">Reservar Mi Momento Especial</a>
+                    </p>
+
+                    <p style="color: #666; font-size: 15px; line-height: 1.7; margin-top: 40px;">
+                        Te esperamos con los brazos abiertos en tu segundo hogar de descanso. Queremos seguir siendo parte de esos momentos que te hacen bien.<br><br>
+                        Con cariño,<br>
+                        <strong style="color: #8B4513;">Todo el equipo de Aremko</strong> 💚
+                    </p>
                 </div>
-                ''' for rec in recommendations])}
+            </body>
+            </html>
+            """
+        else:
+            # Email formal y profesional
+            email_body = f"""
+            <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #2c5282;">Hola {cliente['nombre']},</h2>
 
-                <div style="background-color: #edf2f7; padding: 20px; margin: 20px 0; border-radius: 8px;">
-                    <h3 style="color: #2c5282; margin-top: 0;">{offer["title"]}</h3>
-                    <p>{offer["description"]}</p>
-                    {f'<p style="font-size: 18px; color: #e53e3e; font-weight: bold;">{offer["discount"]}</p>' if offer.get("discount") else ''}
+                    <p>En Aremko valoramos tu preferencia y queremos ofrecerte una experiencia única y personalizada.</p>
+
+                    <h3 style="color: #2c5282;">Recomendaciones Especiales para Ti:</h3>
+
+                    {"".join([f'''
+                    <div style="background-color: #f7fafc; padding: 15px; margin: 10px 0; border-left: 4px solid #4299e1;">
+                        <strong>{rec["service_name"]}</strong><br>
+                        <span style="color: #718096;">{rec["reason"]}</span><br>
+                        <span style="color: #2d3748; font-weight: bold;">Precio estimado: ${rec["estimated_price"]:,}</span>
+                    </div>
+                    ''' for rec in recommendations])}
+
+                    <div style="background-color: #edf2f7; padding: 20px; margin: 20px 0; border-radius: 8px;">
+                        <h3 style="color: #2c5282; margin-top: 0;">{offer["title"]}</h3>
+                        <p>{offer["description"]}</p>
+                        {f'<p style="font-size: 18px; color: #e53e3e; font-weight: bold;">{offer["discount"]}</p>' if offer.get("discount") else ''}
+                    </div>
+
+                    <p><a href="https://www.aremko.cl" style="display: inline-block; background-color: #4299e1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Reservar Ahora</a></p>
+
+                    <p style="color: #718096; font-size: 14px;">
+                        ¡Esperamos verte pronto en Aremko!<br>
+                        Equipo Aremko
+                    </p>
                 </div>
-
-                <p><a href="https://www.aremko.cl" style="display: inline-block; background-color: #4299e1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Reservar Ahora</a></p>
-
-                <p style="color: #718096; font-size: 14px;">
-                    ¡Esperamos verte pronto en Aremko!<br>
-                    Equipo Aremko
-                </p>
-            </div>
-        </body>
-        </html>
-        """
+            </body>
+            </html>
+            """
 
         return {
             "customer_profile": {

@@ -29,6 +29,20 @@
                     <a href="{% url 'ventas:crm_buscar' %}" class="btn btn-outline-secondary me-2">
                         <i class="fas fa-arrow-left"></i> Volver
                     </a>
+
+                    <!-- Selector de Estilo -->
+                    <div class="btn-group me-2" role="group">
+                        <input type="radio" class="btn-check" name="estiloEmail" id="estiloFormal" value="formal" checked>
+                        <label class="btn btn-outline-primary" for="estiloFormal">
+                            <i class="fas fa-briefcase"></i> Formal
+                        </label>
+
+                        <input type="radio" class="btn-check" name="estiloEmail" id="estiloCalido" value="calido">
+                        <label class="btn btn-outline-primary" for="estiloCalido">
+                            <i class="fas fa-heart"></i> Cálido
+                        </label>
+                    </div>
+
                     <button
                         type="button"
                         class="btn btn-primary"
@@ -269,6 +283,10 @@
         const propuestaArea = document.getElementById('propuestaArea');
         const propuestaContent = document.getElementById('propuestaContent');
 
+        // Obtener estilo seleccionado
+        const estiloSeleccionado = document.querySelector('input[name="estiloEmail"]:checked').value;
+        const estiloNombre = estiloSeleccionado === 'calido' ? 'cálida y emocional' : 'formal y profesional';
+
         // Mostrar área de propuesta con loading
         propuestaArea.style.display = 'block';
         propuestaContent.innerHTML = `
@@ -276,7 +294,7 @@
                 <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">Generando...</span>
                 </div>
-                <p class="mt-3 text-muted">Analizando perfil del cliente y generando propuesta personalizada...</p>
+                <p class="mt-3 text-muted">Generando propuesta ${estiloNombre} para el cliente...</p>
             </div>
         `;
 
@@ -284,13 +302,16 @@
         btnGenerar.disabled = true;
         btnGenerar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
 
-        // Hacer request al API
+        // Hacer request al API con estilo
         fetch(`/ventas/crm/cliente/${clienteId}/propuesta/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
-            }
+            },
+            body: JSON.stringify({
+                estilo: estiloSeleccionado
+            })
         })
         .then(response => response.json())
         .then(data => {

@@ -109,15 +109,25 @@ def cliente_detalle(request, cliente_id):
 def generar_propuesta(request, cliente_id):
     """
     Genera propuesta personalizada usando IA (DeepSeek o fallback)
+    Soporta dos estilos: 'formal' (default) y 'calido'
     """
     try:
+        # Obtener estilo del request (formal por defecto)
+        import json as json_lib
+        try:
+            body = json_lib.loads(request.body.decode('utf-8')) if request.body else {}
+            estilo = body.get('estilo', 'formal')
+        except:
+            estilo = request.POST.get('estilo', 'formal')
+
         # Usar servicio de IA local
         ai_service = get_ai_service()
-        propuesta = ai_service.generar_propuesta(cliente_id)
+        propuesta = ai_service.generar_propuesta(cliente_id, estilo=estilo)
 
         return JsonResponse({
             'success': True,
-            'propuesta': propuesta
+            'propuesta': propuesta,
+            'estilo': estilo
         })
 
     except Exception as e:
