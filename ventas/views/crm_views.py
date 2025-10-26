@@ -6,6 +6,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.contrib import messages
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from ventas.models import Cliente, ServiceHistory
 from ventas.services.crm_service import CRMService
 from ventas.services.ai_proposal_service import get_ai_service
@@ -103,6 +104,7 @@ def cliente_detalle(request, cliente_id):
 
 
 # @login_required  # TEMPORALMENTE DESHABILITADO PARA TESTING
+@csrf_exempt  # TEMPORALMENTE DESHABILITADO PARA TESTING
 @require_http_methods(["POST"])
 def generar_propuesta(request, cliente_id):
     """
@@ -127,6 +129,7 @@ def generar_propuesta(request, cliente_id):
 
 
 # @login_required  # TEMPORALMENTE DESHABILITADO PARA TESTING
+@csrf_exempt  # TEMPORALMENTE DESHABILITADO PARA TESTING
 @require_http_methods(["POST"])
 def enviar_propuesta(request, cliente_id):
     """
