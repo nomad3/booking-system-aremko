@@ -13,7 +13,7 @@
                     <h1 class="h2 mb-0">Buscar Cliente</h1>
                     <p class="text-muted mb-0">Encuentra clientes por nombre, teléfono o email</p>
                 </div>
-                <a href="{% url 'crm_dashboard' %}" class="btn btn-outline-secondary">
+                <a href="{% url 'ventas:crm_dashboard' %}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left"></i> Volver al Dashboard
                 </a>
             </div>
@@ -25,7 +25,7 @@
         <div class="col-md-8 mx-auto">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
-                    <form method="GET" action="{% url 'crm_buscar' %}" id="searchForm">
+                    <form method="GET" action="{% url 'ventas:crm_buscar' %}" id="searchForm">
                         <div class="input-group input-group-lg">
                             <span class="input-group-text bg-white">
                                 <i class="fas fa-search text-muted"></i>
@@ -120,7 +120,7 @@
                                     </td>
                                     <td class="text-end">
                                         <a
-                                            href="{% url 'cliente_detalle' cliente.id %}"
+                                            href="{% url 'ventas:cliente_detalle' cliente.id %}"
                                             class="btn btn-sm btn-primary"
                                         >
                                             <i class="fas fa-eye"></i> Ver Perfil
