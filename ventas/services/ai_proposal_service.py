@@ -266,33 +266,137 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
                 "discount": "10% descuento"
             }
 
-        # Email HTML según estilo
-        logger.info(f"Generando email con estilo: {estilo}")
+        # Intentar usar template editable si existe
+        template = EmailContentTemplate.get_active_template(estilo)
+
+        if template:
+            logger.info(f"→ Usando template EDITABLE: {template.nombre}")
+            # Preparar contexto para el template
+            email_body = self._render_email_from_template(template, perfil, categorias, offer, estilo)
+        else:
+            # Fallback a templates hardcoded
+            logger.info(f"→ No hay template editable activo, usando código hardcoded")
+            email_body = self._render_email_hardcoded(perfil, categorias, offer, estilo)
+
+        # Generar asunto dinámico según estilo
+        email_subject = EmailSubjectTemplate.get_random_subject(
+            estilo=estilo,
+            nombre_cliente=cliente['nombre']
+        )
+        logger.info(f"Asunto generado: {email_subject}")
+
+        return {
+            "customer_profile": {
+                "nombre": cliente['nombre'],
+                "email": cliente['email'],
+                "segmento": segmentacion['rfm_segment'],
+                "total_servicios": metricas['total_servicios'],
+                "gasto_total": metricas['gasto_total']
+            },
+            "insights": insights,
+            "recommendations": recommendations,
+            "offer": offer,
+            "email_subject": email_subject,
+            "email_body": email_body.strip()
+        }
+
+    def _render_email_from_template(self, template, perfil, categorias, offer, estilo):
+        """
+        Renderiza email usando template editable
+        """
+        cliente = perfil['cliente']
+        metricas = perfil['metricas']
+        segmentacion = perfil['segmentacion']
+        nombre_cliente = cliente['nombre'].split()[0] if estilo == "calido" else cliente['nombre']
+
+        # Construir narrativa de servicios
+        servicios_narrativa = self._build_servicios_narrativa(categorias, metricas, estilo)
+
+        # Obtener mes actual
+        try:
+            locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
+        except:
+            try:
+                locale.setlocale(locale.LC_TIME, 'es_CL.UTF-8')
+            except:
+                pass
+        mes_actual = datetime.now().strftime('%B')
+
+        # Preparar ofertas según estilo
         if estilo == "calido":
-            logger.info("→ Usando template CÁLIDO")
-            # Email cálido y emocional con storytelling - estilo muy personal
-            # Construir narrativa de servicios específicos
-            servicios_narrativa = ""
-            if categorias:
-                for cat in categorias[:2]:
-                    if 'Cabaña' in cat['service_type'] or 'cabaña' in cat['service_type'].lower():
-                        veces = cat['cantidad']
-                        servicios_narrativa += f"las {veces} escapadas inolvidables que viviste en nuestras cabañas rodeadas de naturaleza"
-                    elif 'Tina' in cat['service_type'] or 'tinaja' in cat['service_type'].lower():
-                        veces = cat['cantidad']
-                        if servicios_narrativa:
-                            servicios_narrativa += f", y los momentos de relajo que disfrutaste en nuestras tinajas calientes privadas en {veces} ocasiones"
-                        else:
-                            servicios_narrativa += f"los {veces} momentos de relajo en nuestras tinajas calientes privadas"
-                    elif 'Masaje' in cat['service_type']:
-                        veces = cat['cantidad']
-                        if servicios_narrativa:
-                            servicios_narrativa += f", además de {veces} sesiones de masajes relajantes"
-                        else:
-                            servicios_narrativa += f"las {veces} sesiones de masajes que tanto disfrutaste"
+            oferta_porcentaje = "15%"
+            oferta_servicios = "tinajas calientes privadas y cabañas"
+            oferta_texto_completo = """<strong>15% de descuento</strong> en tu próxima experiencia en tinaja caliente privada o en una estadía en nuestras cabañas (¡tú eliges la forma de relajarte!).<br><br>
+                    <strong>10% de descuento</strong> en cualquier masaje de nuestro spa, para que complementes tu descanso como te mereces."""
+        else:
+            oferta_porcentaje = offer.get('discount', '15% descuento').split()[0]
+            oferta_servicios = "todos nuestros servicios"
+            oferta_texto_completo = f"<strong>{offer.get('discount', '15% descuento')}</strong>"
+
+        # Preparar contexto para el template
+        context = {
+            'nombre': nombre_cliente,
+            'servicios_narrativa': servicios_narrativa,
+            'oferta_porcentaje': oferta_porcentaje,
+            'oferta_servicios': oferta_servicios,
+            'oferta_texto_completo': oferta_texto_completo,
+            'mes_actual': mes_actual,
+            'segmento': segmentacion['rfm_segment']
+        }
+
+        # Renderizar usando el template
+        return template.render_email(context)
+
+    def _build_servicios_narrativa(self, categorias, metricas, estilo):
+        """
+        Construye la narrativa de servicios desde el historial
+        """
+        servicios_narrativa = ""
+
+        if estilo == "calido" and categorias:
+            for cat in categorias[:2]:
+                if 'Cabaña' in cat['service_type'] or 'cabaña' in cat['service_type'].lower():
+                    veces = cat['cantidad']
+                    servicios_narrativa += f"las {veces} escapadas inolvidables que viviste en nuestras cabañas rodeadas de naturaleza"
+                elif 'Tina' in cat['service_type'] or 'tinaja' in cat['service_type'].lower():
+                    veces = cat['cantidad']
+                    if servicios_narrativa:
+                        servicios_narrativa += f", y los momentos de relajo que disfrutaste en nuestras tinajas calientes privadas en {veces} ocasiones"
+                    else:
+                        servicios_narrativa += f"los {veces} momentos de relajo en nuestras tinajas calientes privadas"
+                elif 'Masaje' in cat['service_type']:
+                    veces = cat['cantidad']
+                    if servicios_narrativa:
+                        servicios_narrativa += f", además de {veces} sesiones de masajes relajantes"
+                    else:
+                        servicios_narrativa += f"las {veces} sesiones de masajes que tanto disfrutaste"
 
             if not servicios_narrativa:
                 servicios_narrativa = f"las {metricas['total_servicios']} veces que nos has visitado"
+        else:
+            # Formal
+            if categorias:
+                servicios_narrativa = f"tus {metricas['total_servicios']} visitas anteriores a Aremko"
+            else:
+                servicios_narrativa = "tu interés en nuestros servicios"
+
+        return servicios_narrativa
+
+    def _render_email_hardcoded(self, perfil, categorias, offer, estilo):
+        """
+        Renderiza email usando código hardcoded (fallback cuando no hay template editable)
+        """
+        cliente = perfil['cliente']
+        metricas = perfil['metricas']
+        nombre_cliente = cliente['nombre'].split()[0] if estilo == "calido" else cliente['nombre']
+
+        # Construir narrativa
+        servicios_narrativa = self._build_servicios_narrativa(categorias, metricas, estilo)
+
+        logger.info(f"Generando email con estilo hardcoded: {estilo}")
+        if estilo == "calido":
+            logger.info("→ Usando template CÁLIDO")
+            # Email cálido y emocional con storytelling - estilo muy personal
 
             # Ofertas diferenciadas por categoría
             ofertas_texto = """<strong>15% de descuento</strong> en tu próxima experiencia en tinaja caliente privada o en una estadía en nuestras cabañas (¡tú eliges la forma de relajarte!).<br><br>
@@ -351,19 +455,15 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
             <html>
             <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                 <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <h2 style="color: #2c5282;">Hola {cliente['nombre']},</h2>
+                    <h2 style="color: #2c5282;">Estimado/a {cliente['nombre']},</h2>
 
-                    <p>En Aremko valoramos tu preferencia y queremos ofrecerte una experiencia única y personalizada.</p>
+                    <p>En Aremko valoramos tu preferencia y queremos ofrecerte una experiencia única y personalizada basada en {servicios_narrativa}.</p>
 
-                    <h3 style="color: #2c5282;">Recomendaciones Especiales para Ti:</h3>
-
-                    {"".join([f'''
+                    <h3 style="color: #2c5282;">Tu Historial con Aremko:</h3>
                     <div style="background-color: #f7fafc; padding: 15px; margin: 10px 0; border-left: 4px solid #4299e1;">
-                        <strong>{rec["service_name"]}</strong><br>
-                        <span style="color: #718096;">{rec["reason"]}</span><br>
-                        <span style="color: #2d3748; font-weight: bold;">Precio estimado: ${rec["estimated_price"]:,}</span>
+                        <p style="margin: 5px 0;"><strong>Total de visitas:</strong> {metricas['total_servicios']}</p>
+                        <p style="margin: 5px 0;"><strong>Inversión en bienestar:</strong> ${metricas['gasto_total']:,.0f} CLP</p>
                     </div>
-                    ''' for rec in recommendations])}
 
                     <div style="background-color: #edf2f7; padding: 20px; margin: 20px 0; border-radius: 8px;">
                         <h3 style="color: #2c5282; margin-top: 0;">{offer["title"]}</h3>
@@ -371,38 +471,19 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
                         {f'<p style="font-size: 18px; color: #e53e3e; font-weight: bold;">{offer["discount"]}</p>' if offer.get("discount") else ''}
                     </div>
 
-                    <p><a href="https://www.aremko.cl" style="display: inline-block; background-color: #4299e1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Reservar Ahora</a></p>
+                    <p style="text-align: center;"><a href="https://www.aremko.cl" style="display: inline-block; background-color: #4299e1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Reservar Ahora</a></p>
 
-                    <p style="color: #718096; font-size: 14px;">
+                    <p style="color: #718096; font-size: 14px; margin-top: 30px;">
                         ¡Esperamos verte pronto en Aremko!<br>
-                        Equipo Aremko
+                        Equipo Aremko<br>
+                        Puerto Varas, Chile
                     </p>
                 </div>
             </body>
             </html>
             """
 
-        # Generar asunto dinámico según estilo
-        email_subject = EmailSubjectTemplate.get_random_subject(
-            estilo=estilo,
-            nombre_cliente=cliente['nombre']
-        )
-        logger.info(f"Asunto generado: {email_subject}")
-
-        return {
-            "customer_profile": {
-                "nombre": cliente['nombre'],
-                "email": cliente['email'],
-                "segmento": segmentacion['rfm_segment'],
-                "total_servicios": metricas['total_servicios'],
-                "gasto_total": metricas['gasto_total']
-            },
-            "insights": insights,
-            "recommendations": recommendations,
-            "offer": offer,
-            "email_subject": email_subject,
-            "email_body": email_body.strip()
-        }
+        return email_body
 
     def _preparar_contexto(self, perfil: Dict[str, Any]) -> Dict[str, Any]:
         """
