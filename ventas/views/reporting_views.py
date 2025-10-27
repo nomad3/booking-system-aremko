@@ -516,7 +516,7 @@ def auditoria_movimientos_view(request):
     context = {
         'movimientos': page_obj, # Pass the page object
         'fecha_inicio': fecha_inicio_str,
-        'fecha_fin': fecha_str,
+        'fecha_fin': fecha_fin_str,
         'tipo_movimiento': tipo_movimiento or '', # Ensure not None
         'usuario_username': usuario_username or '', # Ensure not None
         'usuarios': User.objects.filter(is_active=True).order_by('username'),  # Solo usuarios activos for filter dropdown
