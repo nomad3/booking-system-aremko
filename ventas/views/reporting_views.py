@@ -618,9 +618,7 @@ def cliente_segmentation_view(request):
         segment_key = f"{visit_category}_{spend_category}"
         if segment_key in segments:
             segments[segment_key]['count'] += 1
-        else:
-             # This case shouldn't happen with the current logic, but good for safety
-             logger.warning(f"Unexpected segment key generated: {segment_key} for client {cliente_data['cliente_id']}")
+        # else: This case shouldn't happen with the current logic
 
 
     context = {
