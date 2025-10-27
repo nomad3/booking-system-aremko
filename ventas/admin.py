@@ -17,7 +17,7 @@ from .models import (
     # Communication models
     CommunicationLimit, ClientPreferences, CommunicationLog, SMSTemplate, MailParaEnviar,
     # Advanced Email Campaign models
-    EmailCampaign, EmailRecipient, EmailDeliveryLog, EmailBlacklist, EmailTemplate, EmailSubjectTemplate
+    EmailCampaign, EmailRecipient, EmailDeliveryLog, EmailBlacklist, EmailTemplate, EmailSubjectTemplate, EmailContentTemplate
 )
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
@@ -1085,3 +1085,72 @@ class EmailSubjectTemplateAdmin(admin.ModelAdmin):
         queryset.update(activo=False)
         self.message_user(request, f"{queryset.count()} asuntos desactivados")
     deactivate_subjects.short_description = "Desactivar asuntos"
+
+
+@admin.register(EmailContentTemplate)
+class EmailContentTemplateAdmin(admin.ModelAdmin):
+    """Administrador para templates de contenido de email editables"""
+    list_display = ['nombre', 'estilo', 'activo', 'updated_at', 'created_by']
+    list_filter = ['estilo', 'activo', 'created_at']
+    search_fields = ['nombre', 'saludo', 'introduccion']
+    readonly_fields = ['created_at', 'updated_at', 'created_by']
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('nombre', 'estilo', 'activo')
+        }),
+        ('Contenido del Email', {
+            'fields': ('saludo', 'introduccion', 'seccion_ofertas_titulo', 'seccion_ofertas_intro', 'oferta_texto', 'cierre', 'firma'),
+            'description': '''
+                <strong>Placeholders disponibles:</strong><br>
+                - <code>{nombre}</code>: Nombre del cliente<br>
+                - <code>{servicios_narrativa}</code>: Narrativa generada del historial<br>
+                - <code>{oferta_porcentaje}</code>: Porcentaje de descuento<br>
+                - <code>{oferta_servicios}</code>: Servicios en oferta<br>
+                - <code>{mes_actual}</code>: Mes actual<br>
+                - <code>{segmento}</code>: Segmento RFM del cliente
+            '''
+        }),
+        ('Call to Action', {
+            'fields': ('call_to_action_texto',)
+        }),
+        ('Estilos y Colores', {
+            'fields': ('color_principal', 'color_secundario', 'fuente_tipografia'),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at', 'created_by'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    actions = ['duplicate_template', 'activate_template', 'deactivate_template']
+    
+    def save_model(self, request, obj, form, change):
+        """Guardar el creador del template"""
+        if not change:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+    
+    def duplicate_template(self, request, queryset):
+        """Duplica templates seleccionados"""
+        for template in queryset:
+            template.pk = None
+            template.nombre = f"{template.nombre} (Copia)"
+            template.activo = False
+            template.created_by = request.user
+            template.save()
+        self.message_user(request, f"{queryset.count()} templates duplicados")
+    duplicate_template.short_description = "Duplicar templates"
+    
+    def activate_template(self, request, queryset):
+        """Activa templates seleccionados"""
+        queryset.update(activo=True)
+        self.message_user(request, f"{queryset.count()} templates activados")
+    activate_template.short_description = "Activar templates"
+    
+    def deactivate_template(self, request, queryset):
+        """Desactiva templates seleccionados"""
+        queryset.update(activo=False)
+        self.message_user(request, f"{queryset.count()} templates desactivados")
+    deactivate_template.short_description = "Desactivar templates"

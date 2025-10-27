@@ -1822,3 +1822,195 @@ class EmailSubjectTemplate(models.Model):
         
         return random.choice(subjects)
 
+
+
+# ============================================================================
+# MODELOS CRM - TEMPLATES DE CONTENIDO DE EMAIL EDITABLES
+# ============================================================================
+
+class EmailContentTemplate(models.Model):
+    """
+    Templates editables para el contenido de los emails de propuestas
+    Permite personalizar cada sección del email desde el admin
+    """
+    ESTILO_CHOICES = [
+        ('formal', 'Formal/Profesional'),
+        ('calido', 'Cálido/Emocional'),
+    ]
+    
+    nombre = models.CharField(
+        max_length=100,
+        verbose_name="Nombre del Template",
+        help_text="Ej: 'Template Cálido Primavera 2025'"
+    )
+    estilo = models.CharField(
+        max_length=10,
+        choices=ESTILO_CHOICES,
+        verbose_name="Estilo de Email"
+    )
+    activo = models.BooleanField(
+        default=True,
+        verbose_name="Activo",
+        help_text="Solo se usa el template activo de cada estilo"
+    )
+    
+    # Estructura del email
+    saludo = models.TextField(
+        verbose_name="Saludo",
+        help_text="Usa {nombre} para el nombre del cliente. Ej: 'Hola {nombre},'",
+        default="Hola {nombre},"
+    )
+    
+    introduccion = models.TextField(
+        verbose_name="Introducción",
+        help_text="Texto de apertura. Usa {servicios_narrativa} para la narrativa del historial.",
+        default="Espero que te encuentres muy bien."
+    )
+    
+    seccion_ofertas_titulo = models.CharField(
+        max_length=200,
+        verbose_name="Título de Ofertas",
+        default="Oferta Especial"
+    )
+    
+    seccion_ofertas_intro = models.TextField(
+        verbose_name="Introducción de Ofertas",
+        help_text="Texto antes de mostrar las ofertas. Usa {mes_actual} para el mes.",
+        default="Este mes tenemos algo especial para ti:"
+    )
+    
+    oferta_texto = models.TextField(
+        verbose_name="Texto de Ofertas",
+        help_text="Usa {oferta_porcentaje} y {oferta_servicios} para ofertas dinámicas.",
+        default="{oferta_porcentaje} de descuento en {oferta_servicios}"
+    )
+    
+    call_to_action_texto = models.CharField(
+        max_length=200,
+        verbose_name="Texto del Botón CTA",
+        default="Reservar Ahora"
+    )
+    
+    cierre = models.TextField(
+        verbose_name="Cierre/Despedida",
+        help_text="Texto de cierre del email.",
+        default="¡Esperamos verte pronto!"
+    )
+    
+    firma = models.TextField(
+        verbose_name="Firma",
+        default="Equipo Aremko\nPuerto Varas, Chile"
+    )
+    
+    # Estilos CSS personalizables
+    color_principal = models.CharField(
+        max_length=7,
+        verbose_name="Color Principal",
+        default="#2c5530",
+        help_text="Color hexadecimal (ej: #2c5530)"
+    )
+    
+    color_secundario = models.CharField(
+        max_length=7,
+        verbose_name="Color Secundario",
+        default="#8B7355",
+        help_text="Color hexadecimal (ej: #8B7355)"
+    )
+    
+    fuente_tipografia = models.CharField(
+        max_length=100,
+        verbose_name="Tipografía",
+        default="Georgia, serif",
+        help_text="Fuente CSS (ej: 'Georgia, serif' o 'Arial, sans-serif')"
+    )
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Creado")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Actualizado")
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Creado por"
+    )
+    
+    class Meta:
+        ordering = ['estilo', '-activo', '-updated_at']
+        verbose_name = "Template de Email"
+        verbose_name_plural = "Templates de Email"
+    
+    def __str__(self):
+        return f"{self.nombre} ({self.get_estilo_display()}) {'✓' if self.activo else '✗'}"
+    
+    @classmethod
+    def get_active_template(cls, estilo='calido'):
+        """
+        Obtiene el template activo para el estilo especificado
+        """
+        try:
+            return cls.objects.filter(estilo=estilo, activo=True).latest('updated_at')
+        except cls.DoesNotExist:
+            return None
+    
+    def render_email(self, context):
+        """
+        Renderiza el email completo usando el template y el contexto
+        
+        Args:
+            context: Dict con variables como:
+                - nombre: Nombre del cliente
+                - servicios_narrativa: Texto generado del historial
+                - ofertas: Dict con porcentajes y servicios
+                - mes_actual: Nombre del mes actual
+                
+        Returns:
+            String con HTML completo del email
+        """
+        # Reemplazar placeholders en cada sección
+        saludo = self.saludo.format(**context)
+        introduccion = self.introduccion.format(**context)
+        ofertas_intro = self.seccion_ofertas_intro.format(**context)
+        oferta_texto = self.oferta_texto.format(**context)
+        cierre = self.cierre.format(**context)
+        firma = self.firma
+        
+        # Construir HTML completo
+        html = f"""
+        <html>
+        <body style="font-family: {self.fuente_tipografia}; line-height: 1.8; color: #333; background-color: #fafafa;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 30px 20px; background-color: #ffffff;">
+                <h2 style="color: {self.color_principal}; font-weight: 400; margin-bottom: 20px;">{saludo}</h2>
+                
+                <p style="font-size: 16px; line-height: 1.8; margin-bottom: 20px;">
+                    {introduccion}
+                </p>
+                
+                <p style="font-size: 16px; line-height: 1.8; margin-bottom: 25px;">
+                    {ofertas_intro}
+                </p>
+                
+                <div style="background-color: #f8f5f0; border-left: 4px solid {self.color_secundario}; padding: 20px; margin: 25px 0;">
+                    <p style="font-size: 16px; line-height: 1.8; margin: 0;">
+                        {oferta_texto}
+                    </p>
+                </div>
+                
+                <div style="text-align: center; margin: 35px 0;">
+                    <a href="https://www.aremko.cl" style="display: inline-block; background-color: {self.color_principal}; color: white; padding: 14px 40px; text-decoration: none; border-radius: 4px; font-size: 16px; font-weight: 500;">{self.call_to_action_texto}</a>
+                </div>
+                
+                <p style="font-size: 16px; line-height: 1.8; margin-bottom: 25px;">
+                    {cierre}
+                </p>
+                
+                <p style="font-size: 15px; line-height: 1.7; color: #666; margin-top: 40px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                    {firma.replace(chr(10), '<br>')}
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return html.strip()
+

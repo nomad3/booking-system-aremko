@@ -9,7 +9,9 @@ from typing import Dict, Any
 import httpx
 from django.conf import settings
 from ventas.services.crm_service import CRMService
-from ventas.models import EmailSubjectTemplate
+from ventas.models import EmailSubjectTemplate, EmailContentTemplate
+from datetime import datetime
+import locale
 
 logger = logging.getLogger(__name__)
 
