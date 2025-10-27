@@ -212,8 +212,9 @@
                 <div class="card-body">
                     <i class="fas fa-robot card-icon text-info"></i>
                     <h5 class="card-title">Mail con IA</h5>
-                    <p class="card-text small">Templates personalizados con IA</p>
+                    <p class="card-text small">Sistema completo de emails con IA</p>
                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:crm_dashboard' %}" class="btn btn-sm btn-modern btn-primary-modern">👥 Gestión de Clientes</a>
                         <a href="{% url 'admin:ventas_emailcontenttemplate_changelist' %}" class="btn btn-sm btn-modern btn-info-modern">🤖 Ver Templates</a>
                         <a href="{% url 'admin:ventas_emailsubjecttemplate_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">📝 Asuntos Email</a>
                         <a href="{% url 'ventas:bulk_email_sender' %}" class="btn btn-sm btn-modern btn-success-modern">📧 Enviar Emails Masivos</a>
