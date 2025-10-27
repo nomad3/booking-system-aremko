@@ -1953,26 +1953,48 @@ class EmailContentTemplate(models.Model):
         except cls.DoesNotExist:
             return None
     
+    def safe_format(self, text, context):
+        """
+        Reemplaza placeholders de forma segura, ignorando llaves que no son placeholders
+
+        Args:
+            text: Texto con posibles placeholders {variable}
+            context: Dict con valores para reemplazar
+
+        Returns:
+            Texto con placeholders reemplazados, llaves no-placeholders intactas
+        """
+        import re
+
+        # Solo reemplazar placeholders que existen en el context
+        def replacer(match):
+            key = match.group(1)
+            return str(context.get(key, match.group(0)))
+
+        # Buscar solo placeholders válidos (nombres de variables Python)
+        pattern = r'\{(\w+)\}'
+        return re.sub(pattern, replacer, text)
+
     def render_email(self, context):
         """
         Renderiza el email completo usando el template y el contexto
-        
+
         Args:
             context: Dict con variables como:
                 - nombre: Nombre del cliente
                 - servicios_narrativa: Texto generado del historial
                 - ofertas: Dict con porcentajes y servicios
                 - mes_actual: Nombre del mes actual
-                
+
         Returns:
             String con HTML completo del email
         """
-        # Reemplazar placeholders en cada sección
-        saludo = self.saludo.format(**context)
-        introduccion = self.introduccion.format(**context)
-        ofertas_intro = self.seccion_ofertas_intro.format(**context)
-        oferta_texto = self.oferta_texto.format(**context)
-        cierre = self.cierre.format(**context)
+        # Reemplazar placeholders en cada sección de forma segura
+        saludo = self.safe_format(self.saludo, context)
+        introduccion = self.safe_format(self.introduccion, context)
+        ofertas_intro = self.safe_format(self.seccion_ofertas_intro, context)
+        oferta_texto = self.safe_format(self.oferta_texto, context)
+        cierre = self.safe_format(self.cierre, context)
         firma = self.firma
         
         # Construir HTML completo
