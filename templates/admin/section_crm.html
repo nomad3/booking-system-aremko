@@ -206,6 +206,21 @@
             </div>
         </div>
 
+        {# Mail con IA - Email Templates Editables #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-robot card-icon text-info"></i>
+                    <h5 class="card-title">Mail con IA</h5>
+                    <p class="card-text small">Templates personalizados con IA</p>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_emailcontenttemplate_changelist' %}" class="btn btn-sm btn-modern btn-info-modern">🤖 Ver Templates</a>
+                        <a href="{% url 'admin:ventas_emailsubjecttemplate_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">📝 Asuntos Email</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {# Giftcard Campaign (Legacy) #}
         <div class="col-lg-3 col-md-4 col-sm-6">
             <div class="card h-100 text-center card-hover">
