@@ -528,38 +528,104 @@ def auditoria_movimientos_view(request):
 def _get_combined_metrics_for_segmentation():
     """
     Helper para obtener métricas combinadas (servicios actuales + históricos) para segmentación
+    Si la tabla histórica no existe, solo usa datos actuales.
     """
+    from ventas.models import ServiceHistory
     from django.db import connection
+    import logging
 
-    query = """
-    SELECT
-        c.id as cliente_id,
-        c.nombre,
-        c.email,
-        -- Servicios actuales
-        COUNT(DISTINCT vr.id) as servicios_actuales,
-        COALESCE(SUM(vr.total), 0) as gasto_actual,
-        -- Servicios históricos
-        COUNT(DISTINCT sh.id) as servicios_historicos,
-        COALESCE(SUM(sh.precio_total), 0) as gasto_historico,
-        -- Totales combinados
-        (COUNT(DISTINCT vr.id) + COUNT(DISTINCT sh.id)) as total_servicios,
-        (COALESCE(SUM(vr.total), 0) + COALESCE(SUM(sh.precio_total), 0)) as total_gasto
-    FROM ventas_cliente c
-    LEFT JOIN ventas_ventareserva vr ON c.id = vr.cliente_id
-    LEFT JOIN crm_service_history sh ON LOWER(TRIM(c.email)) = LOWER(TRIM(sh.customer_email))
-    GROUP BY c.id, c.nombre, c.email
-    ORDER BY total_gasto DESC
-    """
+    logger = logging.getLogger(__name__)
 
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-        columns = [col[0] for col in cursor.description]
+    # Verificar si la tabla crm_service_history existe
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_name = 'crm_service_history'
+                )
+            """)
+            table_exists = cursor.fetchone()[0]
+    except Exception as e:
+        logger.warning(f"Error checking table existence: {e}")
+        table_exists = False
+
+    if not table_exists:
+        logger.info("Tabla crm_service_history no existe, usando solo datos actuales")
+        # Solo usar datos actuales
+        clientes = Cliente.objects.annotate(
+            total_servicios=Count('ventareserva'),
+            total_gasto=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField())
+        ).values('id', 'nombre', 'email', 'total_servicios', 'total_gasto')
+
         results = []
-        for row in cursor.fetchall():
-            results.append(dict(zip(columns, row)))
+        for c in clientes:
+            results.append({
+                'cliente_id': c['id'],
+                'nombre': c['nombre'],
+                'email': c['email'],
+                'servicios_actuales': c['total_servicios'],
+                'gasto_actual': float(c['total_gasto']),
+                'servicios_historicos': 0,
+                'gasto_historico': 0,
+                'total_servicios': c['total_servicios'],
+                'total_gasto': float(c['total_gasto'])
+            })
+        return results
 
-    return results
+    # Tabla existe, usar query combinada
+    try:
+        query = """
+        SELECT
+            c.id as cliente_id,
+            c.nombre,
+            c.email,
+            -- Servicios actuales
+            COUNT(DISTINCT vr.id) as servicios_actuales,
+            COALESCE(SUM(vr.total), 0) as gasto_actual,
+            -- Servicios históricos
+            COUNT(DISTINCT sh.id) as servicios_historicos,
+            COALESCE(SUM(sh.price_paid), 0) as gasto_historico,
+            -- Totales combinados
+            (COUNT(DISTINCT vr.id) + COUNT(DISTINCT sh.id)) as total_servicios,
+            (COALESCE(SUM(vr.total), 0) + COALESCE(SUM(sh.price_paid), 0)) as total_gasto
+        FROM ventas_cliente c
+        LEFT JOIN ventas_ventareserva vr ON c.id = vr.cliente_id
+        LEFT JOIN crm_service_history sh ON c.id = sh.cliente_id
+        GROUP BY c.id, c.nombre, c.email
+        ORDER BY total_gasto DESC
+        """
+
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            columns = [col[0] for col in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                results.append(dict(zip(columns, row)))
+
+        return results
+    except Exception as e:
+        logger.error(f"Error ejecutando query combinada: {e}")
+        # Fallback a solo datos actuales
+        clientes = Cliente.objects.annotate(
+            total_servicios=Count('ventareserva'),
+            total_gasto=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField())
+        ).values('id', 'nombre', 'email', 'total_servicios', 'total_gasto')
+
+        results = []
+        for c in clientes:
+            results.append({
+                'cliente_id': c['id'],
+                'nombre': c['nombre'],
+                'email': c['email'],
+                'servicios_actuales': c['total_servicios'],
+                'gasto_actual': float(c['total_gasto']),
+                'servicios_historicos': 0,
+                'gasto_historico': 0,
+                'total_servicios': c['total_servicios'],
+                'total_gasto': float(c['total_gasto'])
+            })
+        return results
 
 @login_required
 def cliente_segmentation_view(request):
