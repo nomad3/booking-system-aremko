@@ -1,0 +1,284 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/modern.css' %}">
+<style>
+    .segment-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    .segment-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border-color: #007bff;
+    }
+    .segment-card.selected {
+        border-color: #007bff;
+        background-color: #f0f7ff;
+    }
+    .segment-label {
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    .segment-count {
+        font-size: 1.5rem;
+        color: #007bff;
+        font-weight: 700;
+    }
+    .email-style-selector {
+        margin: 2rem 0;
+    }
+    .style-option {
+        display: inline-block;
+        margin-right: 1.5rem;
+    }
+    .progress-container {
+        display: none;
+        margin-top: 2rem;
+    }
+    .result-container {
+        display: none;
+        margin-top: 2rem;
+    }
+    .result-success {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+    .result-error {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+        padding: 1rem;
+        border-radius: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; <a href="{% url 'ventas:admin_section_crm' %}">CRM & Marketing</a>
+    &rsaquo; {{ page_title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4">
+    <div class="page-header mb-4">
+        <h1><i class="fas fa-paper-plane"></i> {{ page_title }}</h1>
+        <p>Selecciona un segmento de clientes y envía propuestas personalizadas con IA</p>
+    </div>
+
+    <!-- Selector de Segmento -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>1. Selecciona el Segmento de Clientes</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for key, segment in segments.items %}
+                <div class="col-lg-4 col-md-6 mb-3">
+                    <div class="segment-card" data-segment="{{ key }}">
+                        <div class="segment-label">{{ segment.label }}</div>
+                        <div class="segment-count">{{ segment.count }} clientes</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Selector de Estilo -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>2. Selecciona el Estilo del Email</h3>
+        </div>
+        <div class="card-body">
+            <div class="email-style-selector">
+                <div class="style-option">
+                    <input type="radio" id="estilo-calido" name="estilo" value="calido" checked>
+                    <label for="estilo-calido">
+                        <strong>🤗 Cálido/Emocional</strong>
+                        <p class="text-muted">Tono cercano y personal, evoca emociones</p>
+                    </label>
+                </div>
+                <div class="style-option">
+                    <input type="radio" id="estilo-formal" name="estilo" value="formal">
+                    <label for="estilo-formal">
+                        <strong>💼 Formal/Profesional</strong>
+                        <p class="text-muted">Tono corporativo y directo</p>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuración de Envío -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>3. Configuración de Envío</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label for="limit">Límite de envíos (máximo por batch):</label>
+                <input type="number" id="limit" class="form-control" value="50" min="1" max="100" style="max-width: 200px;">
+                <small class="form-text text-muted">Máximo 100 emails por envío para evitar sobrecargar el servidor</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botón de Envío -->
+    <div class="text-center mb-4">
+        <button id="btnSend" class="btn btn-lg btn-primary" disabled>
+            <i class="fas fa-rocket"></i> Enviar Propuestas Personalizadas
+        </button>
+    </div>
+
+    <!-- Barra de Progreso -->
+    <div class="progress-container">
+        <h4>Enviando emails...</h4>
+        <div class="progress" style="height: 30px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+        </div>
+        <p class="mt-2 text-center">Por favor espera, esto puede tomar algunos segundos...</p>
+    </div>
+
+    <!-- Resultados -->
+    <div class="result-container">
+        <h4>Resultado del Envío</h4>
+        <div class="result-success" style="display:none;">
+            <h5><i class="fas fa-check-circle"></i> Envío Completado</h5>
+            <p><strong>Emails enviados exitosamente:</strong> <span id="successCount">0</span></p>
+        </div>
+        <div class="result-error" style="display:none;">
+            <h5><i class="fas fa-exclamation-triangle"></i> Errores Detectados</h5>
+            <p><strong>Emails fallidos:</strong> <span id="errorCount">0</span></p>
+            <ul id="errorList"></ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    let selectedSegment = null;
+
+    // Manejo de selección de segmento
+    document.querySelectorAll('.segment-card').forEach(card => {
+        card.addEventListener('click', function() {
+            // Remover selección anterior
+            document.querySelectorAll('.segment-card').forEach(c => c.classList.remove('selected'));
+
+            // Seleccionar este
+            this.classList.add('selected');
+            selectedSegment = this.dataset.segment;
+
+            // Habilitar botón
+            document.getElementById('btnSend').disabled = false;
+        });
+    });
+
+    // Manejo de envío
+    document.getElementById('btnSend').addEventListener('click', function() {
+        if (!selectedSegment) {
+            alert('Por favor selecciona un segmento de clientes');
+            return;
+        }
+
+        const estilo = document.querySelector('input[name="estilo"]:checked').value;
+        const limit = parseInt(document.getElementById('limit').value);
+
+        // Confirmar
+        if (!confirm(`¿Estás seguro de enviar hasta ${limit} emails personalizados (${estilo}) al segmento seleccionado?`)) {
+            return;
+        }
+
+        // Deshabilitar botón
+        this.disabled = true;
+
+        // Mostrar progreso
+        document.querySelector('.progress-container').style.display = 'block';
+        document.querySelector('.result-container').style.display = 'none';
+
+        // Enviar request AJAX
+        fetch('{% url "ventas:bulk_email_send" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                segment: selectedSegment,
+                estilo: estilo,
+                limit: limit
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Ocultar progreso
+            document.querySelector('.progress-container').style.display = 'none';
+
+            // Mostrar resultados
+            document.querySelector('.result-container').style.display = 'block';
+
+            if (data.success) {
+                // Mostrar éxitos
+                if (data.success_count > 0) {
+                    const successDiv = document.querySelector('.result-success');
+                    successDiv.style.display = 'block';
+                    document.getElementById('successCount').textContent = data.success_count;
+                }
+
+                // Mostrar errores
+                if (data.error_count > 0) {
+                    const errorDiv = document.querySelector('.result-error');
+                    errorDiv.style.display = 'block';
+                    document.getElementById('errorCount').textContent = data.error_count;
+
+                    const errorList = document.getElementById('errorList');
+                    errorList.innerHTML = '';
+                    data.errors.forEach(error => {
+                        const li = document.createElement('li');
+                        li.textContent = error;
+                        errorList.appendChild(li);
+                    });
+                }
+            } else {
+                alert('Error: ' + data.error);
+            }
+
+            // Re-habilitar botón
+            document.getElementById('btnSend').disabled = false;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al enviar emails: ' + error);
+            document.querySelector('.progress-container').style.display = 'none';
+            document.getElementById('btnSend').disabled = false;
+        });
+    });
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}

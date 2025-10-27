@@ -121,6 +121,10 @@ urlpatterns = [
     path('admin/campaigns/preview-recipients/', campaign_views.campaign_preview_recipients_ajax, name='campaign_preview_recipients_ajax'),
     path('admin/campaigns/test-ai/', campaign_views.test_ai_service_ajax, name='campaign_test_ai_ajax'),
 
+    # === BULK EMAIL SENDER WITH AI ===
+    path('crm/bulk-email-sender/', crm_views.bulk_email_sender_view, name='bulk_email_sender'),
+    path('crm/bulk-email-send/', crm_views.bulk_email_send_view, name='bulk_email_send'),
+
     # API Router (Keep this last if possible, or ensure specific paths come first)
     path('', include(router.urls)),
 ]
