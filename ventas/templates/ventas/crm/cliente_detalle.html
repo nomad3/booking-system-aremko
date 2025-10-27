@@ -423,12 +423,18 @@
         btnEnviar.disabled = true;
         btnEnviar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
 
+        // Obtener estilo seleccionado
+        const estiloSeleccionado = document.querySelector('input[name="estiloEmail"]:checked').value;
+
         fetch(`/ventas/crm/cliente/${clienteId}/enviar/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
-            }
+            },
+            body: JSON.stringify({
+                estilo: estiloSeleccionado
+            })
         })
         .then(response => response.json())
         .then(data => {
