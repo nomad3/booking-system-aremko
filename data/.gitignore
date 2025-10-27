@@ -1,0 +1,6 @@
+# Ignorar todo en este directorio
+*
+
+# Excepto este gitignore y el CSV de servicios históricos
+!.gitignore
+!servicios_historicos.csv
