@@ -525,11 +525,47 @@ def auditoria_movimientos_view(request):
     return render(request, 'ventas/auditoria_movimientos.html', context)
 
 
+def _get_combined_metrics_for_segmentation():
+    """
+    Helper para obtener métricas combinadas (servicios actuales + históricos) para segmentación
+    """
+    from django.db import connection
+
+    query = """
+    SELECT
+        c.id as cliente_id,
+        c.nombre,
+        c.email,
+        -- Servicios actuales
+        COUNT(DISTINCT vr.id) as servicios_actuales,
+        COALESCE(SUM(vr.total), 0) as gasto_actual,
+        -- Servicios históricos
+        COUNT(DISTINCT sh.id) as servicios_historicos,
+        COALESCE(SUM(sh.precio_total), 0) as gasto_historico,
+        -- Totales combinados
+        (COUNT(DISTINCT vr.id) + COUNT(DISTINCT sh.id)) as total_servicios,
+        (COALESCE(SUM(vr.total), 0) + COALESCE(SUM(sh.precio_total), 0)) as total_gasto
+    FROM ventas_cliente c
+    LEFT JOIN ventas_ventareserva vr ON c.id = vr.cliente_id
+    LEFT JOIN crm_service_history sh ON LOWER(TRIM(c.email)) = LOWER(TRIM(sh.customer_email))
+    GROUP BY c.id, c.nombre, c.email
+    ORDER BY total_gasto DESC
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        columns = [col[0] for col in cursor.description]
+        results = []
+        for row in cursor.fetchall():
+            results.append(dict(zip(columns, row)))
+
+    return results
+
 @login_required
-# @user_passes_test(es_administrador) # Optional: Restrict to admins if needed
 def cliente_segmentation_view(request):
     """
     Displays client segmentation based on visit count and total spend.
+    Incluye tanto servicios actuales como históricos (CSV importados).
     """
     # Define Segmentation Thresholds (adjust as needed)
     VISIT_THRESHOLD_REGULAR = 2
@@ -537,12 +573,8 @@ def cliente_segmentation_view(request):
     SPEND_THRESHOLD_MEDIUM = 50000 # Example: 50,000 CLP
     SPEND_THRESHOLD_HIGH = 150000 # Example: 150,000 CLP
 
-    # Annotate clients with visit count and total spend
-    # Use Coalesce to handle clients with no spending (Sum returns None)
-    clientes_annotated = Cliente.objects.annotate(
-        num_visits=Count('ventareserva'),
-        total_spend=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField()) # Use imported Coalesce
-    ).order_by('-total_spend') # Order for potential display
+    # Obtener métricas combinadas (actuales + históricos)
+    clientes_data = _get_combined_metrics_for_segmentation()
 
     # --- Categorize Clients ---
     segments = {
@@ -558,9 +590,9 @@ def cliente_segmentation_view(request):
         'zero_spend': {'count': 0, 'label': 'Clientes Sin Gasto Registrado'}, # Clients with no VentaReserva
     }
 
-    for cliente in clientes_annotated:
-        visits = cliente.num_visits
-        spend = cliente.total_spend
+    for cliente_data in clientes_data:
+        visits = cliente_data['total_servicios']
+        spend = cliente_data['total_gasto']
 
         if visits == 0 and spend == 0:
              segments['zero_spend']['count'] += 1
@@ -588,12 +620,12 @@ def cliente_segmentation_view(request):
             segments[segment_key]['count'] += 1
         else:
              # This case shouldn't happen with the current logic, but good for safety
-             logger.warning(f"Unexpected segment key generated: {segment_key} for client {cliente.id}")
+             logger.warning(f"Unexpected segment key generated: {segment_key} for client {cliente_data['cliente_id']}")
 
 
     context = {
         'segments': segments,
-        'total_clients': clientes_annotated.count(),
+        'total_clients': len(clientes_data),
         # Pass thresholds for display/info
         'visit_threshold_regular': VISIT_THRESHOLD_REGULAR,
         'visit_threshold_vip': VISIT_THRESHOLD_VIP,
@@ -609,6 +641,7 @@ def cliente_segmentation_view(request):
 def client_list_by_segment_view(request, segment_name):
     """
     Displays a list of clients for a specific segment.
+    Incluye tanto servicios actuales como históricos.
     """
     # Define Segmentation Thresholds (adjust as needed)
     VISIT_THRESHOLD_REGULAR = 2
@@ -616,72 +649,50 @@ def client_list_by_segment_view(request, segment_name):
     SPEND_THRESHOLD_MEDIUM = 50000 # Example: 50,000 CLP
     SPEND_THRESHOLD_HIGH = 150000 # Example: 150,000 CLP
 
-    # Annotate clients with visit count and total spend
-    clientes_annotated = Cliente.objects.annotate(
-        num_visits=Count('ventareserva'),
-        total_spend=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField())
-    )
+    # Obtener métricas combinadas
+    clientes_data = _get_combined_metrics_for_segmentation()
 
-    # Filter clients based on segment_name
-    if segment_name == 'new_low_spend':
-        clients = clientes_annotated.filter(
-            num_visits__lt=VISIT_THRESHOLD_REGULAR,
-            total_spend__lt=SPEND_THRESHOLD_MEDIUM
+    # Filtrar clientes según el segmento en Python
+    filtered_client_ids = []
+
+    for cliente_data in clientes_data:
+        visits = cliente_data['total_servicios']
+        spend = cliente_data['total_gasto']
+
+        include = False
+
+        if segment_name == 'new_low_spend':
+            include = visits < VISIT_THRESHOLD_REGULAR and spend < SPEND_THRESHOLD_MEDIUM
+        elif segment_name == 'new_medium_spend':
+            include = visits < VISIT_THRESHOLD_REGULAR and SPEND_THRESHOLD_MEDIUM <= spend < SPEND_THRESHOLD_HIGH
+        elif segment_name == 'new_high_spend':
+            include = visits < VISIT_THRESHOLD_REGULAR and spend >= SPEND_THRESHOLD_HIGH
+        elif segment_name == 'regular_low_spend':
+            include = VISIT_THRESHOLD_REGULAR <= visits < VISIT_THRESHOLD_VIP and spend < SPEND_THRESHOLD_MEDIUM
+        elif segment_name == 'regular_medium_spend':
+            include = VISIT_THRESHOLD_REGULAR <= visits < VISIT_THRESHOLD_VIP and SPEND_THRESHOLD_MEDIUM <= spend < SPEND_THRESHOLD_HIGH
+        elif segment_name == 'regular_high_spend':
+            include = VISIT_THRESHOLD_REGULAR <= visits < VISIT_THRESHOLD_VIP and spend >= SPEND_THRESHOLD_HIGH
+        elif segment_name == 'vip_low_spend':
+            include = visits >= VISIT_THRESHOLD_VIP and spend < SPEND_THRESHOLD_MEDIUM
+        elif segment_name == 'vip_medium_spend':
+            include = visits >= VISIT_THRESHOLD_VIP and SPEND_THRESHOLD_MEDIUM <= spend < SPEND_THRESHOLD_HIGH
+        elif segment_name == 'vip_high_spend':
+            include = visits >= VISIT_THRESHOLD_VIP and spend >= SPEND_THRESHOLD_HIGH
+        elif segment_name == 'zero_spend':
+            include = visits == 0 and spend == 0
+
+        if include:
+            filtered_client_ids.append(cliente_data['cliente_id'])
+
+    # Convertir IDs filtrados de vuelta a queryset de Cliente
+    if filtered_client_ids:
+        clients = Cliente.objects.filter(id__in=filtered_client_ids).annotate(
+            num_visits=Count('ventareserva'),
+            total_spend=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField())
         )
-    elif segment_name == 'new_medium_spend':
-        clients = clientes_annotated.filter(
-            num_visits__lt=VISIT_THRESHOLD_REGULAR,
-            total_spend__gte=SPEND_THRESHOLD_MEDIUM,
-            total_spend__lt=SPEND_THRESHOLD_HIGH
-        )
-    elif segment_name == 'new_high_spend':
-        clients = clientes_annotated.filter(
-            num_visits__lt=VISIT_THRESHOLD_REGULAR,
-            total_spend__gte=SPEND_THRESHOLD_HIGH
-        )
-    elif segment_name == 'regular_low_spend':
-        clients = clientes_annotated.filter(
-            num_visits__gte=VISIT_THRESHOLD_REGULAR,
-            num_visits__lt=VISIT_THRESHOLD_VIP,
-            total_spend__lt=SPEND_THRESHOLD_MEDIUM
-        )
-    elif segment_name == 'regular_medium_spend':
-        clients = clientes_annotated.filter(
-            num_visits__gte=VISIT_THRESHOLD_REGULAR,
-            num_visits__lt=VISIT_THRESHOLD_VIP,
-            total_spend__gte=SPEND_THRESHOLD_MEDIUM,
-            total_spend__lt=SPEND_THRESHOLD_HIGH
-        )
-    elif segment_name == 'regular_high_spend':
-        clients = clientes_annotated.filter(
-            num_visits__gte=VISIT_THRESHOLD_REGULAR,
-            num_visits__lt=VISIT_THRESHOLD_VIP,
-            total_spend__gte=SPEND_THRESHOLD_HIGH
-        )
-    elif segment_name == 'vip_low_spend':
-        clients = clientes_annotated.filter(
-            num_visits__gte=VISIT_THRESHOLD_VIP,
-            total_spend__lt=SPEND_THRESHOLD_MEDIUM
-        )
-    elif segment_name == 'vip_medium_spend':
-        clients = clientes_annotated.filter(
-            num_visits__gte=VISIT_THRESHOLD_VIP,
-            total_spend__gte=SPEND_THRESHOLD_MEDIUM,
-            total_spend__lt=SPEND_THRESHOLD_HIGH
-        )
-    elif segment_name == 'vip_high_spend':
-        clients = clientes_annotated.filter(
-            num_visits__gte=VISIT_THRESHOLD_VIP,
-            total_spend__gte=SPEND_THRESHOLD_HIGH
-        )
-    elif segment_name == 'zero_spend':
-         clients = clientes_annotated.filter(
-             num_visits=0,
-             total_spend=0
-         )
     else:
-        # Handle invalid segment name, perhaps return an empty list or an error
-        clients = Cliente.objects.none() # Return an empty queryset
+        clients = Cliente.objects.none()
 
     context = {
         'segment_name': segment_name,
