@@ -321,11 +321,25 @@ class CRMService:
         Returns:
             Lista de clientes encontrados con info básica
         """
-        clientes = Cliente.objects.filter(
-            Q(nombre__icontains=query) |
-            Q(telefono__icontains=query) |
-            Q(email__icontains=query)
-        )[:limit]
+        # Si el query parece un teléfono, normalizarlo primero
+        normalized_phone = None
+        if query and any(c.isdigit() for c in query):
+            try:
+                normalized_phone = Cliente.normalize_phone(query)
+            except:
+                pass
+
+        # Buscar por nombre, email, o teléfono (original + normalizado)
+        q_filter = Q(nombre__icontains=query) | Q(email__icontains=query)
+
+        # Buscar por teléfono original
+        q_filter |= Q(telefono__icontains=query)
+
+        # Si se normalizó el teléfono, buscar también por el normalizado
+        if normalized_phone and normalized_phone != query:
+            q_filter |= Q(telefono__icontains=normalized_phone)
+
+        clientes = Cliente.objects.filter(q_filter).distinct()[:limit]
 
         resultados = []
         for cliente in clientes:

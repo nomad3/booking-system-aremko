@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 import random
 import string
+import re
 from django.db.models import Sum, F, DecimalField, FloatField # Added DecimalField, FloatField
 from solo.models import SingletonModel # Added import for django-solo
 
@@ -246,6 +247,54 @@ class Cliente(models.Model):
     documento_identidad = models.CharField(max_length=20, null=True, blank=True, verbose_name="ID/DNI/Passport/RUT")
     pais = models.CharField(max_length=100, null=True, blank=True)
     ciudad = models.CharField(max_length=100, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+
+    @staticmethod
+    def normalize_phone(phone_str):
+        """
+        Normaliza número de teléfono a formato estándar sin '+'
+        Para Chile: 56XXXXXXXXX (11-12 dígitos)
+        Para otros: mantiene formato sin símbolos
+
+        Returns:
+            str: Teléfono normalizado o None si inválido
+        """
+        if not phone_str or phone_str.strip() == '':
+            return None
+
+        # Limpiar caracteres no numéricos (incluyendo +)
+        phone = re.sub(r'[^0-9]', '', str(phone_str))
+
+        # Validar longitud mínima
+        if len(phone) < 8:
+            return None
+
+        # Si tiene código de país 56 (Chile), dejarlo
+        if phone.startswith('56') and len(phone) in [11, 12]:
+            return phone
+
+        # Si tiene 9 dígitos y empieza con 9 (móvil chileno), agregar código país
+        if len(phone) == 9 and phone.startswith('9'):
+            return f'56{phone}'
+
+        # Si tiene 8 dígitos (fijo chileno), agregar código país y código área 2 (Santiago)
+        if len(phone) == 8:
+            return f'562{phone}'
+
+        # Para otros formatos, retornar si tiene al menos 8 dígitos
+        return phone if len(phone) >= 8 else None
+
+    def save(self, *args, **kwargs):
+        """
+        Override save para normalizar teléfono antes de guardar
+        """
+        if self.telefono:
+            normalized = self.normalize_phone(self.telefono)
+            if normalized:
+                self.telefono = normalized
+            else:
+                raise ValidationError(f"Formato de teléfono inválido: {self.telefono}")
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.nombre} - {self.telefono}"
