@@ -17,7 +17,9 @@ from .models import (
     # Communication models
     CommunicationLimit, ClientPreferences, CommunicationLog, SMSTemplate, MailParaEnviar,
     # Advanced Email Campaign models
-    EmailCampaign, EmailRecipient, EmailDeliveryLog, EmailBlacklist, EmailTemplate, EmailSubjectTemplate, EmailContentTemplate
+    EmailCampaign, EmailRecipient, EmailDeliveryLog, EmailBlacklist, EmailTemplate, EmailSubjectTemplate, EmailContentTemplate,
+    # Historical data
+    ServiceHistory
 )
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
@@ -1154,3 +1156,57 @@ class EmailContentTemplateAdmin(admin.ModelAdmin):
         queryset.update(activo=False)
         self.message_user(request, f"{queryset.count()} templates desactivados")
     deactivate_template.short_description = "Desactivar templates"
+
+
+# ================================================================================
+# SERVICI HISTORY (DATOS HISTÓRICOS IMPORTADOS)
+# ================================================================================
+
+@admin.register(ServiceHistory)
+class ServiceHistoryAdmin(admin.ModelAdmin):
+    """
+    Admin para servicios históricos importados desde CSV
+    Permite visualizar y verificar los 26K+ servicios históricos (2020-2024)
+    """
+    list_display = ('id', 'cliente_link', 'service_name', 'service_type',
+                    'service_date', 'price_paid', 'season', 'year', 'reserva_id')
+    list_filter = ('service_type', 'season', 'year', 'service_date')
+    search_fields = ('cliente__nombre', 'cliente__email', 'cliente__telefono',
+                     'service_name', 'reserva_id')
+    readonly_fields = ('id', 'cliente', 'reserva_id', 'service_type', 'service_name',
+                       'service_date', 'quantity', 'price_paid', 'season', 'year')
+    list_per_page = 50
+    date_hierarchy = 'service_date'
+
+    fieldsets = (
+        ('Cliente', {
+            'fields': ('cliente',)
+        }),
+        ('Servicio', {
+            'fields': ('reserva_id', 'service_type', 'service_name', 'quantity', 'price_paid')
+        }),
+        ('Fecha y Temporada', {
+            'fields': ('service_date', 'year', 'season')
+        }),
+    )
+
+    def cliente_link(self, obj):
+        """Link al cliente en el admin"""
+        if obj.cliente:
+            url = reverse('admin:ventas_cliente_change', args=[obj.cliente.id])
+            return format_html('<a href="{}">{}</a>', url, obj.cliente.nombre)
+        return '-'
+    cliente_link.short_description = 'Cliente'
+
+    def has_add_permission(self, request):
+        """No permitir agregar servicios históricos manualmente"""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Solo superusers pueden eliminar"""
+        return request.user.is_superuser
+
+    class Media:
+        css = {
+            'all': ('admin/css/custom.css',)
+        }
