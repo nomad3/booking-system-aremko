@@ -162,8 +162,8 @@ class CRMService:
                     'servicios_recientes': servicios_recientes,
                     'gasto_total': float(gasto_total),
                     'ticket_promedio': float(ticket_promedio),
-                    'primer_servicio': primer_servicio.isoformat() if primer_servicio else None,
-                    'ultimo_servicio': ultimo_servicio.isoformat() if ultimo_servicio else None,
+                    'primer_servicio': primer_servicio,  # Pass date object for Django template date filter
+                    'ultimo_servicio': ultimo_servicio,  # Pass date object for Django template date filter
                     'dias_como_cliente': dias_cliente,
                 },
                 'segmentacion': {
@@ -177,7 +177,7 @@ class CRMService:
                         'id': s['id'],
                         'servicio': s['servicio'],
                         'tipo': s['tipo'],
-                        'fecha': s['fecha'].isoformat(),
+                        'fecha': s['fecha'],  # Pass date object directly for Django template date filter
                         'precio': s['precio'],
                         'cantidad': s['cantidad'],
                         'fuente': s['fuente']
@@ -356,7 +356,7 @@ class CRMService:
                 'telefono': cliente.telefono,
                 'email': cliente.email,
                 'total_servicios': datos['total_combinados'],
-                'ultimo_servicio': ultimo_servicio.isoformat() if ultimo_servicio else None,
+                'ultimo_servicio': ultimo_servicio,  # Pass date object for Django template date filter
             })
 
         return resultados
