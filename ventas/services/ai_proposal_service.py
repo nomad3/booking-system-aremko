@@ -9,6 +9,7 @@ from typing import Dict, Any
 import httpx
 from django.conf import settings
 from ventas.services.crm_service import CRMService
+from ventas.models import EmailSubjectTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -379,6 +380,13 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
             </html>
             """
 
+        # Generar asunto dinámico según estilo
+        email_subject = EmailSubjectTemplate.get_random_subject(
+            estilo=estilo,
+            nombre_cliente=cliente['nombre']
+        )
+        logger.info(f"Asunto generado: {email_subject}")
+
         return {
             "customer_profile": {
                 "nombre": cliente['nombre'],
@@ -390,6 +398,7 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
             "insights": insights,
             "recommendations": recommendations,
             "offer": offer,
+            "email_subject": email_subject,
             "email_body": email_body.strip()
         }
 

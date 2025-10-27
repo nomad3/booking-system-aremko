@@ -149,9 +149,17 @@ def generar_propuesta(request, cliente_id):
 @require_http_methods(["POST"])
 def enviar_propuesta(request, cliente_id):
     """
-    Genera y envía propuesta por email
+    Genera y envía propuesta por email con asunto dinámico
     """
     try:
+        # Obtener estilo del request (formal por defecto)
+        import json as json_lib
+        try:
+            body = json_lib.loads(request.body.decode('utf-8')) if request.body else {}
+            estilo = body.get('estilo', 'formal')
+        except:
+            estilo = request.POST.get('estilo', 'formal')
+
         # Obtener perfil del cliente
         perfil = CRMService.get_customer_360(cliente_id)
         cliente = perfil['cliente']
@@ -163,12 +171,12 @@ def enviar_propuesta(request, cliente_id):
                 'error': 'El cliente no tiene email registrado'
             }, status=400)
 
-        # Generar propuesta con IA
+        # Generar propuesta con IA (con estilo)
         ai_service = get_ai_service()
-        propuesta = ai_service.generar_propuesta(cliente_id)
+        propuesta = ai_service.generar_propuesta(cliente_id, estilo=estilo)
 
-        # Enviar email
-        subject = f"Propuesta Personalizada - Aremko"
+        # Usar asunto dinámico de la propuesta (o fallback)
+        subject = propuesta.get('email_subject', 'Propuesta Personalizada - Aremko')
         message = "Por favor visualiza este mensaje en un cliente que soporte HTML."
         from_email = settings.DEFAULT_FROM_EMAIL
         recipient_list = [cliente['email']]
@@ -183,7 +191,7 @@ def enviar_propuesta(request, cliente_id):
             fail_silently=False
         )
 
-        logger.info(f"Propuesta enviada exitosamente a {cliente['email']} (Cliente ID: {cliente_id})")
+        logger.info(f"Propuesta enviada exitosamente a {cliente['email']} (Cliente ID: {cliente_id}) con asunto: {subject}")
         messages.success(request, f"Propuesta enviada exitosamente a {cliente['email']}")
 
         return JsonResponse({

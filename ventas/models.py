@@ -1679,3 +1679,146 @@ class ServiceHistory(models.Model):
         from datetime import datetime, timedelta
         six_months_ago = datetime.now().date() - timedelta(days=180)
         return self.service_date >= six_months_ago
+
+
+# ============================================================================
+# MODELOS CRM - ASUNTOS DE EMAIL VARIABLES
+# ============================================================================
+
+class EmailSubjectTemplate(models.Model):
+    """
+    Templates de asuntos para emails personalizados
+    Permite variedad para evitar detección de spam
+    """
+    ESTILO_CHOICES = [
+        ('formal', 'Formal/Profesional'),
+        ('calido', 'Cálido/Emocional'),
+        ('ambos', 'Ambos Estilos'),
+    ]
+    
+    subject_template = models.CharField(
+        max_length=200,
+        verbose_name="Asunto del Email",
+        help_text="Usa {nombre} para insertar el nombre del cliente. Ej: '{nombre}, tenemos algo especial para ti'"
+    )
+    estilo = models.CharField(
+        max_length=10,
+        choices=ESTILO_CHOICES,
+        default='calido',
+        verbose_name="Estilo de Email"
+    )
+    activo = models.BooleanField(
+        default=True,
+        verbose_name="Activo",
+        help_text="Desmarcar para desactivar este asunto temporalmente"
+    )
+    veces_usado = models.IntegerField(
+        default=0,
+        verbose_name="Veces Usado",
+        help_text="Contador automático de cuántas veces se ha usado"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Creado")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Actualizado")
+    
+    class Meta:
+        ordering = ['estilo', '-activo', 'veces_usado']
+        verbose_name = "Asunto de Email"
+        verbose_name_plural = "Asuntos de Email"
+    
+    def __str__(self):
+        return f"{self.subject_template} ({self.get_estilo_display()})"
+    
+    @classmethod
+    def get_random_subject(cls, estilo='calido', nombre_cliente=''):
+        """
+        Obtiene un asunto aleatorio para el estilo especificado
+        
+        Args:
+            estilo: 'formal' o 'calido'
+            nombre_cliente: Nombre del cliente para reemplazar {nombre}
+        
+        Returns:
+            String con el asunto personalizado
+        """
+        # Buscar templates activos del estilo o que sirvan para ambos
+        templates = cls.objects.filter(
+            activo=True
+        ).filter(
+            models.Q(estilo=estilo) | models.Q(estilo='ambos')
+        )
+        
+        if templates.exists():
+            # Seleccionar uno al azar (priorizando los menos usados)
+            # Ordenar por veces_usado y tomar uno de los 5 menos usados al azar
+            least_used = list(templates.order_by('veces_usado')[:5])
+            selected = random.choice(least_used)
+            
+            # Incrementar contador
+            selected.veces_usado += 1
+            selected.save(update_fields=['veces_usado'])
+            
+            # Reemplazar {nombre} con el nombre del cliente
+            nombre = nombre_cliente.split()[0] if nombre_cliente else ''
+            subject = selected.subject_template.replace('{nombre}', nombre)
+            
+            return subject
+        else:
+            # Fallback a asuntos default si no hay en la base de datos
+            return cls._get_default_subject(estilo, nombre_cliente)
+    
+    @staticmethod
+    def _get_default_subject(estilo='calido', nombre_cliente=''):
+        """
+        Asuntos default si no hay en la base de datos
+        """
+        nombre = nombre_cliente.split()[0] if nombre_cliente else 'amigo'
+        
+        if estilo == 'calido':
+            subjects = [
+                f"{nombre}, tenemos buenas noticias para ti",
+                f"{nombre}, algo especial te espera en Aremko",
+                f"Hola {nombre}, te extrañamos",
+                f"{nombre}, un regalo especial para ti",
+                f"¡{nombre}! Tu momento de relax te está esperando",
+                f"{nombre}, vuelve a disfrutar de la naturaleza",
+                f"Una sorpresa para ti, {nombre}",
+                f"{nombre}, ¿cuándo vuelves a visitarnos?",
+                f"Tenemos un detalle especial para ti, {nombre}",
+                f"{nombre}, tu escape perfecto te espera",
+                f"Hola {nombre}, reservamos algo para ti",
+                f"{nombre}, es hora de relajarte de nuevo",
+                f"¡{nombre}! Beneficios exclusivos para ti",
+                f"{nombre}, te recordamos con cariño",
+                f"Un mensaje especial para ti, {nombre}",
+                f"{nombre}, ven a renovar tu energía",
+                f"Hola {nombre}, te tenemos presente",
+                f"{nombre}, vuelve a conectar con la naturaleza",
+                f"Tu bienestar es importante, {nombre}",
+                f"{nombre}, momentos únicos te esperan",
+                f"¡{nombre}! Oferta especial solo para ti",
+                f"Hola {nombre}, pensamos en ti",
+                f"{nombre}, tu próxima aventura te llama",
+                f"Un beneficio exclusivo para ti, {nombre}",
+                f"{nombre}, te invitamos a desconectar",
+                f"¡{nombre}! Descubre lo que preparamos para ti",
+                f"Hola {nombre}, hora de mimarte",
+                f"{nombre}, tu refugio natural te espera",
+                f"Algo especial preparado para ti, {nombre}",
+                f"{nombre}, vuelve a enamorarte de Aremko",
+            ]
+        else:  # formal
+            subjects = [
+                f"Propuesta Personalizada para {nombre}",
+                f"Oferta Exclusiva - {nombre}",
+                f"Recomendaciones Especiales - Aremko",
+                f"Beneficios Personalizados para Usted",
+                f"Su Próxima Experiencia en Aremko",
+                f"Propuesta de Valor Especial",
+                f"Servicios Recomendados - {nombre}",
+                f"Oferta Limitada - Aremko Spa",
+                f"Experiencia Premium Personalizada",
+                f"Plan Especial para {nombre}",
+            ]
+        
+        return random.choice(subjects)
+

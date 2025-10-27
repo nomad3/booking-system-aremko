@@ -17,7 +17,7 @@ from .models import (
     # Communication models
     CommunicationLimit, ClientPreferences, CommunicationLog, SMSTemplate, MailParaEnviar,
     # Advanced Email Campaign models
-    EmailCampaign, EmailRecipient, EmailDeliveryLog, EmailBlacklist, EmailTemplate
+    EmailCampaign, EmailRecipient, EmailDeliveryLog, EmailBlacklist, EmailTemplate, EmailSubjectTemplate
 )
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
@@ -1045,3 +1045,43 @@ class EmailBlacklistAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         })
     )
+
+
+@admin.register(EmailSubjectTemplate)
+class EmailSubjectTemplateAdmin(admin.ModelAdmin):
+    """Administrador para asuntos de email variables"""
+    list_display = ['subject_template', 'estilo', 'activo', 'veces_usado', 'created_at']
+    list_filter = ['estilo', 'activo', 'created_at']
+    search_fields = ['subject_template']
+    readonly_fields = ['veces_usado', 'created_at', 'updated_at']
+    
+    fieldsets = (
+        ('Asunto del Email', {
+            'fields': ('subject_template', 'estilo', 'activo'),
+            'description': 'Usa {nombre} en el asunto para insertar el nombre del cliente. Ejemplo: "{nombre}, tenemos algo especial para ti"'
+        }),
+        ('Estadísticas', {
+            'fields': ('veces_usado', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    actions = ['reset_usage_counter', 'activate_subjects', 'deactivate_subjects']
+    
+    def reset_usage_counter(self, request, queryset):
+        """Reinicia el contador de uso"""
+        queryset.update(veces_usado=0)
+        self.message_user(request, f"Contador reiniciado para {queryset.count()} asuntos")
+    reset_usage_counter.short_description = "Reiniciar contador de uso"
+    
+    def activate_subjects(self, request, queryset):
+        """Activa asuntos seleccionados"""
+        queryset.update(activo=True)
+        self.message_user(request, f"{queryset.count()} asuntos activados")
+    activate_subjects.short_description = "Activar asuntos"
+    
+    def deactivate_subjects(self, request, queryset):
+        """Desactiva asuntos seleccionados"""
+        queryset.update(activo=False)
+        self.message_user(request, f"{queryset.count()} asuntos desactivados")
+    deactivate_subjects.short_description = "Desactivar asuntos"
