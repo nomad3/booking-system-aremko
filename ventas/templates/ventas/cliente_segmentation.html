@@ -60,6 +60,44 @@
         {% endfor %}
     </div>
 
+    <!-- Filtro Personalizado -->
+    <div class="card mt-4">
+        <div class="card-header" style="background-color: #28a745; color: white;">
+            <strong>🎯 Filtro Personalizado de Clientes</strong>
+        </div>
+        <div class="card-body">
+            <p class="mb-3">Define tu propio segmento personalizado por rango de gasto y ciudad:</p>
+            <form action="{% url 'ventas:client_list_custom_filter' %}" method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <label for="gasto_min" class="form-label"><strong>Gasto Mínimo (CLP):</strong></label>
+                    <input type="number" class="form-control" id="gasto_min" name="gasto_min"
+                           min="0" step="1000" placeholder="Ej: 50000" value="0">
+                    <small class="text-muted">Dejar en 0 para sin límite inferior</small>
+                </div>
+                <div class="col-md-4">
+                    <label for="gasto_max" class="form-label"><strong>Gasto Máximo (CLP):</strong></label>
+                    <input type="number" class="form-control" id="gasto_max" name="gasto_max"
+                           min="0" step="1000" placeholder="Ej: 200000">
+                    <small class="text-muted">Dejar vacío para sin límite superior</small>
+                </div>
+                <div class="col-md-4">
+                    <label for="ciudad" class="form-label"><strong>Ciudad:</strong></label>
+                    <select class="form-select" id="ciudad" name="ciudad">
+                        <option value="todas" selected>Todas las ciudades</option>
+                        {% for c in ciudades %}
+                        <option value="{{ c }}">{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 text-center mt-3">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="fas fa-filter"></i> Aplicar Filtro Personalizado
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="card mt-4">
          <div class="card-header">
              Definición de Segmentos

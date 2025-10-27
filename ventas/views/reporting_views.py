@@ -663,6 +663,12 @@ def cliente_segmentation_view(request):
         else:
             segments['high_spend']['count'] += 1
 
+    # Obtener ciudades únicas para filtro personalizado
+    ciudades = Cliente.objects.filter(
+        ciudad__isnull=False
+    ).exclude(
+        ciudad=''
+    ).values_list('ciudad', flat=True).distinct().order_by('ciudad')
 
     context = {
         'segments': segments,
@@ -670,6 +676,8 @@ def cliente_segmentation_view(request):
         # Pass thresholds for display/info
         'spend_threshold_medium': SPEND_THRESHOLD_MEDIUM,
         'spend_threshold_high': SPEND_THRESHOLD_HIGH,
+        # Filtro personalizado
+        'ciudades': list(ciudades),
     }
 
     return render(request, 'ventas/cliente_segmentation.html', context)
@@ -730,6 +738,72 @@ def client_list_by_segment_view(request, segment_name):
         'segment_name': segment_name,
         'segment_label': segment_labels.get(segment_name, segment_name),
         'clients': clients,
+    }
+
+    return render(request, 'ventas/client_list_by_segment.html', context)
+
+
+@login_required
+def client_list_custom_filter_view(request):
+    """
+    Vista para filtro personalizado de clientes por rango de gasto y ciudad
+    """
+    # Obtener parámetros del formulario
+    gasto_min = request.GET.get('gasto_min', '0')
+    gasto_max = request.GET.get('gasto_max', '')
+    ciudad = request.GET.get('ciudad', 'todas')
+
+    try:
+        gasto_min = float(gasto_min) if gasto_min else 0
+    except ValueError:
+        gasto_min = 0
+
+    try:
+        gasto_max = float(gasto_max) if gasto_max else float('inf')
+    except ValueError:
+        gasto_max = float('inf')
+
+    # Obtener métricas combinadas
+    clientes_data = _get_combined_metrics_for_segmentation()
+
+    # Filtrar por rango de gasto
+    filtered_client_ids = []
+    for cliente_data in clientes_data:
+        spend = cliente_data['total_gasto']
+
+        if gasto_min <= spend <= gasto_max:
+            filtered_client_ids.append(cliente_data['cliente_id'])
+
+    # Convertir a queryset y aplicar filtro de ciudad
+    if filtered_client_ids:
+        clients = Cliente.objects.filter(id__in=filtered_client_ids).annotate(
+            num_visits=Count('ventareserva'),
+            total_spend=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField())
+        )
+
+        # Filtrar por ciudad si no es "todas"
+        if ciudad and ciudad != 'todas':
+            clients = clients.filter(ciudad__iexact=ciudad)
+    else:
+        clients = Cliente.objects.none()
+
+    # Generar label descriptivo
+    if gasto_max == float('inf'):
+        segment_label = f'Gasto ≥ ${gasto_min:,.0f}'
+    else:
+        segment_label = f'Gasto: ${gasto_min:,.0f} - ${gasto_max:,.0f}'
+
+    if ciudad and ciudad != 'todas':
+        segment_label += f' | Ciudad: {ciudad}'
+
+    context = {
+        'segment_name': 'custom_filter',
+        'segment_label': segment_label,
+        'clients': clients,
+        'gasto_min': int(gasto_min) if gasto_min else 0,
+        'gasto_max': int(gasto_max) if gasto_max != float('inf') else '',
+        'ciudad': ciudad,
+        'is_custom_filter': True,
     }
 
     return render(request, 'ventas/client_list_by_segment.html', context)

@@ -49,6 +49,7 @@ urlpatterns = [
     # Custom Views for CRM/Reporting
     path('reportes/segmentacion-clientes/', reporting_views.cliente_segmentation_view, name='cliente_segmentation'),
     path('reportes/segmentacion-clientes/<str:segment_name>/', reporting_views.client_list_by_segment_view, name='client_list_by_segment'),
+    path('reportes/clientes-filtro-personalizado/', reporting_views.client_list_custom_filter_view, name='client_list_custom_filter'),
     path('admin/campaign/setup/', admin_views.campaign_setup_view, name='campaign_setup_add'), # For adding new
     path('admin/campaign/setup/<int:campaign_id>/', admin_views.campaign_setup_view, name='campaign_setup_change'), # For editing existing
     path('admin/campaign/select-for-clients/', admin_views.select_campaign_for_clients_view, name='select_campaign_for_clients'),
