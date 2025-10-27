@@ -24,8 +24,10 @@ class AIProposalService:
 
     def __init__(self):
         # Obtener API key de variables de entorno
-        self.api_key = os.getenv('DEEPSEEK_API_KEY')
+        self.api_key = os.getenv('DEEPSEEK_API_KEY', '').strip()
+        # Considerar vacía si es string vacío o None
         if not self.api_key:
+            self.api_key = None
             logger.warning("DEEPSEEK_API_KEY no configurada. Propuestas usarán fallback.")
 
     def generar_propuesta(self, customer_id: int, estilo: str = "formal") -> Dict[str, Any]:
@@ -190,13 +192,13 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
 
         except httpx.HTTPError as e:
             logger.error(f"Error llamando a DeepSeek API: {e}")
-            return self._generar_propuesta_basica(perfil)
+            return self._generar_propuesta_basica(perfil, estilo)
         except json.JSONDecodeError as e:
             logger.error(f"Error parseando respuesta JSON de IA: {e}")
-            return self._generar_propuesta_basica(perfil)
+            return self._generar_propuesta_basica(perfil, estilo)
         except Exception as e:
             logger.error(f"Error en generación con IA: {e}")
-            return self._generar_propuesta_basica(perfil)
+            return self._generar_propuesta_basica(perfil, estilo)
 
     def _generar_propuesta_basica(self, perfil: Dict[str, Any], estilo: str = "formal") -> Dict[str, Any]:
         """
