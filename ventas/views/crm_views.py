@@ -270,62 +270,39 @@ def historial_servicios(request, cliente_id):
 def bulk_email_sender_view(request):
     """
     Vista principal para envío masivo de emails con IA
-    Permite seleccionar clientes por segmento o búsqueda
+    Segmentación SIMPLIFICADA - Solo por gasto (sin contar visitas)
     """
     from django.db.models import Count, Sum
     from django.db.models.functions import Coalesce
     from django.db import models as django_models
 
-    # Obtener segmentos predefinidos (igual que en segmentación)
-    VISIT_THRESHOLD_REGULAR = 2
-    VISIT_THRESHOLD_VIP = 6
+    # Thresholds de gasto
     SPEND_THRESHOLD_MEDIUM = 50000
     SPEND_THRESHOLD_HIGH = 150000
 
     segments = {
-        'new_low_spend': {'label': 'Nuevos (0-1 Visita, Bajo Gasto)', 'count': 0},
-        'new_medium_spend': {'label': 'Nuevos (0-1 Visita, Gasto Medio)', 'count': 0},
-        'new_high_spend': {'label': 'Nuevos (0-1 Visita, Alto Gasto)', 'count': 0},
-        'regular_low_spend': {'label': f'Regulares ({VISIT_THRESHOLD_REGULAR}-{VISIT_THRESHOLD_VIP-1} Visitas, Bajo Gasto)', 'count': 0},
-        'regular_medium_spend': {'label': f'Regulares ({VISIT_THRESHOLD_REGULAR}-{VISIT_THRESHOLD_VIP-1} Visitas, Gasto Medio)', 'count': 0},
-        'regular_high_spend': {'label': f'Regulares ({VISIT_THRESHOLD_REGULAR}-{VISIT_THRESHOLD_VIP-1} Visitas, Alto Gasto)', 'count': 0},
-        'vip_low_spend': {'label': f'VIP (>{VISIT_THRESHOLD_VIP-1} Visitas, Bajo Gasto)', 'count': 0},
-        'vip_medium_spend': {'label': f'VIP (>{VISIT_THRESHOLD_VIP-1} Visitas, Gasto Medio)', 'count': 0},
-        'vip_high_spend': {'label': f'VIP (>{VISIT_THRESHOLD_VIP-1} Visitas, Alto Gasto)', 'count': 0},
+        'low_spend': {'label': 'Bajo Gasto (< $50,000)', 'count': 0},
+        'medium_spend': {'label': 'Gasto Medio ($50,000 - $150,000)', 'count': 0},
+        'high_spend': {'label': 'Alto Gasto (> $150,000)', 'count': 0},
+        'zero_spend': {'label': 'Sin Gasto Registrado', 'count': 0},
     }
 
     # Calcular conteos de clientes por segmento
     clientes = Cliente.objects.annotate(
-        num_visits=Count('ventareserva'),
         total_spend=Coalesce(Sum('ventareserva__total'), 0, output_field=django_models.DecimalField())
     )
 
     for cliente in clientes:
-        visits = cliente.num_visits
         spend = float(cliente.total_spend)
 
-        if visits == 0 and spend == 0:
-            continue
-
-        # Categorize by Visits
-        if visits < VISIT_THRESHOLD_REGULAR:
-            visit_category = 'new'
-        elif visits < VISIT_THRESHOLD_VIP:
-            visit_category = 'regular'
-        else:
-            visit_category = 'vip'
-
-        # Categorize by Spend
-        if spend < SPEND_THRESHOLD_MEDIUM:
-            spend_category = 'low_spend'
+        if spend == 0:
+            segments['zero_spend']['count'] += 1
+        elif spend < SPEND_THRESHOLD_MEDIUM:
+            segments['low_spend']['count'] += 1
         elif spend < SPEND_THRESHOLD_HIGH:
-            spend_category = 'medium_spend'
+            segments['medium_spend']['count'] += 1
         else:
-            spend_category = 'high_spend'
-
-        segment_key = f"{visit_category}_{spend_category}"
-        if segment_key in segments:
-            segments[segment_key]['count'] += 1
+            segments['high_spend']['count'] += 1
 
     context = {
         'segments': segments,
@@ -342,6 +319,7 @@ def bulk_email_send_view(request):
     """
     Vista AJAX para enviar emails masivos con IA
     Genera propuestas automáticamente y envía en lote
+    Segmentación SIMPLIFICADA - Solo por gasto (sin contar visitas)
     """
     import json
     from django.db.models import Count, Sum
@@ -357,44 +335,30 @@ def bulk_email_send_view(request):
         if not segment:
             return JsonResponse({'success': False, 'error': 'Segmento no especificado'})
 
-        # Thresholds de segmentación
-        VISIT_THRESHOLD_REGULAR = 2
-        VISIT_THRESHOLD_VIP = 6
+        # Thresholds de gasto
         SPEND_THRESHOLD_MEDIUM = 50000
         SPEND_THRESHOLD_HIGH = 150000
 
         # Filtrar clientes según segmento
         clientes = Cliente.objects.annotate(
-            num_visits=Count('ventareserva'),
             total_spend=Coalesce(Sum('ventareserva__total'), 0, output_field=django_models.DecimalField())
         ).filter(email__isnull=False).exclude(email='')
 
-        # Aplicar filtro de segmento
+        # Aplicar filtro de segmento (SOLO POR GASTO)
         filtered_clients = []
         for cliente in clientes:
-            visits = cliente.num_visits
             spend = float(cliente.total_spend)
 
             include = False
 
-            if segment == 'new_low_spend':
-                include = visits < VISIT_THRESHOLD_REGULAR and spend < SPEND_THRESHOLD_MEDIUM
-            elif segment == 'new_medium_spend':
-                include = visits < VISIT_THRESHOLD_REGULAR and SPEND_THRESHOLD_MEDIUM <= spend < SPEND_THRESHOLD_HIGH
-            elif segment == 'new_high_spend':
-                include = visits < VISIT_THRESHOLD_REGULAR and spend >= SPEND_THRESHOLD_HIGH
-            elif segment == 'regular_low_spend':
-                include = VISIT_THRESHOLD_REGULAR <= visits < VISIT_THRESHOLD_VIP and spend < SPEND_THRESHOLD_MEDIUM
-            elif segment == 'regular_medium_spend':
-                include = VISIT_THRESHOLD_REGULAR <= visits < VISIT_THRESHOLD_VIP and SPEND_THRESHOLD_MEDIUM <= spend < SPEND_THRESHOLD_HIGH
-            elif segment == 'regular_high_spend':
-                include = VISIT_THRESHOLD_REGULAR <= visits < VISIT_THRESHOLD_VIP and spend >= SPEND_THRESHOLD_HIGH
-            elif segment == 'vip_low_spend':
-                include = visits >= VISIT_THRESHOLD_VIP and spend < SPEND_THRESHOLD_MEDIUM
-            elif segment == 'vip_medium_spend':
-                include = visits >= VISIT_THRESHOLD_VIP and SPEND_THRESHOLD_MEDIUM <= spend < SPEND_THRESHOLD_HIGH
-            elif segment == 'vip_high_spend':
-                include = visits >= VISIT_THRESHOLD_VIP and spend >= SPEND_THRESHOLD_HIGH
+            if segment == 'low_spend':
+                include = 0 < spend < SPEND_THRESHOLD_MEDIUM
+            elif segment == 'medium_spend':
+                include = SPEND_THRESHOLD_MEDIUM <= spend < SPEND_THRESHOLD_HIGH
+            elif segment == 'high_spend':
+                include = spend >= SPEND_THRESHOLD_HIGH
+            elif segment == 'zero_spend':
+                include = spend == 0
 
             if include:
                 filtered_clients.append(cliente)

@@ -630,69 +630,44 @@ def _get_combined_metrics_for_segmentation():
 @login_required
 def cliente_segmentation_view(request):
     """
-    Displays client segmentation based on visit count and total spend.
+    Displays client segmentation based ONLY on total spend (no visit count).
     Incluye tanto servicios actuales como históricos (CSV importados).
     """
     # Define Segmentation Thresholds (adjust as needed)
-    VISIT_THRESHOLD_REGULAR = 2
-    VISIT_THRESHOLD_VIP = 6 # Example: 6 or more visits
     SPEND_THRESHOLD_MEDIUM = 50000 # Example: 50,000 CLP
     SPEND_THRESHOLD_HIGH = 150000 # Example: 150,000 CLP
 
     # Obtener métricas combinadas (actuales + históricos)
     clientes_data = _get_combined_metrics_for_segmentation()
 
-    # --- Categorize Clients ---
+    # --- Categorize Clients (SOLO POR GASTO) ---
     segments = {
-        'new_low_spend': {'count': 0, 'label': 'Nuevos (0-1 Visita, Bajo Gasto)'},
-        'new_medium_spend': {'count': 0, 'label': 'Nuevos (0-1 Visita, Gasto Medio)'},
-        'new_high_spend': {'count': 0, 'label': 'Nuevos (0-1 Visita, Alto Gasto)'},
-        'regular_low_spend': {'count': 0, 'label': f'Regulares ({VISIT_THRESHOLD_REGULAR}-{VISIT_THRESHOLD_VIP-1} Visitas, Bajo Gasto)'},
-        'regular_medium_spend': {'count': 0, 'label': f'Regulares ({VISIT_THRESHOLD_REGULAR}-{VISIT_THRESHOLD_VIP-1} Visitas, Gasto Medio)'},
-        'regular_high_spend': {'count': 0, 'label': f'Regulares ({VISIT_THRESHOLD_REGULAR}-{VISIT_THRESHOLD_VIP-1} Visitas, Alto Gasto)'},
-        'vip_low_spend': {'count': 0, 'label': f'VIP (>{VISIT_THRESHOLD_VIP-1} Visitas, Bajo Gasto)'},
-        'vip_medium_spend': {'count': 0, 'label': f'VIP (>{VISIT_THRESHOLD_VIP-1} Visitas, Gasto Medio)'},
-        'vip_high_spend': {'count': 0, 'label': f'VIP (>{VISIT_THRESHOLD_VIP-1} Visitas, Alto Gasto)'},
-        'zero_spend': {'count': 0, 'label': 'Clientes Sin Gasto Registrado'}, # Clients with no VentaReserva
+        'low_spend': {'count': 0, 'label': 'Bajo Gasto (< $50,000)'},
+        'medium_spend': {'count': 0, 'label': 'Gasto Medio ($50,000 - $150,000)'},
+        'high_spend': {'count': 0, 'label': 'Alto Gasto (> $150,000)'},
+        'zero_spend': {'count': 0, 'label': 'Clientes Sin Gasto Registrado'},
     }
 
     for cliente_data in clientes_data:
-        visits = cliente_data['total_servicios']
         spend = cliente_data['total_gasto']
 
-        if visits == 0 and spend == 0:
+        if spend == 0:
              segments['zero_spend']['count'] += 1
-             continue # Skip further categorization if no visits/spend
+             continue
 
-        # Categorize by Visits
-        if visits < VISIT_THRESHOLD_REGULAR: # 0-1 visits
-            visit_category = 'new'
-        elif visits < VISIT_THRESHOLD_VIP: # 2-5 visits (example)
-            visit_category = 'regular'
-        else: # 6+ visits
-            visit_category = 'vip'
-
-        # Categorize by Spend
+        # Categorize ONLY by Spend
         if spend < SPEND_THRESHOLD_MEDIUM:
-            spend_category = 'low_spend'
+            segments['low_spend']['count'] += 1
         elif spend < SPEND_THRESHOLD_HIGH:
-            spend_category = 'medium_spend'
+            segments['medium_spend']['count'] += 1
         else:
-            spend_category = 'high_spend'
-
-        # Increment the combined segment count
-        segment_key = f"{visit_category}_{spend_category}"
-        if segment_key in segments:
-            segments[segment_key]['count'] += 1
-        # else: This case shouldn't happen with the current logic
+            segments['high_spend']['count'] += 1
 
 
     context = {
         'segments': segments,
         'total_clients': len(clientes_data),
         # Pass thresholds for display/info
-        'visit_threshold_regular': VISIT_THRESHOLD_REGULAR,
-        'visit_threshold_vip': VISIT_THRESHOLD_VIP,
         'spend_threshold_medium': SPEND_THRESHOLD_MEDIUM,
         'spend_threshold_high': SPEND_THRESHOLD_HIGH,
     }
@@ -704,47 +679,32 @@ def cliente_segmentation_view(request):
 # @user_passes_test(es_administrador) # Optional: Restrict to admins if needed
 def client_list_by_segment_view(request, segment_name):
     """
-    Displays a list of clients for a specific segment.
+    Displays a list of clients for a specific segment (SOLO BASADO EN GASTO).
     Incluye tanto servicios actuales como históricos.
     """
-    # Define Segmentation Thresholds (adjust as needed)
-    VISIT_THRESHOLD_REGULAR = 2
-    VISIT_THRESHOLD_VIP = 6 # Example: 6 or more visits
-    SPEND_THRESHOLD_MEDIUM = 50000 # Example: 50,000 CLP
-    SPEND_THRESHOLD_HIGH = 150000 # Example: 150,000 CLP
+    # Define Segmentation Thresholds
+    SPEND_THRESHOLD_MEDIUM = 50000 # 50,000 CLP
+    SPEND_THRESHOLD_HIGH = 150000 # 150,000 CLP
 
     # Obtener métricas combinadas
     clientes_data = _get_combined_metrics_for_segmentation()
 
-    # Filtrar clientes según el segmento en Python
+    # Filtrar clientes según el segmento en Python (SOLO POR GASTO)
     filtered_client_ids = []
 
     for cliente_data in clientes_data:
-        visits = cliente_data['total_servicios']
         spend = cliente_data['total_gasto']
 
         include = False
 
-        if segment_name == 'new_low_spend':
-            include = visits < VISIT_THRESHOLD_REGULAR and spend < SPEND_THRESHOLD_MEDIUM
-        elif segment_name == 'new_medium_spend':
-            include = visits < VISIT_THRESHOLD_REGULAR and SPEND_THRESHOLD_MEDIUM <= spend < SPEND_THRESHOLD_HIGH
-        elif segment_name == 'new_high_spend':
-            include = visits < VISIT_THRESHOLD_REGULAR and spend >= SPEND_THRESHOLD_HIGH
-        elif segment_name == 'regular_low_spend':
-            include = VISIT_THRESHOLD_REGULAR <= visits < VISIT_THRESHOLD_VIP and spend < SPEND_THRESHOLD_MEDIUM
-        elif segment_name == 'regular_medium_spend':
-            include = VISIT_THRESHOLD_REGULAR <= visits < VISIT_THRESHOLD_VIP and SPEND_THRESHOLD_MEDIUM <= spend < SPEND_THRESHOLD_HIGH
-        elif segment_name == 'regular_high_spend':
-            include = VISIT_THRESHOLD_REGULAR <= visits < VISIT_THRESHOLD_VIP and spend >= SPEND_THRESHOLD_HIGH
-        elif segment_name == 'vip_low_spend':
-            include = visits >= VISIT_THRESHOLD_VIP and spend < SPEND_THRESHOLD_MEDIUM
-        elif segment_name == 'vip_medium_spend':
-            include = visits >= VISIT_THRESHOLD_VIP and SPEND_THRESHOLD_MEDIUM <= spend < SPEND_THRESHOLD_HIGH
-        elif segment_name == 'vip_high_spend':
-            include = visits >= VISIT_THRESHOLD_VIP and spend >= SPEND_THRESHOLD_HIGH
+        if segment_name == 'low_spend':
+            include = 0 < spend < SPEND_THRESHOLD_MEDIUM
+        elif segment_name == 'medium_spend':
+            include = SPEND_THRESHOLD_MEDIUM <= spend < SPEND_THRESHOLD_HIGH
+        elif segment_name == 'high_spend':
+            include = spend >= SPEND_THRESHOLD_HIGH
         elif segment_name == 'zero_spend':
-            include = visits == 0 and spend == 0
+            include = spend == 0
 
         if include:
             filtered_client_ids.append(cliente_data['cliente_id'])
@@ -758,8 +718,17 @@ def client_list_by_segment_view(request, segment_name):
     else:
         clients = Cliente.objects.none()
 
+    # Mapeo de nombres de segmento para el display
+    segment_labels = {
+        'low_spend': 'Bajo Gasto (< $50,000)',
+        'medium_spend': 'Gasto Medio ($50,000 - $150,000)',
+        'high_spend': 'Alto Gasto (> $150,000)',
+        'zero_spend': 'Sin Gasto Registrado'
+    }
+
     context = {
         'segment_name': segment_name,
+        'segment_label': segment_labels.get(segment_name, segment_name),
         'clients': clients,
     }
 
