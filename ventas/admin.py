@@ -19,12 +19,15 @@ from .models import (
     # Advanced Email Campaign models
     EmailCampaign, EmailRecipient, EmailDeliveryLog, EmailBlacklist, EmailTemplate, EmailSubjectTemplate, EmailContentTemplate,
     # Historical data
-    ServiceHistory
+    ServiceHistory,
+    # Sistema de Tramos y Premios
+    Premio, ClientePremio, HistorialTramo
 )
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.urls import path, reverse
+from django.utils.html import format_html
 import json
 import xlwt
 from django.core.paginator import Paginator
@@ -1210,3 +1213,286 @@ class ServiceHistoryAdmin(admin.ModelAdmin):
         css = {
             'all': ('admin/css/custom.css',)
         }
+
+# ============================================================================
+# ADMIN: SISTEMA DE TRAMOS Y PREMIOS
+# ============================================================================
+
+@admin.register(Premio)
+class PremioAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'tipo', 'valor_monetario', 'dias_validez', 'activo', 'fecha_creacion')
+    list_filter = ('tipo', 'activo', 'fecha_creacion')
+    search_fields = ('nombre', 'descripcion_corta')
+    readonly_fields = ('fecha_creacion', 'fecha_modificacion')
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('nombre', 'tipo', 'activo')
+        }),
+        ('Descripciones', {
+            'fields': ('descripcion_corta', 'descripcion_legal')
+        }),
+        ('Valores y Descuentos', {
+            'fields': (
+                'porcentaje_descuento_tinas',
+                'porcentaje_descuento_masajes',
+                'valor_monetario'
+            )
+        }),
+        ('Configuración', {
+            'fields': ('dias_validez', 'restricciones')
+        }),
+        ('Metadata', {
+            'fields': ('fecha_creacion', 'fecha_modificacion'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(ClientePremio)
+class ClientePremioAdmin(admin.ModelAdmin):
+    list_display = (
+        'cliente_link',
+        'premio',
+        'estado_badge',
+        'tramo_info',
+        'fecha_ganado',
+        'fecha_expiracion',
+        'esta_vigente_badge',
+        'acciones_rapidas'
+    )
+    list_filter = (
+        'estado',
+        'fecha_ganado',
+        'tramo_al_ganar',
+        'premio__tipo'
+    )
+    search_fields = (
+        'cliente__nombre',
+        'cliente__email',
+        'codigo_unico',
+        'premio__nombre'
+    )
+    readonly_fields = (
+        'fecha_ganado',
+        'codigo_unico',
+        'tramo_al_ganar',
+        'gasto_total_al_ganar',
+        'fecha_uso',
+        'esta_vigente_badge'
+    )
+    autocomplete_fields = ['cliente', 'venta_donde_uso']
+    
+    fieldsets = (
+        ('Cliente y Premio', {
+            'fields': ('cliente', 'premio', 'estado')
+        }),
+        ('Tracking de Tramo', {
+            'fields': (
+                'tramo_al_ganar',
+                'tramo_anterior',
+                'gasto_total_al_ganar'
+            )
+        }),
+        ('Fechas', {
+            'fields': (
+                'fecha_ganado',
+                'fecha_aprobacion',
+                'fecha_enviado',
+                'fecha_expiracion',
+                'fecha_uso',
+                'esta_vigente_badge'
+            )
+        }),
+        ('Email', {
+            'fields': ('asunto_email', 'cuerpo_email'),
+            'classes': ('collapse',)
+        }),
+        ('Uso del Premio', {
+            'fields': ('codigo_unico', 'venta_donde_uso')
+        }),
+        ('Notas', {
+            'fields': ('notas_admin',)
+        }),
+    )
+    
+    actions = ['aprobar_premios', 'marcar_como_enviado', 'cancelar_premios']
+    
+    def cliente_link(self, obj):
+        """Link al cliente"""
+        if obj.cliente:
+            url = reverse('admin:ventas_cliente_change', args=[obj.cliente.id])
+            return format_html('<a href="{}">{}</a>', url, obj.cliente.nombre)
+        return '-'
+    cliente_link.short_description = 'Cliente'
+    
+    def estado_badge(self, obj):
+        """Badge visual del estado"""
+        colors = {
+            'pendiente_aprobacion': '#FFA500',
+            'aprobado': '#4CAF50',
+            'enviado': '#2196F3',
+            'usado': '#9C27B0',
+            'expirado': '#F44336',
+            'cancelado': '#757575',
+        }
+        color = colors.get(obj.estado, '#757575')
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 4px 8px; border-radius: 3px; font-size: 11px;">{}</span>',
+            color,
+            obj.get_estado_display()
+        )
+    estado_badge.short_description = 'Estado'
+    
+    def tramo_info(self, obj):
+        """Info de tramo"""
+        if obj.tramo_anterior:
+            return format_html(
+                'Tramo {} → {} <br><small>${:,}</small>',
+                obj.tramo_anterior,
+                obj.tramo_al_ganar,
+                obj.gasto_total_al_ganar
+            )
+        return format_html(
+            'Tramo {} <br><small>${:,}</small>',
+            obj.tramo_al_ganar,
+            obj.gasto_total_al_ganar
+        )
+    tramo_info.short_description = 'Tramo'
+    
+    def esta_vigente_badge(self, obj):
+        """Badge de vigencia"""
+        if obj.esta_vigente():
+            return format_html(
+                '<span style="color: green;">✓ Vigente</span>'
+            )
+        return format_html(
+            '<span style="color: red;">✗ No vigente</span>'
+        )
+    esta_vigente_badge.short_description = 'Vigencia'
+    
+    def acciones_rapidas(self, obj):
+        """Botones de acciones rápidas"""
+        buttons = []
+        
+        if obj.estado == 'pendiente_aprobacion':
+            buttons.append(
+                '<a class="button" href="{}?ids={}">Aprobar</a>'.format(
+                    reverse('admin:ventas_clientepremio_changelist'),
+                    obj.id
+                )
+            )
+        
+        if obj.estado in ['aprobado', 'enviado'] and obj.esta_vigente():
+            buttons.append(
+                '<a class="button" href="{}">Ver Email</a>'.format(
+                    reverse('admin:ventas_clientepremio_change', args=[obj.id])
+                )
+            )
+        
+        return format_html(' '.join(buttons)) if buttons else '-'
+    acciones_rapidas.short_description = 'Acciones'
+    
+    def aprobar_premios(self, request, queryset):
+        """Acción para aprobar premios en lote"""
+        from django.utils import timezone
+        
+        updated = queryset.filter(estado='pendiente_aprobacion').update(
+            estado='aprobado',
+            fecha_aprobacion=timezone.now()
+        )
+        
+        self.message_user(
+            request,
+            f'{updated} premio(s) aprobado(s) exitosamente.'
+        )
+    aprobar_premios.short_description = "Aprobar premios seleccionados"
+    
+    def marcar_como_enviado(self, request, queryset):
+        """Acción para marcar como enviado"""
+        from django.utils import timezone
+        
+        updated = queryset.filter(estado='aprobado').update(
+            estado='enviado',
+            fecha_enviado=timezone.now()
+        )
+        
+        self.message_user(
+            request,
+            f'{updated} premio(s) marcado(s) como enviado.'
+        )
+    marcar_como_enviado.short_description = "Marcar como enviado"
+    
+    def cancelar_premios(self, request, queryset):
+        """Acción para cancelar premios"""
+        updated = queryset.update(estado='cancelado')
+        
+        self.message_user(
+            request,
+            f'{updated} premio(s) cancelado(s).'
+        )
+    cancelar_premios.short_description = "Cancelar premios seleccionados"
+
+
+@admin.register(HistorialTramo)
+class HistorialTramoAdmin(admin.ModelAdmin):
+    list_display = (
+        'cliente_link',
+        'cambio_tramo',
+        'gasto_momento',
+        'fecha_cambio',
+        'premio_link'
+    )
+    list_filter = ('fecha_cambio', 'tramo_hasta')
+    search_fields = ('cliente__nombre', 'cliente__email')
+    readonly_fields = (
+        'cliente',
+        'tramo_desde',
+        'tramo_hasta',
+        'fecha_cambio',
+        'gasto_en_momento',
+        'premio_generado'
+    )
+    
+    def cliente_link(self, obj):
+        """Link al cliente"""
+        if obj.cliente:
+            url = reverse('admin:ventas_cliente_change', args=[obj.cliente.id])
+            return format_html('<a href="{}">{}</a>', url, obj.cliente.nombre)
+        return '-'
+    cliente_link.short_description = 'Cliente'
+    
+    def cambio_tramo(self, obj):
+        """Visualización del cambio de tramo"""
+        return format_html(
+            '<span style="font-weight: bold;">Tramo {} → {}</span>',
+            obj.tramo_desde,
+            obj.tramo_hasta
+        )
+    cambio_tramo.short_description = 'Cambio'
+    
+    def gasto_momento(self, obj):
+        """Gasto formateado"""
+        return f'${obj.gasto_en_momento:,.0f}'
+    gasto_momento.short_description = 'Gasto'
+    
+    def premio_link(self, obj):
+        """Link al premio generado"""
+        if obj.premio_generado:
+            url = reverse('admin:ventas_clientepremio_change', args=[obj.premio_generado.id])
+            return format_html(
+                '<a href="{}">{}</a>',
+                url,
+                obj.premio_generado.premio.nombre
+            )
+        return '-'
+    premio_link.short_description = 'Premio Generado'
+    
+    def has_add_permission(self, request):
+        """No permitir crear manualmente"""
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Solo superusers pueden eliminar"""
+        return request.user.is_superuser
+
