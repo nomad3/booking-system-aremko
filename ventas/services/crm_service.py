@@ -74,7 +74,8 @@ class CRMService:
                 'id': f'res_{rs.id}'
             })
 
-        # Ordenar por fecha descendente
+        # Ordenar por fecha descendente (más reciente primero)
+        # reverse=True: fecha más actual arriba, más antigua abajo
         servicios_combinados.sort(key=lambda x: x['fecha'], reverse=True)
 
         return {
