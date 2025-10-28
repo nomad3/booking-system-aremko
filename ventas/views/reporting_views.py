@@ -806,6 +806,9 @@ def client_list_custom_filter_view(request):
             cliente.gasto_total_combinado = gastos['total']
             clients_list.append(cliente)
 
+        # Ordenar por gasto total descendente (mayor a menor)
+        clients_list.sort(key=lambda c: c.gasto_total_combinado, reverse=True)
+
         clients = clients_list
     else:
         clients = []
