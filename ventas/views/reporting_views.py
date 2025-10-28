@@ -580,17 +580,23 @@ def _get_combined_metrics_for_segmentation():
             c.id as cliente_id,
             c.nombre,
             c.email,
-            -- Servicios actuales
-            COUNT(DISTINCT vr.id) as servicios_actuales,
-            COALESCE(SUM(vr.total), 0) as gasto_actual,
+            -- Servicios actuales (contar ReservaServicio, no VentaReserva)
+            COUNT(DISTINCT rs.id) as servicios_actuales,
+            COALESCE(SUM(
+                CAST(s.precio_base AS DECIMAL) * COALESCE(rs.cantidad_personas, 1)
+            ), 0) as gasto_actual,
             -- Servicios históricos
             COUNT(DISTINCT sh.id) as servicios_historicos,
             COALESCE(SUM(sh.price_paid), 0) as gasto_historico,
             -- Totales combinados
-            (COUNT(DISTINCT vr.id) + COUNT(DISTINCT sh.id)) as total_servicios,
-            (COALESCE(SUM(vr.total), 0) + COALESCE(SUM(sh.price_paid), 0)) as total_gasto
+            (COUNT(DISTINCT rs.id) + COUNT(DISTINCT sh.id)) as total_servicios,
+            (COALESCE(SUM(
+                CAST(s.precio_base AS DECIMAL) * COALESCE(rs.cantidad_personas, 1)
+            ), 0) + COALESCE(SUM(sh.price_paid), 0)) as total_gasto
         FROM ventas_cliente c
-        LEFT JOIN ventas_ventareserva vr ON c.id = vr.cliente_id
+        LEFT JOIN ventas_ventareserva vr ON c.id = vr.cliente_id AND vr.estado_pago IN ('pagado', 'parcial')
+        LEFT JOIN ventas_reservaservicio rs ON vr.id = rs.venta_reserva_id
+        LEFT JOIN ventas_servicio s ON rs.servicio_id = s.id
         LEFT JOIN crm_service_history sh ON c.id = sh.cliente_id
         GROUP BY c.id, c.nombre, c.email
         ORDER BY total_gasto DESC
