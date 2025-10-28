@@ -183,7 +183,7 @@ class CRMService:
                         'cantidad': s['cantidad'],
                         'fuente': s['fuente']
                     }
-                    for s in servicios[:10]
+                    for s in servicios  # Mostrar TODOS los servicios, sin límite
                 ]
             }
         except Cliente.DoesNotExist:
