@@ -43,22 +43,26 @@
                 <thead>
                     <tr>
                         <th style="width: 5%;"><input type="checkbox" id="select-all" title="Seleccionar Todos"></th>
+                        <th style="width: 5%;">#</th>
                         <th>Nombre</th>
                         <th>Teléfono</th>
                         <th>Email</th>
+                        <th>Ciudad</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for client in clients %}
                     <tr>
                         <td><input type="checkbox" class="client-select" value="{{ client.id }}"></td>
+                        <td>{{ forloop.counter }}</td>
                         <td>{{ client.nombre }}</td>
                         <td>{{ client.telefono|default:"N/A" }}</td>
                         <td>{{ client.email|default:"N/A" }}</td>
+                        <td>{{ client.ciudad|default:"N/A" }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center">No se encontraron clientes para este segmento.</td>
+                        <td colspan="6" class="text-center">No se encontraron clientes para este segmento.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
