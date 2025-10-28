@@ -766,26 +766,34 @@ def client_list_custom_filter_view(request):
     # Obtener métricas combinadas
     clientes_data = _get_combined_metrics_for_segmentation()
 
-    # Filtrar por rango de gasto
+    # Filtrar por rango de gasto y crear mapa de gastos combinados
     filtered_client_ids = []
+    gasto_combinado_map = {}  # {cliente_id: gasto_total_combinado}
+
     for cliente_data in clientes_data:
         spend = cliente_data['total_gasto']
 
         if gasto_min <= spend <= gasto_max:
             filtered_client_ids.append(cliente_data['cliente_id'])
+            gasto_combinado_map[cliente_data['cliente_id']] = spend
 
     # Convertir a queryset y aplicar filtro de ciudad
     if filtered_client_ids:
-        clients = Cliente.objects.filter(id__in=filtered_client_ids).annotate(
-            num_visits=Count('ventareserva'),
-            total_spend=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField())
-        )
+        clients = Cliente.objects.filter(id__in=filtered_client_ids)
 
         # Filtrar por ciudad si no es "todas"
         if ciudad and ciudad != 'todas':
             clients = clients.filter(ciudad__iexact=ciudad)
+
+        # Agregar gasto combinado a cada cliente
+        clients_list = []
+        for cliente in clients:
+            cliente.gasto_total_combinado = gasto_combinado_map.get(cliente.id, 0)
+            clients_list.append(cliente)
+
+        clients = clients_list
     else:
-        clients = Cliente.objects.none()
+        clients = []
 
     # Generar label descriptivo
     if gasto_max == float('inf'):
