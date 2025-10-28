@@ -573,32 +573,55 @@ def _get_combined_metrics_for_segmentation():
             })
         return results
 
-    # Tabla existe, usar query combinada
+    # Tabla existe, usar query combinada con SUBCONSULTAS para evitar multiplicación cartesiana
     try:
         query = """
         SELECT
             c.id as cliente_id,
             c.nombre,
             c.email,
-            -- Servicios actuales (contar ReservaServicio, no VentaReserva)
-            COUNT(DISTINCT rs.id) as servicios_actuales,
-            COALESCE(SUM(
-                CAST(s.precio_base AS DECIMAL) * COALESCE(rs.cantidad_personas, 1)
-            ), 0) as gasto_actual,
-            -- Servicios históricos
-            COUNT(DISTINCT sh.id) as servicios_historicos,
-            COALESCE(SUM(sh.price_paid), 0) as gasto_historico,
-            -- Totales combinados
-            (COUNT(DISTINCT rs.id) + COUNT(DISTINCT sh.id)) as total_servicios,
-            (COALESCE(SUM(
-                CAST(s.precio_base AS DECIMAL) * COALESCE(rs.cantidad_personas, 1)
-            ), 0) + COALESCE(SUM(sh.price_paid), 0)) as total_gasto
+            -- Subconsulta para servicios actuales
+            (SELECT COUNT(DISTINCT rs2.id)
+             FROM ventas_ventareserva vr2
+             JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
+             WHERE vr2.cliente_id = c.id AND vr2.estado_pago IN ('pagado', 'parcial')
+            ) as servicios_actuales,
+            (SELECT COALESCE(SUM(CAST(s2.precio_base AS DECIMAL) * COALESCE(rs2.cantidad_personas, 1)), 0)
+             FROM ventas_ventareserva vr2
+             JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
+             JOIN ventas_servicio s2 ON rs2.servicio_id = s2.id
+             WHERE vr2.cliente_id = c.id AND vr2.estado_pago IN ('pagado', 'parcial')
+            ) as gasto_actual,
+            -- Subconsulta para servicios históricos
+            (SELECT COUNT(DISTINCT sh2.id)
+             FROM crm_service_history sh2
+             WHERE sh2.cliente_id = c.id
+            ) as servicios_historicos,
+            (SELECT COALESCE(SUM(sh2.price_paid), 0)
+             FROM crm_service_history sh2
+             WHERE sh2.cliente_id = c.id
+            ) as gasto_historico,
+            -- Totales combinados (calculados a partir de subconsultas)
+            ((SELECT COUNT(DISTINCT rs2.id)
+              FROM ventas_ventareserva vr2
+              JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
+              WHERE vr2.cliente_id = c.id AND vr2.estado_pago IN ('pagado', 'parcial')
+             ) +
+             (SELECT COUNT(DISTINCT sh2.id)
+              FROM crm_service_history sh2
+              WHERE sh2.cliente_id = c.id
+             )) as total_servicios,
+            ((SELECT COALESCE(SUM(CAST(s2.precio_base AS DECIMAL) * COALESCE(rs2.cantidad_personas, 1)), 0)
+              FROM ventas_ventareserva vr2
+              JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
+              JOIN ventas_servicio s2 ON rs2.servicio_id = s2.id
+              WHERE vr2.cliente_id = c.id AND vr2.estado_pago IN ('pagado', 'parcial')
+             ) +
+             (SELECT COALESCE(SUM(sh2.price_paid), 0)
+              FROM crm_service_history sh2
+              WHERE sh2.cliente_id = c.id
+             )) as total_gasto
         FROM ventas_cliente c
-        LEFT JOIN ventas_ventareserva vr ON c.id = vr.cliente_id AND vr.estado_pago IN ('pagado', 'parcial')
-        LEFT JOIN ventas_reservaservicio rs ON vr.id = rs.venta_reserva_id
-        LEFT JOIN ventas_servicio s ON rs.servicio_id = s.id
-        LEFT JOIN crm_service_history sh ON c.id = sh.cliente_id
-        GROUP BY c.id, c.nombre, c.email
         ORDER BY total_gasto DESC
         """
 
