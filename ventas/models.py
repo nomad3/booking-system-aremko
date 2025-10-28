@@ -2093,3 +2093,210 @@ class EmailContentTemplate(models.Model):
         
         return html.strip()
 
+
+# ============================================================================
+# SISTEMA DE TRAMOS Y PREMIOS
+# ============================================================================
+
+class Premio(models.Model):
+    """
+    Modelo para definir los premios disponibles en el sistema de fidelización
+    """
+    TIPO_CHOICES = [
+        ('descuento_bienvenida', 'Descuento Bienvenida'),
+        ('tinas_gratis', 'Tinas Gratis con Masajes'),
+        ('noche_gratis', 'Noche de Alojamiento'),
+    ]
+    
+    nombre = models.CharField(max_length=200, help_text="Nombre del premio")
+    tipo = models.CharField(max_length=50, choices=TIPO_CHOICES)
+    descripcion_corta = models.TextField(help_text="Descripción para mostrar en emails")
+    descripcion_legal = models.TextField(help_text="Términos y condiciones detallados")
+    
+    # Valores
+    porcentaje_descuento_tinas = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text="% descuento en tinas/cabañas"
+    )
+    porcentaje_descuento_masajes = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text="% descuento en masajes"
+    )
+    valor_monetario = models.DecimalField(
+        max_digits=10, 
+        decimal_places=0, 
+        null=True, 
+        blank=True,
+        help_text="Valor en pesos del premio (ej: vale $60,000)"
+    )
+    
+    # Configuración
+    dias_validez = models.IntegerField(default=30, help_text="Días de validez del premio")
+    restricciones = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Restricciones en JSON. Ej: {"no_sabados": true, "no_acumulable": true}'
+    )
+    
+    # Metadata
+    activo = models.BooleanField(default=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Premio"
+        verbose_name_plural = "Premios"
+        ordering = ['tipo', 'nombre']
+    
+    def __str__(self):
+        return f"{self.get_tipo_display()} - {self.nombre}"
+
+
+class ClientePremio(models.Model):
+    """
+    Modelo para tracking de premios asignados a clientes
+    """
+    ESTADO_CHOICES = [
+        ('pendiente_aprobacion', 'Pendiente Aprobación'),
+        ('aprobado', 'Aprobado'),
+        ('enviado', 'Email Enviado'),
+        ('usado', 'Premio Usado'),
+        ('expirado', 'Expirado'),
+        ('cancelado', 'Cancelado'),
+    ]
+    
+    cliente = models.ForeignKey('Cliente', on_delete=models.CASCADE, related_name='premios')
+    premio = models.ForeignKey(Premio, on_delete=models.PROTECT)
+    estado = models.CharField(max_length=50, choices=ESTADO_CHOICES, default='pendiente_aprobacion')
+    
+    # Fechas
+    fecha_ganado = models.DateTimeField(auto_now_add=True)
+    fecha_aprobacion = models.DateTimeField(null=True, blank=True)
+    fecha_enviado = models.DateTimeField(null=True, blank=True)
+    fecha_expiracion = models.DateTimeField(help_text="Calculado automáticamente basado en días de validez")
+    fecha_uso = models.DateTimeField(null=True, blank=True)
+    
+    # Tracking del contexto
+    tramo_al_ganar = models.IntegerField(help_text="Tramo del cliente al momento de ganar el premio")
+    gasto_total_al_ganar = models.DecimalField(
+        max_digits=12, 
+        decimal_places=0,
+        help_text="Gasto total acumulado al momento de ganar"
+    )
+    tramo_anterior = models.IntegerField(
+        null=True, 
+        blank=True,
+        help_text="Tramo anterior (solo si el premio es por subida de tramo)"
+    )
+    
+    # Email
+    asunto_email = models.CharField(max_length=200, blank=True)
+    cuerpo_email = models.TextField(blank=True)
+    
+    # Código único para validar uso
+    codigo_unico = models.CharField(
+        max_length=50, 
+        unique=True, 
+        blank=True,
+        help_text="Código único para validar el uso del premio"
+    )
+    
+    # Relación con venta donde se usó
+    venta_donde_uso = models.ForeignKey(
+        'VentaReserva', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='premios_usados'
+    )
+    
+    # Notas administrativas
+    notas_admin = models.TextField(blank=True, help_text="Notas internas para administración")
+    
+    class Meta:
+        verbose_name = "Premio de Cliente"
+        verbose_name_plural = "Premios de Clientes"
+        ordering = ['-fecha_ganado']
+        indexes = [
+            models.Index(fields=['estado', 'fecha_aprobacion']),
+            models.Index(fields=['cliente', 'estado']),
+            models.Index(fields=['codigo_unico']),
+        ]
+    
+    def __str__(self):
+        return f"{self.cliente.nombre} - {self.premio.nombre} ({self.get_estado_display()})"
+    
+    def save(self, *args, **kwargs):
+        # Generar código único si no existe
+        if not self.codigo_unico:
+            self.codigo_unico = self._generar_codigo_unico()
+        
+        # Calcular fecha de expiración si no existe
+        if not self.fecha_expiracion and self.fecha_ganado:
+            self.fecha_expiracion = self.fecha_ganado + timedelta(days=self.premio.dias_validez)
+        
+        super().save(*args, **kwargs)
+    
+    def _generar_codigo_unico(self):
+        """Genera un código único alfanumérico de 12 caracteres"""
+        while True:
+            codigo = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
+            if not ClientePremio.objects.filter(codigo_unico=codigo).exists():
+                return codigo
+    
+    def marcar_como_usado(self, venta=None):
+        """Marca el premio como usado"""
+        self.estado = 'usado'
+        self.fecha_uso = timezone.now()
+        if venta:
+            self.venta_donde_uso = venta
+        self.save()
+    
+    def esta_vigente(self):
+        """Verifica si el premio está vigente"""
+        if self.estado not in ['aprobado', 'enviado']:
+            return False
+        if timezone.now() > self.fecha_expiracion:
+            return False
+        return True
+
+
+class HistorialTramo(models.Model):
+    """
+    Modelo para tracking histórico de cambios de tramo de clientes
+    """
+    cliente = models.ForeignKey('Cliente', on_delete=models.CASCADE, related_name='historial_tramos')
+    tramo_desde = models.IntegerField(help_text="Tramo anterior")
+    tramo_hasta = models.IntegerField(help_text="Nuevo tramo")
+    fecha_cambio = models.DateTimeField(auto_now_add=True)
+    gasto_en_momento = models.DecimalField(
+        max_digits=12, 
+        decimal_places=0,
+        help_text="Gasto total al momento del cambio"
+    )
+    premio_generado = models.ForeignKey(
+        ClientePremio, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        help_text="Premio generado por este cambio de tramo"
+    )
+    
+    class Meta:
+        verbose_name = "Historial de Tramo"
+        verbose_name_plural = "Historial de Tramos"
+        ordering = ['-fecha_cambio']
+        indexes = [
+            models.Index(fields=['cliente', '-fecha_cambio']),
+        ]
+    
+    def __str__(self):
+        return f"{self.cliente.nombre}: Tramo {self.tramo_desde} → {self.tramo_hasta}"
+
+
