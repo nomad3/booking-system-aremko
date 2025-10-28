@@ -541,3 +541,69 @@ def validar_disponibilidad_admin(sender, instance, **kwargs):
         except Exception as e:
              logger.error(f"Error during availability check for ReservaServicio {instance.pk}: {e}")
              # raise ValidationError("Error inesperado al verificar disponibilidad.") # Optionally raise error
+
+
+# --- Premio/Tramo Signals ---
+
+@receiver(post_save, sender=VentaReserva)
+def actualizar_tramo_y_premios_on_pago(sender, instance, created, raw, using, update_fields, **kwargs):
+    """
+    Signal que detecta cuando una VentaReserva es pagada y actualiza el tramo del cliente.
+    Genera premios automáticamente si corresponde (hitos, bienvenida).
+    """
+    # Skip if fixture loading
+    if raw:
+        return
+
+    # Solo procesar si está pagado o parcialmente pagado
+    if instance.estado_pago not in ['pagado', 'parcial']:
+        return
+
+    # Asegurar que tiene cliente
+    if not instance.cliente:
+        return
+
+    try:
+        from ventas.services.tramo_service import TramoService
+        from ventas.services.premio_service import PremioService
+
+        with transaction.atomic():
+            # Verificar si es cliente nuevo (antes de actualizar tramo)
+            es_nuevo = TramoService.es_cliente_nuevo(instance.cliente)
+
+            # Actualizar tramo del cliente
+            resultado = TramoService.actualizar_tramo_cliente(instance.cliente)
+
+            logger.info(
+                f"Tramo actualizado para cliente {instance.cliente.id}: "
+                f"Tramo {resultado['tramo_anterior']} → {resultado['tramo_actual']}, "
+                f"Gasto: ${resultado['gasto_total']:,.0f}"
+            )
+
+            # Si es cliente nuevo y alcanzó el primer tramo, generar premio de bienvenida
+            if es_nuevo and resultado['tramo_actual'] >= 1 and not resultado['premio_generado']:
+                premio_bienvenida = PremioService.generar_premio_cliente_nuevo(
+                    cliente=instance.cliente,
+                    gasto_total=resultado['gasto_total']
+                )
+
+                if premio_bienvenida:
+                    logger.info(
+                        f"Premio de bienvenida generado para cliente {instance.cliente.id} "
+                        f"(VentaReserva {instance.id})"
+                    )
+
+            # Si alcanzó un hito, el premio ya fue generado por TramoService
+            if resultado['hito_alcanzado']:
+                logger.info(
+                    f"¡Hito alcanzado! Cliente {instance.cliente.id} llegó al Tramo {resultado['tramo_actual']}. "
+                    f"Premio generado: {resultado['premio_generado'].premio.nombre if resultado['premio_generado'] else 'N/A'}"
+                )
+
+    except Exception as e:
+        # Log error but don't break the sale process
+        logger.error(
+            f"Error actualizando tramo/premios para VentaReserva {instance.id}, "
+            f"Cliente {instance.cliente.id}: {e}",
+            exc_info=True
+        )
