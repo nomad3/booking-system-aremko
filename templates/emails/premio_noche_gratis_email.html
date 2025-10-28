@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡Premio VIP! - Aremko</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e8ba3 100%);
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .vip-banner {
+            background: linear-gradient(90deg, #ffd700 0%, #ffed4e 50%, #ffd700 100%);
+            color: #1e3c72;
+            text-align: center;
+            padding: 10px;
+            margin: -30px -30px 20px -30px;
+            border-radius: 12px 12px 0 0;
+            font-weight: bold;
+            font-size: 14px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            box-shadow: 0 4px 10px rgba(255, 215, 0, 0.3);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 20px;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        .title {
+            color: #1e3c72;
+            font-size: 32px;
+            margin-bottom: 10px;
+            line-height: 1.3;
+        }
+        .vip-achievement {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 35px;
+            border-radius: 15px;
+            text-align: center;
+            margin: 25px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .vip-achievement::before {
+            content: "⭐";
+            position: absolute;
+            font-size: 100px;
+            opacity: 0.1;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .vip-badge {
+            display: inline-block;
+            background: linear-gradient(45deg, #ffd700, #ffed4e);
+            color: #1e3c72;
+            padding: 10px 30px;
+            border-radius: 25px;
+            font-size: 20px;
+            font-weight: bold;
+            margin: 15px 0;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+        }
+        .milestone {
+            font-size: 56px;
+            margin: 20px 0;
+            position: relative;
+            z-index: 2;
+        }
+        .milestone-text {
+            font-size: 18px;
+            margin: 15px 0;
+            opacity: 0.95;
+            position: relative;
+            z-index: 2;
+        }
+        .prize-showcase {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 35px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 25px 0;
+            border: 3px solid #ffd700;
+        }
+        .prize-title {
+            font-size: 24px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .prize-icon {
+            font-size: 72px;
+            margin: 20px 0;
+        }
+        .prize-description {
+            font-size: 20px;
+            margin: 20px 0;
+            line-height: 1.4;
+            font-weight: 500;
+        }
+        .prize-value {
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 16px;
+        }
+        .code-box {
+            background: #f8f9fa;
+            border: 3px solid #ffd700;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 25px 0;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
+        }
+        .code-label {
+            font-size: 14px;
+            color: #6c757d;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        .code-value {
+            background: linear-gradient(45deg, #1e3c72, #2a5298);
+            color: #ffd700;
+            padding: 18px 30px;
+            border-radius: 30px;
+            display: inline-block;
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 5px;
+            font-family: 'Courier New', monospace;
+            box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);
+        }
+        .stats-box {
+            display: flex;
+            justify-content: space-around;
+            margin: 25px 0;
+            padding: 25px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 10px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1e3c72;
+            display: block;
+        }
+        .stat-label {
+            font-size: 13px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .expiry-info {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 18px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .terms {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 14px;
+            border: 1px solid #dee2e6;
+        }
+        .terms h3 {
+            margin-top: 0;
+            color: #495057;
+            font-size: 16px;
+        }
+        .terms ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .terms li {
+            margin-bottom: 8px;
+            color: #6c757d;
+        }
+        .terms .highlight {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(45deg, #ffd700, #ffed4e);
+            color: #1e3c72;
+            padding: 20px 50px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 18px;
+            margin: 20px 0;
+            transition: transform 0.2s;
+            box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .celebration {
+            text-align: center;
+            font-size: 18px;
+            margin: 30px 0;
+            padding: 25px;
+            background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%);
+            border-radius: 10px;
+            border-left: 4px solid #28a745;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .contact-info {
+            margin-top: 15px;
+            font-size: 13px;
+        }
+        .contact-info div { margin: 3px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="vip-banner">
+            ⭐ Premio Exclusivo VIP ⭐
+        </div>
+
+        <div class="header">
+            <div class="logo">🏨 AREMKO</div>
+            <h1 class="title">🏆 ¡Felicitaciones, Cliente VIP!</h1>
+        </div>
+
+        <p style="font-size: 17px;">Estimado/a <strong>{{ cliente.nombre }}</strong>,</p>
+
+        <div class="vip-achievement">
+            <div style="font-size: 22px; margin-bottom: 15px; position: relative; z-index: 2;">🎯 NIVEL VIP ALCANZADO</div>
+            <div class="milestone">👑 Tramo {{ cliente_premio.tramo_al_ganar }} 👑</div>
+            <div class="vip-badge">MIEMBRO VIP</div>
+            <div class="milestone-text">
+                Has alcanzado el prestigioso <strong>Tramo {{ cliente_premio.tramo_al_ganar }}</strong><br>
+                ¡Eres parte de nuestro círculo exclusivo de clientes VIP!
+            </div>
+        </div>
+
+        <div class="stats-box">
+            <div class="stat-item">
+                <span class="stat-value">${{ cliente_premio.gasto_total_al_ganar|floatformat:0|intcomma }}</span>
+                <span class="stat-label">Invertido en<br>experiencias únicas</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ cliente_premio.tramo_al_ganar }}</span>
+                <span class="stat-label">Nivel VIP<br>Alcanzado</span>
+            </div>
+        </div>
+
+        <p style="text-align: center; font-size: 18px; margin: 30px 0; line-height: 1.6;">
+            Tu lealtad y compromiso con tu bienestar son excepcionales.<br>
+            Como reconocimiento, tenemos un <strong>premio VIP exclusivo</strong> para ti:
+        </p>
+
+        <div class="prize-showcase">
+            <div class="prize-title">🎁 TU PREMIO VIP EXCLUSIVO</div>
+            <div class="prize-icon">🏡</div>
+            <div class="prize-description">
+                <strong>1 NOCHE GRATIS EN CABAÑA</strong><br>
+                Experiencia completa de alojamiento premium
+            </div>
+            <div class="prize-value">
+                Valor hasta $150.000 | Incluye todas las comodidades
+            </div>
+        </div>
+
+        <p style="text-align: center; font-size: 16px; margin: 25px 0;">
+            {{ premio.descripcion_corta }}
+        </p>
+
+        <div class="code-box">
+            <div class="code-label">🎫 Tu Código VIP Exclusivo</div>
+            <div class="code-value">{{ cliente_premio.codigo_unico }}</div>
+            <p style="margin: 15px 0 0 0; font-size: 14px; color: #6c757d;">
+                Código único e intransferible - Guárdalo con cuidado
+            </p>
+        </div>
+
+        <div class="expiry-info">
+            <strong>⏰ Válido hasta: {{ cliente_premio.fecha_expiracion|date:"d/m/Y" }}</strong><br>
+            <span style="font-size: 14px;">Tienes {{ cliente_premio.fecha_expiracion|timeuntil }} para disfrutar de esta experiencia VIP exclusiva.</span>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="https://www.aremko.cl" class="cta-button">🌟 Reservar Mi Noche VIP</a>
+        </div>
+
+        <div class="terms">
+            <h3>📋 Términos y Condiciones del Premio VIP</h3>
+            <p>{{ premio.descripcion_legal }}</p>
+            <ul>
+                <li>1 noche de alojamiento gratuito en cabaña (valor hasta $150.000)</li>
+                <li>Incluye todas las comodidades estándar de la cabaña</li>
+                <li class="highlight">NO VÁLIDO LOS DÍAS SÁBADO (alta demanda)</li>
+                <li>Válido de domingo a viernes, sujeto a disponibilidad</li>
+                <li>Debe reservar con al menos 7 días de anticipación</li>
+                <li>No acumulable con otras promociones</li>
+                <li>No incluye servicios adicionales (masajes, tinas, etc.)</li>
+                <li>Check-in: 15:00 hrs | Check-out: 12:00 hrs</li>
+                <li>Debe presentar código al momento de la reserva</li>
+                <li>Premio válido hasta {{ cliente_premio.fecha_expiracion|date:"d/m/Y" }}</li>
+                <li>No reembolsable ni canjeable por dinero</li>
+            </ul>
+        </div>
+
+        <div class="celebration">
+            <strong style="font-size: 20px; display: block; margin-bottom: 15px;">
+                🎊 ¡GRACIAS POR SER PARTE DE NUESTRA FAMILIA VIP! 🎊
+            </strong>
+            <p style="margin: 0; font-size: 16px; line-height: 1.6;">
+                Tu confianza y lealtad son invaluables para nosotros. Cada visita nos motiva a seguir
+                mejorando y ofreciendo las mejores experiencias de descanso y bienestar.<br><br>
+                <strong>¡Seguimos creciendo juntos!</strong>
+            </p>
+        </div>
+
+        <p style="text-align: center; font-size: 15px; margin: 25px 0; color: #6c757d;">
+            <em>Para reservar tu noche VIP, contáctanos por WhatsApp o email mencionando tu código exclusivo.<br>
+            Estaremos encantados de coordinar la mejor fecha para tu estadía.</em>
+        </p>
+
+        <div class="footer">
+            <strong>Con profundo agradecimiento,</strong><br>
+            <strong>Todo el equipo de Aremko</strong><br>
+            <div class="contact-info">
+                <div>📧 ventas@aremko.cl</div>
+                <div>💬 Whatsapp +56 9 5790 2525</div>
+                <div>🌐 www.aremko.cl</div>
+            </div>
+            <p style="margin-top: 15px; font-size: 12px; color: #adb5bd;">
+                Este premio VIP ha sido generado automáticamente por nuestro sistema de fidelización.<br>
+                Para cualquier consulta sobre tu premio, nuestro equipo está disponible para ayudarte.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
