@@ -1,6 +1,7 @@
 """
 Script para normalizar TODOS los teléfonos en la base de datos actual
-Convierte +56XXXXXXXXX → 56XXXXXXXXX
+Convierte 56XXXXXXXXX → +56XXXXXXXXX
+Asegura que TODOS los teléfonos tengan el signo +
 """
 import os
 import django
@@ -14,7 +15,7 @@ from django.db import transaction
 def normalize_all_phones(dry_run=True):
     """
     Normaliza todos los teléfonos en la base de datos
-    Quita el signo + de todos los teléfonos
+    Agrega el signo + a todos los teléfonos que no lo tengan
     """
     if dry_run:
         print("\n" + "="*80)
@@ -43,18 +44,19 @@ def normalize_all_phones(dry_run=True):
             no_change_count += 1
             continue
 
-        # Verificar si tiene el signo +
-        if cliente.telefono.startswith('+'):
-            old_phone = cliente.telefono
-            new_phone = cliente.telefono.replace('+', '').strip()
+        # Usar Cliente.normalize_phone para normalizar
+        old_phone = cliente.telefono
+        new_phone = Cliente.normalize_phone(cliente.telefono)
 
+        # Si la normalización cambió el teléfono, actualizarlo
+        if new_phone and new_phone != old_phone:
             if dry_run:
                 print(f"   [{cliente.id}] {old_phone} → {new_phone}")
                 normalized_count += 1
             else:
                 try:
                     # Actualizar directamente en la BD sin usar save()
-                    # para evitar validaciones y triggers
+                    # para evitar conflictos de unique constraint
                     Cliente.objects.filter(id=cliente.id).update(telefono=new_phone)
                     normalized_count += 1
                 except Exception as e:
@@ -139,7 +141,8 @@ if __name__ == '__main__':
     print("🔧 NORMALIZADOR DE TELÉFONOS - AREMKO")
     print("="*80)
     print("\nEste script normaliza TODOS los teléfonos en la base de datos")
-    print("Convierte: +56XXXXXXXXX → 56XXXXXXXXX")
+    print("Convierte: 56XXXXXXXXX → +56XXXXXXXXX")
+    print("Asegura que TODOS los teléfonos tengan el signo +")
     print("Afecta a TODOS los clientes (actuales e históricos)")
     print()
 

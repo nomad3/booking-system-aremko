@@ -252,9 +252,14 @@ class Cliente(models.Model):
     @staticmethod
     def normalize_phone(phone_str):
         """
-        Normaliza número de teléfono a formato estándar sin '+'
-        Para Chile: 56XXXXXXXXX (11-12 dígitos)
-        Para otros: mantiene formato sin símbolos
+        Normaliza número de teléfono a formato estándar CON '+'
+        Para Chile: +56XXXXXXXXX (11-12 dígitos)
+        Para otros países: +CCXXXXXXXXX (código país + número)
+
+        Reglas:
+        - SIEMPRE incluye el signo + al inicio
+        - Sin espacios ni caracteres especiales
+        - Validación estricta de formato
 
         Returns:
             str: Teléfono normalizado o None si inválido
@@ -262,27 +267,30 @@ class Cliente(models.Model):
         if not phone_str or phone_str.strip() == '':
             return None
 
-        # Limpiar caracteres no numéricos (incluyendo +)
-        phone = re.sub(r'[^0-9]', '', str(phone_str))
+        # Limpiar caracteres no numéricos (excepto +)
+        phone = re.sub(r'[^0-9+]', '', str(phone_str))
+
+        # Remover todos los + para limpiar, luego agregarlo al inicio
+        phone = phone.replace('+', '')
 
         # Validar longitud mínima
         if len(phone) < 8:
             return None
 
-        # Si tiene código de país 56 (Chile), dejarlo
+        # Si tiene código de país 56 (Chile), validar y agregar +
         if phone.startswith('56') and len(phone) in [11, 12]:
-            return phone
+            return f'+{phone}'
 
         # Si tiene 9 dígitos y empieza con 9 (móvil chileno), agregar código país
         if len(phone) == 9 and phone.startswith('9'):
-            return f'56{phone}'
+            return f'+56{phone}'
 
         # Si tiene 8 dígitos (fijo chileno), agregar código país y código área 2 (Santiago)
         if len(phone) == 8:
-            return f'562{phone}'
+            return f'+562{phone}'
 
-        # Para otros formatos, retornar si tiene al menos 8 dígitos
-        return phone if len(phone) >= 8 else None
+        # Para otros formatos, agregar + si tiene al menos 8 dígitos
+        return f'+{phone}' if len(phone) >= 8 else None
 
     def save(self, *args, **kwargs):
         """
