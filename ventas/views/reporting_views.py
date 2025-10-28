@@ -766,16 +766,22 @@ def client_list_custom_filter_view(request):
     # Obtener métricas combinadas
     clientes_data = _get_combined_metrics_for_segmentation()
 
-    # Filtrar por rango de gasto y crear mapa de gastos combinados
+    # Filtrar por rango de gasto y crear mapas detallados
     filtered_client_ids = []
-    gasto_combinado_map = {}  # {cliente_id: gasto_total_combinado}
+    gasto_map = {}  # {cliente_id: {'actual': X, 'historico': Y, 'total': Z}}
 
     for cliente_data in clientes_data:
-        spend = cliente_data['total_gasto']
+        spend_total = cliente_data['total_gasto']
+        spend_actual = cliente_data.get('gasto_actual', 0)
+        spend_historico = cliente_data.get('gasto_historico', 0)
 
-        if gasto_min <= spend <= gasto_max:
+        if gasto_min <= spend_total <= gasto_max:
             filtered_client_ids.append(cliente_data['cliente_id'])
-            gasto_combinado_map[cliente_data['cliente_id']] = spend
+            gasto_map[cliente_data['cliente_id']] = {
+                'actual': spend_actual,
+                'historico': spend_historico,
+                'total': spend_total
+            }
 
     # Convertir a queryset y aplicar filtro de ciudad
     if filtered_client_ids:
@@ -785,10 +791,13 @@ def client_list_custom_filter_view(request):
         if ciudad and ciudad != 'todas':
             clients = clients.filter(ciudad__iexact=ciudad)
 
-        # Agregar gasto combinado a cada cliente
+        # Agregar gastos detallados a cada cliente
         clients_list = []
         for cliente in clients:
-            cliente.gasto_total_combinado = gasto_combinado_map.get(cliente.id, 0)
+            gastos = gasto_map.get(cliente.id, {'actual': 0, 'historico': 0, 'total': 0})
+            cliente.gasto_actual = gastos['actual']
+            cliente.gasto_historico = gastos['historico']
+            cliente.gasto_total_combinado = gastos['total']
             clients_list.append(cliente)
 
         clients = clients_list
