@@ -180,6 +180,20 @@
                                 <label for="checkoutDocumento" class="form-label">ID/DNI/Passport/RUT (opcional)</label>
                                 <input type="text" class="form-control" id="checkoutDocumento" name="documento_identidad">
                             </div>
+                            <div class="mb-3">
+                                <label for="checkoutRegion" class="form-label">Región *</label>
+                                <select class="form-select" id="checkoutRegion" name="region" required>
+                                    <option value="">Seleccione una región</option>
+                                </select>
+                                <div class="invalid-feedback">Por favor seleccione una región.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="checkoutComuna" class="form-label">Comuna *</label>
+                                <select class="form-select" id="checkoutComuna" name="comuna" required disabled>
+                                    <option value="">Primero seleccione una región</option>
+                                </select>
+                                <div class="invalid-feedback">Por favor seleccione una comuna.</div>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -333,6 +347,45 @@ Email para comprobante: ventas@aremko.cl</pre>
 <script>
     // --- Global Variables ---
     let isProcessingCheckout = false; // Flag to prevent double submission
+
+    // --- Region/Comuna Functions ---
+    async function loadRegiones() {
+        try {
+            const response = await fetch('/ventas/api/regiones/');
+            const regiones = await response.json();
+            const select = document.getElementById('checkoutRegion');
+
+            regiones.forEach(region => {
+                const option = document.createElement('option');
+                option.value = region.id;
+                option.textContent = region.nombre;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading regiones:', error);
+        }
+    }
+
+    async function loadComunas(regionId) {
+        try {
+            const response = await fetch(`/ventas/api/comunas/?region=${regionId}`);
+            const comunas = await response.json();
+            const select = document.getElementById('checkoutComuna');
+
+            // Clear previous options
+            select.innerHTML = '<option value="">Seleccione una comuna</option>';
+            select.disabled = false;
+
+            comunas.forEach(comuna => {
+                const option = document.createElement('option');
+                option.value = comuna.id;
+                option.textContent = comuna.nombre;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading comunas:', error);
+        }
+    }
 
     // --- Helper Functions ---
     function getCookie(name) {
@@ -648,6 +701,25 @@ Email para comprobante: ventas@aremko.cl</pre>
         const processingOverlay = document.getElementById('processingOverlay');
         const telefonoInput = document.getElementById('checkoutTelefono');
 
+        // Load regiones on page load
+        loadRegiones();
+
+        // Add event listener for region change to load comunas
+        const regionSelect = document.getElementById('checkoutRegion');
+        if (regionSelect) {
+            regionSelect.addEventListener('change', function(e) {
+                const regionId = e.target.value;
+                const comunaSelect = document.getElementById('checkoutComuna');
+
+                if (regionId) {
+                    loadComunas(regionId);
+                } else {
+                    comunaSelect.innerHTML = '<option value="">Primero seleccione una región</option>';
+                    comunaSelect.disabled = true;
+                }
+            });
+        }
+
         if (completeCheckoutBtn) {
             completeCheckoutBtn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -660,10 +732,12 @@ Email para comprobante: ventas@aremko.cl</pre>
                 const email = document.getElementById('checkoutEmail').value;
                 const telefono = document.getElementById('checkoutTelefono').value;
                 const documento = document.getElementById('checkoutDocumento').value;
+                const region = document.getElementById('checkoutRegion').value;
+                const comuna = document.getElementById('checkoutComuna').value;
                 const paymentMethodInput = document.querySelector('input[name="paymentMethod"]:checked');
 
-                if (!nombre || !email || !telefono) {
-                    alert('Por favor completa todos los campos requeridos de contacto.');
+                if (!nombre || !email || !telefono || !region || !comuna) {
+                    alert('Por favor completa todos los campos requeridos de contacto (incluyendo región y comuna).');
                     hideProcessing(null, completeCheckoutBtn); // Reset button, keep overlay hidden
                     return;
                 }
@@ -698,6 +772,8 @@ Email para comprobante: ventas@aremko.cl</pre>
                 formData.append('email', email);
                 formData.append('telefono', telefono);
                 formData.append('documento_identidad', documento);
+                formData.append('region', region);
+                formData.append('comuna', comuna);
                 formData.append('metodo_pago', paymentMethod);
 
                 // --- Call Appropriate Handler ---

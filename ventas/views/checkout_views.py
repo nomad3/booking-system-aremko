@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models.signals import pre_save # Import pre_save signal
 from django.contrib import messages
-from ..models import Servicio, Cliente, VentaReserva, ReservaServicio, Pago # Relative imports
+from ..models import Servicio, Cliente, VentaReserva, ReservaServicio, Pago, Region, Comuna # Relative imports
 # Import the specific signal receiver to disconnect/reconnect
 from ..signals import validar_disponibilidad_admin
 
@@ -164,6 +164,8 @@ def complete_checkout(request):
             email = request.POST.get('email')
             telefono = request.POST.get('telefono')
             documento_identidad = request.POST.get('documento_identidad', '')
+            region_id = request.POST.get('region')
+            comuna_id = request.POST.get('comuna')
             metodo_pago = request.POST.get('metodo_pago') # Get payment method
 
             # Get cart from session
@@ -223,13 +225,20 @@ def complete_checkout(request):
 
             # Get or create cliente using the normalized phone number
             try:
+                defaults = {
+                    'nombre': nombre,
+                    'email': email, # Still save email if provided
+                    'documento_identidad': documento_identidad
+                }
+                # Add region and comuna if provided
+                if region_id:
+                    defaults['region_id'] = region_id
+                if comuna_id:
+                    defaults['comuna_id'] = comuna_id
+
                 cliente, created = Cliente.objects.get_or_create(
                     telefono=formatted_telefono, # Use normalized phone number for lookup
-                    defaults={
-                        'nombre': nombre,
-                        'email': email, # Still save email if provided
-                        'documento_identidad': documento_identidad
-                    }
+                    defaults=defaults
                 )
             except Exception as e:
                 print(f"Error al crear/obtener cliente: {e}")
@@ -239,7 +248,7 @@ def complete_checkout(request):
                     'error': f'Error al procesar datos del cliente: {str(e)}'
                 })
 
-            # If cliente exists, update name/email if they were changed in the form
+            # If cliente exists, update name/email/region/comuna if they were changed in the form
             if not created:
                 update_needed = False
                 if cliente.nombre != nombre:
@@ -259,6 +268,18 @@ def complete_checkout(request):
                 elif not cliente.documento_identidad and documento_identidad: # Add doc if missing
                      cliente.documento_identidad = documento_identidad
                      update_needed = True
+                # Update region if provided and different
+                if region_id:
+                    region_id_int = int(region_id)
+                    if cliente.region_id != region_id_int:
+                        cliente.region_id = region_id_int
+                        update_needed = True
+                # Update comuna if provided and different
+                if comuna_id:
+                    comuna_id_int = int(comuna_id)
+                    if cliente.comuna_id != comuna_id_int:
+                        cliente.comuna_id = comuna_id_int
+                        update_needed = True
 
                 if update_needed:
                     cliente.save()
