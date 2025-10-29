@@ -135,9 +135,10 @@ if cambios:
         with transaction.atomic():
             for cambio in cambios:
                 try:
-                    cliente = Cliente.objects.get(id=cambio['id'])
-                    cliente.ciudad = cambio['ciudad_normalizada']
-                    cliente.save(update_fields=['ciudad'])
+                    # Usar .update() en lugar de .save() para evitar validaciones del modelo
+                    # Esto es importante porque algunos clientes pueden tener teléfonos inválidos
+                    # pero solo queremos actualizar el campo ciudad
+                    Cliente.objects.filter(id=cambio['id']).update(ciudad=cambio['ciudad_normalizada'])
                     actualizados += 1
 
                     if actualizados % 100 == 0:
