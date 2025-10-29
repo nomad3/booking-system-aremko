@@ -1,0 +1,482 @@
+[
+  {
+    "model": "ventas.region",
+    "pk": 1,
+    "fields": {
+      "codigo": "XV",
+      "nombre": "Arica y Parinacota",
+      "orden": 1
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 2,
+    "fields": {
+      "codigo": "I",
+      "nombre": "Tarapacá",
+      "orden": 2
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 3,
+    "fields": {
+      "codigo": "II",
+      "nombre": "Antofagasta",
+      "orden": 3
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 4,
+    "fields": {
+      "codigo": "III",
+      "nombre": "Atacama",
+      "orden": 4
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 5,
+    "fields": {
+      "codigo": "IV",
+      "nombre": "Coquimbo",
+      "orden": 5
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 6,
+    "fields": {
+      "codigo": "V",
+      "nombre": "Valparaíso",
+      "orden": 6
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 7,
+    "fields": {
+      "codigo": "RM",
+      "nombre": "Región Metropolitana",
+      "orden": 7
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 8,
+    "fields": {
+      "codigo": "VI",
+      "nombre": "O'Higgins",
+      "orden": 8
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 9,
+    "fields": {
+      "codigo": "VII",
+      "nombre": "Maule",
+      "orden": 9
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 10,
+    "fields": {
+      "codigo": "XVI",
+      "nombre": "Ñuble",
+      "orden": 10
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 11,
+    "fields": {
+      "codigo": "VIII",
+      "nombre": "Biobío",
+      "orden": 11
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 12,
+    "fields": {
+      "codigo": "IX",
+      "nombre": "La Araucanía",
+      "orden": 12
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 13,
+    "fields": {
+      "codigo": "XIV",
+      "nombre": "Los Ríos",
+      "orden": 13
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 14,
+    "fields": {
+      "codigo": "X",
+      "nombre": "Los Lagos",
+      "orden": 14
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 15,
+    "fields": {
+      "codigo": "XI",
+      "nombre": "Aysén",
+      "orden": 15
+    }
+  },
+  {
+    "model": "ventas.region",
+    "pk": 16,
+    "fields": {
+      "codigo": "XII",
+      "nombre": "Magallanes",
+      "orden": 16
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 1,
+    "fields": {
+      "region": 1,
+      "nombre": "Arica"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 2,
+    "fields": {
+      "region": 2,
+      "nombre": "Iquique"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 3,
+    "fields": {
+      "region": 3,
+      "nombre": "Antofagasta"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 4,
+    "fields": {
+      "region": 3,
+      "nombre": "Calama"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 5,
+    "fields": {
+      "region": 5,
+      "nombre": "La Serena"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 6,
+    "fields": {
+      "region": 6,
+      "nombre": "Valparaíso"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 7,
+    "fields": {
+      "region": 6,
+      "nombre": "Viña del Mar"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 8,
+    "fields": {
+      "region": 6,
+      "nombre": "Concón"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 9,
+    "fields": {
+      "region": 6,
+      "nombre": "Quilpué"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 10,
+    "fields": {
+      "region": 6,
+      "nombre": "San Antonio"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 11,
+    "fields": {
+      "region": 6,
+      "nombre": "Santo Domingo"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 12,
+    "fields": {
+      "region": 7,
+      "nombre": "Santiago"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 13,
+    "fields": {
+      "region": 8,
+      "nombre": "Rancagua"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 14,
+    "fields": {
+      "region": 8,
+      "nombre": "Santa Cruz"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 15,
+    "fields": {
+      "region": 10,
+      "nombre": "Chillán"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 16,
+    "fields": {
+      "region": 11,
+      "nombre": "Concepción"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 17,
+    "fields": {
+      "region": 11,
+      "nombre": "Los Ángeles"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 18,
+    "fields": {
+      "region": 12,
+      "nombre": "Temuco"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 19,
+    "fields": {
+      "region": 12,
+      "nombre": "Angol"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 20,
+    "fields": {
+      "region": 13,
+      "nombre": "Valdivia"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 21,
+    "fields": {
+      "region": 13,
+      "nombre": "La Unión"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 22,
+    "fields": {
+      "region": 13,
+      "nombre": "Río Bueno"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 23,
+    "fields": {
+      "region": 13,
+      "nombre": "Futrono"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 24,
+    "fields": {
+      "region": 14,
+      "nombre": "Puerto Montt"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 25,
+    "fields": {
+      "region": 14,
+      "nombre": "Puerto Varas"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 26,
+    "fields": {
+      "region": 14,
+      "nombre": "Osorno"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 27,
+    "fields": {
+      "region": 14,
+      "nombre": "Castro"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 28,
+    "fields": {
+      "region": 14,
+      "nombre": "Ancud"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 29,
+    "fields": {
+      "region": 14,
+      "nombre": "Frutillar"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 30,
+    "fields": {
+      "region": 14,
+      "nombre": "Llanquihue"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 31,
+    "fields": {
+      "region": 14,
+      "nombre": "Calbuco"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 32,
+    "fields": {
+      "region": 14,
+      "nombre": "Puerto Octay"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 33,
+    "fields": {
+      "region": 14,
+      "nombre": "Cochamó"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 34,
+    "fields": {
+      "region": 14,
+      "nombre": "Hornopirén"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 35,
+    "fields": {
+      "region": 14,
+      "nombre": "Purranque"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 36,
+    "fields": {
+      "region": 14,
+      "nombre": "Fresia"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 37,
+    "fields": {
+      "region": 14,
+      "nombre": "Río Negro"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 38,
+    "fields": {
+      "region": 14,
+      "nombre": "Puyehue"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 39,
+    "fields": {
+      "region": 14,
+      "nombre": "Maullín"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 40,
+    "fields": {
+      "region": 15,
+      "nombre": "Puerto Aysén"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 41,
+    "fields": {
+      "region": 15,
+      "nombre": "Coyhaique"
+    }
+  },
+  {
+    "model": "ventas.comuna",
+    "pk": 42,
+    "fields": {
+      "region": 16,
+      "nombre": "Punta Arenas"
+    }
+  }
+]

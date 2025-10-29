@@ -240,13 +240,105 @@ class Servicio(models.Model):
     def horario_valido(self, hora_propuesta):
         return hora_propuesta in self.slots_disponibles
 
+
+# ============================================
+# MODELS DE UBICACIÓN GEOGRÁFICA
+# ============================================
+
+class Region(models.Model):
+    """
+    Regiones oficiales de Chile.
+
+    Chile tiene 16 regiones administrativas, cada una con un código romano
+    y un nombre oficial.
+    """
+    codigo = models.CharField(
+        max_length=10,
+        unique=True,
+        help_text="Código de la región (ej: 'RM', 'X', 'XIV')"
+    )
+    nombre = models.CharField(
+        max_length=100,
+        help_text="Nombre oficial de la región"
+    )
+    orden = models.PositiveIntegerField(
+        default=0,
+        help_text="Orden de visualización (de norte a sur)"
+    )
+
+    class Meta:
+        ordering = ['orden']
+        verbose_name = "Región"
+        verbose_name_plural = "Regiones"
+
+    def __str__(self):
+        return f"{self.nombre}"
+
+
+class Comuna(models.Model):
+    """
+    Comunas de Chile agrupadas por región.
+
+    Chile tiene 346 comunas distribuidas en 16 regiones.
+    """
+    region = models.ForeignKey(
+        Region,
+        on_delete=models.CASCADE,
+        related_name='comunas',
+        help_text="Región a la que pertenece esta comuna"
+    )
+    nombre = models.CharField(
+        max_length=100,
+        help_text="Nombre oficial de la comuna"
+    )
+    codigo = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        help_text="Código de la comuna (opcional)"
+    )
+
+    class Meta:
+        ordering = ['region__orden', 'nombre']
+        verbose_name = "Comuna"
+        verbose_name_plural = "Comunas"
+        unique_together = [['region', 'nombre']]
+
+    def __str__(self):
+        return f"{self.nombre}, {self.region.nombre}"
+
+
 class Cliente(models.Model):
     nombre = models.CharField(max_length=100)
     email = models.EmailField(blank=True, null=True) # Allow blank email if phone is primary
     telefono = models.CharField(max_length=20, unique=True, help_text="Número de teléfono único (formato internacional preferido)") # Add unique=True
     documento_identidad = models.CharField(max_length=20, null=True, blank=True, verbose_name="ID/DNI/Passport/RUT")
     pais = models.CharField(max_length=100, null=True, blank=True)
-    ciudad = models.CharField(max_length=100, null=True, blank=True)
+
+    # Ubicación (campos legacy y nuevos)
+    ciudad = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="Campo legacy de ciudad (texto libre). Se recomienda usar región + comuna."
+    )
+    region = models.ForeignKey(
+        Region,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='clientes',
+        help_text="Región de Chile"
+    )
+    comuna = models.ForeignKey(
+        Comuna,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='clientes',
+        help_text="Comuna de Chile"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     @staticmethod
