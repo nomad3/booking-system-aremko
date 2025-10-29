@@ -51,7 +51,7 @@ for cliente in clientes:
 
             reservas_info['ventas'].append({
                 'id': venta.id,
-                'fecha_reserva': venta.fecha_reserva.date(),
+                'fecha_reserva': venta.fecha_reserva.date() if venta.fecha_reserva else None,
                 'fecha_checkin': fecha_checkin,
                 'estado': venta.estado_reserva,
                 'estado_pago': venta.estado_pago,
@@ -115,6 +115,7 @@ if duplicados:
                 print(f"  {'-'*90}")
 
                 for venta in reservas['ventas']:
+                    fecha_reserva_str = str(venta['fecha_reserva']) if venta['fecha_reserva'] else 'Sin fecha'
                     fecha_checkin_str = str(venta['fecha_checkin']) if venta['fecha_checkin'] else 'Sin fecha'
 
                     # Determinar si es futura o pasada
@@ -126,7 +127,7 @@ if duplicados:
                     else:
                         tipo = "???"
 
-                    print(f"  {venta['id']:<8} {str(venta['fecha_reserva']):<12} {fecha_checkin_str:<12} "
+                    print(f"  {venta['id']:<8} {fecha_reserva_str:<12} {fecha_checkin_str:<12} "
                           f"{venta['estado']:<12} {venta['estado_pago']:<10} ${venta['total']:>11,.0f} "
                           f"{venta['num_servicios']:<4} {tipo:<8}")
 
