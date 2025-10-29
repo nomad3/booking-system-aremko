@@ -91,6 +91,7 @@ urlpatterns = [
     path('cart/', checkout_views.cart_view, name='cart'), # Added cart view URL
     path('checkout/', checkout_views.checkout_view, name='checkout'),
     path('complete-checkout/', checkout_views.complete_checkout, name='complete_checkout'),
+    path('api/cliente-por-telefono/', checkout_views.get_client_details_by_phone, name='get_client_details_by_phone'),
     # Flow Payment URLs
     path('api/flow/create/', flow_views.create_flow_payment, name='create_flow_payment'),
     path('payment/confirmation/', flow_views.flow_confirmation, name='flow_confirmation'), # Adjust path as needed

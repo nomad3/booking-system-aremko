@@ -158,9 +158,15 @@
                         <h4 class="mb-4">Información de Contacto</h4>
                         <form id="checkoutForm">
                             <div class="mb-3">
-                                <label for="checkoutTelefono" class="form-label">Teléfono</label>
-                                <input type="tel" class="form-control" id="checkoutTelefono" name="telefono" required placeholder="+56912345678">
-                                <div class="form-text">Ingresa tu número para buscar tus datos.</div>
+                                <label for="checkoutTelefono" class="form-label">Teléfono *</label>
+                                <input type="tel"
+                                       class="form-control"
+                                       id="checkoutTelefono"
+                                       name="telefono"
+                                       required
+                                       placeholder="+56912345678 o 9 1234 5678">
+                                <div id="phoneValidationMessage" class="form-text"></div>
+                                <div id="phoneErrorMessage" class="invalid-feedback d-block" style="display:none !important;"></div>
                             </div>
                             <div class="mb-3">
                                 <label for="checkoutNombre" class="form-label">Nombre Completo</label>
@@ -345,39 +351,83 @@ Email para comprobante: ventas@aremko.cl</pre>
     }
 
     async function fetchClientData(telefono) {
-        const cleanedTelefono = telefono.replace(/\s+/g, '');
-        if (cleanedTelefono.length < 9) {
-             console.log("Phone number too short to fetch data.");
-             return;
+        const phoneInput = document.getElementById('checkoutTelefono');
+        const validationMsg = document.getElementById('phoneValidationMessage');
+        const errorMsg = document.getElementById('phoneErrorMessage');
+
+        // Reset messages and styles
+        validationMsg.textContent = '';
+        validationMsg.className = 'form-text';
+        errorMsg.style.display = 'none';
+        phoneInput.classList.remove('is-invalid', 'is-valid');
+
+        // Validar que no contenga letras
+        const hasInvalidChars = /[a-zA-Z]/.test(telefono);
+        if (hasInvalidChars) {
+            phoneInput.classList.add('is-invalid');
+            errorMsg.textContent = '❌ Solo acepta números. No uses letras.';
+            errorMsg.style.display = 'block';
+            return;
         }
-        console.log(`Fetching client data for phone: ${cleanedTelefono}`);
+
+        // Limpiar espacios, guiones
+        const cleanedTelefono = telefono.replace(/[\s\-]/g, '');
+
+        // Validar longitud mínima (contar solo dígitos)
+        const digitCount = cleanedTelefono.replace(/[^0-9]/g, '').length;
+        if (digitCount < 9) {
+            validationMsg.textContent = 'Ingresa al menos 9 dígitos.';
+            validationMsg.className = 'form-text text-muted';
+            return;
+        }
+
+        console.log(`Validando teléfono: ${cleanedTelefono}`);
+
         try {
-            // Corrected API endpoint URL name
             const lookupUrl = `{% url 'ventas:get_client_details_by_phone' %}?telefono=${encodeURIComponent(cleanedTelefono)}`;
             const response = await fetch(lookupUrl);
+
             if (response.ok) {
                 const data = await response.json();
-                // Updated to check data.found directly
-                if (data.found) { 
-                    console.log("Client found:", data);
-                    const nombreInput = document.getElementById('checkoutNombre');
-                    const emailInput = document.getElementById('checkoutEmail');
-                    const documentoInput = document.getElementById('checkoutDocumento');
-                    if (nombreInput) nombreInput.value = data.nombre || '';
-                    if (emailInput) emailInput.value = data.email || '';
-                    if (documentoInput) documentoInput.value = data.documento_identidad || '';
+
+                if (!data.valid) {
+                    // Teléfono inválido
+                    phoneInput.classList.add('is-invalid');
+                    errorMsg.textContent = data.error || 'Formato de teléfono inválido';
+                    errorMsg.style.display = 'block';
+                    return;
+                }
+
+                // Actualizar campo con teléfono normalizado
+                if (data.telefono_normalizado) {
+                    phoneInput.value = data.telefono_normalizado;
+                }
+
+                if (data.found) {
+                    // Cliente encontrado - auto-fill
+                    phoneInput.classList.add('is-valid');
+                    validationMsg.textContent = '✓ Cliente encontrado. Datos cargados.';
+                    validationMsg.className = 'form-text text-success';
+
+                    console.log("Cliente encontrado:", data);
+                    document.getElementById('checkoutNombre').value = data.nombre || '';
+                    document.getElementById('checkoutEmail').value = data.email || '';
+                    document.getElementById('checkoutDocumento').value = data.documento_identidad || '';
                 } else {
-                    console.log("Client not found for this phone number.");
-                     // Optionally clear fields if client not found
-                    // document.getElementById('checkoutNombre').value = '';
-                    // document.getElementById('checkoutEmail').value = '';
-                    // document.getElementById('checkoutDocumento').value = '';
+                    // Cliente nuevo pero teléfono válido
+                    phoneInput.classList.add('is-valid');
+                    validationMsg.textContent = '✓ Teléfono válido. Por favor completa tus datos.';
+                    validationMsg.className = 'form-text text-primary';
                 }
             } else {
                 console.error(`Error fetching client data: ${response.status} ${response.statusText}`);
+                errorMsg.textContent = 'Error al validar el teléfono. Intenta nuevamente.';
+                errorMsg.style.display = 'block';
             }
         } catch (error) {
-            console.error('Error during fetchClientData:', error);
+            console.error('Error durante fetchClientData:', error);
+            errorMsg.textContent = 'Error de conexión. Verifica tu internet.';
+            errorMsg.style.display = 'block';
         }
     }
 
@@ -666,9 +716,21 @@ Email para comprobante: ventas@aremko.cl</pre>
             console.error("Complete checkout button not found");
         }
 
+        // Variable para debounce
+        let phoneValidationTimeout;
+
         if (telefonoInput) {
+            // Validación al salir del campo
             telefonoInput.addEventListener('blur', function() {
                 fetchClientData(this.value);
+            });
+
+            // Validación mientras escribe (con delay de 800ms)
+            telefonoInput.addEventListener('input', function() {
+                clearTimeout(phoneValidationTimeout);
+                phoneValidationTimeout = setTimeout(() => {
+                    fetchClientData(this.value);
+                }, 800);
             });
         } else {
             console.error("Telefono input not found");

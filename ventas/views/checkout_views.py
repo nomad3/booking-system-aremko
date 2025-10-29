@@ -205,23 +205,39 @@ def complete_checkout(request):
                 return JsonResponse({'success': False, 'error': f"Algunos horarios ya no están disponibles: {error_message}"})
 
 
-            # Clean/normalize phone number (basic example)
-            # Consider using phonenumbers library for robust parsing/validation
-            cleaned_telefono = ''.join(filter(str.isdigit, telefono))
-            if len(cleaned_telefono) > 9 and not telefono.startswith('+'):
-                 formatted_telefono = '+' + cleaned_telefono # Basic international format assumption
-            else:
-                 formatted_telefono = telefono
+            # Normalize phone number using Cliente model's method
+            try:
+                formatted_telefono = Cliente.normalize_phone(telefono)
 
-            # Get or create cliente using the phone number
-            cliente, created = Cliente.objects.get_or_create(
-                telefono=formatted_telefono, # Use phone number for lookup
-                defaults={
-                    'nombre': nombre,
-                    'email': email, # Still save email if provided
-                    'documento_identidad': documento_identidad
-                }
-            )
+                if not formatted_telefono:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Formato de teléfono inválido. Debe tener al menos 9 dígitos.'
+                    })
+            except Exception as e:
+                print(f"Error al normalizar teléfono: {e}")
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Error al validar teléfono: {str(e)}'
+                })
+
+            # Get or create cliente using the normalized phone number
+            try:
+                cliente, created = Cliente.objects.get_or_create(
+                    telefono=formatted_telefono, # Use normalized phone number for lookup
+                    defaults={
+                        'nombre': nombre,
+                        'email': email, # Still save email if provided
+                        'documento_identidad': documento_identidad
+                    }
+                )
+            except Exception as e:
+                print(f"Error al crear/obtener cliente: {e}")
+                traceback.print_exc()
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Error al procesar datos del cliente: {str(e)}'
+                })
 
             # If cliente exists, update name/email if they were changed in the form
             if not created:
@@ -325,3 +341,75 @@ def complete_checkout(request):
 
     # If not POST, return error as JSON
     return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
+def get_client_details_by_phone(request):
+    """
+    API endpoint para buscar cliente por teléfono
+    Normaliza el teléfono y retorna datos del cliente si existe
+
+    Respuestas:
+    - found=True, valid=True: Cliente existe, retorna datos
+    - found=False, valid=True: Teléfono válido pero cliente no existe
+    - found=False, valid=False: Teléfono inválido
+    """
+    if request.method == 'GET':
+        telefono_raw = request.GET.get('telefono', '').strip()
+
+        if not telefono_raw:
+            return JsonResponse({
+                'found': False,
+                'valid': False,
+                'error': 'Teléfono vacío'
+            })
+
+        # Validar que no contenga letras
+        import re
+        if re.search(r'[a-zA-Z]', telefono_raw):
+            return JsonResponse({
+                'found': False,
+                'valid': False,
+                'error': 'El teléfono no puede contener letras.'
+            })
+
+        # Normalizar teléfono usando el método del modelo Cliente
+        try:
+            telefono_normalizado = Cliente.normalize_phone(telefono_raw)
+
+            if not telefono_normalizado:
+                return JsonResponse({
+                    'found': False,
+                    'valid': False,
+                    'error': 'Formato de teléfono inválido. Debe tener al menos 9 dígitos.'
+                })
+
+            # Buscar cliente con teléfono normalizado
+            try:
+                cliente = Cliente.objects.get(telefono=telefono_normalizado)
+                return JsonResponse({
+                    'found': True,
+                    'valid': True,
+                    'nombre': cliente.nombre,
+                    'email': cliente.email or '',
+                    'ciudad': cliente.ciudad or '',
+                    'documento_identidad': cliente.documento_identidad or '',
+                    'telefono_normalizado': telefono_normalizado
+                })
+            except Cliente.DoesNotExist:
+                # Cliente no existe, pero teléfono es válido
+                return JsonResponse({
+                    'found': False,
+                    'valid': True,
+                    'telefono_normalizado': telefono_normalizado,
+                    'message': 'Cliente nuevo. Por favor completa tus datos.'
+                })
+
+        except Exception as e:
+            print(f"Error en get_client_details_by_phone: {e}")
+            traceback.print_exc()
+            return JsonResponse({
+                'found': False,
+                'valid': False,
+                'error': f'Error al validar teléfono: {str(e)}'
+            })
+
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
