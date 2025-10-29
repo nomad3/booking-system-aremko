@@ -241,7 +241,7 @@
                                 <tr>
                                     <td>{{ servicio.fecha|date:"d/m/Y" }}</td>
                                     <td>
-                                        {% if servicio.numero_reserva == 'N/A' %}
+                                        {% if servicio.numero_reserva == 'N/A' or not servicio.numero_reserva %}
                                             <span class="text-muted">N/A</span>
                                         {% else %}
                                             <strong>#{{ servicio.numero_reserva }}</strong>

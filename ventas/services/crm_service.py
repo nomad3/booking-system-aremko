@@ -191,6 +191,7 @@ class CRMService:
                         'fecha': s['fecha'],  # Pass date object directly for Django template date filter
                         'precio': s['precio'],
                         'cantidad': s['cantidad'],
+                        'numero_reserva': s.get('numero_reserva', 'N/A'),  # Agregar número de reserva
                         'fuente': s['fuente']
                     }
                     for s in servicios  # Mostrar TODOS los servicios, sin límite
