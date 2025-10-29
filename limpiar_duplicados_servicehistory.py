@@ -20,7 +20,7 @@ print("="*80 + "\n")
 print("📊 Paso 1: Identificando duplicados...\n")
 
 duplicados = ServiceHistory.objects.values(
-    'cliente', 'service_date', 'price_paid', 'service_name', 'quantity'
+    'cliente', 'reserva_id', 'service_date', 'price_paid', 'service_name', 'quantity'
 ).annotate(
     count=Count('id'),
     ids=Count('id')  # Para contar
@@ -86,6 +86,7 @@ with transaction.atomic():
             # Obtener todos los registros de este grupo
             registros = ServiceHistory.objects.filter(
                 cliente_id=dup['cliente'],
+                reserva_id=dup['reserva_id'],
                 service_date=dup['service_date'],
                 price_paid=dup['price_paid'],
                 service_name=dup['service_name'],
@@ -123,7 +124,7 @@ print(f"Errores:                 {errores:>10,}")
 
 # Verificar que no quedan duplicados
 duplicados_restantes = ServiceHistory.objects.values(
-    'cliente', 'service_date', 'price_paid', 'service_name', 'quantity'
+    'cliente', 'reserva_id', 'service_date', 'price_paid', 'service_name', 'quantity'
 ).annotate(count=Count('id')).filter(count__gt=1).count()
 
 print(f"\nDuplicados restantes:    {duplicados_restantes:>10,}")

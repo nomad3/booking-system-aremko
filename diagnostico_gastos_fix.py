@@ -44,7 +44,7 @@ print("🔍 DETECCIÓN DE DUPLICADOS")
 print("="*80 + "\n")
 
 duplicados = ServiceHistory.objects.values(
-    'cliente', 'service_date', 'price_paid', 'service_name'
+    'cliente', 'reserva_id', 'service_date', 'price_paid', 'service_name'
 ).annotate(
     count=Count('id')
 ).filter(count__gt=1).order_by('-count')[:20]
@@ -59,7 +59,8 @@ if duplicados.exists():
         except:
             nombre = "Cliente desconocido"
 
-        print(f"{i:>2}. {nombre:<30} | {dup['service_date']} | {dup['service_name'][:25]:<25} | ${dup['price_paid']:>10,.0f} | x{dup['count']} veces")
+        reserva = dup['reserva_id'][:15] if dup['reserva_id'] else 'sin ID'
+        print(f"{i:>2}. {nombre:<30} | {reserva:<15} | {dup['service_date']} | {dup['service_name'][:20]:<20} | ${dup['price_paid']:>10,.0f} | x{dup['count']}")
 else:
     print("✅ No se encontraron duplicados exactos")
 
