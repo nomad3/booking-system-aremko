@@ -709,12 +709,11 @@ def cliente_segmentation_view(request):
         else:
             segments['high_spend']['count'] += 1
 
-    # Obtener ciudades únicas para filtro personalizado
-    ciudades = Cliente.objects.filter(
-        ciudad__isnull=False
-    ).exclude(
-        ciudad=''
-    ).values_list('ciudad', flat=True).distinct().order_by('ciudad')
+    # Obtener comunas únicas para filtro personalizado (usando el nuevo campo estructurado)
+    from ..models import Comuna
+    comunas = Comuna.objects.filter(
+        clientes__isnull=False  # Solo comunas que tienen clientes
+    ).distinct().order_by('nombre').values('id', 'nombre')
 
     context = {
         'segments': segments,
@@ -722,8 +721,8 @@ def cliente_segmentation_view(request):
         # Pass thresholds for display/info
         'spend_threshold_medium': SPEND_THRESHOLD_MEDIUM,
         'spend_threshold_high': SPEND_THRESHOLD_HIGH,
-        # Filtro personalizado
-        'ciudades': list(ciudades),
+        # Filtro personalizado (ahora usando comunas estructuradas)
+        'comunas': list(comunas),
     }
 
     return render(request, 'ventas/cliente_segmentation.html', context)
@@ -792,12 +791,12 @@ def client_list_by_segment_view(request, segment_name):
 @login_required
 def client_list_custom_filter_view(request):
     """
-    Vista para filtro personalizado de clientes por rango de gasto y ciudad
+    Vista para filtro personalizado de clientes por rango de gasto y comuna
     """
     # Obtener parámetros del formulario
     gasto_min = request.GET.get('gasto_min', '0')
     gasto_max = request.GET.get('gasto_max', '')
-    ciudad = request.GET.get('ciudad', 'todas')
+    comuna_id = request.GET.get('comuna', 'todas')  # Cambio de ciudad a comuna
 
     try:
         gasto_min = float(gasto_min) if gasto_min else 0
@@ -829,13 +828,13 @@ def client_list_custom_filter_view(request):
                 'total': spend_total
             }
 
-    # Convertir a queryset y aplicar filtro de ciudad
+    # Convertir a queryset y aplicar filtro de comuna
     if filtered_client_ids:
         clients = Cliente.objects.filter(id__in=filtered_client_ids)
 
-        # Filtrar por ciudad si no es "todas"
-        if ciudad and ciudad != 'todas':
-            clients = clients.filter(ciudad__iexact=ciudad)
+        # Filtrar por comuna si no es "todas"
+        if comuna_id and comuna_id != 'todas':
+            clients = clients.filter(comuna_id=int(comuna_id))
 
         # Agregar gastos detallados a cada cliente
         clients_list = []
@@ -859,8 +858,14 @@ def client_list_custom_filter_view(request):
     else:
         segment_label = f'Gasto: ${gasto_min:,.0f} - ${gasto_max:,.0f}'
 
-    if ciudad and ciudad != 'todas':
-        segment_label += f' | Ciudad: {ciudad}'
+    # Agregar nombre de comuna al label si está filtrado
+    if comuna_id and comuna_id != 'todas':
+        from ..models import Comuna
+        try:
+            comuna = Comuna.objects.get(id=int(comuna_id))
+            segment_label += f' | Comuna: {comuna.nombre}'
+        except Comuna.DoesNotExist:
+            pass
 
     context = {
         'segment_name': 'custom_filter',
@@ -868,7 +873,7 @@ def client_list_custom_filter_view(request):
         'clients': clients,
         'gasto_min': int(gasto_min) if gasto_min else 0,
         'gasto_max': int(gasto_max) if gasto_max != float('inf') else '',
-        'ciudad': ciudad,
+        'comuna_id': comuna_id,
         'is_custom_filter': True,
     }
 
