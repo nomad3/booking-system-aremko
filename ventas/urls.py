@@ -19,6 +19,8 @@ router.register(r'api/productos', api_views.ProductoViewSet)
 router.register(r'api/ventasreservas', api_views.VentaReservaViewSet)
 router.register(r'api/pagos', api_views.PagoViewSet)
 router.register(r'api/clientes', api_views.ClienteViewSet)
+router.register(r'api/regiones', api_views.RegionViewSet)
+router.register(r'api/comunas', api_views.ComunaViewSet)
 # Note: ReservaProductoViewSet and ReservaServicioViewSet were in the old views.py but not registered here.
 # If they need API endpoints, they should be registered using api_views.
 
