@@ -49,6 +49,7 @@ class CRMService:
                     'tipo': h.service_type,
                     'precio': float(h.price_paid),
                     'cantidad': h.quantity,
+                    'numero_reserva': 'N/A',  # Datos históricos sin número de reserva
                     'fuente': 'histórico',
                     'id': f'hist_{h.id}'
                 })
@@ -78,6 +79,7 @@ class CRMService:
                 'tipo': rs.servicio.categoria.nombre if rs.servicio.categoria else 'Sin categoría',
                 'precio': precio_total,
                 'cantidad': cantidad,
+                'numero_reserva': rs.venta_reserva.id,  # ID de la VentaReserva
                 'fuente': 'actual',
                 'id': f'res_{rs.id}'
             })

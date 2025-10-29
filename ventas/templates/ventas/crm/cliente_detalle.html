@@ -228,6 +228,7 @@
                             <thead>
                                 <tr>
                                     <th>Fecha</th>
+                                    <th>Reserva</th>
                                     <th>Servicio</th>
                                     <th>Tipo</th>
                                     <th class="text-center">Cantidad</th>
@@ -239,6 +240,13 @@
                                 {% for servicio in perfil.historial_reciente %}
                                 <tr>
                                     <td>{{ servicio.fecha|date:"d/m/Y" }}</td>
+                                    <td>
+                                        {% if servicio.numero_reserva == 'N/A' %}
+                                            <span class="text-muted">N/A</span>
+                                        {% else %}
+                                            <strong>#{{ servicio.numero_reserva }}</strong>
+                                        {% endif %}
+                                    </td>
                                     <td>{{ servicio.servicio }}</td>
                                     <td>
                                         <span class="badge bg-secondary">{{ servicio.tipo }}</span>
