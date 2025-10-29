@@ -20,6 +20,7 @@ NORMALIZACION_CIUDADES = {
     'p. montt': 'Puerto Montt',
     'p montt': 'Puerto Montt',
     'Pmontt': 'Puerto Montt',
+    'puerto mptt': 'Puerto Montt',  # typo detectado en preview
 
     # ============================================
     # PUERTO VARAS (~561 clientes total)
@@ -32,6 +33,8 @@ NORMALIZACION_CIUDADES = {
     'p. varas': 'Puerto Varas',
     'p varas': 'Puerto Varas',
     'Pvaras': 'Puerto Varas',
+    'puerto vras': 'Puerto Varas',  # typo detectado en preview
+    'puerto varasa': 'Puerto Varas',  # typo detectado en preview
 
     # ============================================
     # SANTIAGO (~378 clientes)
@@ -40,6 +43,7 @@ NORMALIZACION_CIUDADES = {
     'SANTIAGO': 'Santiago',
     'santigo': 'Santiago',  # typo detectado
     'sANTIGO': 'Santiago',  # typo detectado
+    'santiaggo': 'Santiago',  # typo detectado en preview
     'stgo': 'Santiago',
     'stgo.': 'Santiago',
 
@@ -316,6 +320,26 @@ NORMALIZACION_CIUDADES = {
     # ============================================
     'santa cruz': 'Santa Cruz',
     'SANTA CRUZ': 'Santa Cruz',
+
+    # ============================================
+    # CIUDADES/PAÍSES EXTRANJEROS
+    # ============================================
+    # Estados Unidos
+    'santa fé nm': 'Santa Fe, NM',  # Santa Fe, Nuevo México
+    'santa fé, nm': 'Santa Fe, NM',
+    'el cajòn, ca': 'El Cajón, CA',  # El Cajón, California
+    'eeuu': 'Estados Unidos',
+    'usa': 'Estados Unidos',
+    'united states': 'Estados Unidos',
+
+    # Argentina
+    'argentina': 'Argentina',
+    'buenos aires': 'Buenos Aires',
+
+    # Otros
+    'extranjero': 'Extranjero',
+    'extrangero': 'Extranjero',  # typo común
+    'isla de pascua': 'Isla de Pascua',
 }
 
 
