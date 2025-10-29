@@ -166,7 +166,7 @@
                                        required
                                        placeholder="+56912345678 o 9 1234 5678">
                                 <div id="phoneValidationMessage" class="form-text"></div>
-                                <div id="phoneErrorMessage" class="invalid-feedback d-block" style="display:none !important;"></div>
+                                <div id="phoneErrorMessage" class="invalid-feedback"></div>
                             </div>
                             <div class="mb-3">
                                 <label for="checkoutNombre" class="form-label">Nombre Completo</label>
@@ -722,6 +722,9 @@ Email para comprobante: ventas@aremko.cl</pre>
         if (telefonoInput) {
             // Validación al salir del campo
             telefonoInput.addEventListener('blur', function() {
+                // Cancelar timeout pendiente para evitar race condition
+                clearTimeout(phoneValidationTimeout);
+                // Validar inmediatamente
                 fetchClientData(this.value);
             });
 

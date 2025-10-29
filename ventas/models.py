@@ -260,6 +260,7 @@ class Cliente(models.Model):
         - SIEMPRE incluye el signo + al inicio
         - Sin espacios ni caracteres especiales
         - Validación estricta de formato
+        - Rechaza números chilenos incompletos (56 + menos de 9 dígitos)
 
         Returns:
             str: Teléfono normalizado o None si inválido
@@ -277,9 +278,14 @@ class Cliente(models.Model):
         if len(phone) < 8:
             return None
 
-        # Si tiene código de país 56 (Chile), validar y agregar +
-        if phone.startswith('56') and len(phone) in [11, 12]:
-            return f'+{phone}'
+        # Si tiene código de país 56 (Chile), validar ESTRICTAMENTE
+        if phone.startswith('56'):
+            # Chile requiere 56 + 9 dígitos (móvil) o 56 + 1 + 8 dígitos (fijo con área)
+            if len(phone) in [11, 12]:
+                return f'+{phone}'
+            else:
+                # Número chileno incompleto - RECHAZAR
+                return None
 
         # Si tiene 9 dígitos y empieza con 9 (móvil chileno), agregar código país
         if len(phone) == 9 and phone.startswith('9'):
@@ -289,8 +295,8 @@ class Cliente(models.Model):
         if len(phone) == 8:
             return f'+562{phone}'
 
-        # Para otros formatos, agregar + si tiene al menos 8 dígitos
-        return f'+{phone}' if len(phone) >= 8 else None
+        # Para otros países, solo aceptar números completos (10+ dígitos)
+        return f'+{phone}' if len(phone) >= 10 else None
 
     def save(self, *args, **kwargs):
         """
