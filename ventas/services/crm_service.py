@@ -4,13 +4,16 @@ Integra datos históricos (ServiceHistory) y datos actuales (VentaReserva)
 """
 from django.db.models import Sum, Count, Max, Min, Avg, Q, F
 from django.utils import timezone
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Dict, List, Tuple, Optional
 from ventas.models import Cliente, ServiceHistory, VentaReserva, ReservaServicio
 from decimal import Decimal
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Fecha placeholder usada en migración histórica (debe excluirse de cálculos)
+FECHA_PLACEHOLDER_HISTORICA = date(2021, 1, 1)
 
 
 class CRMService:
@@ -31,8 +34,13 @@ class CRMService:
         total_historicos = 0
 
         # 1. DATOS HISTÓRICOS - ServiceHistory (2020-2024)
+        # Excluir fecha placeholder (2021-01-01) usada en migración
         try:
-            historicos = ServiceHistory.objects.filter(cliente=cliente)
+            historicos = ServiceHistory.objects.filter(
+                cliente=cliente
+            ).exclude(
+                service_date=FECHA_PLACEHOLDER_HISTORICA
+            )
             total_historicos = historicos.count()
             for h in historicos:
                 servicios_combinados.append({
