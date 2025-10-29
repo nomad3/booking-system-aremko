@@ -138,7 +138,7 @@ for cliente in clientes_problematicos[:3]:
 
     print(f"  Gasto histórico (ServiceHistory): ${gasto_hist:,.0f}")
     print(f"  Gasto actual (VentaReserva):      ${gasto_actual:,.0f}")
-    print(f"  Total combinado:                   ${gasto_hist + gasto_actual:,.0f}")
+    print(f"  Total combinado:                   ${float(gasto_hist) + gasto_actual:,.0f}")
 
 print("\n" + "="*80)
 print("✅ DIAGNÓSTICO COMPLETADO")
