@@ -573,55 +573,72 @@ def _get_combined_metrics_for_segmentation():
             })
         return results
 
-    # Tabla existe, usar query combinada con SUBCONSULTAS para evitar multiplicación cartesiana
+    # Tabla existe, usar query combinada AGRUPADA POR TELEFONO para consolidar duplicados
     try:
         query = """
+        WITH clientes_por_telefono AS (
+            -- Agrupar clientes por teléfono y elegir un representante
+            SELECT
+                telefono,
+                MIN(id) as cliente_id_representante,
+                MAX(nombre) as nombre,
+                MAX(email) as email,
+                ARRAY_AGG(id) as todos_los_ids
+            FROM ventas_cliente
+            WHERE telefono IS NOT NULL AND telefono != ''
+            GROUP BY telefono
+        )
         SELECT
-            c.id as cliente_id,
-            c.nombre,
-            c.email,
-            -- Subconsulta para servicios actuales
+            cpt.cliente_id_representante as cliente_id,
+            cpt.nombre,
+            cpt.email,
+            cpt.telefono,
+            -- Servicios actuales: SUMAR de TODOS los IDs con ese teléfono
             (SELECT COUNT(DISTINCT rs2.id)
              FROM ventas_ventareserva vr2
              JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
-             WHERE vr2.cliente_id = c.id AND vr2.estado_pago IN ('pagado', 'parcial')
+             WHERE vr2.cliente_id = ANY(cpt.todos_los_ids)
+               AND vr2.estado_pago IN ('pagado', 'parcial')
             ) as servicios_actuales,
             (SELECT COALESCE(SUM(CAST(s2.precio_base AS DECIMAL) * COALESCE(rs2.cantidad_personas, 1)), 0)
              FROM ventas_ventareserva vr2
              JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
              JOIN ventas_servicio s2 ON rs2.servicio_id = s2.id
-             WHERE vr2.cliente_id = c.id AND vr2.estado_pago IN ('pagado', 'parcial')
+             WHERE vr2.cliente_id = ANY(cpt.todos_los_ids)
+               AND vr2.estado_pago IN ('pagado', 'parcial')
             ) as gasto_actual,
-            -- Subconsulta para servicios históricos
+            -- Servicios históricos: SUMAR de TODOS los IDs con ese teléfono
             (SELECT COUNT(DISTINCT sh2.id)
              FROM crm_service_history sh2
-             WHERE sh2.cliente_id = c.id
+             WHERE sh2.cliente_id = ANY(cpt.todos_los_ids)
             ) as servicios_historicos,
             (SELECT COALESCE(SUM(sh2.price_paid), 0)
              FROM crm_service_history sh2
-             WHERE sh2.cliente_id = c.id
+             WHERE sh2.cliente_id = ANY(cpt.todos_los_ids)
             ) as gasto_historico,
-            -- Totales combinados (calculados a partir de subconsultas)
+            -- Totales combinados
             ((SELECT COUNT(DISTINCT rs2.id)
               FROM ventas_ventareserva vr2
               JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
-              WHERE vr2.cliente_id = c.id AND vr2.estado_pago IN ('pagado', 'parcial')
+              WHERE vr2.cliente_id = ANY(cpt.todos_los_ids)
+                AND vr2.estado_pago IN ('pagado', 'parcial')
              ) +
              (SELECT COUNT(DISTINCT sh2.id)
               FROM crm_service_history sh2
-              WHERE sh2.cliente_id = c.id
+              WHERE sh2.cliente_id = ANY(cpt.todos_los_ids)
              )) as total_servicios,
             ((SELECT COALESCE(SUM(CAST(s2.precio_base AS DECIMAL) * COALESCE(rs2.cantidad_personas, 1)), 0)
               FROM ventas_ventareserva vr2
               JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
               JOIN ventas_servicio s2 ON rs2.servicio_id = s2.id
-              WHERE vr2.cliente_id = c.id AND vr2.estado_pago IN ('pagado', 'parcial')
+              WHERE vr2.cliente_id = ANY(cpt.todos_los_ids)
+                AND vr2.estado_pago IN ('pagado', 'parcial')
              ) +
              (SELECT COALESCE(SUM(sh2.price_paid), 0)
               FROM crm_service_history sh2
-              WHERE sh2.cliente_id = c.id
+              WHERE sh2.cliente_id = ANY(cpt.todos_los_ids)
              )) as total_gasto
-        FROM ventas_cliente c
+        FROM clientes_por_telefono cpt
         ORDER BY total_gasto DESC
         """
 
