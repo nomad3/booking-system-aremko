@@ -2043,9 +2043,16 @@ class EmailContentTemplate(models.Model):
     call_to_action_texto = models.CharField(
         max_length=200,
         verbose_name="Texto del Botón CTA",
-        default="Reservar Ahora"
+        default="📱 Reservar por WhatsApp"
     )
-    
+
+    call_to_action_url = models.URLField(
+        max_length=500,
+        verbose_name="URL del Botón CTA",
+        default="https://wa.me/56957902525?text=Hola%2C%20me%20gustar%C3%ADa%20reservar",
+        help_text="URL completa del botón. Ej: https://wa.me/56957902525?text=..."
+    )
+
     cierre = models.TextField(
         verbose_name="Cierre/Despedida",
         help_text="Texto de cierre del email.",
@@ -2174,7 +2181,7 @@ class EmailContentTemplate(models.Model):
                 </div>
                 
                 <div style="text-align: center; margin: 35px 0;">
-                    <a href="https://www.aremko.cl" style="display: inline-block; background-color: {self.color_principal}; color: white; padding: 14px 40px; text-decoration: none; border-radius: 4px; font-size: 16px; font-weight: 500;">{self.call_to_action_texto}</a>
+                    <a href="{self.call_to_action_url}" style="display: inline-block; background-color: #25d366; color: white; padding: 14px 40px; text-decoration: none; border-radius: 25px; font-size: 16px; font-weight: 500;">{self.call_to_action_texto}</a>
                 </div>
                 
                 <p style="font-size: 16px; line-height: 1.8; margin-bottom: 25px;">
