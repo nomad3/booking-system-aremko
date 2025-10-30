@@ -145,7 +145,7 @@ class CampaignInteractionInline(admin.TabularInline):
 class ClienteAdmin(admin.ModelAdmin):
     search_fields = ('nombre', 'telefono', 'email')
     list_display = ('nombre', 'telefono', 'email')
-    actions = ['exportar_a_excel']
+    actions = ['exportar_a_excel', 'exportar_backup_completo']
 
     def exportar_a_excel(self, request, queryset):
         response = HttpResponse(content_type='application/ms-excel')
@@ -166,6 +166,66 @@ class ClienteAdmin(admin.ModelAdmin):
         wb.save(response)
         return response
     exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
+
+    def exportar_backup_completo(self, request, queryset):
+        """
+        Exporta backup completo con TODOS los campos y estadísticas
+        """
+        import csv
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = 'attachment; filename="backup_clientes_completo_{}.csv"'.format(
+            datetime.now().strftime('%Y%m%d_%H%M%S')
+        )
+
+        # BOM para Excel UTF-8
+        response.write('\ufeff')
+
+        writer = csv.writer(response)
+
+        # Headers completos
+        headers = [
+            'ID',
+            'Nombre',
+            'Email',
+            'Teléfono',
+            'Documento Identidad',
+            'País',
+            'Ciudad (Legacy)',
+            'Región ID',
+            'Región Nombre',
+            'Comuna ID',
+            'Comuna Nombre',
+            'Fecha Creación',
+            'Número de Visitas',
+            'Gasto Total'
+        ]
+        writer.writerow(headers)
+
+        # Datos con select_related para optimizar
+        clientes = queryset.select_related('region', 'comuna')
+
+        for cliente in clientes:
+            writer.writerow([
+                cliente.id,
+                cliente.nombre,
+                cliente.email or '',
+                cliente.telefono,
+                cliente.documento_identidad or '',
+                cliente.pais or '',
+                cliente.ciudad or '',
+                cliente.region_id or '',
+                cliente.region.nombre if cliente.region else '',
+                cliente.comuna_id or '',
+                cliente.comuna.nombre if cliente.comuna else '',
+                cliente.created_at.strftime('%Y-%m-%d %H:%M:%S') if cliente.created_at else '',
+                cliente.numero_visitas(),
+                f'{cliente.gasto_total():.0f}'
+            ])
+
+        self.message_user(request, f'✅ Exportados {clientes.count()} clientes con éxito', messages.SUCCESS)
+        return response
+
+    exportar_backup_completo.short_description = "🔒 Backup Completo (CSV con todos los campos)"
 
 class VentaReservaAdmin(admin.ModelAdmin):
     list_per_page = 50
