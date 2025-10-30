@@ -237,6 +237,23 @@
             </div>
         </div>
 
+        {# Premios y Fidelización #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-trophy card-icon text-warning"></i>
+                    <h5 class="card-title">Premios y Fidelización</h5>
+                    <p class="card-text small">Sistema de premios por tramos</p>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:premio_dashboard' %}" class="btn btn-sm btn-modern btn-warning-modern">🎁 Dashboard Premios</a>
+                        <a href="{% url 'ventas:premios_pendientes' %}" class="btn btn-sm btn-modern btn-info-modern">✅ Aprobar Premios</a>
+                        <a href="{% url 'ventas:clientes_con_premios' %}" class="btn btn-sm btn-modern btn-primary-modern">👥 Clientes</a>
+                        <a href="{% url 'ventas:historial_tramos' %}" class="btn btn-sm btn-modern btn-secondary-modern">📈 Historial</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 {% endblock %}
