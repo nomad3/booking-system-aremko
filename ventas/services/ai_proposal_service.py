@@ -436,7 +436,9 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
                     </p>
 
                     <div style="text-align: center; margin: 35px 0;">
-                        <a href="https://www.aremko.cl" style="display: inline-block; background-color: #2c5530; color: white; padding: 14px 40px; text-decoration: none; border-radius: 4px; font-size: 16px; font-weight: 500;">Reservar Ahora</a>
+                        <a href="https://wa.me/56957902525?text=Hola%2C%20me%20gustar%C3%ADa%20reservar%20aprovechando%20la%20oferta%20especial" style="display: inline-block; background-color: #25d366; color: white; padding: 14px 40px; text-decoration: none; border-radius: 25px; font-size: 16px; font-weight: 500;">
+                            📱 Reservar por WhatsApp
+                        </a>
                     </div>
 
                     <p style="font-size: 15px; line-height: 1.7; color: #666; margin-top: 40px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
@@ -471,7 +473,11 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
                         {f'<p style="font-size: 18px; color: #e53e3e; font-weight: bold;">{offer["discount"]}</p>' if offer.get("discount") else ''}
                     </div>
 
-                    <p style="text-align: center;"><a href="https://www.aremko.cl" style="display: inline-block; background-color: #4299e1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Reservar Ahora</a></p>
+                    <p style="text-align: center;">
+                        <a href="https://wa.me/56957902525?text=Hola%2C%20me%20interesa%20reservar%20de%20acuerdo%20a%20la%20propuesta%20recibida" style="display: inline-block; background-color: #25d366; color: white; padding: 14px 30px; text-decoration: none; border-radius: 25px; font-weight: bold;">
+                            📱 Reservar por WhatsApp
+                        </a>
+                    </p>
 
                     <p style="color: #718096; font-size: 14px; margin-top: 30px;">
                         ¡Esperamos verte pronto en Aremko!<br>
