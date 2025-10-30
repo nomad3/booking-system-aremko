@@ -44,6 +44,7 @@
                 <thead>
                     <tr>
                         <th>Cliente</th>
+                        <th>Teléfono</th>
                         <th>Cambio de Tramo</th>
                         <th>Gasto en el momento</th>
                         <th>Premio Generado</th>
@@ -54,6 +55,15 @@
                     {% for item in historial %}
                     <tr>
                         <td>{{ item.cliente.nombre }}</td>
+                        <td>
+                            {% if item.cliente.telefono %}
+                                <a href="{% url 'ventas:cliente_detalle' item.cliente.id %}" class="text-decoration-none" title="Ver perfil del cliente">
+                                    {{ item.cliente.telefono }}
+                                </a>
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <span class="badge bg-secondary">Tramo {{ item.tramo_desde }}</span>
                             →
@@ -71,7 +81,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center">No hay historial que mostrar</td>
+                        <td colspan="6" class="text-center">No hay historial que mostrar</td>
                     </tr>
                     {% endfor %}
                 </tbody>
