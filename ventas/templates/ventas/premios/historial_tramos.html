@@ -1,0 +1,82 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Historial de Tramos{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/modern.css' %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; <a href="{% url 'ventas:premio_dashboard' %}">Premios</a>
+    &rsaquo; Historial de Tramos
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4">
+    <h1>📈 Historial de Tramos</h1>
+
+    <div class="card mt-3">
+        <div class="card-body">
+            <form method="get" class="mb-4">
+                <label>Filtrar por cliente:</label>
+                <select name="cliente" class="form-select" onchange="this.form.submit()">
+                    <option value="">Todos los clientes</option>
+                    {% for c in clientes_con_historial %}
+                    <option value="{{ c.id }}" {% if cliente and cliente.id == c.id %}selected{% endif %}>
+                        {{ c.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </form>
+
+            {% if cliente %}
+            <div class="alert alert-info">
+                Mostrando historial de: <strong>{{ cliente.nombre }}</strong>
+            </div>
+            {% endif %}
+
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Cambio de Tramo</th>
+                        <th>Gasto en el momento</th>
+                        <th>Premio Generado</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in historial %}
+                    <tr>
+                        <td>{{ item.cliente.nombre }}</td>
+                        <td>
+                            <span class="badge bg-secondary">Tramo {{ item.tramo_desde }}</span>
+                            →
+                            <span class="badge bg-primary">Tramo {{ item.tramo_hasta }}</span>
+                        </td>
+                        <td>${{ item.gasto_en_momento|floatformat:0 }}</td>
+                        <td>
+                            {% if item.premio_generado %}
+                            <span class="badge bg-success">{{ item.premio_generado.premio.nombre }}</span>
+                            {% else %}
+                            <span class="text-muted">Sin premio</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ item.fecha_cambio|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">No hay historial que mostrar</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

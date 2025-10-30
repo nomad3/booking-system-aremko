@@ -549,7 +549,10 @@ def validar_disponibilidad_admin(sender, instance, **kwargs):
 def actualizar_tramo_y_premios_on_pago(sender, instance, created, raw, using, update_fields, **kwargs):
     """
     Signal que detecta cuando una VentaReserva es pagada y actualiza el tramo del cliente.
-    Genera premios automáticamente si corresponde (hitos, bienvenida).
+    Genera premios automáticamente solo para hitos (tramos 5, 10, 15, 20).
+
+    NOTA: El premio de bienvenida ahora se genera con delay de 3 días después del check-in
+    mediante el comando: python manage.py procesar_premios_bienvenida
     """
     # Skip if fixture loading
     if raw:
@@ -568,10 +571,7 @@ def actualizar_tramo_y_premios_on_pago(sender, instance, created, raw, using, up
         from ventas.services.premio_service import PremioService
 
         with transaction.atomic():
-            # Verificar si es cliente nuevo (antes de actualizar tramo)
-            es_nuevo = TramoService.es_cliente_nuevo(instance.cliente)
-
-            # Actualizar tramo del cliente
+            # Actualizar tramo del cliente (esto puede generar premios de hitos automáticamente)
             resultado = TramoService.actualizar_tramo_cliente(instance.cliente)
 
             logger.info(
@@ -580,18 +580,9 @@ def actualizar_tramo_y_premios_on_pago(sender, instance, created, raw, using, up
                 f"Gasto: ${resultado['gasto_total']:,.0f}"
             )
 
-            # Si es cliente nuevo y alcanzó el primer tramo, generar premio de bienvenida
-            if es_nuevo and resultado['tramo_actual'] >= 1 and not resultado['premio_generado']:
-                premio_bienvenida = PremioService.generar_premio_cliente_nuevo(
-                    cliente=instance.cliente,
-                    gasto_total=resultado['gasto_total']
-                )
-
-                if premio_bienvenida:
-                    logger.info(
-                        f"Premio de bienvenida generado para cliente {instance.cliente.id} "
-                        f"(VentaReserva {instance.id})"
-                    )
+            # PREMIO DE BIENVENIDA SE DESACTIVÓ AQUÍ
+            # Ahora se genera mediante comando de gestión 3 días después del check-in
+            # Ver: python manage.py procesar_premios_bienvenida
 
             # Si alcanzó un hito, el premio ya fue generado por TramoService
             if resultado['hito_alcanzado']:

@@ -1,0 +1,96 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Clientes con Premios{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/modern.css' %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; <a href="{% url 'ventas:premio_dashboard' %}">Premios</a>
+    &rsaquo; Clientes con Premios
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4">
+    <h1>👥 Clientes con Premios</h1>
+
+    <div class="card mt-3">
+        <div class="card-body">
+            <form method="get" class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <label>Estado:</label>
+                    <select name="estado" class="form-select">
+                        <option value="">Todos</option>
+                        {% for estado_value, estado_label in estados %}
+                        <option value="{{ estado_value }}" {% if estado_value == estado_filter %}selected{% endif %}>
+                            {{ estado_label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label>Tipo:</label>
+                    <select name="tipo" class="form-select">
+                        <option value="">Todos</option>
+                        {% for tipo_value, tipo_label in tipos %}
+                        <option value="{{ tipo_value }}" {% if tipo_value == tipo_filter %}selected{% endif %}>
+                            {{ tipo_label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label>&nbsp;</label>
+                    <button type="submit" class="btn btn-primary d-block">Filtrar</button>
+                </div>
+            </form>
+
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Premio</th>
+                        <th>Tipo</th>
+                        <th>Estado</th>
+                        <th>Fecha Ganado</th>
+                        <th>Expira</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for premio in premios %}
+                    <tr>
+                        <td>
+                            <strong>{{ premio.cliente.nombre }}</strong><br>
+                            <small>{{ premio.cliente.telefono }}</small>
+                        </td>
+                        <td>{{ premio.premio.nombre }}</td>
+                        <td>{{ premio.premio.get_tipo_display }}</td>
+                        <td>
+                            <span class="badge bg-{% if premio.estado == 'usado' %}success{% elif premio.estado == 'expirado' %}danger{% elif premio.estado == 'aprobado' %}primary{% else %}warning{% endif %}">
+                                {{ premio.get_estado_display }}
+                            </span>
+                        </td>
+                        <td>{{ premio.fecha_ganado|date:"d/m/Y" }}</td>
+                        <td>{{ premio.fecha_expiracion|date:"d/m/Y" }}</td>
+                        <td>
+                            <a href="{% url 'ventas:cliente_premio_detalle' premio.id %}" class="btn btn-sm btn-info">Ver</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center">No hay premios que mostrar</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

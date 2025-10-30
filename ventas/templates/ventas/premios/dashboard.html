@@ -1,0 +1,324 @@
+{% extends "admin/base_site.html" %}
+{% load static i18n %}
+
+{% block title %}Premios y Fidelización{% endblock %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+    <style>
+        .premios-container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .premios-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .premios-header h1 {
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .premios-header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        /* Estadísticas rápidas */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .stat-card .number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card .label {
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        .stat-card.pendientes .number { color: #ffa726; }
+        .stat-card.aprobados .number { color: #66bb6a; }
+        .stat-card.enviados .number { color: #42a5f5; }
+        .stat-card.usados .number { color: #26a69a; }
+        .stat-card.expirados .number { color: #ef5350; }
+        .stat-card.total .number { color: #7e57c2; }
+
+        /* Sección de módulos (botones principales) */
+        .modulos-section {
+            margin-bottom: 3rem;
+        }
+
+        .modulo-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .modulo-card h2 {
+            color: #333;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .buttons-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .btn-modulo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1.25rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .btn-modulo:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            color: white;
+        }
+
+        .btn-modulo .icon {
+            font-size: 1.5rem;
+        }
+
+        /* Colores de botones (similar a la imagen) */
+        .btn-clientes { background: linear-gradient(135deg, #e57373 0%, #ef5350 100%); }
+        .btn-pendientes { background: linear-gradient(135deg, #4dd0e1 0%, #00acc1 100%); }
+        .btn-dashboard { background: linear-gradient(135deg, #81c784 0%, #66bb6a 100%); }
+        .btn-procesar { background: linear-gradient(135deg, #aed581 0%, #9ccc65 100%); }
+        .btn-historial { background: linear-gradient(135deg, #ba68c8 0%, #ab47bc 100%); }
+        .btn-configurar { background: linear-gradient(135deg, #ffb74d 0%, #ffa726 100%); }
+
+        /* Sección de últimos premios */
+        .ultimos-premios {
+            margin-bottom: 2rem;
+        }
+
+        .premio-item {
+            background: white;
+            padding: 1rem;
+            border-left: 4px solid #66bb6a;
+            margin-bottom: 0.75rem;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .premio-item:hover {
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+
+        .premio-item .cliente-nombre {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.25rem;
+        }
+
+        .premio-item .premio-nombre {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .premio-item .fecha {
+            color: #999;
+            font-size: 0.85rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .badge-pendiente { background: #fff3e0; color: #f57c00; }
+        .badge-aprobado { background: #e8f5e9; color: #2e7d32; }
+        .badge-enviado { background: #e3f2fd; color: #1565c0; }
+        .badge-usado { background: #e0f2f1; color: #00695c; }
+        .badge-expirado { background: #ffebee; color: #c62828; }
+    </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+    &rsaquo; Premios y Fidelización
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="premios-container">
+    <div class="premios-header">
+        <h1>🎁 Premios y Fidelización</h1>
+        <p>Sistema completo de gestión de premios por tramos de gasto</p>
+    </div>
+
+    <!-- Estadísticas rápidas -->
+    <div class="stats-grid">
+        <div class="stat-card pendientes">
+            <div class="number">{{ stats.pendientes }}</div>
+            <div class="label">Pendientes Aprobación</div>
+        </div>
+        <div class="stat-card aprobados">
+            <div class="number">{{ stats.aprobados }}</div>
+            <div class="label">Aprobados</div>
+        </div>
+        <div class="stat-card enviados">
+            <div class="number">{{ stats.enviados }}</div>
+            <div class="label">Enviados</div>
+        </div>
+        <div class="stat-card usados">
+            <div class="number">{{ stats.usados }}</div>
+            <div class="label">Usados</div>
+        </div>
+        <div class="stat-card expirados">
+            <div class="number">{{ stats.expirados }}</div>
+            <div class="label">Expirados</div>
+        </div>
+        <div class="stat-card total">
+            <div class="number">{{ stats.total }}</div>
+            <div class="label">Total Premios</div>
+        </div>
+    </div>
+
+    <!-- Módulos principales -->
+    <div class="modulos-section">
+        <div class="modulo-card">
+            <h2>🤝 Gestión de Clientes y Premios</h2>
+            <div class="buttons-grid">
+                <a href="{% url 'ventas:clientes_con_premios' %}" class="btn-modulo btn-clientes">
+                    <span class="icon">👥</span>
+                    <span>Clientes con Premios</span>
+                </a>
+                <a href="{% url 'ventas:premios_pendientes' %}" class="btn-modulo btn-pendientes">
+                    <span class="icon">✅</span>
+                    <span>Aprobar Premios Pendientes</span>
+                </a>
+                <a href="{% url 'ventas:estadisticas_premios' %}" class="btn-modulo btn-dashboard">
+                    <span class="icon">📊</span>
+                    <span>Dashboard de Premios</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="modulo-card">
+            <h2>⚙️ Configuración y Procesamiento</h2>
+            <div class="buttons-grid">
+                <button id="btn-procesar-manual" class="btn-modulo btn-procesar">
+                    <span class="icon">⚡</span>
+                    <span>Procesar Premios Ahora</span>
+                </button>
+                <a href="{% url 'ventas:historial_tramos' %}" class="btn-modulo btn-historial">
+                    <span class="icon">📈</span>
+                    <span>Historial de Tramos</span>
+                </a>
+                <a href="{% url 'ventas:configurar_premios' %}" class="btn-modulo btn-configurar">
+                    <span class="icon">⚙️</span>
+                    <span>Configurar Premios</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Últimos premios generados -->
+    <div class="modulo-card ultimos-premios">
+        <h2>🆕 Últimos Premios Generados</h2>
+        {% if ultimos_premios %}
+            {% for premio in ultimos_premios %}
+            <div class="premio-item">
+                <div class="cliente-nombre">{{ premio.cliente.nombre }}</div>
+                <div class="premio-nombre">{{ premio.premio.nombre }}</div>
+                <span class="badge badge-{{ premio.estado }}">
+                    {% if premio.estado == 'pendiente_aprobacion' %}Pendiente
+                    {% elif premio.estado == 'aprobado' %}Aprobado
+                    {% elif premio.estado == 'enviado' %}Enviado
+                    {% elif premio.estado == 'usado' %}Usado
+                    {% elif premio.estado == 'expirado' %}Expirado
+                    {% endif %}
+                </span>
+                <span class="fecha">{{ premio.fecha_ganado|date:"d/m/Y H:i" }}</span>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p style="color: #999; text-align: center; padding: 2rem;">No hay premios generados aún.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.getElementById('btn-procesar-manual').addEventListener('click', function() {
+    if (!confirm('¿Ejecutar procesamiento manual de premios de bienvenida?\n\nEsto buscará clientes con check-in hace 3 días y generará premios si corresponde.')) {
+        return;
+    }
+
+    this.disabled = true;
+    this.innerHTML = '<span class="icon">⏳</span><span>Procesando...</span>';
+
+    fetch('{% url "ventas:procesar_premios_manual" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Procesamiento completado exitosamente.');
+            location.reload();
+        } else {
+            alert('❌ Error: ' + data.error);
+            this.disabled = false;
+            this.innerHTML = '<span class="icon">⚡</span><span>Procesar Premios Ahora</span>';
+        }
+    })
+    .catch(error => {
+        alert('❌ Error de conexión: ' + error);
+        this.disabled = false;
+        this.innerHTML = '<span class="icon">⚡</span><span>Procesar Premios Ahora</span>';
+    });
+});
+</script>
+{% endblock %}

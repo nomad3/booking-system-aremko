@@ -1,0 +1,97 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Estadísticas de Premios{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/modern.css' %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; <a href="{% url 'ventas:premio_dashboard' %}">Premios</a>
+    &rsaquo; Estadísticas
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4">
+    <h1>📊 Estadísticas del Programa de Fidelización</h1>
+
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h3>{{ total_premios }}</h3>
+                    <p>Total Premios Generados</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h3>{{ premios_usados }}</h3>
+                    <p>Premios Usados</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h3>{{ tasa_conversion }}%</h3>
+                    <p>Tasa de Conversión</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <strong>Premios Más Populares</strong>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Premio</th>
+                        <th>Total Asignados</th>
+                        <th>Usados</th>
+                        <th>Tasa de Uso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for premio in premios_populares %}
+                    <tr>
+                        <td>{{ premio.nombre }}</td>
+                        <td>{{ premio.total }}</td>
+                        <td>{{ premio.usados }}</td>
+                        <td>{% if premio.total > 0 %}{{ premio.usados|floatformat:0 |default:0 }} / {{ premio.total }} ({% widthratio premio.usados premio.total 100 %}%){% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <strong>Clientes por Tramo</strong>
+        </div>
+        <div class="card-body">
+            {% for item in clientes_por_tramo %}
+            <div class="mb-2">
+                <strong>Tramo {{ item.tramo }}:</strong> {{ item.count }} clientes
+                <div class="progress" style="height: 20px;">
+                    <div class="progress-bar" role="progressbar"
+                         style="width: {% widthratio item.count 100 100 %}%">
+                        {{ item.count }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

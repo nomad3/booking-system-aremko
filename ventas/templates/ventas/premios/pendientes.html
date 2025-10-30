@@ -1,0 +1,146 @@
+{% extends "admin/base_site.html" %}
+{% load static i18n %}
+
+{% block title %}Premios Pendientes de Aprobación{% endblock %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+    <style>
+        .pendientes-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        .premio-card {
+            background: white;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .premio-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .premio-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .cliente-info {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1rem;
+        }
+        .premio-info {
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+        .acciones {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .btn {
+            padding: 0.5rem 1.5rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-aprobar {
+            background: #66bb6a;
+            color: white;
+        }
+        .btn-rechazar {
+            background: #ef5350;
+            color: white;
+        }
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+        .no-premios {
+            text-align: center;
+            padding: 3rem;
+            color: #999;
+        }
+    </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+    &rsaquo; <a href="{% url 'ventas:premio_dashboard' %}">Premios</a>
+    &rsaquo; Pendientes de Aprobación
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="pendientes-container">
+    <h1>✅ Premios Pendientes de Aprobación</h1>
+
+    {% if premios_pendientes %}
+    <form method="post" id="form-premios">
+        {% csrf_token %}
+        {% for premio in premios_pendientes %}
+        <div class="premio-card">
+            <div class="premio-header">
+                <div>
+                    <input type="checkbox" name="premio_ids" value="{{ premio.id }}" class="premio-checkbox">
+                    <span class="cliente-info">{{ premio.cliente.nombre }} - {{ premio.cliente.telefono }}</span>
+                </div>
+                <span style="color: #999;">{{ premio.fecha_ganado|date:"d/m/Y H:i" }}</span>
+            </div>
+            <div class="premio-info">
+                <strong>Premio:</strong> {{ premio.premio.nombre }}<br>
+                <strong>Tipo:</strong> {{ premio.premio.get_tipo_display }}<br>
+                <strong>Descripción:</strong> {{ premio.premio.descripcion_corta }}<br>
+                <strong>Tramo al ganar:</strong> Tramo {{ premio.tramo_al_ganar }} - Gasto: ${{ premio.gasto_total_al_ganar|floatformat:0 }}<br>
+                <strong>Válido hasta:</strong> {{ premio.fecha_expiracion|date:"d/m/Y" }}
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="acciones" style="margin-top: 2rem;">
+            <button type="submit" name="action" value="aprobar" class="btn btn-aprobar">
+                Aprobar Seleccionados
+            </button>
+            <button type="submit" name="action" value="rechazar" class="btn btn-rechazar">
+                Rechazar Seleccionados
+            </button>
+        </div>
+    </form>
+
+    <script>
+        // Select all checkbox functionality
+        const checkboxes = document.querySelectorAll('.premio-checkbox');
+        document.querySelector('h1').insertAdjacentHTML('afterend',
+            '<label style="margin: 1rem 0; display: block;"><input type="checkbox" id="select-all"> Seleccionar todos</label>'
+        );
+
+        document.getElementById('select-all').addEventListener('change', function(e) {
+            checkboxes.forEach(cb => cb.checked = e.target.checked);
+        });
+
+        // Form validation
+        document.getElementById('form-premios').addEventListener('submit', function(e) {
+            const checked = Array.from(checkboxes).filter(cb => cb.checked);
+            if (checked.length === 0) {
+                e.preventDefault();
+                alert('Por favor, selecciona al menos un premio.');
+            }
+        });
+    </script>
+    {% else %}
+    <div class="no-premios">
+        <p>🎉 No hay premios pendientes de aprobación</p>
+        <a href="{% url 'ventas:premio_dashboard' %}" class="btn btn-aprobar" style="display: inline-block; margin-top: 1rem;">
+            Volver al Dashboard
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

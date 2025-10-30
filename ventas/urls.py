@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views # Import the new admin views module and mercadopago views
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views # Import premio_views
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -128,6 +128,18 @@ urlpatterns = [
     # === BULK EMAIL SENDER WITH AI ===
     path('crm/bulk-email-sender/', crm_views.bulk_email_sender_view, name='bulk_email_sender'),
     path('crm/bulk-email-send/', crm_views.bulk_email_send_view, name='bulk_email_send'),
+
+    # === PREMIOS Y FIDELIZACIÓN ===
+    path('premios/', premio_views.premio_dashboard, name='premio_dashboard'),
+    path('premios/pendientes/', premio_views.premios_pendientes, name='premios_pendientes'),
+    path('premios/clientes/', premio_views.clientes_con_premios, name='clientes_con_premios'),
+    path('premios/historial-tramos/', premio_views.historial_tramos, name='historial_tramos'),
+    path('premios/configurar/', premio_views.configurar_premios, name='configurar_premios'),
+    path('premios/procesar-manual/', premio_views.procesar_premios_manual, name='procesar_premios_manual'),
+    path('premios/estadisticas/', premio_views.estadisticas_premios, name='estadisticas_premios'),
+    path('premios/<int:premio_id>/', premio_views.cliente_premio_detalle, name='cliente_premio_detalle'),
+    path('premios/<int:premio_id>/marcar-enviado/', premio_views.marcar_premio_enviado, name='marcar_premio_enviado'),
+    # === END PREMIOS ===
 
     # API Router (Keep this last if possible, or ensure specific paths come first)
     path('', include(router.urls)),

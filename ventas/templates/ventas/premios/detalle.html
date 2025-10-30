@@ -1,0 +1,113 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Detalle del Premio{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/modern.css' %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; <a href="{% url 'ventas:premio_dashboard' %}">Premios</a>
+    &rsaquo; Detalle
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="modern-container mt-4">
+    <h1>🎁 Detalle del Premio</h1>
+
+    <div class="card mt-3">
+        <div class="card-header">
+            <strong>Información del Cliente</strong>
+        </div>
+        <div class="card-body">
+            <p><strong>Nombre:</strong> {{ cliente_premio.cliente.nombre }}</p>
+            <p><strong>Teléfono:</strong> {{ cliente_premio.cliente.telefono }}</p>
+            <p><strong>Email:</strong> {{ cliente_premio.cliente.email|default:"No registrado" }}</p>
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-header">
+            <strong>Información del Premio</strong>
+        </div>
+        <div class="card-body">
+            <p><strong>Premio:</strong> {{ cliente_premio.premio.nombre }}</p>
+            <p><strong>Tipo:</strong> {{ cliente_premio.premio.get_tipo_display }}</p>
+            <p><strong>Descripción:</strong> {{ cliente_premio.premio.descripcion_corta }}</p>
+            <p><strong>Estado:</strong>
+                <span class="badge bg-{% if cliente_premio.estado == 'usado' %}success{% elif cliente_premio.estado == 'expirado' %}danger{% elif cliente_premio.estado == 'aprobado' %}primary{% else %}warning{% endif %}">
+                    {{ cliente_premio.get_estado_display }}
+                </span>
+            </p>
+            <p><strong>Tramo al ganar:</strong> Tramo {{ cliente_premio.tramo_al_ganar }}</p>
+            <p><strong>Gasto total al ganar:</strong> ${{ cliente_premio.gasto_total_al_ganar|floatformat:0 }}</p>
+            <p><strong>Fecha ganado:</strong> {{ cliente_premio.fecha_ganado|date:"d/m/Y H:i" }}</p>
+            <p><strong>Fecha expiración:</strong> {{ cliente_premio.fecha_expiracion|date:"d/m/Y" }}</p>
+
+            {% if cliente_premio.estado == 'aprobado' %}
+            <button class="btn btn-primary" onclick="marcarEnviado({{ cliente_premio.id }})">
+                Marcar como Enviado
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-header">
+            <strong>Otros Premios del Cliente</strong>
+        </div>
+        <div class="card-body">
+            {% if otros_premios %}
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Premio</th>
+                        <th>Estado</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for premio in otros_premios %}
+                    <tr>
+                        <td>{{ premio.premio.nombre }}</td>
+                        <td>{{ premio.get_estado_display }}</td>
+                        <td>{{ premio.fecha_ganado|date:"d/m/Y" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-muted">No tiene otros premios</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function marcarEnviado(premioId) {
+    if (!confirm('¿Marcar este premio como enviado?')) return;
+
+    fetch(`/premios/${premioId}/marcar-enviado/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Premio marcado como enviado');
+            location.reload();
+        } else {
+            alert('❌ Error: ' + data.error);
+        }
+    });
+}
+</script>
+{% endblock %}
