@@ -8,7 +8,7 @@ import sys
 import django
 
 # Setup Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gestor_talleres.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aremko_project.settings')
 django.setup()
 
 from django.db import connection
