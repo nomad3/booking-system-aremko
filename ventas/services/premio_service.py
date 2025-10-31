@@ -139,6 +139,7 @@ class PremioService:
     def _determinar_tipo_premio_hito(cls, tramo: int) -> str:
         """
         Determina el tipo de premio según el tramo alcanzado
+        AHORA CONSULTA LA BASE DE DATOS (campo tramo_hito)
 
         Args:
             tramo: Número de tramo
@@ -146,16 +147,16 @@ class PremioService:
         Returns:
             Tipo de premio ('tinas_gratis', 'noche_gratis', etc.) o None
         """
-        if tramo == 5:
-            return 'tinas_gratis'  # Vale $60K en tinas con masajes
-        elif tramo == 10:
-            return 'noche_gratis'  # 1 noche en cabaña (VIP)
-        elif tramo == 15:
-            return 'tinas_gratis'  # Vale premium
-        elif tramo == 20:
-            return 'noche_gratis'  # 1 noche elite
+        # Buscar premio configurado para este tramo
+        premio = Premio.objects.filter(
+            tramo_hito=tramo,
+            activo=True
+        ).first()
+
+        if premio:
+            return premio.tipo
         else:
-            return None
+            return None  # No hay premio configurado para este tramo
 
     @classmethod
     def aprobar_premio(cls, premio_id: int) -> bool:

@@ -312,7 +312,7 @@ class Cliente(models.Model):
     nombre = models.CharField(max_length=100)
     email = models.EmailField(blank=True, null=True) # Allow blank email if phone is primary
     telefono = models.CharField(max_length=20, unique=True, help_text="Número de teléfono único (formato internacional preferido)") # Add unique=True
-    documento_identidad = models.CharField(max_length=20, null=True, blank=True, verbose_name="ID/DNI/Passport/RUT")
+    documento_identidad = models.CharField(max_length=100, null=True, blank=True, verbose_name="ID/DNI/Passport/RUT")
     pais = models.CharField(max_length=100, null=True, blank=True)
 
     # Ubicación (campos legacy y nuevos)
@@ -2243,12 +2243,17 @@ class Premio(models.Model):
     
     # Configuración
     dias_validez = models.IntegerField(default=30, help_text="Días de validez del premio")
+    tramo_hito = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Tramo en que se otorga este premio automáticamente (ej: 5, 10, 15, 20). NULL = no se otorga automáticamente"
+    )
     restricciones = models.JSONField(
         default=dict,
         blank=True,
         help_text='Restricciones en JSON. Ej: {"no_sabados": true, "no_acumulable": true}'
     )
-    
+
     # Metadata
     activo = models.BooleanField(default=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
@@ -2258,9 +2263,29 @@ class Premio(models.Model):
         verbose_name = "Premio"
         verbose_name_plural = "Premios"
         ordering = ['tipo', 'nombre']
-    
+
     def __str__(self):
         return f"{self.get_tipo_display()} - {self.nombre}"
+
+    def obtener_rango_tramo(self):
+        """
+        Retorna el rango de gasto del tramo asociado a este premio
+        """
+        if not self.tramo_hito:
+            return None, None
+
+        from ventas.services.tramo_service import TramoService
+        return TramoService.obtener_rango_tramo(self.tramo_hito)
+
+    def descripcion_tramo(self):
+        """
+        Retorna descripción legible del tramo
+        """
+        if not self.tramo_hito:
+            return "No asignado a tramo"
+
+        min_gasto, max_gasto = self.obtener_rango_tramo()
+        return f"Tramo {self.tramo_hito} (${min_gasto:,} - ${max_gasto:,})"
 
 
 class ClientePremio(models.Model):
