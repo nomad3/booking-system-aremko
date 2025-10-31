@@ -349,34 +349,31 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
 
     def _build_servicios_narrativa(self, categorias, metricas, estilo):
         """
-        Construye la narrativa de servicios desde el historial
+        Construye la narrativa de servicios desde el historial (sin mencionar cantidades específicas)
         """
         servicios_narrativa = ""
 
         if estilo == "calido" and categorias:
             for cat in categorias[:2]:
                 if 'Cabaña' in cat['service_type'] or 'cabaña' in cat['service_type'].lower():
-                    veces = cat['cantidad']
-                    servicios_narrativa += f"las {veces} escapadas inolvidables que viviste en nuestras cabañas rodeadas de naturaleza"
+                    servicios_narrativa += "las escapadas inolvidables que viviste en nuestras cabañas rodeadas de naturaleza"
                 elif 'Tina' in cat['service_type'] or 'tinaja' in cat['service_type'].lower():
-                    veces = cat['cantidad']
                     if servicios_narrativa:
-                        servicios_narrativa += f", y los momentos de relajo que disfrutaste en nuestras tinajas calientes privadas en {veces} ocasiones"
+                        servicios_narrativa += ", y los momentos de relajo que disfrutaste en nuestras tinajas calientes privadas"
                     else:
-                        servicios_narrativa += f"los {veces} momentos de relajo en nuestras tinajas calientes privadas"
+                        servicios_narrativa += "los momentos de relajo en nuestras tinajas calientes privadas"
                 elif 'Masaje' in cat['service_type']:
-                    veces = cat['cantidad']
                     if servicios_narrativa:
-                        servicios_narrativa += f", además de {veces} sesiones de masajes relajantes"
+                        servicios_narrativa += ", además de las sesiones de masajes relajantes"
                     else:
-                        servicios_narrativa += f"las {veces} sesiones de masajes que tanto disfrutaste"
+                        servicios_narrativa += "las sesiones de masajes que tanto disfrutaste"
 
             if not servicios_narrativa:
-                servicios_narrativa = f"las {metricas['total_servicios']} veces que nos has visitado"
+                servicios_narrativa = "las veces que nos has visitado"
         else:
             # Formal
             if categorias:
-                servicios_narrativa = f"tus {metricas['total_servicios']} visitas anteriores a Aremko"
+                servicios_narrativa = "tus visitas anteriores a Aremko"
             else:
                 servicios_narrativa = "tu interés en nuestros servicios"
 
