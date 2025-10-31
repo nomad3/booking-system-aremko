@@ -608,13 +608,16 @@ def _get_combined_metrics_for_segmentation():
                AND vr2.estado_pago IN ('pagado', 'parcial')
             ) as gasto_actual,
             -- Servicios históricos: SUMAR de TODOS los IDs con ese teléfono
+            -- EXCLUIR servicios con fecha placeholder 2021-01-01 (importación histórica sin fecha real)
             (SELECT COUNT(DISTINCT sh2.id)
              FROM crm_service_history sh2
              WHERE sh2.cliente_id = ANY(cpt.todos_los_ids)
+               AND sh2.service_date != '2021-01-01'
             ) as servicios_historicos,
             (SELECT COALESCE(SUM(sh2.price_paid), 0)
              FROM crm_service_history sh2
              WHERE sh2.cliente_id = ANY(cpt.todos_los_ids)
+               AND sh2.service_date != '2021-01-01'
             ) as gasto_historico,
             -- Totales combinados
             ((SELECT COUNT(DISTINCT rs2.id)
@@ -626,6 +629,7 @@ def _get_combined_metrics_for_segmentation():
              (SELECT COUNT(DISTINCT sh2.id)
               FROM crm_service_history sh2
               WHERE sh2.cliente_id = ANY(cpt.todos_los_ids)
+                AND sh2.service_date != '2021-01-01'
              )) as total_servicios,
             ((SELECT COALESCE(SUM(CAST(s2.precio_base AS DECIMAL) * COALESCE(rs2.cantidad_personas, 1)), 0)
               FROM ventas_ventareserva vr2
@@ -637,6 +641,7 @@ def _get_combined_metrics_for_segmentation():
              (SELECT COALESCE(SUM(sh2.price_paid), 0)
               FROM crm_service_history sh2
               WHERE sh2.cliente_id = ANY(cpt.todos_los_ids)
+                AND sh2.service_date != '2021-01-01'
              )) as total_gasto
         FROM clientes_por_telefono cpt
         ORDER BY total_gasto DESC
