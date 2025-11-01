@@ -80,11 +80,19 @@ else:
     print("Variables de entorno para superusuario no están completamente configuradas.")
 EOF
 
-# Recolectar archivos estáticos
-echo "Recolectando archivos estáticos..."
-python manage.py collectstatic --noinput
+# Verificar si se pasaron argumentos al contenedor (ej: comando de cron job)
+if [ "$#" -gt 0 ]; then
+    # Si hay argumentos, ejecutarlos directamente (para cron jobs)
+    echo "Ejecutando comando: $@"
+    exec "$@"
+else
+    # Si no hay argumentos, ejecutar comportamiento por defecto (web service)
+    # Recolectar archivos estáticos
+    echo "Recolectando archivos estáticos..."
+    python manage.py collectstatic --noinput
 
-# Iniciar Gunicorn para servir la aplicación, usando el puerto asignado por Render
-PORT=${PORT:-8000}
-echo "Iniciando Gunicorn en 0.0.0.0:$PORT con 1 worker, timeout 120s, log-level warning..."
-exec gunicorn aremko_project.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level warning
+    # Iniciar Gunicorn para servir la aplicación, usando el puerto asignado por Render
+    PORT=${PORT:-8000}
+    echo "Iniciando Gunicorn en 0.0.0.0:$PORT con 1 worker, timeout 120s, log-level warning..."
+    exec gunicorn aremko_project.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level warning
+fi
