@@ -1377,7 +1377,31 @@ class ClientePremioAdmin(admin.ModelAdmin):
     )
     
     actions = ['aprobar_premios', 'marcar_como_enviado', 'cancelar_premios']
-    
+
+    def get_urls(self):
+        """Agregar URL personalizada para preview de email"""
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                '<int:premio_id>/preview-email/',
+                self.admin_site.admin_view(self.preview_email_view),
+                name='preview_premio_email',
+            ),
+        ]
+        return custom_urls + urls
+
+    def preview_email_view(self, request, premio_id):
+        """Vista para mostrar preview del email de premio"""
+        from django.http import HttpResponse
+        from ventas.services.email_premio_service import EmailPremioService
+
+        # Generar el HTML del email usando el servicio
+        html_content = EmailPremioService.preview_email(premio_id)
+
+        # Retornar el HTML directamente
+        return HttpResponse(html_content)
+
     def cliente_link(self, obj):
         """Link al cliente"""
         if obj.cliente:
@@ -1434,22 +1458,37 @@ class ClientePremioAdmin(admin.ModelAdmin):
     def acciones_rapidas(self, obj):
         """Botones de acciones rápidas"""
         buttons = []
-        
+
         if obj.estado == 'pendiente_aprobacion':
+            # Botón de Vista Previa
+            preview_url = reverse('admin:preview_premio_email', args=[obj.id])
+            buttons.append(
+                '<a class="button" href="{}" target="_blank" style="background-color: #2196F3; color: white;">👁️ Vista Previa</a>'.format(
+                    preview_url
+                )
+            )
+            # Botón de Aprobar
             buttons.append(
                 '<a class="button" href="{}?ids={}">Aprobar</a>'.format(
                     reverse('admin:ventas_clientepremio_changelist'),
                     obj.id
                 )
             )
-        
+
         if obj.estado in ['aprobado', 'enviado'] and obj.esta_vigente():
+            # Botón de Vista Previa también para aprobados/enviados
+            preview_url = reverse('admin:preview_premio_email', args=[obj.id])
+            buttons.append(
+                '<a class="button" href="{}" target="_blank" style="background-color: #2196F3; color: white;">👁️ Vista Previa</a>'.format(
+                    preview_url
+                )
+            )
             buttons.append(
                 '<a class="button" href="{}">Ver Email</a>'.format(
                     reverse('admin:ventas_clientepremio_change', args=[obj.id])
                 )
             )
-        
+
         return format_html(' '.join(buttons)) if buttons else '-'
     acciones_rapidas.short_description = 'Acciones'
     
