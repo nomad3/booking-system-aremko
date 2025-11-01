@@ -84,7 +84,8 @@ EOF
 if [ "$#" -gt 0 ]; then
     # Si hay argumentos, ejecutarlos directamente (para cron jobs)
     echo "Ejecutando comando: $@"
-    exec "$@"
+    # Usar eval para ejecutar el comando correctamente si contiene espacios
+    eval exec "$@"
 else
     # Si no hay argumentos, ejecutar comportamiento por defecto (web service)
     # Recolectar archivos estáticos
