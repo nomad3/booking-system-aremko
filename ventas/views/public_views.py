@@ -77,8 +77,15 @@ def categoria_detail_view(request, categoria_id):
         canonical_url = request.build_absolute_uri(request.path)
     except Exception:
         canonical_url = request.path
-    
-    category_hero_image = categoria.imagen.url if categoria.imagen else None
+
+    # Get category hero image safely (handle missing files in cloud storage)
+    category_hero_image = None
+    try:
+        if categoria.imagen:
+            category_hero_image = categoria.imagen.url
+    except Exception:
+        # File exists in DB but not in cloud storage - gracefully handle
+        pass
 
     context = {
         'categoria_actual': categoria,
