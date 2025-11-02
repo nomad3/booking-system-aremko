@@ -44,14 +44,23 @@ def premio_dashboard(request):
         'cliente', 'premio'
     ).order_by('-fecha_ganado')[:10]
 
-    # Distribución de clientes por tramo
+    # Distribución de clientes por tramo (usando datos combinados histórico + actual)
+    from collections import defaultdict
+    tramo_counts = defaultdict(int)
+
+    # Calcular tramo real de cada cliente usando TramoService (que usa CRMService internamente)
+    for cliente in Cliente.objects.all():
+        tramo_actual = TramoService.obtener_tramo_actual(cliente)
+        if tramo_actual > 0:
+            tramo_counts[tramo_actual] += 1
+
+    # Construir el diccionario de distribución
     distribución_tramos = {}
-    for tramo in range(1, 21):
-        count = HistorialTramo.objects.filter(tramo_hasta=tramo).values('cliente').distinct().count()
-        if count > 0:
+    for tramo in sorted(tramo_counts.keys()):
+        if tramo <= 20:  # Solo mostrar hasta tramo 20 en dashboard
             min_gasto, max_gasto = TramoService.obtener_rango_tramo(tramo)
             distribución_tramos[tramo] = {
-                'count': count,
+                'count': tramo_counts[tramo],
                 'min_gasto': min_gasto,
                 'max_gasto': max_gasto,
             }
@@ -323,14 +332,21 @@ def estadisticas_premios(request):
     premios_usados = ClientePremio.objects.filter(estado='usado').count()
     tasa_conversion = (premios_usados / total_premios * 100) if total_premios > 0 else 0
 
-    # Clientes por tramo
+    # Clientes por tramo (usando datos combinados histórico + actual)
+    from collections import defaultdict
+    tramo_counts = defaultdict(int)
+
+    # Calcular tramo real de cada cliente usando TramoService (que usa CRMService internamente)
+    for cliente in Cliente.objects.all():
+        tramo_actual = TramoService.obtener_tramo_actual(cliente)
+        if tramo_actual > 0:
+            tramo_counts[tramo_actual] += 1
+
+    # Construir la lista de clientes por tramo
     clientes_por_tramo = []
-    for tramo in range(1, 21):
-        count = Cliente.objects.filter(
-            historial_tramos__tramo_hasta=tramo
-        ).distinct().count()
-        if count > 0:
-            clientes_por_tramo.append({'tramo': tramo, 'count': count})
+    for tramo in sorted(tramo_counts.keys()):
+        if tramo <= 20:  # Solo mostrar hasta tramo 20 en estadísticas
+            clientes_por_tramo.append({'tramo': tramo, 'count': tramo_counts[tramo]})
 
     # Premios más populares
     premios_populares = Premio.objects.annotate(
