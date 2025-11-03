@@ -71,9 +71,13 @@ def premio_dashboard(request):
                 Value(0, output_field=DecimalField())
             ),
             # Gasto en ventas actuales (estado pagado o parcial)
+            # Nota: el precio se calcula como servicio__precio_base * cantidad_personas
             gasto_actual=Coalesce(
-                Sum('ventareserva__reservaservicio__precio_final',
-                    filter=Q(ventareserva__estado_pago__in=['pagado', 'parcial'])),
+                Sum(
+                    F('ventareserva__reservaservicios__servicio__precio_base') *
+                    F('ventareserva__reservaservicios__cantidad_personas'),
+                    filter=Q(ventareserva__estado_pago__in=['pagado', 'parcial'])
+                ),
                 Value(0, output_field=DecimalField())
             )
         ).annotate(
@@ -397,8 +401,11 @@ def estadisticas_premios(request):
             Value(0, output_field=DecimalField())
         ),
         gasto_actual=Coalesce(
-            Sum('ventareserva__reservaservicio__precio_final',
-                filter=Q(ventareserva__estado_pago__in=['pagado', 'parcial'])),
+            Sum(
+                F('ventareserva__reservaservicios__servicio__precio_base') *
+                F('ventareserva__reservaservicios__cantidad_personas'),
+                filter=Q(ventareserva__estado_pago__in=['pagado', 'parcial'])
+            ),
             Value(0, output_field=DecimalField())
         )
     ).annotate(
