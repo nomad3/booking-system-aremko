@@ -44,26 +44,49 @@ def premio_dashboard(request):
         'cliente', 'premio'
     ).order_by('-fecha_ganado')[:10]
 
-    # Distribución de clientes por tramo (usando datos combinados histórico + actual)
+    # Distribución de clientes por tramo (OPTIMIZADO - query única)
     from collections import defaultdict
+    from django.db.models import F, Sum, Case, When, Value, DecimalField
+    from django.db.models.functions import Coalesce
+
     tramo_counts = defaultdict(int)
 
-    # Calcular tramo real de cada cliente usando TramoService (que usa CRMService internamente)
-    for cliente in Cliente.objects.all():
-        tramo_actual = TramoService.obtener_tramo_actual(cliente)
-        if tramo_actual > 0:
+    # Query OPTIMIZADA: calcular gasto total de cada cliente en UNA sola query
+    # Combina servicios históricos + ventas actuales usando SUBQUERIES
+    clientes_con_gasto = Cliente.objects.annotate(
+        # Gasto en servicios históricos (excluyendo fecha genérica 2021-01-01)
+        gasto_historico=Coalesce(
+            Sum('service_history__price_paid',
+                filter=~Q(service_history__service_date='2021-01-01')),
+            Value(0, output_field=DecimalField())
+        ),
+        # Gasto en ventas actuales (estado pagado o parcial)
+        gasto_actual=Coalesce(
+            Sum('ventareserva__reservaservicio__precio_final',
+                filter=Q(ventareserva__estado_pago__in=['pagado', 'parcial'])),
+            Value(0, output_field=DecimalField())
+        )
+    ).annotate(
+        # Gasto total = histórico + actual
+        gasto_total=F('gasto_historico') + F('gasto_actual')
+    ).values('gasto_total')
+
+    # Agrupar clientes por tramo basado en su gasto total
+    for cliente_data in clientes_con_gasto:
+        gasto_total = float(cliente_data['gasto_total'] or 0)
+        tramo_actual = int(gasto_total / 50000)  # Cada tramo = $50,000
+        if tramo_actual > 0 and tramo_actual <= 20:
             tramo_counts[tramo_actual] += 1
 
     # Construir el diccionario de distribución
     distribución_tramos = {}
     for tramo in sorted(tramo_counts.keys()):
-        if tramo <= 20:  # Solo mostrar hasta tramo 20 en dashboard
-            min_gasto, max_gasto = TramoService.obtener_rango_tramo(tramo)
-            distribución_tramos[tramo] = {
-                'count': tramo_counts[tramo],
-                'min_gasto': min_gasto,
-                'max_gasto': max_gasto,
-            }
+        min_gasto, max_gasto = TramoService.obtener_rango_tramo(tramo)
+        distribución_tramos[tramo] = {
+            'count': tramo_counts[tramo],
+            'min_gasto': min_gasto,
+            'max_gasto': max_gasto,
+        }
 
     context = {
         'stats': stats,
@@ -332,21 +355,40 @@ def estadisticas_premios(request):
     premios_usados = ClientePremio.objects.filter(estado='usado').count()
     tasa_conversion = (premios_usados / total_premios * 100) if total_premios > 0 else 0
 
-    # Clientes por tramo (usando datos combinados histórico + actual)
+    # Clientes por tramo (OPTIMIZADO - query única)
     from collections import defaultdict
+    from django.db.models import F, Sum, Case, When, Value, DecimalField
+    from django.db.models.functions import Coalesce
+
     tramo_counts = defaultdict(int)
 
-    # Calcular tramo real de cada cliente usando TramoService (que usa CRMService internamente)
-    for cliente in Cliente.objects.all():
-        tramo_actual = TramoService.obtener_tramo_actual(cliente)
-        if tramo_actual > 0:
+    # Query OPTIMIZADA: calcular gasto total de cada cliente en UNA sola query
+    clientes_con_gasto = Cliente.objects.annotate(
+        gasto_historico=Coalesce(
+            Sum('service_history__price_paid',
+                filter=~Q(service_history__service_date='2021-01-01')),
+            Value(0, output_field=DecimalField())
+        ),
+        gasto_actual=Coalesce(
+            Sum('ventareserva__reservaservicio__precio_final',
+                filter=Q(ventareserva__estado_pago__in=['pagado', 'parcial'])),
+            Value(0, output_field=DecimalField())
+        )
+    ).annotate(
+        gasto_total=F('gasto_historico') + F('gasto_actual')
+    ).values('gasto_total')
+
+    # Agrupar por tramo
+    for cliente_data in clientes_con_gasto:
+        gasto_total = float(cliente_data['gasto_total'] or 0)
+        tramo_actual = int(gasto_total / 50000)
+        if tramo_actual > 0 and tramo_actual <= 20:
             tramo_counts[tramo_actual] += 1
 
     # Construir la lista de clientes por tramo
     clientes_por_tramo = []
     for tramo in sorted(tramo_counts.keys()):
-        if tramo <= 20:  # Solo mostrar hasta tramo 20 en estadísticas
-            clientes_por_tramo.append({'tramo': tramo, 'count': tramo_counts[tramo]})
+        clientes_por_tramo.append({'tramo': tramo, 'count': tramo_counts[tramo]})
 
     # Premios más populares
     premios_populares = Premio.objects.annotate(
