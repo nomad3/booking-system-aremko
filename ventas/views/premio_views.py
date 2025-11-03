@@ -53,57 +53,57 @@ def premio_dashboard(request):
 
         # Últimos premios generados
         ultimos_premios = ClientePremio.objects.select_related(
-        'cliente', 'premio'
-    ).order_by('-fecha_ganado')[:10]
+            'cliente', 'premio'
+        ).order_by('-fecha_ganado')[:10]
 
-    # Distribución de clientes por tramo (OPTIMIZADO - query única)
-    from collections import defaultdict
+        # Distribución de clientes por tramo (OPTIMIZADO - query única)
+        from collections import defaultdict
 
-    tramo_counts = defaultdict(int)
+        tramo_counts = defaultdict(int)
 
-    # Query OPTIMIZADA: calcular gasto total de cada cliente en UNA sola query
-    # Combina servicios históricos + ventas actuales usando SUBQUERIES
-    clientes_con_gasto = Cliente.objects.annotate(
-        # Gasto en servicios históricos (excluyendo fecha genérica 2021-01-01)
-        gasto_historico=Coalesce(
-            Sum('historial_servicios__price_paid',
-                filter=~Q(historial_servicios__service_date='2021-01-01')),
-            Value(0, output_field=DecimalField())
-        ),
-        # Gasto en ventas actuales (estado pagado o parcial)
-        gasto_actual=Coalesce(
-            Sum('ventareserva__reservaservicio__precio_final',
-                filter=Q(ventareserva__estado_pago__in=['pagado', 'parcial'])),
-            Value(0, output_field=DecimalField())
-        )
-    ).annotate(
-        # Gasto total = histórico + actual
-        gasto_total=F('gasto_historico') + F('gasto_actual')
-    ).values('gasto_total')
+        # Query OPTIMIZADA: calcular gasto total de cada cliente en UNA sola query
+        # Combina servicios históricos + ventas actuales usando SUBQUERIES
+        clientes_con_gasto = Cliente.objects.annotate(
+            # Gasto en servicios históricos (excluyendo fecha genérica 2021-01-01)
+            gasto_historico=Coalesce(
+                Sum('historial_servicios__price_paid',
+                    filter=~Q(historial_servicios__service_date='2021-01-01')),
+                Value(0, output_field=DecimalField())
+            ),
+            # Gasto en ventas actuales (estado pagado o parcial)
+            gasto_actual=Coalesce(
+                Sum('ventareserva__reservaservicio__precio_final',
+                    filter=Q(ventareserva__estado_pago__in=['pagado', 'parcial'])),
+                Value(0, output_field=DecimalField())
+            )
+        ).annotate(
+            # Gasto total = histórico + actual
+            gasto_total=F('gasto_historico') + F('gasto_actual')
+        ).values('gasto_total')
 
-    # Agrupar clientes por tramo basado en su gasto total
-    for cliente_data in clientes_con_gasto:
-        gasto_total = float(cliente_data['gasto_total'] or 0)
-        tramo_actual = int(gasto_total / 50000)  # Cada tramo = $50,000
-        if tramo_actual > 0 and tramo_actual <= 20:
-            tramo_counts[tramo_actual] += 1
+        # Agrupar clientes por tramo basado en su gasto total
+        for cliente_data in clientes_con_gasto:
+            gasto_total = float(cliente_data['gasto_total'] or 0)
+            tramo_actual = int(gasto_total / 50000)  # Cada tramo = $50,000
+            if tramo_actual > 0 and tramo_actual <= 20:
+                tramo_counts[tramo_actual] += 1
 
-    # Construir el diccionario de distribución
-    distribución_tramos = {}
-    for tramo in sorted(tramo_counts.keys()):
-        min_gasto, max_gasto = TramoService.obtener_rango_tramo(tramo)
-        distribución_tramos[tramo] = {
-            'count': tramo_counts[tramo],
-            'min_gasto': min_gasto,
-            'max_gasto': max_gasto,
+        # Construir el diccionario de distribución
+        distribución_tramos = {}
+        for tramo in sorted(tramo_counts.keys()):
+            min_gasto, max_gasto = TramoService.obtener_rango_tramo(tramo)
+            distribución_tramos[tramo] = {
+                'count': tramo_counts[tramo],
+                'min_gasto': min_gasto,
+                'max_gasto': max_gasto,
+            }
+
+        context = {
+            'stats': stats,
+            'premios_por_tipo': premios_por_tipo,
+            'ultimos_premios': ultimos_premios,
+            'distribución_tramos': distribución_tramos,
         }
-
-    context = {
-        'stats': stats,
-        'premios_por_tipo': premios_por_tipo,
-        'ultimos_premios': ultimos_premios,
-        'distribución_tramos': distribución_tramos,
-    }
 
         return render(request, 'ventas/premios/dashboard.html', context)
 
