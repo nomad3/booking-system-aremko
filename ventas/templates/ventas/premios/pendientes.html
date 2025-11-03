@@ -58,7 +58,15 @@
             background: #ef5350;
             color: white;
         }
-        .btn:hover {
+        .btn-preview {
+            background: #42a5f5;
+            color: white;
+            font-size: 0.9rem;
+            padding: 0.4rem 1rem;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover, .btn-preview:hover {
             opacity: 0.9;
             transform: translateY(-2px);
         }
@@ -100,6 +108,11 @@
                 <strong>Descripción:</strong> {{ premio.premio.descripcion_corta }}<br>
                 <strong>Tramo al ganar:</strong> Tramo {{ premio.tramo_al_ganar }} - Gasto: ${{ premio.gasto_total_al_ganar|floatformat:0 }}<br>
                 <strong>Válido hasta:</strong> {{ premio.fecha_expiracion|date:"d/m/Y" }}
+            </div>
+            <div style="text-align: right; margin-top: 0.5rem;">
+                <a href="{% url 'ventas:premio_preview' premio.id %}" class="btn btn-preview" target="_blank">
+                    👁️ Ver Vista Previa del Email
+                </a>
             </div>
         </div>
         {% endfor %}

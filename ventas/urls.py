@@ -132,6 +132,7 @@ urlpatterns = [
     # === PREMIOS Y FIDELIZACIÓN ===
     path('premios/', premio_views.premio_dashboard, name='premio_dashboard'),
     path('premios/pendientes/', premio_views.premios_pendientes, name='premios_pendientes'),
+    path('premios/<int:premio_id>/preview/', premio_views.premio_preview, name='premio_preview'),
     path('premios/clientes/', premio_views.clientes_con_premios, name='clientes_con_premios'),
     path('premios/historial-tramos/', premio_views.historial_tramos, name='historial_tramos'),
     path('premios/configurar/', premio_views.configurar_premios, name='configurar_premios'),

@@ -25,6 +25,89 @@ from ..services.premio_service import PremioService
 
 import traceback
 from django.http import HttpResponse
+from ..services.email_premio_service import EmailPremioService
+
+
+@staff_member_required
+def premio_preview(request, premio_id):
+    """
+    Vista previa del email de premio antes de aprobarlo
+    """
+    try:
+        premio = get_object_or_404(ClientePremio, id=premio_id)
+
+        # Generar preview del email
+        html_content = EmailPremioService.preview_email(premio_id)
+
+        # Agregar botón para volver
+        back_url = request.META.get('HTTP_REFERER', '/ventas/premios/pendientes/')
+
+        html_with_controls = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Vista Previa - Premio {premio.cliente.nombre}</title>
+            <style>
+                .preview-controls {{
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    background: #f5f5f5;
+                    border-bottom: 2px solid #ddd;
+                    padding: 1rem;
+                    z-index: 1000;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }}
+                .preview-controls h2 {{
+                    margin: 0 0 0.5rem 0;
+                    color: #333;
+                }}
+                .preview-controls .info {{
+                    color: #666;
+                    font-size: 0.9rem;
+                    margin-bottom: 0.5rem;
+                }}
+                .preview-controls .btn {{
+                    display: inline-block;
+                    padding: 0.5rem 1.5rem;
+                    background: #007bff;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 4px;
+                    margin-right: 0.5rem;
+                }}
+                .preview-controls .btn:hover {{
+                    background: #0056b3;
+                }}
+                .email-preview {{
+                    margin-top: 150px;
+                    padding: 2rem;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="preview-controls">
+                <h2>📧 Vista Previa del Email de Premio</h2>
+                <div class="info">
+                    <strong>Cliente:</strong> {premio.cliente.nombre} |
+                    <strong>Email:</strong> {premio.cliente.email} |
+                    <strong>Premio:</strong> {premio.premio.nombre}
+                </div>
+                <a href="{back_url}" class="btn">← Volver a la lista</a>
+            </div>
+            <div class="email-preview">
+                {html_content}
+            </div>
+        </body>
+        </html>
+        """
+
+        return HttpResponse(html_with_controls)
+
+    except Exception as e:
+        return HttpResponse(f"Error generando vista previa: {str(e)}", status=500)
 
 
 @staff_member_required
