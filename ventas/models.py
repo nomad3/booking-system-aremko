@@ -2246,7 +2246,12 @@ class Premio(models.Model):
     tramo_hito = models.IntegerField(
         null=True,
         blank=True,
-        help_text="Tramo en que se otorga este premio automáticamente (ej: 5, 10, 15, 20). NULL = no se otorga automáticamente"
+        help_text="DEPRECATED: Usar tramos_validos. Tramo único antiguo"
+    )
+    tramos_validos = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Lista de tramos donde aplica este premio. Ej: [5,6,7,8] para premio de tramos 5-8'
     )
     restricciones = models.JSONField(
         default=dict,
@@ -2286,6 +2291,41 @@ class Premio(models.Model):
 
         min_gasto, max_gasto = self.obtener_rango_tramo()
         return f"Tramo {self.tramo_hito} (${min_gasto:,} - ${max_gasto:,})"
+
+    def get_tramos_list(self):
+        """
+        Obtiene la lista de tramos válidos para este premio
+        Mantiene compatibilidad con tramo_hito antiguo
+        """
+        if self.tramos_validos:
+            return self.tramos_validos
+        elif self.tramo_hito:
+            return [self.tramo_hito]
+        return []
+
+    def aplica_para_tramo(self, tramo):
+        """
+        Verifica si este premio aplica para un tramo específico
+        """
+        return tramo in self.get_tramos_list()
+
+    def descripcion_tramos_validos(self):
+        """
+        Retorna descripción legible de los tramos válidos
+        """
+        tramos = self.get_tramos_list()
+        if not tramos:
+            return "No asignado a tramos"
+
+        if len(tramos) == 1:
+            return f"Tramo {tramos[0]}"
+
+        # Agrupar tramos consecutivos
+        tramos_sorted = sorted(tramos)
+        if tramos_sorted == list(range(tramos_sorted[0], tramos_sorted[-1] + 1)):
+            return f"Tramos {tramos_sorted[0]} al {tramos_sorted[-1]}"
+        else:
+            return f"Tramos {', '.join(map(str, tramos_sorted))}"
 
 
 class ClientePremio(models.Model):

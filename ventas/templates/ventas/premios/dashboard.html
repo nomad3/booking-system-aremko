@@ -314,6 +314,7 @@
                     <th>Rango de Gasto</th>
                     <th>Total Clientes</th>
                     <th>Clientes con Premios</th>
+                    <th>Premios Disponibles</th>
                 </tr>
             </thead>
             <tbody>
@@ -331,10 +332,19 @@
                     <td>
                         <span class="premios-count">{{ data.clientes_con_premios }}</span> con premios
                     </td>
+                    <td style="font-size: 0.9rem;">
+                        {% if data.premios_disponibles %}
+                            {% for premio in data.premios_disponibles %}
+                                <span style="display: block; margin: 2px 0;">• {{ premio }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span style="color: #999;">Sin premios asignados</span>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" style="text-align: center; color: #999; padding: 2rem;">
+                    <td colspan="5" style="text-align: center; color: #999; padding: 2rem;">
                         No hay datos de clientes por tramo disponibles.
                     </td>
                 </tr>

@@ -15,6 +15,25 @@ class PremioService:
     """Servicio para asignación y gestión de premios"""
 
     @classmethod
+    def puede_recibir_premio_tipo(cls, cliente, tipo_premio: str) -> bool:
+        """
+        Verifica si un cliente puede recibir un premio de cierto tipo
+        (Implementa la regla de un premio por tipo por cliente)
+
+        Args:
+            cliente: Objeto Cliente
+            tipo_premio: Tipo del premio
+
+        Returns:
+            True si puede recibir el premio, False si ya lo tiene
+        """
+        return not ClientePremio.objects.filter(
+            cliente=cliente,
+            premio__tipo=tipo_premio,
+            estado__in=['pendiente_aprobacion', 'aprobado', 'enviado', 'usado']
+        ).exists()
+
+    @classmethod
     @transaction.atomic
     def generar_premio_cliente_nuevo(cls, cliente: Cliente, gasto_total: Decimal) -> ClientePremio:
         """
@@ -77,12 +96,13 @@ class PremioService:
         gasto_total: Decimal
     ) -> ClientePremio:
         """
-        Genera premio por alcanzar un hito (Tramo 5, 10, 15, 20, etc.)
+        Genera premio por alcanzar un hito con la nueva lógica de rangos
 
-        Premios por tramo:
-        - Tramo 5: Vale $60K en tinas con masajes x2
-        - Tramo 10: 1 noche gratis en cabaña (VIP)
-        - Tramo 15+: Premios escalonados
+        Nueva lógica con rangos de tramos:
+        - Tramos 5-8: Vale $60K en tinas con masajes x2
+        - Tramos 9-12: 1 noche gratis en cabaña (VIP)
+        - Tramos 13-16: Vale Premium Alojamiento con Tinas
+        - Tramos 17-20: 1 Noche Gratis en Cabaña (ELITE)
 
         Args:
             cliente: Objeto Cliente
@@ -94,22 +114,23 @@ class PremioService:
             ClientePremio creado o None
         """
         try:
-            # Determinar tipo de premio según el tramo
-            tipo_premio = cls._determinar_tipo_premio_hito(tramo_actual)
+            # Buscar todos los premios activos que aplican para este tramo
+            premios_disponibles = []
+            for premio in Premio.objects.filter(activo=True):
+                if premio.aplica_para_tramo(tramo_actual):
+                    # Verificar que el cliente no tenga ya este tipo de premio
+                    if cls.puede_recibir_premio_tipo(cliente, premio.tipo):
+                        premios_disponibles.append(premio)
 
-            if not tipo_premio:
-                logger.info(f"Tramo {tramo_actual} no genera premio automático")
+            if not premios_disponibles:
+                logger.info(
+                    f"No hay premios disponibles para cliente {cliente.id} en tramo {tramo_actual} "
+                    f"(puede que ya tenga todos los premios de este rango)"
+                )
                 return None
 
-            # Buscar el premio en la base de datos
-            premio = Premio.objects.filter(
-                tipo=tipo_premio,
-                activo=True
-            ).first()
-
-            if not premio:
-                logger.error(f"No existe premio de tipo '{tipo_premio}' activo")
-                return None
+            # Tomar el primer premio disponible
+            premio = premios_disponibles[0]
 
             # Crear el premio
             cliente_premio = ClientePremio.objects.create(
@@ -124,7 +145,8 @@ class PremioService:
 
             logger.info(
                 f"Premio de hito creado: Cliente {cliente.id}, "
-                f"Tramo {tramo_anterior} → {tramo_actual}, Premio: {premio.nombre}"
+                f"Tramo {tramo_anterior} → {tramo_actual}, Premio: {premio.nombre} "
+                f"(tipo: {premio.tipo})"
             )
             return cliente_premio
 

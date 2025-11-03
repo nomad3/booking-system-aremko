@@ -177,6 +177,15 @@ def premio_dashboard(request):
 
         # Construir el diccionario de distribución
         distribución_tramos = {}
+
+        # Obtener premios activos y sus tramos
+        premios_por_tramo = {}
+        for premio in Premio.objects.filter(activo=True):
+            for tramo in premio.get_tramos_list():
+                if tramo not in premios_por_tramo:
+                    premios_por_tramo[tramo] = []
+                premios_por_tramo[tramo].append(premio.nombre)
+
         for tramo in sorted(tramo_counts.keys()):
             min_gasto, max_gasto = TramoService.obtener_rango_tramo(tramo)
 
@@ -190,6 +199,7 @@ def premio_dashboard(request):
                 'min_gasto': min_gasto,
                 'max_gasto': max_gasto,
                 'clientes_con_premios': clientes_con_premios,
+                'premios_disponibles': premios_por_tramo.get(tramo, []),
             }
 
         context = {
