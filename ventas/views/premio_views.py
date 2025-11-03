@@ -47,8 +47,6 @@ def premio_dashboard(request):
 
     # Distribución de clientes por tramo (OPTIMIZADO - query única)
     from collections import defaultdict
-    from django.db.models import F, Sum, Case, When, Value, DecimalField
-    from django.db.models.functions import Coalesce
 
     tramo_counts = defaultdict(int)
 
