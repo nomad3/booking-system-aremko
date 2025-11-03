@@ -23,28 +23,36 @@ from ..services.tramo_service import TramoService
 from ..services.premio_service import PremioService
 
 
+import traceback
+from django.http import HttpResponse
+
+
 @staff_member_required
 def premio_dashboard(request):
     """
     Dashboard principal del módulo de premios y fidelización
     """
-    # Estadísticas de premios
-    stats = {
-        'pendientes': ClientePremio.objects.filter(estado='pendiente_aprobacion').count(),
-        'aprobados': ClientePremio.objects.filter(estado='aprobado').count(),
-        'enviados': ClientePremio.objects.filter(estado='enviado').count(),
-        'usados': ClientePremio.objects.filter(estado='usado').count(),
-        'expirados': ClientePremio.objects.filter(estado='expirado').count(),
-        'total': ClientePremio.objects.count(),
-    }
+    import logging
+    logger = logging.getLogger(__name__)
 
-    # Premios por tipo
-    premios_por_tipo = Premio.objects.filter(activo=True).annotate(
-        cantidad=Count('clientepremio')
-    ).values('tipo', 'nombre', 'cantidad')
+    try:
+        # Estadísticas de premios
+        stats = {
+            'pendientes': ClientePremio.objects.filter(estado='pendiente_aprobacion').count(),
+            'aprobados': ClientePremio.objects.filter(estado='aprobado').count(),
+            'enviados': ClientePremio.objects.filter(estado='enviado').count(),
+            'usados': ClientePremio.objects.filter(estado='usado').count(),
+            'expirados': ClientePremio.objects.filter(estado='expirado').count(),
+            'total': ClientePremio.objects.count(),
+        }
 
-    # Últimos premios generados
-    ultimos_premios = ClientePremio.objects.select_related(
+        # Premios por tipo
+        premios_por_tipo = Premio.objects.filter(activo=True).annotate(
+            cantidad=Count('clientepremio')
+        ).values('tipo', 'nombre', 'cantidad')
+
+        # Últimos premios generados
+        ultimos_premios = ClientePremio.objects.select_related(
         'cliente', 'premio'
     ).order_by('-fecha_ganado')[:10]
 
@@ -97,7 +105,24 @@ def premio_dashboard(request):
         'distribución_tramos': distribución_tramos,
     }
 
-    return render(request, 'ventas/premios/dashboard.html', context)
+        return render(request, 'ventas/premios/dashboard.html', context)
+
+    except Exception as e:
+        logger.error(f"Error en premio_dashboard: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+
+        # Retornar una respuesta de error detallada para debug
+        error_html = f"""
+        <html>
+        <body>
+        <h1>Error en Dashboard de Premios</h1>
+        <h2>Error: {str(e)}</h2>
+        <h3>Tipo de error: {type(e).__name__}</h3>
+        <pre>{traceback.format_exc()}</pre>
+        </body>
+        </html>
+        """
+        return HttpResponse(error_html, status=500)
 
 
 @staff_member_required
