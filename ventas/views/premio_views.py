@@ -58,8 +58,8 @@ def premio_dashboard(request):
     clientes_con_gasto = Cliente.objects.annotate(
         # Gasto en servicios históricos (excluyendo fecha genérica 2021-01-01)
         gasto_historico=Coalesce(
-            Sum('service_history__price_paid',
-                filter=~Q(service_history__service_date='2021-01-01')),
+            Sum('historial_servicios__price_paid',
+                filter=~Q(historial_servicios__service_date='2021-01-01')),
             Value(0, output_field=DecimalField())
         ),
         # Gasto en ventas actuales (estado pagado o parcial)
@@ -367,8 +367,8 @@ def estadisticas_premios(request):
     # Query OPTIMIZADA: calcular gasto total de cada cliente en UNA sola query
     clientes_con_gasto = Cliente.objects.annotate(
         gasto_historico=Coalesce(
-            Sum('service_history__price_paid',
-                filter=~Q(service_history__service_date='2021-01-01')),
+            Sum('historial_servicios__price_paid',
+                filter=~Q(historial_servicios__service_date='2021-01-01')),
             Value(0, output_field=DecimalField())
         ),
         gasto_actual=Coalesce(
