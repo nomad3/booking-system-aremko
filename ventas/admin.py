@@ -1300,7 +1300,7 @@ class PremioAdmin(admin.ModelAdmin):
             )
         }),
         ('Configuración', {
-            'fields': ('tramo_hito', 'dias_validez', 'restricciones')
+            'fields': ('tramo_hito', 'tramos_validos', 'dias_validez', 'restricciones')
         }),
         ('Metadata', {
             'fields': ('fecha_creacion', 'fecha_modificacion'),
