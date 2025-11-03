@@ -96,10 +96,17 @@ def premio_dashboard(request):
         distribución_tramos = {}
         for tramo in sorted(tramo_counts.keys()):
             min_gasto, max_gasto = TramoService.obtener_rango_tramo(tramo)
+
+            # Contar clientes con premios en este tramo
+            clientes_con_premios = ClientePremio.objects.filter(
+                tramo_al_ganar=tramo
+            ).values('cliente').distinct().count()
+
             distribución_tramos[tramo] = {
                 'count': tramo_counts[tramo],
                 'min_gasto': min_gasto,
                 'max_gasto': max_gasto,
+                'clientes_con_premios': clientes_con_premios,
             }
 
         context = {
