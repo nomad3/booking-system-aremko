@@ -5,7 +5,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
 from django.utils import timezone
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Q, Sum, F, Value, DecimalField
+from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.core.management import call_command
 from django.db import transaction
