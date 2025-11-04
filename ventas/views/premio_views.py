@@ -8,7 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
 from django.utils import timezone
-from django.db.models import Count, Q, Sum, F, Value, DecimalField, Max, Subquery, OuterRef
+from django.db.models import Count, Q, Sum, F, Value, DecimalField, Max
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.core.management import call_command
@@ -548,39 +548,62 @@ def clientes_premios(request):
     """
     Vista para listar todos los clientes con premios
     """
-    # Importar VentaReserva aquí para evitar importaciones circulares
-    from ..models import VentaReserva
+    try:
+        # Importar VentaReserva aquí para evitar importaciones circulares
+        from ..models import VentaReserva
+        from django.db.models import Subquery, OuterRef
 
-    # Obtener filtros
-    estado = request.GET.get('estado')
-    tipo = request.GET.get('tipo')
+        # Obtener filtros
+        estado = request.GET.get('estado')
+        tipo = request.GET.get('tipo')
 
-    # Subquery para obtener el número de la última reserva
-    ultima_reserva_subq = VentaReserva.objects.filter(
-        cliente=OuterRef('cliente')
-    ).order_by('-fecha_venta').values('numero')[:1]
+        # Subquery para obtener el número de la última reserva
+        ultima_reserva_subq = VentaReserva.objects.filter(
+            cliente=OuterRef('cliente')
+        ).order_by('-fecha_venta').values('numero')[:1]
 
-    # Query base con anotación de última reserva
-    queryset = ClientePremio.objects.select_related(
-        'cliente', 'premio'
-    ).annotate(
-        ultima_reserva_numero=Subquery(ultima_reserva_subq)
-    )
+        # Query base con anotación de última reserva
+        queryset = ClientePremio.objects.select_related(
+            'cliente', 'premio'
+        ).annotate(
+            ultima_reserva_numero=Subquery(ultima_reserva_subq)
+        )
 
-    # Aplicar filtros
-    if estado:
-        queryset = queryset.filter(estado=estado)
-    if tipo:
-        queryset = queryset.filter(premio__tipo=tipo)
+        # Aplicar filtros
+        if estado:
+            queryset = queryset.filter(estado=estado)
+        if tipo:
+            queryset = queryset.filter(premio__tipo=tipo)
 
-    # Ordenar por fecha más reciente
-    queryset = queryset.order_by('-fecha_ganado')
+        # Ordenar por fecha más reciente
+        queryset = queryset.order_by('-fecha_ganado')
 
-    context = {
-        'clientes_premios': queryset[:100],  # Limitar a 100 resultados
-    }
+        context = {
+            'clientes_premios': list(queryset[:100]),  # Limitar a 100 resultados
+        }
 
-    return render(request, 'ventas/premios/clientes_premios.html', context)
+        return render(request, 'ventas/premios/clientes_premios.html', context)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        # En caso de error, mostrar la página sin el número de reserva
+        queryset = ClientePremio.objects.select_related('cliente', 'premio')
+
+        # Aplicar filtros
+        if estado:
+            queryset = queryset.filter(estado=estado)
+        if tipo:
+            queryset = queryset.filter(premio__tipo=tipo)
+
+        # Ordenar por fecha más reciente
+        queryset = queryset.order_by('-fecha_ganado')
+
+        context = {
+            'clientes_premios': list(queryset[:100]),
+        }
+
+        return render(request, 'ventas/premios/clientes_premios.html', context)
 
 
 @staff_member_required
