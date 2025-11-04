@@ -565,7 +565,7 @@ def clientes_premios(request):
         # Subquery para obtener la fecha del último check-in de servicio
         ultima_fecha_servicio_subq = ReservaServicio.objects.filter(
             venta_reserva__cliente=OuterRef('cliente')
-        ).order_by('-fecha_servicio').values('fecha_servicio')[:1]
+        ).order_by('-fecha_agendamiento').values('fecha_agendamiento')[:1]
 
         # Query base con anotación de última reserva
         queryset = ClientePremio.objects.select_related(
@@ -681,7 +681,7 @@ def premio_whatsapp_message(request, premio_id):
         # Obtener fecha del último check-in de servicio
         ultimo_servicio = ReservaServicio.objects.filter(
             venta_reserva__cliente=cliente_premio.cliente
-        ).order_by('-fecha_servicio').values('fecha_servicio').first()
+        ).order_by('-fecha_agendamiento').values('fecha_agendamiento').first()
 
         # Preparar respuesta JSON con el mensaje y datos del cliente
         response_data = {
@@ -690,7 +690,7 @@ def premio_whatsapp_message(request, premio_id):
             'cliente_nombre': cliente_premio.cliente.nombre,
             'cliente_telefono': telefono,
             'ultima_reserva_numero': ultima_reserva['id'] if ultima_reserva else None,
-            'ultima_reserva_fecha': ultimo_servicio['fecha_servicio'].strftime('%d/%m/%Y') if ultimo_servicio and ultimo_servicio['fecha_servicio'] else None,
+            'ultima_reserva_fecha': ultimo_servicio['fecha_agendamiento'].strftime('%d/%m/%Y') if ultimo_servicio and ultimo_servicio['fecha_agendamiento'] else None,
         }
 
         return JsonResponse(response_data)
