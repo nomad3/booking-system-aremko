@@ -294,6 +294,11 @@
                     <td>
                         <div class="cliente-info">{{ cliente_premio.cliente.nombre|truncatewords:3 }}</div>
                         <div class="telefono">{{ cliente_premio.cliente.telefono }}</div>
+                        {% if cliente_premio.ultima_reserva_numero %}
+                        <div style="font-size: 0.85rem; color: #6c757d; margin-top: 0.25rem;">
+                            Reserva: #{{ cliente_premio.ultima_reserva_numero }}
+                        </div>
+                        {% endif %}
                     </td>
                     <td>{{ cliente_premio.premio.nombre }}</td>
                     <td>{{ cliente_premio.premio.get_tipo_display|default:cliente_premio.premio.tipo }}</td>
@@ -349,10 +354,14 @@ function showWhatsApp(premioId) {
         .then(data => {
             if (data.success) {
                 // Mostrar datos del cliente
-                document.getElementById('clienteData').innerHTML = `
+                let clienteDataHTML = `
                     <div><strong>Cliente:</strong> ${data.cliente_nombre}</div>
                     <div><strong>Teléfono:</strong> ${data.cliente_telefono || 'No registrado'}</div>
                 `;
+                if (data.ultima_reserva_numero) {
+                    clienteDataHTML += `<div><strong>Última Reserva:</strong> #${data.ultima_reserva_numero}</div>`;
+                }
+                document.getElementById('clienteData').innerHTML = clienteDataHTML;
 
                 // Mostrar mensaje
                 document.getElementById('whatsappMessage').textContent = data.mensaje;

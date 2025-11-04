@@ -8,7 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
 from django.utils import timezone
-from django.db.models import Count, Q, Sum, F, Value, DecimalField
+from django.db.models import Count, Q, Sum, F, Value, DecimalField, Max, Subquery, OuterRef
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.core.management import call_command
@@ -548,12 +548,24 @@ def clientes_premios(request):
     """
     Vista para listar todos los clientes con premios
     """
+    # Importar VentaReserva aquí para evitar importaciones circulares
+    from ..models import VentaReserva
+
     # Obtener filtros
     estado = request.GET.get('estado')
     tipo = request.GET.get('tipo')
 
-    # Query base
-    queryset = ClientePremio.objects.select_related('cliente', 'premio').all()
+    # Subquery para obtener el número de la última reserva
+    ultima_reserva_subq = VentaReserva.objects.filter(
+        cliente=OuterRef('cliente')
+    ).order_by('-fecha_venta').values('numero')[:1]
+
+    # Query base con anotación de última reserva
+    queryset = ClientePremio.objects.select_related(
+        'cliente', 'premio'
+    ).annotate(
+        ultima_reserva_numero=Subquery(ultima_reserva_subq)
+    )
 
     # Aplicar filtros
     if estado:
@@ -629,12 +641,19 @@ def premio_whatsapp_message(request, premio_id):
         elif telefono.startswith('56'):
             telefono = telefono[2:]
 
+        # Obtener número de última reserva
+        from ..models import VentaReserva
+        ultima_reserva = VentaReserva.objects.filter(
+            cliente=cliente_premio.cliente
+        ).order_by('-fecha_venta').values('numero').first()
+
         # Preparar respuesta JSON con el mensaje y datos del cliente
         response_data = {
             'success': True,
             'mensaje': mensaje,
             'cliente_nombre': cliente_premio.cliente.nombre,
             'cliente_telefono': telefono,
+            'ultima_reserva_numero': ultima_reserva['numero'] if ultima_reserva else None,
         }
 
         return JsonResponse(response_data)
