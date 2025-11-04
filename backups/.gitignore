@@ -1,0 +1,4 @@
+# Ignorar todos los respaldos pero mantener el directorio
+*
+!.gitignore
+!README.md
