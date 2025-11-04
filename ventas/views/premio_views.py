@@ -564,8 +564,13 @@ def clientes_premios(request):
     # Ordenar por fecha más reciente
     queryset = queryset.order_by('-fecha_ganado')
 
+    # Debug: agregar IDs disponibles
+    premios_list = list(queryset[:100])
+    if premios_list:
+        print(f"DEBUG: Premios disponibles IDs: {[p.id for p in premios_list[:10]]}")
+
     context = {
-        'clientes_premios': queryset[:100],  # Limitar a 100 resultados
+        'clientes_premios': premios_list,  # Limitar a 100 resultados
     }
 
     return render(request, 'ventas/premios/clientes_premios.html', context)
@@ -577,7 +582,29 @@ def premio_whatsapp_message(request, premio_id):
     Genera un mensaje de WhatsApp para un premio específico
     """
     try:
-        cliente_premio = get_object_or_404(ClientePremio, id=premio_id)
+        # Buscar el premio con todas las relaciones necesarias
+        cliente_premio = ClientePremio.objects.select_related(
+            'cliente', 'premio'
+        ).filter(id=premio_id).first()
+
+        if not cliente_premio:
+            return JsonResponse({
+                'success': False,
+                'error': f'No se encontró el premio con ID {premio_id}'
+            }, status=404)
+
+        # Validar que el cliente y premio existan
+        if not cliente_premio.cliente:
+            return JsonResponse({
+                'success': False,
+                'error': 'El premio no tiene un cliente asociado'
+            }, status=400)
+
+        if not cliente_premio.premio:
+            return JsonResponse({
+                'success': False,
+                'error': 'El premio no tiene información del premio asociada'
+            }, status=400)
 
         # Preparar contexto para el template
         context = {
@@ -588,17 +615,23 @@ def premio_whatsapp_message(request, premio_id):
 
         # Renderizar el template de WhatsApp
         from django.template.loader import render_to_string
-        mensaje = render_to_string('emails/premio_whatsapp_template.txt', context)
+        try:
+            mensaje = render_to_string('emails/premio_whatsapp_template.txt', context)
+        except Exception as template_error:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error al generar el mensaje: {str(template_error)}'
+            }, status=500)
 
         # Limpiar espacios extra y saltos de línea múltiples
         import re
         mensaje = re.sub(r'\n\s*\n', '\n\n', mensaje.strip())
 
         # Obtener el teléfono del cliente sin el +56
-        telefono = cliente_premio.cliente.telefono
-        if telefono and telefono.startswith('+56'):
+        telefono = cliente_premio.cliente.telefono or ''
+        if telefono.startswith('+56'):
             telefono = telefono[3:]
-        elif telefono and telefono.startswith('56'):
+        elif telefono.startswith('56'):
             telefono = telefono[2:]
 
         # Preparar respuesta JSON con el mensaje y datos del cliente
@@ -612,7 +645,9 @@ def premio_whatsapp_message(request, premio_id):
         return JsonResponse(response_data)
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return JsonResponse({
             'success': False,
-            'error': str(e)
-        })
+            'error': f'Error inesperado: {str(e)}'
+        }, status=500)

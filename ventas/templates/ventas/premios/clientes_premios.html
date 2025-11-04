@@ -340,31 +340,41 @@
 <script>
 function showWhatsApp(premioId) {
     fetch(`/ventas/premios/whatsapp/${premioId}/`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => Promise.reject(err));
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 // Mostrar datos del cliente
                 document.getElementById('clienteData').innerHTML = `
                     <div><strong>Cliente:</strong> ${data.cliente_nombre}</div>
-                    <div><strong>Teléfono:</strong> ${data.cliente_telefono}</div>
+                    <div><strong>Teléfono:</strong> ${data.cliente_telefono || 'No registrado'}</div>
                 `;
 
                 // Mostrar mensaje
                 document.getElementById('whatsappMessage').textContent = data.mensaje;
 
-                // Configurar enlace de WhatsApp
-                const whatsappUrl = `https://wa.me/56${data.cliente_telefono}?text=${encodeURIComponent(data.mensaje)}`;
-                document.getElementById('sendWhatsApp').href = whatsappUrl;
+                // Configurar enlace de WhatsApp solo si hay teléfono
+                if (data.cliente_telefono) {
+                    const whatsappUrl = `https://wa.me/56${data.cliente_telefono}?text=${encodeURIComponent(data.mensaje)}`;
+                    document.getElementById('sendWhatsApp').href = whatsappUrl;
+                    document.getElementById('sendWhatsApp').style.display = 'inline-block';
+                } else {
+                    document.getElementById('sendWhatsApp').style.display = 'none';
+                }
 
                 // Mostrar modal
                 document.getElementById('whatsappModal').style.display = 'block';
             } else {
-                alert('Error al generar el mensaje de WhatsApp');
+                alert(`Error: ${data.error || 'Error al generar el mensaje de WhatsApp'}`);
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error al conectar con el servidor');
+            alert(`Error: ${error.error || 'Error al conectar con el servidor'}`);
         });
 }
 
