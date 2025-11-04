@@ -302,13 +302,13 @@
             <thead>
                 <tr>
                     <th>CLIENTE</th>
+                    <th>ACCIONES</th>
+                    <th>WHATSAPP</th>
                     <th>PREMIO</th>
                     <th>TIPO</th>
                     <th>ESTADO</th>
-                    <th>WHATSAPP</th>
                     <th>FECHA GANADO</th>
                     <th>EXPIRA</th>
-                    <th>ACCIONES</th>
                 </tr>
             </thead>
             <tbody>
@@ -326,12 +326,9 @@
                         </div>
                         {% endif %}
                     </td>
-                    <td>{{ cliente_premio.premio.nombre }}</td>
-                    <td>{{ cliente_premio.premio.get_tipo_display|default:cliente_premio.premio.tipo }}</td>
                     <td>
-                        <span class="badge badge-{{ cliente_premio.estado }}">
-                            {{ cliente_premio.get_estado_display|default:cliente_premio.estado|capfirst }}
-                        </span>
+                        <a href="{% url 'ventas:premio_preview' cliente_premio.id %}" class="btn-action btn-ver" target="_blank">Ver</a>
+                        <button class="btn-action btn-whatsapp" onclick="showWhatsApp({{ cliente_premio.id }})">WhatsApp</button>
                     </td>
                     <td>
                         {% if cliente_premio.fecha_envio_whatsapp %}
@@ -344,12 +341,15 @@
                             </span>
                         {% endif %}
                     </td>
+                    <td>{{ cliente_premio.premio.nombre }}</td>
+                    <td>{{ cliente_premio.premio.get_tipo_display|default:cliente_premio.premio.tipo }}</td>
+                    <td>
+                        <span class="badge badge-{{ cliente_premio.estado }}">
+                            {{ cliente_premio.get_estado_display|default:cliente_premio.estado|capfirst }}
+                        </span>
+                    </td>
                     <td>{{ cliente_premio.fecha_ganado|date:"d/m/Y" }}</td>
                     <td>{{ cliente_premio.fecha_expiracion|date:"d/m/Y" }}</td>
-                    <td>
-                        <a href="{% url 'ventas:premio_preview' cliente_premio.id %}" class="btn-action btn-ver" target="_blank">Ver</a>
-                        <button class="btn-action btn-whatsapp" onclick="showWhatsApp({{ cliente_premio.id }})">WhatsApp</button>
-                    </td>
                 </tr>
                 {% empty %}
                 <tr>
