@@ -77,6 +77,7 @@ urlpatterns = [
     path('crm/cliente/<int:cliente_id>/enviar/', crm_views.enviar_propuesta, name='enviar_propuesta'),
     path('crm/cliente/<int:cliente_id>/preview/', crm_views.propuesta_preview, name='propuesta_preview'),
     path('crm/cliente/<int:cliente_id>/historial/', crm_views.historial_servicios, name='historial_servicios'),
+    path('crm/cliente/<int:cliente_id>/whatsapp-propuesta/', crm_views.whatsapp_propuesta, name='whatsapp_propuesta'),
     # === END CRM PROPUESTAS ===
 
     # Keep existing api paths using the api module

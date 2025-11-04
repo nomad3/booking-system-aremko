@@ -410,3 +410,85 @@ def bulk_email_send_view(request):
             'success': False,
             'error': str(e)
         })
+
+
+@require_http_methods(["POST"])
+def whatsapp_propuesta(request, cliente_id):
+    """
+    Genera un mensaje de WhatsApp basado en la propuesta personalizada
+    """
+    import json
+
+    try:
+        cliente = get_object_or_404(Cliente, id=cliente_id)
+        data = json.loads(request.body)
+        estilo = data.get('estilo', 'formal')
+        propuesta = data.get('propuesta', {})
+
+        # Construir el mensaje de WhatsApp
+        if estilo == 'calido':
+            mensaje = f"Hola {cliente.nombre.split()[0]} 👋\n\n"
+            mensaje += "¡Te extrañamos! "
+        else:
+            mensaje = f"Estimado/a {cliente.nombre},\n\n"
+
+        # Agregar insights si existen
+        if propuesta.get('insights'):
+            insights = propuesta['insights']
+            if 'segmento' in insights and 'Cliente At Risk' in str(insights.get('segmento')):
+                mensaje += "Nos hemos dado cuenta que ha pasado tiempo desde tu última visita. "
+            mensaje += "Sabemos lo importante que es para ti el descanso y bienestar.\n\n"
+
+        # Agregar recomendaciones
+        if propuesta.get('recommendations'):
+            mensaje += "🎯 *Recomendaciones especiales para ti:*\n"
+            for i, rec in enumerate(propuesta['recommendations'][:2], 1):
+                mensaje += f"{i}. {rec['service_name']}"
+                if rec.get('estimated_price'):
+                    mensaje += f" - ${rec['estimated_price']:,.0f}"
+                mensaje += "\n"
+            mensaje += "\n"
+
+        # Agregar oferta si existe
+        if propuesta.get('offer'):
+            offer = propuesta['offer']
+            mensaje += f"🎁 *{offer['title']}*\n"
+            mensaje += f"{offer['description']}\n"
+            if offer.get('discount'):
+                mensaje += f"👉 {offer['discount']}\n"
+            mensaje += "\n"
+
+        # Call to action
+        if estilo == 'calido':
+            mensaje += "¿Te gustaría reservar? ¡Estamos aquí para consentirte! 💆‍♀️\n\n"
+        else:
+            mensaje += "Para realizar su reserva o consultas, estamos a su disposición.\n\n"
+
+        # Firma
+        mensaje += "📱 Reservas: +56 9 5790 2525\n"
+        mensaje += "🌐 www.aremko.cl"
+
+        # Limpiar teléfono
+        telefono = cliente.telefono
+        if telefono:
+            telefono = ''.join(filter(str.isdigit, str(telefono)))
+            if telefono.startswith('569'):
+                telefono = telefono[2:]
+            elif telefono.startswith('56'):
+                telefono = telefono[2:]
+            elif telefono.startswith('9'):
+                telefono = telefono
+
+        return JsonResponse({
+            'success': True,
+            'mensaje': mensaje,
+            'telefono': telefono,
+            'cliente_nombre': cliente.nombre
+        })
+
+    except Exception as e:
+        logger.error(f"Error generando mensaje WhatsApp: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
