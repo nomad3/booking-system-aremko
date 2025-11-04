@@ -418,6 +418,8 @@ def whatsapp_propuesta(request, cliente_id):
     Genera un mensaje de WhatsApp basado en la propuesta personalizada
     """
     import json
+    from bs4 import BeautifulSoup
+    import html
 
     try:
         cliente = get_object_or_404(Cliente, id=cliente_id)
@@ -425,32 +427,45 @@ def whatsapp_propuesta(request, cliente_id):
         estilo = data.get('estilo', 'formal')
         propuesta = data.get('propuesta', {})
 
-        # Construir el mensaje de WhatsApp
+        # Extraer el contenido del email HTML
+        email_body = propuesta.get('email_body', '')
+
+        # Parsear el HTML con BeautifulSoup
+        soup = BeautifulSoup(email_body, 'html.parser')
+
+        # Iniciar mensaje
+        nombre_cliente = cliente.nombre.split()[0] if estilo == 'calido' else cliente.nombre
+
         if estilo == 'calido':
-            mensaje = f"Hola {cliente.nombre.split()[0]} 👋\n\n"
-            mensaje += "¡Te extrañamos! "
+            mensaje = f"Hola {nombre_cliente} 👋\n\n"
         else:
             mensaje = f"Estimado/a {cliente.nombre},\n\n"
 
-        # Agregar insights si existen
-        if propuesta.get('insights'):
-            insights = propuesta['insights']
-            if 'segmento' in insights and 'Cliente At Risk' in str(insights.get('segmento')):
-                mensaje += "Nos hemos dado cuenta que ha pasado tiempo desde tu última visita. "
-            mensaje += "Sabemos lo importante que es para ti el descanso y bienestar.\n\n"
+        # Extraer párrafos principales del email (ignorando estilos)
+        # Buscar el saludo y contenido principal
+        for p in soup.find_all('p'):
+            texto = p.get_text().strip()
 
-        # Agregar recomendaciones
-        if propuesta.get('recommendations'):
-            mensaje += "🎯 *Recomendaciones especiales para ti:*\n"
-            for i, rec in enumerate(propuesta['recommendations'][:2], 1):
-                mensaje += f"{i}. {rec['service_name']}"
-                if rec.get('estimated_price'):
-                    mensaje += f" - ${rec['estimated_price']:,.0f}"
-                mensaje += "\n"
-            mensaje += "\n"
+            # Saltar el saludo (ya lo agregamos)
+            if texto.startswith('Hola') or texto.startswith('Estimado') or texto.startswith('Espero que'):
+                continue
 
-        # Agregar oferta si existe
-        if propuesta.get('offer'):
+            # Saltar la firma
+            if 'Con cariño' in texto or 'El equipo de Aremko' in texto or 'Equipo Aremko' in texto:
+                break
+
+            # Agregar párrafos relevantes
+            if texto and len(texto) > 20:
+                mensaje += f"{texto}\n\n"
+
+        # Buscar la oferta específica (generalmente en un div con background)
+        oferta_div = soup.find('div', style=lambda value: value and 'background-color' in value)
+        if oferta_div:
+            oferta_texto = oferta_div.get_text().strip()
+            if oferta_texto:
+                mensaje += f"🎁 *OFERTA ESPECIAL:*\n{oferta_texto}\n\n"
+        elif propuesta.get('offer'):
+            # Fallback si no se encuentra en el HTML
             offer = propuesta['offer']
             mensaje += f"🎁 *{offer['title']}*\n"
             mensaje += f"{offer['description']}\n"
