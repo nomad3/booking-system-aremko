@@ -557,16 +557,21 @@ def clientes_premios(request):
         estado = request.GET.get('estado')
         tipo = request.GET.get('tipo')
 
-        # Subquery para obtener el número de la última reserva
-        ultima_reserva_subq = VentaReserva.objects.filter(
+        # Subqueries para obtener datos de la última reserva
+        ultima_reserva_id_subq = VentaReserva.objects.filter(
             cliente=OuterRef('cliente')
         ).order_by('-fecha_creacion').values('id')[:1]
+
+        ultima_reserva_fecha_subq = VentaReserva.objects.filter(
+            cliente=OuterRef('cliente')
+        ).order_by('-fecha_creacion').values('fecha_creacion')[:1]
 
         # Query base con anotación de última reserva
         queryset = ClientePremio.objects.select_related(
             'cliente', 'premio'
         ).annotate(
-            ultima_reserva_numero=Subquery(ultima_reserva_subq)
+            ultima_reserva_numero=Subquery(ultima_reserva_id_subq),
+            ultima_reserva_fecha=Subquery(ultima_reserva_fecha_subq)
         )
 
         # Aplicar filtros
@@ -664,11 +669,11 @@ def premio_whatsapp_message(request, premio_id):
         elif telefono.startswith('56'):
             telefono = telefono[2:]
 
-        # Obtener número de última reserva
+        # Obtener número y fecha de última reserva
         from ..models import VentaReserva
         ultima_reserva = VentaReserva.objects.filter(
             cliente=cliente_premio.cliente
-        ).order_by('-fecha_creacion').values('id').first()
+        ).order_by('-fecha_creacion').values('id', 'fecha_creacion').first()
 
         # Preparar respuesta JSON con el mensaje y datos del cliente
         response_data = {
@@ -677,6 +682,7 @@ def premio_whatsapp_message(request, premio_id):
             'cliente_nombre': cliente_premio.cliente.nombre,
             'cliente_telefono': telefono,
             'ultima_reserva_numero': ultima_reserva['id'] if ultima_reserva else None,
+            'ultima_reserva_fecha': ultima_reserva['fecha_creacion'].strftime('%d/%m/%Y') if ultima_reserva and ultima_reserva['fecha_creacion'] else None,
         }
 
         return JsonResponse(response_data)

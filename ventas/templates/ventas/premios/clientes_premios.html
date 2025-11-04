@@ -297,6 +297,9 @@
                         {% if cliente_premio.ultima_reserva_numero %}
                         <div style="font-size: 0.85rem; color: #6c757d; margin-top: 0.25rem;">
                             Reserva: #{{ cliente_premio.ultima_reserva_numero }}
+                            {% if cliente_premio.ultima_reserva_fecha %}
+                            - {{ cliente_premio.ultima_reserva_fecha|date:"d/m/Y" }}
+                            {% endif %}
                         </div>
                         {% endif %}
                     </td>
@@ -359,7 +362,11 @@ function showWhatsApp(premioId) {
                     <div><strong>Teléfono:</strong> ${data.cliente_telefono || 'No registrado'}</div>
                 `;
                 if (data.ultima_reserva_numero) {
-                    clienteDataHTML += `<div><strong>Última Reserva:</strong> #${data.ultima_reserva_numero}</div>`;
+                    let reservaText = `#${data.ultima_reserva_numero}`;
+                    if (data.ultima_reserva_fecha) {
+                        reservaText += ` - ${data.ultima_reserva_fecha}`;
+                    }
+                    clienteDataHTML += `<div><strong>Última Reserva:</strong> ${reservaText}</div>`;
                 }
                 document.getElementById('clienteData').innerHTML = clienteDataHTML;
 
