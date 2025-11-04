@@ -560,7 +560,7 @@ def clientes_premios(request):
         # Subquery para obtener el número de la última reserva
         ultima_reserva_subq = VentaReserva.objects.filter(
             cliente=OuterRef('cliente')
-        ).order_by('-fecha_venta').values('numero')[:1]
+        ).order_by('-fecha_creacion').values('numero')[:1]
 
         # Query base con anotación de última reserva
         queryset = ClientePremio.objects.select_related(
@@ -668,7 +668,7 @@ def premio_whatsapp_message(request, premio_id):
         from ..models import VentaReserva
         ultima_reserva = VentaReserva.objects.filter(
             cliente=cliente_premio.cliente
-        ).order_by('-fecha_venta').values('numero').first()
+        ).order_by('-fecha_creacion').values('numero').first()
 
         # Preparar respuesta JSON con el mensaje y datos del cliente
         response_data = {
