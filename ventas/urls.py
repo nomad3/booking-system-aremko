@@ -142,6 +142,7 @@ urlpatterns = [
     path('premios/<int:premio_id>/marcar-enviado/', premio_views.marcar_premio_enviado, name='marcar_premio_enviado'),
     path('premios/lista/', premio_views.clientes_premios, name='lista_clientes_premios'),
     path('premios/whatsapp/<int:premio_id>/', premio_views.premio_whatsapp_message, name='premio_whatsapp'),
+    path('premios/marcar-whatsapp-enviado/<int:premio_id>/', premio_views.marcar_whatsapp_enviado, name='marcar_whatsapp_enviado'),
     # === END PREMIOS ===
 
     # API Router (Keep this last if possible, or ensure specific paths come first)

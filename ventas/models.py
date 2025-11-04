@@ -2349,6 +2349,7 @@ class ClientePremio(models.Model):
     fecha_ganado = models.DateTimeField(auto_now_add=True)
     fecha_aprobacion = models.DateTimeField(null=True, blank=True)
     fecha_enviado = models.DateTimeField(null=True, blank=True)
+    fecha_envio_whatsapp = models.DateTimeField(null=True, blank=True, help_text="Fecha cuando se envió por WhatsApp")
     fecha_expiracion = models.DateTimeField(help_text="Calculado automáticamente basado en días de validez")
     fecha_uso = models.DateTimeField(null=True, blank=True)
     

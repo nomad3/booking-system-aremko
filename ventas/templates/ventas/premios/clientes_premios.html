@@ -116,6 +116,14 @@
             background: #dc3545;
             color: white;
         }
+        .badge-whatsapp-enviado {
+            background: #25D366;
+            color: white;
+        }
+        .badge-whatsapp-pendiente {
+            background: #e9ecef;
+            color: #6c757d;
+        }
         .btn-action {
             padding: 0.4rem 1rem;
             border-radius: 6px;
@@ -221,6 +229,20 @@
             text-decoration: none;
             display: inline-block;
         }
+        .btn-mark-sent {
+            background: #28a745;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .btn-mark-sent:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
         .cliente-data {
             background: #f8f9fa;
             padding: 1rem;
@@ -283,6 +305,7 @@
                     <th>PREMIO</th>
                     <th>TIPO</th>
                     <th>ESTADO</th>
+                    <th>WHATSAPP</th>
                     <th>FECHA GANADO</th>
                     <th>EXPIRA</th>
                     <th>ACCIONES</th>
@@ -310,6 +333,17 @@
                             {{ cliente_premio.get_estado_display|default:cliente_premio.estado|capfirst }}
                         </span>
                     </td>
+                    <td>
+                        {% if cliente_premio.fecha_envio_whatsapp %}
+                            <span class="badge badge-whatsapp-enviado">
+                                ✓ Enviado
+                            </span>
+                        {% else %}
+                            <span class="badge badge-whatsapp-pendiente">
+                                Pendiente
+                            </span>
+                        {% endif %}
+                    </td>
                     <td>{{ cliente_premio.fecha_ganado|date:"d/m/Y" }}</td>
                     <td>{{ cliente_premio.fecha_expiracion|date:"d/m/Y" }}</td>
                     <td>
@@ -319,7 +353,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="no-results">
+                    <td colspan="8" class="no-results">
                         No se encontraron clientes con premios
                     </td>
                 </tr>
@@ -341,12 +375,16 @@
         <div class="whatsapp-actions">
             <button class="btn-copy" onclick="copyMessage()">📋 Copiar Mensaje</button>
             <a href="#" id="sendWhatsApp" class="btn-send-whatsapp" target="_blank">📱 Enviar por WhatsApp</a>
+            <button class="btn-mark-sent" id="markSentBtn" onclick="markWhatsAppSent()">✓ Marcar WhatsApp Enviado</button>
         </div>
     </div>
 </div>
 
 <script>
+let currentPremioId = null;
+
 function showWhatsApp(premioId) {
+    currentPremioId = premioId;
     fetch(`/ventas/premios/whatsapp/${premioId}/`)
         .then(response => {
             if (!response.ok) {
@@ -380,6 +418,16 @@ function showWhatsApp(premioId) {
                     document.getElementById('sendWhatsApp').style.display = 'inline-block';
                 } else {
                     document.getElementById('sendWhatsApp').style.display = 'none';
+                }
+
+                // Configurar botón de marcar enviado
+                const markSentBtn = document.getElementById('markSentBtn');
+                if (data.whatsapp_enviado) {
+                    markSentBtn.textContent = '✓ WhatsApp Ya Enviado';
+                    markSentBtn.disabled = true;
+                } else {
+                    markSentBtn.textContent = '✓ Marcar WhatsApp Enviado';
+                    markSentBtn.disabled = false;
                 }
 
                 // Mostrar modal
@@ -425,6 +473,58 @@ window.onclick = function(event) {
     if (event.target == modal) {
         closeModal();
     }
+}
+
+function markWhatsAppSent() {
+    if (!currentPremioId) return;
+
+    const btn = document.getElementById('markSentBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Marcando...';
+
+    fetch(`/ventas/premios/marcar-whatsapp-enviado/${currentPremioId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            btn.textContent = '✓ WhatsApp Ya Enviado';
+            btn.disabled = true;
+            // Recargar la tabla para mostrar el cambio
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            btn.textContent = '✓ Marcar WhatsApp Enviado';
+            btn.disabled = false;
+            alert(`Error: ${data.error || 'Error al marcar como enviado'}`);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        btn.textContent = '✓ Marcar WhatsApp Enviado';
+        btn.disabled = false;
+        alert('Error al conectar con el servidor');
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 </script>
 {% endblock %}

@@ -691,6 +691,7 @@ def premio_whatsapp_message(request, premio_id):
             'cliente_telefono': telefono,
             'ultima_reserva_numero': ultima_reserva['id'] if ultima_reserva else None,
             'ultima_reserva_fecha': ultimo_servicio['fecha_agendamiento'].strftime('%d/%m/%Y') if ultimo_servicio and ultimo_servicio['fecha_agendamiento'] else None,
+            'whatsapp_enviado': cliente_premio.fecha_envio_whatsapp is not None,
         }
 
         return JsonResponse(response_data)
@@ -701,4 +702,46 @@ def premio_whatsapp_message(request, premio_id):
         return JsonResponse({
             'success': False,
             'error': f'Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@staff_member_required
+def marcar_whatsapp_enviado(request, premio_id):
+    """
+    Marca un premio como enviado por WhatsApp
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'error': 'Método no permitido'
+        }, status=405)
+
+    try:
+        from django.utils import timezone
+
+        # Buscar el premio
+        cliente_premio = ClientePremio.objects.filter(id=premio_id).first()
+
+        if not cliente_premio:
+            return JsonResponse({
+                'success': False,
+                'error': f'No se encontró el premio con ID {premio_id}'
+            }, status=404)
+
+        # Marcar como enviado por WhatsApp
+        cliente_premio.fecha_envio_whatsapp = timezone.now()
+        cliente_premio.save(update_fields=['fecha_envio_whatsapp'])
+
+        return JsonResponse({
+            'success': True,
+            'mensaje': 'Premio marcado como enviado por WhatsApp',
+            'fecha_envio': cliente_premio.fecha_envio_whatsapp.strftime('%d/%m/%Y %H:%M')
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False,
+            'error': f'Error al marcar como enviado: {str(e)}'
         }, status=500)
