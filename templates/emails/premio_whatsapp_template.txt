@@ -1,6 +1,6 @@
 Hola {{ cliente.nombre.split|first }} 👋
 
-¡Felicitaciones! 🎉 Has alcanzado el Tramo {{ cliente_premio.tramo_al_ganar }} con un total de ${{ cliente_premio.gasto_total_al_ganar|floatformat:0|intcomma }} en Aremko.
+¡Felicitaciones! 🎉 Has alcanzado el Tramo {{ cliente_premio.tramo_al_ganar }} con un total de ${{ cliente_premio.gasto_total_al_ganar|floatformat:0 }} en Aremko.
 
 *Tu premio:* {{ premio.nombre }}
 {{ premio.descripcion_corta }}

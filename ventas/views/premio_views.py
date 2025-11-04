@@ -564,13 +564,8 @@ def clientes_premios(request):
     # Ordenar por fecha más reciente
     queryset = queryset.order_by('-fecha_ganado')
 
-    # Debug: agregar IDs disponibles
-    premios_list = list(queryset[:100])
-    if premios_list:
-        print(f"DEBUG: Premios disponibles IDs: {[p.id for p in premios_list[:10]]}")
-
     context = {
-        'clientes_premios': premios_list,  # Limitar a 100 resultados
+        'clientes_premios': queryset[:100],  # Limitar a 100 resultados
     }
 
     return render(request, 'ventas/premios/clientes_premios.html', context)
