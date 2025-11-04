@@ -5,7 +5,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ventas', '0059_add_tramos_validos_simple'),
+        ('ventas', '0059_add_tramos_validos'),
     ]
 
     operations = [
