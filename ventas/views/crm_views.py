@@ -441,63 +441,58 @@ def whatsapp_propuesta(request, cliente_id):
         else:
             mensaje = f"Estimado/a {cliente.nombre},\n\n"
 
-        # Extraer contenido principal de manera más inteligente
-        contenido_procesado = set()  # Para evitar duplicados
+        # Variables para almacenar partes del mensaje
+        narrativa_servicios = ""
+        consecuencia_texto = ""
+        oferta_completa = ""
+        validez_texto = ""
+        familia_aremko_texto = ""
 
-        # Buscar el primer párrafo después del saludo
+        # Extraer cada parte específica del email
         parrafos = soup.find_all('p')
-        for i, p in enumerate(parrafos):
-            texto = p.get_text().strip()
 
-            # Saltar saludos
-            if texto.startswith('Hola') or texto.startswith('Estimado') or texto.startswith('Espero que'):
-                continue
-
-            # Detectar inicio de la firma y parar
-            if any(firma in texto for firma in ['Con cariño', 'El equipo de Aremko', 'Equipo Aremko', 'Atentamente']):
-                break
-
-            # Solo agregar si no es duplicado y tiene contenido sustancial
-            if texto and len(texto) > 20 and texto not in contenido_procesado:
-                contenido_procesado.add(texto)
-
-                # Si es el párrafo de la narrativa de servicios, agregarlo
-                if any(servicio in texto for servicio in ['momentos de relajo', 'tinajas calientes', 'cabañas', 'visitas anteriores']):
-                    mensaje += f"{texto}\n\n"
-                # Si menciona "En consecuencia" o propuesta
-                elif 'consecuencia' in texto or 'propuesta' in texto:
-                    mensaje += f"{texto}\n\n"
-
-        # Buscar y extraer la oferta principal (el div con la invitación)
-        oferta_encontrada = False
-
-        # Buscar en divs con background
-        for div in soup.find_all('div', style=lambda value: value and ('background-color' in value or 'border' in value)):
-            texto_oferta = div.get_text().strip()
-            if 'Invitación exclusiva' in texto_oferta or 'descuento' in texto_oferta.lower():
-                # Limpiar espacios múltiples
-                texto_oferta = re.sub(r'\s+', ' ', texto_oferta)
-                mensaje += f"🎁 *OFERTA ESPECIAL:*\n{texto_oferta}\n\n"
-                oferta_encontrada = True
-                break
-
-        # Si no encontramos la oferta en divs, buscar en párrafos con strong
-        if not oferta_encontrada:
-            for p in soup.find_all('p'):
-                if p.find('strong') and ('descuento' in p.get_text().lower() or 'invitación' in p.get_text().lower()):
-                    texto_oferta = p.get_text().strip()
-                    texto_oferta = re.sub(r'\s+', ' ', texto_oferta)
-                    if texto_oferta not in contenido_procesado:
-                        mensaje += f"🎁 *OFERTA ESPECIAL:*\n{texto_oferta}\n\n"
-                        break
-
-        # Agregar párrafo de validez si existe
         for p in parrafos:
             texto = p.get_text().strip()
-            if 'beneficios son válidos' in texto or 'válidos durante' in texto:
-                if texto not in contenido_procesado:
-                    mensaje += f"{texto}\n\n"
-                    break
+
+            # Buscar narrativa de servicios
+            if 'recordar' in texto and any(s in texto for s in ['tinajas', 'cabañas', 'momentos']):
+                narrativa_servicios = texto
+
+            # Buscar "En consecuencia"
+            elif texto.startswith('En consecuencia') or 'consecuencia' in texto:
+                consecuencia_texto = texto
+
+            # Buscar párrafo de validez
+            elif 'beneficios son válidos' in texto or 'válidos durante' in texto:
+                validez_texto = texto
+
+            # Buscar párrafo "no eres un cliente más"
+            elif 'no eres un cliente más' in texto or 'familia Aremko' in texto:
+                familia_aremko_texto = texto
+
+        # Buscar la oferta en el div destacado
+        for div in soup.find_all('div', style=lambda value: value and ('background-color' in value or 'border' in value)):
+            texto_div = div.get_text().strip()
+            if 'Invitación exclusiva' in texto_div or 'descuento' in texto_div.lower():
+                # Limpiar espacios múltiples
+                oferta_completa = re.sub(r'\s+', ' ', texto_div)
+                break
+
+        # Construir el mensaje en el orden correcto
+        if narrativa_servicios:
+            mensaje += f"{narrativa_servicios}\n\n"
+
+        if consecuencia_texto:
+            mensaje += f"{consecuencia_texto}\n\n"
+
+        if oferta_completa:
+            mensaje += f"🎁 *OFERTA ESPECIAL:*\n{oferta_completa}\n\n"
+
+        if validez_texto:
+            mensaje += f"{validez_texto}\n\n"
+
+        if familia_aremko_texto:
+            mensaje += f"{familia_aremko_texto}\n\n"
 
         # Call to action
         if estilo == 'calido':
