@@ -130,6 +130,7 @@
         .btn-procesar { background: linear-gradient(135deg, #aed581 0%, #9ccc65 100%); }
         .btn-historial { background: linear-gradient(135deg, #ba68c8 0%, #ab47bc 100%); }
         .btn-configurar { background: linear-gradient(135deg, #ffb74d 0%, #ffa726 100%); }
+        .btn-clientes { background: linear-gradient(135deg, #00bcd4 0%, #00acc1 100%); }
 
         /* Sección de últimos premios */
         .ultimos-premios {
@@ -257,6 +258,10 @@
                 <a href="{% url 'ventas:configurar_premios' %}" class="btn-modulo btn-configurar">
                     <span class="icon">⚙️</span>
                     <span>Configurar Premios</span>
+                </a>
+                <a href="{% url 'ventas:lista_clientes_premios' %}" class="btn-modulo btn-clientes">
+                    <span class="icon">👥</span>
+                    <span>Lista de Clientes</span>
                 </a>
             </div>
         </div>

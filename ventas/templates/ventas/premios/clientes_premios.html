@@ -1,0 +1,404 @@
+{% extends "admin/base_site.html" %}
+{% load static i18n %}
+
+{% block title %}Clientes con Premios{% endblock %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+    <style>
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        .page-title {
+            font-size: 1.8rem;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .filter-group label {
+            font-weight: 600;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .filter-group select {
+            padding: 0.5rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            min-width: 200px;
+        }
+        .btn-filter {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 0.5rem 2rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            align-self: flex-end;
+        }
+        .btn-filter:hover {
+            background: #0056b3;
+        }
+        .table-container {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background: #f8f9fa;
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+        }
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #f1f3f5;
+        }
+        tr:hover {
+            background: #f8f9fa;
+        }
+        .cliente-info {
+            font-weight: 600;
+            color: #333;
+        }
+        .telefono {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .badge-aprobado {
+            background: #007bff;
+            color: white;
+        }
+        .badge-enviado {
+            background: #ffc107;
+            color: #333;
+        }
+        .badge-usado {
+            background: #28a745;
+            color: white;
+        }
+        .badge-expirado {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-action {
+            padding: 0.4rem 1rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-ver {
+            background: #42a5f5;
+            color: white;
+            margin-right: 0.5rem;
+        }
+        .btn-whatsapp {
+            background: #25D366;
+            color: white;
+        }
+        .btn-action:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: #999;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        .modal-header h3 {
+            margin: 0;
+            color: #333;
+        }
+        .close {
+            font-size: 28px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: #000;
+        }
+        .whatsapp-preview {
+            background: #e5ddd5;
+            padding: 1.5rem;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .whatsapp-actions {
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 1rem;
+        }
+        .btn-copy {
+            background: #6c757d;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .btn-send-whatsapp {
+            background: #25D366;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .cliente-data {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+        .cliente-data div {
+            margin-bottom: 0.5rem;
+        }
+        .cliente-data strong {
+            color: #495057;
+        }
+    </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+    &rsaquo; <a href="{% url 'ventas:premio_dashboard' %}">Premios</a>
+    &rsaquo; Clientes con Premios
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">👥 Clientes con Premios</h1>
+    </div>
+
+    <!-- Filtros -->
+    <form method="get" class="filters">
+        <div class="filter-group">
+            <label for="estado">Estado:</label>
+            <select name="estado" id="estado">
+                <option value="">Todos</option>
+                <option value="aprobado" {% if request.GET.estado == 'aprobado' %}selected{% endif %}>Aprobado</option>
+                <option value="enviado" {% if request.GET.estado == 'enviado' %}selected{% endif %}>Email Enviado</option>
+                <option value="usado" {% if request.GET.estado == 'usado' %}selected{% endif %}>Usado</option>
+                <option value="expirado" {% if request.GET.estado == 'expirado' %}selected{% endif %}>Expirado</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="tipo">Tipo:</label>
+            <select name="tipo" id="tipo">
+                <option value="">Todos</option>
+                <option value="descuento_bienvenida" {% if request.GET.tipo == 'descuento_bienvenida' %}selected{% endif %}>Descuento Bienvenida</option>
+                <option value="noche_gratis" {% if request.GET.tipo == 'noche_gratis' %}selected{% endif %}>Noche Gratis</option>
+                <option value="descuento_tinas" {% if request.GET.tipo == 'descuento_tinas' %}selected{% endif %}>Descuento Tinas</option>
+            </select>
+        </div>
+        <button type="submit" class="btn-filter">Filtrar</button>
+    </form>
+
+    <!-- Tabla de resultados -->
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>CLIENTE</th>
+                    <th>PREMIO</th>
+                    <th>TIPO</th>
+                    <th>ESTADO</th>
+                    <th>FECHA GANADO</th>
+                    <th>EXPIRA</th>
+                    <th>ACCIONES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cliente_premio in clientes_premios %}
+                <tr>
+                    <td>
+                        <div class="cliente-info">{{ cliente_premio.cliente.nombre|truncatewords:3 }}</div>
+                        <div class="telefono">{{ cliente_premio.cliente.telefono }}</div>
+                    </td>
+                    <td>{{ cliente_premio.premio.nombre }}</td>
+                    <td>{{ cliente_premio.premio.get_tipo_display|default:cliente_premio.premio.tipo }}</td>
+                    <td>
+                        <span class="badge badge-{{ cliente_premio.estado }}">
+                            {{ cliente_premio.get_estado_display|default:cliente_premio.estado|capfirst }}
+                        </span>
+                    </td>
+                    <td>{{ cliente_premio.fecha_ganado|date:"d/m/Y" }}</td>
+                    <td>{{ cliente_premio.fecha_expiracion|date:"d/m/Y" }}</td>
+                    <td>
+                        <a href="{% url 'ventas:premio_preview' cliente_premio.id %}" class="btn-action btn-ver" target="_blank">Ver</a>
+                        <button class="btn-action btn-whatsapp" onclick="showWhatsApp({{ cliente_premio.id }})">WhatsApp</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="no-results">
+                        No se encontraron clientes con premios
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal para WhatsApp -->
+<div id="whatsappModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>📱 Mensaje de WhatsApp</h3>
+            <span class="close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="cliente-data" id="clienteData"></div>
+        <div class="whatsapp-preview" id="whatsappMessage"></div>
+        <div class="whatsapp-actions">
+            <button class="btn-copy" onclick="copyMessage()">📋 Copiar Mensaje</button>
+            <a href="#" id="sendWhatsApp" class="btn-send-whatsapp" target="_blank">📱 Enviar por WhatsApp</a>
+        </div>
+    </div>
+</div>
+
+<script>
+function showWhatsApp(premioId) {
+    fetch(`/ventas/premios/whatsapp/${premioId}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Mostrar datos del cliente
+                document.getElementById('clienteData').innerHTML = `
+                    <div><strong>Cliente:</strong> ${data.cliente_nombre}</div>
+                    <div><strong>Teléfono:</strong> ${data.cliente_telefono}</div>
+                `;
+
+                // Mostrar mensaje
+                document.getElementById('whatsappMessage').textContent = data.mensaje;
+
+                // Configurar enlace de WhatsApp
+                const whatsappUrl = `https://wa.me/56${data.cliente_telefono}?text=${encodeURIComponent(data.mensaje)}`;
+                document.getElementById('sendWhatsApp').href = whatsappUrl;
+
+                // Mostrar modal
+                document.getElementById('whatsappModal').style.display = 'block';
+            } else {
+                alert('Error al generar el mensaje de WhatsApp');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al conectar con el servidor');
+        });
+}
+
+function closeModal() {
+    document.getElementById('whatsappModal').style.display = 'none';
+}
+
+function copyMessage() {
+    const message = document.getElementById('whatsappMessage').textContent;
+    navigator.clipboard.writeText(message).then(() => {
+        const btn = document.querySelector('.btn-copy');
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Copiado!';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 2000);
+    }).catch(err => {
+        console.error('Error al copiar:', err);
+        // Fallback para navegadores antiguos
+        const textArea = document.createElement('textarea');
+        textArea.value = message;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+    });
+}
+
+// Cerrar modal al hacer clic fuera
+window.onclick = function(event) {
+    const modal = document.getElementById('whatsappModal');
+    if (event.target == modal) {
+        closeModal();
+    }
+}
+</script>
+{% endblock %}

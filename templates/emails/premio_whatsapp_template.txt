@@ -1,0 +1,17 @@
+Hola {{ cliente.nombre.split|first }} 👋
+
+¡Felicitaciones! 🎉 Has alcanzado el Tramo {{ cliente_premio.tramo_al_ganar }} con un total de ${{ cliente_premio.gasto_total_al_ganar|floatformat:0|intcomma }} en Aremko.
+
+*Tu premio:* {{ premio.nombre }}
+{{ premio.descripcion_corta }}
+
+*Código:* {{ cliente_premio.codigo_unico }}
+*Válido hasta:* {{ cliente_premio.fecha_expiracion|date:"d/m/Y" }}
+
+Para reservar, contáctanos mencionando tu código exclusivo.
+
+_Términos: {{ premio.descripcion_legal }}_
+
+Saludos,
+Equipo Aremko
+📧 ventas@aremko.cl

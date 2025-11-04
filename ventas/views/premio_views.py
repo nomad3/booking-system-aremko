@@ -26,6 +26,7 @@ from ..services.premio_service import PremioService
 import traceback
 from django.http import HttpResponse
 from ..services.email_premio_service import EmailPremioService
+from django.core.paginator import Paginator
 
 
 @staff_member_required
@@ -540,3 +541,78 @@ def estadisticas_premios(request):
     }
 
     return render(request, 'ventas/premios/estadisticas.html', context)
+
+
+@staff_member_required
+def clientes_premios(request):
+    """
+    Vista para listar todos los clientes con premios
+    """
+    # Obtener filtros
+    estado = request.GET.get('estado')
+    tipo = request.GET.get('tipo')
+
+    # Query base
+    queryset = ClientePremio.objects.select_related('cliente', 'premio').all()
+
+    # Aplicar filtros
+    if estado:
+        queryset = queryset.filter(estado=estado)
+    if tipo:
+        queryset = queryset.filter(premio__tipo=tipo)
+
+    # Ordenar por fecha más reciente
+    queryset = queryset.order_by('-fecha_ganado')
+
+    context = {
+        'clientes_premios': queryset[:100],  # Limitar a 100 resultados
+    }
+
+    return render(request, 'ventas/premios/clientes_premios.html', context)
+
+
+@staff_member_required
+def premio_whatsapp_message(request, premio_id):
+    """
+    Genera un mensaje de WhatsApp para un premio específico
+    """
+    try:
+        cliente_premio = get_object_or_404(ClientePremio, id=premio_id)
+
+        # Preparar contexto para el template
+        context = {
+            'cliente': cliente_premio.cliente,
+            'premio': cliente_premio.premio,
+            'cliente_premio': cliente_premio,
+        }
+
+        # Renderizar el template de WhatsApp
+        from django.template.loader import render_to_string
+        mensaje = render_to_string('emails/premio_whatsapp_template.txt', context)
+
+        # Limpiar espacios extra y saltos de línea múltiples
+        import re
+        mensaje = re.sub(r'\n\s*\n', '\n\n', mensaje.strip())
+
+        # Obtener el teléfono del cliente sin el +56
+        telefono = cliente_premio.cliente.telefono
+        if telefono and telefono.startswith('+56'):
+            telefono = telefono[3:]
+        elif telefono and telefono.startswith('56'):
+            telefono = telefono[2:]
+
+        # Preparar respuesta JSON con el mensaje y datos del cliente
+        response_data = {
+            'success': True,
+            'mensaje': mensaje,
+            'cliente_nombre': cliente_premio.cliente.nombre,
+            'cliente_telefono': telefono,
+        }
+
+        return JsonResponse(response_data)
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
