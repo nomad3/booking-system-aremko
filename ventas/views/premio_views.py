@@ -549,29 +549,30 @@ def clientes_premios(request):
     Vista para listar todos los clientes con premios
     """
     try:
-        # Importar VentaReserva aquí para evitar importaciones circulares
-        from ..models import VentaReserva
-        from django.db.models import Subquery, OuterRef
+        # Importar modelos aquí para evitar importaciones circulares
+        from ..models import VentaReserva, ReservaServicio
+        from django.db.models import Subquery, OuterRef, Max
 
         # Obtener filtros
         estado = request.GET.get('estado')
         tipo = request.GET.get('tipo')
 
-        # Subqueries para obtener datos de la última reserva
+        # Subquery para obtener el ID de la última reserva
         ultima_reserva_id_subq = VentaReserva.objects.filter(
             cliente=OuterRef('cliente')
         ).order_by('-fecha_creacion').values('id')[:1]
 
-        ultima_reserva_fecha_subq = VentaReserva.objects.filter(
-            cliente=OuterRef('cliente')
-        ).order_by('-fecha_creacion').values('fecha_creacion')[:1]
+        # Subquery para obtener la fecha del último check-in de servicio
+        ultima_fecha_servicio_subq = ReservaServicio.objects.filter(
+            venta_reserva__cliente=OuterRef('cliente')
+        ).order_by('-fecha_servicio').values('fecha_servicio')[:1]
 
         # Query base con anotación de última reserva
         queryset = ClientePremio.objects.select_related(
             'cliente', 'premio'
         ).annotate(
             ultima_reserva_numero=Subquery(ultima_reserva_id_subq),
-            ultima_reserva_fecha=Subquery(ultima_reserva_fecha_subq)
+            ultima_reserva_fecha=Subquery(ultima_fecha_servicio_subq)
         )
 
         # Aplicar filtros
@@ -669,11 +670,18 @@ def premio_whatsapp_message(request, premio_id):
         elif telefono.startswith('56'):
             telefono = telefono[2:]
 
-        # Obtener número y fecha de última reserva
-        from ..models import VentaReserva
+        # Obtener número de última reserva y fecha del último servicio
+        from ..models import VentaReserva, ReservaServicio
+
+        # Obtener última reserva
         ultima_reserva = VentaReserva.objects.filter(
             cliente=cliente_premio.cliente
-        ).order_by('-fecha_creacion').values('id', 'fecha_creacion').first()
+        ).order_by('-fecha_creacion').values('id').first()
+
+        # Obtener fecha del último check-in de servicio
+        ultimo_servicio = ReservaServicio.objects.filter(
+            venta_reserva__cliente=cliente_premio.cliente
+        ).order_by('-fecha_servicio').values('fecha_servicio').first()
 
         # Preparar respuesta JSON con el mensaje y datos del cliente
         response_data = {
@@ -682,7 +690,7 @@ def premio_whatsapp_message(request, premio_id):
             'cliente_nombre': cliente_premio.cliente.nombre,
             'cliente_telefono': telefono,
             'ultima_reserva_numero': ultima_reserva['id'] if ultima_reserva else None,
-            'ultima_reserva_fecha': ultima_reserva['fecha_creacion'].strftime('%d/%m/%Y') if ultima_reserva and ultima_reserva['fecha_creacion'] else None,
+            'ultima_reserva_fecha': ultimo_servicio['fecha_servicio'].strftime('%d/%m/%Y') if ultimo_servicio and ultimo_servicio['fecha_servicio'] else None,
         }
 
         return JsonResponse(response_data)
