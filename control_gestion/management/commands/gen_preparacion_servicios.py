@@ -136,8 +136,8 @@ class Command(BaseCommand):
                         # Verificar si ya existe una tarea de preparación para este servicio
                         tarea_existe = Task.objects.filter(
                             reservation_id=str(reserva.id),
-                            title__icontains=f"Preparar servicio",
-                            title__icontains=servicio_nombre
+                            title__icontains="Preparar servicio",
+                            description__icontains=servicio_nombre
                         ).exists()
                         
                         if tarea_existe:
