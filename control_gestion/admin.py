@@ -7,6 +7,7 @@ Admin completo con inlines, acciones y validaciones para el sistema de tareas.
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 from .models import Task, ChecklistItem, TaskLog, CustomerSegment, DailyReport, TaskState, Priority
+from .forms import TaskAdminForm
 
 
 class ChecklistInline(admin.TabularInline):
@@ -164,6 +165,8 @@ def ai_generate_checklist_action(modeladmin, request, queryset):
 
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
+    form = TaskAdminForm  # Usar form personalizado con validación WIP=1
+    
     list_display = (
         'title',
         'swimlane',
@@ -232,18 +235,10 @@ class TaskAdmin(admin.ModelAdmin):
     )
     
     def save_model(self, request, obj, form, change):
-        """Asignar created_by si es nuevo y validar WIP=1"""
+        """Asignar created_by si es nuevo"""
         if not change:
             obj.created_by = request.user
-        
-        try:
-            super().save_model(request, obj, form, change)
-        except ValidationError as e:
-            # Capturar ValidationError (ej: WIP=1) y mostrarlo como mensaje
-            from django.contrib import messages
-            messages.error(request, str(e))
-            # Re-lanzar para que el formulario no se guarde
-            raise
+        super().save_model(request, obj, form, change)
 
 
 # ===== ADMIN DE CUSTOMER SEGMENT =====
