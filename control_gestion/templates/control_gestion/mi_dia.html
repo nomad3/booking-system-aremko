@@ -144,6 +144,11 @@
         
         <div class="task-actions">
             <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn">📝 Ver Detalles</a>
+            {% if task.state == 'BACKLOG' %}
+            <a href="/admin/control_gestion/task/?ids={{ task.id }}&action=mark_in_progress" class="btn" style="background: #f39c12;">▶️ Iniciar</a>
+            {% elif task.state == 'IN_PROGRESS' %}
+            <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn" style="background: #27ae60;">✅ Completar</a>
+            {% endif %}
             <a href="/admin/control_gestion/task/?owner__id__exact={{ user.id }}" class="btn btn-secondary">📋 Ver Todas</a>
         </div>
     </div>
