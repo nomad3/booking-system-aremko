@@ -1,20 +1,23 @@
 """
 Comando: Generar tareas de preparación de servicios (1 hora antes)
 
-Este comando debe ejecutarse CADA HORA para revisar qué servicios
+Este comando debe ejecutarse CADA 15 MINUTOS para revisar qué servicios
 comienzan en la próxima hora y crear tareas de preparación.
 
-Ejemplo: Si hay servicio a las 16:00, a las 15:00 se crea la tarea
-de preparar la tina/sala.
+Ejemplo: Si hay servicio a las 16:00, a las 15:00 se crea la tarea.
+         Si hay servicio a las 14:30, a las 13:30 se crea la tarea.
 
 Uso:
     python manage.py gen_preparacion_servicios
+    python manage.py gen_preparacion_servicios --dry-run  # Simular
 
-Cron recomendado (cada hora):
-    0 * * * * cd /path/to/proyecto && python manage.py gen_preparacion_servicios
+Cron recomendado:
+    ⭐ Cada 15 minutos (ÓPTIMO para horarios flexibles):
+    */15 * * * * cd /path/to/proyecto && python manage.py gen_preparacion_servicios
     
-    O cada 30 minutos para mayor precisión:
-    */30 * * * * cd /path/to/proyecto && python manage.py gen_preparacion_servicios
+    Alternativas:
+    */30 * * * * (cada 30 min) - bueno
+    0 * * * * (cada hora) - menos preciso
 """
 
 from django.core.management.base import BaseCommand
@@ -41,8 +44,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--tolerancia',
             type=int,
-            default=30,
-            help='Tolerancia en minutos (default: 30, crea tarea si servicio está entre 60-90 min)'
+            default=20,
+            help='Tolerancia en minutos (default: 20, crea tarea si servicio está entre 40-80 min)'
         )
         parser.add_argument(
             '--dry-run',
@@ -73,10 +76,10 @@ class Command(BaseCommand):
         # Queremos crear la tarea cuando el servicio esté entre:
         # (anticipacion - tolerancia) y (anticipacion + tolerancia) minutos en el futuro
         #
-        # Ejemplo con anticipacion=60, tolerancia=30:
+        # Ejemplo con anticipacion=60, tolerancia=20:
         # - Si ahora son las 14:00
-        # - Detectar servicios entre 15:00 (14:00 + 60min) y 15:30 (14:00 + 90min)
-        # - Esto cubre servicios a las 15:00, 15:15, 15:30
+        # - Detectar servicios entre 14:40 (14:00 + 40min) y 15:20 (14:00 + 80min)
+        # - Ejecutando cada 15 min cubre: 14:00, 14:15, 14:30, 14:45, 15:00, 15:15, 15:30...
         
         min_minutos_futuro = anticipacion - tolerancia  # Ej: 60 - 30 = 30 min
         max_minutos_futuro = anticipacion + tolerancia  # Ej: 60 + 30 = 90 min
@@ -225,9 +228,10 @@ class Command(BaseCommand):
         
         # Nota de configuración
         self.stdout.write("\n" + self.style.WARNING("📌 CONFIGURACIÓN CRON:"))
-        self.stdout.write("   ⭐ RECOMENDADO: Ejecutar cada 30 minutos:")
-        self.stdout.write("   */30 * * * * python manage.py gen_preparacion_servicios")
-        self.stdout.write("\n   Esto cubre servicios con horarios intermedios (14:30, 15:15, etc.)")
-        self.stdout.write("\n   También puedes ejecutar cada hora si prefieres:")
-        self.stdout.write("   0 * * * * python manage.py gen_preparacion_servicios\n")
+        self.stdout.write("   ⭐ RECOMENDADO: Ejecutar cada 15 minutos:")
+        self.stdout.write("   */15 * * * * python manage.py gen_preparacion_servicios")
+        self.stdout.write("\n   Esto cubre TODOS los horarios posibles (14:00, 14:15, 14:30, 14:45, etc.)")
+        self.stdout.write("\n\n   Alternativas:")
+        self.stdout.write("   */30 * * * * python manage.py gen_preparacion_servicios  (cada 30 min)")
+        self.stdout.write("   0 * * * * python manage.py gen_preparacion_servicios     (cada hora)\n")
 
