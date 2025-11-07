@@ -360,3 +360,13 @@ class DailyReport(models.Model):
     def __str__(self):
         return f"Reporte {self.date.strftime('%Y-%m-%d')}"
 
+
+# Importar modelos adicionales de templates
+from .models_templates import TaskTemplate, EmpleadoDisponibilidad
+
+__all__ = [
+    'Task', 'ChecklistItem', 'TaskLog', 'CustomerSegment', 'DailyReport',
+    'TaskTemplate', 'EmpleadoDisponibilidad',
+    'Swimlane', 'TaskState', 'Priority', 'TaskSource', 'LocationRef'
+]
+

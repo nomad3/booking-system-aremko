@@ -6,7 +6,10 @@ Admin completo con inlines, acciones y validaciones para el sistema de tareas.
 
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
-from .models import Task, ChecklistItem, TaskLog, CustomerSegment, DailyReport, TaskState, Priority
+from .models import (
+    Task, ChecklistItem, TaskLog, CustomerSegment, DailyReport,
+    TaskState, Priority, TaskTemplate, EmpleadoDisponibilidad
+)
 from .forms import TaskAdminForm
 
 
@@ -260,4 +263,87 @@ class DailyReportAdmin(admin.ModelAdmin):
     search_fields = ('summary',)
     readonly_fields = ('generated_at',)
     ordering = ['-date']
+
+
+# ===== ADMIN DE TASK TEMPLATE =====
+
+@admin.register(TaskTemplate)
+class TaskTemplateAdmin(admin.ModelAdmin):
+    list_display = (
+        'title_template',
+        'swimlane',
+        'get_dias_display',
+        'asignar_a_grupo',
+        'asignar_a_usuario',
+        'activa',
+        'solo_martes'
+    )
+    list_filter = ('swimlane', 'activa', 'solo_martes', 'asignar_a_grupo')
+    search_fields = ('title_template', 'description')
+    
+    fieldsets = (
+        ('Información de la Tarea', {
+            'fields': ('title_template', 'description')
+        }),
+        ('Configuración', {
+            'fields': ('swimlane', 'priority', 'queue_position')
+        }),
+        ('Recurrencia', {
+            'fields': ('dias_activa', 'solo_martes', 'activa'),
+            'description': 'Configurar qué días se genera esta tarea'
+        }),
+        ('Asignación', {
+            'fields': ('asignar_a_grupo', 'asignar_a_usuario'),
+            'description': 'A quién se asigna (grupo o usuario específico)'
+        }),
+    )
+    
+    def get_dias_display(self, obj):
+        return obj.get_dias_str()
+    get_dias_display.short_description = 'Días'
+    
+    actions = ['generar_tareas_ahora']
+    
+    @admin.action(description="🔄 Generar tareas AHORA de estas plantillas")
+    def generar_tareas_ahora(self, request, queryset):
+        """Genera tareas inmediatamente de las plantillas seleccionadas"""
+        count = 0
+        for template in queryset:
+            if template.aplica_hoy():
+                task = template.generar_tarea()
+                if task:
+                    count += 1
+        
+        if count > 0:
+            messages.success(request, f"✅ {count} tarea(s) generada(s) desde plantillas")
+        else:
+            messages.warning(request, "⚠️ Ninguna plantilla aplica para hoy o ya fueron generadas")
+
+
+# ===== ADMIN DE EMPLEADO DISPONIBILIDAD =====
+
+@admin.register(EmpleadoDisponibilidad)
+class EmpleadoDisponibilidadAdmin(admin.ModelAdmin):
+    list_display = ('empleado', 'get_dias_display', 'trabaja_hoy_display', 'notas')
+    list_filter = ('empleado__groups',)
+    search_fields = ('empleado__username', 'empleado__first_name', 'notas')
+    
+    fieldsets = (
+        ('Empleado', {
+            'fields': ('empleado',)
+        }),
+        ('Disponibilidad', {
+            'fields': ('dias_trabajo', 'notas'),
+            'description': 'Configurar qué días trabaja este empleado'
+        }),
+    )
+    
+    def get_dias_display(self, obj):
+        return obj.get_dias_str()
+    get_dias_display.short_description = 'Días de trabajo'
+    
+    def trabaja_hoy_display(self, obj):
+        trabaja = obj.trabaja_hoy()
+        return "✅ Sí" if trabaja else "❌ No"
+    trabaja_hoy_display.short_description = 'Trabaja hoy'
 
