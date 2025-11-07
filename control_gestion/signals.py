@@ -267,7 +267,7 @@ def react_to_reserva_change(sender, instance, created, **kwargs):
     if old_estado != "checkin" and new_estado == "checkin":
         logger.info(f"Reserva #{instance.id} → CHECKIN. Creando tareas automáticas...")
         
-        # Tarea para RECEPCIÓN
+        # Tarea para RECEPCIÓN (inmediata)
         Task.objects.create(
             title=f"Check-in confirmado – Reserva #{instance.id}",
             description=(
@@ -287,32 +287,18 @@ def react_to_reserva_change(sender, instance, created, **kwargs):
         )
         logger.info(f"✅ Tarea RECEPCION creada para reserva #{instance.id}")
         
-        # Tareas para OPERACIÓN (una por cada servicio)
-        for rs in servicios:
-            servicio_nombre = getattr(rs.servicio, 'nombre', 'Servicio') if rs.servicio else 'Servicio'
-            
-            Task.objects.create(
-                title=f"Preparar servicio – {servicio_nombre} (Reserva #{instance.id})",
-                description=(
-                    f"Fecha: {rs.fecha_agendamiento} Hora: {rs.hora_inicio}\n"
-                    f"Preparar [tina/sala/cabaña] según tipo de servicio.\n"
-                    f"Verificar temperatura, limpieza e insumos antes de la hora de inicio."
-                ),
-                swimlane=Swimlane.OPERACION,
-                owner=ops,
-                created_by=ops,
-                state=TaskState.BACKLOG,
-                queue_position=1,
-                reservation_id=str(instance.id),
-                customer_phone_last9=customer_phone,
-                segment_tag=segment_tag,
-                service_type=getattr(rs.servicio, 'tipo_servicio', '') if rs.servicio else '',
-                location_ref="",  # Se puede mapear según servicio si es necesario
-                priority=Priority.NORMAL,
-                source=TaskSource.SISTEMA
-            )
+        # NOTA: Las tareas de preparación de servicios (OPERACION) 
+        # NO se crean aquí en el check-in administrativo.
+        # Se crean automáticamente 1 hora antes del servicio mediante el comando:
+        # python manage.py gen_preparacion_servicios
+        # 
+        # Este comando debe ejecutarse cada hora vía cron:
+        # 0 * * * * python manage.py gen_preparacion_servicios
         
-        logger.info(f"✅ {servicios.count()} tarea(s) OPERACION creadas para reserva #{instance.id}")
+        logger.info(
+            f"ℹ️  Tareas de preparación de servicios se crearán automáticamente "
+            f"1 hora antes vía comando gen_preparacion_servicios"
+        )
     
     # ===== TRANSICIÓN A CHECKOUT =====
     elif old_estado != "checkout" and new_estado == "checkout":
