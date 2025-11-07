@@ -268,3 +268,129 @@ def ai_generate_checklist(request):
             "error": str(e)
         }, status=500)
 
+
+# ===== ENDPOINTS PARA CRON EXTERNO =====
+
+@csrf_exempt
+def cron_preparacion_servicios(request):
+    """
+    Endpoint para ejecutar gen_preparacion_servicios desde cron externo
+    
+    GET o POST: /control_gestion/cron/preparacion-servicios/
+    
+    Opcionalmente puede recibir un token de seguridad:
+    ?token=tu_token_secreto
+    """
+    # Validar token si está configurado
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+    
+    try:
+        from django.core.management import call_command
+        from io import StringIO
+        
+        # Capturar output del comando
+        output = StringIO()
+        call_command('gen_preparacion_servicios', stdout=output)
+        
+        result = output.getvalue()
+        
+        logger.info("✅ Cron preparacion_servicios ejecutado vía HTTP")
+        
+        return JsonResponse({
+            "ok": True,
+            "message": "Comando ejecutado exitosamente",
+            "output": result[:1000]  # Limitar output
+        })
+    
+    except Exception as e:
+        logger.error(f"Error en cron_preparacion_servicios: {str(e)}")
+        return JsonResponse({
+            "ok": False,
+            "error": str(e)
+        }, status=500)
+
+
+@csrf_exempt  
+def cron_daily_opening(request):
+    """
+    Endpoint para ejecutar gen_daily_opening desde cron externo
+    
+    GET o POST: /control_gestion/cron/daily-opening/
+    """
+    # Validar token
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+    
+    try:
+        from django.core.management import call_command
+        from io import StringIO
+        
+        output = StringIO()
+        call_command('gen_daily_opening', stdout=output)
+        
+        result = output.getvalue()
+        
+        logger.info("✅ Cron daily_opening ejecutado vía HTTP")
+        
+        return JsonResponse({
+            "ok": True,
+            "message": "Comando ejecutado exitosamente",
+            "output": result[:1000]
+        })
+    
+    except Exception as e:
+        logger.error(f"Error en cron_daily_opening: {str(e)}")
+        return JsonResponse({
+            "ok": False,
+            "error": str(e)
+        }, status=500)
+
+
+@csrf_exempt
+def cron_daily_reports(request):
+    """
+    Endpoint para ejecutar gen_daily_reports desde cron externo
+    
+    GET o POST: /control_gestion/cron/daily-reports/?momento=matutino
+    """
+    # Validar token
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+    
+    try:
+        from django.core.management import call_command
+        from io import StringIO
+        
+        momento = request.GET.get('momento', 'vespertino')
+        
+        output = StringIO()
+        call_command('gen_daily_reports', momento=momento, stdout=output)
+        
+        result = output.getvalue()
+        
+        logger.info(f"✅ Cron daily_reports ({momento}) ejecutado vía HTTP")
+        
+        return JsonResponse({
+            "ok": True,
+            "message": "Comando ejecutado exitosamente",
+            "momento": momento,
+            "output": result[:1000]
+        })
+    
+    except Exception as e:
+        logger.error(f"Error en cron_daily_reports: {str(e)}")
+        return JsonResponse({
+            "ok": False,
+            "error": str(e)
+        }, status=500)
+
