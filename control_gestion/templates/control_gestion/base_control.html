@@ -1,0 +1,123 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Control de Gestión{% endblock %} - Aremko</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        header .subtitle {
+            color: #ecf0f1;
+            font-size: 14px;
+        }
+        
+        nav {
+            background: white;
+            padding: 15px 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        nav a {
+            color: #3498db;
+            text-decoration: none;
+            margin-right: 20px;
+            padding: 8px 15px;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+        
+        nav a:hover {
+            background: #ecf0f1;
+        }
+        
+        nav a.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+        }
+        
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🎯 Control de Gestión - Aremko</h1>
+            <p class="subtitle">Sistema de tareas operativas | Usuario: {{ user.username }}</p>
+        </div>
+    </header>
+    
+    <nav>
+        <div class="container">
+            <a href="{% url 'control_gestion:mi_dia' %}" {% if request.resolver_match.url_name == 'mi_dia' %}class="active"{% endif %}>📅 Mi Día</a>
+            <a href="{% url 'control_gestion:equipo' %}" {% if request.resolver_match.url_name == 'equipo' %}class="active"{% endif %}>👥 Equipo</a>
+            <a href="/admin/control_gestion/task/">⚙️ Admin</a>
+            <a href="/admin/">🏠 Dashboard</a>
+        </div>
+    </nav>
+    
+    <main>
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
+

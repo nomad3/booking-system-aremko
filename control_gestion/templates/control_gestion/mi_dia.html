@@ -1,0 +1,163 @@
+{% extends "control_gestion/base_control.html" %}
+
+{% block title %}Mi Día{% endblock %}
+
+{% block extra_head %}
+<style>
+    .task-card {
+        background: white;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        border-left: 4px solid #3498db;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .task-card.priority-high {
+        border-left-color: #e74c3c;
+        background: #fff5f5;
+    }
+    
+    .task-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 15px;
+    }
+    
+    .task-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2c3e50;
+        flex: 1;
+    }
+    
+    .task-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 15px;
+    }
+    
+    .badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .badge-swimlane {
+        background: #3498db;
+        color: white;
+    }
+    
+    .badge-state {
+        background: #95a5a6;
+        color: white;
+    }
+    
+    .badge-state.in-progress {
+        background: #f39c12;
+    }
+    
+    .badge-state.blocked {
+        background: #e74c3c;
+    }
+    
+    .badge-priority {
+        background: #e74c3c;
+        color: white;
+    }
+    
+    .task-description {
+        color: #7f8c8d;
+        margin-bottom: 15px;
+        white-space: pre-wrap;
+    }
+    
+    .task-actions {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: white;
+        border-radius: 8px;
+    }
+    
+    .empty-state h2 {
+        color: #27ae60;
+        font-size: 32px;
+        margin-bottom: 10px;
+    }
+    
+    .stats {
+        background: #ecf0f1;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2 style="margin-bottom: 20px;">📅 Mis Tareas del Día</h2>
+
+<div class="stats">
+    <strong>Total de tareas pendientes:</strong> {{ total_pending }}
+    <span style="margin-left: 20px; color: #7f8c8d;">Mostrando top 3</span>
+</div>
+
+{% if tasks %}
+    {% for task in tasks %}
+    <div class="task-card {% if task.priority == 'ALTA' %}priority-high{% endif %}">
+        <div class="task-header">
+            <div class="task-title">{{ task.title }}</div>
+        </div>
+        
+        <div class="task-meta">
+            <span class="badge badge-swimlane">{{ task.get_swimlane_display }}</span>
+            <span class="badge badge-state {% if task.state == 'IN_PROGRESS' %}in-progress{% elif task.state == 'BLOCKED' %}blocked{% endif %}">
+                {{ task.get_state_display }}
+            </span>
+            {% if task.priority == 'ALTA' %}
+            <span class="badge badge-priority">🔥 ALTA PRIORIDAD</span>
+            {% endif %}
+            {% if task.promise_due_at %}
+            <span class="badge" style="background: #9b59b6; color: white;">
+                📅 Promesa: {{ task.promise_due_at|date:"d/m H:i" }}
+            </span>
+            {% endif %}
+            {% if task.reservation_id %}
+            <span class="badge" style="background: #16a085; color: white;">
+                🎫 Reserva #{{ task.reservation_id }}
+            </span>
+            {% endif %}
+        </div>
+        
+        <div class="task-description">
+            {{ task.description|truncatewords:50 }}
+        </div>
+        
+        <div class="task-actions">
+            <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn">📝 Ver Detalles</a>
+            <a href="/admin/control_gestion/task/?owner__id__exact={{ user.id }}" class="btn btn-secondary">📋 Ver Todas</a>
+        </div>
+    </div>
+    {% endfor %}
+    
+    <div style="text-align: center; margin-top: 30px;">
+        <a href="/admin/control_gestion/task/?owner__id__exact={{ user.id }}" class="btn">Ver Todas Mis Tareas ({{ total_pending}})</a>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <h2>✅</h2>
+        <h3>¡Sin tareas pendientes!</h3>
+        <p style="color: #7f8c8d; margin-top: 10px;">Buen trabajo. Disfruta tu día 🎉</p>
+    </div>
+{% endif %}
+{% endblock %}
+

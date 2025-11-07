@@ -1,0 +1,175 @@
+{% extends "control_gestion/base_control.html" %}
+
+{% block title %}Equipo{% endblock %}
+
+{% block extra_head %}
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stat-number {
+        font-size: 36px;
+        font-weight: bold;
+        color: #3498db;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        color: #7f8c8d;
+        font-size: 14px;
+    }
+    
+    .stat-card.done .stat-number {
+        color: #27ae60;
+    }
+    
+    .stat-card.blocked .stat-number {
+        color: #e74c3c;
+    }
+    
+    .stat-card.in-progress .stat-number {
+        color: #f39c12;
+    }
+    
+    .task-list {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .task-row {
+        padding: 15px;
+        border-bottom: 1px solid #ecf0f1;
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr 100px;
+        gap: 15px;
+        align-items: center;
+    }
+    
+    .task-row:last-child {
+        border-bottom: none;
+    }
+    
+    .task-row:hover {
+        background: #f8f9fa;
+    }
+    
+    .swimlane-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: white;
+    }
+    
+    .swimlane-OPS { background: #3498db; }
+    .swimlane-RX { background: #9b59b6; }
+    .swimlane-COM { background: #27ae60; }
+    .swimlane-CS { background: #e67e22; }
+    .swimlane-SUP { background: #34495e; }
+    
+    .state-badge {
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .state-BACKLOG { background: #ecf0f1; color: #7f8c8d; }
+    .state-IN_PROGRESS { background: #fff3cd; color: #856404; }
+    .state-BLOCKED { background: #f8d7da; color: #721c24; }
+    .state-DONE { background: #d4edda; color: #155724; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+    <h2>👥 Snapshot del Equipo</h2>
+    <div style="color: #7f8c8d;">{{ today|date:"l, d F Y" }}</div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.total }}</div>
+        <div class="stat-label">Total Hoy</div>
+    </div>
+    <div class="stat-card done">
+        <div class="stat-number">{{ stats.done }}</div>
+        <div class="stat-label">Completadas</div>
+    </div>
+    <div class="stat-card in-progress">
+        <div class="stat-number">{{ stats.in_progress }}</div>
+        <div class="stat-label">En Curso</div>
+    </div>
+    <div class="stat-card blocked">
+        <div class="stat-number">{{ stats.blocked }}</div>
+        <div class="stat-label">Bloqueadas</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.backlog }}</div>
+        <div class="stat-label">Pendientes</div>
+    </div>
+</div>
+
+{% if tasks %}
+<div class="task-list">
+    <div class="task-row" style="font-weight: 600; border-bottom: 2px solid #bdc3c7;">
+        <div>Tarea</div>
+        <div>Área</div>
+        <div>Responsable</div>
+        <div>Estado</div>
+        <div>Cola</div>
+    </div>
+    
+    {% for task in tasks %}
+    <div class="task-row">
+        <div>
+            <a href="/admin/control_gestion/task/{{ task.id }}/change/" style="color: #2c3e50; text-decoration: none; font-weight: 500;">
+                {{ task.title|truncatewords:10 }}
+            </a>
+            {% if task.priority == 'ALTA' %}
+            <span style="color: #e74c3c; font-size: 12px;">🔥</span>
+            {% endif %}
+        </div>
+        <div>
+            <span class="swimlane-badge swimlane-{{ task.swimlane }}">
+                {{ task.get_swimlane_display }}
+            </span>
+        </div>
+        <div>{{ task.owner.username }}</div>
+        <div>
+            <span class="state-badge state-{{ task.state }}">
+                {{ task.get_state_display }}
+            </span>
+        </div>
+        <div style="text-align: center; color: #7f8c8d;">
+            #{{ task.queue_position }}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div style="background: white; padding: 60px; text-align: center; border-radius: 8px;">
+    <h3 style="color: #95a5a6;">Sin tareas actualizadas hoy</h3>
+</div>
+{% endif %}
+
+<div style="margin-top: 30px; text-align: center;">
+    <a href="/admin/control_gestion/task/" class="btn">Ver Todas las Tareas en Admin</a>
+</div>
+{% endblock %}
+
