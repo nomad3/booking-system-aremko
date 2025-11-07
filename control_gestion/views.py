@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 import json
 import logging
+import os
 
 from .models import (
     Task, TaskState, Priority, Swimlane, TaskSource, 
