@@ -33,10 +33,16 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--ventana',
+            '--anticipacion',
             type=int,
             default=60,
-            help='Minutos de ventana para buscar servicios (default: 60)'
+            help='Minutos de anticipación para crear tarea (default: 60 = 1 hora antes)'
+        )
+        parser.add_argument(
+            '--tolerancia',
+            type=int,
+            default=30,
+            help='Tolerancia en minutos (default: 30, crea tarea si servicio está entre 60-90 min)'
         )
         parser.add_argument(
             '--dry-run',
@@ -45,7 +51,8 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        ventana = options['ventana']
+        anticipacion = options['anticipacion']  # Ej: 60 minutos
+        tolerancia = options['tolerancia']      # Ej: 30 minutos
         dry_run = options['dry_run']
         
         now = timezone.now()
@@ -56,17 +63,36 @@ class Command(BaseCommand):
         
         self.stdout.write(f"🕐 Hora actual: {now.strftime('%H:%M')}")
         self.stdout.write(f"📅 Fecha: {now.date()}")
-        self.stdout.write(f"⏱️  Ventana: {ventana} minutos antes del servicio\n")
+        self.stdout.write(f"⏱️  Anticipación: {anticipacion} minutos antes del servicio")
+        self.stdout.write(f"⏱️  Tolerancia: ±{tolerancia} minutos\n")
         
         if dry_run:
             self.stdout.write(self.style.WARNING("⚠️  MODO DRY-RUN\n"))
         
-        # Calcular rango de tiempo
-        # Buscar servicios que comienzan entre ahora y (ahora + ventana)
-        inicio_ventana = now
-        fin_ventana = now + timedelta(minutes=ventana)
+        # Calcular rango de tiempo para detectar servicios
+        # Queremos crear la tarea cuando el servicio esté entre:
+        # (anticipacion - tolerancia) y (anticipacion + tolerancia) minutos en el futuro
+        #
+        # Ejemplo con anticipacion=60, tolerancia=30:
+        # - Si ahora son las 14:00
+        # - Detectar servicios entre 15:00 (14:00 + 60min) y 15:30 (14:00 + 90min)
+        # - Esto cubre servicios a las 15:00, 15:15, 15:30
         
-        self.stdout.write(f"🔍 Buscando servicios entre {inicio_ventana.strftime('%H:%M')} y {fin_ventana.strftime('%H:%M')}...")
+        min_minutos_futuro = anticipacion - tolerancia  # Ej: 60 - 30 = 30 min
+        max_minutos_futuro = anticipacion + tolerancia  # Ej: 60 + 30 = 90 min
+        
+        inicio_ventana = now + timedelta(minutes=min_minutos_futuro)
+        fin_ventana = now + timedelta(minutes=max_minutos_futuro)
+        
+        self.stdout.write(
+            f"🔍 Buscando servicios que comiencen entre "
+            f"{inicio_ventana.strftime('%H:%M')} y {fin_ventana.strftime('%H:%M')}..."
+        )
+        self.stdout.write(
+            f"   (Esto cubre servicios con horarios como: "
+            f"{inicio_ventana.strftime('%H:%M')}, {(inicio_ventana + timedelta(minutes=15)).strftime('%H:%M')}, "
+            f"{(inicio_ventana + timedelta(minutes=30)).strftime('%H:%M')}, etc.)\n"
+        )
         
         # Obtener usuario de operaciones
         ops_user = User.objects.filter(groups__name="OPERACIONES").first()
@@ -199,8 +225,9 @@ class Command(BaseCommand):
         
         # Nota de configuración
         self.stdout.write("\n" + self.style.WARNING("📌 CONFIGURACIÓN CRON:"))
-        self.stdout.write("   Ejecutar cada hora:")
-        self.stdout.write("   0 * * * * python manage.py gen_preparacion_servicios")
-        self.stdout.write("\n   O cada 30 minutos para mayor precisión:")
-        self.stdout.write("   */30 * * * * python manage.py gen_preparacion_servicios\n")
+        self.stdout.write("   ⭐ RECOMENDADO: Ejecutar cada 30 minutos:")
+        self.stdout.write("   */30 * * * * python manage.py gen_preparacion_servicios")
+        self.stdout.write("\n   Esto cubre servicios con horarios intermedios (14:30, 15:15, etc.)")
+        self.stdout.write("\n   También puedes ejecutar cada hora si prefieres:")
+        self.stdout.write("   0 * * * * python manage.py gen_preparacion_servicios\n")
 
