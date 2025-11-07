@@ -14,7 +14,10 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from .models import Task, TaskLog, TaskState, Priority
+from .models import Task, TaskLog, TaskState, Priority, Swimlane, TaskSource
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # ===== FASE 1: SIGNALS INTERNOS DEL MÓDULO =====
@@ -151,24 +154,241 @@ def qa_on_done(sender, instance, created, **kwargs):
         )
 
 
-# ===== FASE 2: INTEGRACIÓN CON VENTAS (SE IMPLEMENTARÁ EN ETAPA 3) =====
+# ===== FASE 2: INTEGRACIÓN CON VENTAS =====
 
 # Caché para guardar estado anterior de VentaReserva
 _old_estado_cache = {}
 
 
-# Los siguientes signals se activarán en Etapa 3 cuando tengamos la integración completa
+def _get_last9_digits(phone: str) -> str:
+    """
+    Extrae los últimos 9 dígitos de un teléfono
+    
+    Args:
+        phone: Teléfono en cualquier formato (ej: +56912345678)
+    
+    Returns:
+        Últimos 9 dígitos o string vacío
+    """
+    if not phone:
+        return ""
+    
+    # Extraer solo dígitos
+    digits = "".join([c for c in str(phone) if c.isdigit()])
+    
+    # Retornar últimos 9
+    return digits[-9:] if len(digits) >= 9 else digits
 
-# @receiver(pre_save, sender='ventas.VentaReserva')
-# def capture_old_estado(sender, instance, **kwargs):
-#     """Captura el estado anterior de la reserva"""
-#     # Se implementará en Etapa 3
-#     pass
+
+def _get_user_by_group(group_name: str):
+    """
+    Obtiene el primer usuario de un grupo
+    
+    Args:
+        group_name: Nombre del grupo
+    
+    Returns:
+        User o None
+    """
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    
+    return User.objects.filter(groups__name=group_name).first() or User.objects.first()
 
 
-# @receiver(post_save, sender='ventas.VentaReserva')
-# def react_to_reserva_change(sender, instance, created, **kwargs):
-#     """Crea tareas automáticas al cambiar estado de reserva (checkin/checkout)"""
-#     # Se implementará en Etapa 3
-#     pass
+@receiver(pre_save, sender='ventas.VentaReserva')
+def capture_old_estado(sender, instance, **kwargs):
+    """
+    Captura el estado_reserva anterior antes de guardar
+    
+    Esto permite detectar transiciones de estado (pendiente → checkin → checkout)
+    """
+    if instance.pk:
+        try:
+            # Importar dinámicamente para evitar circular imports
+            from ventas.models import VentaReserva
+            
+            old = VentaReserva.objects.get(pk=instance.pk)
+            _old_estado_cache[instance.pk] = old.estado_reserva
+        except Exception:
+            _old_estado_cache[instance.pk] = None
+    else:
+        _old_estado_cache[instance.pk] = None
+
+
+@receiver(post_save, sender='ventas.VentaReserva')
+def react_to_reserva_change(sender, instance, created, **kwargs):
+    """
+    Crea tareas automáticas cuando el recepcionista cambia estado_reserva
+    
+    Transiciones detectadas:
+    - pendiente → checkin: Crear tareas de preparación (RECEPCION + OPERACION)
+    - checkin → checkout: Crear tareas post-visita (NPS + premio D+3)
+    
+    Las tareas se crean automáticamente y se asignan a los usuarios
+    correspondientes de cada grupo.
+    """
+    from datetime import datetime, timedelta
+    from ventas.models import ReservaServicio
+    
+    # Obtener estado anterior
+    old_estado = _old_estado_cache.pop(instance.pk, None)
+    new_estado = instance.estado_reserva
+    
+    # Si no hay cambio de estado, no hacer nada
+    if old_estado == new_estado:
+        return
+    
+    # Obtener usuarios por grupo
+    ops = _get_user_by_group("OPERACIONES")
+    rx = _get_user_by_group("RECEPCION")
+    com = _get_user_by_group("VENTAS")
+    cs = _get_user_by_group("ATENCION") or com
+    
+    # Obtener teléfono del cliente (últimos 9 dígitos)
+    customer_phone = _get_last9_digits(
+        getattr(instance.cliente, "telefono", "") if instance.cliente else ""
+    )
+    
+    # Obtener tramo del cliente (opcional, puede fallar si TramoService no disponible)
+    segment_tag = ""
+    try:
+        from ventas.services.tramo_service import TramoService
+        gasto_total = TramoService.calcular_gasto_cliente(instance.cliente)
+        tramo_actual = TramoService.calcular_tramo(float(gasto_total))
+        segment_tag = f"Tramo {tramo_actual}"
+    except Exception as e:
+        logger.warning(f"No se pudo calcular tramo del cliente: {str(e)}")
+    
+    # Obtener servicios asociados a esta reserva
+    servicios = instance.reservaservicios.all()
+    
+    # ===== TRANSICIÓN A CHECKIN =====
+    if old_estado != "checkin" and new_estado == "checkin":
+        logger.info(f"Reserva #{instance.id} → CHECKIN. Creando tareas automáticas...")
+        
+        # Tarea para RECEPCIÓN
+        Task.objects.create(
+            title=f"Check-in confirmado – Reserva #{instance.id}",
+            description=(
+                "Dar la bienvenida al cliente, entregar indicaciones del spa, "
+                "validar pago y documento si aplica, coordinar con Operaciones."
+            ),
+            swimlane=Swimlane.RECEPCION,
+            owner=rx,
+            created_by=rx,
+            state=TaskState.BACKLOG,
+            queue_position=1,
+            reservation_id=str(instance.id),
+            customer_phone_last9=customer_phone,
+            segment_tag=segment_tag,
+            priority=Priority.NORMAL,
+            source=TaskSource.SISTEMA
+        )
+        logger.info(f"✅ Tarea RECEPCION creada para reserva #{instance.id}")
+        
+        # Tareas para OPERACIÓN (una por cada servicio)
+        for rs in servicios:
+            servicio_nombre = getattr(rs.servicio, 'nombre', 'Servicio') if rs.servicio else 'Servicio'
+            
+            Task.objects.create(
+                title=f"Preparar servicio – {servicio_nombre} (Reserva #{instance.id})",
+                description=(
+                    f"Fecha: {rs.fecha_agendamiento} Hora: {rs.hora_inicio}\n"
+                    f"Preparar [tina/sala/cabaña] según tipo de servicio.\n"
+                    f"Verificar temperatura, limpieza e insumos antes de la hora de inicio."
+                ),
+                swimlane=Swimlane.OPERACION,
+                owner=ops,
+                created_by=ops,
+                state=TaskState.BACKLOG,
+                queue_position=1,
+                reservation_id=str(instance.id),
+                customer_phone_last9=customer_phone,
+                segment_tag=segment_tag,
+                service_type=getattr(rs.servicio, 'tipo_servicio', '') if rs.servicio else '',
+                location_ref="",  # Se puede mapear según servicio si es necesario
+                priority=Priority.NORMAL,
+                source=TaskSource.SISTEMA
+            )
+        
+        logger.info(f"✅ {servicios.count()} tarea(s) OPERACION creadas para reserva #{instance.id}")
+    
+    # ===== TRANSICIÓN A CHECKOUT =====
+    elif old_estado != "checkout" and new_estado == "checkout":
+        logger.info(f"Reserva #{instance.id} → CHECKOUT. Creando tareas post-visita...")
+        
+        # Tarea para ATENCIÓN AL CLIENTE (NPS)
+        Task.objects.create(
+            title=f"NPS post-visita – Reserva #{instance.id}",
+            description=(
+                "Contactar al cliente por WhatsApp o llamada para:\n"
+                "- Pedir calificación NPS (0-10)\n"
+                "- Solicitar comentarios de la experiencia\n"
+                "- Registrar feedback en CRM\n"
+                "- Agradecer la visita"
+            ),
+            swimlane=Swimlane.ATENCION,
+            owner=cs,
+            created_by=cs,
+            state=TaskState.BACKLOG,
+            queue_position=1,
+            reservation_id=str(instance.id),
+            customer_phone_last9=customer_phone,
+            segment_tag=segment_tag,
+            priority=Priority.NORMAL,
+            source=TaskSource.SISTEMA
+        )
+        logger.info(f"✅ Tarea NPS creada para reserva #{instance.id}")
+        
+        # Tareas para COMERCIAL (Premio D+3)
+        # Crear una tarea por cada servicio, programada para D+3 después del check-in
+        for rs in servicios:
+            # Calcular fecha D+3 después del check-in
+            try:
+                due_at = datetime.combine(
+                    rs.fecha_agendamiento,
+                    datetime.min.time()
+                ) + timedelta(days=3)
+                
+                # Convertir a aware datetime
+                due_at = timezone.make_aware(due_at)
+            except Exception:
+                # Si falla, usar 3 días desde ahora
+                due_at = timezone.now() + timedelta(days=3)
+            
+            servicio_nombre = getattr(rs.servicio, 'nombre', 'Servicio') if rs.servicio else 'Servicio'
+            
+            Task.objects.create(
+                title=f"Verificar premio D+3 – Reserva #{instance.id}",
+                description=(
+                    f"Enviar premio según tramo del cliente ({segment_tag}):\n"
+                    f"- Enviar por WhatsApp con mensaje personalizado\n"
+                    f"- Enviar por Email con vale digital\n"
+                    f"- (Opcional) SMS de respaldo\n"
+                    f"- Registrar envío en sistema de premios\n"
+                    f"- Validar que cliente recibió correctamente\n\n"
+                    f"Servicio: {servicio_nombre}\n"
+                    f"Check-in fue: {rs.fecha_agendamiento}"
+                ),
+                swimlane=Swimlane.COMERCIAL,
+                owner=com,
+                created_by=com,
+                state=TaskState.BACKLOG,
+                queue_position=1,
+                reservation_id=str(instance.id),
+                customer_phone_last9=customer_phone,
+                segment_tag=segment_tag,
+                service_type=getattr(rs.servicio, 'tipo_servicio', '') if rs.servicio else '',
+                priority=Priority.NORMAL,
+                source=TaskSource.SISTEMA,
+                promise_due_at=due_at  # ⭐ Programada para D+3
+            )
+        
+        logger.info(f"✅ {servicios.count()} tarea(s) PREMIO D+3 creadas para reserva #{instance.id}")
+    
+    else:
+        # Otras transiciones no gatillan tareas automáticas por ahora
+        logger.debug(f"Reserva #{instance.id}: {old_estado} → {new_estado} (sin tareas automáticas)")
+
 
