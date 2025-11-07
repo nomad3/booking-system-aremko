@@ -118,7 +118,25 @@ class Command(BaseCommand):
             for rs in reserva.reservaservicios.all():
                 # Construir datetime del servicio
                 try:
-                    hora_servicio = datetime.strptime(rs.hora_inicio, "%H:%M").time()
+                    # Normalizar formato de hora (manejar formatos diversos)
+                    hora_str = str(rs.hora_inicio).strip()
+                    
+                    # Reemplazar separadores incorrectos
+                    hora_str = hora_str.replace(';', ':').replace('.', ':')
+                    
+                    # Si no tiene ':', agregar según longitud
+                    if ':' not in hora_str:
+                        if len(hora_str) == 4:  # '1900' → '19:00'
+                            hora_str = f"{hora_str[:2]}:{hora_str[2:]}"
+                        elif len(hora_str) == 3:  # '900' → '09:00'
+                            hora_str = f"0{hora_str[0]}:{hora_str[1:]}"
+                        elif len(hora_str) == 2:  # '17' → '17:00'
+                            hora_str = f"{hora_str}:00"
+                        elif len(hora_str) == 1:  # '9' → '09:00'
+                            hora_str = f"0{hora_str}:00"
+                    
+                    # Intentar parsear
+                    hora_servicio = datetime.strptime(hora_str, "%H:%M").time()
                     datetime_servicio = timezone.make_aware(
                         datetime.combine(rs.fecha_agendamiento, hora_servicio)
                     )
