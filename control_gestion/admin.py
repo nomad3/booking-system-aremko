@@ -232,10 +232,18 @@ class TaskAdmin(admin.ModelAdmin):
     )
     
     def save_model(self, request, obj, form, change):
-        """Asignar created_by si es nuevo"""
+        """Asignar created_by si es nuevo y validar WIP=1"""
         if not change:
             obj.created_by = request.user
-        super().save_model(request, obj, form, change)
+        
+        try:
+            super().save_model(request, obj, form, change)
+        except ValidationError as e:
+            # Capturar ValidationError (ej: WIP=1) y mostrarlo como mensaje
+            from django.contrib import messages
+            messages.error(request, str(e))
+            # Re-lanzar para que el formulario no se guarde
+            raise
 
 
 # ===== ADMIN DE CUSTOMER SEGMENT =====
