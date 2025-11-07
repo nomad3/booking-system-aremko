@@ -1,0 +1,99 @@
+[
+  {
+    "model": "control_gestion.tasktemplate",
+    "pk": 1,
+    "fields": {
+      "title_template": "Apertura AM – limpieza y preparación tinas/salas",
+      "description": "Rutina de apertura diaria:\n• Sanitizar todas las tinas\n• Llenar tinas según reservas del día\n• Verificar temperatura (tinas y salas)\n• Revisar niveles de estanques\n• Verificar químicos y cloro\n• Encender sistemas de calefacción",
+      "swimlane": "OPS",
+      "priority": "NORMAL",
+      "queue_position": 1,
+      "dias_activa": [0, 2, 3, 4, 5, 6],
+      "asignar_a_grupo": "OPERACIONES",
+      "asignar_a_usuario": null,
+      "activa": true,
+      "solo_martes": false
+    }
+  },
+  {
+    "model": "control_gestion.tasktemplate",
+    "pk": 2,
+    "fields": {
+      "title_template": "Monitoreo °C 16–22h (cada hora)",
+      "description": "Registro de temperatura cada hora:\n• Medir temperatura a las 16:00, 17:00, 18:00, 19:00, 20:00, 21:00, 22:00\n• Registrar en planilla de control\n• Ajustar calefacción si es necesario\n• Alertar si alguna tina está fuera de rango (36-38°C)",
+      "swimlane": "OPS",
+      "priority": "NORMAL",
+      "queue_position": 2,
+      "dias_activa": [0, 2, 3, 4, 5, 6],
+      "asignar_a_grupo": "OPERACIONES",
+      "asignar_a_usuario": null,
+      "activa": true,
+      "solo_martes": false
+    }
+  },
+  {
+    "model": "control_gestion.tasktemplate",
+    "pk": 3,
+    "fields": {
+      "title_template": "Cierre PM – lavar filtros y apagar sistemas",
+      "description": "Rutina de cierre diaria:\n• Lavar filtros de bombas\n• Apagar sistemas de calefacción\n• Vaciar tinas según protocolo\n• Verificar que todas las áreas estén cerradas\n• Registrar observaciones del día",
+      "swimlane": "OPS",
+      "priority": "NORMAL",
+      "queue_position": 3,
+      "dias_activa": [0, 2, 3, 4, 5, 6],
+      "asignar_a_grupo": "OPERACIONES",
+      "asignar_a_usuario": null,
+      "activa": true,
+      "solo_martes": false
+    }
+  },
+  {
+    "model": "control_gestion.tasktemplate",
+    "pk": 4,
+    "fields": {
+      "title_template": "Recepción lista 15:30 – limpieza/insumos/café",
+      "description": "Preparación de recepción antes de horario de atención:\n• Limpieza completa de recepción\n• Verificar baños limpios\n• Preparar cafetería (café, agua, insumos)\n• Revisar stock de toallas\n• Verificar sistema de reservas funcionando\n• Lista antes de 15:30",
+      "swimlane": "RX",
+      "priority": "NORMAL",
+      "queue_position": 1,
+      "dias_activa": [0, 2, 3, 4, 5, 6],
+      "asignar_a_grupo": "RECEPCION",
+      "asignar_a_usuario": null,
+      "activa": true,
+      "solo_martes": false
+    }
+  },
+  {
+    "model": "control_gestion.tasktemplate",
+    "pk": 5,
+    "fields": {
+      "title_template": "MARTES – Mantención Mayor Tinas y Sistemas",
+      "description": "Mantención profunda semanal (SOLO MARTES):\n• Limpieza profunda de todas las tinas\n• Revisión de bombas y motores\n• Cambio de filtros si es necesario\n• Revisión de niveles químicos y ajustes\n• Inspección de instalaciones eléctricas\n• Mantenimiento de calderas\n• Revisión de tuberías y válvulas\n• Documentar cualquier problema encontrado",
+      "swimlane": "OPS",
+      "priority": "NORMAL",
+      "queue_position": 1,
+      "dias_activa": [1],
+      "asignar_a_grupo": "OPERACIONES",
+      "asignar_a_usuario": null,
+      "activa": true,
+      "solo_martes": true
+    }
+  },
+  {
+    "model": "control_gestion.tasktemplate",
+    "pk": 6,
+    "fields": {
+      "title_template": "MARTES – Limpieza Profunda Instalaciones",
+      "description": "Limpieza profunda de instalaciones (SOLO MARTES):\n• Lavar pisos y paredes de todas las salas\n• Limpieza profunda de baños\n• Lavar ventanas\n• Desinfección completa de áreas comunes\n• Limpieza de cafetería y cocina\n• Organización de bodegas",
+      "swimlane": "OPS",
+      "priority": "NORMAL",
+      "queue_position": 2,
+      "dias_activa": [1],
+      "asignar_a_grupo": "OPERACIONES",
+      "asignar_a_usuario": null,
+      "activa": true,
+      "solo_martes": true
+    }
+  }
+]
+
