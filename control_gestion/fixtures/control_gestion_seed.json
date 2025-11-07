@@ -1,0 +1,53 @@
+[
+  {
+    "model": "control_gestion.customersegment",
+    "pk": 1,
+    "fields": {
+      "name": "TRAMO 1",
+      "min_spend": 0,
+      "max_spend": 50000,
+      "benefit": "5% descuento en masajes"
+    }
+  },
+  {
+    "model": "control_gestion.customersegment",
+    "pk": 2,
+    "fields": {
+      "name": "TRAMO 2",
+      "min_spend": 50001,
+      "max_spend": 100000,
+      "benefit": "10% descuento en tinas"
+    }
+  },
+  {
+    "model": "control_gestion.customersegment",
+    "pk": 3,
+    "fields": {
+      "name": "TRAMO 5-8",
+      "min_spend": 200001,
+      "max_spend": 400000,
+      "benefit": "Vale $60K tinas gratis + masajes x2"
+    }
+  },
+  {
+    "model": "control_gestion.customersegment",
+    "pk": 4,
+    "fields": {
+      "name": "VIP (TRAMO 10)",
+      "min_spend": 500000,
+      "max_spend": 700000,
+      "benefit": "1 noche gratis en cabaña VIP"
+    }
+  },
+  {
+    "model": "control_gestion.customersegment",
+    "pk": 5,
+    "fields": {
+      "name": "ELITE (TRAMO 17+)",
+      "min_spend": 850000,
+      "max_spend": null,
+      "benefit": "1 noche gratis cabaña ELITE + upgrade"
+    }
+  }
+]
+
