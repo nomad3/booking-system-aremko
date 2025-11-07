@@ -316,6 +316,31 @@ def react_to_reserva_change(sender, instance, created, **kwargs):
         if primer_servicio:
             hora_servicio = f" ({primer_servicio.hora_inicio})"
         
+        # Tarea para RECEPCIÓN (checkout/despedida)
+        Task.objects.create(
+            title=f"Checkout completado – Reserva #{instance.id}{hora_servicio}",
+            description=(
+                "Procedimiento de checkout:\n"
+                "- Despedir al cliente cordialmente\n"
+                "- Verificar cobro final (si hay pendiente)\n"
+                "- Preguntar: ¿Todo estuvo bien? (feedback rápido)\n"
+                "- Agradecer la visita\n"
+                "- Invitar a volver y recordar beneficios de fidelidad\n"
+                "- Verificar que el área quede en orden"
+            ),
+            swimlane=Swimlane.RECEPCION,
+            owner=rx,
+            created_by=rx,
+            state=TaskState.BACKLOG,
+            queue_position=1,
+            reservation_id=str(instance.id),
+            customer_phone_last9=customer_phone,
+            segment_tag=segment_tag,
+            priority=Priority.NORMAL,
+            source=TaskSource.SISTEMA
+        )
+        logger.info(f"✅ Tarea RECEPCION (checkout) creada para reserva #{instance.id}")
+        
         # Tarea para ATENCIÓN AL CLIENTE (NPS)
         Task.objects.create(
             title=f"NPS post-visita – Reserva #{instance.id}{hora_servicio}",
