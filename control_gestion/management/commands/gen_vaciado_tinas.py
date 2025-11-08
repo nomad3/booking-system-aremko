@@ -206,7 +206,8 @@ class Command(BaseCommand):
                     nombre_tina_corto = servicio_nombre.split()[-1]  # Ej: "Hornopiren"
                     tarea_existe = Task.objects.filter(
                         reservation_id=str(reserva.id),
-                        title__icontains="Vaciar",
+                        title__icontains="Vaciar"
+                    ).filter(
                         title__icontains=nombre_tina_corto
                     ).exists()
                     
