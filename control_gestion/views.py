@@ -354,6 +354,45 @@ def cron_daily_opening(request):
 
 
 @csrf_exempt
+def cron_vaciado_tinas(request):
+    """
+    Endpoint para ejecutar gen_vaciado_tinas desde cron externo
+    
+    GET o POST: /control_gestion/cron/vaciado-tinas/
+    """
+    # Validar token
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+    
+    try:
+        from django.core.management import call_command
+        from io import StringIO
+        
+        output = StringIO()
+        call_command('gen_vaciado_tinas', stdout=output)
+        
+        result = output.getvalue()
+        
+        logger.info("✅ Cron vaciado_tinas ejecutado vía HTTP")
+        
+        return JsonResponse({
+            "ok": True,
+            "message": "Comando ejecutado exitosamente",
+            "output": result[:1000]
+        })
+    
+    except Exception as e:
+        logger.error(f"Error en cron_vaciado_tinas: {str(e)}")
+        return JsonResponse({
+            "ok": False,
+            "error": str(e)
+        }, status=500)
+
+
+@csrf_exempt
 def cron_daily_reports(request):
     """
     Endpoint para ejecutar gen_daily_reports desde cron externo

@@ -19,6 +19,7 @@ urlpatterns = [
     
     # Endpoints para cron externo
     path("cron/preparacion-servicios/", views.cron_preparacion_servicios, name="cron_preparacion"),
+    path("cron/vaciado-tinas/", views.cron_vaciado_tinas, name="cron_vaciado"),
     path("cron/daily-opening/", views.cron_daily_opening, name="cron_opening"),
     path("cron/daily-reports/", views.cron_daily_reports, name="cron_reports"),
 ]
