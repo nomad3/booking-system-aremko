@@ -31,16 +31,23 @@ class LLMClient:
         """Inicializar cliente según configuración"""
         self.provider = os.getenv("LLM_PROVIDER", "mock").lower()
         self.model = os.getenv("LLM_MODEL", "gpt-4o-mini")
-        self.api_key = os.getenv("OPENAI_API_KEY")
+        self.api_key = None
         self._openai = None
+        self._deepseek_client = None
         
-        # Si no hay API key, forzar modo mock
-        if self.provider == "openai" and not self.api_key:
-            logger.warning(
-                "LLM_PROVIDER=openai pero no hay OPENAI_API_KEY. "
-                "Cambiando a modo mock."
-            )
-            self.provider = "mock"
+        # Determinar proveedor y API key
+        if self.provider == "openai":
+            self.api_key = os.getenv("OPENAI_API_KEY")
+            if not self.api_key:
+                logger.warning("LLM_PROVIDER=openai pero no hay OPENAI_API_KEY. Cambiando a mock.")
+                self.provider = "mock"
+        
+        elif self.provider == "deepseek":
+            self.api_key = os.getenv("DEEPSEEK_API_KEY")
+            self.model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+            if not self.api_key:
+                logger.warning("LLM_PROVIDER=deepseek pero no hay DEEPSEEK_API_KEY. Cambiando a mock.")
+                self.provider = "mock"
         
         logger.info(f"LLMClient inicializado en modo: {self.provider}")
     
@@ -134,6 +141,51 @@ class LLMClient:
             # Respuesta genérica
             return f"MOCK RESPONSE: {user[:280] if user else 'Sin input'}"
     
+    def _deepseek_completion(self, system: str, user: str) -> str:
+        """
+        Llamada a DeepSeek API
+        
+        Args:
+            system: System prompt
+            user: User prompt
+            
+        Returns:
+            Respuesta del modelo
+        """
+        try:
+            import requests
+            
+            url = "https://api.deepseek.com/v1/chat/completions"
+            
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user}
+                ],
+                "temperature": 0.2,
+                "max_tokens": 2000
+            }
+            
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            content = data['choices'][0]['message']['content']
+            
+            logger.info(f"DeepSeek completion exitoso (model: {self.model})")
+            return content
+        
+        except Exception as e:
+            logger.error(f"Error en llamada a DeepSeek: {str(e)}")
+            logger.warning("Fallback a modo mock por error en DeepSeek")
+            return self._mock_completion(system, user)
+    
     def _oai_completion(self, system: str, user: str) -> str:
         """
         Llamada real a OpenAI
@@ -187,6 +239,8 @@ class LLMClient:
         try:
             if self.provider == "openai":
                 return self._oai_completion(system, user)
+            elif self.provider == "deepseek":
+                return self._deepseek_completion(system, user)
             else:
                 return self._mock_completion(system, user)
         
