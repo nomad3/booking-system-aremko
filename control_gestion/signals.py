@@ -310,15 +310,12 @@ def react_to_reserva_change(sender, instance, created, **kwargs):
     elif old_estado != "checkout" and new_estado == "checkout":
         logger.info(f"Reserva #{instance.id} → CHECKOUT. Creando tareas post-visita...")
         
-        # Obtener hora del servicio para título
-        primer_servicio = servicios.first()
-        hora_servicio = ""
-        if primer_servicio:
-            hora_servicio = f" ({primer_servicio.hora_inicio})"
+        # Usar hora REAL del checkout (cuando el recepcionista lo marca)
+        hora_checkout_real = timezone.now().strftime('%H:%M')
         
         # Tarea para RECEPCIÓN (checkout/despedida)
         Task.objects.create(
-            title=f"Checkout completado – Reserva #{instance.id}{hora_servicio}",
+            title=f"Checkout completado – Reserva #{instance.id} ({hora_checkout_real})",
             description=(
                 "Procedimiento de checkout:\n"
                 "- Despedir al cliente cordialmente\n"
@@ -341,9 +338,9 @@ def react_to_reserva_change(sender, instance, created, **kwargs):
         )
         logger.info(f"✅ Tarea RECEPCION (checkout) creada para reserva #{instance.id}")
         
-        # Tarea para ATENCIÓN AL CLIENTE (NPS)
+        # Tarea para ATENCIÓN AL CLIENTE (NPS) - también con hora real de checkout
         Task.objects.create(
-            title=f"NPS post-visita – Reserva #{instance.id}{hora_servicio}",
+            title=f"NPS post-visita – Reserva #{instance.id} ({hora_checkout_real})",
             description=(
                 "Contactar al cliente por WhatsApp o llamada para:\n"
                 "- Pedir calificación NPS (0-10)\n"
@@ -381,7 +378,8 @@ def react_to_reserva_change(sender, instance, created, **kwargs):
                 due_at = timezone.now() + timedelta(days=3)
             
             servicio_nombre = getattr(rs.servicio, 'nombre', 'Servicio') if rs.servicio else 'Servicio'
-            hora_display = f" ({rs.hora_inicio})" if rs.hora_inicio else ""
+            # Para premio, mostrar hora de inicio del servicio (referencia)
+            hora_display = f" (Servicio {rs.hora_inicio})" if rs.hora_inicio else ""
             
             Task.objects.create(
                 title=f"Verificar premio D+3 – Reserva #{instance.id}{hora_display}",
