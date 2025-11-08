@@ -203,10 +203,11 @@ class Command(BaseCommand):
                     
                     # NO hay servicio siguiente → VACIAR
                     # Verificar si ya existe tarea de vaciado
+                    nombre_tina_corto = servicio_nombre.split()[-1]  # Ej: "Hornopiren"
                     tarea_existe = Task.objects.filter(
                         reservation_id=str(reserva.id),
                         title__icontains="Vaciar",
-                        title__icontains=servicio_nombre.split()[-1]
+                        title__icontains=nombre_tina_corto
                     ).exists()
                     
                     if tarea_existe:
