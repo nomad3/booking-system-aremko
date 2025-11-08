@@ -105,9 +105,10 @@ class Command(BaseCommand):
                 "⚠️  Grupo OPERACIONES no encontrado, usando primer usuario"
             ))
         
-        # Buscar reservas con check-in hecho (estado checkin o checkout)
+        # Buscar reservas activas (pendiente, checkin o checkout)
+        # IMPORTANTE: Incluir 'pendiente' para preparar ANTES de que llegue el cliente
         reservas_activas = VentaReserva.objects.filter(
-            estado_reserva__in=['checkin', 'checkout']
+            estado_reserva__in=['pendiente', 'checkin', 'checkout']
         ).prefetch_related('reservaservicios__servicio')
         
         servicios_encontrados = 0
