@@ -162,7 +162,8 @@ def equipo_snapshot(request):
         'tasks': tasks,
         'stats': stats,
         'today': today,
-        'area_filter': area_filter
+        'area_filter': area_filter,
+        'user': request.user  # Agregar usuario para verificar permisos en template
     }
     
     return render(request, "control_gestion/equipo.html", context)
