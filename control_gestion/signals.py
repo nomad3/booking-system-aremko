@@ -293,18 +293,96 @@ def react_to_reserva_change(sender, instance, created, **kwargs):
         )
         logger.info(f"✅ Tarea RECEPCION creada para reserva #{instance.id}")
         
-        # NOTA: Las tareas de preparación de servicios (OPERACION) 
-        # NO se crean aquí en el check-in administrativo.
-        # Se crean automáticamente 1 hora antes del servicio mediante el comando:
-        # python manage.py gen_preparacion_servicios
-        # 
-        # Este comando debe ejecutarse cada hora vía cron:
-        # 0 * * * * python manage.py gen_preparacion_servicios
-        
-        logger.info(
-            f"ℹ️  Tareas de preparación de servicios se crearán automáticamente "
-            f"1 hora antes vía comando gen_preparacion_servicios"
-        )
+        # Tareas de OPERACION: Crear una por cada servicio
+        # Se crean inmediatamente pero con promise_due_at = 1 hora antes del servicio
+        for rs in servicios:
+            try:
+                # Construir datetime del servicio
+                hora_str = str(rs.hora_inicio).strip() if rs.hora_inicio else ""
+                
+                # Normalizar formato de hora
+                hora_str = hora_str.replace(';', ':').replace('.', ':')
+                if ':' not in hora_str:
+                    if len(hora_str) == 4:
+                        hora_str = f"{hora_str[:2]}:{hora_str[2:]}"
+                    elif len(hora_str) == 3:
+                        hora_str = f"0{hora_str[0]}:{hora_str[1:]}"
+                    elif len(hora_str) == 2:
+                        hora_str = f"{hora_str}:00"
+                    elif len(hora_str) == 1:
+                        hora_str = f"0{hora_str}:00"
+                
+                # Parsear hora
+                hora_servicio_obj = datetime.strptime(hora_str, "%H:%M").time()
+                datetime_servicio = timezone.make_aware(
+                    datetime.combine(rs.fecha_agendamiento, hora_servicio_obj)
+                )
+                
+                # Calcular promise_due_at (1 hora antes del servicio)
+                promise_due_at = datetime_servicio - timedelta(hours=1)
+                
+                # Nombre del servicio
+                servicio_nombre = rs.servicio.nombre if rs.servicio else "Servicio"
+                
+                # Verificar si ya existe una tarea de preparación para este servicio
+                tarea_existe = Task.objects.filter(
+                    reservation_id=str(instance.id),
+                    title__icontains="Preparar servicio",
+                    description__icontains=servicio_nombre
+                ).exists()
+                
+                if not tarea_existe:
+                    Task.objects.create(
+                        title=f"Preparar servicio – {servicio_nombre} (Reserva #{instance.id})",
+                        description=(
+                            f"⏰ SERVICIO COMIENZA A LAS {rs.hora_inicio}\n"
+                            f"📅 Fecha: {rs.fecha_agendamiento}\n"
+                            f"👤 Cliente: {instance.cliente.nombre if instance.cliente else 'N/A'}\n\n"
+                            f"🔧 TAREAS DE PREPARACIÓN (completar antes de las {promise_due_at.strftime('%H:%M')}):\n"
+                            f"• Limpiar y sanitizar tina/sala\n"
+                            f"• Llenar tina con agua caliente\n"
+                            f"• Verificar temperatura (36-38°C)\n"
+                            f"• Preparar toallas y amenidades\n"
+                            f"• Verificar que todo funcione correctamente\n"
+                            f"• Área lista y presentable para las {rs.hora_inicio}"
+                        ),
+                        swimlane=Swimlane.OPERACION,
+                        owner=ops,
+                        created_by=ops,
+                        state=TaskState.BACKLOG,
+                        queue_position=1,
+                        reservation_id=str(instance.id),
+                        customer_phone_last9=customer_phone,
+                        segment_tag=segment_tag,
+                        service_type=rs.servicio.tipo_servicio if rs.servicio else '',
+                        source=TaskSource.SISTEMA,
+                        promise_due_at=promise_due_at  # ⭐ 1 hora antes del servicio
+                    )
+                    logger.info(f"✅ Tarea OPERACION creada para servicio '{servicio_nombre}' (Reserva #{instance.id})")
+                else:
+                    logger.debug(f"Tarea OPERACION ya existe para servicio '{servicio_nombre}' (Reserva #{instance.id})")
+                    
+            except Exception as e:
+                logger.error(f"Error creando tarea OPERACION para servicio de reserva #{instance.id}: {str(e)}")
+                # Crear tarea genérica si falla el parsing
+                Task.objects.create(
+                    title=f"Preparar servicio – Reserva #{instance.id}",
+                    description=(
+                        f"Preparar servicio para Reserva #{instance.id}\n"
+                        f"Fecha: {rs.fecha_agendamiento if rs else 'N/A'}\n"
+                        f"Hora: {rs.hora_inicio if rs else 'N/A'}\n\n"
+                        f"Verificar limpieza, temperatura y preparar área."
+                    ),
+                    swimlane=Swimlane.OPERACION,
+                    owner=ops,
+                    created_by=ops,
+                    state=TaskState.BACKLOG,
+                    queue_position=1,
+                    reservation_id=str(instance.id),
+                    customer_phone_last9=customer_phone,
+                    segment_tag=segment_tag,
+                    source=TaskSource.SISTEMA
+                )
     
     # ===== TRANSICIÓN A CHECKOUT =====
     elif old_estado != "checkout" and new_estado == "checkout":
