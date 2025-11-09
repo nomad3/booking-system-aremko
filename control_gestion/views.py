@@ -700,12 +700,12 @@ def cron_daily_reports(request):
 def reportes_diarios(request):
     """
     Vista de reportes diarios generados por IA
-    
+
     Muestra los últimos reportes matutinos y vespertinos.
     """
     # Obtener últimos 7 días de reportes
     reportes = DailyReport.objects.all().order_by('-date')[:14]
-    
+
     # Estadísticas
     stats = {
         'total': DailyReport.objects.count(),
@@ -713,12 +713,25 @@ def reportes_diarios(request):
             date__gte=timezone.now().date() - timedelta(days=7)
         ).count()
     }
-    
+
     context = {
         'reportes': reportes,
         'stats': stats,
         'today': timezone.localdate()
     }
-    
+
     return render(request, "control_gestion/reportes_diarios.html", context)
+
+
+@login_required
+def como_usarlo(request):
+    """
+    Vista de documentación "Cómo Usarlo"
+
+    Muestra guía completa para administradores y usuarios del sistema.
+    """
+    context = {
+        'user': request.user,
+    }
+    return render(request, "control_gestion/como_usarlo.html", context)
 

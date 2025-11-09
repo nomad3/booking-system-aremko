@@ -25,6 +25,9 @@ urlpatterns = [
     
     # Reportes diarios
     path("reportes/", views.reportes_diarios, name="reportes_diarios"),
+
+    # Documentación
+    path("como-usarlo/", views.como_usarlo, name="como_usarlo"),
     
     # Webhooks
     path("webhooks/cliente_en_sitio/", views.webhook_cliente_en_sitio, name="webhook_cliente_en_sitio"),

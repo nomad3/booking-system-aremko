@@ -1,0 +1,602 @@
+{% extends "control_gestion/base_control.html" %}
+
+{% block title %}Cómo Usar Control de Gestión{% endblock %}
+
+{% block extra_head %}
+<style>
+    .doc-container {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .doc-section {
+        background: white;
+        padding: 30px;
+        margin-bottom: 25px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .doc-section h2 {
+        color: #2c3e50;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 3px solid #3498db;
+    }
+
+    .doc-section h3 {
+        color: #34495e;
+        margin-top: 25px;
+        margin-bottom: 15px;
+        font-size: 20px;
+    }
+
+    .role-badge {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    .role-admin {
+        background: #e74c3c;
+        color: white;
+    }
+
+    .role-supervisor {
+        background: #f39c12;
+        color: white;
+    }
+
+    .role-user {
+        background: #3498db;
+        color: white;
+    }
+
+    .example-box {
+        background: #ecf0f1;
+        padding: 15px;
+        border-radius: 6px;
+        margin: 15px 0;
+        border-left: 4px solid #3498db;
+    }
+
+    .example-box strong {
+        color: #2c3e50;
+    }
+
+    .step-list {
+        list-style: none;
+        counter-reset: step-counter;
+        padding-left: 0;
+    }
+
+    .step-list li {
+        counter-increment: step-counter;
+        margin-bottom: 15px;
+        padding-left: 40px;
+        position: relative;
+    }
+
+    .step-list li:before {
+        content: counter(step-counter);
+        position: absolute;
+        left: 0;
+        top: 0;
+        background: #3498db;
+        color: white;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 14px;
+    }
+
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 15px;
+        margin: 20px 0;
+    }
+
+    .feature-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 6px;
+        border: 1px solid #dee2e6;
+    }
+
+    .feature-card h4 {
+        color: #2c3e50;
+        font-size: 16px;
+        margin-bottom: 8px;
+    }
+
+    .feature-card p {
+        color: #7f8c8d;
+        font-size: 14px;
+        margin: 0;
+    }
+
+    .workflow-diagram {
+        background: #fff;
+        padding: 20px;
+        border: 2px dashed #3498db;
+        border-radius: 8px;
+        margin: 20px 0;
+        text-align: center;
+    }
+
+    .workflow-step {
+        display: inline-block;
+        padding: 10px 20px;
+        background: #3498db;
+        color: white;
+        border-radius: 6px;
+        margin: 5px;
+        font-weight: 600;
+    }
+
+    .workflow-arrow {
+        display: inline-block;
+        color: #3498db;
+        font-size: 24px;
+        margin: 0 10px;
+    }
+
+    .alert-info {
+        background: #d1ecf1;
+        border: 1px solid #bee5eb;
+        color: #0c5460;
+        padding: 15px;
+        border-radius: 6px;
+        margin: 15px 0;
+    }
+
+    .alert-warning {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        color: #856404;
+        padding: 15px;
+        border-radius: 6px;
+        margin: 15px 0;
+    }
+
+    code {
+        background: #2c3e50;
+        color: #ecf0f1;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+    }
+
+    .back-button {
+        display: inline-block;
+        padding: 10px 20px;
+        background: #95a5a6;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        transition: background 0.3s;
+    }
+
+    .back-button:hover {
+        background: #7f8c8d;
+        color: white;
+        text-decoration: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="doc-container">
+    <a href="/admin/" class="back-button">← Volver al Dashboard</a>
+
+    <div class="doc-section">
+        <h2>📚 Cómo Usar el Sistema de Control de Gestión</h2>
+        <p style="font-size: 16px; color: #7f8c8d; margin-bottom: 0;">
+            Guía completa para administradores, supervisores y usuarios del sistema de tareas operativas de Aremko.
+        </p>
+    </div>
+
+    <!-- Sección 1: Introducción -->
+    <div class="doc-section">
+        <h2>🎯 ¿Qué es Control de Gestión?</h2>
+
+        <p>El sistema de Control de Gestión es una herramienta diseñada para organizar y gestionar todas las tareas operativas del día a día en Aremko. Funciona bajo el principio <strong>WIP-1</strong> (Work In Progress = 1), lo que significa que cada persona debe tener <strong>máximo 1 tarea en curso</strong> a la vez.</p>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h4>📋 Tareas Organizadas</h4>
+                <p>Cada tarea está asignada a un área específica (swimlane) y tiene prioridad definida.</p>
+            </div>
+            <div class="feature-card">
+                <h4>🔄 Flujo de Trabajo</h4>
+                <p>Las tareas avanzan de Backlog → En Curso → Hecha, con reglas claras.</p>
+            </div>
+            <div class="feature-card">
+                <h4>🤖 Automatización</h4>
+                <p>Plantillas automáticas para tareas rutinarias (preparación servicios, vaciado tinas, etc.)</p>
+            </div>
+            <div class="feature-card">
+                <h4>📊 Reportes IA</h4>
+                <p>Reportes diarios generados automáticamente con inteligencia artificial.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección 2: Roles y Permisos -->
+    <div class="doc-section">
+        <h2>👥 Roles y Permisos</h2>
+
+        <h3><span class="role-badge role-admin">ADMINISTRADOR</span></h3>
+        <p><strong>Puede:</strong></p>
+        <ul>
+            <li>✅ Crear, editar y eliminar tareas de cualquier usuario</li>
+            <li>✅ Configurar plantillas de tareas automáticas</li>
+            <li>✅ Ver todos los reportes y estadísticas</li>
+            <li>✅ Reasignar tareas entre usuarios</li>
+            <li>✅ Cambiar prioridades y fechas de promesa</li>
+            <li>✅ Acceder al Admin de Django</li>
+        </ul>
+
+        <h3><span class="role-badge role-supervisor">SUPERVISOR</span></h3>
+        <p><strong>Puede:</strong></p>
+        <ul>
+            <li>✅ Ver tareas de todo el equipo</li>
+            <li>✅ Cambiar estado de tareas de otros</li>
+            <li>✅ Ver indicadores y reportes</li>
+            <li>✅ Crear tareas para otros usuarios</li>
+            <li>⚠️ No puede eliminar tareas ni configurar plantillas</li>
+        </ul>
+
+        <h3><span class="role-badge role-user">USUARIO</span></h3>
+        <p><strong>Puede:</strong></p>
+        <ul>
+            <li>✅ Ver sus propias tareas en "Mi Día"</li>
+            <li>✅ Marcar sus tareas como "En Curso" o "Hecha"</li>
+            <li>✅ Completar checklist de sus tareas</li>
+            <li>✅ Agregar notas y comentarios</li>
+            <li>❌ No puede crear tareas nuevas</li>
+            <li>❌ No puede cambiar tareas de otros</li>
+        </ul>
+    </div>
+
+    <!-- Sección 3: Para Administradores -->
+    <div class="doc-section">
+        <h2>⚙️ Guía para Administradores</h2>
+
+        <h3>1. Configurar Plantillas de Tareas Automáticas</h3>
+
+        <p><strong>Ubicación:</strong> <a href="/control_gestion/plantillas/">Control de Gestión > Plantillas</a></p>
+
+        <div class="example-box">
+            <strong>Ejemplo: Preparación de Servicios</strong><br>
+            Crear una plantilla que automáticamente genere tareas de preparación 2 horas antes de cada reserva.
+        </div>
+
+        <ol class="step-list">
+            <li>Ir a "Plantillas" en el dashboard</li>
+            <li>Click en "Crear Nueva Plantilla"</li>
+            <li>Configurar:
+                <ul>
+                    <li><code>Nombre</code>: "Preparación Tina Hidro"</li>
+                    <li><code>Tipo</code>: "Preparación de Servicio"</li>
+                    <li><code>Swimlane</code>: "Operación"</li>
+                    <li><code>Anticipación</code>: 120 minutos (2 horas)</li>
+                    <li><code>Activa</code>: Sí</li>
+                </ul>
+            </li>
+            <li>Guardar plantilla</li>
+        </ol>
+
+        <div class="alert-info">
+            💡 <strong>Tip:</strong> Las plantillas se ejecutan automáticamente vía Cron Jobs en Render. Verifica que los Cron Jobs estén configurados correctamente.
+        </div>
+
+        <h3>2. Gestionar Disponibilidad de Empleados</h3>
+
+        <div class="example-box">
+            <strong>Ejemplo: Configurar turnos</strong><br>
+            Ana trabaja de Lunes a Viernes 9:00-18:00. Pedro trabaja fines de semana 10:00-19:00.
+        </div>
+
+        <ol class="step-list">
+            <li>Ir a Admin Django > Control de Gestión > Empleado Disponibilidad</li>
+            <li>Crear registro para Ana:
+                <ul>
+                    <li><code>Empleado</code>: Ana</li>
+                    <li><code>Día</code>: Lunes</li>
+                    <li><code>Hora Inicio</code>: 09:00</li>
+                    <li><code>Hora Fin</code>: 18:00</li>
+                    <li><code>Activo</code>: Sí</li>
+                </ul>
+            </li>
+            <li>Repetir para cada día de la semana</li>
+        </ol>
+
+        <div class="alert-warning">
+            ⚠️ <strong>Importante:</strong> Las tareas solo se asignan a usuarios que tengan disponibilidad configurada para el horario de la tarea.
+        </div>
+
+        <h3>3. Monitorear el Sistema</h3>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h4>📊 Indicadores</h4>
+                <p>Ver eficiencia por persona y área, promesas cumplidas, tareas bloqueadas >24h.</p>
+                <a href="/control_gestion/indicadores/">Ver Indicadores →</a>
+            </div>
+            <div class="feature-card">
+                <h4>📈 Reportes Diarios</h4>
+                <p>Reportes generados con IA 2 veces al día (matutino y vespertino).</p>
+                <a href="/control_gestion/reportes/">Ver Reportes →</a>
+            </div>
+            <div class="feature-card">
+                <h4>👥 Vista Equipo</h4>
+                <p>Ver todas las tareas del equipo del día, filtrar por área.</p>
+                <a href="/control_gestion/equipo/">Ver Equipo →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección 4: Para Usuarios -->
+    <div class="doc-section">
+        <h2>📱 Guía para Usuarios</h2>
+
+        <h3>Flujo de Trabajo Diario</h3>
+
+        <div class="workflow-diagram">
+            <div class="workflow-step">1. Abrir "Mi Día"</div>
+            <span class="workflow-arrow">→</span>
+            <div class="workflow-step">2. Tomar 1ra tarea</div>
+            <span class="workflow-arrow">→</span>
+            <div class="workflow-step">3. Completar</div>
+            <span class="workflow-arrow">→</span>
+            <div class="workflow-step">4. Siguiente</div>
+        </div>
+
+        <h3>1. Revisar "Mi Día" (Mañana y varias veces al día)</h3>
+
+        <ol class="step-list">
+            <li>Acceder a <a href="/control_gestion/mi-dia/">Mi Día</a></li>
+            <li>Ver las <strong>3 tareas top</strong> que debes hacer hoy</li>
+            <li>Las tareas están ordenadas por prioridad automáticamente</li>
+        </ol>
+
+        <h3>2. Trabajar en una Tarea (Regla WIP-1)</h3>
+
+        <ol class="step-list">
+            <li><strong>Tomar la primera tarea</strong> de tu lista (la de más arriba)</li>
+            <li>Click en "Cambiar a EN CURSO" (botón azul)</li>
+            <li>Completar el checklist paso a paso</li>
+            <li>Cuando termines: Click en "Marcar como HECHA" (botón verde)</li>
+        </ol>
+
+        <div class="alert-info">
+            💡 <strong>Regla de Oro:</strong> Solo puedes tener <strong>1 tarea EN CURSO</strong> a la vez. Si necesitas dejar una tarea, márcala como "Bloqueada" y explica el motivo en las notas.
+        </div>
+
+        <h3>3. Completar Checklist</h3>
+
+        <div class="example-box">
+            <strong>Ejemplo: Preparar Tina 4 para Cliente VIP</strong><br><br>
+            <input type="checkbox" checked> Verificar temperatura agua (38-40°C)<br>
+            <input type="checkbox" checked> Agregar sales aromáticas<br>
+            <input type="checkbox"> Colocar toallas limpias<br>
+            <input type="checkbox"> Verificar luces ambientales<br>
+            <input type="checkbox"> Limpiar área alrededor de tina
+        </div>
+
+        <p>Marca cada ítem al completarlo. Todos deben estar ✅ antes de marcar la tarea como Hecha.</p>
+
+        <h3>4. Agregar Notas (Si es necesario)</h3>
+
+        <div class="example-box">
+            <strong>Ejemplo de nota útil:</strong><br>
+            "Cliente pidió temperatura más baja (36°C). Ajustado según preferencia."
+        </div>
+
+        <p>Las notas ayudan al equipo a entender detalles importantes de la tarea.</p>
+    </div>
+
+    <!-- Sección 5: Estados de Tareas -->
+    <div class="doc-section">
+        <h2>🔄 Estados de las Tareas</h2>
+
+        <div class="feature-grid">
+            <div class="feature-card" style="border-left: 4px solid #95a5a6;">
+                <h4>📋 BACKLOG</h4>
+                <p><strong>Significado:</strong> Tarea pendiente, aún no iniciada.</p>
+                <p><strong>Qué hacer:</strong> Esperar tu turno. Cuando termines la tarea actual, esta pasará a ser la siguiente.</p>
+            </div>
+
+            <div class="feature-card" style="border-left: 4px solid #3498db;">
+                <h4>⚙️ EN CURSO</h4>
+                <p><strong>Significado:</strong> Estás trabajando en esta tarea AHORA.</p>
+                <p><strong>Regla:</strong> Solo 1 tarea en curso por persona a la vez.</p>
+            </div>
+
+            <div class="feature-card" style="border-left: 4px solid #e74c3c;">
+                <h4>🚫 BLOQUEADA</h4>
+                <p><strong>Significado:</strong> No puedes avanzar por algún motivo externo.</p>
+                <p><strong>Qué hacer:</strong> Agregar nota explicando el bloqueo. Pasar a la siguiente tarea.</p>
+            </div>
+
+            <div class="feature-card" style="border-left: 4px solid #27ae60;">
+                <h4>✅ HECHA</h4>
+                <p><strong>Significado:</strong> Tarea completada exitosamente.</p>
+                <p><strong>Resultado:</strong> La tarea desaparece de "Mi Día". Siguiente tarea sube automáticamente.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección 6: Tipos de Tareas -->
+    <div class="doc-section">
+        <h2>📁 Tipos de Tareas</h2>
+
+        <h3>1. Tareas de Preparación de Servicios</h3>
+        <p>Se crean <strong>automáticamente 2 horas antes</strong> de cada reserva.</p>
+        <div class="example-box">
+            <strong>Ejemplo:</strong><br>
+            Reserva: Tina Hidro a las 15:00<br>
+            → Tarea creada automáticamente a las 13:00<br>
+            → Asignada a usuario de Operación con disponibilidad
+        </div>
+
+        <h3>2. Tareas de Vaciado de Tinas</h3>
+        <p>Se crean <strong>automáticamente 30 minutos después</strong> de finalizar un servicio.</p>
+        <div class="example-box">
+            <strong>Ejemplo:</strong><br>
+            Servicio termina: 16:00<br>
+            → Tarea de vaciado creada a las 16:30<br>
+            → Asignada a usuario de Operación
+        </div>
+
+        <h3>3. Tareas de Apertura Diaria</h3>
+        <p>Se crean <strong>automáticamente cada día a las 7:00 AM</strong> para preparar las instalaciones.</p>
+
+        <h3>4. Tareas Manuales</h3>
+        <p>Creadas por admin/supervisor para casos especiales.</p>
+        <div class="example-box">
+            <strong>Ejemplo:</strong><br>
+            "Reparar puerta de Cabaña 3"<br>
+            "Comprar insumos de limpieza"
+        </div>
+    </div>
+
+    <!-- Sección 7: Áreas (Swimlanes) -->
+    <div class="doc-section">
+        <h2>🏊 Áreas de Trabajo (Swimlanes)</h2>
+
+        <p>Cada tarea pertenece a un área específica:</p>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h4>💼 Comercial</h4>
+                <p>Ventas, cotizaciones, seguimiento de leads.</p>
+            </div>
+            <div class="feature-card">
+                <h4>🎧 Atención Cliente</h4>
+                <p>Consultas, reclamos, encuestas de satisfacción.</p>
+            </div>
+            <div class="feature-card">
+                <h4>⚙️ Operación</h4>
+                <p>Preparación servicios, vaciado tinas, mantenimiento.</p>
+            </div>
+            <div class="feature-card">
+                <h4>📞 Recepción</h4>
+                <p>Atención telefónica, reservas, check-in.</p>
+            </div>
+            <div class="feature-card">
+                <h4>📊 Marketing y Supervisión</h4>
+                <p>Campañas, reportes, supervisión de equipo.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección 8: Prioridades -->
+    <div class="doc-section">
+        <h2>⚡ Prioridades</h2>
+
+        <div class="feature-card" style="border-left: 4px solid #e74c3c; margin-bottom: 15px;">
+            <h4>🔴 ALTA (Cliente en Sitio)</h4>
+            <p><strong>Ejemplo:</strong> Cliente en Tina 4 pidió café urgente.</p>
+            <p><strong>Acción:</strong> Atender INMEDIATAMENTE. Pausa lo que estés haciendo.</p>
+        </div>
+
+        <div class="feature-card" style="border-left: 4px solid #3498db;">
+            <h4>🔵 NORMAL</h4>
+            <p><strong>Ejemplo:</strong> Preparar tina para reserva de las 15:00.</p>
+            <p><strong>Acción:</strong> Seguir orden de la cola (primera en entrar, primera en salir).</p>
+        </div>
+    </div>
+
+    <!-- Sección 9: Reportes -->
+    <div class="doc-section">
+        <h2>📊 Reportes con IA</h2>
+
+        <p>El sistema genera <strong>automáticamente</strong> reportes con inteligencia artificial <strong>2 veces al día</strong>:</p>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h4>🌅 Reporte Matutino (09:05 AM)</h4>
+                <p>Resumen del día anterior y planes para hoy.</p>
+            </div>
+            <div class="feature-card">
+                <h4>🌆 Reporte Vespertino (18:00 PM)</h4>
+                <p>Resumen del día y prioridades para mañana.</p>
+            </div>
+        </div>
+
+        <p><strong>Acceso:</strong> <a href="/control_gestion/reportes/">Control de Gestión > Reportes</a></p>
+
+        <div class="alert-info">
+            💡 <strong>Uso recomendado:</strong> Enviar reportes por WhatsApp/Email al equipo al final del día para mantener a todos informados.
+        </div>
+    </div>
+
+    <!-- Sección 10: Preguntas Frecuentes -->
+    <div class="doc-section">
+        <h2>❓ Preguntas Frecuentes</h2>
+
+        <h3>¿Qué hago si tengo 2 tareas urgentes?</h3>
+        <p>Solo puedes tener 1 en curso. Si llega una urgencia (cliente en sitio), marca la actual como "Bloqueada" temporalmente, atiende la urgencia, y vuelve a la anterior.</p>
+
+        <h3>¿Puedo crear tareas yo mismo como usuario?</h3>
+        <p>No. Los usuarios solo pueden trabajar en tareas asignadas. Si necesitas crear una tarea, contacta a tu supervisor o admin.</p>
+
+        <h3>¿Qué pasa si una tarea está bloqueada >24 horas?</h3>
+        <p>Aparece en los indicadores como "alerta". El supervisor debe resolverla o reasignarla.</p>
+
+        <h3>¿Dónde veo el histórico de mis tareas completadas?</h3>
+        <p>Admin Django > Control de Gestión > Tareas > Filtrar por "Tu usuario" + Estado "Hecha"</p>
+
+        <h3>¿Los reportes se generan solos?</h3>
+        <p>Sí, vía Cron Jobs en Render. Se ejecutan automáticamente a las 09:05 AM y 18:00 PM todos los días.</p>
+    </div>
+
+    <!-- Sección 11: Buenas Prácticas -->
+    <div class="doc-section">
+        <h2>✅ Buenas Prácticas</h2>
+
+        <h3>Para Usuarios:</h3>
+        <ul>
+            <li>✅ Revisa "Mi Día" al inicio de tu turno</li>
+            <li>✅ Márcalo tareas como "En Curso" solo cuando empieces a trabajar en ellas</li>
+            <li>✅ Completa el checklist completo antes de marcar como Hecha</li>
+            <li>✅ Agrega notas útiles si algo fue diferente de lo esperado</li>
+            <li>❌ No dejes tareas "En Curso" sin terminar al final del día</li>
+        </ul>
+
+        <h3>Para Supervisores:</h3>
+        <ul>
+            <li>✅ Revisa "Vista Equipo" varias veces al día</li>
+            <li>✅ Atiende tareas bloqueadas rápidamente</li>
+            <li>✅ Verifica que no haya usuarios con >1 tarea en curso</li>
+            <li>✅ Envía reportes al equipo al final del día</li>
+        </ul>
+
+        <h3>Para Administradores:</h3>
+        <ul>
+            <li>✅ Revisa indicadores semanalmente</li>
+            <li>✅ Ajusta plantillas según necesidades</li>
+            <li>✅ Verifica que Cron Jobs funcionen correctamente</li>
+            <li>✅ Mantén actualizada la disponibilidad de empleados</li>
+        </ul>
+    </div>
+
+    <!-- Botón final -->
+    <div style="text-align: center; margin-top: 40px;">
+        <a href="/admin/" class="back-button">← Volver al Dashboard</a>
+        <a href="/control_gestion/mi-dia/" class="btn btn-primary" style="padding: 10px 30px; font-size: 16px;">Ir a Mi Día →</a>
+    </div>
+</div>
+{% endblock %}
