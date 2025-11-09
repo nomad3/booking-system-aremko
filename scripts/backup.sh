@@ -96,14 +96,84 @@ EOF
 
 echo -e "   ✓ Información del sistema generada"
 
-echo -e "\n${GREEN}5. LISTANDO MIGRACIONES APLICADAS...${NC}"
+echo -e "\n${GREEN}5. RESPALDANDO DEPENDENCIAS...${NC}"
+if [ -f "requirements.txt" ]; then
+    cp requirements.txt "${CURRENT_BACKUP_DIR}/requirements.txt"
+    echo -e "   ✓ requirements.txt respaldado"
+fi
+
+if command -v pip &> /dev/null; then
+    pip freeze > "${CURRENT_BACKUP_DIR}/pip_freeze.txt" 2>&1
+    echo -e "   ✓ pip freeze generado"
+fi
+
+echo -e "\n${GREEN}6. LISTANDO MIGRACIONES APLICADAS...${NC}"
 if command -v python &> /dev/null && [ -f "manage.py" ]; then
     python manage.py showmigrations --list > "${CURRENT_BACKUP_DIR}/migrations_status.txt" 2>&1 || \
     echo "Error al obtener migraciones" > "${CURRENT_BACKUP_DIR}/migrations_status.txt"
     echo -e "   ✓ Estado de migraciones guardado"
 fi
 
-echo -e "\n${GREEN}6. COMPRIMIENDO RESPALDO COMPLETO...${NC}"
+echo -e "\n${GREEN}7. RESPALDANDO BASE DE DATOS (DUMPDATA)...${NC}"
+if command -v python &> /dev/null && [ -f "manage.py" ]; then
+    # Dump de ventas
+    python manage.py dumpdata ventas --indent 2 > "${CURRENT_BACKUP_DIR}/ventas_data.json" 2>&1 && \
+    echo -e "   ✓ Datos de ventas exportados" || \
+    echo -e "   ${YELLOW}No se pudo exportar datos de ventas${NC}"
+
+    # Dump de control_gestion
+    python manage.py dumpdata control_gestion --indent 2 > "${CURRENT_BACKUP_DIR}/control_gestion_data.json" 2>&1 && \
+    echo -e "   ✓ Datos de control_gestion exportados" || \
+    echo -e "   ${YELLOW}No se pudo exportar datos de control_gestion${NC}"
+
+    # Dump de usuarios
+    python manage.py dumpdata auth.User --indent 2 > "${CURRENT_BACKUP_DIR}/users_data.json" 2>&1 && \
+    echo -e "   ✓ Datos de usuarios exportados" || \
+    echo -e "   ${YELLOW}No se pudo exportar datos de usuarios${NC}"
+
+    # Crear archivo con instrucciones de restauración
+    cat > "${CURRENT_BACKUP_DIR}/RESTORE_INSTRUCTIONS.md" << 'HEREDOC'
+# Instrucciones de Restauración
+
+## Restaurar Código
+```bash
+tar -xzf code.tar.gz -C /ruta/destino/
+```
+
+## Restaurar Configuración
+```bash
+cp .env.backup /ruta/proyecto/.env
+```
+
+## Restaurar Base de Datos
+```bash
+python manage.py loaddata ventas_data.json
+python manage.py loaddata control_gestion_data.json
+python manage.py loaddata users_data.json
+```
+
+## Restaurar Dependencias
+```bash
+pip install -r requirements.txt
+# O usar el snapshot exacto:
+pip install -r pip_freeze.txt
+```
+
+## Restaurar Media
+```bash
+tar -xzf media.tar.gz -C /ruta/proyecto/
+```
+
+## Backup de BD de Producción (Render)
+Para respaldar la BD de producción:
+1. Ir a Render Dashboard > PostgreSQL Database
+2. Click en "Manual Backup"
+3. O usar pg_dump con DATABASE_URL desde variables de entorno
+HEREDOC
+    echo -e "   ✓ Instrucciones de restauración creadas"
+fi
+
+echo -e "\n${GREEN}8. COMPRIMIENDO RESPALDO COMPLETO...${NC}"
 cd "$BACKUP_DIR"
 tar -czf "${BACKUP_NAME}.tar.gz" "$BACKUP_NAME"
 cd ..
