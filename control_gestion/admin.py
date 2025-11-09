@@ -303,6 +303,7 @@ class TaskAdmin(admin.ModelAdmin):
     form = TaskAdminForm  # Usar form personalizado con validación WIP=1
     
     list_display = (
+        'id',
         'title',
         'swimlane',
         'owner',
@@ -322,6 +323,7 @@ class TaskAdmin(admin.ModelAdmin):
         'created_at'
     )
     search_fields = (
+        'id',
         'title',
         'description',
         'reservation_id',
