@@ -153,7 +153,165 @@
         border-radius: 8px;
         margin-bottom: 30px;
     }
+    
+    .btn-cambiar-estado {
+        cursor: pointer;
+    }
+    
+    .btn-cambiar-estado:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .loading {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+    
+    .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+    }
+    
+    .toast.success {
+        background: #27ae60;
+    }
+    
+    .toast.error {
+        background: #e74c3c;
+    }
+    
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
 </style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Manejar clicks en botones de cambiar estado
+    document.querySelectorAll('.btn-cambiar-estado').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const taskId = this.dataset.taskId;
+            const nuevoEstado = this.dataset.nuevoEstado;
+            const estadoActual = this.dataset.estadoActual;
+            
+            // Confirmación según el estado
+            let mensaje = '';
+            if (nuevoEstado === 'IN_PROGRESS') {
+                mensaje = '¿Marcar esta tarea como EN CURSO?';
+            } else if (nuevoEstado === 'DONE') {
+                mensaje = '¿Marcar esta tarea como COMPLETADA?';
+            } else if (nuevoEstado === 'BLOCKED') {
+                mensaje = '¿Bloquear esta tarea?';
+            }
+            
+            if (!confirm(mensaje)) {
+                return;
+            }
+            
+            // Deshabilitar botón y mostrar loading
+            this.disabled = true;
+            this.textContent = '⏳ Procesando...';
+            
+            // Obtener CSRF token
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+            
+            const csrftoken = getCookie('csrftoken');
+            
+            // Llamar a la API
+            fetch(`/control_gestion/tarea/${taskId}/cambiar-estado/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                body: JSON.stringify({
+                    nuevo_estado: nuevoEstado
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.ok) {
+                    // Mostrar mensaje de éxito
+                    mostrarToast(data.mensaje, 'success');
+                    
+                    // Recargar página después de 1 segundo
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    mostrarToast('Error: ' + data.error, 'error');
+                    this.disabled = false;
+                    // Restaurar texto original
+                    if (nuevoEstado === 'IN_PROGRESS') {
+                        this.textContent = estadoActual === 'BLOCKED' ? '▶️ Reanudar' : '▶️ Iniciar';
+                    } else if (nuevoEstado === 'DONE') {
+                        this.textContent = '✅ Completar';
+                    } else if (nuevoEstado === 'BLOCKED') {
+                        this.textContent = '🚫 Bloquear';
+                    }
+                }
+            })
+            .catch(error => {
+                mostrarToast('Error de conexión', 'error');
+                this.disabled = false;
+                if (nuevoEstado === 'IN_PROGRESS') {
+                    this.textContent = estadoActual === 'BLOCKED' ? '▶️ Reanudar' : '▶️ Iniciar';
+                } else if (nuevoEstado === 'DONE') {
+                    this.textContent = '✅ Completar';
+                } else if (nuevoEstado === 'BLOCKED') {
+                    this.textContent = '🚫 Bloquear';
+                }
+            });
+        });
+    });
+    
+    function mostrarToast(mensaje, tipo) {
+        // Remover toast anterior si existe
+        const toastAnterior = document.querySelector('.toast');
+        if (toastAnterior) {
+            toastAnterior.remove();
+        }
+        
+        // Crear nuevo toast
+        const toast = document.createElement('div');
+        toast.className = `toast ${tipo}`;
+        toast.textContent = mensaje;
+        document.body.appendChild(toast);
+        
+        // Remover después de 3 segundos
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
+});
+</script>
 {% endblock %}
 
 {% block content %}
@@ -197,16 +355,41 @@
         
         <div class="task-actions">
             <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn-action btn-primary">📝 Ver Detalles</a>
+            
             {% if task.state == 'BACKLOG' %}
-            <form method="post" action="/admin/control_gestion/task/" style="display: inline;">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="mark_in_progress">
-                <input type="hidden" name="_selected_action" value="{{ task.id }}">
-                <button type="submit" class="btn-action btn-warning" onclick="return confirm('¿Marcar esta tarea como EN CURSO?')">▶️ Iniciar</button>
-            </form>
+            <button 
+                class="btn-action btn-warning btn-cambiar-estado" 
+                data-task-id="{{ task.id }}"
+                data-nuevo-estado="IN_PROGRESS"
+                data-estado-actual="BACKLOG">
+                ▶️ Iniciar
+            </button>
             {% elif task.state == 'IN_PROGRESS' %}
-            <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn-action btn-success">✅ Completar</a>
+            <button 
+                class="btn-action btn-success btn-cambiar-estado" 
+                data-task-id="{{ task.id }}"
+                data-nuevo-estado="DONE"
+                data-estado-actual="IN_PROGRESS">
+                ✅ Completar
+            </button>
+            <button 
+                class="btn-action btn-cambiar-estado" 
+                style="background: #e74c3c; color: white;"
+                data-task-id="{{ task.id }}"
+                data-nuevo-estado="BLOCKED"
+                data-estado-actual="IN_PROGRESS">
+                🚫 Bloquear
+            </button>
+            {% elif task.state == 'BLOCKED' %}
+            <button 
+                class="btn-action btn-warning btn-cambiar-estado" 
+                data-task-id="{{ task.id }}"
+                data-nuevo-estado="IN_PROGRESS"
+                data-estado-actual="BLOCKED">
+                ▶️ Reanudar
+            </button>
             {% endif %}
+            
             <a href="/admin/control_gestion/task/?owner__id__exact={{ user.id }}" class="btn-action btn-secondary">📋 Ver Todas</a>
         </div>
     </div>

@@ -2,28 +2,102 @@
 Vistas para Control de Gestión
 
 Incluye:
-- Vistas web: mi_dia, equipo_snapshot
+- Vistas web: mi_dia, equipo_snapshot, indicadores
 - Webhooks: cliente_en_sitio, ai_ingest_message, ai_generate_checklist
+- Acciones rápidas: cambiar estado de tareas (AJAX)
 """
 
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError, PermissionDenied
 import json
 import logging
 import os
 
 from .models import (
     Task, TaskState, Priority, Swimlane, TaskSource, 
-    ChecklistItem, LocationRef
+    ChecklistItem, LocationRef, TaskLog
 )
 from . import ai
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+@login_required
+@require_http_methods(["POST"])
+def cambiar_estado_tarea(request, task_id):
+    """
+    Vista AJAX para cambiar estado de tarea rápidamente
+    
+    POST /control_gestion/tarea/<id>/cambiar-estado/
+    Body: {"nuevo_estado": "IN_PROGRESS" | "DONE" | "BLOCKED" | "BACKLOG"}
+    
+    Retorna JSON con resultado
+    """
+    task = get_object_or_404(Task, pk=task_id)
+    
+    # Verificar permisos: solo el owner o SUPERVISION/ADMIN pueden cambiar
+    if not request.user.is_superuser:
+        if not request.user.groups.filter(name='SUPERVISION').exists():
+            if task.owner != request.user:
+                return JsonResponse({
+                    "ok": False,
+                    "error": "No tienes permiso para modificar esta tarea"
+                }, status=403)
+    
+    try:
+        # Parsear nuevo estado
+        data = json.loads(request.body.decode('utf-8')) if request.body else {}
+        nuevo_estado = data.get('nuevo_estado', '').upper()
+        
+        # Validar estado
+        estados_validos = [TaskState.BACKLOG, TaskState.IN_PROGRESS, TaskState.BLOCKED, TaskState.DONE]
+        if nuevo_estado not in estados_validos:
+            return JsonResponse({
+                "ok": False,
+                "error": f"Estado inválido. Debe ser uno de: {', '.join(estados_validos)}"
+            }, status=400)
+        
+        # Cambiar estado
+        estado_anterior = task.state
+        task.state = nuevo_estado
+        task.save()
+        
+        # Crear log
+        TaskLog.objects.create(
+            task=task,
+            actor=request.user,
+            action="STATE_CHANGED",
+            note=f"Estado cambiado de {estado_anterior} a {nuevo_estado}"
+        )
+        
+        logger.info(f"Tarea #{task.id} cambiada de {estado_anterior} a {nuevo_estado} por {request.user.username}")
+        
+        return JsonResponse({
+            "ok": True,
+            "task_id": task.id,
+            "estado_anterior": estado_anterior,
+            "nuevo_estado": nuevo_estado,
+            "mensaje": f"Tarea cambiada a '{task.get_state_display()}'"
+        })
+        
+    except ValidationError as e:
+        return JsonResponse({
+            "ok": False,
+            "error": str(e)
+        }, status=400)
+    except Exception as e:
+        logger.error(f"Error cambiando estado de tarea {task_id}: {str(e)}")
+        return JsonResponse({
+            "ok": False,
+            "error": str(e)
+        }, status=500)
 
 
 @login_required

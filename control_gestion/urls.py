@@ -13,6 +13,9 @@ urlpatterns = [
     path("equipo/", views.equipo_snapshot, name="equipo"),
     path("indicadores/", views.indicadores, name="indicadores"),
     
+    # Acciones rápidas (AJAX)
+    path("tarea/<int:task_id>/cambiar-estado/", views.cambiar_estado_tarea, name="cambiar_estado"),
+    
     # Webhooks
     path("webhooks/cliente_en_sitio/", views.webhook_cliente_en_sitio, name="webhook_cliente_en_sitio"),
     path("ai/ingest_message/", views.ai_ingest_message, name="ai_ingest_message"),
