@@ -88,7 +88,7 @@ def plantillas_crear(request):
     context = {
         'swimlanes': Swimlane.choices,
         'priorities': Priority.choices,
-        'grupos': ['OPERACIONES', 'RECEPCION', 'VENTAS', 'ATENCION', 'SUPERVISION'],
+        'grupos': ['OPERACIONES', 'RECEPCION', 'VENTAS', 'ATENCION', 'SUPERVISION', 'MUCAMA'],
         'dias_semana': [
             (0, 'Lunes'),
             (1, 'Martes'),
@@ -140,7 +140,7 @@ def plantillas_editar(request, plantilla_id):
         'plantilla': plantilla,
         'swimlanes': Swimlane.choices,
         'priorities': Priority.choices,
-        'grupos': ['OPERACIONES', 'RECEPCION', 'VENTAS', 'ATENCION', 'SUPERVISION'],
+        'grupos': ['OPERACIONES', 'RECEPCION', 'VENTAS', 'ATENCION', 'SUPERVISION', 'MUCAMA'],
         'dias_semana': [
             (0, 'Lunes'),
             (1, 'Martes'),

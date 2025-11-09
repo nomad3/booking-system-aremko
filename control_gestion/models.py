@@ -21,6 +21,7 @@ class Swimlane(models.TextChoices):
     OPERACION = "OPS", "Operación"
     RECEPCION = "RX", "Recepción"
     SUPERVISION = "SUP", "Marketing y Supervisión"
+    MUCAMA = "MUC", "Mucama"
 
 
 class TaskState(models.TextChoices):

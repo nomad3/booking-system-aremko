@@ -77,7 +77,8 @@ class Command(BaseCommand):
             Swimlane.ATENCION,
             Swimlane.OPERACION,
             Swimlane.RECEPCION,
-            Swimlane.SUPERVISION
+            Swimlane.SUPERVISION,
+            Swimlane.MUCAMA
         ]:
             por_area[lane] = {
                 "nombre": dict(Swimlane.choices)[lane],
