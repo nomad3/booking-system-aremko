@@ -140,34 +140,56 @@ def equipo_snapshot(request):
     
     today = timezone.localdate()
     
-    tasks = Task.objects.filter(
-        updated_at__date=today
-    ).select_related('owner').order_by('swimlane', 'queue_position')
+    try:
+        tasks = Task.objects.filter(
+            updated_at__date=today
+        ).select_related('owner').order_by('swimlane', 'queue_position')
+        
+        # Filtro por área si se especifica
+        area_filter = request.GET.get('area', '')
+        if area_filter:
+            tasks = tasks.filter(swimlane=area_filter)
+        
+        # Estadísticas del día
+        stats = {
+            'total': tasks.count(),
+            'done': tasks.filter(state=TaskState.DONE).count(),
+            'in_progress': tasks.filter(state=TaskState.IN_PROGRESS).count(),
+            'blocked': tasks.filter(state=TaskState.BLOCKED).count(),
+            'backlog': tasks.filter(state=TaskState.BACKLOG).count(),
+        }
+        
+        # Verificar si usuario está en grupo SUPERVISION de forma segura
+        is_supervision = False
+        try:
+            is_supervision = request.user.groups.filter(name='SUPERVISION').exists()
+        except Exception:
+            pass  # Si hay error, simplemente será False
+        
+        context = {
+            'tasks': tasks,
+            'stats': stats,
+            'today': today,
+            'area_filter': area_filter,
+            'user': request.user,
+            'is_supervision': is_supervision
+        }
+        
+        return render(request, "control_gestion/equipo.html", context)
     
-    # Filtro por área si se especifica
-    area_filter = request.GET.get('area', '')
-    if area_filter:
-        tasks = tasks.filter(swimlane=area_filter)
-    
-    # Estadísticas del día
-    stats = {
-        'total': tasks.count(),
-        'done': tasks.filter(state=TaskState.DONE).count(),
-        'in_progress': tasks.filter(state=TaskState.IN_PROGRESS).count(),
-        'blocked': tasks.filter(state=TaskState.BLOCKED).count(),
-        'backlog': tasks.filter(state=TaskState.BACKLOG).count(),
-    }
-    
-    context = {
-        'tasks': tasks,
-        'stats': stats,
-        'today': today,
-        'area_filter': area_filter,
-        'user': request.user,  # Agregar usuario para verificar permisos en template
-        'is_supervision': request.user.groups.filter(name='SUPERVISION').exists()  # Helper para template
-    }
-    
-    return render(request, "control_gestion/equipo.html", context)
+    except Exception as e:
+        logger.error(f"Error en equipo_snapshot: {str(e)}", exc_info=True)
+        # Retornar página de error o página vacía
+        context = {
+            'tasks': Task.objects.none(),
+            'stats': {'total': 0, 'done': 0, 'in_progress': 0, 'blocked': 0, 'backlog': 0},
+            'today': today,
+            'area_filter': '',
+            'user': request.user,
+            'is_supervision': False,
+            'error': str(e)
+        }
+        return render(request, "control_gestion/equipo.html", context)
 
 
 @login_required
