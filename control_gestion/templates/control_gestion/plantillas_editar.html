@@ -1,0 +1,78 @@
+{% extends "control_gestion/plantillas_crear.html" %}
+
+{% block title %}Editar Plantilla{% endblock %}
+
+{% block content %}
+<h2 style="margin-bottom: 30px;">✏️ Editar Plantilla de Tarea Recurrente</h2>
+
+<div class="form-container">
+    <form method="POST">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="title_template">Título de la Tarea *</label>
+            <input type="text" id="title_template" name="title_template" required
+                   value="{{ plantilla.title_template }}">
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Descripción / Checklist *</label>
+            <textarea id="description" name="description" required>{{ plantilla.description }}</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="swimlane">Área Responsable *</label>
+            <select id="swimlane" name="swimlane" required>
+                {% for value, label in swimlanes %}
+                <option value="{{ value }}" {% if plantilla.swimlane == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="asignar_a_grupo">Asignar a Grupo *</label>
+            <select id="asignar_a_grupo" name="asignar_a_grupo">
+                <option value="">-- Seleccionar grupo --</option>
+                {% for grupo in grupos %}
+                <option value="{{ grupo }}" {% if plantilla.asignar_a_grupo == grupo %}selected{% endif %}>{{ grupo }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>Días de la Semana en que Se Genera *</label>
+            <div class="checkbox-group">
+                {% for dia_num, dia_nombre in dias_semana %}
+                <div class="checkbox-item">
+                    <input type="checkbox" id="dia_{{ dia_num }}" name="dia_{{ dia_num }}"
+                           {% if dia_num in plantilla.dias_activa %}checked{% endif %}>
+                    <label for="dia_{{ dia_num }}" style="margin: 0; font-weight: normal;">{{ dia_nombre }}</label>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <div class="checkbox-item">
+                <input type="checkbox" id="solo_martes" name="solo_martes"
+                       {% if plantilla.solo_martes %}checked{% endif %}>
+                <label for="solo_martes" style="margin: 0;">⚠️ Tarea SOLO de Martes</label>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <div class="checkbox-item">
+                <input type="checkbox" id="activa" name="activa"
+                       {% if plantilla.activa %}checked{% endif %}>
+                <label for="activa" style="margin: 0;">✅ Plantilla Activa</label>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-large">💾 Guardar Cambios</button>
+            <a href="{% url 'control_gestion:plantillas_dashboard' %}" class="btn btn-secondary btn-large">❌ Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
