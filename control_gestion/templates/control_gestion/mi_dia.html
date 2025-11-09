@@ -61,8 +61,25 @@
         background: #f39c12;
     }
     
-    .badge-state.blocked {
-        background: #e74c3c;
+    .badge-state.done {
+        background: #27ae60;
+        color: white;
+    }
+    
+    .task-card.selected {
+        border-left-width: 6px;
+        border-left-color: #2196f3;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .keyboard-hint {
+        margin-top: 20px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        font-size: 12px;
+        color: #6c757d;
+        text-align: center;
     }
     
     .badge-priority {
@@ -79,6 +96,59 @@
     .task-actions {
         display: flex;
         gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .btn-action {
+        padding: 8px 16px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+    }
+    
+    .btn-action:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .btn-primary {
+        background: #3498db;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #2980b9;
+    }
+    
+    .btn-success {
+        background: #27ae60;
+        color: white;
+    }
+    
+    .btn-success:hover {
+        background: #229954;
+    }
+    
+    .btn-warning {
+        background: #f39c12;
+        color: white;
+    }
+    
+    .btn-warning:hover {
+        background: #e67e22;
+    }
+    
+    .btn-secondary {
+        background: #95a5a6;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background: #7f8c8d;
     }
     
     .empty-state {
@@ -100,7 +170,305 @@
         border-radius: 8px;
         margin-bottom: 30px;
     }
+    
+    .btn-cambiar-estado {
+        cursor: pointer;
+    }
+    
+    .btn-cambiar-estado:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .loading {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+    
+    .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+    }
+    
+    .toast.success {
+        background: #27ae60;
+    }
+    
+    .toast.error {
+        background: #e74c3c;
+    }
+    
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
 </style>
+<script>
+// Función compartida para cambiar estado
+function cambiarEstadoTarea(taskId, nuevoEstado, estadoActual, buttonElement) {
+    // Confirmación según el estado
+    let mensaje = '';
+    if (nuevoEstado === 'IN_PROGRESS') {
+        mensaje = '¿Marcar esta tarea como EN CURSO?';
+    } else if (nuevoEstado === 'DONE') {
+        mensaje = '¿Marcar esta tarea como COMPLETADA?';
+    } else if (nuevoEstado === 'BLOCKED') {
+        mensaje = '¿Bloquear esta tarea?';
+    }
+    
+    if (!confirm(mensaje)) {
+        return;
+    }
+    
+    // Deshabilitar botón y mostrar loading
+    if (buttonElement) {
+        buttonElement.disabled = true;
+        buttonElement.textContent = '⏳ Procesando...';
+    }
+    
+    // Obtener CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    const csrftoken = getCookie('csrftoken');
+    
+    // Llamar a la API
+    fetch(`/control_gestion/tarea/${taskId}/cambiar-estado/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify({
+            nuevo_estado: nuevoEstado
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.ok) {
+            mostrarToast(data.mensaje, 'success');
+            actualizarTareaEnDOM(taskId, nuevoEstado);
+        } else {
+            mostrarToast('Error: ' + data.error, 'error');
+            if (buttonElement) {
+                buttonElement.disabled = false;
+                restaurarTextoBoton(buttonElement, nuevoEstado, estadoActual);
+            }
+        }
+    })
+    .catch(error => {
+        mostrarToast('Error de conexión', 'error');
+        if (buttonElement) {
+            buttonElement.disabled = false;
+            restaurarTextoBoton(buttonElement, nuevoEstado, estadoActual);
+        }
+    });
+}
+
+function restaurarTextoBoton(btn, nuevoEstado, estadoActual) {
+    if (nuevoEstado === 'IN_PROGRESS') {
+        btn.textContent = estadoActual === 'BLOCKED' ? '▶️ Reanudar' : '▶️ Iniciar';
+    } else if (nuevoEstado === 'DONE') {
+        btn.textContent = '✅ Completar';
+    } else if (nuevoEstado === 'BLOCKED') {
+        btn.textContent = '🚫 Bloquear';
+    }
+}
+
+function actualizarTareaEnDOM(taskId, nuevoEstado) {
+    const taskCard = document.querySelector(`[data-task-id="${taskId}"]`);
+    if (!taskCard) {
+        // Si no encontramos la tarjeta, recargar página
+        setTimeout(() => window.location.reload(), 1000);
+        return;
+    }
+    
+    // Actualizar estado en el badge
+    const stateBadge = taskCard.querySelector('.badge-state');
+    if (stateBadge) {
+        // Remover clases anteriores
+        stateBadge.classList.remove('in-progress', 'blocked', 'done');
+        
+        // Agregar nueva clase
+        if (nuevoEstado === 'IN_PROGRESS') {
+            stateBadge.classList.add('in-progress');
+            stateBadge.textContent = 'En curso';
+        } else if (nuevoEstado === 'BLOCKED') {
+            stateBadge.classList.add('blocked');
+            stateBadge.textContent = 'Bloqueada';
+        } else if (nuevoEstado === 'DONE') {
+            stateBadge.classList.add('done');
+            stateBadge.textContent = 'Hecha';
+        } else {
+            stateBadge.textContent = 'Pendiente';
+        }
+    }
+    
+    // Actualizar data-estado
+    taskCard.setAttribute('data-estado', nuevoEstado);
+    
+    // Actualizar botones de acción
+    const actionsDiv = taskCard.querySelector('.task-actions');
+    if (actionsDiv) {
+        let nuevoHTML = '<a href="/admin/control_gestion/task/' + taskId + '/change/" class="btn-action btn-primary">📝 Ver Detalles</a> ';
+        
+        if (nuevoEstado === 'BACKLOG') {
+            nuevoHTML += '<button class="btn-action btn-warning btn-cambiar-estado" data-task-id="' + taskId + '" data-nuevo-estado="IN_PROGRESS" data-estado-actual="BACKLOG">▶️ Iniciar</button> ';
+        } else if (nuevoEstado === 'IN_PROGRESS') {
+            nuevoHTML += '<button class="btn-action btn-success btn-cambiar-estado" data-task-id="' + taskId + '" data-nuevo-estado="DONE" data-estado-actual="IN_PROGRESS">✅ Completar</button> ';
+            nuevoHTML += '<button class="btn-action btn-cambiar-estado" style="background: #e74c3c; color: white;" data-task-id="' + taskId + '" data-nuevo-estado="BLOCKED" data-estado-actual="IN_PROGRESS">🚫 Bloquear</button> ';
+        } else if (nuevoEstado === 'BLOCKED') {
+            nuevoHTML += '<button class="btn-action btn-warning btn-cambiar-estado" data-task-id="' + taskId + '" data-nuevo-estado="IN_PROGRESS" data-estado-actual="BLOCKED">▶️ Reanudar</button> ';
+        }
+        
+        nuevoHTML += '<a href="/admin/control_gestion/task/?owner__id__exact={{ user.id }}" class="btn-action btn-secondary">📋 Ver Todas</a>';
+        actionsDiv.innerHTML = nuevoHTML;
+        
+        // Re-attach event listeners
+        actionsDiv.querySelectorAll('.btn-cambiar-estado').forEach(btn => {
+            btn.addEventListener('click', function() {
+                cambiarEstadoTarea(
+                    this.dataset.taskId,
+                    this.dataset.nuevoEstado,
+                    this.dataset.estadoActual,
+                    this
+                );
+            });
+        });
+    }
+    
+    // Si la tarea está DONE, ocultarla o moverla
+    if (nuevoEstado === 'DONE') {
+        setTimeout(() => {
+            taskCard.style.opacity = '0.5';
+            taskCard.style.transition = 'opacity 0.3s';
+        }, 500);
+    }
+}
+
+function mostrarToast(mensaje, tipo) {
+    const toastAnterior = document.querySelector('.toast');
+    if (toastAnterior) {
+        toastAnterior.remove();
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `toast ${tipo}`;
+    toast.textContent = mensaje;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+
+// Atajos de teclado
+let tareaSeleccionada = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Manejar clicks en botones de cambiar estado
+    document.querySelectorAll('.btn-cambiar-estado').forEach(btn => {
+        btn.addEventListener('click', function() {
+            cambiarEstadoTarea(
+                this.dataset.taskId,
+                this.dataset.nuevoEstado,
+                this.dataset.estadoActual,
+                this
+            );
+        });
+    });
+    
+    // Seleccionar tarea al hacer click en la tarjeta
+    document.querySelectorAll('[data-task-id]').forEach(card => {
+        card.addEventListener('click', function(e) {
+            // No seleccionar si se clickeó un botón o link
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A') {
+                return;
+            }
+            
+            // Remover selección anterior
+            document.querySelectorAll('.task-card.selected').forEach(c => {
+                c.classList.remove('selected');
+            });
+            
+            // Seleccionar esta tarjeta
+            this.classList.add('selected');
+            tareaSeleccionada = {
+                id: this.dataset.taskId,
+                estado: this.dataset.estado
+            };
+        });
+    });
+    
+    // Atajos de teclado
+    document.addEventListener('keydown', function(e) {
+        // Solo si no estamos escribiendo en un input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+        
+        if (!tareaSeleccionada) {
+            return;
+        }
+        
+        const estado = tareaSeleccionada.estado;
+        let nuevoEstado = null;
+        
+        switch(e.key.toLowerCase()) {
+            case 'c':
+                if (estado === 'IN_PROGRESS') {
+                    nuevoEstado = 'DONE';
+                }
+                break;
+            case 'b':
+                if (estado === 'IN_PROGRESS') {
+                    nuevoEstado = 'BLOCKED';
+                }
+                break;
+            case 'i':
+                if (estado === 'BACKLOG') {
+                    nuevoEstado = 'IN_PROGRESS';
+                }
+                break;
+            case 'r':
+                if (estado === 'BLOCKED') {
+                    nuevoEstado = 'IN_PROGRESS';
+                }
+                break;
+        }
+        
+        if (nuevoEstado) {
+            e.preventDefault();
+            cambiarEstadoTarea(tareaSeleccionada.id, nuevoEstado, estado, null);
+        }
+    });
+});
+</script>
 {% endblock %}
 
 {% block content %}
@@ -113,14 +481,14 @@
 
 {% if tasks %}
     {% for task in tasks %}
-    <div class="task-card {% if task.priority == 'ALTA' %}priority-high{% endif %}">
+    <div class="task-card {% if task.priority == 'ALTA' %}priority-high{% endif %}" data-task-id="{{ task.id }}" data-estado="{{ task.state }}">
         <div class="task-header">
             <div class="task-title">{{ task.title }}</div>
         </div>
         
         <div class="task-meta">
             <span class="badge badge-swimlane">{{ task.get_swimlane_display }}</span>
-            <span class="badge badge-state {% if task.state == 'IN_PROGRESS' %}in-progress{% elif task.state == 'BLOCKED' %}blocked{% endif %}">
+            <span class="badge badge-state {% if task.state == 'IN_PROGRESS' %}in-progress{% elif task.state == 'BLOCKED' %}blocked{% elif task.state == 'DONE' %}done{% endif %}">
                 {{ task.get_state_display }}
             </span>
             {% if task.priority == 'ALTA' %}
@@ -143,19 +511,54 @@
         </div>
         
         <div class="task-actions">
-            <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn">📝 Ver Detalles</a>
+            <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn-action btn-primary">📝 Ver Detalles</a>
+            
             {% if task.state == 'BACKLOG' %}
-            <a href="/admin/control_gestion/task/?ids={{ task.id }}&action=mark_in_progress" class="btn" style="background: #f39c12;">▶️ Iniciar</a>
+            <button 
+                class="btn-action btn-warning btn-cambiar-estado" 
+                data-task-id="{{ task.id }}"
+                data-nuevo-estado="IN_PROGRESS"
+                data-estado-actual="BACKLOG">
+                ▶️ Iniciar
+            </button>
             {% elif task.state == 'IN_PROGRESS' %}
-            <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn" style="background: #27ae60;">✅ Completar</a>
+            <button 
+                class="btn-action btn-success btn-cambiar-estado" 
+                data-task-id="{{ task.id }}"
+                data-nuevo-estado="DONE"
+                data-estado-actual="IN_PROGRESS">
+                ✅ Completar
+            </button>
+            <button 
+                class="btn-action btn-cambiar-estado" 
+                style="background: #e74c3c; color: white;"
+                data-task-id="{{ task.id }}"
+                data-nuevo-estado="BLOCKED"
+                data-estado-actual="IN_PROGRESS">
+                🚫 Bloquear
+            </button>
+            {% elif task.state == 'BLOCKED' %}
+            <button 
+                class="btn-action btn-warning btn-cambiar-estado" 
+                data-task-id="{{ task.id }}"
+                data-nuevo-estado="IN_PROGRESS"
+                data-estado-actual="BLOCKED">
+                ▶️ Reanudar
+            </button>
             {% endif %}
-            <a href="/admin/control_gestion/task/?owner__id__exact={{ user.id }}" class="btn btn-secondary">📋 Ver Todas</a>
+            
+            <a href="/admin/control_gestion/task/?owner__id__exact={{ user.id }}" class="btn-action btn-secondary">📋 Ver Todas</a>
         </div>
     </div>
     {% endfor %}
     
     <div style="text-align: center; margin-top: 30px;">
         <a href="/admin/control_gestion/task/?owner__id__exact={{ user.id }}" class="btn">Ver Todas Mis Tareas ({{ total_pending}})</a>
+    </div>
+    
+    <div class="keyboard-hint">
+        <strong>⌨️ Atajos de teclado:</strong> Selecciona una tarea (click) y luego presiona:
+        <strong>C</strong> = Completar | <strong>B</strong> = Bloquear | <strong>I</strong> = Iniciar | <strong>R</strong> = Reanudar
     </div>
 {% else %}
     <div class="empty-state">

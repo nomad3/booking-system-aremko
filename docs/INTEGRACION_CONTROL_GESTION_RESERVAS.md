@@ -36,10 +36,12 @@ Signal: react_to_reserva_change (post_save)
     v
 Crear Task(s) automáticas
     |
-    |-->  RECEPCION: Bienvenida
-    |-->  OPERACION: Preparar servicios
-    |-->  ATENCION: NPS post-visita
-    |-->  COMERCIAL: Premio D+3
+    |-->  RECEPCION: Bienvenida (check-in)
+    |-->  RECEPCION: Checkout completado (checkout)
+    |-->  ATENCION: NPS post-visita (checkout)
+    |-->  COMERCIAL: Premio D+3 (checkout)
+    |
+    ⚠️ OPERACION: Preparar servicios → vía gen_preparacion_servicios (1 hora antes)
 ```
 
 ---
@@ -68,21 +70,32 @@ Crear Task(s) automáticas
 - **Swimlane**: OPERACION
 - **Descripción**:
   ```
-  Fecha: [fecha_agendamiento] Hora: [hora_inicio]
-  Preparar [tina/sala/cabaña] según tipo de servicio.
-  Verificar temperatura, limpieza e insumos antes de la hora de inicio.
+  ⏰ SERVICIO COMIENZA A LAS [hora_inicio]
+  📅 Fecha: [fecha_agendamiento]
+  👤 Cliente: [nombre_cliente]
+  
+  🔧 TAREAS DE PREPARACIÓN (completar 1 hora antes):
+  • Limpiar y sanitizar tina/sala
+  • Llenar tina con agua caliente
+  • Verificar temperatura (36-38°C)
+  • Preparar toallas y amenidades
+  • Verificar que todo funcione correctamente
+  • Área lista y presentable para las [hora_inicio]
   ```
 - **Prioridad**: NORMAL
 - **Cola**: Posición 1
 - **Contexto**: service_type, reservation_id, segment_tag
+- **⚠️ IMPORTANTE**: Estas tareas NO se crean automáticamente al check-in. Se crean mediante el comando `gen_preparacion_servicios` que debe ejecutarse cada 15 minutos vía cron.
 
 **Ejemplo**:
 ```
 Reserva #3851 con 2 servicios:
-→ Crea 3 tareas:
+→ Al check-in se crea:
   1. RECEPCION: Check-in confirmado
-  2. OPERACION: Preparar Tina Hidromasaje
-  3. OPERACION: Preparar Masaje Relajante
+
+→ 1 hora antes de cada servicio (vía gen_preparacion_servicios):
+  2. OPERACION: Preparar Tina Hidromasaje (creada a las 15:00 si servicio es 16:00)
+  3. OPERACION: Preparar Masaje Relajante (creada según hora del servicio)
 ```
 
 ---

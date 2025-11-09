@@ -11,6 +11,10 @@ urlpatterns = [
     # Vistas web
     path("mi-dia/", views.mi_dia, name="mi_dia"),
     path("equipo/", views.equipo_snapshot, name="equipo"),
+    path("indicadores/", views.indicadores, name="indicadores"),
+    
+    # Acciones rápidas (AJAX)
+    path("tarea/<int:task_id>/cambiar-estado/", views.cambiar_estado_tarea, name="cambiar_estado"),
     
     # Gestión de plantillas (interfaz amigable)
     path("plantillas/", views_templates.plantillas_dashboard, name="plantillas_dashboard"),

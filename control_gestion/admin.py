@@ -6,6 +6,10 @@ Admin completo con inlines, acciones y validaciones para el sistema de tareas.
 
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
+from django.http import HttpResponse
+from django.utils import timezone
+import csv
+from datetime import datetime
 from .models import (
     Task, ChecklistItem, TaskLog, CustomerSegment, DailyReport,
     TaskState, Priority, TaskTemplate, EmpleadoDisponibilidad
@@ -164,6 +168,134 @@ def ai_generate_checklist_action(modeladmin, request, queryset):
         messages.error(request, "⚠️ Módulo de IA no disponible aún (se implementará en Etapa 2)")
 
 
+@admin.action(description="📥 Exportar a CSV")
+def export_to_csv(modeladmin, request, queryset):
+    """Exporta las tareas seleccionadas a CSV"""
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="tareas_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    writer = csv.writer(response)
+    
+    # Encabezados
+    writer.writerow([
+        'ID', 'Título', 'Área', 'Responsable', 'Estado', 'Prioridad',
+        'Posición Cola', 'Fecha Creación', 'Fecha Actualización',
+        'Promesa Entrega', 'Reserva ID', 'Teléfono Cliente',
+        'Segmento', 'Ubicación', 'Tipo Servicio', 'Origen',
+        'Checklist Items', 'Logs Count'
+    ])
+    
+    # Datos
+    for task in queryset:
+        checklist_count = task.checklist.count()
+        logs_count = task.logs.count()
+        
+        writer.writerow([
+            task.id,
+            task.title,
+            task.get_swimlane_display(),
+            task.owner.username if task.owner else '',
+            task.get_state_display(),
+            task.get_priority_display(),
+            task.queue_position,
+            task.created_at.strftime('%Y-%m-%d %H:%M:%S') if task.created_at else '',
+            task.updated_at.strftime('%Y-%m-%d %H:%M:%S') if task.updated_at else '',
+            task.promise_due_at.strftime('%Y-%m-%d %H:%M:%S') if task.promise_due_at else '',
+            task.reservation_id,
+            task.customer_phone_last9,
+            task.segment_tag,
+            task.get_location_ref_display() if task.location_ref else '',
+            task.service_type,
+            task.get_source_display(),
+            checklist_count,
+            logs_count
+        ])
+    
+    return response
+
+
+@admin.action(description="📊 Exportar a Excel")
+def export_to_excel(modeladmin, request, queryset):
+    """Exporta las tareas seleccionadas a Excel"""
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+    except ImportError:
+        messages.error(request, "⚠️ openpyxl no está instalado. Instala con: pip install openpyxl")
+        return
+    
+    # Crear workbook
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Tareas"
+    
+    # Estilos
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    
+    # Encabezados
+    headers = [
+        'ID', 'Título', 'Área', 'Responsable', 'Estado', 'Prioridad',
+        'Posición Cola', 'Fecha Creación', 'Fecha Actualización',
+        'Promesa Entrega', 'Reserva ID', 'Teléfono Cliente',
+        'Segmento', 'Ubicación', 'Tipo Servicio', 'Origen',
+        'Checklist Items', 'Logs Count'
+    ]
+    
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+    
+    # Datos
+    for row_num, task in enumerate(queryset, 2):
+        checklist_count = task.checklist.count()
+        logs_count = task.logs.count()
+        
+        ws.cell(row=row_num, column=1, value=task.id)
+        ws.cell(row=row_num, column=2, value=task.title)
+        ws.cell(row=row_num, column=3, value=task.get_swimlane_display())
+        ws.cell(row=row_num, column=4, value=task.owner.username if task.owner else '')
+        ws.cell(row=row_num, column=5, value=task.get_state_display())
+        ws.cell(row=row_num, column=6, value=task.get_priority_display())
+        ws.cell(row=row_num, column=7, value=task.queue_position)
+        ws.cell(row=row_num, column=8, value=task.created_at.strftime('%Y-%m-%d %H:%M:%S') if task.created_at else '')
+        ws.cell(row=row_num, column=9, value=task.updated_at.strftime('%Y-%m-%d %H:%M:%S') if task.updated_at else '')
+        ws.cell(row=row_num, column=10, value=task.promise_due_at.strftime('%Y-%m-%d %H:%M:%S') if task.promise_due_at else '')
+        ws.cell(row=row_num, column=11, value=task.reservation_id)
+        ws.cell(row=row_num, column=12, value=task.customer_phone_last9)
+        ws.cell(row=row_num, column=13, value=task.segment_tag)
+        ws.cell(row=row_num, column=14, value=task.get_location_ref_display() if task.location_ref else '')
+        ws.cell(row=row_num, column=15, value=task.service_type)
+        ws.cell(row=row_num, column=16, value=task.get_source_display())
+        ws.cell(row=row_num, column=17, value=checklist_count)
+        ws.cell(row=row_num, column=18, value=logs_count)
+    
+    # Ajustar ancho de columnas
+    for col in ws.columns:
+        max_length = 0
+        col_letter = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[col_letter].width = adjusted_width
+    
+    # Crear respuesta
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="tareas_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+    
+    wb.save(response)
+    return response
+
+
 # ===== ADMIN DE TASK =====
 
 @admin.register(Task)
@@ -205,7 +337,9 @@ class TaskAdmin(admin.ModelAdmin):
         mark_in_progress,
         mark_done,
         mark_blocked,
-        ai_generate_checklist_action
+        ai_generate_checklist_action,
+        export_to_csv,
+        export_to_excel
     ]
     
     readonly_fields = ('created_at', 'updated_at')
@@ -242,6 +376,93 @@ class TaskAdmin(admin.ModelAdmin):
         if not change:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
+    
+    # ===== PERMISOS POR GRUPO =====
+    
+    def has_view_permission(self, request, obj=None):
+        """
+        Controla quién puede ver tareas
+        
+        - ADMIN/SUPERUSER: Ve todas
+        - SUPERVISION: Ve todas
+        - Otros grupos: Solo sus propias tareas
+        """
+        if request.user.is_superuser:
+            return True
+        
+        # Grupo SUPERVISION puede ver todas
+        if request.user.groups.filter(name='SUPERVISION').exists():
+            return True
+        
+        # Si hay objeto específico, verificar si es el owner
+        if obj is not None:
+            return obj.owner == request.user
+        
+        # Para listado, se filtra en get_queryset
+        return True
+    
+    def has_change_permission(self, request, obj=None):
+        """
+        Controla quién puede modificar tareas
+        
+        - ADMIN/SUPERUSER: Puede modificar todas
+        - SUPERVISION: Puede modificar todas
+        - Owner: Solo puede modificar sus propias tareas
+        """
+        if request.user.is_superuser:
+            return True
+        
+        # Grupo SUPERVISION puede modificar todas
+        if request.user.groups.filter(name='SUPERVISION').exists():
+            return True
+        
+        # Solo el owner puede modificar su tarea
+        if obj is not None:
+            return obj.owner == request.user
+        
+        # Para acciones masivas, permitir si tiene permisos básicos
+        return True
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Controla quién puede eliminar tareas
+        
+        - ADMIN/SUPERUSER: Puede eliminar todas
+        - SUPERVISION: Puede eliminar todas
+        - Owner: Solo puede eliminar sus propias tareas
+        """
+        if request.user.is_superuser:
+            return True
+        
+        # Grupo SUPERVISION puede eliminar todas
+        if request.user.groups.filter(name='SUPERVISION').exists():
+            return True
+        
+        # Solo el owner puede eliminar su tarea
+        if obj is not None:
+            return obj.owner == request.user
+        
+        return True
+    
+    def get_queryset(self, request):
+        """
+        Filtra el queryset según los permisos del usuario
+        
+        - ADMIN/SUPERUSER: Ve todas
+        - SUPERVISION: Ve todas
+        - Otros: Solo sus propias tareas
+        """
+        qs = super().get_queryset(request)
+        
+        if request.user.is_superuser:
+            return qs
+        
+        # Grupo SUPERVISION ve todas
+        if request.user.groups.filter(name='SUPERVISION').exists():
+            return qs
+        
+        # Otros usuarios solo ven sus propias tareas
+        return qs.filter(owner=request.user)
 
 
 # ===== ADMIN DE CUSTOMER SEGMENT =====
