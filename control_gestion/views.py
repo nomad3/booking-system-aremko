@@ -161,10 +161,12 @@ def equipo_snapshot(request):
         
         # Verificar si usuario está en grupo SUPERVISION de forma segura
         is_supervision = False
-        try:
-            is_supervision = request.user.groups.filter(name='SUPERVISION').exists()
-        except Exception:
-            pass  # Si hay error, simplemente será False
+        if request.user.is_authenticated:
+            try:
+                is_supervision = request.user.groups.filter(name='SUPERVISION').exists()
+            except Exception as e:
+                logger.warning(f"Error verificando grupo SUPERVISION: {str(e)}")
+                is_supervision = False
         
         context = {
             'tasks': tasks,
