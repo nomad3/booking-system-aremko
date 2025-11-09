@@ -23,6 +23,9 @@ urlpatterns = [
     path("plantillas/<int:plantilla_id>/toggle/", views_templates.plantillas_toggle, name="plantillas_toggle"),
     path("plantillas/<int:plantilla_id>/eliminar/", views_templates.plantillas_eliminar, name="plantillas_eliminar"),
     
+    # Reportes diarios
+    path("reportes/", views.reportes_diarios, name="reportes_diarios"),
+    
     # Webhooks
     path("webhooks/cliente_en_sitio/", views.webhook_cliente_en_sitio, name="webhook_cliente_en_sitio"),
     path("ai/ingest_message/", views.ai_ingest_message, name="ai_ingest_message"),

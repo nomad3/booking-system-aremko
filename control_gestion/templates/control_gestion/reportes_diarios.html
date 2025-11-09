@@ -1,0 +1,149 @@
+{% extends "control_gestion/base_control.html" %}
+
+{% block title %}Reportes Diarios{% endblock %}
+
+{% block extra_head %}
+<style>
+    .reporte-card {
+        background: white;
+        padding: 25px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .reporte-card.hoy {
+        border-left: 4px solid #27ae60;
+    }
+    
+    .reporte-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #ecf0f1;
+    }
+    
+    .reporte-fecha {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+    
+    .reporte-hora {
+        color: #7f8c8d;
+        font-size: 14px;
+    }
+    
+    .reporte-contenido {
+        line-height: 1.8;
+        color: #34495e;
+        white-space: pre-wrap;
+    }
+    
+    .stats-box {
+        background: #ecf0f1;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+    }
+    
+    .stat-item {
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 32px;
+        font-weight: bold;
+        color: #3498db;
+    }
+    
+    .stat-label {
+        color: #7f8c8d;
+        margin-top: 5px;
+    }
+    
+    .empty-state {
+        background: white;
+        padding: 60px;
+        text-align: center;
+        border-radius: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+    <h2>📊 Reportes Diarios IA</h2>
+    <div style="color: #7f8c8d;">Generados automáticamente 2x día</div>
+</div>
+
+<div class="stats-box">
+    <div class="stat-item">
+        <div class="stat-number">{{ stats.total }}</div>
+        <div class="stat-label">Total Reportes</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-number" style="color: #27ae60;">{{ stats.ultima_semana }}</div>
+        <div class="stat-label">Última Semana</div>
+    </div>
+</div>
+
+{% if reportes %}
+    {% for reporte in reportes %}
+    <div class="reporte-card {% if reporte.date == today %}hoy{% endif %}">
+        <div class="reporte-header">
+            <div>
+                <div class="reporte-fecha">
+                    📅 {{ reporte.date|date:"l, d F Y" }}
+                    {% if reporte.date == today %}
+                    <span style="color: #27ae60; font-size: 14px; margin-left: 10px;">● HOY</span>
+                    {% endif %}
+                </div>
+                <div class="reporte-hora">
+                    🕐 Generado: {{ reporte.generated_at|date:"H:i" }}
+                </div>
+            </div>
+        </div>
+        
+        <div class="reporte-contenido">
+{{ reporte.summary }}
+        </div>
+    </div>
+    {% endfor %}
+    
+    <div style="text-align: center; margin-top: 30px;">
+        <a href="/admin/control_gestion/dailyreport/" class="btn btn-secondary">Ver Todos en Admin</a>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <h3 style="color: #95a5a6;">📊 Sin reportes aún</h3>
+        <p style="color: #7f8c8d; margin: 20px 0;">
+            Los reportes se generan automáticamente 2 veces al día:
+        </p>
+        <ul style="color: #7f8c8d; text-align: left; max-width: 400px; margin: 20px auto;">
+            <li>09:05 AM - Reporte matutino</li>
+            <li>18:00 PM - Reporte vespertino</li>
+        </ul>
+        <p style="color: #7f8c8d;">O ejecuta manualmente:</p>
+        <code style="background: #ecf0f1; padding: 10px; border-radius: 4px; display: inline-block; margin-top: 10px;">
+            python manage.py gen_daily_reports
+        </code>
+    </div>
+{% endif %}
+
+<div style="margin-top: 30px; padding: 20px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #f39c12;">
+    <h4 style="margin-top: 0;">💡 Sobre los Reportes Diarios:</h4>
+    <ul style="color: #856404;">
+        <li><strong>Matutino (09:05 AM)</strong>: Resumen del día anterior y planes para hoy</li>
+        <li><strong>Vespertino (18:00 PM)</strong>: Resumen del día y prioridades para mañana</li>
+        <li>Generados automáticamente por <strong>{{ 'DeepSeek IA' if 'deepseek' else 'IA Mock' }}</strong></li>
+        <li>Útiles para enviar por WhatsApp/Email al equipo</li>
+    </ul>
+</div>
+{% endblock %}
+
