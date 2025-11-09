@@ -1,0 +1,191 @@
+{% extends "control_gestion/base_control.html" %}
+
+{% block title %}Plantillas Recurrentes{% endblock %}
+
+{% block extra_head %}
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+    
+    .stat-box {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stat-number {
+        font-size: 32px;
+        font-weight: bold;
+        color: #3498db;
+    }
+    
+    .stat-label {
+        color: #7f8c8d;
+        font-size: 14px;
+        margin-top: 5px;
+    }
+    
+    .plantilla-card {
+        background: white;
+        padding: 20px;
+        margin-bottom: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-left: 4px solid #3498db;
+    }
+    
+    .plantilla-card.inactiva {
+        opacity: 0.6;
+        border-left-color: #95a5a6;
+    }
+    
+    .plantilla-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 10px;
+    }
+    
+    .plantilla-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+    
+    .badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-right: 5px;
+        margin-top: 5px;
+    }
+    
+    .badge-area {
+        background: #3498db;
+        color: white;
+    }
+    
+    .badge-dias {
+        background: #9b59b6;
+        color: white;
+    }
+    
+    .badge-grupo {
+        background: #27ae60;
+        color: white;
+    }
+    
+    .badge-martes {
+        background: #e74c3c;
+        color: white;
+    }
+    
+    .plantilla-actions {
+        margin-top: 15px;
+        display: flex;
+        gap: 10px;
+    }
+    
+    .btn-small {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+    
+    .btn-danger {
+        background: #e74c3c;
+    }
+    
+    .btn-danger:hover {
+        background: #c0392b;
+    }
+    
+    .btn-success {
+        background: #27ae60;
+    }
+    
+    .btn-success:hover {
+        background: #229954;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+    <h2>🔄 Plantillas de Tareas Recurrentes</h2>
+    <a href="{% url 'control_gestion:plantillas_crear' %}" class="btn">➕ Nueva Plantilla</a>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-box">
+        <div class="stat-number">{{ stats.total }}</div>
+        <div class="stat-label">Total Plantillas</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-number" style="color: #27ae60;">{{ stats.activas }}</div>
+        <div class="stat-label">Activas</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-number" style="color: #e74c3c;">{{ stats.solo_martes }}</div>
+        <div class="stat-label">Solo Martes</div>
+    </div>
+</div>
+
+{% if plantillas %}
+    {% for plantilla in plantillas %}
+    <div class="plantilla-card {% if not plantilla.activa %}inactiva{% endif %}">
+        <div class="plantilla-header">
+            <div class="plantilla-title">
+                {{ plantilla.title_template }}
+                {% if not plantilla.activa %}<span style="color: #95a5a6;">(Inactiva)</span>{% endif %}
+            </div>
+        </div>
+        
+        <div style="margin: 10px 0;">
+            <span class="badge badge-area">{{ plantilla.get_swimlane_display }}</span>
+            <span class="badge badge-dias">📅 {{ plantilla.get_dias_str }}</span>
+            {% if plantilla.asignar_a_grupo %}
+            <span class="badge badge-grupo">👥 {{ plantilla.asignar_a_grupo }}</span>
+            {% endif %}
+            {% if plantilla.solo_martes %}
+            <span class="badge badge-martes">⚠️ Solo Martes</span>
+            {% endif %}
+        </div>
+        
+        <div style="color: #7f8c8d; margin: 10px 0;">
+            {{ plantilla.description|truncatewords:30 }}
+        </div>
+        
+        <div class="plantilla-actions">
+            <a href="{% url 'control_gestion:plantillas_editar' plantilla.id %}" class="btn btn-small">✏️ Editar</a>
+            
+            {% if plantilla.activa %}
+            <a href="{% url 'control_gestion:plantillas_toggle' plantilla.id %}" class="btn btn-small btn-secondary">⏸️ Desactivar</a>
+            {% else %}
+            <a href="{% url 'control_gestion:plantillas_toggle' plantilla.id %}" class="btn btn-small btn-success">▶️ Activar</a>
+            {% endif %}
+            
+            <a href="{% url 'control_gestion:plantillas_eliminar' plantilla.id %}" 
+               class="btn btn-small btn-danger"
+               onclick="return confirm('¿Eliminar plantilla {{ plantilla.title_template }}?')">
+               🗑️ Eliminar
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div style="background: white; padding: 60px; text-align: center; border-radius: 8px;">
+        <h3 style="color: #95a5a6;">Sin plantillas configuradas</h3>
+        <p style="color: #7f8c8d; margin: 20px 0;">Crea tu primera plantilla de tarea recurrente</p>
+        <a href="{% url 'control_gestion:plantillas_crear' %}" class="btn">➕ Crear Primera Plantilla</a>
+    </div>
+{% endif %}
+{% endblock %}
+

@@ -3,7 +3,7 @@ URLs para Control de Gestión
 """
 
 from django.urls import path
-from . import views
+from . import views, views_templates
 
 app_name = "control_gestion"
 
@@ -11,6 +11,13 @@ urlpatterns = [
     # Vistas web
     path("mi-dia/", views.mi_dia, name="mi_dia"),
     path("equipo/", views.equipo_snapshot, name="equipo"),
+    
+    # Gestión de plantillas (interfaz amigable)
+    path("plantillas/", views_templates.plantillas_dashboard, name="plantillas_dashboard"),
+    path("plantillas/crear/", views_templates.plantillas_crear, name="plantillas_crear"),
+    path("plantillas/<int:plantilla_id>/editar/", views_templates.plantillas_editar, name="plantillas_editar"),
+    path("plantillas/<int:plantilla_id>/toggle/", views_templates.plantillas_toggle, name="plantillas_toggle"),
+    path("plantillas/<int:plantilla_id>/eliminar/", views_templates.plantillas_eliminar, name="plantillas_eliminar"),
     
     # Webhooks
     path("webhooks/cliente_en_sitio/", views.webhook_cliente_en_sitio, name="webhook_cliente_en_sitio"),
