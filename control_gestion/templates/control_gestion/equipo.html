@@ -191,17 +191,13 @@
 <script>
 // Función compartida para cambiar estado
 function cambiarEstadoTarea(taskId, nuevoEstado, estadoActual, buttonElement) {
-    // Confirmación solo para DONE y BLOCKED (no para IN_PROGRESS)
-    if (nuevoEstado === 'DONE') {
-        if (!confirm('¿Marcar esta tarea como COMPLETADA?')) {
-            return;
-        }
-    } else if (nuevoEstado === 'BLOCKED') {
+    // Confirmación solo para BLOCKED
+    if (nuevoEstado === 'BLOCKED') {
         if (!confirm('¿Bloquear esta tarea?')) {
             return;
         }
     }
-    // IN_PROGRESS: sin confirmación, cambio directo
+    // IN_PROGRESS y DONE: sin confirmación, cambio directo
     
     // Deshabilitar botón y mostrar loading
     if (buttonElement) {
