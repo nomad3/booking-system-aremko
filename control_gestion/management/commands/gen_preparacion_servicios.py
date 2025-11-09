@@ -193,7 +193,7 @@ class Command(BaseCommand):
                         if not dry_run:
                             # Crear tarea de preparación
                             Task.objects.create(
-                                title=f"Preparar servicio – {servicio_nombre} (Reserva #{reserva.id})",
+                                title=f"Preparar servicio – {servicio_nombre} (Reserva #{reserva.id} - {rs.hora_inicio})",
                                 description=(
                                     f"⏰ SERVICIO COMIENZA A LAS {rs.hora_inicio}\n"
                                     f"📅 Fecha: {rs.fecha_agendamiento}\n"
