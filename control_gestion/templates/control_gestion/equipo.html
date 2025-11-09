@@ -1,4 +1,5 @@
 {% extends "control_gestion/base_control.html" %}
+{% load control_gestion_tags %}
 
 {% block title %}Equipo{% endblock %}
 
@@ -479,17 +480,8 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
     
     {% for task in tasks %}
-    {% if task.owner %}
-        {% if task.owner.id == user.id %}
-            {% with can_edit_task=True %}{% endwith %}
-        {% else %}
-            {% with can_edit_task=False %}{% endwith %}
-        {% endif %}
-    {% else %}
-        {% with can_edit_task=False %}{% endwith %}
-    {% endif %}
     <div class="task-row" data-task-id="{{ task.id }}" data-estado="{{ task.state }}" 
-         {% if task.owner.id == user.id or user.is_superuser or is_supervision %}
+         {% if task|can_edit_task:user %}
          style="cursor: pointer;"
          {% endif %}>
         <div>
@@ -499,7 +491,7 @@ document.addEventListener('DOMContentLoaded', function() {
             {% if task.priority == 'ALTA' %}
             <span style="color: #e74c3c; font-size: 12px;">🔥</span>
             {% endif %}
-            {% if task.owner.id == user.id or user.is_superuser or is_supervision %}
+            {% if task|can_edit_task:user %}
             <div class="task-actions-quick">
                 {% if task.state == 'BACKLOG' %}
                 <button class="btn-quick btn-quick-start" onclick="cambiarEstadoTarea({{ task.id }}, 'IN_PROGRESS', 'BACKLOG', this)">▶️ Iniciar</button>
