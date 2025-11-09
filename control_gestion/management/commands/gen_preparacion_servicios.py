@@ -152,11 +152,13 @@ class Command(BaseCommand):
                         
                         servicio_nombre = rs.servicio.nombre if rs.servicio else "Servicio"
                         
-                        # Verificar si ya existe una tarea de preparación para este servicio
+                        # Verificar si ya existe una tarea de preparación para este servicio específico
+                        # Usar reservation_id + servicio + hora para evitar duplicados
                         tarea_existe = Task.objects.filter(
                             reservation_id=str(reserva.id),
                             title__icontains="Preparar servicio",
-                            description__icontains=servicio_nombre
+                            title__icontains=servicio_nombre,
+                            title__icontains=str(rs.hora_inicio)
                         ).exists()
                         
                         if tarea_existe:
