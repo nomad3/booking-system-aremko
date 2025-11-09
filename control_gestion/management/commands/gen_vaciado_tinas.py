@@ -85,10 +85,12 @@ class Command(BaseCommand):
             ops_user = User.objects.first()
         
         # Buscar servicios de TINAS que ya terminaron (reserva en checkin o checkout)
-        # Buscar en ventana de tiempo (ej: últimas 2.5 horas)
-        inicio_busqueda = now - timedelta(minutes=ventana)
-        
-        # Buscar reservas de TINAS activas
+        # IMPORTANTE: Solo buscar servicios del DÍA ACTUAL
+        today = now.date()
+
+        self.stdout.write(f"🔍 Buscando solo servicios de tinas del día actual: {today}\n")
+
+        # Buscar reservas de TINAS activas DEL DÍA ACTUAL
         reservas = VentaReserva.objects.filter(
             estado_reserva__in=['checkin', 'checkout']
         ).prefetch_related('reservaservicios__servicio')
@@ -119,10 +121,14 @@ class Command(BaseCommand):
                     datetime_inicio = timezone.make_aware(
                         datetime.combine(rs.fecha_agendamiento, hora_inicio)
                     )
-                    
+
+                    # FILTRO CRÍTICO: Solo procesar servicios del DÍA ACTUAL
+                    if rs.fecha_agendamiento != today:
+                        continue  # Servicio es de otro día, ignorar
+
                     # Calcular hora de fin del servicio (inicio + duración)
                     datetime_fin = datetime_inicio + timedelta(minutes=duracion_tina)
-                    
+
                     # ¿Ya pasó el tiempo de vaciado? (ahora >= fin del servicio)
                     if now < datetime_fin:
                         continue  # Servicio aún no termina
