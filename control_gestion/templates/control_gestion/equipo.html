@@ -55,7 +55,7 @@
         padding: 15px;
         border-bottom: 1px solid #ecf0f1;
         display: grid;
-        grid-template-columns: 2fr 1fr 1fr 1fr 100px;
+        grid-template-columns: 80px 2fr 1fr 1fr 1fr 100px;
         gap: 15px;
         align-items: center;
     }
@@ -468,6 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
 {% if tasks %}
 <div class="task-list">
     <div class="task-row" style="font-weight: 600; border-bottom: 2px solid #bdc3c7;">
+        <div>ID</div>
         <div>Tarea</div>
         <div>Área</div>
         <div>Responsable</div>
@@ -476,10 +477,13 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
     
     {% for task in tasks %}
-    <div class="task-row" data-task-id="{{ task.id }}" data-estado="{{ task.state }}" 
+    <div class="task-row" data-task-id="{{ task.id }}" data-estado="{{ task.state }}"
          {% if task|can_edit_task:user %}
          style="cursor: pointer;"
          {% endif %}>
+        <div style="text-align: center; color: #7f8c8d; font-family: monospace;">
+            {{ task.id }}
+        </div>
         <div>
             <a href="/admin/control_gestion/task/{{ task.id }}/change/" style="color: #2c3e50; text-decoration: none; font-weight: 500;">
                 {{ task.title|truncatewords:10 }}

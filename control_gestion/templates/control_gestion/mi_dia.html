@@ -477,7 +477,10 @@ document.addEventListener('DOMContentLoaded', function() {
     {% for task in tasks %}
     <div class="task-card {% if task.priority == 'ALTA' %}priority-high{% endif %}" data-task-id="{{ task.id }}" data-estado="{{ task.state }}">
         <div class="task-header">
-            <div class="task-title">{{ task.title }}</div>
+            <div class="task-title">
+                <span style="color: #7f8c8d; font-family: monospace; font-size: 12px; margin-right: 8px;">ID:{{ task.id }}</span>
+                {{ task.title }}
+            </div>
         </div>
         
         <div class="task-meta">
