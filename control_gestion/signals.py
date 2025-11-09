@@ -386,12 +386,32 @@ def react_to_reserva_change(sender, instance, created, **kwargs):
     
     # ===== TRANSICIÓN A CHECKOUT =====
     elif old_estado != "checkout" and new_estado == "checkout":
-        logger.info(f"Reserva #{instance.id} → CHECKOUT. Creando tareas post-visita...")
+        logger.info(f"Reserva #{instance.id} → CHECKOUT. Completando tareas relacionadas y creando tareas post-visita...")
+        
+        # ⭐ COMPLETAR AUTOMÁTICAMENTE TAREAS RELACIONADAS CON ESTA RESERVA
+        # Buscar todas las tareas pendientes relacionadas con esta reserva
+        tareas_relacionadas = Task.objects.filter(
+            reservation_id=str(instance.id),
+            state__in=[TaskState.BACKLOG, TaskState.IN_PROGRESS]
+        )
+        
+        # Completar tareas de check-in y preparación de servicios
+        tareas_completadas = 0
+        for tarea in tareas_relacionadas:
+            # Solo completar tareas de RECEPCION (check-in) y OPERACION (preparación)
+            if tarea.swimlane in [Swimlane.RECEPCION, Swimlane.OPERACION]:
+                tarea.state = TaskState.DONE
+                tarea.save(update_fields=['state'])
+                tareas_completadas += 1
+                logger.info(f"✅ Tarea '{tarea.title}' marcada como completada automáticamente")
+        
+        if tareas_completadas > 0:
+            logger.info(f"✅ {tareas_completadas} tarea(s) completada(s) automáticamente al hacer checkout")
         
         # Usar hora REAL del checkout (cuando el recepcionista lo marca)
         hora_checkout_real = timezone.now().strftime('%H:%M')
         
-        # Tarea para RECEPCIÓN (checkout/despedida)
+        # Tarea para RECEPCIÓN (checkout/despedida) - Se crea como DONE porque el checkout ya se hizo
         Task.objects.create(
             title=f"Checkout completado – Reserva #{instance.id} ({hora_checkout_real})",
             description=(
@@ -406,7 +426,7 @@ def react_to_reserva_change(sender, instance, created, **kwargs):
             swimlane=Swimlane.RECEPCION,
             owner=rx,
             created_by=rx,
-            state=TaskState.BACKLOG,
+            state=TaskState.DONE,  # ⭐ Ya completada porque el checkout ya se hizo
             queue_position=1,
             reservation_id=str(instance.id),
             customer_phone_last9=customer_phone,
@@ -414,7 +434,7 @@ def react_to_reserva_change(sender, instance, created, **kwargs):
             priority=Priority.NORMAL,
             source=TaskSource.SISTEMA
         )
-        logger.info(f"✅ Tarea RECEPCION (checkout) creada para reserva #{instance.id}")
+        logger.info(f"✅ Tarea RECEPCION (checkout) creada como COMPLETADA para reserva #{instance.id}")
         
         # Tarea para ATENCIÓN AL CLIENTE (NPS) - también con hora real de checkout
         Task.objects.create(
