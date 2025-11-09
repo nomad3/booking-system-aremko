@@ -163,7 +163,8 @@ def equipo_snapshot(request):
         'stats': stats,
         'today': today,
         'area_filter': area_filter,
-        'user': request.user  # Agregar usuario para verificar permisos en template
+        'user': request.user,  # Agregar usuario para verificar permisos en template
+        'is_supervision': request.user.groups.filter(name='SUPERVISION').exists()  # Helper para template
     }
     
     return render(request, "control_gestion/equipo.html", context)
