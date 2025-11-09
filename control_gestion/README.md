@@ -125,9 +125,10 @@ Cuando el recepcionista cambia `estado_reserva`:
 
 **Check-in** (`pendiente` → `checkin`):
 - ✅ Tarea RECEPCION: Bienvenida
-- ✅ Tarea(s) OPERACION: Preparar servicios
+- ⚠️ Tarea(s) OPERACION: Se crean automáticamente 1 hora antes vía `gen_preparacion_servicios`
 
 **Checkout** (`checkin` → `checkout`):
+- ✅ Tarea RECEPCION: Checkout completado
 - ✅ Tarea ATENCION: NPS post-visita
 - ✅ Tarea(s) COMERCIAL: Premio D+3 (programada)
 
@@ -137,9 +138,15 @@ Cuando el recepcionista cambia `estado_reserva`:
 # Rutinas diarias (excepto martes)
 python manage.py gen_daily_opening
 
+# Preparación de servicios (cada 15 minutos) ⭐ IMPORTANTE
+python manage.py gen_preparacion_servicios
+
 # Reporte diario con IA
 python manage.py gen_daily_reports --momento=matutino   # 09:00
 python manage.py gen_daily_reports --momento=vespertino  # 18:00
+
+# Vaciado de tinas
+python manage.py gen_vaciado_tinas
 ```
 
 ### Webhooks
@@ -264,10 +271,10 @@ Ver `docs/CREAR_USUARIOS_GRUPOS.md` para configurar.
 | 1. MVP Admin | ✅ | 3 | Modelos, admin, WIP=1 |
 | 2. IA | ✅ | 2 | Cliente LLM + 5 funciones |
 | 3. Integración | ✅ | 3 | Signals con VentaReserva |
-| 4. Vistas/Webhooks | ✅ | 2 | Mi día, equipo, 3 webhooks |
-| 5. Comandos | ✅ | 2 | Rutinas + reportes IA |
+| 4. Vistas/Webhooks | ✅ | 2 | Mi día, equipo, 3 webhooks + 4 endpoints cron |
+| 5. Comandos | ✅ | 2 | Rutinas + reportes IA + preparación servicios |
 | 6. Polish | ⏳ | 2 | UI, permisos, KPIs |
-| 7. Testing/Docs | ⏳ | 2 | Tests, documentación |
+| 7. Testing/Docs | ⏳ | 2 | Tests adicionales, documentación final |
 | 8. Producción | ⏳ | 1 | Deploy, monitoreo |
 
 **Progreso**: 71% (12/17 días)

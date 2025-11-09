@@ -70,6 +70,11 @@ def equipo_snapshot(request):
         updated_at__date=today
     ).select_related('owner').order_by('swimlane', 'queue_position')
     
+    # Filtro por área si se especifica
+    area_filter = request.GET.get('area', '')
+    if area_filter:
+        tasks = tasks.filter(swimlane=area_filter)
+    
     # Estadísticas del día
     stats = {
         'total': tasks.count(),
@@ -82,10 +87,166 @@ def equipo_snapshot(request):
     context = {
         'tasks': tasks,
         'stats': stats,
-        'today': today
+        'today': today,
+        'area_filter': area_filter
     }
     
     return render(request, "control_gestion/equipo.html", context)
+
+
+@login_required
+def indicadores(request):
+    """
+    Vista de Indicadores/KPIs - Dashboard de métricas
+    
+    Muestra:
+    - KPI por persona: tareas hechas/bloqueadas/promedio días
+    - KPI por área: eficiencia, bloqueos >24h
+    - Promesas cumplidas vs vencidas
+    """
+    from django.db.models import Count, Avg, Q
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    today = timezone.localdate()
+    thirty_days_ago = today - timedelta(days=30)
+    
+    # ===== KPIs POR PERSONA =====
+    kpis_persona = []
+    
+    # Obtener todos los usuarios que tienen tareas
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    
+    usuarios_con_tareas = User.objects.filter(
+        owned_tasks__isnull=False
+    ).distinct()
+    
+    for usuario in usuarios_con_tareas:
+        tareas_usuario = Task.objects.filter(owner=usuario)
+        tareas_30d = tareas_usuario.filter(created_at__date__gte=thirty_days_ago)
+        
+        hechas = tareas_30d.filter(state=TaskState.DONE).count()
+        bloqueadas = tareas_30d.filter(state=TaskState.BLOCKED).count()
+        en_curso = tareas_30d.filter(state=TaskState.IN_PROGRESS).count()
+        total = tareas_30d.count()
+        
+        # Calcular promedio de días para completar tareas
+        tareas_completadas = tareas_30d.filter(
+            state=TaskState.DONE,
+            created_at__isnull=False,
+            updated_at__isnull=False
+        )
+        
+        promedio_dias = None
+        if tareas_completadas.exists():
+            tiempos = []
+            for tarea in tareas_completadas:
+                if tarea.created_at and tarea.updated_at:
+                    delta = (tarea.updated_at.date() - tarea.created_at.date()).days
+                    if delta >= 0:
+                        tiempos.append(delta)
+            
+            if tiempos:
+                promedio_dias = sum(tiempos) / len(tiempos)
+        
+        # Tareas bloqueadas >24h
+        bloqueadas_24h = tareas_30d.filter(
+            state=TaskState.BLOCKED,
+            updated_at__lt=timezone.now() - timedelta(hours=24)
+        ).count()
+        
+        kpis_persona.append({
+            'usuario': usuario,
+            'hechas': hechas,
+            'bloqueadas': bloqueadas,
+            'en_curso': en_curso,
+            'total': total,
+            'promedio_dias': round(promedio_dias, 1) if promedio_dias else None,
+            'bloqueadas_24h': bloqueadas_24h,
+            'eficiencia': round((hechas / total * 100), 1) if total > 0 else 0
+        })
+    
+    # Ordenar por eficiencia descendente
+    kpis_persona.sort(key=lambda x: x['eficiencia'], reverse=True)
+    
+    # ===== KPIs POR ÁREA (SWIMLANE) =====
+    kpis_area = []
+    
+    for swimlane_code, swimlane_name in Swimlane.choices:
+        tareas_area = Task.objects.filter(swimlane=swimlane_code)
+        tareas_area_30d = tareas_area.filter(created_at__date__gte=thirty_days_ago)
+        
+        hechas = tareas_area_30d.filter(state=TaskState.DONE).count()
+        bloqueadas = tareas_area_30d.filter(state=TaskState.BLOCKED).count()
+        total = tareas_area_30d.count()
+        
+        # Bloqueos >24h
+        bloqueadas_24h = tareas_area_30d.filter(
+            state=TaskState.BLOCKED,
+            updated_at__lt=timezone.now() - timedelta(hours=24)
+        ).count()
+        
+        kpis_area.append({
+            'area': swimlane_name,
+            'codigo': swimlane_code,
+            'hechas': hechas,
+            'bloqueadas': bloqueadas,
+            'total': total,
+            'bloqueadas_24h': bloqueadas_24h,
+            'eficiencia': round((hechas / total * 100), 1) if total > 0 else 0
+        })
+    
+    # Ordenar por total descendente
+    kpis_area.sort(key=lambda x: x['total'], reverse=True)
+    
+    # ===== PROMESAS CUMPLIDAS VS VENCIDAS =====
+    from django.db.models import F
+    
+    promesas_cumplidas = Task.objects.filter(
+        promise_due_at__isnull=False,
+        state=TaskState.DONE
+    ).filter(updated_at__lte=F('promise_due_at')).count()
+    
+    promesas_vencidas = Task.objects.filter(
+        promise_due_at__isnull=False,
+        promise_due_at__lt=timezone.now(),
+        state__in=[TaskState.BACKLOG, TaskState.IN_PROGRESS, TaskState.BLOCKED]
+    ).count()
+    
+    promesas_pendientes = Task.objects.filter(
+        promise_due_at__isnull=False,
+        promise_due_at__gte=timezone.now(),
+        state__in=[TaskState.BACKLOG, TaskState.IN_PROGRESS]
+    ).count()
+    
+    total_promesas = promesas_cumplidas + promesas_vencidas + promesas_pendientes
+    tasa_cumplimiento = round((promesas_cumplidas / total_promesas * 100), 1) if total_promesas > 0 else 0
+    
+    # ===== ESTADÍSTICAS GENERALES =====
+    stats_generales = {
+        'total_tareas_30d': Task.objects.filter(created_at__date__gte=thirty_days_ago).count(),
+        'tareas_hechas_30d': Task.objects.filter(
+            created_at__date__gte=thirty_days_ago,
+            state=TaskState.DONE
+        ).count(),
+        'tareas_bloqueadas_ahora': Task.objects.filter(state=TaskState.BLOCKED).count(),
+        'tareas_en_curso': Task.objects.filter(state=TaskState.IN_PROGRESS).count(),
+        'promesas_cumplidas': promesas_cumplidas,
+        'promesas_vencidas': promesas_vencidas,
+        'promesas_pendientes': promesas_pendientes,
+        'tasa_cumplimiento': tasa_cumplimiento
+    }
+    
+    context = {
+        'kpis_persona': kpis_persona,
+        'kpis_area': kpis_area,
+        'stats_generales': stats_generales,
+        'fecha_desde': thirty_days_ago,
+        'fecha_hasta': today
+    }
+    
+    return render(request, "control_gestion/indicadores.html", context)
 
 
 @csrf_exempt

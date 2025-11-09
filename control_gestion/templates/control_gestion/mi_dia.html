@@ -79,6 +79,59 @@
     .task-actions {
         display: flex;
         gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .btn-action {
+        padding: 8px 16px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+    }
+    
+    .btn-action:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .btn-primary {
+        background: #3498db;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #2980b9;
+    }
+    
+    .btn-success {
+        background: #27ae60;
+        color: white;
+    }
+    
+    .btn-success:hover {
+        background: #229954;
+    }
+    
+    .btn-warning {
+        background: #f39c12;
+        color: white;
+    }
+    
+    .btn-warning:hover {
+        background: #e67e22;
+    }
+    
+    .btn-secondary {
+        background: #95a5a6;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background: #7f8c8d;
     }
     
     .empty-state {
@@ -143,13 +196,18 @@
         </div>
         
         <div class="task-actions">
-            <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn">📝 Ver Detalles</a>
+            <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn-action btn-primary">📝 Ver Detalles</a>
             {% if task.state == 'BACKLOG' %}
-            <a href="/admin/control_gestion/task/?ids={{ task.id }}&action=mark_in_progress" class="btn" style="background: #f39c12;">▶️ Iniciar</a>
+            <form method="post" action="/admin/control_gestion/task/" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="mark_in_progress">
+                <input type="hidden" name="_selected_action" value="{{ task.id }}">
+                <button type="submit" class="btn-action btn-warning" onclick="return confirm('¿Marcar esta tarea como EN CURSO?')">▶️ Iniciar</button>
+            </form>
             {% elif task.state == 'IN_PROGRESS' %}
-            <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn" style="background: #27ae60;">✅ Completar</a>
+            <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn-action btn-success">✅ Completar</a>
             {% endif %}
-            <a href="/admin/control_gestion/task/?owner__id__exact={{ user.id }}" class="btn btn-secondary">📋 Ver Todas</a>
+            <a href="/admin/control_gestion/task/?owner__id__exact={{ user.id }}" class="btn-action btn-secondary">📋 Ver Todas</a>
         </div>
     </div>
     {% endfor %}

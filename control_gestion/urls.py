@@ -11,6 +11,7 @@ urlpatterns = [
     # Vistas web
     path("mi-dia/", views.mi_dia, name="mi_dia"),
     path("equipo/", views.equipo_snapshot, name="equipo"),
+    path("indicadores/", views.indicadores, name="indicadores"),
     
     # Webhooks
     path("webhooks/cliente_en_sitio/", views.webhook_cliente_en_sitio, name="webhook_cliente_en_sitio"),
