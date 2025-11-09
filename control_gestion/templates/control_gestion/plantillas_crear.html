@@ -113,6 +113,16 @@
         </div>
         
         <div class="form-group">
+            <label for="priority">Prioridad</label>
+            <select id="priority" name="priority">
+                {% for value, label in priorities %}
+                <option value="{{ value }}" {% if value == 'NORMAL' %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <div class="help-text">Normalmente usa "Normal". "Alta" solo para urgencias.</div>
+        </div>
+        
+        <div class="form-group">
             <label for="asignar_a_grupo">Asignar a Grupo *</label>
             <select id="asignar_a_grupo" name="asignar_a_grupo">
                 <option value="">-- Seleccionar grupo --</option>
