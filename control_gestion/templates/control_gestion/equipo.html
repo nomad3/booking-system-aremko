@@ -480,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     {% for task in tasks %}
     <div class="task-row" data-task-id="{{ task.id }}" data-estado="{{ task.state }}" 
-         {% if task.owner and task.owner == user or user.is_superuser or is_supervision %}
+         {% if task.owner.id == user.id or user.is_superuser or is_supervision %}
          style="cursor: pointer;"
          {% endif %}>
         <div>
@@ -490,7 +490,7 @@ document.addEventListener('DOMContentLoaded', function() {
             {% if task.priority == 'ALTA' %}
             <span style="color: #e74c3c; font-size: 12px;">🔥</span>
             {% endif %}
-            {% if task.owner and task.owner == user or user.is_superuser or is_supervision %}
+            {% if task.owner.id == user.id or user.is_superuser or is_supervision %}
             <div class="task-actions-quick">
                 {% if task.state == 'BACKLOG' %}
                 <button class="btn-quick btn-quick-start" onclick="cambiarEstadoTarea({{ task.id }}, 'IN_PROGRESS', 'BACKLOG', this)">▶️ Iniciar</button>
