@@ -261,7 +261,8 @@ class Command(BaseCommand):
             nombre_tina_corto = srv['servicio_nombre'].split()[-1]
             tarea_existe = Task.objects.filter(
                 reservation_id=str(srv['reserva'].id),
-                title__icontains="Vaciar",
+                title__icontains="Vaciar"
+            ).filter(
                 title__icontains=nombre_tina_corto
             ).exists()
 
