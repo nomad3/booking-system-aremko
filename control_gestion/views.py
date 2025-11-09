@@ -21,9 +21,10 @@ import os
 
 from .models import (
     Task, TaskState, Priority, Swimlane, TaskSource, 
-    ChecklistItem, LocationRef, TaskLog
+    ChecklistItem, LocationRef, TaskLog, DailyReport
 )
 from . import ai
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -693,4 +694,31 @@ def cron_daily_reports(request):
             "ok": False,
             "error": str(e)
         }, status=500)
+
+
+@login_required
+def reportes_diarios(request):
+    """
+    Vista de reportes diarios generados por IA
+    
+    Muestra los últimos reportes matutinos y vespertinos.
+    """
+    # Obtener últimos 7 días de reportes
+    reportes = DailyReport.objects.all().order_by('-date')[:14]
+    
+    # Estadísticas
+    stats = {
+        'total': DailyReport.objects.count(),
+        'ultima_semana': DailyReport.objects.filter(
+            date__gte=timezone.now().date() - timedelta(days=7)
+        ).count()
+    }
+    
+    context = {
+        'reportes': reportes,
+        'stats': stats,
+        'today': timezone.localdate()
+    }
+    
+    return render(request, "control_gestion/reportes_diarios.html", context)
 
