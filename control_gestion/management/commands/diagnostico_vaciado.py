@@ -59,24 +59,32 @@ class Command(BaseCommand):
             ))
             self.stdout.write("   💡 Solución: Crear grupo con Group.objects.create(name='OPERACIONES')\n")
 
-        # 2. Buscar servicios de tinas del día
+        # 2. Buscar servicios de tinas (ACTIVAS - checkin/checkout)
         self.stdout.write("─" * 80)
-        self.stdout.write("2️⃣ BUSCANDO SERVICIOS DE TINAS DEL DÍA")
+        self.stdout.write("2️⃣ BUSCANDO SERVICIOS DE TINAS ACTIVOS (CHECKIN/CHECKOUT)")
         self.stdout.write("─" * 80 + "\n")
 
-        # Buscar reservas activas
-        reservas_hoy = VentaReserva.objects.filter(
-            fecha_reserva=today
+        # Buscar reservas activas (mismo criterio que gen_vaciado_tinas.py)
+        reservas_activas = VentaReserva.objects.filter(
+            estado_reserva__in=['checkin', 'checkout']
         ).prefetch_related('reservaservicios__servicio')
 
-        self.stdout.write(f"   📊 Total reservas hoy: {reservas_hoy.count()}\n")
+        self.stdout.write(f"   📊 Total reservas activas (checkin/checkout): {reservas_activas.count()}")
 
-        # Buscar servicios de tinas
-        servicios_tina_hoy = []
-        for reserva in reservas_hoy:
+        # También buscar reservas pendientes de hoy
+        reservas_pendientes_hoy = VentaReserva.objects.filter(
+            fecha_reserva=today,
+            estado_reserva='pendiente'
+        ).prefetch_related('reservaservicios__servicio').count()
+
+        self.stdout.write(f"   📊 Reservas pendientes hoy: {reservas_pendientes_hoy}\n")
+
+        # Buscar servicios de tinas en reservas activas
+        servicios_tina = []
+        for reserva in reservas_activas:
             for rs in reserva.reservaservicios.all():
                 if rs.servicio and rs.servicio.tipo_servicio == 'tina':
-                    servicios_tina_hoy.append({
+                    servicios_tina.append({
                         'reserva': reserva,
                         'rs': rs,
                         'servicio_nombre': rs.servicio.nombre,
@@ -85,11 +93,11 @@ class Command(BaseCommand):
                         'estado_reserva': reserva.estado_reserva
                     })
 
-        self.stdout.write(f"   🛁 Servicios de TINAS hoy: {len(servicios_tina_hoy)}")
+        self.stdout.write(f"   🛁 Servicios de TINAS activos: {len(servicios_tina)}")
 
-        if servicios_tina_hoy:
+        if servicios_tina:
             self.stdout.write("\n   📋 Detalle de servicios de tinas:\n")
-            for srv in servicios_tina_hoy:
+            for srv in servicios_tina:
                 # Normalizar hora
                 hora_str = str(srv['hora_inicio']).strip()
                 hora_str = hora_str.replace(';', ':').replace('.', ':')
@@ -148,7 +156,7 @@ class Command(BaseCommand):
         )
 
         servicios_para_vaciar = []
-        for srv in servicios_tina_hoy:
+        for srv in servicios_tina:
             hora_str = str(srv['hora_inicio']).strip().replace(';', ':').replace('.', ':')
 
             if ':' not in hora_str:
@@ -249,10 +257,10 @@ class Command(BaseCommand):
             })
 
         # Verificar servicios de tina
-        if not servicios_tina_hoy:
+        if not servicios_tina:
             problemas.append({
-                'problema': 'No hay servicios de tinas programados para hoy',
-                'solucion': 'Esto es normal si no hay reservas de tinas hoy'
+                'problema': 'No hay servicios de tinas activos (checkin/checkout)',
+                'solucion': 'Cambiar estado de reservas a "checkin" cuando el servicio comience'
             })
 
         # Verificar servicios terminados sin tarea
@@ -276,8 +284,8 @@ class Command(BaseCommand):
             })
 
         # Verificar estado de reservas
-        reservas_pendiente = [s for s in servicios_tina_hoy if s['estado_reserva'] == 'pendiente']
-        if len(reservas_pendiente) == len(servicios_tina_hoy) and servicios_tina_hoy:
+        reservas_pendiente = [s for s in servicios_tina if s['estado_reserva'] == 'pendiente']
+        if len(reservas_pendiente) == len(servicios_tina) and servicios_tina:
             problemas.append({
                 'problema': 'Todas las reservas de tinas están en estado "pendiente"',
                 'solucion': 'Cambiar a "checkin" o "checkout" cuando el servicio esté en curso o termine'
@@ -298,7 +306,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("📋 RESUMEN"))
         self.stdout.write("=" * 80 + "\n")
 
-        self.stdout.write(f"   🛁 Servicios de tinas hoy: {len(servicios_tina_hoy)}")
+        self.stdout.write(f"   🛁 Servicios de tinas activos: {len(servicios_tina)}")
         self.stdout.write(f"   ✅ Servicios terminados: {len(servicios_para_vaciar)}")
         self.stdout.write(f"   📝 Tareas de vaciado creadas hoy: {tareas_vaciado_hoy.count()}")
         self.stdout.write(f"   ⚠️  Problemas detectados: {len(problemas)}")
