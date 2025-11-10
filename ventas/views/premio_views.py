@@ -287,8 +287,8 @@ def clientes_con_premios(request):
     estado_filter = request.GET.get('estado', '')
     tipo_filter = request.GET.get('tipo', '')
 
-    # Query base
-    premios = ClientePremio.objects.select_related('cliente', 'premio').order_by('-fecha_ganado')
+    # Query base - ordenado por ID descendente (más recientes primero)
+    premios = ClientePremio.objects.select_related('cliente', 'premio').order_by('-id')
 
     if estado_filter:
         premios = premios.filter(estado=estado_filter)
