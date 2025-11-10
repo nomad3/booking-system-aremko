@@ -301,6 +301,7 @@
         <table>
             <thead>
                 <tr>
+                    <th>ID</th>
                     <th>CLIENTE</th>
                     <th>ACCIONES</th>
                     <th>WHATSAPP</th>
@@ -314,6 +315,7 @@
             <tbody>
                 {% for cliente_premio in clientes_premios %}
                 <tr>
+                    <td><strong>#{{ cliente_premio.id }}</strong></td>
                     <td>
                         <div class="cliente-info">{{ cliente_premio.cliente.nombre|truncatewords:3 }}</div>
                         <div class="telefono">{{ cliente_premio.cliente.telefono }}</div>
@@ -353,7 +355,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="no-results">
+                    <td colspan="9" class="no-results">
                         No se encontraron clientes con premios
                     </td>
                 </tr>
