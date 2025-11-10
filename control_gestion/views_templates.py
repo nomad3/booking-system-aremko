@@ -56,7 +56,13 @@ def plantillas_crear(request):
             swimlane = request.POST.get('swimlane')
             priority = request.POST.get('priority', 'NORMAL')
             asignar_a_grupo = request.POST.get('asignar_a_grupo')
-            
+
+            # Asignar a usuario específico
+            asignar_a_usuario = None
+            usuario_id = request.POST.get('asignar_a_usuario')
+            if usuario_id:
+                asignar_a_usuario = User.objects.get(id=usuario_id)
+
             # Días de la semana (checkboxes)
             dias_activa = []
             for i in range(7):
@@ -74,6 +80,7 @@ def plantillas_crear(request):
                 priority=priority,
                 dias_activa=dias_activa,
                 asignar_a_grupo=asignar_a_grupo,
+                asignar_a_usuario=asignar_a_usuario,
                 solo_martes=solo_martes,
                 activa=activa
             )
@@ -85,10 +92,14 @@ def plantillas_crear(request):
             messages.error(request, f'❌ Error al crear plantilla: {str(e)}')
     
     # GET - mostrar formulario
+    # Obtener todos los usuarios para el dropdown
+    usuarios = User.objects.all().order_by('username')
+
     context = {
         'swimlanes': Swimlane.choices,
         'priorities': Priority.choices,
         'grupos': ['OPERACIONES', 'RECEPCION', 'VENTAS', 'ATENCION', 'SUPERVISION', 'MUCAMA'],
+        'usuarios': usuarios,
         'dias_semana': [
             (0, 'Lunes'),
             (1, 'Martes'),
@@ -117,7 +128,14 @@ def plantillas_editar(request, plantilla_id):
             plantilla.swimlane = request.POST.get('swimlane')
             plantilla.priority = request.POST.get('priority')
             plantilla.asignar_a_grupo = request.POST.get('asignar_a_grupo')
-            
+
+            # Asignar a usuario específico
+            usuario_id = request.POST.get('asignar_a_usuario')
+            if usuario_id:
+                plantilla.asignar_a_usuario = User.objects.get(id=usuario_id)
+            else:
+                plantilla.asignar_a_usuario = None
+
             # Días
             dias_activa = []
             for i in range(7):
@@ -136,11 +154,15 @@ def plantillas_editar(request, plantilla_id):
         except Exception as e:
             messages.error(request, f'❌ Error: {str(e)}')
     
+    # Obtener todos los usuarios para el dropdown
+    usuarios = User.objects.all().order_by('username')
+
     context = {
         'plantilla': plantilla,
         'swimlanes': Swimlane.choices,
         'priorities': Priority.choices,
         'grupos': ['OPERACIONES', 'RECEPCION', 'VENTAS', 'ATENCION', 'SUPERVISION', 'MUCAMA'],
+        'usuarios': usuarios,
         'dias_semana': [
             (0, 'Lunes'),
             (1, 'Martes'),

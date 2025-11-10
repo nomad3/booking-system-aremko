@@ -39,15 +39,33 @@
         </div>
         
         <div class="form-group">
-            <label for="asignar_a_grupo">Asignar a Grupo *</label>
+            <label for="asignar_a_grupo">Asignar a Grupo</label>
             <select id="asignar_a_grupo" name="asignar_a_grupo">
                 <option value="">-- Seleccionar grupo --</option>
                 {% for grupo in grupos %}
                 <option value="{{ grupo }}" {% if plantilla.asignar_a_grupo == grupo %}selected{% endif %}>{{ grupo }}</option>
                 {% endfor %}
             </select>
+            <small style="display: block; margin-top: 5px; color: #666;">
+                Si seleccionas un usuario específico abajo, se ignorará el grupo.
+            </small>
         </div>
-        
+
+        <div class="form-group">
+            <label for="asignar_a_usuario">Asignar a Usuario Específico</label>
+            <select id="asignar_a_usuario" name="asignar_a_usuario">
+                <option value="">-- Usar grupo (arriba) --</option>
+                {% for usuario in usuarios %}
+                <option value="{{ usuario.id }}" {% if plantilla.asignar_a_usuario and plantilla.asignar_a_usuario.id == usuario.id %}selected{% endif %}>
+                    {{ usuario.username }}{% if usuario.first_name %} ({{ usuario.first_name }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+            <small style="display: block; margin-top: 5px; color: #666;">
+                Opcional: Selecciona un usuario específico para asignarle directamente las tareas.
+            </small>
+        </div>
+
         <div class="form-group">
             <label>Días de la Semana en que Se Genera *</label>
             <div class="checkbox-group">
