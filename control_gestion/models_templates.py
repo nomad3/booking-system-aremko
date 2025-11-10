@@ -169,6 +169,24 @@ class TaskTemplate(models.Model):
     def get_dias_str(self):
         """Retorna string con descripción de frecuencia (ej: 'Lun-Vie', 'Mensual día 1', etc.)"""
 
+        # Protección contra frecuencia=NULL (legacy data)
+        if not self.frecuencia:
+            if not self.dias_activa:
+                return "Sin días"
+
+            dias_nombres = {0: 'Lun', 1: 'Mar', 2: 'Mié', 3: 'Jue', 4: 'Vie', 5: 'Sáb', 6: 'Dom'}
+
+            # Si es lun-vie (0,1,2,3,4)
+            if sorted(self.dias_activa) == [0, 1, 2, 3, 4]:
+                return "Lun-Vie"
+
+            # Si son todos los días
+            if len(self.dias_activa) == 7:
+                return "Todos los días"
+
+            # Mostrar días individuales
+            return ", ".join([dias_nombres.get(d, str(d)) for d in sorted(self.dias_activa)])
+
         # ===== FRECUENCIA DIARIA =====
         if self.frecuencia == self.Frecuencia.DIARIA:
             if not self.dias_activa:
@@ -237,6 +255,19 @@ class TaskTemplate(models.Model):
 
         today = timezone.localdate()
         dia_semana = today.weekday()  # 0=lunes, 1=martes, etc.
+
+        # Protección contra frecuencia=NULL (legacy data) - comportamiento por defecto DIARIA
+        if not self.frecuencia:
+            # Si es solo martes y hoy es martes
+            if self.solo_martes:
+                return dia_semana == 1
+
+            # Si hoy NO es martes y la tarea NO es solo_martes
+            if dia_semana == 1 and not self.solo_martes:
+                return False  # Martes = no rutinas normales
+
+            # Verificar si hoy está en la lista de días
+            return dia_semana in self.dias_activa
 
         # ===== FRECUENCIA DIARIA =====
         if self.frecuencia == self.Frecuencia.DIARIA:
