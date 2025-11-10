@@ -54,6 +54,7 @@
             <table class="table table-striped">
                 <thead>
                     <tr>
+                        <th>ID</th>
                         <th>Cliente</th>
                         <th>Premio</th>
                         <th>Tipo</th>
@@ -66,6 +67,7 @@
                 <tbody>
                     {% for premio in premios %}
                     <tr>
+                        <td><strong>#{{ premio.id }}</strong></td>
                         <td>
                             <strong>{{ premio.cliente.nombre }}</strong><br>
                             <small>{{ premio.cliente.telefono }}</small>
@@ -85,7 +87,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center">No hay premios que mostrar</td>
+                        <td colspan="8" class="text-center">No hay premios que mostrar</td>
                     </tr>
                     {% endfor %}
                 </tbody>
