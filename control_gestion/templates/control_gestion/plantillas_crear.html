@@ -76,6 +76,43 @@
         font-size: 16px;
     }
 </style>
+
+<script>
+function toggleFrequencyFields() {
+    const frecuencia = document.getElementById('frecuencia').value;
+
+    // Campos para DIARIA
+    const groupDiasSemana = document.getElementById('group_dias_semana');
+    const groupSoloMartes = document.getElementById('group_solo_martes');
+
+    // Campos para MENSUAL/TRIMESTRAL/SEMESTRAL/ANUAL
+    const groupDiaDelMes = document.getElementById('group_dia_del_mes');
+    const groupMesInicio = document.getElementById('group_mes_inicio');
+
+    // Ocultar todos primero
+    groupDiasSemana.style.display = 'none';
+    groupSoloMartes.style.display = 'none';
+    groupDiaDelMes.style.display = 'none';
+    groupMesInicio.style.display = 'none';
+
+    // Mostrar según frecuencia
+    if (frecuencia === 'DIARIA') {
+        groupDiasSemana.style.display = 'block';
+        groupSoloMartes.style.display = 'block';
+    } else if (frecuencia === 'MENSUAL') {
+        groupDiaDelMes.style.display = 'block';
+    } else if (frecuencia === 'TRIMESTRAL' || frecuencia === 'SEMESTRAL' || frecuencia === 'ANUAL') {
+        groupDiaDelMes.style.display = 'block';
+        groupMesInicio.style.display = 'block';
+    }
+}
+
+// Ejecutar al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    toggleFrequencyFields();
+});
+</script>
+
 {% endblock %}
 
 {% block content %}
@@ -147,6 +184,19 @@
         </div>
 
         <div class="form-group">
+            <label for="frecuencia">Frecuencia de Repetición *</label>
+            <select id="frecuencia" name="frecuencia" onchange="toggleFrequencyFields()">
+                <option value="DIARIA" selected>Diaria (ciertos días de semana)</option>
+                <option value="SEMANAL">Semanal (cada N semanas)</option>
+                <option value="MENSUAL">Mensual (cierto día del mes)</option>
+                <option value="TRIMESTRAL">Trimestral (cada 3 meses)</option>
+                <option value="SEMESTRAL">Semestral (cada 6 meses)</option>
+                <option value="ANUAL">Anual (una vez al año)</option>
+            </select>
+            <div class="help-text">Con qué frecuencia se repite esta tarea</div>
+        </div>
+
+        <div class="form-group" id="group_dias_semana">
             <label>Días de la Semana en que Se Genera *</label>
             <div class="checkbox-group">
                 {% for dia_num, dia_nombre in dias_semana %}
@@ -159,13 +209,36 @@
             </div>
             <div class="help-text">Marca los días en que esta tarea debe generarse automáticamente</div>
         </div>
-        
-        <div class="form-group">
+
+        <div class="form-group" id="group_solo_martes">
             <div class="checkbox-item">
                 <input type="checkbox" id="solo_martes" name="solo_martes">
                 <label for="solo_martes" style="margin: 0;">⚠️ Tarea SOLO de Martes (mantención especial)</label>
             </div>
             <div class="help-text">Si marcas esto, SOLO se generará los martes (ignora otros días)</div>
+        </div>
+
+        <div class="form-group" id="group_dia_del_mes" style="display: none;">
+            <label for="dia_del_mes">Día del Mes *</label>
+            <select id="dia_del_mes" name="dia_del_mes">
+                <option value="">-- Seleccionar día --</option>
+                <option value="0">Último día del mes</option>
+                {% for dia in dias_mes %}
+                <option value="{{ dia }}">{{ dia }}</option>
+                {% endfor %}
+            </select>
+            <div class="help-text">Día del mes en que se genera (1-31, o último día)</div>
+        </div>
+
+        <div class="form-group" id="group_mes_inicio" style="display: none;">
+            <label for="mes_inicio">Mes de Inicio del Ciclo *</label>
+            <select id="mes_inicio" name="mes_inicio">
+                <option value="">-- Seleccionar mes --</option>
+                {% for mes_num, mes_nombre in meses %}
+                <option value="{{ mes_num }}">{{ mes_nombre }}</option>
+                {% endfor %}
+            </select>
+            <div class="help-text">Mes en que comienza el ciclo de repetición</div>
         </div>
         
         <div class="form-group">

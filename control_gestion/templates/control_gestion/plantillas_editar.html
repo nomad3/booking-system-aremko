@@ -67,6 +67,19 @@
         </div>
 
         <div class="form-group">
+            <label for="frecuencia">Frecuencia de Repetición *</label>
+            <select id="frecuencia" name="frecuencia" onchange="toggleFrequencyFields()">
+                <option value="DIARIA" {% if plantilla.frecuencia == 'DIARIA' %}selected{% endif %}>Diaria (ciertos días de semana)</option>
+                <option value="SEMANAL" {% if plantilla.frecuencia == 'SEMANAL' %}selected{% endif %}>Semanal (cada N semanas)</option>
+                <option value="MENSUAL" {% if plantilla.frecuencia == 'MENSUAL' %}selected{% endif %}>Mensual (cierto día del mes)</option>
+                <option value="TRIMESTRAL" {% if plantilla.frecuencia == 'TRIMESTRAL' %}selected{% endif %}>Trimestral (cada 3 meses)</option>
+                <option value="SEMESTRAL" {% if plantilla.frecuencia == 'SEMESTRAL' %}selected{% endif %}>Semestral (cada 6 meses)</option>
+                <option value="ANUAL" {% if plantilla.frecuencia == 'ANUAL' %}selected{% endif %}>Anual (una vez al año)</option>
+            </select>
+            <div class="help-text">Con qué frecuencia se repite esta tarea</div>
+        </div>
+
+        <div class="form-group" id="group_dias_semana">
             <label>Días de la Semana en que Se Genera *</label>
             <div class="checkbox-group">
                 {% for dia_num, dia_nombre in dias_semana %}
@@ -78,13 +91,36 @@
                 {% endfor %}
             </div>
         </div>
-        
-        <div class="form-group">
+
+        <div class="form-group" id="group_solo_martes">
             <div class="checkbox-item">
                 <input type="checkbox" id="solo_martes" name="solo_martes"
                        {% if plantilla.solo_martes %}checked{% endif %}>
                 <label for="solo_martes" style="margin: 0;">⚠️ Tarea SOLO de Martes</label>
             </div>
+        </div>
+
+        <div class="form-group" id="group_dia_del_mes" style="display: none;">
+            <label for="dia_del_mes">Día del Mes *</label>
+            <select id="dia_del_mes" name="dia_del_mes">
+                <option value="">-- Seleccionar día --</option>
+                <option value="0" {% if plantilla.dia_del_mes == 0 %}selected{% endif %}>Último día del mes</option>
+                {% for dia in dias_mes %}
+                <option value="{{ dia }}" {% if plantilla.dia_del_mes == dia %}selected{% endif %}>{{ dia }}</option>
+                {% endfor %}
+            </select>
+            <div class="help-text">Día del mes en que se genera (1-31, o último día)</div>
+        </div>
+
+        <div class="form-group" id="group_mes_inicio" style="display: none;">
+            <label for="mes_inicio">Mes de Inicio del Ciclo *</label>
+            <select id="mes_inicio" name="mes_inicio">
+                <option value="">-- Seleccionar mes --</option>
+                {% for mes_num, mes_nombre in meses %}
+                <option value="{{ mes_num }}" {% if plantilla.mes_inicio == mes_num %}selected{% endif %}>{{ mes_nombre }}</option>
+                {% endfor %}
+            </select>
+            <div class="help-text">Mes en que comienza el ciclo de repetición</div>
         </div>
         
         <div class="form-group">

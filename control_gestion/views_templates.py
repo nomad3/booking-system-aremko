@@ -63,22 +63,37 @@ def plantillas_crear(request):
             if usuario_id:
                 asignar_a_usuario = User.objects.get(id=usuario_id)
 
-            # Días de la semana (checkboxes)
+            # Frecuencia
+            frecuencia = request.POST.get('frecuencia', 'DIARIA')
+
+            # Días de la semana (solo para DIARIA)
             dias_activa = []
-            for i in range(7):
-                if request.POST.get(f'dia_{i}'):
-                    dias_activa.append(i)
-            
+            if frecuencia == 'DIARIA':
+                for i in range(7):
+                    if request.POST.get(f'dia_{i}'):
+                        dias_activa.append(i)
+
             solo_martes = request.POST.get('solo_martes') == 'on'
             activa = request.POST.get('activa', 'on') == 'on'
-            
+
+            # Día del mes (para MENSUAL/TRIMESTRAL/SEMESTRAL/ANUAL)
+            dia_del_mes = request.POST.get('dia_del_mes')
+            dia_del_mes = int(dia_del_mes) if dia_del_mes else None
+
+            # Mes de inicio (para TRIMESTRAL/SEMESTRAL/ANUAL)
+            mes_inicio = request.POST.get('mes_inicio')
+            mes_inicio = int(mes_inicio) if mes_inicio else None
+
             # Crear plantilla
             plantilla = TaskTemplate.objects.create(
                 title_template=title,
                 description=description,
                 swimlane=swimlane,
                 priority=priority,
+                frecuencia=frecuencia,
                 dias_activa=dias_activa,
+                dia_del_mes=dia_del_mes,
+                mes_inicio=mes_inicio,
                 asignar_a_grupo=asignar_a_grupo,
                 asignar_a_usuario=asignar_a_usuario,
                 solo_martes=solo_martes,
@@ -108,6 +123,13 @@ def plantillas_crear(request):
             (4, 'Viernes'),
             (5, 'Sábado'),
             (6, 'Domingo'),
+        ],
+        'dias_mes': range(1, 32),  # 1-31
+        'meses': [
+            (1, 'Enero'), (2, 'Febrero'), (3, 'Marzo'),
+            (4, 'Abril'), (5, 'Mayo'), (6, 'Junio'),
+            (7, 'Julio'), (8, 'Agosto'), (9, 'Septiembre'),
+            (10, 'Octubre'), (11, 'Noviembre'), (12, 'Diciembre'),
         ]
     }
     
@@ -136,16 +158,29 @@ def plantillas_editar(request, plantilla_id):
             else:
                 plantilla.asignar_a_usuario = None
 
-            # Días
+            # Frecuencia
+            frecuencia = request.POST.get('frecuencia', 'DIARIA')
+            plantilla.frecuencia = frecuencia
+
+            # Días (solo para DIARIA)
             dias_activa = []
-            for i in range(7):
-                if request.POST.get(f'dia_{i}'):
-                    dias_activa.append(i)
+            if frecuencia == 'DIARIA':
+                for i in range(7):
+                    if request.POST.get(f'dia_{i}'):
+                        dias_activa.append(i)
             plantilla.dias_activa = dias_activa
-            
+
             plantilla.solo_martes = request.POST.get('solo_martes') == 'on'
             plantilla.activa = request.POST.get('activa', 'on') == 'on'
-            
+
+            # Día del mes (para MENSUAL/TRIMESTRAL/SEMESTRAL/ANUAL)
+            dia_del_mes = request.POST.get('dia_del_mes')
+            plantilla.dia_del_mes = int(dia_del_mes) if dia_del_mes else None
+
+            # Mes de inicio (para TRIMESTRAL/SEMESTRAL/ANUAL)
+            mes_inicio = request.POST.get('mes_inicio')
+            plantilla.mes_inicio = int(mes_inicio) if mes_inicio else None
+
             plantilla.save()
             
             messages.success(request, f'✅ Plantilla "{plantilla.title_template}" actualizada')
@@ -171,6 +206,13 @@ def plantillas_editar(request, plantilla_id):
             (4, 'Viernes'),
             (5, 'Sábado'),
             (6, 'Domingo'),
+        ],
+        'dias_mes': range(1, 32),  # 1-31
+        'meses': [
+            (1, 'Enero'), (2, 'Febrero'), (3, 'Marzo'),
+            (4, 'Abril'), (5, 'Mayo'), (6, 'Junio'),
+            (7, 'Julio'), (8, 'Agosto'), (9, 'Septiembre'),
+            (10, 'Octubre'), (11, 'Noviembre'), (12, 'Diciembre'),
         ]
     }
     
