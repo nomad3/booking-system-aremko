@@ -15,10 +15,24 @@ User = get_user_model()
 class TaskTemplate(models.Model):
     """
     Plantilla para tareas recurrentes
-    
-    Ejemplo: "Apertura AM - limpieza tinas" se repite lun-vie
+
+    Soporta múltiples frecuencias:
+    - DIARIA: Se repite ciertos días de la semana
+    - SEMANAL: Se repite cada N semanas
+    - MENSUAL: Se repite cierto día del mes
+    - TRIMESTRAL: Se repite cada 3 meses
+    - SEMESTRAL: Se repite cada 6 meses
+    - ANUAL: Se repite una vez al año
     """
-    
+
+    class Frecuencia(models.TextChoices):
+        DIARIA = 'DIARIA', 'Diaria (ciertos días de semana)'
+        SEMANAL = 'SEMANAL', 'Semanal (cada N semanas)'
+        MENSUAL = 'MENSUAL', 'Mensual (cierto día del mes)'
+        TRIMESTRAL = 'TRIMESTRAL', 'Trimestral (cada 3 meses)'
+        SEMESTRAL = 'SEMESTRAL', 'Semestral (cada 6 meses)'
+        ANUAL = 'ANUAL', 'Anual (una vez al año)'
+
     DIAS_SEMANA = [
         (0, 'Lunes'),
         (1, 'Martes'),
@@ -27,6 +41,21 @@ class TaskTemplate(models.Model):
         (4, 'Viernes'),
         (5, 'Sábado'),
         (6, 'Domingo'),
+    ]
+
+    MESES = [
+        (1, 'Enero'),
+        (2, 'Febrero'),
+        (3, 'Marzo'),
+        (4, 'Abril'),
+        (5, 'Mayo'),
+        (6, 'Junio'),
+        (7, 'Julio'),
+        (8, 'Agosto'),
+        (9, 'Septiembre'),
+        (10, 'Octubre'),
+        (11, 'Noviembre'),
+        (12, 'Diciembre'),
     ]
     
     # Información de la tarea
@@ -56,14 +85,48 @@ class TaskTemplate(models.Model):
         default=1,
         verbose_name="Posición en cola"
     )
-    
-    # Días de la semana que aplica (JSONField con lista de días)
+
+    # ===== FRECUENCIA Y PERIODICIDAD =====
+    frecuencia = models.CharField(
+        max_length=12,
+        choices=Frecuencia.choices,
+        default=Frecuencia.DIARIA,
+        verbose_name="Frecuencia",
+        help_text="Con qué frecuencia se repite esta tarea"
+    )
+
+    # Para tareas DIARIAS: días de la semana que aplica (JSONField con lista de días)
     dias_activa = models.JSONField(
         default=list,
         verbose_name="Días activa",
-        help_text="Lista de días de semana: [0,1,2,3,4] = Lun-Vie, [1] = Solo martes"
+        help_text="Solo para frecuencia DIARIA: [0,1,2,3,4] = Lun-Vie, [1] = Solo martes"
     )
-    
+
+    # Para tareas MENSUALES/TRIMESTRALES/SEMESTRALES/ANUALES: día del mes
+    dia_del_mes = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Día del mes",
+        help_text="Para frecuencias MENSUAL/TRIMESTRAL/SEMESTRAL/ANUAL: día del mes (1-31, 0 = último día)"
+    )
+
+    # Para tareas TRIMESTRALES/SEMESTRALES/ANUALES: mes de inicio
+    mes_inicio = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        choices=MESES,
+        verbose_name="Mes de inicio",
+        help_text="Para TRIMESTRAL/SEMESTRAL/ANUAL: mes en que comienza el ciclo"
+    )
+
+    # Control de última generación (para evitar duplicados)
+    ultima_generacion = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Última generación",
+        help_text="Fecha en que se generó la última tarea (control interno)"
+    )
+
     # Asignación
     asignar_a_grupo = models.CharField(
         max_length=50,
@@ -104,42 +167,165 @@ class TaskTemplate(models.Model):
         return f"[{self.get_swimlane_display()}] {self.title_template} ({dias_str})"
     
     def get_dias_str(self):
-        """Retorna string con días (ej: 'Lun-Vie', 'Mar', etc.)"""
-        if not self.dias_activa:
-            return "Sin días"
-        
-        if self.solo_martes:
-            return "Solo Martes"
-        
-        dias_nombres = {0: 'Lun', 1: 'Mar', 2: 'Mié', 3: 'Jue', 4: 'Vie', 5: 'Sáb', 6: 'Dom'}
-        
-        # Si es lun-vie (0,1,2,3,4)
-        if sorted(self.dias_activa) == [0, 1, 2, 3, 4]:
-            return "Lun-Vie"
-        
-        # Si son todos los días
-        if len(self.dias_activa) == 7:
-            return "Todos los días"
-        
-        # Mostrar días individuales
-        return ", ".join([dias_nombres.get(d, str(d)) for d in sorted(self.dias_activa)])
+        """Retorna string con descripción de frecuencia (ej: 'Lun-Vie', 'Mensual día 1', etc.)"""
+
+        # ===== FRECUENCIA DIARIA =====
+        if self.frecuencia == self.Frecuencia.DIARIA:
+            if not self.dias_activa:
+                return "Sin días"
+
+            if self.solo_martes:
+                return "Solo Martes"
+
+            dias_nombres = {0: 'Lun', 1: 'Mar', 2: 'Mié', 3: 'Jue', 4: 'Vie', 5: 'Sáb', 6: 'Dom'}
+
+            # Si es lun-vie (0,1,2,3,4)
+            if sorted(self.dias_activa) == [0, 1, 2, 3, 4]:
+                return "Lun-Vie"
+
+            # Si son todos los días
+            if len(self.dias_activa) == 7:
+                return "Todos los días"
+
+            # Mostrar días individuales
+            return ", ".join([dias_nombres.get(d, str(d)) for d in sorted(self.dias_activa)])
+
+        # ===== FRECUENCIA MENSUAL =====
+        elif self.frecuencia == self.Frecuencia.MENSUAL:
+            if not self.dia_del_mes:
+                return "Mensual (sin día configurado)"
+            if self.dia_del_mes == 0:
+                return "Mensual - último día"
+            return f"Mensual - día {self.dia_del_mes}"
+
+        # ===== FRECUENCIA TRIMESTRAL =====
+        elif self.frecuencia == self.Frecuencia.TRIMESTRAL:
+            if not self.dia_del_mes or not self.mes_inicio:
+                return "Trimestral (sin configurar)"
+            mes_nombre = dict(self.MESES).get(self.mes_inicio, str(self.mes_inicio))
+            return f"Trimestral - día {self.dia_del_mes} (inicia {mes_nombre})"
+
+        # ===== FRECUENCIA SEMESTRAL =====
+        elif self.frecuencia == self.Frecuencia.SEMESTRAL:
+            if not self.dia_del_mes or not self.mes_inicio:
+                return "Semestral (sin configurar)"
+            mes_nombre = dict(self.MESES).get(self.mes_inicio, str(self.mes_inicio))
+            return f"Semestral - día {self.dia_del_mes} (inicia {mes_nombre})"
+
+        # ===== FRECUENCIA ANUAL =====
+        elif self.frecuencia == self.Frecuencia.ANUAL:
+            if not self.dia_del_mes or not self.mes_inicio:
+                return "Anual (sin configurar)"
+            mes_nombre = dict(self.MESES).get(self.mes_inicio, str(self.mes_inicio))
+            return f"Anual - {self.dia_del_mes} de {mes_nombre}"
+
+        return str(self.frecuencia)
     
     def aplica_hoy(self):
-        """Verifica si esta plantilla aplica para el día actual"""
+        """
+        Verifica si esta plantilla aplica para el día actual
+
+        Soporta múltiples frecuencias:
+        - DIARIA: Verifica días de semana
+        - MENSUAL: Verifica día del mes
+        - TRIMESTRAL: Verifica si es tiempo de generar (cada 3 meses)
+        - SEMESTRAL: Verifica si es tiempo de generar (cada 6 meses)
+        - ANUAL: Verifica si es el mes y día configurado
+        """
         from django.utils import timezone
+        from dateutil.relativedelta import relativedelta
+
         today = timezone.localdate()
         dia_semana = today.weekday()  # 0=lunes, 1=martes, etc.
-        
-        # Si es solo martes y hoy es martes
-        if self.solo_martes:
-            return dia_semana == 1
-        
-        # Si hoy NO es martes y la tarea NO es solo_martes
-        if dia_semana == 1 and not self.solo_martes:
-            return False  # Martes = no rutinas normales
-        
-        # Verificar si hoy está en la lista de días
-        return dia_semana in self.dias_activa
+
+        # ===== FRECUENCIA DIARIA =====
+        if self.frecuencia == self.Frecuencia.DIARIA:
+            # Si es solo martes y hoy es martes
+            if self.solo_martes:
+                return dia_semana == 1
+
+            # Si hoy NO es martes y la tarea NO es solo_martes
+            if dia_semana == 1 and not self.solo_martes:
+                return False  # Martes = no rutinas normales
+
+            # Verificar si hoy está en la lista de días
+            return dia_semana in self.dias_activa
+
+        # ===== FRECUENCIA MENSUAL =====
+        elif self.frecuencia == self.Frecuencia.MENSUAL:
+            if not self.dia_del_mes:
+                return False
+
+            # Día 0 = último día del mes
+            if self.dia_del_mes == 0:
+                import calendar
+                ultimo_dia = calendar.monthrange(today.year, today.month)[1]
+                return today.day == ultimo_dia
+
+            # Verificar si hoy es el día configurado
+            return today.day == self.dia_del_mes
+
+        # ===== FRECUENCIA TRIMESTRAL =====
+        elif self.frecuencia == self.Frecuencia.TRIMESTRAL:
+            if not self.dia_del_mes or not self.mes_inicio:
+                return False
+
+            # Verificar si hoy es el día configurado
+            if today.day != self.dia_del_mes:
+                return False
+
+            # Calcular si es un mes trimestral desde mes_inicio
+            # Ej: mes_inicio=1 (Enero) → genera en Enero, Abril, Julio, Octubre
+            meses_desde_inicio = (today.month - self.mes_inicio) % 12
+            if meses_desde_inicio % 3 != 0:
+                return False
+
+            # Verificar que no se haya generado ya este mes
+            if self.ultima_generacion:
+                if self.ultima_generacion.year == today.year and self.ultima_generacion.month == today.month:
+                    return False  # Ya se generó este mes
+
+            return True
+
+        # ===== FRECUENCIA SEMESTRAL =====
+        elif self.frecuencia == self.Frecuencia.SEMESTRAL:
+            if not self.dia_del_mes or not self.mes_inicio:
+                return False
+
+            # Verificar si hoy es el día configurado
+            if today.day != self.dia_del_mes:
+                return False
+
+            # Calcular si es un mes semestral desde mes_inicio
+            # Ej: mes_inicio=1 (Enero) → genera en Enero y Julio
+            meses_desde_inicio = (today.month - self.mes_inicio) % 12
+            if meses_desde_inicio % 6 != 0:
+                return False
+
+            # Verificar que no se haya generado ya este mes
+            if self.ultima_generacion:
+                if self.ultima_generacion.year == today.year and self.ultima_generacion.month == today.month:
+                    return False
+
+            return True
+
+        # ===== FRECUENCIA ANUAL =====
+        elif self.frecuencia == self.Frecuencia.ANUAL:
+            if not self.dia_del_mes or not self.mes_inicio:
+                return False
+
+            # Verificar si hoy es el mes y día configurado
+            if today.month != self.mes_inicio or today.day != self.dia_del_mes:
+                return False
+
+            # Verificar que no se haya generado ya este año
+            if self.ultima_generacion:
+                if self.ultima_generacion.year == today.year:
+                    return False
+
+            return True
+
+        return False
     
     def generar_tarea(self, fecha=None):
         """
@@ -184,7 +370,12 @@ class TaskTemplate(models.Model):
             queue_position=self.queue_position,
             source=TaskSource.RUTINA
         )
-        
+
+        # Actualizar última generación (para tareas no diarias)
+        if self.frecuencia != self.Frecuencia.DIARIA:
+            self.ultima_generacion = fecha
+            self.save(update_fields=['ultima_generacion'])
+
         return task
 
 
