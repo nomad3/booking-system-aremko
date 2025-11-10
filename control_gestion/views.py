@@ -104,21 +104,21 @@ def cambiar_estado_tarea(request, task_id):
 @login_required
 def mi_dia(request):
     """
-    Vista "Mi Día" - Muestra las tareas top del usuario logueado
-    
+    Vista "Mi Día" - Muestra las tareas del usuario logueado
+
     Características:
     - Solo tareas del usuario actual
     - Excluye tareas DONE
     - Ordenadas por swimlane, cola, promesa
-    - Límite de 3 tareas top (enfoque)
+    - Muestra todas las tareas pendientes (sin límite)
     """
-    
+
     tasks = (
         Task.objects
         .filter(owner=request.user)
         .exclude(state=TaskState.DONE)
         .order_by("swimlane", "queue_position", "promise_due_at", "created_at")
-    )[:3]
+    )
     
     context = {
         'tasks': tasks,
