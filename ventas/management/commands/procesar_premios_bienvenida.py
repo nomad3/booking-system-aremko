@@ -8,6 +8,7 @@ from datetime import timedelta
 from ventas.models import Cliente, ReservaServicio, ClientePremio
 from ventas.services.premio_service import PremioService
 from ventas.services.tramo_service import TramoService
+from ventas.services.crm_service import CRMService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -90,13 +91,15 @@ class Command(BaseCommand):
             stats['clientes_evaluados'] += 1
 
             try:
-                # ⭐ VERIFICACIÓN CRÍTICA: ¿Es cliente NUEVO? (considera históricos)
-                es_cliente_nuevo = TramoService.es_cliente_nuevo(cliente)
+                # ⭐ VERIFICACIÓN CRÍTICA: ¿Es primera reserva? (considera históricos)
+                # Un cliente puede tener múltiples servicios en su primera reserva
+                datos_360 = CRMService.get_customer_360(cliente.id)
+                servicios_historicos = datos_360['metricas']['servicios_historicos']
 
-                if not es_cliente_nuevo:
+                if servicios_historicos > 0:
                     stats['no_es_primera_reserva'] += 1
                     self.stdout.write(
-                        f"  ⏭️  {cliente.nombre[:40]:<40} - No es cliente nuevo (tiene servicios previos)"
+                        f"  ⏭️  {cliente.nombre[:40]:<40} - No es primera reserva (tiene {servicios_historicos} servicios históricos)"
                     )
                     continue
 
@@ -200,7 +203,8 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING("📌 NOTAS IMPORTANTES:"))
         self.stdout.write("   • Este comando debe ejecutarse diariamente")
         self.stdout.write("   • Procesa clientes con check-in hace 3 días (configurable con --dias)")
-        self.stdout.write("   • Solo genera premios para clientes NUEVOS (sin servicios previos)")
-        self.stdout.write("   • ✅ CONSIDERA servicios históricos (usa TramoService.es_cliente_nuevo)")
+        self.stdout.write("   • Solo genera premios para clientes en su PRIMERA RESERVA")
+        self.stdout.write("   • ✅ Cliente puede tener múltiples servicios en esa primera reserva")
+        self.stdout.write("   • ✅ Verifica servicios históricos (NO genera si tiene históricos)")
         self.stdout.write("   • No genera duplicados (verifica si ya tienen premio)")
         self.stdout.write("   • Recomendado: Configurar en cron o Celery Beat\n")

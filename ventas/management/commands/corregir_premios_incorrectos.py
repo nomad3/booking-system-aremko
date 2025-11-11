@@ -81,13 +81,15 @@ class Command(BaseCommand):
                 # Obtener datos 360 del cliente
                 datos_360 = CRMService.get_customer_360(cliente.id)
                 total_servicios = datos_360['metricas']['total_servicios']
+                servicios_historicos = datos_360['metricas']['servicios_historicos']
                 gasto_total = datos_360['metricas']['gasto_total']
 
-                # Verificar si es realmente cliente nuevo
-                es_nuevo = TramoService.es_cliente_nuevo(cliente)
+                # ⭐ VERIFICACIÓN CORRECTA: Cliente debe tener SOLO servicios actuales (no históricos)
+                # Un cliente "nuevo" puede tener múltiples servicios en su primera reserva
+                tiene_servicios_historicos = servicios_historicos > 0
 
-                if not es_nuevo or total_servicios > 1:
-                    # ❌ PREMIO INCORRECTO: Cliente tiene servicios previos
+                if tiene_servicios_historicos:
+                    # ❌ PREMIO INCORRECTO: Cliente tiene servicios históricos (no es primera reserva)
                     stats['premios_incorrectos'] += 1
 
                     self.stdout.write(
@@ -96,6 +98,7 @@ class Command(BaseCommand):
                         )
                     )
                     self.stdout.write(f"   Total servicios: {total_servicios}")
+                    self.stdout.write(f"   Servicios históricos: {servicios_historicos} ⚠️")
                     self.stdout.write(f"   Gasto total: ${gasto_total:,.0f}")
                     self.stdout.write(f"   Estado premio: {premio.estado}")
                     self.stdout.write(f"   Fecha generado: {premio.fecha_ganado}")
@@ -110,8 +113,8 @@ class Command(BaseCommand):
                             # Anular premio incorrecto
                             premio.estado = 'cancelado'
                             premio.notas = (
-                                f"Cancelado automáticamente: Cliente tiene {total_servicios} servicios. "
-                                f"No es cliente nuevo. Sistema corregido el {timezone.now().date()}"
+                                f"Cancelado automáticamente: Cliente tiene {servicios_historicos} servicios históricos. "
+                                f"No es primera reserva. Sistema corregido el {timezone.now().date()}"
                             )
                             premio.save()
 
