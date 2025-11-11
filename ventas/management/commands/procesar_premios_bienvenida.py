@@ -90,16 +90,23 @@ class Command(BaseCommand):
             stats['clientes_evaluados'] += 1
 
             try:
-                # Verificar si esta es su PRIMERA reserva de servicio
+                # ⭐ VERIFICACIÓN CRÍTICA: ¿Es cliente NUEVO? (considera históricos)
+                es_cliente_nuevo = TramoService.es_cliente_nuevo(cliente)
+
+                if not es_cliente_nuevo:
+                    stats['no_es_primera_reserva'] += 1
+                    self.stdout.write(
+                        f"  ⏭️  {cliente.nombre[:40]:<40} - No es cliente nuevo (tiene servicios previos)"
+                    )
+                    continue
+
+                # Verificar que el check-in haya sido en la fecha objetivo
                 primera_reserva = ReservaServicio.objects.filter(
                     venta_reserva__cliente=cliente
                 ).order_by('fecha_agendamiento', 'id').first()
 
                 if not primera_reserva or primera_reserva.fecha_agendamiento != fecha_objetivo:
-                    stats['no_es_primera_reserva'] += 1
-                    self.stdout.write(
-                        f"  ⏭️  {cliente.nombre[:40]:<40} - No es su primera reserva"
-                    )
+                    # Este cliente tuvo su primer check-in en otra fecha, no procesar ahora
                     continue
 
                 # Verificar si ya tiene un premio de bienvenida
@@ -193,6 +200,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING("📌 NOTAS IMPORTANTES:"))
         self.stdout.write("   • Este comando debe ejecutarse diariamente")
         self.stdout.write("   • Procesa clientes con check-in hace 3 días (configurable con --dias)")
-        self.stdout.write("   • Solo genera premios para clientes en su PRIMERA reserva")
+        self.stdout.write("   • Solo genera premios para clientes NUEVOS (sin servicios previos)")
+        self.stdout.write("   • ✅ CONSIDERA servicios históricos (usa TramoService.es_cliente_nuevo)")
         self.stdout.write("   • No genera duplicados (verifica si ya tienen premio)")
         self.stdout.write("   • Recomendado: Configurar en cron o Celery Beat\n")
