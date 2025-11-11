@@ -458,54 +458,57 @@ def react_to_reserva_change(sender, instance, created, **kwargs):
             source=TaskSource.SISTEMA
         )
         logger.info(f"✅ Tarea NPS creada para reserva #{instance.id}")
-        
-        # Tareas para COMERCIAL (Premio D+3)
-        # Crear una tarea por cada servicio, programada para D+3 después del check-in
-        for rs in servicios:
-            # Calcular fecha D+3 después del check-in
-            try:
-                due_at = datetime.combine(
-                    rs.fecha_agendamiento,
-                    datetime.min.time()
-                ) + timedelta(days=3)
-                
-                # Convertir a aware datetime
-                due_at = timezone.make_aware(due_at)
-            except Exception:
-                # Si falla, usar 3 días desde ahora
-                due_at = timezone.now() + timedelta(days=3)
-            
-            servicio_nombre = getattr(rs.servicio, 'nombre', 'Servicio') if rs.servicio else 'Servicio'
-            # Para premio, mostrar hora de inicio del servicio (referencia)
-            hora_display = f" (Servicio {rs.hora_inicio})" if rs.hora_inicio else ""
-            
-            Task.objects.create(
-                title=f"Verificar premio D+3 – Reserva #{instance.id}{hora_display}",
-                description=(
-                    f"Enviar premio según tramo del cliente ({segment_tag}):\n"
-                    f"- Enviar por WhatsApp con mensaje personalizado\n"
-                    f"- Enviar por Email con vale digital\n"
-                    f"- (Opcional) SMS de respaldo\n"
-                    f"- Registrar envío en sistema de premios\n"
-                    f"- Validar que cliente recibió correctamente\n\n"
-                    f"Servicio: {servicio_nombre}\n"
-                    f"Check-in fue: {rs.fecha_agendamiento}"
-                ),
-                swimlane=Swimlane.COMERCIAL,
-                owner=com,
-                created_by=com,
-                state=TaskState.BACKLOG,
-                queue_position=1,
-                reservation_id=str(instance.id),
-                customer_phone_last9=customer_phone,
-                segment_tag=segment_tag,
-                service_type=getattr(rs.servicio, 'tipo_servicio', '') if rs.servicio else '',
-                priority=Priority.NORMAL,
-                source=TaskSource.SISTEMA,
-                promise_due_at=due_at  # ⭐ Programada para D+3
-            )
-        
-        logger.info(f"✅ {servicios.count()} tarea(s) PREMIO D+3 creadas para reserva #{instance.id}")
+
+        # DESACTIVADO: Tareas para COMERCIAL (Premio D+3)
+        # Estas tareas no son necesarias porque el sistema de premios es automático
+        # y se aprueba directamente desde el Admin de Django
+        #
+        # # Crear una tarea por cada servicio, programada para D+3 después del check-in
+        # for rs in servicios:
+        #     # Calcular fecha D+3 después del check-in
+        #     try:
+        #         due_at = datetime.combine(
+        #             rs.fecha_agendamiento,
+        #             datetime.min.time()
+        #         ) + timedelta(days=3)
+        #
+        #         # Convertir a aware datetime
+        #         due_at = timezone.make_aware(due_at)
+        #     except Exception:
+        #         # Si falla, usar 3 días desde ahora
+        #         due_at = timezone.now() + timedelta(days=3)
+        #
+        #     servicio_nombre = getattr(rs.servicio, 'nombre', 'Servicio') if rs.servicio else 'Servicio'
+        #     # Para premio, mostrar hora de inicio del servicio (referencia)
+        #     hora_display = f" (Servicio {rs.hora_inicio})" if rs.hora_inicio else ""
+        #
+        #     Task.objects.create(
+        #         title=f"Verificar premio D+3 – Reserva #{instance.id}{hora_display}",
+        #         description=(
+        #             f"Enviar premio según tramo del cliente ({segment_tag}):\n"
+        #             f"- Enviar por WhatsApp con mensaje personalizado\n"
+        #             f"- Enviar por Email con vale digital\n"
+        #             f"- (Opcional) SMS de respaldo\n"
+        #             f"- Registrar envío en sistema de premios\n"
+        #             f"- Validar que cliente recibió correctamente\n\n"
+        #             f"Servicio: {servicio_nombre}\n"
+        #             f"Check-in fue: {rs.fecha_agendamiento}"
+        #         ),
+        #         swimlane=Swimlane.COMERCIAL,
+        #         owner=com,
+        #         created_by=com,
+        #         state=TaskState.BACKLOG,
+        #         queue_position=1,
+        #         reservation_id=str(instance.id),
+        #         customer_phone_last9=customer_phone,
+        #         segment_tag=segment_tag,
+        #         service_type=getattr(rs.servicio, 'tipo_servicio', '') if rs.servicio else '',
+        #         priority=Priority.NORMAL,
+        #         source=TaskSource.SISTEMA,
+        #         promise_due_at=due_at  # ⭐ Programada para D+3
+        #     )
+        #
+        # logger.info(f"✅ {servicios.count()} tarea(s) PREMIO D+3 creadas para reserva #{instance.id}")
     
     else:
         # Otras transiciones no gatillan tareas automáticas por ahora
