@@ -41,18 +41,18 @@ class Command(BaseCommand):
         }
 
         # Buscar premios de bienvenida CANCELADOS
+        # Buscar TODOS los cancelados, no solo los que tienen nota específica
         premios_cancelados = ClientePremio.objects.filter(
             premio__tipo='descuento_bienvenida',
-            estado='cancelado',
-            notas_admin__icontains='Cancelado automáticamente'  # Solo los que fueron cancelados por el script
+            estado='cancelado'
         ).select_related('cliente', 'premio').order_by('id')
 
         stats['total_cancelados'] = premios_cancelados.count()
 
-        self.stdout.write(f"📊 Total de premios cancelados automáticamente: {stats['total_cancelados']:,}\n")
+        self.stdout.write(f"📊 Total de premios de bienvenida cancelados: {stats['total_cancelados']:,}\n")
 
         if stats['total_cancelados'] == 0:
-            self.stdout.write(self.style.WARNING("No hay premios cancelados automáticamente para revisar."))
+            self.stdout.write(self.style.WARNING("No hay premios de bienvenida cancelados para revisar."))
             return
 
         self.stdout.write("─" * 80)
@@ -135,7 +135,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("📊 REPORTE FINAL"))
         self.stdout.write("=" * 80 + "\n")
 
-        self.stdout.write(f"Total cancelados automáticamente: {stats['total_cancelados']:>10,}")
+        self.stdout.write(f"Total cancelados:                  {stats['total_cancelados']:>10,}")
         self.stdout.write(
             self.style.ERROR(f"Cancelaciones incorrectas:        {stats['cancelaciones_incorrectas']:>10,}")
         )
