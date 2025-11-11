@@ -112,7 +112,7 @@ class Command(BaseCommand):
                         with transaction.atomic():
                             # Anular premio incorrecto
                             premio.estado = 'cancelado'
-                            premio.notas = (
+                            premio.notas_admin = (
                                 f"Cancelado automáticamente: Cliente tiene {servicios_historicos} servicios históricos. "
                                 f"No es primera reserva. Sistema corregido el {timezone.now().date()}"
                             )

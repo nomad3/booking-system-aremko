@@ -44,7 +44,7 @@ class Command(BaseCommand):
         premios_cancelados = ClientePremio.objects.filter(
             premio__tipo='descuento_bienvenida',
             estado='cancelado',
-            notas__icontains='Cancelado automáticamente'  # Solo los que fueron cancelados por el script
+            notas_admin__icontains='Cancelado automáticamente'  # Solo los que fueron cancelados por el script
         ).select_related('cliente', 'premio').order_by('id')
 
         stats['total_cancelados'] = premios_cancelados.count()
@@ -86,17 +86,17 @@ class Command(BaseCommand):
                     self.stdout.write(f"   Servicios actuales: {servicios_actuales}")
                     self.stdout.write(f"   Gasto total: ${gasto_total:,.0f}")
                     self.stdout.write(f"   Fecha ganado: {premio.fecha_ganado}")
-                    self.stdout.write(f"   Notas: {premio.notas[:80]}...")
+                    self.stdout.write(f"   Notas: {premio.notas_admin[:80] if premio.notas_admin else 'N/A'}...")
 
                     # Revertir cancelación
                     if not dry_run:
                         with transaction.atomic():
                             # Restaurar a estado pendiente de aprobación
                             premio.estado = 'pendiente_aprobacion'
-                            premio.notas = (
+                            premio.notas_admin = (
                                 f"[REVERTIDO] Premio restaurado el {timezone.now().date()}. "
                                 f"Cancelación anterior fue incorrecta (cliente SÍ es de primera reserva). "
-                                f"Nota original: {premio.notas}"
+                                f"Nota original: {premio.notas_admin}"
                             )
                             premio.save()
 
