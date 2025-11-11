@@ -102,6 +102,9 @@
                 </div>
                 <span style="color: #999;">{{ premio.fecha_ganado|date:"d/m/Y H:i" }}</span>
             </div>
+            <div style="margin-bottom: 0.5rem; color: #666; font-size: 0.9rem;">
+                <strong>Premio #{{ premio.id }}</strong>
+            </div>
             <div class="premio-info">
                 <strong>Premio:</strong> {{ premio.premio.nombre }}<br>
                 <strong>Tipo:</strong> {{ premio.premio.get_tipo_display }}<br>
