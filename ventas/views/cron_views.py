@@ -295,3 +295,50 @@ def cron_triggers_reminders(request):
             "error": str(e),
             "command": "send_communication_triggers --type=reminders"
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_enviar_campana_giftcard(request):
+    """
+    Endpoint para ejecutar enviar_campana_giftcard desde cron externo
+
+    GET o POST: /ventas/cron/enviar-campana-giftcard/?token=xxx
+
+    Qué hace:
+    - Envía campaña específica de gift cards
+    - Procesa lote de emails de gift card
+    - Rate limiting configurado en el comando
+
+    Frecuencia original: Cada 6 minutos (*/6 * * * *)
+    Nota: Este es un comando de campaña específica, normalmente temporal
+    """
+    # Validar token de seguridad
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            logger.warning("❌ Intento de acceso a cron con token inválido")
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+
+    try:
+        # Capturar output del comando
+        output = StringIO()
+        call_command('enviar_campana_giftcard', stdout=output)
+
+        logger.info("✅ Cron enviar_campana_giftcard ejecutado vía HTTP")
+
+        return JsonResponse({
+            "ok": True,
+            "message": "Campaña de gift cards ejecutada",
+            "command": "enviar_campana_giftcard",
+            "output": output.getvalue()
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Error en cron enviar_campana_giftcard: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False,
+            "error": str(e),
+            "command": "enviar_campana_giftcard"
+        }, status=500)
