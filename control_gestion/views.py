@@ -534,12 +534,13 @@ def ai_generate_checklist(request):
 # ===== ENDPOINTS PARA CRON EXTERNO =====
 
 @csrf_exempt
+@require_http_methods(["GET", "POST"])
 def cron_preparacion_servicios(request):
     """
     Endpoint para ejecutar gen_preparacion_servicios desde cron externo
-    
+
     GET o POST: /control_gestion/cron/preparacion-servicios/
-    
+
     Opcionalmente puede recibir un token de seguridad:
     ?token=tu_token_secreto
     """
