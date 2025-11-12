@@ -146,9 +146,12 @@ urlpatterns = [
     path('premios/marcar-whatsapp-enviado/<int:premio_id>/', premio_views.marcar_whatsapp_enviado, name='marcar_whatsapp_enviado'),
     # === END PREMIOS ===
 
-    # === CRON JOBS PREMIOS (endpoints para cron-job.org) ===
+    # === CRON JOBS (endpoints para cron-job.org) ===
+    # Premios
     path('cron/procesar-premios-bienvenida/', cron_views.cron_procesar_premios_bienvenida, name='cron_procesar_premios'),
     path('cron/enviar-premios-aprobados/', cron_views.cron_enviar_premios_aprobados, name='cron_enviar_premios'),
+    # Triggers de Comunicación
+    path('cron/triggers-surveys/', cron_views.cron_triggers_surveys, name='cron_triggers_surveys'),
     # === END CRON JOBS ===
 
     # API Router (Keep this last if possible, or ensure specific paths come first)

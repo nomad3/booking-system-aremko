@@ -106,3 +106,50 @@ def cron_enviar_premios_aprobados(request):
             "error": str(e),
             "command": "enviar_premios_aprobados"
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_triggers_surveys(request):
+    """
+    Endpoint para ejecutar send_communication_triggers --type=surveys desde cron externo
+
+    GET o POST: /ventas/cron/triggers-surveys/?token=xxx
+
+    Qué hace:
+    - Envía encuestas de satisfacción a clientes 24h después del servicio
+    - Respeta límites anti-spam (1 email/semana, 4 emails/mes)
+    - Horario: 9:00 AM - 8:00 PM
+    - Usa plantillas personalizadas de encuesta
+
+    Frecuencia recomendada: Diario 11:00 AM
+    """
+    # Validar token de seguridad
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            logger.warning("❌ Intento de acceso a cron con token inválido")
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+
+    try:
+        # Capturar output del comando
+        output = StringIO()
+        call_command('send_communication_triggers', type='surveys', stdout=output)
+
+        logger.info("✅ Cron send_communication_triggers (surveys) ejecutado vía HTTP")
+
+        return JsonResponse({
+            "ok": True,
+            "message": "Triggers de encuestas de satisfacción ejecutados",
+            "command": "send_communication_triggers --type=surveys",
+            "output": output.getvalue()
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Error en cron triggers surveys: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False,
+            "error": str(e),
+            "command": "send_communication_triggers --type=surveys"
+        }, status=500)
