@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views # Import premio_views
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views # Import premio_views and cron_views
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -145,6 +145,11 @@ urlpatterns = [
     path('premios/whatsapp/<int:premio_id>/', premio_views.premio_whatsapp_message, name='premio_whatsapp'),
     path('premios/marcar-whatsapp-enviado/<int:premio_id>/', premio_views.marcar_whatsapp_enviado, name='marcar_whatsapp_enviado'),
     # === END PREMIOS ===
+
+    # === CRON JOBS PREMIOS (endpoints para cron-job.org) ===
+    path('cron/procesar-premios-bienvenida/', cron_views.cron_procesar_premios_bienvenida, name='cron_procesar_premios'),
+    path('cron/enviar-premios-aprobados/', cron_views.cron_enviar_premios_aprobados, name='cron_enviar_premios'),
+    # === END CRON JOBS ===
 
     # API Router (Keep this last if possible, or ensure specific paths come first)
     path('', include(router.urls)),
