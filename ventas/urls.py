@@ -152,6 +152,7 @@ urlpatterns = [
     path('cron/enviar-premios-aprobados/', cron_views.cron_enviar_premios_aprobados, name='cron_enviar_premios'),
     # Triggers de Comunicación
     path('cron/triggers-surveys/', cron_views.cron_triggers_surveys, name='cron_triggers_surveys'),
+    path('cron/triggers-reactivation/', cron_views.cron_triggers_reactivation, name='cron_triggers_reactivation'),
     # === END CRON JOBS ===
 
     # API Router (Keep this last if possible, or ensure specific paths come first)

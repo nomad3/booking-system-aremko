@@ -153,3 +153,50 @@ def cron_triggers_surveys(request):
             "error": str(e),
             "command": "send_communication_triggers --type=surveys"
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_triggers_reactivation(request):
+    """
+    Endpoint para ejecutar send_communication_triggers --type=reactivation desde cron externo
+
+    GET o POST: /ventas/cron/triggers-reactivation/?token=xxx
+
+    Qué hace:
+    - Envía emails de reactivación a clientes inactivos 90+ días
+    - Respeta límites anti-spam (1 email/trimestre por cliente)
+    - Horario: 9:00 AM - 8:00 PM
+    - Ofertas personalizadas para recuperar clientes
+
+    Frecuencia recomendada: Lunes 9:00 AM (semanal)
+    """
+    # Validar token de seguridad
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            logger.warning("❌ Intento de acceso a cron con token inválido")
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+
+    try:
+        # Capturar output del comando
+        output = StringIO()
+        call_command('send_communication_triggers', type='reactivation', stdout=output)
+
+        logger.info("✅ Cron send_communication_triggers (reactivation) ejecutado vía HTTP")
+
+        return JsonResponse({
+            "ok": True,
+            "message": "Triggers de reactivación de clientes ejecutados",
+            "command": "send_communication_triggers --type=reactivation",
+            "output": output.getvalue()
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Error en cron triggers reactivation: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False,
+            "error": str(e),
+            "command": "send_communication_triggers --type=reactivation"
+        }, status=500)
