@@ -248,3 +248,50 @@ def cron_enviar_emails_programados(request):
             "error": str(e),
             "command": "enviar_emails_programados"
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_triggers_reminders(request):
+    """
+    Endpoint para ejecutar send_communication_triggers --type=reminders desde cron externo
+
+    GET o POST: /ventas/cron/triggers-reminders/?token=xxx
+
+    Qué hace:
+    - Envía recordatorios SMS/Email 24h antes de reservas
+    - Respeta límites anti-spam (2 SMS/día, 8 SMS/mes máximo)
+    - Horario: 9:00 AM - 8:00 PM
+    - Usa templates personalizados con info de reserva
+
+    Frecuencia recomendada: Cada hora (0 * * * *)
+    """
+    # Validar token de seguridad
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            logger.warning("❌ Intento de acceso a cron con token inválido")
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+
+    try:
+        # Capturar output del comando
+        output = StringIO()
+        call_command('send_communication_triggers', type='reminders', stdout=output)
+
+        logger.info("✅ Cron send_communication_triggers (reminders) ejecutado vía HTTP")
+
+        return JsonResponse({
+            "ok": True,
+            "message": "Triggers de recordatorios de reservas ejecutados",
+            "command": "send_communication_triggers --type=reminders",
+            "output": output.getvalue()
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Error en cron triggers reminders: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False,
+            "error": str(e),
+            "command": "send_communication_triggers --type=reminders"
+        }, status=500)

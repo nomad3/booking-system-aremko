@@ -151,6 +151,7 @@ urlpatterns = [
     path('cron/procesar-premios-bienvenida/', cron_views.cron_procesar_premios_bienvenida, name='cron_procesar_premios'),
     path('cron/enviar-premios-aprobados/', cron_views.cron_enviar_premios_aprobados, name='cron_enviar_premios'),
     # Triggers de Comunicación
+    path('cron/triggers-reminders/', cron_views.cron_triggers_reminders, name='cron_triggers_reminders'),
     path('cron/triggers-surveys/', cron_views.cron_triggers_surveys, name='cron_triggers_surveys'),
     path('cron/triggers-reactivation/', cron_views.cron_triggers_reactivation, name='cron_triggers_reactivation'),
     # Emails Programados
