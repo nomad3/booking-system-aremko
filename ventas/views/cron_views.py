@@ -200,3 +200,51 @@ def cron_triggers_reactivation(request):
             "error": str(e),
             "command": "send_communication_triggers --type=reactivation"
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_enviar_emails_programados(request):
+    """
+    Endpoint para ejecutar enviar_emails_programados desde cron externo
+
+    GET o POST: /ventas/cron/enviar-emails-programados/?token=xxx
+
+    Qué hace:
+    - Procesa cola de emails del modelo MailParaEnviar
+    - Envía batch de 2 emails por ejecución (configurable)
+    - Respeta horario permitido: 8:00 AM - 6:00 PM (Chile)
+    - Rate limiting anti-spam integrado
+    - Estados: PENDIENTE → ENVIADO/ERROR
+
+    Frecuencia recomendada: Cada 30 minutos (solo en horario laboral)
+    """
+    # Validar token de seguridad
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            logger.warning("❌ Intento de acceso a cron con token inválido")
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+
+    try:
+        # Capturar output del comando
+        output = StringIO()
+        call_command('enviar_emails_programados', stdout=output)
+
+        logger.info("✅ Cron enviar_emails_programados ejecutado vía HTTP")
+
+        return JsonResponse({
+            "ok": True,
+            "message": "Envío de emails programados ejecutado",
+            "command": "enviar_emails_programados",
+            "output": output.getvalue()
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Error en cron enviar_emails_programados: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False,
+            "error": str(e),
+            "command": "enviar_emails_programados"
+        }, status=500)
