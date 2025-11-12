@@ -435,29 +435,32 @@ def react_to_reserva_change(sender, instance, created, **kwargs):
             source=TaskSource.SISTEMA
         )
         logger.info(f"✅ Tarea RECEPCION (checkout) creada como COMPLETADA para reserva #{instance.id}")
-        
-        # Tarea para ATENCIÓN AL CLIENTE (NPS) - también con hora real de checkout
-        Task.objects.create(
-            title=f"NPS post-visita – Reserva #{instance.id} ({hora_checkout_real})",
-            description=(
-                "Contactar al cliente por WhatsApp o llamada para:\n"
-                "- Pedir calificación NPS (0-10)\n"
-                "- Solicitar comentarios de la experiencia\n"
-                "- Registrar feedback en CRM\n"
-                "- Agradecer la visita"
-            ),
-            swimlane=Swimlane.ATENCION,
-            owner=cs,
-            created_by=cs,
-            state=TaskState.BACKLOG,
-            queue_position=1,
-            reservation_id=str(instance.id),
-            customer_phone_last9=customer_phone,
-            segment_tag=segment_tag,
-            priority=Priority.NORMAL,
-            source=TaskSource.SISTEMA
-        )
-        logger.info(f"✅ Tarea NPS creada para reserva #{instance.id}")
+
+        # DESACTIVADO: Tarea para ATENCIÓN AL CLIENTE (NPS) - ahora se envía automáticamente por email
+        # El sistema de comunicación inteligente (cron_triggers_surveys) envía encuestas automáticamente
+        # 24 horas después del servicio, sin intervención humana.
+        #
+        # Task.objects.create(
+        #     title=f"NPS post-visita – Reserva #{instance.id} ({hora_checkout_real})",
+        #     description=(
+        #         "Contactar al cliente por WhatsApp o llamada para:\n"
+        #         "- Pedir calificación NPS (0-10)\n"
+        #         "- Solicitar comentarios de la experiencia\n"
+        #         "- Registrar feedback en CRM\n"
+        #         "- Agradecer la visita"
+        #     ),
+        #     swimlane=Swimlane.ATENCION,
+        #     owner=cs,
+        #     created_by=cs,
+        #     state=TaskState.BACKLOG,
+        #     queue_position=1,
+        #     reservation_id=str(instance.id),
+        #     customer_phone_last9=customer_phone,
+        #     segment_tag=segment_tag,
+        #     priority=Priority.NORMAL,
+        #     source=TaskSource.SISTEMA
+        # )
+        # logger.info(f"✅ Tarea NPS creada para reserva #{instance.id}")
 
         # DESACTIVADO: Tareas para COMERCIAL (Premio D+3)
         # Estas tareas no son necesarias porque el sistema de premios es automático
