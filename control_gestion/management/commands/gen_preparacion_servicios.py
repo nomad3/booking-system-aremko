@@ -154,11 +154,12 @@ class Command(BaseCommand):
                         
                         # Verificar si ya existe una tarea de preparación para este servicio específico
                         # Usar reservation_id + servicio + hora para evitar duplicados
+                        from django.db.models import Q
                         tarea_existe = Task.objects.filter(
-                            reservation_id=str(reserva.id),
-                            title__icontains="Preparar servicio",
-                            title__icontains=servicio_nombre,
-                            title__icontains=str(rs.hora_inicio)
+                            Q(reservation_id=str(reserva.id)) &
+                            Q(title__icontains="Preparar servicio") &
+                            Q(title__icontains=servicio_nombre) &
+                            Q(title__icontains=str(rs.hora_inicio))
                         ).exists()
                         
                         if tarea_existe:
