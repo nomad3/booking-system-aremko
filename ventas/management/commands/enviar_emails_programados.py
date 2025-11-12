@@ -3,7 +3,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
 from django.utils import timezone
 from ventas.models import MailParaEnviar, Contact
-import pytz
+import zoneinfo
 
 
 class Command(BaseCommand):
@@ -18,13 +18,13 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         batch_size = options["batch_size"]
         ignore_schedule = options["ignore_schedule"]
-        
+
         # Verificar horario (8:00 - 18:00 Chile)
         if not ignore_schedule:
-            chile_tz = pytz.timezone('America/Santiago')
+            chile_tz = zoneinfo.ZoneInfo('America/Santiago')
             now_chile = timezone.now().astimezone(chile_tz)
             hour = now_chile.hour
-            
+
             if hour < 8 or hour >= 18:
                 self.stdout.write(f"Fuera de horario de envío (8:00-18:00). Hora actual: {hour:02d}:{now_chile.minute:02d}")
                 return
