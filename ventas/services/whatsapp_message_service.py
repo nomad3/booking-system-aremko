@@ -1,6 +1,6 @@
 """
 WhatsAppMessageService - Generación de mensajes personalizados de WhatsApp con IA
-Segmenta clientes y genera mensajes contextualizados usando OpenAI GPT-4o
+Segmenta clientes y genera mensajes contextualizados usando DeepSeek API
 """
 from django.conf import settings
 from ventas.services.crm_service import CRMService
@@ -10,13 +10,13 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# Importar OpenAI solo si está disponible
+# Importar OpenAI client (compatible con DeepSeek)
 try:
     from openai import OpenAI
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
-    logger.warning("OpenAI no está instalado. Instalar con: pip install openai")
+    logger.warning("OpenAI SDK no está instalado. Instalar con: pip install openai")
 
 
 class WhatsAppMessageService:
@@ -263,26 +263,30 @@ EJEMPLO DE REFERENCIA (NO COPIAR EXACTAMENTE):
             # Generar prompt para IA
             prompt = cls._generar_prompt_ia(perfil, datos_360)
 
-            # Llamar a OpenAI GPT-4o
+            # Llamar a DeepSeek API
             if not OPENAI_AVAILABLE:
                 return {
                     'success': False,
-                    'error': 'OpenAI no está instalado. Ejecuta: pip install openai'
+                    'error': 'OpenAI SDK no está instalado. Ejecuta: pip install openai'
                 }
 
-            openai_api_key = os.getenv('OPENAI_API_KEY') or getattr(settings, 'OPENAI_API_KEY', None)
-            if not openai_api_key:
+            # Usar DeepSeek API key (ya configurada en variables de entorno)
+            deepseek_api_key = os.getenv('DEEPSEEK_API_KEY') or getattr(settings, 'DEEPSEEK_API_KEY', None)
+            if not deepseek_api_key:
                 return {
                     'success': False,
-                    'error': 'OPENAI_API_KEY no está configurada en las variables de entorno'
+                    'error': 'DEEPSEEK_API_KEY no está configurada en las variables de entorno'
                 }
 
-            # Inicializar cliente OpenAI
-            client = OpenAI(api_key=openai_api_key)
+            # Inicializar cliente DeepSeek (usando OpenAI SDK compatible)
+            client = OpenAI(
+                api_key=deepseek_api_key,
+                base_url="https://api.deepseek.com"  # Endpoint de DeepSeek
+            )
 
-            # Llamar a GPT-4o (modelo más avanzado)
+            # Llamar a DeepSeek Chat (modelo deepseek-chat)
             response = client.chat.completions.create(
-                model="gpt-4o",  # Modelo más reciente y potente
+                model="deepseek-chat",  # Modelo de DeepSeek
                 messages=[
                     {
                         "role": "system",
@@ -297,7 +301,8 @@ EJEMPLO DE REFERENCIA (NO COPIAR EXACTAMENTE):
                 max_tokens=300,
                 top_p=1,
                 frequency_penalty=0.3,
-                presence_penalty=0.3
+                presence_penalty=0.3,
+                stream=False
             )
 
             mensaje_generado = response.choices[0].message.content.strip()
@@ -361,15 +366,18 @@ EJEMPLO DE REFERENCIA (NO COPIAR EXACTAMENTE):
         """
         try:
             if not OPENAI_AVAILABLE:
-                # Mensaje fallback si no hay OpenAI
+                # Mensaje fallback si no hay SDK
                 mensaje = f"¡Hola{' ' + nombre if nombre else ''}! 👋\n\n¡Bienvenido/a a Aremko Spa! 🌿\n\nSomos especialistas en tinas de hidromasaje, cabañas y masajes terapéuticos.\n\n¿En qué podemos ayudarte hoy?"
             else:
-                # Usar IA para generar mensaje más natural
-                openai_api_key = os.getenv('OPENAI_API_KEY') or getattr(settings, 'OPENAI_API_KEY', None)
-                if not openai_api_key:
+                # Usar DeepSeek API para generar mensaje más natural
+                deepseek_api_key = os.getenv('DEEPSEEK_API_KEY') or getattr(settings, 'DEEPSEEK_API_KEY', None)
+                if not deepseek_api_key:
                     mensaje = f"¡Hola{' ' + nombre if nombre else ''}! 👋 Bienvenido/a a Aremko Spa. ¿En qué podemos ayudarte?"
                 else:
-                    client = OpenAI(api_key=openai_api_key)
+                    client = OpenAI(
+                        api_key=deepseek_api_key,
+                        base_url="https://api.deepseek.com"
+                    )
                     prompt = f"""Genera un mensaje de bienvenida cálido y breve (3-4 líneas) para WhatsApp de un cliente completamente nuevo que nunca ha visitado Aremko Spa (spa de lujo con tinas, cabañas y masajes en Chile).
 
 Nombre del cliente: {nombre if nombre else 'Cliente'}
@@ -382,13 +390,14 @@ El mensaje debe:
 - Tono chileno amigable"""
 
                     response = client.chat.completions.create(
-                        model="gpt-4o",
+                        model="deepseek-chat",
                         messages=[
                             {"role": "system", "content": "Eres un experto en comunicación para spas de lujo en Chile."},
                             {"role": "user", "content": prompt}
                         ],
                         temperature=0.7,
-                        max_tokens=200
+                        max_tokens=200,
+                        stream=False
                     )
                     mensaje = response.choices[0].message.content.strip().strip('"').strip("'")
 

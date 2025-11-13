@@ -1,8 +1,8 @@
-# 📱 Sistema de Mensajes WhatsApp Personalizados con IA (GPT-4o)
+# 📱 Sistema de Mensajes WhatsApp Personalizados con IA (DeepSeek)
 
 ## 🎯 Descripción
 
-Sistema avanzado que genera mensajes de WhatsApp personalizados usando **OpenAI GPT-4o**, analizando el perfil 360° del cliente para crear comunicaciones contextualizadas y naturales.
+Sistema avanzado que genera mensajes de WhatsApp personalizados usando **DeepSeek API**, analizando el perfil 360° del cliente para crear comunicaciones contextualizadas y naturales.
 
 ---
 
@@ -17,10 +17,11 @@ Identifica automáticamente 6 perfiles distintos basados en:
 - Segmento RFM (Recency, Frequency, Monetary)
 
 ### 2. **Generación de Mensajes con IA**
-- Usa **GPT-4o** (modelo más avanzado de OpenAI)
+- Usa **DeepSeek Chat** (modelo de IA avanzado y económico)
 - Mensajes cálidos, naturales y profesionales
 - Tono chileno amigable
 - Contextualizados según historial del cliente
+- **70x más económico que GPT-4o**
 
 ### 3. **Interfaz Intuitiva**
 - Botón "Iniciar Conversación" en perfil 360°
@@ -177,23 +178,25 @@ Además, tenemos una sorpresa especial para clientes como tú.
 
 ## 🛠️ Instalación y Configuración
 
-### 1. Instalar OpenAI SDK
+### 1. Instalar OpenAI SDK (Compatible con DeepSeek)
 ```bash
 pip install openai
 ```
 
 ### 2. Configurar API Key
 
-#### Opción A: Variable de Entorno (Recomendado)
+**✅ Ya está configurada**: La variable `DEEPSEEK_API_KEY` ya existe en las variables de entorno de Render.
+
+#### Verificar Configuración
 ```bash
 # En Render.com Dashboard > Environment Variables
-OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# Buscar: DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-#### Opción B: En settings.py
+#### Alternativa: En settings.py
 ```python
 # settings.py
-OPENAI_API_KEY = 'sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+DEEPSEEK_API_KEY = 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 ```
 
 ### 3. Verificar Instalación
@@ -203,6 +206,8 @@ python manage.py shell
 >>> resultado = WhatsAppMessageService.generar_mensaje_whatsapp(cliente_id=123)
 >>> print(resultado)
 ```
+
+**Nota**: El sistema usa DeepSeek API que es compatible con OpenAI SDK.
 
 ---
 
@@ -384,24 +389,23 @@ def determinar_perfil_cliente(datos_360):
 
 ## 🚨 Troubleshooting
 
-### Error: "OpenAI no está instalado"
+### Error: "OpenAI SDK no está instalado"
 ```bash
 pip install openai
 ```
 
-### Error: "OPENAI_API_KEY no configurada"
-1. Ir a Render Dashboard
-2. Environment Variables
-3. Agregar: `OPENAI_API_KEY=sk-proj-...`
-4. Redeploy
+### Error: "DEEPSEEK_API_KEY no configurada"
+1. Verificar en Render Dashboard > Environment Variables
+2. Debe existir: `DEEPSEEK_API_KEY=sk-...`
+3. Si no existe, agregarla y redeploy
 
 ### Error: "Rate limit exceeded"
-Estás excediendo el límite de tokens de OpenAI.
+Estás excediendo el límite de tokens de DeepSeek (muy raro, límites son generosos).
 
 **Solución:**
 - Esperar unos minutos
-- Verificar plan de OpenAI (https://platform.openai.com/usage)
-- Considerar upgrade a plan con más cuota
+- Verificar uso en https://platform.deepseek.com/usage
+- DeepSeek tiene límites muy altos comparado con OpenAI
 
 ### Mensaje Generado es Muy Formal/Informal
 Ajusta el parámetro `temperature` en el código:
@@ -425,24 +429,32 @@ LONGITUD: 3-4 líneas máximo  # ← Cambiar aquí
 
 ## 💰 Costos
 
-### OpenAI GPT-4o Pricing (2025)
+### DeepSeek Pricing (2025)
 
 | Modelo | Input | Output |
 |--------|-------|--------|
-| GPT-4o | $2.50 / 1M tokens | $10.00 / 1M tokens |
+| DeepSeek Chat | $0.14 / 1M tokens | $0.28 / 1M tokens |
 
 ### Estimación de Costos
 
 **Por Mensaje:**
-- Input: ~800 tokens (datos del cliente + prompt) = $0.002
-- Output: ~150 tokens (mensaje generado) = $0.0015
-- **Total por mensaje: ~$0.0035 USD**
+- Input: ~800 tokens (datos del cliente + prompt) = $0.0001
+- Output: ~150 tokens (mensaje generado) = $0.00004
+- **Total por mensaje: ~$0.00014 USD**
+
+**Comparación con GPT-4o:**
+- DeepSeek: $0.00014 USD/mensaje
+- GPT-4o: $0.0035 USD/mensaje
+- **DeepSeek es ~25x más económico**
 
 **Por 1,000 Mensajes:**
-- ~$3.50 USD
+- ~$0.14 USD (vs $3.50 con GPT-4o)
 
 **Por 10,000 Mensajes/Mes:**
-- ~$35 USD/mes
+- ~$1.40 USD/mes (vs $35 con GPT-4o)
+
+**Por 100,000 Mensajes/Mes:**
+- ~$14 USD/mes (vs $350 con GPT-4o)
 
 ---
 
