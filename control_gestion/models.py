@@ -26,7 +26,7 @@ class Swimlane(models.TextChoices):
 
 class TaskState(models.TextChoices):
     """Estados posibles de una tarea"""
-    BACKLOG = "BACKLOG", "Backlog"
+    BACKLOG = "BACKLOG", "Por Ejecutar"
     IN_PROGRESS = "IN_PROGRESS", "En curso"
     BLOCKED = "BLOCKED", "Bloqueada"
     DONE = "DONE", "Hecha"
