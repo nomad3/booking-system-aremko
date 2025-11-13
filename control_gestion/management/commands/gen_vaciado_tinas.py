@@ -79,10 +79,26 @@ class Command(BaseCommand):
         if dry_run:
             self.stdout.write(self.style.WARNING("⚠️  MODO DRY-RUN\n"))
         
-        # Obtener usuario de operaciones
-        ops_user = User.objects.filter(groups__name="OPERACIONES").first()
+        # Obtener usuario de operaciones (usando configuración o fallback)
+        from control_gestion.models import TaskOwnerConfig
+
+        ops_user = TaskOwnerConfig.obtener_responsable_por_tipo('vaciado_tina')
         if not ops_user:
-            ops_user = User.objects.first()
+            # Fallback al comportamiento anterior si no hay configuración
+            ops_user = User.objects.filter(groups__name="OPERACIONES").first()
+            if not ops_user:
+                ops_user = User.objects.first()
+                self.stdout.write(self.style.WARNING(
+                    "⚠️  Grupo OPERACIONES no encontrado y sin configuración TaskOwnerConfig, usando primer usuario"
+                ))
+            else:
+                self.stdout.write(self.style.WARNING(
+                    "ℹ️  Sin configuración TaskOwnerConfig, usando grupo OPERACIONES (fallback)"
+                ))
+        else:
+            self.stdout.write(
+                f"✅ Usando responsable configurado: {ops_user.username}"
+            )
         
         # Buscar servicios de TINAS que ya terminaron (reserva en checkin o checkout)
         # IMPORTANTE: Solo buscar servicios del DÍA ACTUAL

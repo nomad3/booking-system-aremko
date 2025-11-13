@@ -362,11 +362,171 @@ class DailyReport(models.Model):
         return f"Reporte {self.date.strftime('%Y-%m-%d')}"
 
 
+class TaskOwnerConfig(models.Model):
+    """
+    Configuración de responsables por tipo de tarea automática
+
+    Permite configurar desde Django Admin quién debe ser responsable
+    de cada tipo de tarea generada automáticamente, sin hardcodear
+    en el código.
+
+    Ejemplo de uso:
+    - Tipo "preparacion_servicio" → Usuario Ernesto (Operación)
+    - Tipo "vaciado_tina" → Grupo OPERACIONES
+    - Tipo "monitoreo_temperatura" → Usuario Jorge (Comercial)
+    """
+
+    class TipoTarea(models.TextChoices):
+        PREPARACION_SERVICIO = 'preparacion_servicio', 'Preparación de Servicio (1h antes)'
+        VACIADO_TINA = 'vaciado_tina', 'Vaciado de Tina (después del servicio)'
+        APERTURA_AM = 'apertura_am', 'Apertura AM - Limpieza'
+        REPORTE_DIARIO = 'reporte_diario', 'Reporte Diario'
+        MONITOREO = 'monitoreo', 'Monitoreo General'
+        MANTENCION = 'mantencion', 'Mantención y Reparaciones'
+        ALIMENTACION = 'alimentacion', 'Alimentación de Animales'
+        OTROS = 'otros', 'Otros (por defecto)'
+
+    # Identificación del tipo de tarea
+    tipo_tarea = models.CharField(
+        max_length=32,
+        choices=TipoTarea.choices,
+        unique=True,
+        verbose_name="Tipo de Tarea",
+        help_text="Tipo de tarea automática a configurar"
+    )
+
+    # Asignación (prioridad: usuario específico > grupo > fallback)
+    asignar_a_usuario = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='task_owner_configs',
+        verbose_name="Asignar a Usuario",
+        help_text="Usuario específico (tiene prioridad sobre grupo)"
+    )
+
+    asignar_a_grupo = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Asignar a Grupo",
+        help_text="Nombre del grupo (ej: OPERACIONES, RECEPCION, COMERCIAL)"
+    )
+
+    usuario_fallback = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='task_owner_fallback_configs',
+        verbose_name="Usuario Fallback",
+        help_text="Usuario a usar si no se encuentra el usuario/grupo configurado"
+    )
+
+    # Metadata
+    activo = models.BooleanField(
+        default=True,
+        verbose_name="Activo",
+        help_text="Si está inactivo, usará comportamiento por defecto del sistema"
+    )
+
+    notas = models.TextField(
+        blank=True,
+        verbose_name="Notas",
+        help_text="Notas internas sobre esta configuración"
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de creación"
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Última actualización"
+    )
+
+    class Meta:
+        verbose_name = "Configuración de Responsable"
+        verbose_name_plural = "Configuraciones de Responsables"
+        ordering = ['tipo_tarea']
+
+    def __str__(self):
+        asignado = self.get_asignado_display()
+        return f"{self.get_tipo_tarea_display()} → {asignado}"
+
+    def get_asignado_display(self):
+        """Retorna string con información de asignación"""
+        if self.asignar_a_usuario:
+            return f"{self.asignar_a_usuario.username} (usuario)"
+        elif self.asignar_a_grupo:
+            return f"{self.asignar_a_grupo} (grupo)"
+        elif self.usuario_fallback:
+            return f"{self.usuario_fallback.username} (fallback)"
+        else:
+            return "Sin configurar"
+
+    def obtener_responsable(self):
+        """
+        Obtiene el usuario responsable según la configuración
+
+        Lógica de prioridad:
+        1. Usuario específico configurado
+        2. Primer usuario del grupo configurado
+        3. Usuario fallback
+        4. Primer usuario del sistema (último recurso)
+
+        Returns:
+            User: Usuario responsable
+        """
+        # Prioridad 1: Usuario específico
+        if self.asignar_a_usuario:
+            return self.asignar_a_usuario
+
+        # Prioridad 2: Primer usuario del grupo
+        if self.asignar_a_grupo:
+            usuario_grupo = User.objects.filter(
+                groups__name=self.asignar_a_grupo
+            ).first()
+            if usuario_grupo:
+                return usuario_grupo
+
+        # Prioridad 3: Usuario fallback
+        if self.usuario_fallback:
+            return self.usuario_fallback
+
+        # Prioridad 4: Primer usuario del sistema (último recurso)
+        return User.objects.first()
+
+    @classmethod
+    def obtener_responsable_por_tipo(cls, tipo_tarea: str):
+        """
+        Método de clase para obtener responsable por tipo de tarea
+
+        Args:
+            tipo_tarea: String del tipo (ej: 'preparacion_servicio')
+
+        Returns:
+            User: Usuario responsable o None si no existe configuración
+
+        Ejemplo de uso:
+            owner = TaskOwnerConfig.obtener_responsable_por_tipo('preparacion_servicio')
+            if not owner:
+                owner = User.objects.first()  # Fallback manual
+        """
+        try:
+            config = cls.objects.get(tipo_tarea=tipo_tarea, activo=True)
+            return config.obtener_responsable()
+        except cls.DoesNotExist:
+            return None
+
+
 # Importar modelos adicionales de templates
 from .models_templates import TaskTemplate, EmpleadoDisponibilidad
 
 __all__ = [
     'Task', 'ChecklistItem', 'TaskLog', 'CustomerSegment', 'DailyReport',
+    'TaskOwnerConfig',
     'TaskTemplate', 'EmpleadoDisponibilidad',
     'Swimlane', 'TaskState', 'Priority', 'TaskSource', 'LocationRef'
 ]

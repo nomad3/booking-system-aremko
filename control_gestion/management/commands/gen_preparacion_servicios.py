@@ -97,13 +97,26 @@ class Command(BaseCommand):
             f"{(inicio_ventana + timedelta(minutes=30)).strftime('%H:%M')}, etc.)\n"
         )
         
-        # Obtener usuario de operaciones
-        ops_user = User.objects.filter(groups__name="OPERACIONES").first()
+        # Obtener usuario de operaciones (usando configuración o fallback)
+        from control_gestion.models import TaskOwnerConfig
+
+        ops_user = TaskOwnerConfig.obtener_responsable_por_tipo('preparacion_servicio')
         if not ops_user:
-            ops_user = User.objects.first()
-            self.stdout.write(self.style.WARNING(
-                "⚠️  Grupo OPERACIONES no encontrado, usando primer usuario"
-            ))
+            # Fallback al comportamiento anterior si no hay configuración
+            ops_user = User.objects.filter(groups__name="OPERACIONES").first()
+            if not ops_user:
+                ops_user = User.objects.first()
+                self.stdout.write(self.style.WARNING(
+                    "⚠️  Grupo OPERACIONES no encontrado y sin configuración TaskOwnerConfig, usando primer usuario"
+                ))
+            else:
+                self.stdout.write(self.style.WARNING(
+                    "ℹ️  Sin configuración TaskOwnerConfig, usando grupo OPERACIONES (fallback)"
+                ))
+        else:
+            self.stdout.write(
+                f"✅ Usando responsable configurado: {ops_user.username}"
+            )
         
         # Buscar reservas activas (pendiente, checkin o checkout)
         # IMPORTANTE: Incluir 'pendiente' para preparar ANTES de que llegue el cliente

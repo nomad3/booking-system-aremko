@@ -12,7 +12,7 @@ import csv
 from datetime import datetime
 from .models import (
     Task, ChecklistItem, TaskLog, CustomerSegment, DailyReport,
-    TaskState, Priority, TaskTemplate, EmpleadoDisponibilidad
+    TaskState, Priority, TaskTemplate, EmpleadoDisponibilidad, TaskOwnerConfig
 )
 from .forms import TaskAdminForm
 
@@ -569,4 +569,116 @@ class EmpleadoDisponibilidadAdmin(admin.ModelAdmin):
         trabaja = obj.trabaja_hoy()
         return "✅ Sí" if trabaja else "❌ No"
     trabaja_hoy_display.short_description = 'Trabaja hoy'
+
+
+# ===== ADMIN DE TASK OWNER CONFIG =====
+
+@admin.register(TaskOwnerConfig)
+class TaskOwnerConfigAdmin(admin.ModelAdmin):
+    """
+    Admin para configurar responsables de tareas automáticas
+
+    Permite configurar desde Django Admin quién debe ser responsable
+    de cada tipo de tarea generada automáticamente.
+    """
+
+    list_display = (
+        'tipo_tarea_display',
+        'asignado_display',
+        'activo',
+        'updated_at'
+    )
+
+    list_filter = ('activo', 'tipo_tarea')
+
+    search_fields = ('tipo_tarea', 'asignar_a_grupo', 'notas')
+
+    readonly_fields = ('created_at', 'updated_at')
+
+    fieldsets = (
+        ('Tipo de Tarea', {
+            'fields': ('tipo_tarea',),
+            'description': 'Selecciona el tipo de tarea automática a configurar'
+        }),
+        ('Asignación del Responsable', {
+            'fields': (
+                'asignar_a_usuario',
+                'asignar_a_grupo',
+                'usuario_fallback'
+            ),
+            'description': (
+                '<b>Prioridad de asignación:</b><br>'
+                '1. Usuario específico (si está configurado)<br>'
+                '2. Primer usuario del grupo (si está configurado)<br>'
+                '3. Usuario fallback (si está configurado)<br>'
+                '4. Primer usuario del sistema (último recurso)'
+            )
+        }),
+        ('Configuración', {
+            'fields': ('activo', 'notas')
+        }),
+        ('Fechas', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def tipo_tarea_display(self, obj):
+        """Display customizado del tipo de tarea"""
+        return obj.get_tipo_tarea_display()
+    tipo_tarea_display.short_description = 'Tipo de Tarea'
+
+    def asignado_display(self, obj):
+        """Display customizado de la asignación"""
+        if obj.asignar_a_usuario:
+            return f"👤 {obj.asignar_a_usuario.username}"
+        elif obj.asignar_a_grupo:
+            # Contar usuarios en el grupo
+            from django.contrib.auth.models import User
+            count = User.objects.filter(groups__name=obj.asignar_a_grupo).count()
+            return f"👥 {obj.asignar_a_grupo} ({count} usuario{'s' if count != 1 else ''})"
+        elif obj.usuario_fallback:
+            return f"⚠️ Fallback: {obj.usuario_fallback.username}"
+        else:
+            return "❌ Sin configurar"
+    asignado_display.short_description = 'Asignado a'
+
+    actions = ['test_assignment']
+
+    @admin.action(description="🧪 Probar asignación de responsable")
+    def test_assignment(self, request, queryset):
+        """Prueba la asignación de responsable para las configuraciones seleccionadas"""
+        results = []
+
+        for config in queryset:
+            try:
+                responsable = config.obtener_responsable()
+                results.append(
+                    f"✅ {config.get_tipo_tarea_display()}: "
+                    f"{responsable.username} ({responsable.get_full_name() or 'sin nombre'})"
+                )
+            except Exception as e:
+                results.append(
+                    f"❌ {config.get_tipo_tarea_display()}: Error - {str(e)}"
+                )
+
+        for result in results:
+            messages.info(request, result)
+
+    def save_model(self, request, obj, form, change):
+        """Validación al guardar"""
+        super().save_model(request, obj, form, change)
+
+        # Probar la asignación inmediatamente después de guardar
+        try:
+            responsable = obj.obtener_responsable()
+            messages.success(
+                request,
+                f"✅ Configuración guardada. Responsable será: {responsable.username}"
+            )
+        except Exception as e:
+            messages.warning(
+                request,
+                f"⚠️ Configuración guardada pero hay un problema: {str(e)}"
+            )
 
