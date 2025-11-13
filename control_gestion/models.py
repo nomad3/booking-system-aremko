@@ -72,10 +72,10 @@ class LocationRef(models.TextChoices):
 class Task(models.Model):
     """
     Tarea operativa del sistema de Control de Gestión
-    
+
     Las tareas se organizan por swimlane (área) y tienen un orden de prioridad
-    dentro de cada swimlane. Se aplica la regla WIP=1 (Work In Progress = 1)
-    para cada responsable.
+    dentro de cada swimlane. Los usuarios pueden trabajar en múltiples tareas
+    simultáneamente sin restricciones.
     """
     
     # Información básica
