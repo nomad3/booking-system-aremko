@@ -215,12 +215,31 @@ python manage.py shell
 
 ### Desde la Interfaz Web
 
+#### Opción 1: Desde el Dashboard de CRM
+
+1. **Acceder al Dashboard CRM**
+   - Navegar a: **Admin > CRM** o directamente a `/admin/ventas/section_crm/`
+   - Buscar la tarjeta **"Perfil del Cliente"** (ícono WhatsApp verde)
+
+2. **Buscar Cliente**
+   - Click en **"🔍 Buscar Cliente"**
+   - O click en **"🤖📱 WhatsApp con IA"** → luego buscar cliente
+
+3. **Generar Mensaje**
+   - Una vez en el perfil 360° del cliente
+   - Click en botón **"🤖 Iniciar Conversación"** (verde oscuro)
+   - El sistema analiza automáticamente el perfil del cliente
+
+#### Opción 2: Directamente desde Perfil 360°
+
 1. **Navegar al Perfil 360° del Cliente**
    - CRM > Buscar Cliente > Seleccionar Cliente
 
 2. **Generar Mensaje**
    - Click en botón **"🤖 Iniciar Conversación"** (verde oscuro)
    - El sistema analiza automáticamente el perfil del cliente
+
+### Preview y Acciones
 
 3. **Preview del Mensaje**
    - Modal muestra:
