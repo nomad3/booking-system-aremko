@@ -118,7 +118,11 @@ class Command(BaseCommand):
         
         for reserva in reservas:
             for rs in reserva.reservaservicios.all():
-                # Solo servicios de TINAS
+                # FILTRO 1: Excluir servicios "Descuento_Servicios"
+                if rs.servicio and rs.servicio.nombre == "Descuento_Servicios":
+                    continue  # Saltar este servicio
+
+                # FILTRO 2: Solo servicios de TINAS
                 if not rs.servicio or rs.servicio.tipo_servicio != 'tina':
                     continue
                 

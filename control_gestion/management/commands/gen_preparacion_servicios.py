@@ -130,6 +130,10 @@ class Command(BaseCommand):
         
         for reserva in reservas_activas:
             for rs in reserva.reservaservicios.all():
+                # FILTRO: Excluir servicios "Descuento_Servicios"
+                if rs.servicio and rs.servicio.nombre == "Descuento_Servicios":
+                    continue  # Saltar este servicio
+
                 # Construir datetime del servicio
                 try:
                     # Normalizar formato de hora (manejar formatos diversos)
