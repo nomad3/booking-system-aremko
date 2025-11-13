@@ -163,6 +163,8 @@ urlpatterns = [
     path('cron/enviar-emails-programados/', cron_views.cron_enviar_emails_programados, name='cron_enviar_emails_programados'),
     # Campañas Específicas
     path('cron/enviar-campana-giftcard/', cron_views.cron_enviar_campana_giftcard, name='cron_enviar_campana_giftcard'),
+    # Control de Gestión - Tareas Automáticas
+    path('cron/gen-atencion-clientes/', cron_views.cron_gen_atencion_clientes, name='cron_gen_atencion_clientes'),
     # === END CRON JOBS ===
 
     # API Router (Keep this last if possible, or ensure specific paths come first)

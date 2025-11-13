@@ -342,3 +342,51 @@ def cron_enviar_campana_giftcard(request):
             "error": str(e),
             "command": "enviar_campana_giftcard"
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_gen_atencion_clientes(request):
+    """
+    Endpoint para ejecutar gen_atencion_clientes desde cron externo
+
+    GET o POST: /cron/gen-atencion-clientes/?token=xxx
+
+    Qué hace:
+    - Detecta reservas en estado 'checkin'
+    - Crea tareas de atención 20 min después del inicio del servicio
+    - Solo para servicios de TINAS y CABAÑAS
+    - Asigna a Deborah (configurable vía TaskOwnerConfig)
+    - Incluye checklist de atención al cliente
+
+    Frecuencia recomendada: Cada 15 minutos (*/15 * * * *)
+    """
+    # Validar token de seguridad
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            logger.warning("❌ Intento de acceso a cron con token inválido")
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+
+    try:
+        # Capturar output del comando
+        output = StringIO()
+        call_command('gen_atencion_clientes', stdout=output)
+
+        logger.info("✅ Cron gen_atencion_clientes ejecutado vía HTTP")
+
+        return JsonResponse({
+            "ok": True,
+            "message": "Generación de tareas de atención a clientes ejecutada",
+            "command": "gen_atencion_clientes",
+            "output": output.getvalue()
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Error en cron gen_atencion_clientes: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False,
+            "error": str(e),
+            "command": "gen_atencion_clientes"
+        }, status=500)
