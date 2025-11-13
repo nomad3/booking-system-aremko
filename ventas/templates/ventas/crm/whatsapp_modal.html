@@ -125,12 +125,19 @@
 <script>
 let mensajeGenerado = '';
 let whatsappUrl = '';
-let clienteId = {{ cliente.id }};
+// clienteId ya está definido en el template principal (línea 339 de cliente_detalle.html)
 
 /**
  * Genera mensaje WhatsApp con IA
  */
 function generarMensajeWhatsappIA() {
+    // Verificar que clienteId existe
+    if (typeof clienteId === 'undefined') {
+        console.error('clienteId no está definido');
+        alert('Error: No se pudo identificar el cliente');
+        return;
+    }
+
     // Mostrar modal
     const modal = new bootstrap.Modal(document.getElementById('whatsappIaModal'));
     modal.show();
