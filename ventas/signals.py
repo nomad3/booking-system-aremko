@@ -568,11 +568,11 @@ def actualizar_tramo_y_premios_on_pago(sender, instance, created, raw, using, up
 
     try:
         from ventas.services.tramo_service import TramoService
-        from ventas.services.premio_service import PremioService
 
         with transaction.atomic():
-            # Actualizar tramo del cliente (esto puede generar premios de hitos automáticamente)
-            resultado = TramoService.actualizar_tramo_cliente(instance.cliente)
+            # Actualizar tramo del cliente SOLO para registro, SIN generar premios
+            # Los premios (tanto de bienvenida como de hito) se generan 3 días después del check-in
+            resultado = TramoService.actualizar_tramo_cliente(instance.cliente, generar_premio_inmediato=False)
 
             logger.info(
                 f"Tramo actualizado para cliente {instance.cliente.id}: "
@@ -580,15 +580,14 @@ def actualizar_tramo_y_premios_on_pago(sender, instance, created, raw, using, up
                 f"Gasto: ${resultado['gasto_total']:,.0f}"
             )
 
-            # PREMIO DE BIENVENIDA SE DESACTIVÓ AQUÍ
-            # Ahora se genera mediante comando de gestión 3 días después del check-in
+            # PREMIOS DESACTIVADOS AQUÍ (tanto de bienvenida como de hito)
+            # TODOS los premios se generan mediante comando de gestión 3 días después del check-in
             # Ver: python manage.py procesar_premios_bienvenida
 
-            # Si alcanzó un hito, el premio ya fue generado por TramoService
-            if resultado['hito_alcanzado']:
+            if resultado.get('hito_alcanzado'):
                 logger.info(
                     f"¡Hito alcanzado! Cliente {instance.cliente.id} llegó al Tramo {resultado['tramo_actual']}. "
-                    f"Premio generado: {resultado['premio_generado'].premio.nombre if resultado['premio_generado'] else 'N/A'}"
+                    f"Premio se generará automáticamente 3 días después del check-in."
                 )
 
     except Exception as e:

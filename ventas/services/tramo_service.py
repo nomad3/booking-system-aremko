@@ -70,12 +70,14 @@ class TramoService:
 
     @classmethod
     @transaction.atomic
-    def actualizar_tramo_cliente(cls, cliente: Cliente) -> dict:
+    def actualizar_tramo_cliente(cls, cliente: Cliente, generar_premio_inmediato: bool = True) -> dict:
         """
         Actualiza el tramo de un cliente y registra el cambio
 
         Args:
             cliente: Objeto Cliente
+            generar_premio_inmediato: Si True, genera premio inmediatamente al alcanzar hito.
+                                     Si False, solo registra el hito sin generar premio.
 
         Returns:
             Dict con información del cambio:
@@ -124,19 +126,27 @@ class TramoService:
         if tramo_actual in cls.HITOS_PREMIO and tramo_actual > tramo_anterior:
             result['hito_alcanzado'] = True
 
-            # Generar premio correspondiente (delegar a PremioService)
-            from ventas.services.premio_service import PremioService
-            premio = PremioService.generar_premio_por_hito(
-                cliente=cliente,
-                tramo_actual=tramo_actual,
-                tramo_anterior=tramo_anterior,
-                gasto_total=gasto_total
-            )
+            # Generar premio solo si está habilitado (por defecto True para compatibilidad)
+            if generar_premio_inmediato:
+                # Generar premio correspondiente (delegar a PremioService)
+                from ventas.services.premio_service import PremioService
+                premio = PremioService.generar_premio_por_hito(
+                    cliente=cliente,
+                    tramo_actual=tramo_actual,
+                    tramo_anterior=tramo_anterior,
+                    gasto_total=gasto_total
+                )
 
-            if premio:
-                historial.premio_generado = premio
-                historial.save()
-                result['premio_generado'] = premio
+                if premio:
+                    historial.premio_generado = premio
+                    historial.save()
+                    result['premio_generado'] = premio
+            else:
+                logger.info(
+                    f"Hito alcanzado pero generación de premio deshabilitada. "
+                    f"Cliente {cliente.id} - Tramo {tramo_actual}. "
+                    f"Premio se generará mediante cron en 3 días."
+                )
 
         logger.info(f"Tramo actualizado: Cliente {cliente.id} - Tramo {tramo_anterior} → {tramo_actual}")
 

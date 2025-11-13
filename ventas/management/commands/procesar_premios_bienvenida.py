@@ -1,11 +1,12 @@
 """
-Management command para procesar premios de bienvenida 3 días después del check-in
+Management command para procesar TODOS los premios 3 días después del check-in
+Incluye premios de bienvenida Y premios de hito (tramos 5, 10, 15, 20)
 """
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
-from ventas.models import Cliente, ReservaServicio, ClientePremio
+from ventas.models import Cliente, ReservaServicio, ClientePremio, HistorialTramo
 from ventas.services.premio_service import PremioService
 from ventas.services.tramo_service import TramoService
 from ventas.services.crm_service import CRMService
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = 'Procesa premios de bienvenida para clientes que tuvieron su primer check-in hace 3 días'
+    help = 'Procesa TODOS los premios (bienvenida + hitos) para clientes que tuvieron check-in hace 3 días'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -35,7 +36,7 @@ class Command(BaseCommand):
         dias_despues = options['dias']
 
         self.stdout.write("\n" + "=" * 80)
-        self.stdout.write(self.style.SUCCESS("🎁 PROCESAMIENTO DE PREMIOS DE BIENVENIDA"))
+        self.stdout.write(self.style.SUCCESS("🎁 PROCESAMIENTO DE TODOS LOS PREMIOS (BIENVENIDA + HITOS)"))
         self.stdout.write("=" * 80 + "\n")
 
         if dry_run:
@@ -112,48 +113,75 @@ class Command(BaseCommand):
                     # Este cliente tuvo su primer check-in en otra fecha, no procesar ahora
                     continue
 
-                # Verificar si ya tiene un premio de bienvenida
-                tiene_premio = ClientePremio.objects.filter(
-                    cliente=cliente,
-                    premio__tipo='descuento_bienvenida'
-                ).exists()
-
-                if tiene_premio:
-                    stats['ya_tienen_premio'] += 1
-                    self.stdout.write(
-                        f"  ⏭️  {cliente.nombre[:40]:<40} - Ya tiene premio de bienvenida"
-                    )
-                    continue
-
                 # Cliente elegible para premio
                 stats['clientes_elegibles'] += 1
 
-                # Calcular gasto total del cliente
+                # Calcular gasto total y tramo del cliente
                 gasto_total = TramoService.calcular_gasto_cliente(cliente)
+                tramo_actual = TramoService.calcular_tramo(float(gasto_total))
 
                 self.stdout.write(
-                    f"  ✅ {cliente.nombre[:40]:<40} - Elegible (Gasto: ${gasto_total:,.0f})"
+                    f"  ✅ {cliente.nombre[:40]:<40} - Elegible (Gasto: ${gasto_total:,.0f}, Tramo: {tramo_actual})"
                 )
 
-                # Generar premio si no es dry-run
+                # Generar premios si no es dry-run
                 if not dry_run:
-                    with transaction.atomic():
-                        premio_generado = PremioService.generar_premio_cliente_nuevo(
-                            cliente=cliente,
-                            gasto_total=gasto_total
-                        )
+                    premios_generados_cliente = []
 
-                        if premio_generado:
-                            stats['premios_generados'] += 1
-                            self.stdout.write(
-                                self.style.SUCCESS(
-                                    f"     🎉 Premio generado: {premio_generado.premio.nombre}"
-                                )
+                    with transaction.atomic():
+                        # 1. PREMIO DE BIENVENIDA (solo si no lo tiene)
+                        tiene_premio_bienvenida = ClientePremio.objects.filter(
+                            cliente=cliente,
+                            premio__tipo='descuento_bienvenida'
+                        ).exists()
+
+                        if not tiene_premio_bienvenida:
+                            premio_bienvenida = PremioService.generar_premio_cliente_nuevo(
+                                cliente=cliente,
+                                gasto_total=gasto_total
                             )
+                            if premio_bienvenida:
+                                premios_generados_cliente.append(f"Bienvenida: {premio_bienvenida.premio.nombre}")
+
+                        # 2. PREMIO DE HITO (si alcanzó un hito en su primera compra)
+                        if tramo_actual in TramoService.HITOS_PREMIO:
+                            # Obtener historial de tramos para saber el tramo anterior
+                            historial = HistorialTramo.objects.filter(
+                                cliente=cliente,
+                                tramo_hasta=tramo_actual
+                            ).order_by('-fecha_cambio').first()
+
+                            tramo_anterior = historial.tramo_desde if historial else 0
+
+                            # Verificar que no tenga ya un premio de este tramo
+                            premios_existentes_hito = ClientePremio.objects.filter(
+                                cliente=cliente,
+                                tramo_al_ganar=tramo_actual
+                            )
+
+                            if not premios_existentes_hito.exists():
+                                premio_hito = PremioService.generar_premio_por_hito(
+                                    cliente=cliente,
+                                    tramo_actual=tramo_actual,
+                                    tramo_anterior=tramo_anterior,
+                                    gasto_total=gasto_total
+                                )
+                                if premio_hito:
+                                    premios_generados_cliente.append(f"Hito Tramo {tramo_actual}: {premio_hito.premio.nombre}")
+
+                        # Reportar premios generados
+                        if premios_generados_cliente:
+                            stats['premios_generados'] += len(premios_generados_cliente)
+                            for premio_desc in premios_generados_cliente:
+                                self.stdout.write(
+                                    self.style.SUCCESS(
+                                        f"     🎉 Premio generado: {premio_desc}"
+                                    )
+                                )
                         else:
                             self.stdout.write(
                                 self.style.WARNING(
-                                    f"     ⚠️  No se pudo generar premio (verificar logs)"
+                                    f"     ⏭️  Ya tiene todos los premios para este tramo"
                                 )
                             )
 
