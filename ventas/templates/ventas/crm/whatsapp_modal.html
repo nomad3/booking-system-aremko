@@ -1,0 +1,285 @@
+<!-- Modal para Preview de Mensaje WhatsApp Generado con IA -->
+<div class="modal fade" id="whatsappIaModal" tabindex="-1" aria-labelledby="whatsappIaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="whatsappIaModalLabel">
+                    <i class="fab fa-whatsapp me-2"></i>
+                    Mensaje WhatsApp Personalizado con IA
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Loading State -->
+                <div id="whatsappLoading" class="text-center py-5">
+                    <div class="spinner-border text-success mb-3" role="status">
+                        <span class="visually-hidden">Generando mensaje...</span>
+                    </div>
+                    <p class="text-muted">Analizando perfil del cliente con IA GPT-4o...</p>
+                </div>
+
+                <!-- Content State (hidden initially) -->
+                <div id="whatsappContent" style="display: none;">
+                    <!-- Perfil Detectado -->
+                    <div class="alert alert-info d-flex align-items-center mb-4">
+                        <i class="fas fa-user-tag fa-2x me-3"></i>
+                        <div>
+                            <strong>Perfil Detectado:</strong>
+                            <div id="perfilNombre" class="mt-1"></div>
+                        </div>
+                    </div>
+
+                    <!-- Mensaje Generado -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-comment-dots me-2"></i>
+                            Mensaje Generado:
+                        </label>
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <div id="mensajePreview" style="white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.5;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Info del Cliente -->
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-user text-primary me-2"></i>
+                                <div>
+                                    <small class="text-muted d-block">Cliente</small>
+                                    <strong id="clienteNombre"></strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-phone text-success me-2"></i>
+                                <div>
+                                    <small class="text-muted d-block">Teléfono</small>
+                                    <strong id="clienteTelefono"></strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error State (hidden initially) -->
+                <div id="whatsappError" style="display: none;">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Error:</strong>
+                        <span id="errorMessage"></span>
+                    </div>
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-lightbulb me-1"></i>
+                        <small>Verifica que OPENAI_API_KEY esté configurada correctamente en las variables de entorno.</small>
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i> Cerrar
+                </button>
+                <button type="button" class="btn btn-outline-primary" id="btnRegenerarWhatsapp" style="display: none;" onclick="regenerarMensajeWhatsapp()">
+                    <i class="fas fa-sync-alt me-1"></i> Regenerar
+                </button>
+                <button type="button" class="btn btn-primary" id="btnCopiarWhatsapp" style="display: none;" onclick="copiarMensajeWhatsapp()">
+                    <i class="fas fa-copy me-1"></i> Copiar Mensaje
+                </button>
+                <button type="button" class="btn btn-success" id="btnAbrirWhatsapp" style="display: none;" onclick="abrirWhatsapp()">
+                    <i class="fab fa-whatsapp me-1"></i> Abrir WhatsApp
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Animación para el mensaje */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+#whatsappContent {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+/* Estilo del mensaje (similar a WhatsApp) */
+#mensajePreview {
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 12px;
+    border-left: 4px solid #25D366;
+}
+
+/* Hover effects */
+.btn-success:hover {
+    transform: scale(1.02);
+    transition: transform 0.2s ease;
+}
+</style>
+
+<script>
+let mensajeGenerado = '';
+let whatsappUrl = '';
+let clienteId = {{ cliente.id }};
+
+/**
+ * Genera mensaje WhatsApp con IA
+ */
+function generarMensajeWhatsappIA() {
+    // Mostrar modal
+    const modal = new bootstrap.Modal(document.getElementById('whatsappIaModal'));
+    modal.show();
+
+    // Reset states
+    document.getElementById('whatsappLoading').style.display = 'block';
+    document.getElementById('whatsappContent').style.display = 'none';
+    document.getElementById('whatsappError').style.display = 'none';
+
+    // Llamar a la API
+    fetch(`/ventas/crm/cliente/${clienteId}/whatsapp-ia/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('whatsappLoading').style.display = 'none';
+
+        if (data.success) {
+            // Guardar datos
+            mensajeGenerado = data.mensaje;
+            whatsappUrl = data.whatsapp_url;
+
+            // Mostrar contenido
+            document.getElementById('perfilNombre').textContent = data.perfil_nombre;
+            document.getElementById('mensajePreview').textContent = data.mensaje;
+            document.getElementById('clienteNombre').textContent = data.nombre_cliente;
+            document.getElementById('clienteTelefono').textContent = data.telefono;
+
+            document.getElementById('whatsappContent').style.display = 'block';
+            document.getElementById('btnRegenerarWhatsapp').style.display = 'inline-block';
+            document.getElementById('btnCopiarWhatsapp').style.display = 'inline-block';
+            document.getElementById('btnAbrirWhatsapp').style.display = 'inline-block';
+        } else {
+            // Mostrar error
+            document.getElementById('errorMessage').textContent = data.error || 'Error desconocido';
+            document.getElementById('whatsappError').style.display = 'block';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('whatsappLoading').style.display = 'none';
+        document.getElementById('errorMessage').textContent = error.message;
+        document.getElementById('whatsappError').style.display = 'block';
+    });
+}
+
+/**
+ * Regenera el mensaje (llama nuevamente a la IA)
+ */
+function regenerarMensajeWhatsapp() {
+    // Ocultar contenido y mostrar loading
+    document.getElementById('whatsappContent').style.display = 'none';
+    document.getElementById('whatsappLoading').style.display = 'block';
+
+    // Llamar nuevamente a la API
+    fetch(`/ventas/crm/cliente/${clienteId}/whatsapp-ia/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('whatsappLoading').style.display = 'none';
+
+        if (data.success) {
+            mensajeGenerado = data.mensaje;
+            whatsappUrl = data.whatsapp_url;
+
+            document.getElementById('mensajePreview').textContent = data.mensaje;
+            document.getElementById('whatsappContent').style.display = 'block';
+
+            // Mostrar notificación
+            mostrarNotificacion('success', 'Mensaje regenerado exitosamente');
+        } else {
+            document.getElementById('errorMessage').textContent = data.error;
+            document.getElementById('whatsappError').style.display = 'block';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('whatsappLoading').style.display = 'none';
+        document.getElementById('errorMessage').textContent = error.message;
+        document.getElementById('whatsappError').style.display = 'block';
+    });
+}
+
+/**
+ * Copia el mensaje al portapapeles
+ */
+function copiarMensajeWhatsapp() {
+    navigator.clipboard.writeText(mensajeGenerado).then(() => {
+        // Cambiar icono temporalmente
+        const btn = document.getElementById('btnCopiarWhatsapp');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check me-1"></i> ¡Copiado!';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-success');
+
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-primary');
+        }, 2000);
+
+        mostrarNotificacion('success', 'Mensaje copiado al portapapeles');
+    }).catch(err => {
+        console.error('Error copiando:', err);
+        mostrarNotificacion('error', 'Error al copiar mensaje');
+    });
+}
+
+/**
+ * Abre WhatsApp con el mensaje prellenado
+ */
+function abrirWhatsapp() {
+    window.open(whatsappUrl, '_blank');
+    mostrarNotificacion('info', 'Abriendo WhatsApp...');
+}
+
+/**
+ * Obtiene cookie CSRF
+ */
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+/**
+ * Muestra notificación temporal
+ */
+function mostrarNotificacion(tipo, mensaje) {
+    // Implementar con tu sistema de notificaciones preferido
+    // Por ahora, usar alert simple
+    console.log(`[${tipo.toUpperCase()}] ${mensaje}`);
+}
+</script>

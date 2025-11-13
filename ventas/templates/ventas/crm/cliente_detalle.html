@@ -68,6 +68,19 @@
                     >
                         <i class="fab fa-whatsapp"></i> WhatsApp
                     </button>
+
+                    <!-- NUEVO: Botón para Iniciar Conversación con IA -->
+                    <button
+                        type="button"
+                        class="btn btn-success ms-2"
+                        style="background-color: #128C7E; border-color: #128C7E;"
+                        onclick="generarMensajeWhatsappIA()"
+                        id="btnWhatsAppIA"
+                        title="Genera mensaje personalizado usando IA basado en el perfil del cliente"
+                    >
+                        <i class="fas fa-robot me-1"></i>
+                        <i class="fab fa-whatsapp"></i> Iniciar Conversación
+                    </button>
                 </div>
             </div>
         </div>
@@ -662,4 +675,8 @@
         });
     };
 </script>
+
+<!-- Incluir Modal de WhatsApp con IA -->
+{% include 'ventas/crm/whatsapp_modal.html' %}
+
 {% endblock %}

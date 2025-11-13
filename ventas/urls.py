@@ -130,6 +130,11 @@ urlpatterns = [
     path('crm/bulk-email-sender/', crm_views.bulk_email_sender_view, name='bulk_email_sender'),
     path('crm/bulk-email-send/', crm_views.bulk_email_send_view, name='bulk_email_send'),
 
+    # === MENSAJES WHATSAPP PERSONALIZADOS CON IA (GPT-4o) ===
+    path('crm/cliente/<int:cliente_id>/whatsapp-ia/', crm_views.generar_mensaje_whatsapp_ia, name='generar_mensaje_whatsapp_ia'),
+    path('crm/cliente/<int:cliente_id>/whatsapp-preview/', crm_views.preview_mensaje_whatsapp, name='preview_mensaje_whatsapp'),
+    # === END MENSAJES WHATSAPP IA ===
+
     # === PREMIOS Y FIDELIZACIÓN ===
     path('premios/', premio_views.premio_dashboard, name='premio_dashboard'),
     path('premios/pendientes/', premio_views.premios_pendientes, name='premios_pendientes'),

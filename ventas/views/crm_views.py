@@ -528,3 +528,72 @@ def whatsapp_propuesta(request, cliente_id):
             'success': False,
             'error': str(e)
         }, status=500)
+
+
+# ============================================================================
+# SISTEMA DE MENSAJES WHATSAPP PERSONALIZADOS CON IA (GPT-4o)
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def generar_mensaje_whatsapp_ia(request, cliente_id):
+    """
+    Genera mensaje personalizado de WhatsApp usando IA GPT-4o
+    Analiza perfil 360° del cliente y genera mensaje contextualizado
+    """
+    try:
+        from ventas.services.whatsapp_message_service import WhatsAppMessageService
+
+        # Generar mensaje con IA
+        resultado = WhatsAppMessageService.generar_mensaje_whatsapp(cliente_id)
+
+        if resultado['success']:
+            logger.info(f"Mensaje WhatsApp IA generado para cliente {cliente_id} - Perfil: {resultado['perfil']}")
+            return JsonResponse(resultado)
+        else:
+            return JsonResponse(resultado, status=500)
+
+    except Exception as e:
+        logger.error(f"Error generando mensaje WhatsApp IA para cliente {cliente_id}: {e}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': f"Error generando mensaje: {str(e)}"
+        }, status=500)
+
+
+@login_required
+def preview_mensaje_whatsapp(request, cliente_id):
+    """
+    Vista para mostrar preview del mensaje WhatsApp generado con IA
+    Muestra modal con el mensaje, perfil detectado y opciones para copiar/enviar
+    """
+    try:
+        from ventas.services.whatsapp_message_service import WhatsAppMessageService
+        from ventas.services.crm_service import CRMService
+
+        # Obtener datos del cliente
+        datos_360 = CRMService.get_customer_360(cliente_id)
+        cliente = datos_360['cliente']
+
+        # Generar mensaje
+        resultado = WhatsAppMessageService.generar_mensaje_whatsapp(cliente_id)
+
+        if not resultado['success']:
+            messages.error(request, f"Error generando mensaje: {resultado.get('error', 'Error desconocido')}")
+            return redirect('ventas:cliente_detalle', cliente_id=cliente_id)
+
+        return render(request, 'ventas/crm/whatsapp_preview.html', {
+            'cliente': cliente,
+            'mensaje': resultado['mensaje'],
+            'perfil': resultado['perfil'],
+            'perfil_nombre': resultado['perfil_nombre'],
+            'telefono': resultado['telefono'],
+            'telefono_limpio': resultado['telefono_limpio'],
+            'whatsapp_url': resultado['whatsapp_url'],
+            'datos_360': datos_360
+        })
+
+    except Exception as e:
+        logger.error(f"Error en preview mensaje WhatsApp: {e}", exc_info=True)
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('ventas:cliente_detalle', cliente_id=cliente_id)
