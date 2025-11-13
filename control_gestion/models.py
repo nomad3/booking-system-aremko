@@ -379,6 +379,7 @@ class TaskOwnerConfig(models.Model):
     class TipoTarea(models.TextChoices):
         PREPARACION_SERVICIO = 'preparacion_servicio', 'Preparación de Servicio (1h antes)'
         VACIADO_TINA = 'vaciado_tina', 'Vaciado de Tina (después del servicio)'
+        ATENCION_CLIENTES = 'atencion_clientes', 'Atención de Clientes en Servicio (20 min después check-in)'
         APERTURA_AM = 'apertura_am', 'Apertura AM - Limpieza'
         REPORTE_DIARIO = 'reporte_diario', 'Reporte Diario'
         MONITOREO = 'monitoreo', 'Monitoreo General'
