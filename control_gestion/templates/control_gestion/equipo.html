@@ -73,7 +73,7 @@
         }
 
         .task-row > div {
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
 
         .task-row > div:last-child {
@@ -86,38 +86,70 @@
         }
 
         /* Agregar labels antes de cada campo en móvil */
+        .task-row > div:nth-child(1) {
+            font-size: 13px;
+            color: #7f8c8d;
+            text-align: left;
+        }
+
         .task-row > div:nth-child(1)::before {
             content: "ID: ";
             font-weight: 600;
             color: #7f8c8d;
         }
 
-        .task-row > div:nth-child(3)::before {
-            content: "Área: ";
+        /* Título de la tarea - más grande */
+        .task-row > div:nth-child(2) {
+            font-size: 16px;
             font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .task-row > div:nth-child(3)::before {
+            content: "Área";
+            font-weight: 600;
+            color: #7f8c8d;
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            font-size: 13px;
         }
 
         .task-row > div:nth-child(4)::before {
-            content: "Responsable: ";
+            content: "Responsable";
             font-weight: 600;
+            color: #7f8c8d;
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .task-row > div:nth-child(4) {
+            font-size: 15px;
+            color: #2c3e50;
         }
 
         .task-row > div:nth-child(5)::before {
-            content: "Estado: ";
+            content: "Estado";
             font-weight: 600;
+            color: #7f8c8d;
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            font-size: 13px;
         }
 
         .task-row > div:nth-child(6)::before {
-            content: "Cola: ";
+            content: "Cola";
             font-weight: 600;
+            color: #7f8c8d;
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .task-row > div:nth-child(6) {
+            font-size: 15px;
+            color: #7f8c8d;
         }
     }
     
