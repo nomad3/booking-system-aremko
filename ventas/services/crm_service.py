@@ -418,6 +418,7 @@ class CRMService:
     def get_clientes_historicos_inactivos(meses_sin_visita: int = 12) -> List[Dict]:
         """
         Obtiene clientes que tienen datos históricos pero no han comprado recientemente
+        OPTIMIZADO: Usa agregaciones en lugar de loops para evitar N+1 queries
 
         Args:
             meses_sin_visita: Cantidad de meses sin visitas para considerar "inactivo" (default: 12)
@@ -434,63 +435,66 @@ class CRMService:
             - servicios_historicos
         """
         try:
+            from django.db.models import Q, Case, When, Value
+            from django.db.models.functions import Coalesce
+
             # Fecha límite para considerar inactivo
             fecha_limite = datetime.now().date() - timedelta(days=meses_sin_visita * 30)
 
-            # Obtener todos los clientes con ServiceHistory
-            clientes_historicos = ServiceHistory.objects.exclude(
+            # Obtener clientes con datos históricos Y sus métricas en UNA SOLA query
+            clientes_con_metricas = ServiceHistory.objects.exclude(
                 service_date=FECHA_PLACEHOLDER_HISTORICA
-            ).values('cliente').distinct()
+            ).values('cliente').annotate(
+                ultima_visita_hist=Max('service_date'),
+                gasto_historico=Sum('price_paid'),
+                servicios_count=Count('id')
+            ).filter(
+                ultima_visita_hist__isnull=False  # Solo clientes con fecha válida
+            )
 
+            # Obtener última visita en datos actuales para TODOS los clientes (en UNA query)
+            reservas_actuales = {}
+            reservas_query = ReservaServicio.objects.filter(
+                venta_reserva__estado_pago__in=['pagado', 'parcial']
+            ).values('venta_reserva__cliente').annotate(
+                ultima_reserva=Max('fecha_agendamiento')
+            )
+
+            for r in reservas_query:
+                cliente_id = r['venta_reserva__cliente']
+                reservas_actuales[cliente_id] = r['ultima_reserva']
+
+            # Procesar clientes
             clientes_inactivos = []
+            clientes_ids = [c['cliente'] for c in clientes_con_metricas]
 
-            for hist in clientes_historicos:
-                cliente_id = hist['cliente']
+            # Obtener info de clientes en UNA query
+            clientes_dict = {
+                c.id: c for c in Cliente.objects.filter(id__in=clientes_ids)
+            }
 
-                try:
-                    cliente = Cliente.objects.get(id=cliente_id)
-                except Cliente.DoesNotExist:
+            for cliente_data in clientes_con_metricas:
+                cliente_id = cliente_data['cliente']
+
+                if cliente_id not in clientes_dict:
                     continue
 
-                # Obtener última visita del cliente (histórico + actual)
-                ultima_visita_hist = ServiceHistory.objects.filter(
-                    cliente=cliente
-                ).exclude(
-                    service_date=FECHA_PLACEHOLDER_HISTORICA
-                ).aggregate(Max('service_date'))['service_date__max']
-
-                # Última visita en datos actuales
-                ultima_reserva = ReservaServicio.objects.filter(
-                    venta_reserva__cliente=cliente,
-                    venta_reserva__estado_pago__in=['pagado', 'parcial']
-                ).aggregate(Max('fecha_agendamiento'))['fecha_agendamiento__max']
+                cliente = clientes_dict[cliente_id]
+                ultima_visita_hist = cliente_data['ultima_visita_hist']
+                ultima_reserva = reservas_actuales.get(cliente_id)
 
                 # Determinar última visita real
-                ultima_visita = None
                 if ultima_visita_hist and ultima_reserva:
                     ultima_visita = max(ultima_visita_hist, ultima_reserva)
                 elif ultima_visita_hist:
                     ultima_visita = ultima_visita_hist
                 elif ultima_reserva:
                     ultima_visita = ultima_reserva
+                else:
+                    continue
 
                 # Verificar si está inactivo
-                if ultima_visita and ultima_visita < fecha_limite:
-                    # Calcular gasto histórico total
-                    gasto_historico = ServiceHistory.objects.filter(
-                        cliente=cliente
-                    ).exclude(
-                        service_date=FECHA_PLACEHOLDER_HISTORICA
-                    ).aggregate(total=Sum('price_paid'))['total'] or 0
-
-                    # Contar servicios históricos
-                    servicios_historicos = ServiceHistory.objects.filter(
-                        cliente=cliente
-                    ).exclude(
-                        service_date=FECHA_PLACEHOLDER_HISTORICA
-                    ).count()
-
-                    # Calcular días sin visita
+                if ultima_visita < fecha_limite:
                     dias_sin_visita = (datetime.now().date() - ultima_visita).days
 
                     clientes_inactivos.append({
@@ -498,15 +502,16 @@ class CRMService:
                         'nombre': cliente.nombre,
                         'email': cliente.email or 'Sin email',
                         'telefono': cliente.telefono or 'Sin teléfono',
-                        'gasto_historico_total': float(gasto_historico),
+                        'gasto_historico_total': float(cliente_data['gasto_historico'] or 0),
                         'ultima_visita': ultima_visita,
                         'dias_sin_visita': dias_sin_visita,
-                        'servicios_historicos': servicios_historicos
+                        'servicios_historicos': cliente_data['servicios_count']
                     })
 
             # Ordenar por gasto histórico (mayor a menor)
             clientes_inactivos.sort(key=lambda x: x['gasto_historico_total'], reverse=True)
 
+            logger.info(f"Clientes inactivos encontrados: {len(clientes_inactivos)} (filtro: {meses_sin_visita} meses)")
             return clientes_inactivos
 
         except Exception as e:
