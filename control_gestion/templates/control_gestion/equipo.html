@@ -59,6 +59,67 @@
         gap: 15px;
         align-items: center;
     }
+
+    /* Responsive: Mobile */
+    @media (max-width: 768px) {
+        .task-row {
+            display: block;
+            padding: 20px 15px;
+            border-left: 4px solid #3498db;
+        }
+
+        .task-row:hover {
+            background: #f8f9fa;
+        }
+
+        .task-row > div {
+            margin-bottom: 10px;
+        }
+
+        .task-row > div:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Ocultar headers de tabla en móvil */
+        .task-row[style*="font-weight: 600"] {
+            display: none;
+        }
+
+        /* Agregar labels antes de cada campo en móvil */
+        .task-row > div:nth-child(1)::before {
+            content: "ID: ";
+            font-weight: 600;
+            color: #7f8c8d;
+        }
+
+        .task-row > div:nth-child(3)::before {
+            content: "Área: ";
+            font-weight: 600;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .task-row > div:nth-child(4)::before {
+            content: "Responsable: ";
+            font-weight: 600;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .task-row > div:nth-child(5)::before {
+            content: "Estado: ";
+            font-weight: 600;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .task-row > div:nth-child(6)::before {
+            content: "Cola: ";
+            font-weight: 600;
+            display: block;
+            margin-bottom: 5px;
+        }
+    }
     
     .task-row:last-child {
         border-bottom: none;
@@ -185,6 +246,89 @@
         to {
             transform: translateX(0);
             opacity: 1;
+        }
+    }
+
+    /* Responsive: Stats grid */
+    @media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .stat-card {
+            padding: 15px;
+        }
+
+        .stat-number {
+            font-size: 28px;
+        }
+    }
+
+    /* Responsive: Filtros */
+    @media (max-width: 768px) {
+        .filter-container {
+            text-align: center;
+        }
+
+        .filter-container strong {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .filter-container .btn {
+            display: inline-block;
+            margin: 3px;
+            padding: 8px 12px !important;
+            font-size: 12px !important;
+        }
+    }
+
+    /* Responsive: Header */
+    @media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 10px;
+        }
+
+        .page-header h2 {
+            font-size: 24px;
+        }
+
+        .page-header > div {
+            font-size: 13px;
+        }
+    }
+
+    /* Responsive: Botones de acción rápida */
+    @media (max-width: 768px) {
+        .task-actions-quick {
+            margin-top: 15px;
+            justify-content: flex-start;
+        }
+
+        .btn-quick {
+            flex: 1;
+            min-width: 110px;
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+    }
+
+    /* Responsive: Keyboard hints */
+    @media (max-width: 768px) {
+        .keyboard-hint {
+            font-size: 11px;
+            padding: 8px;
+        }
+    }
+
+    /* Responsive: Toast notifications */
+    @media (max-width: 768px) {
+        .toast {
+            left: 10px;
+            right: 10px;
+            top: 10px;
         }
     }
 </style>
@@ -426,12 +570,12 @@ document.addEventListener('DOMContentLoaded', function() {
 {% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
     <h2>👥 Snapshot del Equipo</h2>
     <div style="color: #7f8c8d;">{{ today|date:"l, d F Y" }}</div>
 </div>
 
-<div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+<div class="filter-container" style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
     <strong style="margin-right: 15px;">Filtrar por área:</strong>
     <a href="?area=" class="btn" style="padding: 5px 15px; font-size: 13px; margin-right: 5px;">Todas</a>
     <a href="?area=OPS" class="btn" style="padding: 5px 15px; font-size: 13px; margin-right: 5px;">Operación</a>
