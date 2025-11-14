@@ -6,6 +6,221 @@
 {% block extrastyle %}
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+<style>
+    /* Estilos base para la tabla */
+    .premio-row {
+        display: grid;
+        grid-template-columns: 80px 1fr 1fr 120px 120px 120px 120px 150px;
+        gap: 15px;
+        padding: 15px;
+        align-items: center;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .premio-row:hover {
+        background-color: #f8f9fa;
+    }
+
+    .premio-header {
+        font-weight: 600;
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    /* Responsive: Mobile */
+    @media (max-width: 768px) {
+        .premio-row {
+            display: block;
+            padding: 20px 15px;
+            border-left: 4px solid #ffc107;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+
+        .premio-row > div {
+            margin-bottom: 12px;
+        }
+
+        /* Ocultar headers de tabla en móvil */
+        .premio-header {
+            display: none !important;
+        }
+
+        /* ID del premio - destacado */
+        .premio-row > div:nth-child(1) {
+            font-size: 18px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .premio-row > div:nth-child(1)::before {
+            content: "Premio ";
+            font-weight: 600;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        /* Cliente - destacado */
+        .premio-row > div:nth-child(2) {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .premio-row > div:nth-child(2)::before {
+            content: "Cliente";
+            font-weight: 600;
+            color: #7f8c8d;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        /* Premio */
+        .premio-row > div:nth-child(3)::before {
+            content: "Premio";
+            font-weight: 600;
+            color: #7f8c8d;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .premio-row > div:nth-child(3) {
+            font-size: 15px;
+            color: #34495e;
+        }
+
+        /* Tipo */
+        .premio-row > div:nth-child(4)::before {
+            content: "Tipo";
+            font-weight: 600;
+            color: #7f8c8d;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .premio-row > div:nth-child(4) {
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        /* Estado */
+        .premio-row > div:nth-child(5)::before {
+            content: "Estado";
+            font-weight: 600;
+            color: #7f8c8d;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .premio-row > div:nth-child(5) .badge {
+            font-size: 14px;
+            padding: 6px 12px;
+        }
+
+        /* Fecha Ganado */
+        .premio-row > div:nth-child(6)::before {
+            content: "Fecha Ganado";
+            font-weight: 600;
+            color: #7f8c8d;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .premio-row > div:nth-child(6) {
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        /* Expira */
+        .premio-row > div:nth-child(7)::before {
+            content: "Expira";
+            font-weight: 600;
+            color: #7f8c8d;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .premio-row > div:nth-child(7) {
+            font-size: 14px;
+            color: #e74c3c;
+            font-weight: 500;
+        }
+
+        /* Acciones */
+        .premio-row > div:nth-child(8) {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ecf0f1;
+        }
+
+        .premio-row > div:nth-child(8) .btn {
+            width: 48%;
+            display: inline-block;
+            padding: 10px 15px;
+            font-size: 14px;
+            margin-right: 4%;
+        }
+
+        .premio-row > div:nth-child(8) .btn:last-child {
+            margin-right: 0;
+        }
+    }
+
+    /* Responsive: Filtros */
+    @media (max-width: 768px) {
+        .filter-form .col-md-4 {
+            margin-bottom: 15px;
+        }
+
+        .filter-form label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .filter-form .form-select {
+            font-size: 15px;
+            padding: 10px;
+        }
+
+        .filter-form .btn {
+            width: 100%;
+            padding: 12px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+    }
+
+    /* Responsive: Header */
+    @media (max-width: 768px) {
+        .modern-container h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+    }
+
+    /* Badge styles para mejor visibilidad en móvil */
+    @media (max-width: 768px) {
+        .badge {
+            font-size: 13px;
+            padding: 5px 10px;
+        }
+    }
+</style>
 {% endblock %}
 
 {% block breadcrumbs %}
@@ -22,7 +237,7 @@
 
     <div class="card mt-3">
         <div class="card-body">
-            <form method="get" class="row g-3 mb-4">
+            <form method="get" class="row g-3 mb-4 filter-form">
                 <div class="col-md-4">
                     <label>Estado:</label>
                     <select name="estado" class="form-select">
@@ -51,47 +266,46 @@
                 </div>
             </form>
 
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Cliente</th>
-                        <th>Premio</th>
-                        <th>Tipo</th>
-                        <th>Estado</th>
-                        <th>Fecha Ganado</th>
-                        <th>Expira</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for premio in premios %}
-                    <tr>
-                        <td><strong>#{{ premio.id }}</strong></td>
-                        <td>
-                            <strong>{{ premio.cliente.nombre }}</strong><br>
-                            <small>{{ premio.cliente.telefono }}</small>
-                        </td>
-                        <td>{{ premio.premio.nombre }}</td>
-                        <td>{{ premio.premio.get_tipo_display }}</td>
-                        <td>
-                            <span class="badge bg-{% if premio.estado == 'usado' %}success{% elif premio.estado == 'expirado' %}danger{% elif premio.estado == 'aprobado' %}primary{% else %}warning{% endif %}">
-                                {{ premio.get_estado_display }}
-                            </span>
-                        </td>
-                        <td>{{ premio.fecha_ganado|date:"d/m/Y" }}</td>
-                        <td>{{ premio.fecha_expiracion|date:"d/m/Y" }}</td>
-                        <td>
-                            <a href="{% url 'ventas:cliente_premio_detalle' premio.id %}" class="btn btn-sm btn-info">Ver</a>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="8" class="text-center">No hay premios que mostrar</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <!-- Header (Desktop only) -->
+            <div class="premio-row premio-header">
+                <div>ID</div>
+                <div>CLIENTE</div>
+                <div>PREMIO</div>
+                <div>TIPO</div>
+                <div>ESTADO</div>
+                <div>FECHA GANADO</div>
+                <div>EXPIRA</div>
+                <div>ACCIONES</div>
+            </div>
+
+            <!-- Lista de Premios -->
+            {% for premio in premios %}
+            <div class="premio-row">
+                <div><strong>#{{ premio.id }}</strong></div>
+                <div>
+                    <strong>{{ premio.cliente.nombre }}</strong><br>
+                    <small>{{ premio.cliente.telefono }}</small>
+                </div>
+                <div>{{ premio.premio.nombre }}</div>
+                <div>{{ premio.premio.get_tipo_display }}</div>
+                <div>
+                    <span class="badge bg-{% if premio.estado == 'usado' %}success{% elif premio.estado == 'expirado' %}danger{% elif premio.estado == 'aprobado' %}primary{% else %}warning{% endif %}">
+                        {{ premio.get_estado_display }}
+                    </span>
+                </div>
+                <div>{{ premio.fecha_ganado|date:"d/m/Y" }}</div>
+                <div>{{ premio.fecha_expiracion|date:"d/m/Y" }}</div>
+                <div>
+                    <a href="{% url 'ventas:cliente_premio_detalle' premio.id %}" class="btn btn-sm btn-info">Ver</a>
+                    <a href="{% url 'ventas:premio_whatsapp' premio.id %}" class="btn btn-sm btn-success">WhatsApp</a>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center py-5">
+                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                <p class="text-muted">No hay premios que mostrar</p>
+            </div>
+            {% endfor %}
         </div>
     </div>
 </div>
