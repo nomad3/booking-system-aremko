@@ -413,3 +413,102 @@ class CRMService:
         customer_ids = list(clientes_hist.union(clientes_actual))[:limit]
 
         return customer_ids
+
+    @staticmethod
+    def get_clientes_historicos_inactivos(meses_sin_visita: int = 12) -> List[Dict]:
+        """
+        Obtiene clientes que tienen datos históricos pero no han comprado recientemente
+
+        Args:
+            meses_sin_visita: Cantidad de meses sin visitas para considerar "inactivo" (default: 12)
+
+        Returns:
+            Lista de dicts con:
+            - cliente_id
+            - nombre
+            - email
+            - telefono
+            - gasto_historico_total
+            - ultima_visita
+            - dias_sin_visita
+            - servicios_historicos
+        """
+        try:
+            # Fecha límite para considerar inactivo
+            fecha_limite = datetime.now().date() - timedelta(days=meses_sin_visita * 30)
+
+            # Obtener todos los clientes con ServiceHistory
+            clientes_historicos = ServiceHistory.objects.exclude(
+                service_date=FECHA_PLACEHOLDER_HISTORICA
+            ).values('cliente').distinct()
+
+            clientes_inactivos = []
+
+            for hist in clientes_historicos:
+                cliente_id = hist['cliente']
+
+                try:
+                    cliente = Cliente.objects.get(id=cliente_id)
+                except Cliente.DoesNotExist:
+                    continue
+
+                # Obtener última visita del cliente (histórico + actual)
+                ultima_visita_hist = ServiceHistory.objects.filter(
+                    cliente=cliente
+                ).exclude(
+                    service_date=FECHA_PLACEHOLDER_HISTORICA
+                ).aggregate(Max('service_date'))['service_date__max']
+
+                # Última visita en datos actuales
+                ultima_reserva = ReservaServicio.objects.filter(
+                    venta_reserva__cliente=cliente,
+                    venta_reserva__estado_pago__in=['pagado', 'parcial']
+                ).aggregate(Max('fecha_agendamiento'))['fecha_agendamiento__max']
+
+                # Determinar última visita real
+                ultima_visita = None
+                if ultima_visita_hist and ultima_reserva:
+                    ultima_visita = max(ultima_visita_hist, ultima_reserva)
+                elif ultima_visita_hist:
+                    ultima_visita = ultima_visita_hist
+                elif ultima_reserva:
+                    ultima_visita = ultima_reserva
+
+                # Verificar si está inactivo
+                if ultima_visita and ultima_visita < fecha_limite:
+                    # Calcular gasto histórico total
+                    gasto_historico = ServiceHistory.objects.filter(
+                        cliente=cliente
+                    ).exclude(
+                        service_date=FECHA_PLACEHOLDER_HISTORICA
+                    ).aggregate(total=Sum('price_paid'))['total'] or 0
+
+                    # Contar servicios históricos
+                    servicios_historicos = ServiceHistory.objects.filter(
+                        cliente=cliente
+                    ).exclude(
+                        service_date=FECHA_PLACEHOLDER_HISTORICA
+                    ).count()
+
+                    # Calcular días sin visita
+                    dias_sin_visita = (datetime.now().date() - ultima_visita).days
+
+                    clientes_inactivos.append({
+                        'cliente_id': cliente.id,
+                        'nombre': cliente.nombre,
+                        'email': cliente.email or 'Sin email',
+                        'telefono': cliente.telefono or 'Sin teléfono',
+                        'gasto_historico_total': float(gasto_historico),
+                        'ultima_visita': ultima_visita,
+                        'dias_sin_visita': dias_sin_visita,
+                        'servicios_historicos': servicios_historicos
+                    })
+
+            # Ordenar por gasto histórico (mayor a menor)
+            clientes_inactivos.sort(key=lambda x: x['gasto_historico_total'], reverse=True)
+
+            return clientes_inactivos
+
+        except Exception as e:
+            logger.error(f"Error obteniendo clientes históricos inactivos: {e}", exc_info=True)
+            return []

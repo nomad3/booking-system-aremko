@@ -1,0 +1,268 @@
+{% extends 'admin/base_site.html' %}
+{% load static %}
+
+{% block title %}Clientes Históricos Inactivos - Aremko{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    .filter-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .cliente-card {
+        border-left: 4px solid #667eea;
+        transition: transform 0.2s, box-shadow 0.2s;
+        margin-bottom: 15px;
+    }
+    .cliente-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    }
+    .gasto-badge {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #667eea;
+    }
+    .inactive-days {
+        color: #e74c3c;
+        font-weight: 500;
+    }
+    .filter-input {
+        background: rgba(255,255,255,0.2);
+        border: 2px solid rgba(255,255,255,0.3);
+        color: white;
+        border-radius: 8px;
+        padding: 10px 15px;
+    }
+    .filter-input::placeholder {
+        color: rgba(255,255,255,0.7);
+    }
+    .filter-input:focus {
+        background: rgba(255,255,255,0.3);
+        border-color: white;
+        color: white;
+        outline: none;
+    }
+    .btn-filter {
+        background: white;
+        color: #667eea;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 10px 25px;
+    }
+    .btn-filter:hover {
+        background: #f8f9fa;
+        color: #764ba2;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h2 mb-2">
+                <i class="fas fa-user-clock me-2"></i>
+                Clientes Históricos Inactivos
+            </h1>
+            <p class="text-muted">
+                Clientes con compras históricas que no han visitado Aremko recientemente
+            </p>
+        </div>
+    </div>
+
+    <!-- Filtro de Meses -->
+    <div class="row">
+        <div class="col-12">
+            <div class="filter-card">
+                <form method="GET" action="{% url 'ventas:clientes_historicos_inactivos' %}" class="row align-items-end g-3">
+                    <div class="col-md-8">
+                        <label for="meses_filtro" class="form-label mb-2">
+                            <i class="fas fa-calendar-alt me-1"></i>
+                            Meses sin visitar Aremko
+                        </label>
+                        <input
+                            type="number"
+                            class="form-control filter-input"
+                            id="meses_filtro"
+                            name="meses"
+                            value="{{ meses_filtro }}"
+                            min="1"
+                            max="60"
+                            placeholder="Ej: 12 meses"
+                        >
+                        <small class="d-block mt-2" style="color: rgba(255,255,255,0.9);">
+                            Mostrar clientes que no han visitado el spa en los últimos <strong>{{ meses_filtro }} meses</strong>
+                        </small>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-filter w-100">
+                            <i class="fas fa-filter me-2"></i>
+                            Aplicar Filtro
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas Rápidas -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-2x text-primary mb-2"></i>
+                    <h3 class="mb-0">{{ total_clientes }}</h3>
+                    <p class="text-muted mb-0">Clientes Inactivos</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-calendar-times fa-2x text-danger mb-2"></i>
+                    <h3 class="mb-0">{{ meses_filtro }}</h3>
+                    <p class="text-muted mb-0">Meses sin Visita</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-dollar-sign fa-2x text-success mb-2"></i>
+                    <h3 class="mb-0">
+                        {% if clientes_inactivos %}
+                        ${{ clientes_inactivos.0.gasto_historico_total|floatformat:0 }}
+                        {% else %}
+                        $0
+                        {% endif %}
+                    </h3>
+                    <p class="text-muted mb-0">Mayor Gasto Histórico</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Clientes -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        Listado de Clientes (ordenados por gasto histórico)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if clientes_inactivos %}
+                        {% for cliente in clientes_inactivos %}
+                        <div class="card cliente-card">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-md-4">
+                                        <h5 class="mb-1">
+                                            <i class="fas fa-user-circle me-2 text-primary"></i>
+                                            {{ cliente.nombre }}
+                                        </h5>
+                                        <div class="mt-2">
+                                            {% if cliente.telefono != 'Sin teléfono' %}
+                                            <small class="d-block text-muted">
+                                                <i class="fas fa-phone me-1"></i>
+                                                {{ cliente.telefono }}
+                                            </small>
+                                            {% endif %}
+                                            {% if cliente.email != 'Sin email' %}
+                                            <small class="d-block text-muted">
+                                                <i class="fas fa-envelope me-1"></i>
+                                                {{ cliente.email }}
+                                            </small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <div class="gasto-badge">
+                                            ${{ cliente.gasto_historico_total|floatformat:0 }}
+                                        </div>
+                                        <small class="text-muted d-block">Gasto Histórico</small>
+                                        <small class="text-muted d-block mt-1">
+                                            <i class="fas fa-shopping-bag me-1"></i>
+                                            {{ cliente.servicios_historicos }} servicio{{ cliente.servicios_historicos|pluralize }}
+                                        </small>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <div class="inactive-days">
+                                            <i class="fas fa-calendar-times me-1"></i>
+                                            {{ cliente.dias_sin_visita }} días
+                                        </div>
+                                        <small class="text-muted d-block">Sin visitar Aremko</small>
+                                        <small class="text-muted d-block mt-1">
+                                            Última visita: {{ cliente.ultima_visita|date:"d/m/Y" }}
+                                        </small>
+                                    </div>
+                                    <div class="col-md-2 text-end">
+                                        <a
+                                            href="{% url 'ventas:cliente_detalle' cliente.cliente_id %}"
+                                            class="btn btn-primary btn-sm"
+                                            target="_blank"
+                                        >
+                                            <i class="fas fa-eye me-1"></i>
+                                            Ver Perfil 360°
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No hay clientes inactivos</h5>
+                            <p class="text-muted">
+                                No se encontraron clientes con más de {{ meses_filtro }} meses sin visitar Aremko.
+                            </p>
+                            <a href="{% url 'ventas:clientes_historicos_inactivos' %}?meses=6" class="btn btn-primary">
+                                <i class="fas fa-filter me-2"></i>
+                                Intentar con 6 meses
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botón Volver -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <a href="{% url 'ventas:admin_section_crm' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>
+                Volver a CRM Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-focus en el input de filtro
+    document.getElementById('meses_filtro').focus();
+
+    // Validación del rango de meses
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const meses = parseInt(document.getElementById('meses_filtro').value);
+        if (meses < 1 || meses > 60) {
+            e.preventDefault();
+            alert('Por favor ingresa un valor entre 1 y 60 meses.');
+        }
+    });
+
+    console.log('Clientes Inactivos loaded - Total:', {{ total_clientes }});
+</script>
+{% endblock %}

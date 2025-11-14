@@ -597,3 +597,37 @@ def preview_mensaje_whatsapp(request, cliente_id):
         logger.error(f"Error en preview mensaje WhatsApp: {e}", exc_info=True)
         messages.error(request, f"Error: {str(e)}")
         return redirect('ventas:cliente_detalle', cliente_id=cliente_id)
+
+
+@login_required
+def clientes_historicos_inactivos(request):
+    """
+    Vista de listado de clientes históricos que no han comprado recientemente
+    Incluye filtro por cantidad de meses sin visita
+    """
+    try:
+        # Obtener parámetro de filtro (default: 12 meses)
+        meses_sin_visita = int(request.GET.get('meses', 12))
+
+        # Validar rango (mínimo 1 mes, máximo 60 meses)
+        if meses_sin_visita < 1:
+            meses_sin_visita = 1
+        elif meses_sin_visita > 60:
+            meses_sin_visita = 60
+
+        # Obtener clientes inactivos
+        clientes_inactivos = CRMService.get_clientes_historicos_inactivos(meses_sin_visita)
+
+        context = {
+            'clientes_inactivos': clientes_inactivos,
+            'meses_filtro': meses_sin_visita,
+            'total_clientes': len(clientes_inactivos),
+            'page_title': 'Clientes Históricos Inactivos'
+        }
+
+        return render(request, 'ventas/crm/clientes_inactivos.html', context)
+
+    except Exception as e:
+        logger.error(f"Error en listado de clientes inactivos: {e}", exc_info=True)
+        messages.error(request, f"Error cargando listado: {str(e)}")
+        return redirect('ventas:crm_dashboard')

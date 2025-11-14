@@ -72,6 +72,7 @@ urlpatterns = [
     # === CRM PROPUESTAS PERSONALIZADAS CON IA ===
     path('crm/', crm_views.crm_dashboard, name='crm_dashboard'),
     path('crm/buscar/', crm_views.crm_buscar, name='crm_buscar'),
+    path('crm/clientes-inactivos/', crm_views.clientes_historicos_inactivos, name='clientes_historicos_inactivos'),
     path('crm/cliente/<int:cliente_id>/', crm_views.cliente_detalle, name='cliente_detalle'),
     path('crm/cliente/<int:cliente_id>/propuesta/', crm_views.generar_propuesta, name='generar_propuesta'),
     path('crm/cliente/<int:cliente_id>/enviar/', crm_views.enviar_propuesta, name='enviar_propuesta'),
