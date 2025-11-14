@@ -88,11 +88,24 @@ class CRMService:
         # reverse=True: fecha más actual arriba, más antigua abajo
         servicios_combinados.sort(key=lambda x: x['fecha'], reverse=True)
 
+        # Calcular total de RESERVAS únicas (1 reserva = 1 visita al spa)
+        # En datos actuales: contar VentaReserva únicos
+        reservas_actuales_ids = set()
+        for rs in reservas_servicio:
+            reservas_actuales_ids.add(rs.venta_reserva.id)
+        total_reservas_actuales = len(reservas_actuales_ids)
+
+        # En datos históricos: cada ServiceHistory = 1 visita (no se pueden agrupar por reserva)
+        # Por lo tanto, total_reservas = total_historicos + total_reservas_actuales
+        total_reservas_combinadas = total_historicos + total_reservas_actuales
+
         return {
             'servicios': servicios_combinados,
             'total_historicos': total_historicos,
             'total_actuales': reservas_servicio.count(),
-            'total_combinados': len(servicios_combinados)
+            'total_combinados': len(servicios_combinados),
+            'total_reservas_actuales': total_reservas_actuales,
+            'total_reservas_combinadas': total_reservas_combinadas
         }
 
     @staticmethod
@@ -171,6 +184,8 @@ class CRMService:
                     'servicios_historicos': datos_combinados['total_historicos'],
                     'servicios_actuales': datos_combinados['total_actuales'],
                     'servicios_recientes': servicios_recientes,
+                    'total_reservas': datos_combinados['total_reservas_combinadas'],  # Total visitas al spa
+                    'reservas_actuales': datos_combinados['total_reservas_actuales'],
                     'gasto_total': float(gasto_total),
                     'ticket_promedio': float(ticket_promedio),
                     'primer_servicio': primer_servicio,  # Pass date object for Django template date filter

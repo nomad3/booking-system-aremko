@@ -45,6 +45,7 @@ class WhatsAppMessageService:
         segmentacion = datos_360['segmentacion']
 
         total_servicios = metricas['total_servicios']
+        total_reservas = metricas.get('total_reservas', total_servicios)  # Fallback a total_servicios si no existe
         servicios_historicos = metricas['servicios_historicos']
         servicios_actuales = metricas['servicios_actuales']
         gasto_total = metricas['gasto_total']
@@ -59,11 +60,11 @@ class WhatsAppMessageService:
             dias_desde_ultima = 9999
 
         # 1. Cliente Completamente Nuevo (no existe en BD)
-        if total_servicios == 0:
+        if total_reservas == 0:
             return cls.CLIENTE_NUEVO
 
-        # 2. Cliente Nuevo con Primera Reserva
-        if servicios_actuales <= 3 and servicios_historicos == 0 and dias_como_cliente < 30:
+        # 2. Cliente Nuevo con Primera Reserva (1-2 visitas recientes)
+        if total_reservas <= 2 and servicios_historicos == 0 and dias_como_cliente < 30:
             return cls.PRIMERA_RESERVA
 
         # 3. Cliente VIP / Champions
@@ -75,7 +76,8 @@ class WhatsAppMessageService:
             return cls.EN_RIESGO
 
         # 5. Cliente Antiguo Reactivado (tiene históricos, regresó después de mucho tiempo)
-        if servicios_historicos > 0 and servicios_actuales <= 3:
+        reservas_actuales = metricas.get('reservas_actuales', 0)
+        if servicios_historicos > 0 and reservas_actuales <= 2:
             # Verificar si hubo un gap largo entre históricos y actuales
             primer_servicio = metricas.get('primer_servicio')
             if primer_servicio:
@@ -132,7 +134,8 @@ IMPORTANTE:
 
 INFORMACIÓN DEL CLIENTE:
 - Nombre: {cliente['nombre']}
-- Total servicios: {metricas['total_servicios']}
+- Total visitas al spa: {metricas['total_reservas']}
+- Total servicios contratados: {metricas['total_servicios']}
 - Servicios históricos: {metricas['servicios_historicos']}
 - Servicios actuales: {metricas['servicios_actuales']}
 - Gasto total: ${metricas['gasto_total']:,.0f} CLP
@@ -181,11 +184,14 @@ TONO: Cercano, apreciativo, como hablar con un conocido.
 LONGITUD: 4-5 líneas.
 ESTRUCTURA SUGERIDA:
 1. Saludo personalizado
-2. Mencionar cantidad de visitas o categoría favorita
-3. Sugerencia personalizada o pregunta relevante
+2. Mencionar cantidad de VISITAS (usar total_reservas, NO total_servicios)
+3. Mencionar categoría favorita si aplica
+4. Sugerencia personalizada o pregunta relevante
 
 EJEMPLO DE REFERENCIA (NO COPIAR EXACTAMENTE):
-"¡Hola Carlos! 😊 Qué gusto saber de ti. Veo que has venido {X} veces y te encantan las {categoría}. ¿Vienes por tu favorito o quieres probar algo nuevo?"
+"¡Hola Carlos! 😊 Qué gusto saber de ti. Con {total_reservas} visitas a Aremko, veo que te encantan las {categoría}. ¿Vienes por tu favorito o quieres probar algo nuevo?"
+
+IMPORTANTE: Usa "visitas" para referirte a total_reservas (cantidad de veces que vino al spa), NO uses "servicios".
 """,
 
             cls.REACTIVADO: """
@@ -208,12 +214,16 @@ TONO: Elegante, premium, personalizado, pero no excesivamente formal.
 LONGITUD: 5-6 líneas.
 ESTRUCTURA SUGERIDA:
 1. Saludo personalizado con reconocimiento especial
-2. Mencionar métricas impresionantes (visitas, años como cliente)
+2. Mencionar métricas impresionantes:
+   - Usar total_reservas para "visitas" (cantidad de veces que vino)
+   - Mencionar años como cliente si aplica
 3. Ofrecer atención prioritaria o experiencia personalizada
 4. Pregunta VIP
 
 EJEMPLO DE REFERENCIA (NO COPIAR EXACTAMENTE):
-"¡Roberto! ✨ Es un placer saber de ti. Como uno de nuestros clientes más especiales ({X} visitas, cliente desde {año}), queremos asegurarnos de brindarte la mejor experiencia. ¿Necesitas una reserva prioritaria o algo especial?"
+"¡Roberto! ✨ Qué alegría verte nuevamente hoy en Aremko. Con tus {total_reservas} visitas y siendo cliente VIP desde hace más de {X} años, queremos ofrecerte una experiencia aún más especial. ¿Te gustaría que preparemos tu tina favorita con algún detalle exclusivo para tu próxima visita?"
+
+IMPORTANTE: Usa "visitas" para referirte a total_reservas (veces que vino al spa), NO confundas con "servicios contratados".
 """,
 
             cls.EN_RIESGO: """
