@@ -1,0 +1,47 @@
+# Generated manually
+from django.db import migrations, models
+
+
+def migrate_tramo_hito_to_tramos_validos(apps, schema_editor):
+    """
+    Migra los valores de tramo_hito a tramos_validos
+    """
+    Premio = apps.get_model('ventas', 'Premio')
+
+    for premio in Premio.objects.all():
+        if premio.tramo_hito:
+            premio.tramos_validos = [premio.tramo_hito]
+            premio.save(update_fields=['tramos_validos'])
+
+
+def reverse_migration(apps, schema_editor):
+    """
+    Reversa: toma el primer valor de tramos_validos y lo pone en tramo_hito
+    """
+    Premio = apps.get_model('ventas', 'Premio')
+
+    for premio in Premio.objects.all():
+        if premio.tramos_validos and len(premio.tramos_validos) > 0:
+            premio.tramo_hito = premio.tramos_validos[0]
+            premio.save(update_fields=['tramo_hito'])
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('ventas', '0058_add_tramo_hito_to_premio'),
+    ]
+
+    operations = [
+        migrations.AddField(
+            model_name='premio',
+            name='tramos_validos',
+            field=models.JSONField(blank=True, default=list, help_text='Lista de tramos donde aplica este premio. Ej: [5,6,7,8] para premio de tramos 5-8'),
+        ),
+        migrations.AlterField(
+            model_name='premio',
+            name='tramo_hito',
+            field=models.IntegerField(blank=True, help_text='DEPRECATED: Usar tramos_validos. Tramo único antiguo', null=True),
+        ),
+        migrations.RunPython(migrate_tramo_hito_to_tramos_validos, reverse_migration),
+    ]
