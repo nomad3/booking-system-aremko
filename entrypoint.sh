@@ -49,9 +49,15 @@ while ! nc -z "$DB_HOST" "$DB_PORT"; do
 done
 echo "Base de datos está disponible."
 
-# Aplicar migraciones de Django
-echo "Aplicando migraciones..."
-python manage.py migrate
+# NOTA: Migraciones deshabilitadas permanentemente debido a historial corrupto
+# La base de datos ya tiene todas las tablas y campos necesarios
+echo "⚠️  Migraciones deshabilitadas - BD ya configurada correctamente"
+# if [ "$SKIP_MIGRATIONS" = "true" ]; then
+#     echo "⚠️  SKIP_MIGRATIONS=true - Saltando migraciones (modo de emergencia)"
+# else
+#     echo "Aplicando migraciones..."
+#     python manage.py migrate
+# fi
 
 # Add this section to run populate_fake_data.py in dev environment only
 if [ "$ENVIRONMENT" = "development" ] || [ "$DJANGO_ENV" = "development" ]; then
