@@ -17,6 +17,17 @@
         #start-campaign-btn {
             margin-top: 1rem; /* Add some space above the button */
         }
+        /* Estilos para el link de teléfono clickeable */
+        .phone-link {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .phone-link:hover {
+            color: #0056b3;
+            text-decoration: underline;
+        }
     </style>
 {% endblock %}
 
@@ -43,22 +54,40 @@
                 <thead>
                     <tr>
                         <th style="width: 5%;"><input type="checkbox" id="select-all" title="Seleccionar Todos"></th>
+                        <th style="width: 5%;">#</th>
                         <th>Nombre</th>
                         <th>Teléfono</th>
                         <th>Email</th>
+                        <th>Comuna</th>
+                        <th>Gasto Actual</th>
+                        <th>Gasto Histórico</th>
+                        <th>Gasto Total</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for client in clients %}
                     <tr>
                         <td><input type="checkbox" class="client-select" value="{{ client.id }}"></td>
+                        <td>{{ forloop.counter }}</td>
                         <td>{{ client.nombre }}</td>
-                        <td>{{ client.telefono|default:"N/A" }}</td>
+                        <td>
+                            {% if client.telefono %}
+                                <a href="{% url 'ventas:cliente_detalle' client.id %}" class="phone-link" title="Ver perfil del cliente">
+                                    {{ client.telefono }}
+                                </a>
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
                         <td>{{ client.email|default:"N/A" }}</td>
+                        <td>{{ client.comuna.nombre|default:"N/A" }}</td>
+                        <td>${{ client.gasto_actual|floatformat:0|default:"0" }}</td>
+                        <td>${{ client.gasto_historico|floatformat:0|default:"0" }}</td>
+                        <td><strong>${{ client.gasto_total_combinado|floatformat:0|default:"0" }}</strong></td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center">No se encontraron clientes para este segmento.</td>
+                        <td colspan="9" class="text-center">No se encontraron clientes para este segmento.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

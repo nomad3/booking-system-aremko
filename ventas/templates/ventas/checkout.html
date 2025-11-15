@@ -158,9 +158,15 @@
                         <h4 class="mb-4">Información de Contacto</h4>
                         <form id="checkoutForm">
                             <div class="mb-3">
-                                <label for="checkoutTelefono" class="form-label">Teléfono</label>
-                                <input type="tel" class="form-control" id="checkoutTelefono" name="telefono" required placeholder="+56912345678">
-                                <div class="form-text">Ingresa tu número para buscar tus datos.</div>
+                                <label for="checkoutTelefono" class="form-label">Teléfono *</label>
+                                <input type="tel"
+                                       class="form-control"
+                                       id="checkoutTelefono"
+                                       name="telefono"
+                                       required
+                                       placeholder="+56912345678 o 9 1234 5678">
+                                <div id="phoneValidationMessage" class="form-text"></div>
+                                <div id="phoneErrorMessage" class="invalid-feedback"></div>
                             </div>
                             <div class="mb-3">
                                 <label for="checkoutNombre" class="form-label">Nombre Completo</label>
@@ -173,6 +179,20 @@
                             <div class="mb-3">
                                 <label for="checkoutDocumento" class="form-label">ID/DNI/Passport/RUT (opcional)</label>
                                 <input type="text" class="form-control" id="checkoutDocumento" name="documento_identidad">
+                            </div>
+                            <div class="mb-3">
+                                <label for="checkoutRegion" class="form-label">Región *</label>
+                                <select class="form-select" id="checkoutRegion" name="region" required>
+                                    <option value="">Seleccione una región</option>
+                                </select>
+                                <div class="invalid-feedback">Por favor seleccione una región.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="checkoutComuna" class="form-label">Comuna *</label>
+                                <select class="form-select" id="checkoutComuna" name="comuna" required disabled>
+                                    <option value="">Primero seleccione una región</option>
+                                </select>
+                                <div class="invalid-feedback">Por favor seleccione una comuna.</div>
                             </div>
                         </form>
                     </div>
@@ -246,10 +266,18 @@
                                         {% if value == 'flow' %}
                                             <span class="badge bg-secondary">Próximamente</span>
                                         {% endif %}
+                                        {% if value == 'mercadopago_link' %}
+                                            <span class="badge bg-primary">Recomendado</span>
+                                        {% endif %}
                                     </label>
                                     {% if value == 'transferencia' %}
                                         <div class="form-text mt-1">
                                             Selecciona esta opción para ver los detalles de la cuenta. Tu reserva quedará pendiente hasta confirmar el pago.
+                                        </div>
+                                    {% endif %}
+                                    {% if value == 'mercadopago_link' %}
+                                        <div class="form-text mt-1">
+                                            Paga de forma segura con tarjeta de crédito, débito o transferencia bancaria. Aprobación inmediata.
                                         </div>
                                     {% endif %}
                                 </div>
@@ -257,12 +285,12 @@
                             <div id="bankDetailsSection" class="alert alert-info mt-3" style="display: none;">
                                 <h5>Instrucciones para Transferencia Bancaria</h5>
                                 <p>Para confirmar tu reserva (que se creará en estado pendiente), por favor realiza la transferencia a la siguiente cuenta:</p>
-                                <pre>Banco: Banco Ficticio S.A.
-Tipo de Cuenta: Cuenta Corriente
-Número de Cuenta: 1234567890
-Nombre Titular: Empresa Ejemplo Ltda.
-RUT Titular: 77.777.777-7
-Email para comprobante: pagos@ejemplo.com</pre>
+                                <pre>Titular: Aremko Hotel Spa
+RUT: 76.485.192-7
+Banco: Mercado Pago
+Tipo de Cuenta: Cuenta Vista
+Número de Cuenta: 1016006859
+Email para comprobante: ventas@aremko.cl</pre>
                                 <p><strong>Importante:</strong> Tu reserva se mantendrá como pendiente hasta que confirmemos la recepción del pago.</p>
                             </div>
                         {% else %}
@@ -320,6 +348,45 @@ Email para comprobante: pagos@ejemplo.com</pre>
     // --- Global Variables ---
     let isProcessingCheckout = false; // Flag to prevent double submission
 
+    // --- Region/Comuna Functions ---
+    async function loadRegiones() {
+        try {
+            const response = await fetch('/ventas/api/regiones/');
+            const regiones = await response.json();
+            const select = document.getElementById('checkoutRegion');
+
+            regiones.forEach(region => {
+                const option = document.createElement('option');
+                option.value = region.id;
+                option.textContent = region.nombre;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading regiones:', error);
+        }
+    }
+
+    async function loadComunas(regionId) {
+        try {
+            const response = await fetch(`/ventas/api/comunas/?region=${regionId}`);
+            const comunas = await response.json();
+            const select = document.getElementById('checkoutComuna');
+
+            // Clear previous options
+            select.innerHTML = '<option value="">Seleccione una comuna</option>';
+            select.disabled = false;
+
+            comunas.forEach(comuna => {
+                const option = document.createElement('option');
+                option.value = comuna.id;
+                option.textContent = comuna.nombre;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading comunas:', error);
+        }
+    }
+
     // --- Helper Functions ---
     function getCookie(name) {
         let cookieValue = null;
@@ -337,39 +404,83 @@ Email para comprobante: pagos@ejemplo.com</pre>
     }
 
     async function fetchClientData(telefono) {
-        const cleanedTelefono = telefono.replace(/\s+/g, '');
-        if (cleanedTelefono.length < 9) {
-             console.log("Phone number too short to fetch data.");
-             return;
+        const phoneInput = document.getElementById('checkoutTelefono');
+        const validationMsg = document.getElementById('phoneValidationMessage');
+        const errorMsg = document.getElementById('phoneErrorMessage');
+
+        // Reset messages and styles
+        validationMsg.textContent = '';
+        validationMsg.className = 'form-text';
+        errorMsg.style.display = 'none';
+        phoneInput.classList.remove('is-invalid', 'is-valid');
+
+        // Validar que no contenga letras
+        const hasInvalidChars = /[a-zA-Z]/.test(telefono);
+        if (hasInvalidChars) {
+            phoneInput.classList.add('is-invalid');
+            errorMsg.textContent = '❌ Solo acepta números. No uses letras.';
+            errorMsg.style.display = 'block';
+            return;
         }
-        console.log(`Fetching client data for phone: ${cleanedTelefono}`);
+
+        // Limpiar espacios, guiones
+        const cleanedTelefono = telefono.replace(/[\s\-]/g, '');
+
+        // Validar longitud mínima (contar solo dígitos)
+        const digitCount = cleanedTelefono.replace(/[^0-9]/g, '').length;
+        if (digitCount < 9) {
+            validationMsg.textContent = 'Ingresa al menos 9 dígitos.';
+            validationMsg.className = 'form-text text-muted';
+            return;
+        }
+
+        console.log(`Validando teléfono: ${cleanedTelefono}`);
+
         try {
-            // Corrected API endpoint URL name
             const lookupUrl = `{% url 'ventas:get_client_details_by_phone' %}?telefono=${encodeURIComponent(cleanedTelefono)}`;
             const response = await fetch(lookupUrl);
+
             if (response.ok) {
                 const data = await response.json();
-                // Updated to check data.found directly
-                if (data.found) { 
-                    console.log("Client found:", data);
-                    const nombreInput = document.getElementById('checkoutNombre');
-                    const emailInput = document.getElementById('checkoutEmail');
-                    const documentoInput = document.getElementById('checkoutDocumento');
-                    if (nombreInput) nombreInput.value = data.nombre || '';
-                    if (emailInput) emailInput.value = data.email || '';
-                    if (documentoInput) documentoInput.value = data.documento_identidad || '';
+
+                if (!data.valid) {
+                    // Teléfono inválido
+                    phoneInput.classList.add('is-invalid');
+                    errorMsg.textContent = data.error || 'Formato de teléfono inválido';
+                    errorMsg.style.display = 'block';
+                    return;
+                }
+
+                // Actualizar campo con teléfono normalizado
+                if (data.telefono_normalizado) {
+                    phoneInput.value = data.telefono_normalizado;
+                }
+
+                if (data.found) {
+                    // Cliente encontrado - auto-fill
+                    phoneInput.classList.add('is-valid');
+                    validationMsg.textContent = '✓ Cliente encontrado. Datos cargados.';
+                    validationMsg.className = 'form-text text-success';
+
+                    console.log("Cliente encontrado:", data);
+                    document.getElementById('checkoutNombre').value = data.nombre || '';
+                    document.getElementById('checkoutEmail').value = data.email || '';
+                    document.getElementById('checkoutDocumento').value = data.documento_identidad || '';
                 } else {
-                    console.log("Client not found for this phone number.");
-                     // Optionally clear fields if client not found
-                    // document.getElementById('checkoutNombre').value = '';
-                    // document.getElementById('checkoutEmail').value = '';
-                    // document.getElementById('checkoutDocumento').value = '';
+                    // Cliente nuevo pero teléfono válido
+                    phoneInput.classList.add('is-valid');
+                    validationMsg.textContent = '✓ Teléfono válido. Por favor completa tus datos.';
+                    validationMsg.className = 'form-text text-primary';
                 }
             } else {
                 console.error(`Error fetching client data: ${response.status} ${response.statusText}`);
+                errorMsg.textContent = 'Error al validar el teléfono. Intenta nuevamente.';
+                errorMsg.style.display = 'block';
             }
         } catch (error) {
-            console.error('Error during fetchClientData:', error);
+            console.error('Error durante fetchClientData:', error);
+            errorMsg.textContent = 'Error de conexión. Verifica tu internet.';
+            errorMsg.style.display = 'block';
         }
     }
 
@@ -542,11 +653,72 @@ Email para comprobante: pagos@ejemplo.com</pre>
         // No finally block needed here as redirection or error handling covers state reset.
     }
 
+    async function handleMercadoPagoCheckout(formData, overlay, button) {
+        const csrfToken = getCookie('csrftoken');
+        try {
+            // 1. Create Reservation (Pending)
+            console.log("Creating reservation before Mercado Pago payment...");
+            const checkoutResponse = await fetch('{% url "ventas:complete_checkout" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            });
+            const checkoutData = await handleApiResponse(checkoutResponse);
+            if (!checkoutData.success || !checkoutData.reserva_id) {
+                throw new Error(checkoutData.error || 'Error al crear la reserva antes del pago con Mercado Pago.');
+            }
+            const reservaId = checkoutData.reserva_id;
+            console.log("Reservation created for Mercado Pago, ID:", reservaId);
+
+            // 2. Create Mercado Pago Payment Link
+            console.log("Creating Mercado Pago payment link for reserva_id:", reservaId);
+            const mpResponse = await fetch('{% url "ventas:create_mercadopago_payment" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ reserva_id: reservaId })
+            });
+            const mpData = await handleApiResponse(mpResponse);
+
+            // 3. Redirect to Mercado Pago
+            if (mpData.payment_link) {
+                console.log("Redirecting to Mercado Pago:", mpData.payment_link);
+                window.location.href = mpData.payment_link;
+                // Don't hide processing here, redirection handles it.
+            } else {
+                throw new Error(mpData.error || 'No se recibió link de pago de Mercado Pago.');
+            }
+        } catch (error) {
+            handleCheckoutError(error, overlay, button);
+        }
+    }
+
     // --- Event Listeners ---
     document.addEventListener('DOMContentLoaded', function() {
         const completeCheckoutBtn = document.getElementById('completeCheckoutBtn');
         const processingOverlay = document.getElementById('processingOverlay');
         const telefonoInput = document.getElementById('checkoutTelefono');
+
+        // Load regiones on page load
+        loadRegiones();
+
+        // Add event listener for region change to load comunas
+        const regionSelect = document.getElementById('checkoutRegion');
+        if (regionSelect) {
+            regionSelect.addEventListener('change', function(e) {
+                const regionId = e.target.value;
+                const comunaSelect = document.getElementById('checkoutComuna');
+
+                if (regionId) {
+                    loadComunas(regionId);
+                } else {
+                    comunaSelect.innerHTML = '<option value="">Primero seleccione una región</option>';
+                    comunaSelect.disabled = true;
+                }
+            });
+        }
 
         if (completeCheckoutBtn) {
             completeCheckoutBtn.addEventListener('click', function(e) {
@@ -560,10 +732,12 @@ Email para comprobante: pagos@ejemplo.com</pre>
                 const email = document.getElementById('checkoutEmail').value;
                 const telefono = document.getElementById('checkoutTelefono').value;
                 const documento = document.getElementById('checkoutDocumento').value;
+                const region = document.getElementById('checkoutRegion').value;
+                const comuna = document.getElementById('checkoutComuna').value;
                 const paymentMethodInput = document.querySelector('input[name="paymentMethod"]:checked');
 
-                if (!nombre || !email || !telefono) {
-                    alert('Por favor completa todos los campos requeridos de contacto.');
+                if (!nombre || !email || !telefono || !region || !comuna) {
+                    alert('Por favor completa todos los campos requeridos de contacto (incluyendo región y comuna).');
                     hideProcessing(null, completeCheckoutBtn); // Reset button, keep overlay hidden
                     return;
                 }
@@ -598,6 +772,8 @@ Email para comprobante: pagos@ejemplo.com</pre>
                 formData.append('email', email);
                 formData.append('telefono', telefono);
                 formData.append('documento_identidad', documento);
+                formData.append('region', region);
+                formData.append('comuna', comuna);
                 formData.append('metodo_pago', paymentMethod);
 
                 // --- Call Appropriate Handler ---
@@ -605,6 +781,8 @@ Email para comprobante: pagos@ejemplo.com</pre>
                     handleBankTransferCheckout(formData, processingOverlay, completeCheckoutBtn);
                 } else if (paymentMethod === 'flow') {
                     handleFlowCheckout(formData, processingOverlay, completeCheckoutBtn);
+                } else if (paymentMethod === 'mercadopago_link') {
+                    handleMercadoPagoCheckout(formData, processingOverlay, completeCheckoutBtn);
                 } else {
                     alert('Método de pago no soportado.');
                     hideProcessing(processingOverlay, completeCheckoutBtn);
@@ -614,9 +792,24 @@ Email para comprobante: pagos@ejemplo.com</pre>
             console.error("Complete checkout button not found");
         }
 
+        // Variable para debounce
+        let phoneValidationTimeout;
+
         if (telefonoInput) {
+            // Validación al salir del campo
             telefonoInput.addEventListener('blur', function() {
+                // Cancelar timeout pendiente para evitar race condition
+                clearTimeout(phoneValidationTimeout);
+                // Validar inmediatamente
                 fetchClientData(this.value);
+            });
+
+            // Validación mientras escribe (con delay de 800ms)
+            telefonoInput.addEventListener('input', function() {
+                clearTimeout(phoneValidationTimeout);
+                phoneValidationTimeout = setTimeout(() => {
+                    fetchClientData(this.value);
+                }, 800);
             });
         } else {
             console.error("Telefono input not found");

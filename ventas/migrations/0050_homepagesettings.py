@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        # Dependencia removida - historial de migraciones limpiado
+        ('ventas', '0049_campaigninteraction'),
     ]
 
     operations = [

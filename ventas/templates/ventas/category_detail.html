@@ -1,104 +1,49 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 {% load humanize %}
-{% load ventas_extras %}
+{% load ventas_extras %} {# Load custom filters #}
 
 {% block title %}{{ categoria_actual.nombre }} - Servicios | Aremko Spa Puerto Varas{% endblock %}
 
 {% block meta_description %}
 <meta name="description" content="Explora nuestros servicios de {{ categoria_actual.nombre }} en Aremko Spa Puerto Varas. Reserva tu experiencia de relajación hoy.">
-<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1">
-<meta name="keywords" content="{{ categoria_actual.nombre }} Puerto Varas, {{ categoria_actual.nombre }} spa Puerto Varas, masajes Puerto Varas, tinajas Puerto Varas, reservar {{ categoria_actual.nombre }} Puerto Varas">
-{% endblock %}
-
-{% block meta_og %}
-<meta property="og:title" content="{{ categoria_actual.nombre }} - Aremko Spa">
-<meta property="og:description" content="Servicios de {{ categoria_actual.nombre }} en Puerto Varas. Reserva online.">
-<meta property="og:type" content="website">
-<meta property="og:url" content="{{ canonical_url }}">
-{% if category_hero_image %}<meta property="og:image" content="{{ category_hero_image }}">{% endif %}
-{% if category_hero_image %}<meta property="og:image:alt" content="{{ categoria_actual.nombre }} - Aremko Spa">{% endif %}
-<link rel="alternate" hreflang="es-cl" href="{{ canonical_url }}">
-<link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
-{% endblock %}
-
-{% block meta_twitter %}
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{{ categoria_actual.nombre }} - Aremko Spa Puerto Varas">
-<meta name="twitter:description" content="Reserva servicios de {{ categoria_actual.nombre }} en Puerto Varas: masajes, tinajas y más.">
-{% if category_hero_image %}<meta name="twitter:image" content="{{ category_hero_image }}">{% endif %}
-{% endblock %}
-
-{% block structured_data %}
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "CollectionPage",
-  "name": "{{ categoria_actual.nombre }} - Aremko Spa",
-  "url": "{{ canonical_url }}",
-  "breadcrumb": {
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      {"@type": "ListItem", "position": 1, "name": "Inicio", "item": "{% url 'homepage' %}"},
-      {"@type": "ListItem", "position": 2, "name": "{{ categoria_actual.nombre }}", "item": "{{ canonical_url }}"}
-    ]
-  },
-  "mainEntity": {
-    "@type": "ItemList",
-    "itemListElement": [
-      {% for servicio in servicios %}
-      {"@type": "ListItem", "position": {{ forloop.counter }}, "url": "{{ canonical_url }}#servicio-{{ servicio.id }}", "name": "{{ servicio.nombre }}"}{% if not forloop.last %},{% endif %}
-      {% endfor %}
-    ]
-  }
-}
-</script>
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    {% for servicio in servicios|slice:":10" %}
-    {
-      "@type": "Service",
-      "name": "{{ servicio.nombre }}",
-      "areaServed": "Puerto Varas, Chile",
-      "provider": {"@type": "LocalBusiness", "name": "Aremko Spa"},
-      {% if servicio.imagen %}"image": "{{ servicio.imagen.url }}",{% endif %}
-      {% if servicio.descripcion_web %}"description": "{{ servicio.descripcion_web|striptags|truncatechars:160 }}",{% endif %}
-      "offers": {
-        "@type": "Offer",
-        "price": "{{ servicio.precio_base }}",
-        "priceCurrency": "CLP",
-        "availability": "https://schema.org/InStock"
-      }
-    }{% if not forloop.last %},{% endif %}
-    {% endfor %}
-  ]
-}
-</script>
 {% endblock %}
 
 {% block extra_style %}
 <style>
 /* Styles specific to category detail page */
-.category-hero {
-    background-size: cover;
-    background-position: center;
-    color: white;
+.category-header {
+    background-color: var(--light-gray); /* Or use an image */
+    padding: 60px 0;
+    margin-bottom: 50px;
     text-align: center;
-    padding: 80px 20px;
-    margin-bottom: 40px;
 }
-.category-hero h1 { font-weight: 800; }
-.category-hero p { max-width: 700px; margin: 10px auto 0; }
 
+.category-header h1 {
+    color: var(--primary-color);
+    font-weight: 700;
+}
+
+/* Re-use homepage styles for consistency */
+.service-card .card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.service-card .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+.service-card .price {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
 .section-title {
     text-align: center;
     font-weight: 700;
     color: var(--dark-gray);
     position: relative;
     padding-bottom: 15px;
-    margin-bottom: 30px;
+    margin-bottom: 40px;
 }
 .section-title::after {
     content: '';
@@ -115,39 +60,61 @@
 
 {% block content %}
 
-<!-- Category Hero -->
-<section class="category-hero" style="background-image: linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), {% if category_hero_image %}url('{{ category_hero_image }}'){% else %}url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1740&q=80'){% endif %};">
+<!-- Category Header -->
+<section class="category-header">
     <div class="container">
+        {% if categoria_actual.imagen %}
+            <img src="{{ categoria_actual.imagen.url }}" alt="{{ categoria_actual.nombre }}" class="img-fluid rounded mb-3" style="max-height: 200px; object-fit: cover;">
+        {% endif %}
         <h1>{{ categoria_actual.nombre }}</h1>
-        <p>Descubre nuestras opciones de {{ categoria_actual.nombre|lower }} y arma tu momento perfecto.</p>
-        <a href="{% url 'homepage' %}#servicios" class="btn btn-light mt-3">Ver todas las experiencias</a>
+        {# Optional: Add a short description for the category if available in the model #}
+        {# <p class="lead text-muted">{{ categoria_actual.descripcion }}</p> #}
     </div>
 </section>
 
-<!-- Services in Category -->
+<!-- Services in Category Section -->
 <section class="container mb-5" id="servicios-categoria">
-    <h2 class="section-title">Servicios Disponibles</h2>
+    <h2 class="section-title mb-4">Servicios Disponibles</h2>
+
     <div class="row">
         {% for servicio in servicios %}
-            <div id="servicio-{{ servicio.id }}" class="col-12 col-md-12"></div>
-            {% include "ventas/components/service_card.html" with servicio=servicio %}
+            <div class="col-lg-4 col-md-6 mb-4 service-card"> {# Added mb-4 for spacing #}
+                <div class="card h-100">
+                    {% if servicio.imagen %}
+                        <img src="{{ servicio.imagen.url }}" class="card-img-top" alt="{{ servicio.nombre }}">
+                    {% else %}
+                        {# Optional: Placeholder if no image #}
+                        {# <img src="{% static 'path/to/default/placeholder.png' %}" class="card-img-top" alt="{{ servicio.nombre }}"> #}
+                    {% endif %}
+                    <div class="card-body d-flex flex-column"> {# Use flex column for button alignment #}
+                        <h5 class="card-title">{{ servicio.nombre }}</h5>
+                        {# <p class="card-text">{{ servicio.descripcion|truncatewords:15 }}</p> #} {# Optional: Add service description #}
+                        {% if servicio.tipo_servicio == 'cabana' %}
+                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
+                        {% else %}
+                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
+                        {% endif %}
+                        <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p> {# Use custom filter #}
+                        <button class="btn btn-primary w-100 mt-auto js-open-booking-modal" {# Use mt-auto to push button down #}
+                                data-servicio-id="{{ servicio.id }}"
+                                data-servicio-nombre="{{ servicio.nombre|escapejs }}"
+                                data-servicio-precio="{{ servicio.precio_base }}"
+                                data-servicio-tipo="{{ servicio.tipo_servicio }}"> {# Add service type #}
+                            <i class="fas fa-calendar-plus me-2"></i>Reservar
+                        </button>
+                    </div>
+                </div>
+            </div>
         {% empty %}
-        <div class="col-12"><p class="text-center">No hay servicios disponibles en esta categoría en este momento.</p></div>
+            <div class="col-12">
+                <p class="text-center">No hay servicios disponibles en esta categoría en este momento.</p>
+            </div>
         {% endfor %}
     </div>
-</section>
 
-<!-- Simple Gallery from service images -->
-<section class="container mb-5">
-    <h2 class="section-title">Galería</h2>
-    <div class="row">
-        {% for servicio in servicios|slice:":6" %}
-        {% if servicio.imagen %}
-        <div class="col-6 col-md-4 mb-3">
-            <img src="{{ servicio.imagen.url }}" alt="{{ servicio.nombre }}" class="img-fluid rounded" loading="lazy">
-        </div>
-        {% endif %}
-        {% endfor %}
+    {# Optional: Link back to all services or homepage #}
+    <div class="text-center mt-4">
+        <a href="{% url 'ventas:homepage' %}#servicios" class="btn btn-outline-secondary">Ver Todos los Servicios</a>
     </div>
 </section>
 
@@ -164,25 +131,38 @@
             </div>
             <div class="modal-body">
                 <form id="bookingForm" class="booking-form">
+                    {% csrf_token %}
                     <input type="hidden" id="servicioId" name="servicio_id">
+
                     <div class="mb-3">
                         <label for="servicioNombre" class="form-label">Servicio</label>
                         <input type="text" class="form-control" id="servicioNombre" readonly>
                     </div>
+
                     <div class="mb-3">
                         <label for="fecha" class="form-label">Fecha</label>
                         <input type="text" class="form-control" id="fecha" name="fecha" placeholder="Selecciona una fecha" required>
                     </div>
+
                     <div class="mb-3">
                         <label for="hora" class="form-label">Hora</label>
                         <select class="form-select" id="hora" name="hora" required>
                             <option value="">Selecciona una hora</option>
+                            <!-- Las horas disponibles se cargarán dinámicamente -->
                         </select>
                     </div>
+
                     <div class="mb-3">
                         <label for="cantidadPersonas" class="form-label">Cantidad de Personas</label>
-                        <select class="form-select" id="cantidadPersonas" name="cantidad_personas"></select>
+                        <select class="form-select" id="cantidadPersonas" name="cantidad_personas">
+                            <option value="1">1 persona</option>
+                            <option value="2">2 personas</option>
+                            <option value="3">3 personas</option>
+                            <option value="4">4 personas</option>
+                            <option value="5">5 personas</option>
+                        </select>
                     </div>
+
                     <div class="mb-3">
                         <label for="precioTotal" class="form-label">Precio Total</label>
                         <div class="input-group">
@@ -202,158 +182,249 @@
 {% endblock %}
 
 {% block extra_script %}
+{# Include the same booking script logic as the homepage #}
 <script>
-    function formatCLP(value) {
-      const numberValue = Number(value);
-      if (isNaN(numberValue)) { return '0'; }
-      return new Intl.NumberFormat('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(numberValue);
+    // Function to get CSRF token from cookies
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
     }
 
+    // Helper function to format numbers as CLP (dot for thousands, no decimals)
+    function formatCLP(value) {
+      const numberValue = Number(value);
+      if (isNaN(numberValue)) {
+        return '0'; // Return '0' if not a valid number
+      }
+      return new Intl.NumberFormat('es-CL', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(numberValue);
+    }
+
+    // Global variables for the booking modal on this page
     let currentServicioId = null;
     let currentServicioNombre = null;
     let currentServicioPrecio = 0;
-    let currentServicioTipo = 'otro';
-    let currentServicioMin = 1;
-    let currentServicioMax = 1;
+    let currentServicioTipo = 'otro'; // Add type
 
+    // Function to load available hours
     function loadAvailableHours(servicioId, fecha) {
+        console.log("Loading available hours for:", servicioId, fecha);
         const horaSelect = document.getElementById('hora');
         if (!horaSelect) return;
         horaSelect.innerHTML = '<option value="">Cargando horas...</option>';
         horaSelect.disabled = true;
+
         fetch(`{% url 'ventas:get_available_hours' %}?servicio_id=${servicioId}&fecha=${fecha}`)
-            .then(response => response.ok ? response.json() : Promise.reject(response.status))
+            .then(response => response.ok ? response.json() : Promise.reject(`HTTP error! status: ${response.status}`))
             .then(data => {
                 horaSelect.innerHTML = '<option value="">Selecciona una hora</option>';
                 if (data.success && data.horas_disponibles.length > 0) {
-                    data.horas_disponibles.forEach(hora => { const option = document.createElement('option'); option.value = hora; option.textContent = hora; horaSelect.appendChild(option); });
+                    data.horas_disponibles.forEach(hora => {
+                        const option = document.createElement('option');
+                        option.value = hora;
+                        option.textContent = hora;
+                        horaSelect.appendChild(option);
+                    });
                     horaSelect.disabled = false;
                 } else {
                     horaSelect.innerHTML = '<option value="">No hay horas disponibles</option>';
                 }
             })
-            .catch(() => { horaSelect.innerHTML = '<option value="">Error al cargar horas</option>'; });
+            .catch(error => {
+                console.error('Error fetching available hours:', error);
+                horaSelect.innerHTML = '<option value="">Error al cargar horas</option>';
+            });
     }
 
-    function isCantidadValid() {
-        const s = document.getElementById('cantidadPersonas');
-        if (!s || s.disabled) return true;
-        const v = parseInt(s.value);
-        return v >= currentServicioMin && v <= currentServicioMax;
-    }
-
-    function validateCantidadPersonas() {
-        const s = document.getElementById('cantidadPersonas');
-        const btn = document.getElementById('addToCartBtn');
-        const parentDiv = s.parentNode; let errorMsg = parentDiv.querySelector('.cantidad-error-msg');
-        if (!isCantidadValid()) {
-            if (!errorMsg) { errorMsg = document.createElement('small'); errorMsg.className = 'text-danger d-block mt-1 cantidad-error-msg'; parentDiv.appendChild(errorMsg); }
-            errorMsg.textContent = currentServicioMin === currentServicioMax ? `Cantidad debe ser ${currentServicioMin}.` : `Cantidad debe estar entre ${currentServicioMin} y ${currentServicioMax}.`;
-            errorMsg.style.display = 'block'; btn.disabled = true;
-        } else {
-            if (errorMsg) errorMsg.style.display = 'none';
-            const horaSelect = document.getElementById('hora');
-            if (!horaSelect || !horaSelect.value) { btn.disabled = true; } else { validateSelectedSlot(); }
+    // Function to update total price
+    function updatePrecioTotal() {
+        const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
+        const precioTotalInput = document.getElementById('precioTotal');
+        if (cantidadPersonasSelect && precioTotalInput) {
+            const cantidadPersonas = parseInt(cantidadPersonasSelect.value);
+            let precioTotal = 0;
+             // Calculate price based on service type
+            if (currentServicioTipo === 'cabana') {
+                precioTotal = currentServicioPrecio; // Fixed price for cabin
+            } else {
+                precioTotal = currentServicioPrecio * cantidadPersonas; // Price per person for others
+            }
+            precioTotalInput.value = formatCLP(precioTotal);
+        }
+        // Also validate the slot when quantity changes, if time is already selected
+        const horaSelect = document.getElementById('hora');
+        if (horaSelect && horaSelect.value) {
+            validateSelectedSlot();
         }
     }
 
+    // Function to check availability of the selected slot
     async function validateSelectedSlot() {
         const servicioId = document.getElementById('servicioId').value;
         const fecha = document.getElementById('fecha').value;
         const hora = document.getElementById('hora').value;
-        const btn = document.getElementById('addToCartBtn');
+        const addToCartBtn = document.getElementById('addToCartBtn');
         const horaSelect = document.getElementById('hora');
-        const existingWarning = horaSelect.parentNode.querySelector('.text-danger'); if (existingWarning) existingWarning.remove();
-        if (!isCantidadValid()) { btn.disabled = true; return; }
-        if (!servicioId || !fecha || !hora) { btn.disabled = true; return; }
-        btn.disabled = true;
+
+        const existingWarning = horaSelect.parentNode.querySelector('.text-danger');
+        if (existingWarning) existingWarning.remove();
+
+        if (!servicioId || !fecha || !hora) {
+            addToCartBtn.disabled = true;
+            return;
+        }
+
+        addToCartBtn.disabled = true;
+
         try {
             const response = await fetch(`{% url 'ventas:check_slot_availability' %}?servicio_id=${servicioId}&fecha=${fecha}&hora=${hora}`);
-            if (!response.ok) throw new Error(response.status);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const data = await response.json();
-            if (data.available && isCantidadValid()) { btn.disabled = false; }
-            else { btn.disabled = true; const warningMsg = document.createElement('small'); warningMsg.className = 'text-danger d-block mt-1'; warningMsg.textContent = 'Hora no disponible.'; horaSelect.parentNode.appendChild(warningMsg); }
-        } catch (e) {
-            const warningMsg = document.createElement('small'); warningMsg.className = 'text-danger d-block mt-1'; warningMsg.textContent = 'Error al verificar disponibilidad.'; horaSelect.parentNode.appendChild(warningMsg); btn.disabled = true;
+
+            if (data.available) {
+                addToCartBtn.disabled = false;
+            } else {
+                addToCartBtn.disabled = true;
+                const warningMsg = document.createElement('small');
+                warningMsg.className = 'text-danger d-block mt-1';
+                warningMsg.textContent = 'Hora no disponible.';
+                horaSelect.parentNode.appendChild(warningMsg);
+            }
+        } catch (error) {
+            console.error('Error checking slot availability:', error);
+            const warningMsg = document.createElement('small');
+            warningMsg.className = 'text-danger d-block mt-1';
+            warningMsg.textContent = 'Error al verificar disponibilidad.';
+            horaSelect.parentNode.appendChild(warningMsg);
+            addToCartBtn.disabled = true;
         }
     }
 
-    function updatePrecioTotal() {
-        const s = document.getElementById('cantidadPersonas');
-        const precioTotalInput = document.getElementById('precioTotal');
-        if (s && precioTotalInput) {
-            const n = parseInt(s.value); let total = 0;
-            total = currentServicioTipo === 'cabana' ? currentServicioPrecio : currentServicioPrecio * n;
-            precioTotalInput.value = formatCLP(total);
-        }
-        validateCantidadPersonas();
-        const horaSelect = document.getElementById('hora');
-        if (horaSelect && horaSelect.value) validateSelectedSlot(); else { const btn = document.getElementById('addToCartBtn'); if (!isCantidadValid()) btn.disabled = true; }
-    }
-
+    // Function to add to cart
     function addToCart() {
         const servicioId = document.getElementById('servicioId').value;
         const fecha = document.getElementById('fecha').value;
         const hora = document.getElementById('hora').value;
         const cantidadPersonas = document.getElementById('cantidadPersonas').value;
-        if (!fecha) { alert('Por favor selecciona una fecha'); return; }
-        if (!hora) { alert('Por favor selecciona una hora'); return; }
+
+        if (!fecha || !hora) {
+            alert('Por favor selecciona una fecha y hora');
+            return;
+        }
+
         const formData = new FormData();
         formData.append('servicio_id', servicioId);
         formData.append('fecha', fecha);
         formData.append('hora', hora);
         formData.append('cantidad_personas', cantidadPersonas);
-        fetch('{% url "ventas:add_to_cart" %}', { method: 'POST', body: formData, headers: { 'X-CSRFToken': getCookie('csrftoken') } })
-        .then(response => { if (!response.ok) return response.text().then(text => { throw new Error(`Server responded with ${response.status}: ${text || 'No info'}`); }); if (response.redirected) { window.location.href = response.url; } else { window.location.href = "{% url 'ventas:checkout' %}"; } })
-        .catch(error => { alert(`Error al agregar al carrito: ${error.message}. Por favor intenta de nuevo.`); });
+
+        fetch('{% url "ventas:add_to_cart" %}', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': getCookie('csrftoken') } // Assumes getCookie is global
+        })
+        .then(response => {
+            if (!response.ok) {
+                 return response.text().then(text => { throw new Error(`Server responded with ${response.status}: ${text || 'No error info'}`); });
+            }
+            if (response.redirected) {
+                 window.location.href = response.url; // Go to checkout
+            } else {
+                 window.location.href = "{% url 'ventas:checkout' %}"; // Fallback redirect
+            }
+        })
+        .catch(error => {
+            console.error('Error adding to cart:', error);
+            alert(`Error al agregar al carrito: ${error.message}.`);
+        });
     }
 
+    // Initialize listeners
     document.addEventListener('DOMContentLoaded', function() {
+        // Listener for booking modal buttons
         document.querySelectorAll('.js-open-booking-modal').forEach(button => {
             button.addEventListener('click', function() {
-                const servicioId = this.dataset.servicioId;
-                const servicioNombre = this.dataset.servicioNombre;
-                const servicioPrecio = parseFloat(this.dataset.servicioPrecio);
-                const servicioTipo = this.dataset.servicioTipo || 'otro';
-                const servicioMin = parseInt(this.dataset.servicioMin) || 1;
-                const servicioMax = parseInt(this.dataset.servicioMax) || 1;
-                currentServicioId = servicioId; currentServicioNombre = servicioNombre; currentServicioPrecio = servicioPrecio; currentServicioTipo = servicioTipo; currentServicioMin = servicioMin; currentServicioMax = servicioMax;
-                document.getElementById('servicioId').value = servicioId;
-                document.getElementById('servicioNombre').value = servicioNombre;
+                currentServicioId = this.dataset.servicioId;
+                currentServicioNombre = this.dataset.servicioNombre;
+                currentServicioPrecio = parseFloat(this.dataset.servicioPrecio);
+                currentServicioTipo = this.dataset.servicioTipo || 'otro'; // Get service type
+
+                document.getElementById('servicioId').value = currentServicioId;
+                document.getElementById('servicioNombre').value = currentServicioNombre;
                 document.getElementById('fecha').value = '';
                 document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
-                document.getElementById('hora').disabled = true;
-                document.getElementById('addToCartBtn').disabled = true;
+                document.getElementById('hora').disabled = true; // Disable initially
+
+                 // Handle quantity selector based on service type
                 const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
-                const cantidadPersonasLabel = document.querySelector('label[for="cantidadPersonas"]');
-                const cantidadErrorMsg = cantidadPersonasSelect.parentNode.querySelector('.cantidad-error-msg');
-                if (cantidadErrorMsg) cantidadErrorMsg.style.display = 'none';
-                cantidadPersonasSelect.innerHTML = '';
-                if (servicioTipo !== 'cabana') {
-                    for (let i = 1; i <= currentServicioMax; i++) {
-                        if (i >= currentServicioMin && i <= currentServicioMax) {
-                            const option = document.createElement('option'); option.value = i; option.textContent = `${i} persona${i > 1 ? 's' : ''}`; cantidadPersonasSelect.appendChild(option);
-                        }
-                    }
-                    cantidadPersonasSelect.value = currentServicioMin <= currentServicioMax ? currentServicioMin : (cantidadPersonasSelect.options.length > 0 ? cantidadPersonasSelect.options[0].value : '1');
-                    cantidadPersonasSelect.disabled = false;
-                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'block';
-                    cantidadPersonasSelect.style.display = 'block';
+                const cantidadPersonasLabel = document.querySelector('label[for="cantidadPersonas"]'); // Get label too
+                if (currentServicioTipo === 'cabana') {
+                    cantidadPersonasSelect.value = '2'; // Default/max for cabin
+                    cantidadPersonasSelect.disabled = true; // Disable quantity selection
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none'; // Hide label
+                    cantidadPersonasSelect.style.display = 'none'; // Hide select
+                    document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio); // Show fixed price
                 } else {
-                    const option = document.createElement('option'); option.value = currentServicioMax; option.textContent = `${currentServicioMax} persona${currentServicioMax > 1 ? 's' : ''}`; cantidadPersonasSelect.appendChild(option);
-                    cantidadPersonasSelect.value = currentServicioMax; cantidadPersonasSelect.disabled = true; if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none'; cantidadPersonasSelect.style.display = 'none';
+                    cantidadPersonasSelect.value = '1'; // Default for others
+                    cantidadPersonasSelect.disabled = false; // Enable quantity selection
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'block'; // Show label
+                    cantidadPersonasSelect.style.display = 'block'; // Show select
+                    document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio); // Show initial price per person
                 }
-                updatePrecioTotal();
-                const bookingModalEl = document.getElementById('bookingModal'); if (bookingModalEl) { const bookingModal = new bootstrap.Modal(bookingModalEl); bookingModal.show(); }
+
+
+                const bookingModalEl = document.getElementById('bookingModal');
+                if (bookingModalEl) {
+                    const bookingModal = new bootstrap.Modal(bookingModalEl);
+                    bookingModal.show();
+                }
             });
         });
 
+        // Flatpickr for date picker
         const fechaInput = document.getElementById('fecha');
-        if (fechaInput) { flatpickr(fechaInput, { minDate: "today", dateFormat: "Y-m-d", locale: "es", onChange: function(selectedDates, dateStr) { if (currentServicioId) { loadAvailableHours(currentServicioId, dateStr); } } }); }
+        if (fechaInput) {
+            flatpickr(fechaInput, {
+                minDate: "today",
+                dateFormat: "Y-m-d",
+                locale: "es",
+                onChange: function(selectedDates, dateStr) {
+                    if (currentServicioId) {
+                        loadAvailableHours(currentServicioId, dateStr);
+                    }
+                }
+            });
+        }
 
-        const cantidadPersonasSelect = document.getElementById('cantidadPersonas'); if (cantidadPersonasSelect) { cantidadPersonasSelect.addEventListener('change', updatePrecioTotal); }
-        const horaSelect = document.getElementById('hora'); if (horaSelect) { horaSelect.addEventListener('change', validateSelectedSlot); }
-        const addToCartBtn = document.getElementById('addToCartBtn'); if (addToCartBtn) { addToCartBtn.addEventListener('click', addToCart); }
+        // Listener for quantity change
+        const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
+        if (cantidadPersonasSelect) {
+            cantidadPersonasSelect.addEventListener('change', updatePrecioTotal);
+        }
+
+        // Listener for time selection change
+        const horaSelect = document.getElementById('hora');
+        if (horaSelect) {
+            horaSelect.addEventListener('change', validateSelectedSlot);
+        }
+
+        // Listener for "Add to Cart" button in modal
+        const addToCartBtn = document.getElementById('addToCartBtn');
+        if (addToCartBtn) {
+            addToCartBtn.addEventListener('click', addToCart);
+        }
     });
 </script>
 {% endblock %}

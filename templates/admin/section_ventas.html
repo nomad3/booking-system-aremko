@@ -122,34 +122,6 @@
             </div>
         </div>
 
-         {# Premio Card #}
-         <div class="col-lg-3 col-md-4 col-sm-6">
-            <div class="card h-100 text-center card-hover">
-                <div class="card-body">
-                    <i class="fas fa-trophy card-icon text-warning"></i>
-                    <h5 class="card-title">Premios</h5>
-                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'admin:ventas_premio_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
-                        <a href="{% url 'admin:ventas_premio_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-         {# ClientePremio Card #}
-         <div class="col-lg-3 col-md-4 col-sm-6">
-            <div class="card h-100 text-center card-hover">
-                <div class="card-body">
-                    <i class="fas fa-award card-icon text-warning"></i>
-                    <h5 class="card-title">Clientes Premio</h5>
-                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'admin:ventas_clientepremio_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
-                        <a href="{% url 'admin:ventas_clientepremio_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
     </div>
 </div>
 {% endblock %}

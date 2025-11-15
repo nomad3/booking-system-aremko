@@ -15,14 +15,19 @@ from .models import (
     MovimientoCliente, Compra, DetalleCompra, GiftCard, HomepageConfig,
     Lead, Company, Contact, Activity, Campaign, Deal, CampaignInteraction, HomepageSettings,
     # Communication models
-    CommunicationLimit, ClientPreferences, CommunicationLog, SMSTemplate,
-    # Premio models
+    CommunicationLimit, ClientPreferences, CommunicationLog, SMSTemplate, MailParaEnviar,
+    # Advanced Email Campaign models
+    EmailCampaign, EmailRecipient, EmailDeliveryLog, EmailBlacklist, EmailTemplate, EmailSubjectTemplate, EmailContentTemplate,
+    # Historical data
+    ServiceHistory,
+    # Sistema de Tramos y Premios
     Premio, ClientePremio, HistorialTramo
 )
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.urls import path, reverse
+from django.utils.html import format_html
 import json
 import xlwt
 from django.core.paginator import Paginator
@@ -140,7 +145,7 @@ class CampaignInteractionInline(admin.TabularInline):
 class ClienteAdmin(admin.ModelAdmin):
     search_fields = ('nombre', 'telefono', 'email')
     list_display = ('nombre', 'telefono', 'email')
-    actions = ['exportar_a_excel']
+    actions = ['exportar_a_excel', 'exportar_backup_completo']
 
     def exportar_a_excel(self, request, queryset):
         response = HttpResponse(content_type='application/ms-excel')
@@ -161,6 +166,66 @@ class ClienteAdmin(admin.ModelAdmin):
         wb.save(response)
         return response
     exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
+
+    def exportar_backup_completo(self, request, queryset):
+        """
+        Exporta backup completo con TODOS los campos y estadísticas
+        """
+        import csv
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = 'attachment; filename="backup_clientes_completo_{}.csv"'.format(
+            datetime.now().strftime('%Y%m%d_%H%M%S')
+        )
+
+        # BOM para Excel UTF-8
+        response.write('\ufeff')
+
+        writer = csv.writer(response)
+
+        # Headers completos
+        headers = [
+            'ID',
+            'Nombre',
+            'Email',
+            'Teléfono',
+            'Documento Identidad',
+            'País',
+            'Ciudad (Legacy)',
+            'Región ID',
+            'Región Nombre',
+            'Comuna ID',
+            'Comuna Nombre',
+            'Fecha Creación',
+            'Número de Visitas',
+            'Gasto Total'
+        ]
+        writer.writerow(headers)
+
+        # Datos con select_related para optimizar
+        clientes = queryset.select_related('region', 'comuna')
+
+        for cliente in clientes:
+            writer.writerow([
+                cliente.id,
+                cliente.nombre,
+                cliente.email or '',
+                cliente.telefono,
+                cliente.documento_identidad or '',
+                cliente.pais or '',
+                cliente.ciudad or '',
+                cliente.region_id or '',
+                cliente.region.nombre if cliente.region else '',
+                cliente.comuna_id or '',
+                cliente.comuna.nombre if cliente.comuna else '',
+                cliente.created_at.strftime('%Y-%m-%d %H:%M:%S') if cliente.created_at else '',
+                cliente.numero_visitas(),
+                f'{cliente.gasto_total():.0f}'
+            ])
+
+        self.message_user(request, f'✅ Exportados {clientes.count()} clientes con éxito', messages.SUCCESS)
+        return response
+
+    exportar_backup_completo.short_description = "🔒 Backup Completo (CSV con todos los campos)"
 
 class VentaReservaAdmin(admin.ModelAdmin):
     list_per_page = 50
@@ -286,6 +351,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         }
         js = (
             'admin/js/reserva_servicio_inline.js',
+            'admin/js/prevent_double_submit.js',  # Prevenir duplicación por doble clic
         )
 
 class ProveedorAdmin(admin.ModelAdmin):
@@ -782,6 +848,433 @@ class SMSTemplateAdmin(admin.ModelAdmin):
             f"Se desactivaron {updated} plantilla(s)."
         )
     deactivate_templates.short_description = "Desactivar plantillas seleccionadas"
+
+
+@admin.register(MailParaEnviar)
+class MailParaEnviarAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'email', 'ciudad', 'estado', 'prioridad', 'campana', 'creado_en', 'enviado_en']
+    list_filter = ['estado', 'prioridad', 'campana', 'ciudad', 'rubro', 'creado_en']
+    search_fields = ['nombre', 'email', 'asunto']
+    readonly_fields = ['enviado_en']
+    list_editable = ['estado', 'prioridad']
+    
+    fieldsets = (
+        ('Destinatario', {
+            'fields': ('nombre', 'email', 'ciudad', 'rubro')
+        }),
+        ('Contenido', {
+            'fields': ('asunto', 'contenido_html')
+        }),
+        ('Control de Envío', {
+            'fields': ('estado', 'prioridad', 'campana', 'notas')
+        }),
+        ('Timestamps', {
+            'fields': ('creado_en', 'enviado_en'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    actions = ['marcar_como_pendiente', 'marcar_como_pausado', 'duplicar_emails']
+    
+    def marcar_como_pendiente(self, request, queryset):
+        updated = queryset.update(estado='PENDIENTE')
+        self.message_user(request, f'{updated} emails marcados como PENDIENTE.')
+    marcar_como_pendiente.short_description = "Marcar como PENDIENTE"
+    
+    def marcar_como_pausado(self, request, queryset):
+        updated = queryset.update(estado='PAUSADO')
+        self.message_user(request, f'{updated} emails marcados como PAUSADO.')
+    marcar_como_pausado.short_description = "Marcar como PAUSADO"
+    
+    def duplicar_emails(self, request, queryset):
+        count = 0
+        for obj in queryset:
+            obj.pk = None
+            obj.estado = 'PENDIENTE'
+            obj.enviado_en = None
+            obj.save()
+            count += 1
+        self.message_user(request, f'{count} emails duplicados como PENDIENTE.')
+    duplicar_emails.short_description = "Duplicar emails como PENDIENTE"
+
+
+# =============================================================================
+# ADMIN PARA SISTEMA DE CAMPAÑAS AVANZADO
+# =============================================================================
+
+class EmailRecipientInline(admin.TabularInline):
+    """Inline para mostrar destinatarios de una campaña"""
+    model = EmailRecipient
+    fields = ['email', 'name', 'status', 'send_enabled', 'priority', 'sent_at']
+    readonly_fields = ['sent_at']
+    extra = 0
+    can_delete = False
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('client')
+
+
+@admin.register(EmailCampaign)
+class EmailCampaignAdmin(admin.ModelAdmin):
+    """Administrador para campañas de email"""
+    list_display = [
+        'name', 'status', 'total_recipients', 'emails_sent', 
+        'progress_display', 'created_at', 'created_by'
+    ]
+    list_filter = ['status', 'created_at', 'ai_variation_enabled']
+    search_fields = ['name', 'description']
+    readonly_fields = [
+        'created_at', 'updated_at', 'total_recipients', 'emails_sent',
+        'emails_delivered', 'emails_opened', 'emails_clicked', 
+        'emails_bounced', 'spam_complaints'
+    ]
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('name', 'description', 'status', 'created_by')
+        }),
+        ('Criterios de Selección', {
+            'fields': ('criteria',),
+            'classes': ('collapse',)
+        }),
+        ('Configuración de Envío', {
+            'fields': ('schedule_config',),
+            'classes': ('collapse',)
+        }),
+        ('Template de Email', {
+            'fields': ('email_subject_template', 'email_body_template'),
+            'classes': ('collapse',)
+        }),
+        ('Configuración Avanzada', {
+            'fields': ('ai_variation_enabled',),
+            'classes': ('collapse',)
+        }),
+        ('Estadísticas', {
+            'fields': (
+                'total_recipients', 'emails_sent', 'emails_delivered',
+                'emails_opened', 'emails_clicked', 'emails_bounced',
+                'spam_complaints'
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Metadatos', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    inlines = [EmailRecipientInline]
+    
+    def progress_display(self, obj):
+        """Muestra el progreso de la campaña"""
+        if obj.total_recipients == 0:
+            return "0%"
+        progress = obj.progress_percentage
+        color = "red" if progress < 25 else "orange" if progress < 75 else "green"
+        return format_html(
+            '<span style="color: {};">{:.1f}%</span>',
+            color, progress
+        )
+    progress_display.short_description = "Progreso"
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('created_by')
+
+
+@admin.register(EmailRecipient)
+class EmailRecipientAdmin(admin.ModelAdmin):
+    """Administrador para destinatarios de email"""
+    list_display = [
+        'email', 'name', 'campaign', 'status', 'send_enabled',
+        'priority', 'sent_at', 'delivered_at'
+    ]
+    list_filter = ['status', 'send_enabled', 'campaign', 'sent_at']
+    search_fields = ['email', 'name', 'campaign__name']
+    readonly_fields = [
+        'sent_at', 'delivered_at', 'opened_at', 'clicked_at',
+        'client_total_spend', 'client_visit_count', 'client_last_visit'
+    ]
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('campaign', 'client', 'email', 'name')
+        }),
+        ('Contenido Personalizado', {
+            'fields': ('personalized_subject', 'personalized_body'),
+            'classes': ('collapse',)
+        }),
+        ('Control de Envío', {
+            'fields': ('send_enabled', 'priority', 'status')
+        }),
+        ('Tracking', {
+            'fields': (
+                'scheduled_at', 'sent_at', 'delivered_at', 
+                'opened_at', 'clicked_at'
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Información del Cliente', {
+            'fields': (
+                'client_total_spend', 'client_visit_count', 
+                'client_last_visit', 'client_city'
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Diagnósticos', {
+            'fields': ('error_message', 'bounce_reason', 'user_agent', 'ip_address'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    actions = ['marcar_como_pendiente', 'deshabilitar_envio', 'habilitar_envio']
+    
+    def marcar_como_pendiente(self, request, queryset):
+        updated = queryset.update(status='pending')
+        self.message_user(request, f'{updated} destinatarios marcados como pendientes.')
+    marcar_como_pendiente.short_description = "Marcar como pendiente"
+    
+    def deshabilitar_envio(self, request, queryset):
+        updated = queryset.update(send_enabled=False)
+        self.message_user(request, f'{updated} destinatarios deshabilitados para envío.')
+    deshabilitar_envio.short_description = "Deshabilitar envío"
+    
+    def habilitar_envio(self, request, queryset):
+        updated = queryset.update(send_enabled=True)
+        self.message_user(request, f'{updated} destinatarios habilitados para envío.')
+    habilitar_envio.short_description = "Habilitar envío"
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('campaign', 'client')
+
+
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(admin.ModelAdmin):
+    """Administrador para templates de email"""
+    list_display = ['name', 'campaign_type', 'year', 'month', 'giftcard_amount', 'is_active', 'created_at']
+    list_filter = ['campaign_type', 'year', 'month', 'is_active']
+    search_fields = ['name', 'subject']
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('name', 'campaign_type', 'is_active')
+        }),
+        ('Configuración', {
+            'fields': ('year', 'month', 'giftcard_amount')
+        }),
+        ('Contenido', {
+            'fields': ('subject', 'body_html')
+        }),
+        ('Metadatos', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+    readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(EmailDeliveryLog)
+class EmailDeliveryLogAdmin(admin.ModelAdmin):
+    """Administrador para logs de entrega de email"""
+    list_display = ['recipient', 'log_type', 'timestamp', 'error_code', 'smtp_response_short']
+    list_filter = ['log_type', 'timestamp', 'campaign', 'error_code']
+    search_fields = ['recipient__email', 'recipient__name', 'smtp_response', 'error_message']
+    readonly_fields = ['timestamp']
+    
+    def smtp_response_short(self, obj):
+        """Muestra una versión corta de la respuesta SMTP"""
+        if obj.smtp_response:
+            return obj.smtp_response[:50] + "..." if len(obj.smtp_response) > 50 else obj.smtp_response
+        return "-"
+    smtp_response_short.short_description = "Respuesta SMTP"
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('campaign', 'recipient')
+
+
+@admin.register(EmailBlacklist)
+class EmailBlacklistAdmin(admin.ModelAdmin):
+    """Administrador para lista negra de emails"""
+    list_display = ['email', 'reason', 'added_at', 'is_active', 'domain']
+    list_filter = ['reason', 'is_active', 'added_at', 'domain']
+    search_fields = ['email', 'reason', 'notes', 'domain']
+    readonly_fields = ['added_at', 'domain']
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('email', 'reason', 'is_active')
+        }),
+        ('Detalles', {
+            'fields': ('notes', 'domain', 'expires_at')
+        }),
+        ('Metadatos', {
+            'fields': ('added_at', 'added_by'),
+            'classes': ('collapse',)
+        })
+    )
+
+
+@admin.register(EmailSubjectTemplate)
+class EmailSubjectTemplateAdmin(admin.ModelAdmin):
+    """Administrador para asuntos de email variables"""
+    list_display = ['subject_template', 'estilo', 'activo', 'veces_usado', 'created_at']
+    list_filter = ['estilo', 'activo', 'created_at']
+    search_fields = ['subject_template']
+    readonly_fields = ['veces_usado', 'created_at', 'updated_at']
+    
+    fieldsets = (
+        ('Asunto del Email', {
+            'fields': ('subject_template', 'estilo', 'activo'),
+            'description': 'Usa {nombre} en el asunto para insertar el nombre del cliente. Ejemplo: "{nombre}, tenemos algo especial para ti"'
+        }),
+        ('Estadísticas', {
+            'fields': ('veces_usado', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    actions = ['reset_usage_counter', 'activate_subjects', 'deactivate_subjects']
+    
+    def reset_usage_counter(self, request, queryset):
+        """Reinicia el contador de uso"""
+        queryset.update(veces_usado=0)
+        self.message_user(request, f"Contador reiniciado para {queryset.count()} asuntos")
+    reset_usage_counter.short_description = "Reiniciar contador de uso"
+    
+    def activate_subjects(self, request, queryset):
+        """Activa asuntos seleccionados"""
+        queryset.update(activo=True)
+        self.message_user(request, f"{queryset.count()} asuntos activados")
+    activate_subjects.short_description = "Activar asuntos"
+    
+    def deactivate_subjects(self, request, queryset):
+        """Desactiva asuntos seleccionados"""
+        queryset.update(activo=False)
+        self.message_user(request, f"{queryset.count()} asuntos desactivados")
+    deactivate_subjects.short_description = "Desactivar asuntos"
+
+
+@admin.register(EmailContentTemplate)
+class EmailContentTemplateAdmin(admin.ModelAdmin):
+    """Administrador para templates de contenido de email editables"""
+    list_display = ['nombre', 'estilo', 'activo', 'updated_at', 'created_by']
+    list_filter = ['estilo', 'activo', 'created_at']
+    search_fields = ['nombre', 'saludo', 'introduccion']
+    readonly_fields = ['created_at', 'updated_at', 'created_by']
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('nombre', 'estilo', 'activo')
+        }),
+        ('Contenido del Email', {
+            'fields': ('saludo', 'introduccion', 'seccion_ofertas_titulo', 'seccion_ofertas_intro', 'oferta_texto', 'cierre', 'firma'),
+            'description': '''
+                <strong>Placeholders disponibles:</strong><br>
+                - <code>{nombre}</code>: Nombre del cliente<br>
+                - <code>{servicios_narrativa}</code>: Narrativa generada del historial<br>
+                - <code>{oferta_porcentaje}</code>: Porcentaje de descuento<br>
+                - <code>{oferta_servicios}</code>: Servicios en oferta<br>
+                - <code>{mes_actual}</code>: Mes actual<br>
+                - <code>{segmento}</code>: Segmento RFM del cliente
+            '''
+        }),
+        ('Call to Action', {
+            'fields': ('call_to_action_texto',)
+        }),
+        ('Estilos y Colores', {
+            'fields': ('color_principal', 'color_secundario', 'fuente_tipografia'),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at', 'created_by'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    actions = ['duplicate_template', 'activate_template', 'deactivate_template']
+    
+    def save_model(self, request, obj, form, change):
+        """Guardar el creador del template"""
+        if not change:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+    
+    def duplicate_template(self, request, queryset):
+        """Duplica templates seleccionados"""
+        for template in queryset:
+            template.pk = None
+            template.nombre = f"{template.nombre} (Copia)"
+            template.activo = False
+            template.created_by = request.user
+            template.save()
+        self.message_user(request, f"{queryset.count()} templates duplicados")
+    duplicate_template.short_description = "Duplicar templates"
+    
+    def activate_template(self, request, queryset):
+        """Activa templates seleccionados"""
+        queryset.update(activo=True)
+        self.message_user(request, f"{queryset.count()} templates activados")
+    activate_template.short_description = "Activar templates"
+    
+    def deactivate_template(self, request, queryset):
+        """Desactiva templates seleccionados"""
+        queryset.update(activo=False)
+        self.message_user(request, f"{queryset.count()} templates desactivados")
+    deactivate_template.short_description = "Desactivar templates"
+
+
+# ================================================================================
+# SERVICI HISTORY (DATOS HISTÓRICOS IMPORTADOS)
+# ================================================================================
+
+@admin.register(ServiceHistory)
+class ServiceHistoryAdmin(admin.ModelAdmin):
+    """
+    Admin para servicios históricos importados desde CSV
+    Permite visualizar y verificar los 26K+ servicios históricos (2020-2024)
+    """
+    list_display = ('id', 'cliente_link', 'service_name', 'service_type',
+                    'service_date', 'price_paid', 'season', 'year', 'reserva_id')
+    list_filter = ('service_type', 'season', 'year', 'service_date')
+    search_fields = ('cliente__nombre', 'cliente__email', 'cliente__telefono',
+                     'service_name', 'reserva_id')
+    readonly_fields = ('id', 'cliente', 'reserva_id', 'service_type', 'service_name',
+                       'service_date', 'quantity', 'price_paid', 'season', 'year')
+    list_per_page = 50
+    date_hierarchy = 'service_date'
+
+    fieldsets = (
+        ('Cliente', {
+            'fields': ('cliente',)
+        }),
+        ('Servicio', {
+            'fields': ('reserva_id', 'service_type', 'service_name', 'quantity', 'price_paid')
+        }),
+        ('Fecha y Temporada', {
+            'fields': ('service_date', 'year', 'season')
+        }),
+    )
+
+    def cliente_link(self, obj):
+        """Link al cliente en el admin"""
+        if obj.cliente:
+            url = reverse('admin:ventas_cliente_change', args=[obj.cliente.id])
+            return format_html('<a href="{}">{}</a>', url, obj.cliente.nombre)
+        return '-'
+    cliente_link.short_description = 'Cliente'
+
+    def has_add_permission(self, request):
+        """No permitir agregar servicios históricos manualmente"""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Solo superusers pueden eliminar"""
+        return request.user.is_superuser
+
+    class Media:
+        css = {
+            'all': ('admin/css/custom.css',)
+        }
+
 # ============================================================================
 # ADMIN: SISTEMA DE TRAMOS Y PREMIOS
 # ============================================================================
@@ -819,35 +1312,287 @@ class PremioAdmin(admin.ModelAdmin):
 
 @admin.register(ClientePremio)
 class ClientePremioAdmin(admin.ModelAdmin):
-    list_display = ('id', 'cliente', 'premio', 'estado', 'tramo_al_ganar', 'fecha_ganado')
-    list_filter = ('estado', 'fecha_ganado', 'tramo_al_ganar')
-    search_fields = ('cliente__nombre', 'cliente__email', 'codigo_unico')
-    readonly_fields = ('fecha_ganado', 'codigo_unico', 'tramo_al_ganar', 'gasto_total_al_ganar')
-    autocomplete_fields = ['cliente']
+    list_display = (
+        'cliente_link',
+        'premio',
+        'estado_badge',
+        'tramo_info',
+        'fecha_ganado',
+        'fecha_expiracion',
+        'esta_vigente_badge',
+        'acciones_rapidas'
+    )
+    list_filter = (
+        'estado',
+        'fecha_ganado',
+        'tramo_al_ganar',
+        'premio__tipo'
+    )
+    search_fields = (
+        'cliente__nombre',
+        'cliente__email',
+        'codigo_unico',
+        'premio__nombre'
+    )
+    readonly_fields = (
+        'fecha_ganado',
+        'codigo_unico',
+        'tramo_al_ganar',
+        'gasto_total_al_ganar',
+        'fecha_uso',
+        'esta_vigente_badge'
+    )
+    autocomplete_fields = ['cliente', 'venta_donde_uso']
     
     fieldsets = (
         ('Cliente y Premio', {
             'fields': ('cliente', 'premio', 'estado')
         }),
         ('Tracking de Tramo', {
-            'fields': ('tramo_al_ganar', 'tramo_anterior', 'gasto_total_al_ganar')
+            'fields': (
+                'tramo_al_ganar',
+                'tramo_anterior',
+                'gasto_total_al_ganar'
+            )
         }),
         ('Fechas', {
-            'fields': ('fecha_ganado', 'fecha_aprobacion', 'fecha_enviado', 'fecha_expiracion', 'fecha_uso')
+            'fields': (
+                'fecha_ganado',
+                'fecha_aprobacion',
+                'fecha_enviado',
+                'fecha_expiracion',
+                'fecha_uso',
+                'esta_vigente_badge'
+            )
+        }),
+        ('Email', {
+            'fields': ('asunto_email', 'cuerpo_email'),
+            'classes': ('collapse',)
         }),
         ('Uso del Premio', {
-            'fields': ('codigo_unico',)
+            'fields': ('codigo_unico', 'venta_donde_uso')
+        }),
+        ('Notas', {
+            'fields': ('notas_admin',)
         }),
     )
+    
+    actions = ['aprobar_premios', 'marcar_como_enviado', 'cancelar_premios']
+
+    def get_urls(self):
+        """Agregar URL personalizada para preview de email"""
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                '<int:premio_id>/preview-email/',
+                self.admin_site.admin_view(self.preview_email_view),
+                name='preview_premio_email',
+            ),
+        ]
+        return custom_urls + urls
+
+    def preview_email_view(self, request, premio_id):
+        """Vista para mostrar preview del email de premio"""
+        from django.http import HttpResponse
+        from ventas.services.email_premio_service import EmailPremioService
+
+        # Generar el HTML del email usando el servicio
+        html_content = EmailPremioService.preview_email(premio_id)
+
+        # Retornar el HTML directamente
+        return HttpResponse(html_content)
+
+    def cliente_link(self, obj):
+        """Link al cliente"""
+        if obj.cliente:
+            url = reverse('admin:ventas_cliente_change', args=[obj.cliente.id])
+            return format_html('<a href="{}">{}</a>', url, obj.cliente.nombre)
+        return '-'
+    cliente_link.short_description = 'Cliente'
+    
+    def estado_badge(self, obj):
+        """Badge visual del estado"""
+        colors = {
+            'pendiente_aprobacion': '#FFA500',
+            'aprobado': '#4CAF50',
+            'enviado': '#2196F3',
+            'usado': '#9C27B0',
+            'expirado': '#F44336',
+            'cancelado': '#757575',
+        }
+        color = colors.get(obj.estado, '#757575')
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 4px 8px; border-radius: 3px; font-size: 11px;">{}</span>',
+            color,
+            obj.get_estado_display()
+        )
+    estado_badge.short_description = 'Estado'
+    
+    def tramo_info(self, obj):
+        """Info de tramo"""
+        if obj.tramo_anterior:
+            return format_html(
+                'Tramo {} → {} <br><small>${:,}</small>',
+                obj.tramo_anterior,
+                obj.tramo_al_ganar,
+                obj.gasto_total_al_ganar
+            )
+        return format_html(
+            'Tramo {} <br><small>${:,}</small>',
+            obj.tramo_al_ganar,
+            obj.gasto_total_al_ganar
+        )
+    tramo_info.short_description = 'Tramo'
+    
+    def esta_vigente_badge(self, obj):
+        """Badge de vigencia"""
+        if obj.esta_vigente():
+            return format_html(
+                '<span style="color: green;">✓ Vigente</span>'
+            )
+        return format_html(
+            '<span style="color: red;">✗ No vigente</span>'
+        )
+    esta_vigente_badge.short_description = 'Vigencia'
+    
+    def acciones_rapidas(self, obj):
+        """Botones de acciones rápidas"""
+        buttons = []
+
+        if obj.estado == 'pendiente_aprobacion':
+            # Botón de Vista Previa
+            preview_url = reverse('admin:preview_premio_email', args=[obj.id])
+            buttons.append(
+                '<a class="button" href="{}" target="_blank" style="background-color: #2196F3; color: white;">👁️ Vista Previa</a>'.format(
+                    preview_url
+                )
+            )
+            # Botón de Aprobar
+            buttons.append(
+                '<a class="button" href="{}?ids={}">Aprobar</a>'.format(
+                    reverse('admin:ventas_clientepremio_changelist'),
+                    obj.id
+                )
+            )
+
+        if obj.estado in ['aprobado', 'enviado'] and obj.esta_vigente():
+            # Botón de Vista Previa también para aprobados/enviados
+            preview_url = reverse('admin:preview_premio_email', args=[obj.id])
+            buttons.append(
+                '<a class="button" href="{}" target="_blank" style="background-color: #2196F3; color: white;">👁️ Vista Previa</a>'.format(
+                    preview_url
+                )
+            )
+            buttons.append(
+                '<a class="button" href="{}">Ver Email</a>'.format(
+                    reverse('admin:ventas_clientepremio_change', args=[obj.id])
+                )
+            )
+
+        return format_html(' '.join(buttons)) if buttons else '-'
+    acciones_rapidas.short_description = 'Acciones'
+    
+    def aprobar_premios(self, request, queryset):
+        """Acción para aprobar premios en lote"""
+        from django.utils import timezone
+        
+        updated = queryset.filter(estado='pendiente_aprobacion').update(
+            estado='aprobado',
+            fecha_aprobacion=timezone.now()
+        )
+        
+        self.message_user(
+            request,
+            f'{updated} premio(s) aprobado(s) exitosamente.'
+        )
+    aprobar_premios.short_description = "Aprobar premios seleccionados"
+    
+    def marcar_como_enviado(self, request, queryset):
+        """Acción para marcar como enviado"""
+        from django.utils import timezone
+        
+        updated = queryset.filter(estado='aprobado').update(
+            estado='enviado',
+            fecha_enviado=timezone.now()
+        )
+        
+        self.message_user(
+            request,
+            f'{updated} premio(s) marcado(s) como enviado.'
+        )
+    marcar_como_enviado.short_description = "Marcar como enviado"
+    
+    def cancelar_premios(self, request, queryset):
+        """Acción para cancelar premios"""
+        updated = queryset.update(estado='cancelado')
+        
+        self.message_user(
+            request,
+            f'{updated} premio(s) cancelado(s).'
+        )
+    cancelar_premios.short_description = "Cancelar premios seleccionados"
 
 
 @admin.register(HistorialTramo)
 class HistorialTramoAdmin(admin.ModelAdmin):
-    list_display = ('id', 'cliente', 'tramo_desde', 'tramo_hasta', 'fecha_cambio', 'gasto_en_momento')
+    list_display = (
+        'cliente_link',
+        'cambio_tramo',
+        'gasto_momento',
+        'fecha_cambio',
+        'premio_link'
+    )
     list_filter = ('fecha_cambio', 'tramo_hasta')
     search_fields = ('cliente__nombre', 'cliente__email')
-    readonly_fields = ('cliente', 'tramo_desde', 'tramo_hasta', 'fecha_cambio', 'gasto_en_momento', 'premio_generado')
-
+    readonly_fields = (
+        'cliente',
+        'tramo_desde',
+        'tramo_hasta',
+        'fecha_cambio',
+        'gasto_en_momento',
+        'premio_generado'
+    )
+    
+    def cliente_link(self, obj):
+        """Link al cliente"""
+        if obj.cliente:
+            url = reverse('admin:ventas_cliente_change', args=[obj.cliente.id])
+            return format_html('<a href="{}">{}</a>', url, obj.cliente.nombre)
+        return '-'
+    cliente_link.short_description = 'Cliente'
+    
+    def cambio_tramo(self, obj):
+        """Visualización del cambio de tramo"""
+        return format_html(
+            '<span style="font-weight: bold;">Tramo {} → {}</span>',
+            obj.tramo_desde,
+            obj.tramo_hasta
+        )
+    cambio_tramo.short_description = 'Cambio'
+    
+    def gasto_momento(self, obj):
+        """Gasto formateado"""
+        return f'${obj.gasto_en_momento:,.0f}'
+    gasto_momento.short_description = 'Gasto'
+    
+    def premio_link(self, obj):
+        """Link al premio generado"""
+        if obj.premio_generado:
+            url = reverse('admin:ventas_clientepremio_change', args=[obj.premio_generado.id])
+            return format_html(
+                '<a href="{}">{}</a>',
+                url,
+                obj.premio_generado.premio.nombre
+            )
+        return '-'
+    premio_link.short_description = 'Premio Generado'
+    
     def has_add_permission(self, request):
+        """No permitir crear manualmente"""
         return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Solo superusers pueden eliminar"""
+        return request.user.is_superuser
 

@@ -9,7 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from ..models import ( # Relative imports
     Proveedor, CategoriaProducto, Producto, VentaReserva, Cliente, Pago,
-    Servicio, ReservaProducto, ReservaServicio, CategoriaServicio
+    Servicio, ReservaProducto, ReservaServicio, CategoriaServicio, Region, Comuna
 )
 # Import Cliente and Servicio models directly for the new views
 from ..models import Cliente, Servicio, Proveedor
@@ -17,7 +17,7 @@ from ..serializers import ( # Relative imports
     ProveedorSerializer, CategoriaProductoSerializer, ProductoSerializer,
     VentaReservaSerializer, ClienteSerializer, PagoSerializer,
     ReservaProductoSerializer, ServicioSerializer, ReservaServicioSerializer,
-    CategoriaServicioSerializer
+    CategoriaServicioSerializer, RegionSerializer, ComunaSerializer
 )
 from ..utils import verificar_disponibilidad # Relative import
 from rest_framework.decorators import api_view, permission_classes
@@ -575,3 +575,48 @@ def log_campaign_interaction(request):
     except Exception as e:
         logger.error(f"Error creating CampaignInteraction for contact {contact.id}, campaign {campaign.id}: {e}")
         return Response({"error": "Failed to log interaction."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# ============================================
+# VIEWSETS PARA REGIÓN Y COMUNA
+# ============================================
+
+class RegionViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet de solo lectura para Regiones.
+    
+    Endpoints:
+    - GET /api/regiones/ - Lista todas las regiones
+    - GET /api/regiones/{id}/ - Detalle de una región
+    """
+    queryset = Region.objects.all().order_by('orden')
+    serializer_class = RegionSerializer
+    permission_classes = [AllowAny]  # Permitir acceso público
+
+
+class ComunaViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet de solo lectura para Comunas.
+    
+    Endpoints:
+    - GET /api/comunas/ - Lista todas las comunas
+    - GET /api/comunas/{id}/ - Detalle de una comuna
+    - GET /api/comunas/?region={region_id} - Filtra comunas por región
+    
+    Query params:
+    - region: ID de la región para filtrar comunas
+    """
+    queryset = Comuna.objects.all().select_related('region').order_by('region__orden', 'nombre')
+    serializer_class = ComunaSerializer
+    permission_classes = [AllowAny]  # Permitir acceso público
+    
+    def get_queryset(self):
+        """
+        Filtra comunas por región si se proporciona el parámetro 'region'.
+        """
+        queryset = super().get_queryset()
+        region_id = self.request.query_params.get('region', None)
+        
+        if region_id is not None:
+            queryset = queryset.filter(region_id=region_id)
+        
+        return queryset

@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 import dj_database_url
 
+# Configuración para despliegue en Render
 logger = logging.getLogger(__name__)
 
 # Ruta base del proyecto
@@ -26,7 +27,28 @@ if ALLOWED_HOSTS_ENV:
     ALLOWED_HOSTS = ALLOWED_HOSTS_ENV.split(',')
 else:
     # Fallback para producción en Render
-    ALLOWED_HOSTS = ['aremko-booking-system.onrender.com', '.onrender.com', 'localhost', '127.0.0.1']
+    ALLOWED_HOSTS = [
+        'aremko-booking-system.onrender.com', 
+        'aremko-booking-system-prod.onrender.com',  # Dominio de producción actual
+        'www.aremko.cl',  # Dominio personalizado
+        'aremko.cl',  # Dominio personalizado sin www
+        '.onrender.com', 
+        'localhost', 
+        '127.0.0.1',
+        'testserver'  # Para testing
+    ]
+
+# CSRF_TRUSTED_ORIGINS para HTTPS
+CSRF_TRUSTED_ORIGINS_ENV = os.getenv('CSRF_TRUSTED_ORIGINS', '')
+if CSRF_TRUSTED_ORIGINS_ENV:
+    CSRF_TRUSTED_ORIGINS = CSRF_TRUSTED_ORIGINS_ENV.split(',')
+else:
+    # Fallback para producción en Render
+    CSRF_TRUSTED_ORIGINS = [
+        'https://www.aremko.cl',
+        'https://aremko.cl',
+        'https://aremko-booking-system-prod.onrender.com',
+    ]
 
 # Aplicaciones instaladas
 INSTALLED_APPS = [
@@ -127,8 +149,8 @@ if os.getenv('GOOGLE_APPLICATION_CREDENTIALS') and os.path.exists(os.getenv('GOO
         # For now, we'll rely on the environment variable being set.
         pass # GS_CREDENTIALS = str(GS_CREDENTIALS_PATH) # Uncomment if needed
 
-    # Make uploaded files publicly readable by default - REMOVE OR COMMENT OUT THIS LINE
-    # GS_DEFAULT_ACL = 'publicRead' # REMOVE THIS LINE
+    # Make uploaded files publicly readable by default
+    # GS_DEFAULT_ACL = 'publicRead'  # Temporarily disabled to test
     GS_FILE_OVERWRITE = False # Prevent overwriting files with the same name
     GS_QUERYSTRING_AUTH = False # Keep this: Generate plain public URLs
 
@@ -162,6 +184,13 @@ CORS_ALLOW_ALL_ORIGINS = True  # Only use this in development!
 REDVOISS_API_URL = os.getenv('REDVOISS_API_URL', 'https://sms.lanube.cl/services/rest')
 REDVOISS_USERNAME = os.getenv('REDVOISS_USERNAME', '')
 REDVOISS_PASSWORD = os.getenv('REDVOISS_PASSWORD', '')
+
+# --- Configuración IA para Campañas de Email ---
+DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
+DEEPSEEK_MODEL = os.getenv('DEEPSEEK_MODEL', 'deepseek-chat')
+AI_VARIATION_PROVIDER = os.getenv('AI_VARIATION_PROVIDER', 'deepseek')
+AI_VARIATION_ENABLED = os.getenv('AI_VARIATION_ENABLED', 'true').lower() == 'true'
+AI_ANTI_SPAM_ENABLED = os.getenv('AI_ANTI_SPAM_ENABLED', 'true').lower() == 'true'
 
 # --- Límites Anti-Spam Comunicación ---
 SMS_DAILY_LIMIT_PER_CLIENT = int(os.getenv('SMS_DAILY_LIMIT_PER_CLIENT', '2'))
@@ -232,10 +261,3 @@ LOGGING = {
         },
     },
 }
-
-# ============================================================================
-# EXTERNAL APIS
-# ============================================================================
-
-# DeepSeek AI - Para generación de mensajes personalizados en GiftCards
-DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')

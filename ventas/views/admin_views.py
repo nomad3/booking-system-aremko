@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.contrib.admin import helpers # Import helpers
 from django import forms # Import forms module
 from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.http import require_http_methods
+from django.core.cache import cache
 from django.urls import reverse
 from django.contrib import messages
 from django.http import HttpResponseRedirect, HttpResponse
@@ -12,7 +14,10 @@ from django.db import models # Import models for Q lookup
 from django.template.loader import render_to_string
 from weasyprint import HTML
 
-from ..models import Cliente, Contact, Campaign, Company, Activity, VentaReserva # Added Activity and VentaReserva
+from ..models import Cliente, Contact, Campaign, Company, Activity, VentaReserva, CommunicationLog # Added CommunicationLog
+from django.core.mail import EmailMultiAlternatives
+from django.conf import settings
+import csv, io, threading
 from ..forms import SelectCampaignForm # Keep this if still used elsewhere, otherwise remove
 # Import CampaignForm if needed for a custom form, or rely on ModelAdmin form
 # from ..forms import CampaignForm # Example if you create a custom Campaign form
@@ -176,6 +181,247 @@ def select_campaign_for_clients_view(request):
 def admin_section_crm_view(request):
     context = {**admin.site.each_context(request), 'title': 'CRM y Marketing'}
     return render(request, 'admin/section_crm.html', context)
+
+
+# =============== CSV Campaign Uploader (Beta) ===============
+
+@login_required
+@user_passes_test(es_administrador)
+@require_http_methods(["GET", "POST"])
+def csv_campaign_uploader(request):
+    cache_key = 'csv_campaign_progress'
+    if request.method == 'POST':
+        asunto = request.POST.get('subject', '').strip()
+        cuerpo = request.POST.get('body', '').strip()
+        file = request.FILES.get('csv_file')
+        send_test = request.POST.get('send_test') == 'on'
+        test_email = request.POST.get('test_email', '').strip()
+
+        if not asunto or not cuerpo or not file:
+            messages.error(request, 'Asunto, cuerpo y archivo CSV son obligatorios.')
+        else:
+            try:
+                data = file.read().decode('utf-8')
+                reader = csv.DictReader(io.StringIO(data))
+                rows = list(reader)
+                total = len(rows)
+                cache.set(cache_key, {'status': 'queued', 'total': total, 'sent': 0, 'failed': 0}, 3600)
+
+                def worker():
+                    progress = {'status': 'running', 'total': total, 'queued': 0, 'failed': 0, 'test_sent': False}
+                    cache.set(cache_key, progress, 3600)
+
+                    def val(row, *keys):
+                        for k in keys:
+                            if k in row and row[k] not in (None, ''):
+                                return str(row[k]).strip()
+                        return ''
+
+                    def norm_email(v):
+                        v = (v or '').strip().lower()
+                        return v if v and '@' in v else ''
+
+                    def norm_phone(v):
+                        d = ''.join(filter(str.isdigit, str(v or '')))
+                        if d.startswith('56') and len(d) >= 11:
+                            d = d[-9:]
+                        if len(d) == 8:
+                            d = '9' + d
+                        return f'+56{d}' if len(d) == 9 and d.startswith('9') else ''
+
+                    # Envío de prueba si corresponde
+                    if send_test and test_email:
+                        body = cuerpo.replace('[Nombre]', 'Jorge')
+                        from_email = getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
+                        m = EmailMultiAlternatives(subject=asunto, body=body, from_email=from_email, to=[test_email], reply_to=[getattr(settings,'VENTAS_FROM_EMAIL','ventas@aremko.cl')])
+                        if '<' in body and '>' in body:
+                            m.attach_alternative(body, 'text/html')
+                        try:
+                            m.send()
+                            progress['test_sent'] = True
+                        except Exception as e:
+                            progress['test_sent'] = f'Error: {str(e)}'
+                        cache.set(cache_key, progress, 3600)
+
+                    # Sembrar cola
+                    msg_types = dict(CommunicationLog.MESSAGE_TYPES)
+                    promo_key = 'PROMOTIONAL' if 'PROMOTIONAL' in msg_types else 'PROMOCIONAL'
+                    
+                    for row in rows:
+                        email = norm_email(val(row, 'email'))
+                        if not email:
+                            progress['failed'] += 1
+                            cache.set(cache_key, progress, 3600)
+                            continue
+                            
+                        nombre = val(row, 'nombre', 'first_name') or '-'
+                        apellido = val(row, 'apellido', 'last_name')
+                        phone = norm_phone(val(row, 'celular', 'phone')) or None
+                        empresa = val(row, 'empresa', 'company_name')
+                        rubro = val(row, 'rubro', 'industry')
+                        ciudad = val(row, 'ciudad', 'city')
+
+                        # Crear/actualizar Company si aplica
+                        company = None
+                        if empresa:
+                            company, _ = Company.objects.get_or_create(name=empresa)
+                            if rubro and hasattr(company, 'industry') and (company.industry or '') != rubro:
+                                company.industry = rubro
+                                company.save(update_fields=['industry'])
+
+                        # Crear/actualizar Contact
+                        c, _ = Contact.objects.get_or_create(email=email, defaults={
+                            'first_name': nombre, 'last_name': apellido, 'phone': phone, 'company': company,
+                            'notes': '; '.join([p for p in [f"Ciudad: {ciudad}" if ciudad else '', f"Rubro: {rubro}" if rubro else ''] if p])
+                        })
+                        
+                        # Crear/actualizar Cliente (requerido por CommunicationLog)
+                        try:
+                            display_name = f"{nombre} {apellido}".strip() or (email.split('@')[0])
+                            cliente_obj, _ = Cliente.objects.get_or_create(
+                                email=email,
+                                defaults={'nombre': display_name, 'telefono': phone}
+                            )
+                        except Exception:
+                            cliente_obj = Cliente.objects.filter(email=email).first()
+
+                        # Crear CommunicationLog PENDING solo si no existe ya uno pendiente
+                        if cliente_obj:
+                            existing = CommunicationLog.objects.filter(
+                                destination=email,
+                                communication_type='EMAIL',
+                                message_type=promo_key,
+                                status='PENDING'
+                            ).exists()
+                            
+                            if not existing:
+                                CommunicationLog.objects.create(
+                                    cliente=cliente_obj, 
+                                    campaign=None, 
+                                    communication_type='EMAIL',
+                                    message_type=promo_key,
+                                    subject=asunto, 
+                                    content=cuerpo, 
+                                    destination=email, 
+                                    status='PENDING'
+                                )
+                                progress['queued'] += 1
+                            else:
+                                progress['queued'] += 1  # Ya existía, pero lo contamos como exitoso
+                        else:
+                            progress['failed'] += 1
+                        
+                        cache.set(cache_key, progress, 3600)
+
+                    # Actualizar progreso final
+                    total_pending = CommunicationLog.objects.filter(
+                        communication_type='EMAIL',
+                        message_type=promo_key,
+                        status='PENDING'
+                    ).count()
+                    
+                    progress.update({
+                        'status': 'completed_seeding',
+                        'pending': total_pending,
+                        'message': f'Cola preparada con {total_pending} emails. El goteo automático los enviará cada 10 minutos.'
+                    })
+                    cache.set(cache_key, progress, 3600)
+                    
+                    # Iniciar el proceso de envío automático inmediatamente
+                    try:
+                        from django.core.management import call_command
+                        # Usar el contenido almacenado en los CommunicationLog en lugar de template externo
+                        call_command('send_next_campaign_drip', 
+                                   use_stored_content=True,
+                                   batch_size=5)  # Enviar 5 por vez en lugar de 1
+                        progress['auto_start'] = 'Primer lote enviado automáticamente'
+                    except Exception as e:
+                        progress['auto_send_error'] = f'Error iniciando envío: {str(e)}'
+                        cache.set(cache_key, progress, 3600)
+
+                threading.Thread(target=worker, daemon=True).start()
+                messages.success(request, 'Archivo recibido. Sembrando cola y enviando prueba...')
+            except Exception as e:
+                messages.error(request, f'Error procesando CSV: {e}')
+
+    context = {**admin.site.each_context(request), 'title': 'Campaña por CSV (beta)'}
+    context['progress'] = cache.get(cache_key)
+    return render(request, 'admin/csv_campaign_uploader.html', context)
+
+
+@login_required
+@user_passes_test(es_administrador)
+@require_http_methods(["GET", "POST"])
+def mail_csv_uploader(request):
+    """Subir CSV a la tabla MailParaEnviar"""
+    if request.method == 'POST':
+        asunto = request.POST.get('subject', '').strip()
+        contenido = request.POST.get('body', '').strip()
+        file = request.FILES.get('csv_file')
+        campana = request.POST.get('campaign', '').strip()
+
+        if not asunto or not contenido or not file:
+            messages.error(request, 'Asunto, contenido y archivo CSV son obligatorios.')
+        else:
+            try:
+                from ventas.models import MailParaEnviar
+                data = file.read().decode('utf-8')
+                reader = csv.DictReader(io.StringIO(data))
+                rows = list(reader)
+                
+                def val(row, *keys):
+                    for k in keys:
+                        if k in row and row[k]:
+                            return str(row[k]).strip()
+                    return ''
+
+                def norm_email(v):
+                    v = (v or '').strip().lower()
+                    return v if v and '@' in v else ''
+
+                creados = 0
+                saltados = 0
+                
+                for row in rows:
+                    email = norm_email(val(row, 'email'))
+                    if not email:
+                        saltados += 1
+                        continue
+                        
+                    nombre = val(row, 'nombre', 'empresa') or 'Sin nombre'
+                    ciudad = val(row, 'ciudad')
+                    rubro = val(row, 'rubro')
+                    
+                    # Verificar si ya existe
+                    if MailParaEnviar.objects.filter(email=email, estado='PENDIENTE').exists():
+                        saltados += 1
+                        continue
+                    
+                    # Crear registro
+                    MailParaEnviar.objects.create(
+                        nombre=nombre,
+                        email=email,
+                        ciudad=ciudad,
+                        rubro=rubro,
+                        asunto=asunto,
+                        contenido_html=contenido,
+                        estado='PENDIENTE',
+                        prioridad=1,
+                        campana=campana or 'Sin campaña'
+                    )
+                    creados += 1
+                
+                messages.success(request, f'✅ Importación completada: {creados} emails creados, {saltados} saltados.')
+                
+                # Mostrar total pendientes
+                total_pendientes = MailParaEnviar.objects.filter(estado='PENDIENTE').count()
+                messages.info(request, f'📊 Total emails PENDIENTES: {total_pendientes}')
+                
+            except Exception as e:
+                messages.error(request, f'Error procesando CSV: {e}')
+
+    context = {**admin.site.each_context(request), 'title': 'Importar Emails desde CSV'}
+    return render(request, 'admin/mail_csv_uploader.html', context)
 
 @login_required
 @user_passes_test(es_administrador)

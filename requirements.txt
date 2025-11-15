@@ -1,22 +1,51 @@
-Django==4.2
-psycopg2-binary==2.9.6  # PostgreSQL adapter
-google-api-python-client==2.85.0  # Google Calendar API
-google-auth # Removed version pin to allow compatible version installation
-google-auth-oauthlib==0.7.1
-google-auth-httplib2==0.1.0
-requests==2.28.1  # Para la integración con ManyChat
-djangorestframework==3.14.0  # Django REST Framework
-gunicorn
-openai
-dj-database-url>=0.5.0
-whitenoise
-django-cors-headers
-xlwt==1.3.0  # Para exportación a Excel
-openpyxl==3.1.2  # Para importar desde Excel
-xlwt==1.3.0
-Pillow>=9.0.0     # For ImageField support
-phonenumbers>=8.12.0 # For phone number validation/formatting
-google-cloud-storage>=2.0.0 # For Google Cloud Storage
-django-storages>=1.14.0 # For Django storage backends (Removed [google] extra)
-django-solo>=2.1.0 # For singleton configuration models
-WeasyPrint>=57.1   # Para generar PDF
+# ============================================================
+# DEPENDENCIAS CON VERSIONES SEGURAS
+# Actualizado: 2025-11-09
+# Backup: booking_system_backup_20251109_115651.tar.gz
+# ============================================================
+
+# Core Django (VULNERABILIDADES CRÍTICAS CORREGIDAS)
+Django>=4.2.17,<4.3.0  # Fixes: CVE-2024-38875, CVE-2024-41989, CVE-2024-41990, CVE-2024-42005, CVE-2024-45230, CVE-2024-53907, CVE-2024-53908, CVE-2025-32873
+psycopg2-binary>=2.9.9  # PostgreSQL adapter
+
+# Google APIs
+google-api-python-client>=2.150.0  # Google Calendar API
+google-auth>=2.35.0  # Google authentication
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+
+# HTTP Clients (VULNERABILIDADES CORREGIDAS)
+requests>=2.32.0  # Fixes: Certificate Verification Bypass, Proxy-Authorization Header Leak
+httpx>=0.27.2  # Cliente HTTP asíncrono
+
+# Django REST Framework
+djangorestframework>=3.15.2  # Django REST Framework
+
+# Production Server
+gunicorn>=22.0.0  # Production WSGI server
+
+# OpenAI
+openai>=1.57.0  # OpenAI API client
+
+# Database & Storage
+dj-database-url>=2.2.0
+whitenoise>=6.8.2  # Static files serving
+django-cors-headers>=4.6.0  # CORS headers
+google-cloud-storage>=2.18.0  # Google Cloud Storage
+django-storages>=1.14.4  # Django storage backends
+
+# Excel & Data
+xlwt==1.3.0  # Para exportación a Excel (XLS viejo)
+openpyxl>=3.1.5  # Para importar/exportar Excel moderno (XLSX)
+
+# Media & Images (VULNERABILIDADES CORREGIDAS)
+Pillow>=10.4.0  # ImageField support - versión segura
+
+# Utils
+phonenumbers>=8.13.48  # Phone number validation/formatting
+django-solo>=2.3.0  # Singleton configuration models
+beautifulsoup4>=4.12.3  # HTML parsing
+python-dateutil>=2.9.0  # Date/time utilities (para frecuencias periódicas)
+
+# PDF Generation
+WeasyPrint>=62.3  # PDF generation
