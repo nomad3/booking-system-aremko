@@ -15,7 +15,7 @@ import django
 
 # Configurar Django
 sys.path.insert(0, '/app')
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'booking_system.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aremko_project.settings')
 django.setup()
 
 from control_gestion.models import Task, TimeCriticality, TaskState
