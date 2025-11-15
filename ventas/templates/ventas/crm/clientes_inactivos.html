@@ -232,6 +232,79 @@
                             </a>
                         </div>
                     {% endif %}
+
+                    <!-- Paginación -->
+                    {% if is_paginated %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <nav aria-label="Paginación de clientes">
+                                <ul class="pagination justify-content-center">
+                                    <!-- Botón Primera Página -->
+                                    {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?meses={{ meses_filtro }}&page=1" aria-label="Primera">
+                                            <span aria-hidden="true">&laquo;&laquo;</span>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+
+                                    <!-- Botón Anterior -->
+                                    {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?meses={{ meses_filtro }}&page={{ page_obj.previous_page_number }}" aria-label="Anterior">
+                                            <span aria-hidden="true">&laquo;</span>
+                                        </a>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">&laquo;</span>
+                                    </li>
+                                    {% endif %}
+
+                                    <!-- Números de página -->
+                                    {% for num in paginator.page_range %}
+                                        {% if page_obj.number == num %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ num }}</span>
+                                        </li>
+                                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?meses={{ meses_filtro }}&page={{ num }}">{{ num }}</a>
+                                        </li>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    <!-- Botón Siguiente -->
+                                    {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?meses={{ meses_filtro }}&page={{ page_obj.next_page_number }}" aria-label="Siguiente">
+                                            <span aria-hidden="true">&raquo;</span>
+                                        </a>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">&raquo;</span>
+                                    </li>
+                                    {% endif %}
+
+                                    <!-- Botón Última Página -->
+                                    {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?meses={{ meses_filtro }}&page={{ paginator.num_pages }}" aria-label="Última">
+                                            <span aria-hidden="true">&raquo;&raquo;</span>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+
+                            <!-- Info de paginación -->
+                            <p class="text-center text-muted">
+                                Mostrando clientes {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ total_clientes }}
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

@@ -351,6 +351,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         }
         js = (
             'admin/js/reserva_servicio_inline.js',
+            'admin/js/prevent_double_submit.js',  # Prevenir duplicación por doble clic
         )
 
 class ProveedorAdmin(admin.ModelAdmin):

@@ -604,8 +604,11 @@ def clientes_historicos_inactivos(request):
     """
     Vista de listado de clientes históricos que no han comprado recientemente
     Incluye filtro por cantidad de meses sin visita
+    OPTIMIZADO: Con paginación para evitar timeouts en listados largos
     """
     try:
+        from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+
         # Obtener parámetro de filtro (default: 12 meses)
         meses_sin_visita = int(request.GET.get('meses', 12))
 
@@ -616,13 +619,29 @@ def clientes_historicos_inactivos(request):
             meses_sin_visita = 60
 
         # Obtener clientes inactivos
-        clientes_inactivos = CRMService.get_clientes_historicos_inactivos(meses_sin_visita)
+        clientes_inactivos_list = CRMService.get_clientes_historicos_inactivos(meses_sin_visita)
+
+        # PAGINACIÓN: 25 clientes por página
+        paginator = Paginator(clientes_inactivos_list, 25)
+        page = request.GET.get('page', 1)
+
+        try:
+            clientes_inactivos = paginator.page(page)
+        except PageNotAnInteger:
+            # Si page no es un entero, mostrar primera página
+            clientes_inactivos = paginator.page(1)
+        except EmptyPage:
+            # Si page está fuera de rango, mostrar última página
+            clientes_inactivos = paginator.page(paginator.num_pages)
 
         context = {
             'clientes_inactivos': clientes_inactivos,
             'meses_filtro': meses_sin_visita,
-            'total_clientes': len(clientes_inactivos),
-            'page_title': 'Clientes Históricos Inactivos'
+            'total_clientes': len(clientes_inactivos_list),
+            'page_title': 'Clientes Históricos Inactivos',
+            'paginator': paginator,
+            'page_obj': clientes_inactivos,
+            'is_paginated': paginator.num_pages > 1,
         }
 
         return render(request, 'ventas/crm/clientes_inactivos.html', context)
