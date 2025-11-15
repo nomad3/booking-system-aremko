@@ -4,6 +4,7 @@ Vistas API para el sistema de GiftCards con personalización IA
 """
 
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
@@ -350,3 +351,131 @@ def consultar_giftcard(request, codigo):
             'success': False,
             'error': 'Error al consultar GiftCard'
         }, status=500)
+
+
+# ============================================================================
+# VISTAS DE INTERFAZ WEB (Frontend)
+# ============================================================================
+
+@require_http_methods(["GET"])
+def giftcard_wizard(request):
+    """
+    Página principal del wizard de compra de GiftCards
+
+    GET /giftcards/
+
+    Wizard de 6 pasos:
+    1. Seleccionar experiencia/monto
+    2. Datos del destinatario
+    3. Tipo de mensaje
+    4. Generar y elegir mensaje IA
+    5. Preview de giftcard
+    6. Checkout
+    """
+
+    # Opciones de experiencias/servicios
+    experiencias = [
+        {
+            'id': 'tinas',
+            'nombre': 'Tinas Calientes',
+            'descripcion': 'Experiencia de tinas calientes junto al río Pescado',
+            'imagen': 'images/tinas.jpg',  # Ajustar ruta según tus imágenes
+            'montos_sugeridos': [30000, 50000, 75000, 100000]
+        },
+        {
+            'id': 'masajes',
+            'nombre': 'Masajes Relajantes',
+            'descripcion': 'Sesión de masajes profesionales',
+            'imagen': 'images/masajes.jpg',
+            'montos_sugeridos': [40000, 60000, 80000]
+        },
+        {
+            'id': 'cabanas',
+            'nombre': 'Alojamiento en Cabaña',
+            'descripcion': 'Estadía completa en nuestras cabañas',
+            'imagen': 'images/cabanas.jpg',
+            'montos_sugeridos': [80000, 120000, 150000]
+        },
+        {
+            'id': 'ritual_rio',
+            'nombre': 'Ritual del Río',
+            'descripcion': 'Experiencia completa Ritual del Río',
+            'imagen': 'images/ritual.jpg',
+            'montos_sugeridos': [100000, 150000, 200000]
+        },
+        {
+            'id': 'celebracion',
+            'nombre': 'Celebración Especial',
+            'descripcion': 'Paquete personalizado para celebraciones',
+            'imagen': 'images/celebracion.jpg',
+            'montos_sugeridos': [120000, 180000, 250000]
+        },
+        {
+            'id': 'monto_libre',
+            'nombre': 'Monto Libre',
+            'descripcion': 'El destinatario elige la experiencia',
+            'imagen': 'images/gift_generic.jpg',
+            'montos_sugeridos': [50000, 100000, 150000, 200000]
+        }
+    ]
+
+    # Tipos de mensaje disponibles
+    tipos_mensaje = [
+        {
+            'id': 'romantico',
+            'nombre': 'Romántico',
+            'descripcion': 'Mensaje íntimo y apasionado para parejas',
+            'icono': 'fa-heart'
+        },
+        {
+            'id': 'cumpleanos',
+            'nombre': 'Cumpleaños',
+            'descripcion': 'Celebrativo y alegre para cumpleaños',
+            'icono': 'fa-birthday-cake'
+        },
+        {
+            'id': 'aniversario',
+            'nombre': 'Aniversario',
+            'descripcion': 'Nostálgico y especial para aniversarios',
+            'icono': 'fa-ring'
+        },
+        {
+            'id': 'celebracion',
+            'nombre': 'Celebración',
+            'descripcion': 'Festivo para cualquier celebración',
+            'icono': 'fa-champagne-glasses'
+        },
+        {
+            'id': 'relajacion',
+            'nombre': 'Relajación',
+            'descripcion': 'Tranquilo y sereno para descanso',
+            'icono': 'fa-spa'
+        },
+        {
+            'id': 'parejas',
+            'nombre': 'Parejas',
+            'descripcion': 'Romántico y cómplice para dos',
+            'icono': 'fa-heart-circle'
+        },
+        {
+            'id': 'agradecimiento',
+            'nombre': 'Agradecimiento',
+            'descripcion': 'Cálido y sincero para agradecer',
+            'icono': 'fa-hands-holding-heart'
+        },
+        {
+            'id': 'amistad',
+            'nombre': 'Amistad',
+            'descripcion': 'Fraternal y cariñoso para amigos',
+            'icono': 'fa-user-friends'
+        }
+    ]
+
+    context = {
+        'experiencias': experiencias,
+        'tipos_mensaje': tipos_mensaje,
+        'paso_actual': 1,
+        'total_pasos': 6
+    }
+
+    return render(request, 'ventas/giftcard_wizard.html', context)

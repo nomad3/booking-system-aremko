@@ -77,7 +77,11 @@ urlpatterns = [
     # Removed URL for get_service_providers as it's no longer needed
     # path('api/get-service-providers/<int:servicio_id>/', api_views.get_service_providers, name='get_service_providers'),
 
-    # --- GiftCard AI API URLs ---
+    # --- GiftCard URLs ---
+    # Frontend
+    path('giftcards/', giftcard_views.giftcard_wizard, name='giftcard_wizard'),
+
+    # API
     path('api/giftcard/generar-mensajes/', giftcard_views.generar_mensajes_ai, name='generar_mensajes_ai'),
     path('api/giftcard/regenerar-mensaje/', giftcard_views.regenerar_mensaje_ai, name='regenerar_mensaje_ai'),
     path('api/giftcard/crear/', giftcard_views.crear_giftcard, name='crear_giftcard'),
