@@ -2,11 +2,11 @@
 """
 Servicio de IA para generación de mensajes personalizados en GiftCards
 
-Usa Claude AI (Anthropic) para generar mensajes emocionales, elegantes y memorables
+Usa DeepSeek (via OpenAI API) para generar mensajes emocionales, elegantes y memorables
 basados en el tipo de mensaje, destinatario y contexto proporcionado.
 """
 
-from anthropic import Anthropic
+from openai import OpenAI
 from django.conf import settings
 import logging
 
@@ -33,7 +33,7 @@ class GiftCardAIService:
     @staticmethod
     def generar_mensajes(tipo_mensaje, nombre, relacion, detalle='', cantidad=3):
         """
-        Genera mensajes personalizados usando Claude AI
+        Genera mensajes personalizados usando DeepSeek AI
 
         Args:
             tipo_mensaje (str): Tipo de mensaje ('romantico', 'cumpleanos', etc.)
@@ -57,7 +57,7 @@ class GiftCardAIService:
         # Obtener tono descriptivo
         tono = GiftCardAIService.TONOS_MENSAJE[tipo_mensaje]
 
-        # Construir prompt para Claude
+        # Construir prompt para DeepSeek
         prompt = f"""Genera {cantidad} frases breves (entre 25 y 50 palabras), emocionales, elegantes y memorables para una giftcard del Spa "Aremko Aguas Calientes & Spa", localizado en Puerto Varas junto al río Pescado, rodeado de bosque nativo, con tinas calientes y experiencias románticas.
 
 Tono seleccionado: {tono}.
@@ -80,25 +80,32 @@ IMPORTANTE: Retorna SOLO las {cantidad} frases, una por línea, sin numeración,
 
         try:
             # Verificar que existe la API key
-            api_key = getattr(settings, 'ANTHROPIC_API_KEY', None)
+            api_key = getattr(settings, 'DEEPSEEK_API_KEY', None)
             if not api_key:
-                raise ValueError("ANTHROPIC_API_KEY no configurada en settings.py")
+                raise ValueError("DEEPSEEK_API_KEY no configurada en settings.py")
 
-            # Inicializar cliente de Anthropic
-            client = Anthropic(api_key=api_key)
+            # Inicializar cliente de OpenAI apuntando a DeepSeek
+            client = OpenAI(
+                api_key=api_key,
+                base_url="https://api.deepseek.com"
+            )
 
-            # Llamar a la API de Claude
-            logger.info(f"Generando {cantidad} mensajes de tipo '{tipo_mensaje}' para {nombre}")
+            # Llamar a la API de DeepSeek
+            logger.info(f"Generando {cantidad} mensajes de tipo '{tipo_mensaje}' para {nombre} usando DeepSeek")
 
-            message = client.messages.create(
-                model="claude-sonnet-4-5-20250929",  # Usar Claude Sonnet 4.5
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[
+                    {"role": "system", "content": "Eres un experto en redacción creativa y emocional para regalos especiales. Generas mensajes únicos y memorables."},
+                    {"role": "user", "content": prompt}
+                ],
                 max_tokens=1024,
                 temperature=0.8,  # Un poco de creatividad
-                messages=[{"role": "user", "content": prompt}]
+                stream=False
             )
 
             # Parsear respuesta
-            respuesta_texto = message.content[0].text.strip()
+            respuesta_texto = response.choices[0].message.content.strip()
             mensajes = [m.strip() for m in respuesta_texto.split('\n') if m.strip()]
 
             # Limpiar mensajes (remover numeración si existe)
@@ -169,20 +176,27 @@ IMPORTANTE:
 - Evita clichés y frases genéricas"""
 
         try:
-            api_key = getattr(settings, 'ANTHROPIC_API_KEY', None)
+            api_key = getattr(settings, 'DEEPSEEK_API_KEY', None)
             if not api_key:
-                raise ValueError("ANTHROPIC_API_KEY no configurada")
+                raise ValueError("DEEPSEEK_API_KEY no configurada")
 
-            client = Anthropic(api_key=api_key)
-
-            message = client.messages.create(
-                model="claude-sonnet-4-5-20250929",
-                max_tokens=512,
-                temperature=0.9,  # Más creatividad para regenerar
-                messages=[{"role": "user", "content": prompt}]
+            client = OpenAI(
+                api_key=api_key,
+                base_url="https://api.deepseek.com"
             )
 
-            nuevo_mensaje = message.content[0].text.strip()
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[
+                    {"role": "system", "content": "Eres un experto en redacción creativa y emocional para regalos especiales."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=512,
+                temperature=0.9,  # Más creatividad para regenerar
+                stream=False
+            )
+
+            nuevo_mensaje = response.choices[0].message.content.strip()
 
             # Limpiar prefijos de numeración
             for prefijo in ['1. ', '1) ', '- ', '• ']:
