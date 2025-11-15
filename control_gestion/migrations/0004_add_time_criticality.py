@@ -1,0 +1,64 @@
+# Generated manually - Add time_criticality field to Task model
+
+from django.db import migrations, models
+
+
+def migrate_existing_tasks(apps, schema_editor):
+    """
+    Migración de datos existentes:
+    - Tareas con promise_due_at definido → CRITICAL
+    - Tareas sin promise_due_at → FLEXIBLE
+    """
+    Task = apps.get_model('control_gestion', 'Task')
+
+    # Tareas con hora específica → CRITICAL
+    critical_count = Task.objects.filter(
+        promise_due_at__isnull=False
+    ).update(time_criticality='CRITICAL')
+
+    # Tareas sin hora → FLEXIBLE
+    flexible_count = Task.objects.filter(
+        promise_due_at__isnull=True
+    ).update(time_criticality='FLEXIBLE')
+
+    print(f"✅ Migración completada:")
+    print(f"   - {critical_count} tareas marcadas como CRITICAL (con hora específica)")
+    print(f"   - {flexible_count} tareas marcadas como FLEXIBLE (sin hora específica)")
+
+
+def reverse_migration(apps, schema_editor):
+    """
+    Reversión: No hacemos nada, el campo se eliminará automáticamente
+    """
+    pass
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('control_gestion', '0003_taskownerconfig_manual'),
+    ]
+
+    operations = [
+        migrations.AddField(
+            model_name='task',
+            name='time_criticality',
+            field=models.CharField(
+                max_length=12,
+                choices=[
+                    ('CRITICAL', 'Crítica - Hora exacta'),
+                    ('SCHEDULED', 'Programada - Rango horario'),
+                    ('FLEXIBLE', 'Flexible - Durante el día'),
+                ],
+                default='FLEXIBLE',
+                verbose_name='Criticidad Temporal',
+                help_text='Define la urgencia temporal de la tarea'
+            ),
+        ),
+
+        # Migrar datos existentes
+        migrations.RunPython(
+            migrate_existing_tasks,
+            reverse_code=reverse_migration
+        ),
+    ]

@@ -468,101 +468,224 @@ document.addEventListener('DOMContentLoaded', function() {
 {% block content %}
 <h2 style="margin-bottom: 20px;">📅 Mis Tareas del Día</h2>
 
-<div class="stats">
-    <strong>Total de tareas pendientes:</strong> {{ total_pending }}
-    <span style="margin-left: 20px; color: #7f8c8d;">Mostrando todas tus tareas</span>
+
+<div class="stats" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+    <div>
+        <strong>Total de tareas pendientes:</strong> {{ total_pending }}
+    </div>
+    <div style="display: flex; gap: 15px; font-size: 13px;">
+        <span style="color: #e74c3c;">⏰ Urgentes: {{ count_urgentes }}</span>
+        <span style="color: #3498db;">🔵 Flexibles: {{ count_flexibles }}</span>
+    </div>
 </div>
 
-{% if tasks %}
-    {% for task in tasks %}
-    <div class="task-card {% if task.priority == 'ALTA' %}priority-high{% endif %}" data-task-id="{{ task.id }}" data-estado="{{ task.state }}">
-        <div class="task-header">
-            <div class="task-title">
-                <span style="color: #7f8c8d; font-family: monospace; font-size: 12px; margin-right: 8px;">ID:{{ task.id }}</span>
-                {{ task.title }}
+<!-- SECCIÓN 1: TAREAS URGENTES (Con hora específica) -->
+{% if tareas_urgentes %}
+<div style="margin-bottom: 40px;">
+    <div style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; padding: 15px 20px; border-radius: 8px 8px 0 0; margin-bottom: 0;">
+        <h3 style="margin: 0; font-size: 18px; display: flex; align-items: center; gap: 10px;">
+            <span>⏰</span>
+            <span>TAREAS URGENTES (Hora Específica)</span>
+            <span style="background: rgba(255,255,255,0.3); padding: 2px 10px; border-radius: 12px; font-size: 14px;">
+                {{ count_urgentes }}
+            </span>
+        </h3>
+        <p style="margin: 8px 0 0 0; font-size: 13px; opacity: 0.9;">
+            Estas tareas deben completarse a la hora indicada
+        </p>
+    </div>
+
+    <div style="background: #fff5f5; padding: 20px; border-radius: 0 0 8px 8px; border: 2px solid #e74c3c; border-top: none;">
+        {% for task in tareas_urgentes %}
+        <div class="task-card priority-high" data-task-id="{{ task.id }}" data-estado="{{ task.state }}" style="background: white; border-left: 4px solid #e74c3c;">
+            <div class="task-header">
+                <div class="task-title" style="display: flex; align-items: center; gap: 10px;">
+                    {% if task.promise_due_at %}
+                    <span style="background: #e74c3c; color: white; padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 16px;">
+                        {{ task.promise_due_at|date:"H:i" }}
+                    </span>
+                    {% endif %}
+                    <div>
+                        <span style="color: #7f8c8d; font-family: monospace; font-size: 12px; margin-right: 8px;">ID:{{ task.id }}</span>
+                        {{ task.title }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="task-meta">
+                <span class="badge badge-swimlane">{{ task.get_swimlane_display }}</span>
+                <span class="badge badge-state {% if task.state == 'IN_PROGRESS' %}in-progress{% elif task.state == 'BLOCKED' %}blocked{% elif task.state == 'DONE' %}done{% endif %}">
+                    {{ task.get_state_display }}
+                </span>
+                <span class="badge badge-priority">🔥 URGENTE</span>
+                {% if task.reservation_id %}
+                <span class="badge" style="background: #16a085; color: white;">
+                    🎫 Reserva #{{ task.reservation_id }}
+                </span>
+                {% endif %}
+                {% if task.location_ref %}
+                <span class="badge" style="background: #8e44ad; color: white;">
+                    📍 {{ task.get_location_ref_display }}
+                </span>
+                {% endif %}
+            </div>
+
+            <div class="task-description">
+                {{ task.description|truncatewords:50 }}
+            </div>
+
+            <div class="task-actions">
+                <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn-action btn-primary">📝 Ver Detalles</a>
+
+                {% if task.state == 'BACKLOG' %}
+                <button
+                    class="btn-action btn-warning btn-cambiar-estado"
+                    data-task-id="{{ task.id }}"
+                    data-nuevo-estado="IN_PROGRESS"
+                    data-estado-actual="BACKLOG">
+                    ▶️ Iniciar
+                </button>
+                {% elif task.state == 'IN_PROGRESS' %}
+                <button
+                    class="btn-action btn-success btn-cambiar-estado"
+                    data-task-id="{{ task.id }}"
+                    data-nuevo-estado="DONE"
+                    data-estado-actual="IN_PROGRESS">
+                    ✅ Completar
+                </button>
+                <button
+                    class="btn-action btn-cambiar-estado"
+                    style="background: #e74c3c; color: white;"
+                    data-task-id="{{ task.id }}"
+                    data-nuevo-estado="BLOCKED"
+                    data-estado-actual="IN_PROGRESS">
+                    🚫 Bloquear
+                </button>
+                {% elif task.state == 'BLOCKED' %}
+                <button
+                    class="btn-action btn-warning btn-cambiar-estado"
+                    data-task-id="{{ task.id }}"
+                    data-nuevo-estado="IN_PROGRESS"
+                    data-estado-actual="BLOCKED">
+                    ▶️ Reanudar
+                </button>
+                {% endif %}
             </div>
         </div>
-        
-        <div class="task-meta">
-            <span class="badge badge-swimlane">{{ task.get_swimlane_display }}</span>
-            <span class="badge badge-state {% if task.state == 'IN_PROGRESS' %}in-progress{% elif task.state == 'BLOCKED' %}blocked{% elif task.state == 'DONE' %}done{% endif %}">
-                {{ task.get_state_display }}
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- SECCIÓN 2: TAREAS FLEXIBLES (Sin hora específica) -->
+{% if tareas_flexibles %}
+<div style="margin-bottom: 40px;">
+    <div style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; padding: 15px 20px; border-radius: 8px 8px 0 0; margin-bottom: 0;">
+        <h3 style="margin: 0; font-size: 18px; display: flex; align-items: center; gap: 10px;">
+            <span>🔵</span>
+            <span>TAREAS DEL DÍA (Flexibles)</span>
+            <span style="background: rgba(255,255,255,0.3); padding: 2px 10px; border-radius: 12px; font-size: 14px;">
+                {{ count_flexibles }}
             </span>
-            {% if task.priority == 'ALTA' %}
-            <span class="badge badge-priority">🔥 ALTA PRIORIDAD</span>
-            {% endif %}
-            {% if task.promise_due_at %}
-            <span class="badge" style="background: #9b59b6; color: white;">
-                📅 Promesa: {{ task.promise_due_at|date:"d/m H:i" }}
-            </span>
-            {% endif %}
-            {% if task.reservation_id %}
-            <span class="badge" style="background: #16a085; color: white;">
-                🎫 Reserva #{{ task.reservation_id }}
-            </span>
-            {% endif %}
+        </h3>
+        <p style="margin: 8px 0 0 0; font-size: 13px; opacity: 0.9;">
+            Estas tareas pueden realizarse en cualquier momento del día
+        </p>
+    </div>
+
+    <div style="background: #f0f8ff; padding: 20px; border-radius: 0 0 8px 8px; border: 2px solid #3498db; border-top: none;">
+        {% for task in tareas_flexibles %}
+        <div class="task-card" data-task-id="{{ task.id }}" data-estado="{{ task.state }}" style="background: white; border-left: 4px solid #3498db;">
+            <div class="task-header">
+                <div class="task-title">
+                    <span style="color: #7f8c8d; font-family: monospace; font-size: 12px; margin-right: 8px;">ID:{{ task.id }}</span>
+                    {{ task.title }}
+                </div>
+            </div>
+
+            <div class="task-meta">
+                <span class="badge badge-swimlane">{{ task.get_swimlane_display }}</span>
+                <span class="badge badge-state {% if task.state == 'IN_PROGRESS' %}in-progress{% elif task.state == 'BLOCKED' %}blocked{% elif task.state == 'DONE' %}done{% endif %}">
+                    {{ task.get_state_display }}
+                </span>
+                {% if task.reservation_id %}
+                <span class="badge" style="background: #16a085; color: white;">
+                    🎫 Reserva #{{ task.reservation_id }}
+                </span>
+                {% endif %}
+                {% if task.location_ref %}
+                <span class="badge" style="background: #8e44ad; color: white;">
+                    📍 {{ task.get_location_ref_display }}
+                </span>
+                {% endif %}
+            </div>
+
+            <div class="task-description">
+                {{ task.description|truncatewords:50 }}
+            </div>
+
+            <div class="task-actions">
+                <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn-action btn-primary">📝 Ver Detalles</a>
+
+                {% if task.state == 'BACKLOG' %}
+                <button
+                    class="btn-action btn-warning btn-cambiar-estado"
+                    data-task-id="{{ task.id }}"
+                    data-nuevo-estado="IN_PROGRESS"
+                    data-estado-actual="BACKLOG">
+                    ▶️ Iniciar
+                </button>
+                {% elif task.state == 'IN_PROGRESS' %}
+                <button
+                    class="btn-action btn-success btn-cambiar-estado"
+                    data-task-id="{{ task.id }}"
+                    data-nuevo-estado="DONE"
+                    data-estado-actual="IN_PROGRESS">
+                    ✅ Completar
+                </button>
+                <button
+                    class="btn-action btn-cambiar-estado"
+                    style="background: #e74c3c; color: white;"
+                    data-task-id="{{ task.id }}"
+                    data-nuevo-estado="BLOCKED"
+                    data-estado-actual="IN_PROGRESS">
+                    🚫 Bloquear
+                </button>
+                {% elif task.state == 'BLOCKED' %}
+                <button
+                    class="btn-action btn-warning btn-cambiar-estado"
+                    data-task-id="{{ task.id }}"
+                    data-nuevo-estado="IN_PROGRESS"
+                    data-estado-actual="BLOCKED">
+                    ▶️ Reanudar
+                </button>
+                {% endif %}
+            </div>
         </div>
-        
-        <div class="task-description">
-            {{ task.description|truncatewords:50 }}
-        </div>
-        
-        <div class="task-actions">
-            <a href="/admin/control_gestion/task/{{ task.id }}/change/" class="btn-action btn-primary">📝 Ver Detalles</a>
-            
-            {% if task.state == 'BACKLOG' %}
-            <button 
-                class="btn-action btn-warning btn-cambiar-estado" 
-                data-task-id="{{ task.id }}"
-                data-nuevo-estado="IN_PROGRESS"
-                data-estado-actual="BACKLOG">
-                ▶️ Iniciar
-            </button>
-            {% elif task.state == 'IN_PROGRESS' %}
-            <button 
-                class="btn-action btn-success btn-cambiar-estado" 
-                data-task-id="{{ task.id }}"
-                data-nuevo-estado="DONE"
-                data-estado-actual="IN_PROGRESS">
-                ✅ Completar
-            </button>
-            <button 
-                class="btn-action btn-cambiar-estado" 
-                style="background: #e74c3c; color: white;"
-                data-task-id="{{ task.id }}"
-                data-nuevo-estado="BLOCKED"
-                data-estado-actual="IN_PROGRESS">
-                🚫 Bloquear
-            </button>
-            {% elif task.state == 'BLOCKED' %}
-            <button 
-                class="btn-action btn-warning btn-cambiar-estado" 
-                data-task-id="{{ task.id }}"
-                data-nuevo-estado="IN_PROGRESS"
-                data-estado-actual="BLOCKED">
-                ▶️ Reanudar
-            </button>
-            {% endif %}
-            
-            <a href="/admin/control_gestion/task/?owner__id__exact={{ user.id }}" class="btn-action btn-secondary">📋 Ver Todas</a>
-        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
-    
-    <div style="text-align: center; margin-top: 30px;">
-        <a href="/admin/control_gestion/task/?owner__id__exact={{ user.id }}" class="btn">Ver Todas Mis Tareas ({{ total_pending}})</a>
-    </div>
-    
-    <div class="keyboard-hint">
-        <strong>⌨️ Atajos de teclado:</strong> Selecciona una tarea (click) y luego presiona:
-        <strong>C</strong> = Completar | <strong>B</strong> = Bloquear | <strong>I</strong> = Iniciar | <strong>R</strong> = Reanudar
-    </div>
-{% else %}
-    <div class="empty-state">
-        <h2>✅</h2>
-        <h3>¡Sin tareas pendientes!</h3>
-        <p style="color: #7f8c8d; margin-top: 10px;">Buen trabajo. Disfruta tu día 🎉</p>
-    </div>
+</div>
+{% endif %}
+
+<!-- Estado vacío -->
+{% if not tareas_urgentes and not tareas_flexibles %}
+<div class="empty-state">
+    <h2>✅</h2>
+    <h3>¡Sin tareas pendientes!</h3>
+    <p style="color: #7f8c8d; margin-top: 10px;">Buen trabajo. Disfruta tu día 🎉</p>
+</div>
+{% endif %}
+
+<!-- Botón ver todas -->
+{% if total_pending > 0 %}
+<div style="text-align: center; margin-top: 30px;">
+    <a href="/admin/control_gestion/task/?owner__id__exact={{ user.id }}" class="btn">Ver Todas Mis Tareas ({{ total_pending }})</a>
+</div>
+
+<div class="keyboard-hint">
+    <strong>⌨️ Atajos de teclado:</strong> Selecciona una tarea (click) y luego presiona:
+    <strong>C</strong> = Completar | <strong>B</strong> = Bloquear | <strong>I</strong> = Iniciar | <strong>R</strong> = Reanudar
+</div>
 {% endif %}
 {% endblock %}
-
+{% endblock %}

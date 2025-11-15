@@ -205,6 +205,9 @@ class Command(BaseCommand):
                         else:
                             swimlane = Swimlane.ATENCION
 
+                        # Importar TimeCriticality
+                        from control_gestion.models import TimeCriticality
+
                         Task.objects.create(
                             title=f"Atención de clientes – {servicio_nombre} (Reserva #{reserva.id})",
                             description=(
@@ -234,7 +237,8 @@ class Command(BaseCommand):
                             reservation_id=str(reserva.id),
                             service_type=rs.servicio.tipo_servicio,
                             source=TaskSource.SISTEMA,
-                            promise_due_at=datetime_atencion
+                            promise_due_at=datetime_atencion,
+                            time_criticality=TimeCriticality.CRITICAL  # ⭐ CRÍTICA - Hora exacta
                         )
                         tareas_creadas += 1
                         self.stdout.write(self.style.SUCCESS("       → Tarea de atención creada"))

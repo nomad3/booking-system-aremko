@@ -211,6 +211,9 @@ class Command(BaseCommand):
                         )
                         
                         if not dry_run:
+                            # Importar TimeCriticality
+                            from control_gestion.models import TimeCriticality
+
                             # Crear tarea de preparación
                             Task.objects.create(
                                 title=f"Preparar servicio – {servicio_nombre} (Reserva #{reserva.id} - {rs.hora_inicio})",
@@ -236,7 +239,8 @@ class Command(BaseCommand):
                                 segment_tag=segment_tag,
                                 service_type=rs.servicio.tipo_servicio if rs.servicio else '',
                                 source=TaskSource.SISTEMA,
-                                promise_due_at=hora_preparacion  # ⭐ 1 hora antes del servicio
+                                promise_due_at=hora_preparacion,  # ⭐ 1 hora antes del servicio
+                                time_criticality=TimeCriticality.CRITICAL  # ⭐ CRÍTICA - Hora exacta
                             )
                             tareas_creadas += 1
                             self.stdout.write(self.style.SUCCESS("       → Tarea creada"))

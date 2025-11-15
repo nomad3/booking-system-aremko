@@ -47,6 +47,13 @@ class TaskSource(models.TextChoices):
     SISTEMA = "SISTEMA", "Sistema"
 
 
+class TimeCriticality(models.TextChoices):
+    """Criticidad temporal de la tarea"""
+    CRITICAL = "CRITICAL", "Crítica - Hora exacta"
+    SCHEDULED = "SCHEDULED", "Programada - Rango horario"
+    FLEXIBLE = "FLEXIBLE", "Flexible - Durante el día"
+
+
 class LocationRef(models.TextChoices):
     """Referencias de ubicación en el spa"""
     RECEPCION = "RECEPCION", "Recepción"
@@ -129,7 +136,14 @@ class Task(models.Model):
         verbose_name="Posición en cola",
         help_text="Orden en la cola de tareas del swimlane"
     )
-    
+    time_criticality = models.CharField(
+        max_length=12,
+        choices=TimeCriticality.choices,
+        default=TimeCriticality.FLEXIBLE,
+        verbose_name="Criticidad Temporal",
+        help_text="Define la urgencia temporal: CRITICAL=hora exacta, FLEXIBLE=durante el día"
+    )
+
     # Fechas
     promise_due_at = models.DateTimeField(
         null=True,
@@ -529,6 +543,6 @@ __all__ = [
     'Task', 'ChecklistItem', 'TaskLog', 'CustomerSegment', 'DailyReport',
     'TaskOwnerConfig',
     'TaskTemplate', 'EmpleadoDisponibilidad',
-    'Swimlane', 'TaskState', 'Priority', 'TaskSource', 'LocationRef'
+    'Swimlane', 'TaskState', 'Priority', 'TaskSource', 'LocationRef', 'TimeCriticality'
 ]
 

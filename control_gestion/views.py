@@ -107,27 +107,61 @@ def mi_dia(request):
     Vista "Mi Día" - Muestra las tareas del usuario logueado
 
     Características:
+    - Separación visual entre tareas urgentes (CRITICAL) y flexibles (FLEXIBLE)
+    - Tareas urgentes ordenadas cronológicamente por hora
+    - Tareas flexibles ordenadas por prioridad en cola
     - Solo tareas del usuario actual
     - Excluye tareas DONE
-    - Ordenadas por swimlane, cola, promesa
-    - Muestra todas las tareas pendientes (sin límite)
     """
+    from django.utils import timezone
+    from .models import TimeCriticality
 
-    tasks = (
+    today = timezone.now().date()
+
+    # Tareas URGENTES (CRITICAL) - Con hora específica
+    # Ordenadas cronológicamente para que el usuario vea qué viene primero
+    tareas_urgentes = (
         Task.objects
-        .filter(owner=request.user)
+        .filter(owner=request.user, time_criticality=TimeCriticality.CRITICAL)
         .exclude(state=TaskState.DONE)
-        .order_by("swimlane", "queue_position", "promise_due_at", "created_at")
+        .filter(promise_due_at__date=today)  # Solo del día de hoy
+        .order_by("promise_due_at")  # Ordenar por hora
     )
-    
+
+    # Tareas FLEXIBLES (FLEXIBLE) - Sin hora específica
+    # Ordenadas por posición en cola (prioridad)
+    tareas_flexibles = (
+        Task.objects
+        .filter(owner=request.user, time_criticality=TimeCriticality.FLEXIBLE)
+        .exclude(state=TaskState.DONE)
+        .order_by("swimlane", "queue_position", "created_at")
+    )
+
+    # Tareas PROGRAMADAS (SCHEDULED) - Con rango horario
+    # Por si en el futuro se usan
+    tareas_programadas = (
+        Task.objects
+        .filter(owner=request.user, time_criticality=TimeCriticality.SCHEDULED)
+        .exclude(state=TaskState.DONE)
+        .order_by("promise_due_at")
+    )
+
     context = {
-        'tasks': tasks,
+        'tareas_urgentes': tareas_urgentes,
+        'tareas_flexibles': tareas_flexibles,
+        'tareas_programadas': tareas_programadas,
+        'count_urgentes': tareas_urgentes.count(),
+        'count_flexibles': tareas_flexibles.count(),
+        'count_programadas': tareas_programadas.count(),
         'user': request.user,
-        'total_pending': Task.objects.filter(
-            owner=request.user
-        ).exclude(state=TaskState.DONE).count()
+        'total_pending': (
+            tareas_urgentes.count() +
+            tareas_flexibles.count() +
+            tareas_programadas.count()
+        ),
+        'today': today,
     }
-    
+
     return render(request, "control_gestion/mi_dia.html", context)
 
 
