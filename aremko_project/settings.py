@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.humanize', # Add humanize app
     'django.contrib.sitemaps', # Enable sitemaps
     'ventas',
+    'control_gestion',  # Módulo de Control de Gestión
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
