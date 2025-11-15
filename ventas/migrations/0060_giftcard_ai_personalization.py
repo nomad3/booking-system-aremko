@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ventas', '0050_homepagesettings'),
+        ('ventas', '0059_add_tramos_validos'),
     ]
 
     operations = [
