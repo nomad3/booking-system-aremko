@@ -118,7 +118,11 @@ def mi_dia(request):
     import logging
 
     logger = logging.getLogger(__name__)
-    today = timezone.now().date()
+
+    # Usar hora local (Chile) en vez de UTC
+    # timezone.now() retorna UTC, timezone.localtime() retorna hora local según TIME_ZONE
+    now_local = timezone.localtime(timezone.now())
+    today = now_local.date()
 
     try:
         # Tareas URGENTES (CRITICAL) - Con hora específica
