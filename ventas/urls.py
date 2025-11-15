@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views # Import premio_views and cron_views
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views # Import premio_views, cron_views and giftcard_views
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -135,6 +135,12 @@ urlpatterns = [
     path('crm/cliente/<int:cliente_id>/whatsapp-ia/', crm_views.generar_mensaje_whatsapp_ia, name='generar_mensaje_whatsapp_ia'),
     path('crm/cliente/<int:cliente_id>/whatsapp-preview/', crm_views.preview_mensaje_whatsapp, name='preview_mensaje_whatsapp'),
     # === END MENSAJES WHATSAPP IA ===
+
+    # === GIFTCARD WIZARD ===
+    path('giftcards/', giftcard_views.giftcard_wizard, name='giftcard_wizard'),
+    path('api/giftcard/generar-mensajes/', giftcard_views.generar_mensajes_ai, name='generar_mensajes_ai'),
+    path('api/giftcard/regenerar-mensaje/', giftcard_views.regenerar_mensaje_ai, name='regenerar_mensaje_ai'),
+    # === END GIFTCARD WIZARD ===
 
     # === PREMIOS Y FIDELIZACIÓN ===
     path('premios/', premio_views.premio_dashboard, name='premio_dashboard'),
