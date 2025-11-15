@@ -672,7 +672,7 @@ async function generarMensajesIA() {
     document.getElementById('mensajesError').style.display = 'none';
 
     try {
-        const response = await fetch('/api/giftcard/generar-mensajes/', {
+        const response = await fetch('/ventas/api/giftcard/generar-mensajes/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -775,7 +775,7 @@ async function regenerarMensaje() {
     console.log('🔄 Regenerando mensaje...');
 
     try {
-        const response = await fetch('/api/giftcard/regenerar-mensaje/', {
+        const response = await fetch('/ventas/api/giftcard/regenerar-mensaje/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
