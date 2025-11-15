@@ -231,3 +231,10 @@ LOGGING = {
         },
     },
 }
+
+# ============================================================================
+# EXTERNAL APIS
+# ============================================================================
+
+# DeepSeek AI - Para generación de mensajes personalizados en GiftCards
+DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
