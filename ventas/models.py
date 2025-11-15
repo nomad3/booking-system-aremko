@@ -100,16 +100,96 @@ class GiftCard(models.Model):
     ESTADO_CHOICES = [
         ('por_cobrar', 'Por Cobrar'),
         ('cobrado', 'Cobrado'),
+        ('activo', 'Activo'),
+        ('canjeado', 'Canjeado'),
+        ('expirado', 'Expirado'),
     ]
 
+    TIPO_MENSAJE_CHOICES = [
+        ('romantico', 'Romántico'),
+        ('cumpleanos', 'Cumpleaños'),
+        ('aniversario', 'Aniversario'),
+        ('celebracion', 'Celebración'),
+        ('relajacion', 'Relajación y Bienestar'),
+        ('parejas', 'Parejas'),
+        ('agradecimiento', 'Agradecimiento'),
+        ('amistad', 'Amistad'),
+    ]
+
+    SERVICIO_CHOICES = [
+        ('tinas', 'Tinas Calientes'),
+        ('masajes', 'Masajes'),
+        ('cabanas', 'Alojamiento en Cabaña'),
+        ('ritual_rio', 'Ritual del Río'),
+        ('celebracion', 'Celebración Especial'),
+        ('monto_libre', 'Monto Libre'),
+    ]
+
+    # Campos existentes
     codigo = models.CharField(max_length=12, unique=True, editable=False)
     monto_inicial = models.DecimalField(max_digits=10, decimal_places=0)
     monto_disponible = models.DecimalField(max_digits=10, decimal_places=0)
     fecha_emision = models.DateField(default=timezone.now)
     fecha_vencimiento = models.DateField()
-    estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default='por_cobrar')
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='activo')
     cliente_comprador = models.ForeignKey('Cliente', related_name='giftcards_compradas', on_delete=models.SET_NULL, null=True, blank=True)
     cliente_destinatario = models.ForeignKey('Cliente', related_name='giftcards_recibidas', on_delete=models.SET_NULL, null=True, blank=True)
+
+    # NUEVOS: Datos del comprador (cuando no es cliente registrado)
+    comprador_nombre = models.CharField(max_length=255, blank=True, verbose_name="Nombre del comprador")
+    comprador_email = models.EmailField(blank=True, verbose_name="Email del comprador")
+    comprador_telefono = models.CharField(max_length=20, blank=True, verbose_name="Teléfono del comprador")
+
+    # NUEVOS: Datos del destinatario para personalización IA
+    destinatario_nombre = models.CharField(max_length=100, blank=True, verbose_name="Nombre/Apodo del destinatario")
+    destinatario_email = models.EmailField(blank=True, verbose_name="Email del destinatario")
+    destinatario_telefono = models.CharField(max_length=20, blank=True, verbose_name="Teléfono del destinatario")
+    destinatario_relacion = models.CharField(max_length=100, blank=True, verbose_name="Relación con el comprador")
+    detalle_especial = models.TextField(blank=True, verbose_name="Detalle especial para IA")
+
+    # NUEVOS: Configuración de mensaje IA
+    tipo_mensaje = models.CharField(
+        max_length=50,
+        choices=TIPO_MENSAJE_CHOICES,
+        blank=True,
+        verbose_name="Tipo de mensaje"
+    )
+    mensaje_personalizado = models.TextField(blank=True, verbose_name="Mensaje personalizado generado por IA")
+    mensaje_alternativas = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Mensajes alternativos generados",
+        help_text="Lista de mensajes generados por IA que el usuario puede elegir"
+    )
+
+    # NUEVOS: Servicio asociado
+    servicio_asociado = models.CharField(
+        max_length=50,
+        choices=SERVICIO_CHOICES,
+        blank=True,
+        verbose_name="Servicio/Experiencia"
+    )
+
+    # NUEVOS: PDF y envío
+    pdf_generado = models.FileField(
+        upload_to='giftcards/pdfs/',
+        blank=True,
+        null=True,
+        verbose_name="PDF de la GiftCard"
+    )
+    enviado_email = models.BooleanField(default=False, verbose_name="Enviado por email")
+    enviado_whatsapp = models.BooleanField(default=False, verbose_name="Enviado por WhatsApp")
+    fecha_envio = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de envío")
+
+    # NUEVOS: Tracking de canje
+    fecha_canje = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de canje")
+    reserva_asociada = models.ForeignKey(
+        'VentaReserva',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Reserva donde se canjeó"
+    )
 
     def __str__(self):
         return f"GiftCard {self.codigo} - Saldo: {self.monto_disponible}"
@@ -128,12 +208,25 @@ class GiftCard(models.Model):
                 return codigo
 
     def usar(self, monto):
+        """
+        Usa (canjea) la giftcard descontando el monto especificado
+        """
         if self.fecha_vencimiento < timezone.now().date():
+            self.estado = 'expirado'
+            self.save()
             raise ValueError("La gift card ha expirado.")
+
+        if self.estado == 'canjeado':
+            raise ValueError("La gift card ya fue canjeada completamente.")
+
+        if self.estado == 'expirado':
+            raise ValueError("La gift card ha expirado.")
+
         if self.monto_disponible >= monto:
             self.monto_disponible -= monto
             if self.monto_disponible == 0:
-                self.estado = 'cobrado'
+                self.estado = 'canjeado'  # Nuevo estado
+                self.fecha_canje = timezone.now()
             self.save()
         else:
             raise ValueError("El monto excede el saldo disponible de la gift card.")
