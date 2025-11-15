@@ -15,7 +15,9 @@ from .models import (
     MovimientoCliente, Compra, DetalleCompra, GiftCard, HomepageConfig,
     Lead, Company, Contact, Activity, Campaign, Deal, CampaignInteraction, HomepageSettings,
     # Communication models
-    CommunicationLimit, ClientPreferences, CommunicationLog, SMSTemplate
+    CommunicationLimit, ClientPreferences, CommunicationLog, SMSTemplate,
+    # Premio models
+    Premio, ClientePremio, HistorialTramo
 )
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
