@@ -43,11 +43,8 @@ def homepage_view(request):
         pass
     # --- End Fetch Homepage Config ---
 
-    # Canonical URL for SEO (build safely)
-    try:
-        canonical_url = request.build_absolute_uri(request.path)
-    except Exception:
-        canonical_url = request.path
+    # Canonical URL for SEO
+    canonical_url = request.build_absolute_uri(request.path)
 
     context = {
         'servicios': servicios,
@@ -72,20 +69,8 @@ def categoria_detail_view(request, categoria_id):
     servicios = Servicio.objects.filter(categoria=categoria, activo=True, publicado_web=True)
     categorias = CategoriaServicio.objects.all() # For potential navigation/filtering
 
-    # Build canonical URL safely
-    try:
-        canonical_url = request.build_absolute_uri(request.path)
-    except Exception:
-        canonical_url = request.path
-
-    # Get category hero image safely (handle missing files in cloud storage)
-    category_hero_image = None
-    try:
-        if categoria.imagen:
-            category_hero_image = categoria.imagen.url
-    except Exception:
-        # File exists in DB but not in cloud storage - gracefully handle
-        pass
+    canonical_url = request.build_absolute_uri(request.path)
+    category_hero_image = categoria.imagen.url if categoria.imagen else None
 
     context = {
         'categoria_actual': categoria,
@@ -96,14 +81,3 @@ def categoria_detail_view(request, categoria_id):
         'category_hero_image': category_hero_image,
     }
     return render(request, 'ventas/category_detail.html', context)
-
-
-def empresas_view(request):
-    """
-    Vista para la landing page de servicios empresariales
-    """
-    context = {
-        'page_title': 'Reuniones con Resultados: Productividad + Bienestar',
-        'meta_description': 'Espacios únicos para reuniones empresariales en Puerto Varas. Sala de reuniones, desayuno sureño y tinas calientes para tu equipo.',
-    }
-    return render(request, 'ventas/empresas.html', context)

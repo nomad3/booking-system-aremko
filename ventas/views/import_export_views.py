@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Q
-from ..models import Cliente, Company, Contact  # Relative import
+from ..models import Cliente # Relative import
 
 # Helper function to check if the user is an administrator
 def es_administrador(user):
@@ -147,23 +147,25 @@ def importar_clientes_excel(request):
 # --- Helper Functions for Import ---
 
 def limpiar_telefono(telefono):
-    """Normaliza a formato E.164 de Chile: +569XXXXXXXX (9 dígitos locales)."""
+    """Limpia y formatea el número telefónico a 9 dígitos si es posible."""
     try:
-        if not telefono:
-            return ''
-        # Mantener solo dígitos
-        digits = ''.join(filter(str.isdigit, str(telefono)))
-        # Quitar prefijo país si viene (56...)
-        if digits.startswith('56') and len(digits) >= 11:
-            # Tomar los últimos 9 dígitos locales (comienzan con 9)
-            digits = digits[-9:]
-        # Si viene con 8 dígitos, asumir móvil y anteponer 9
-        if len(digits) == 8:
-            digits = '9' + digits
-        # Validar 9 dígitos locales iniciando en 9
-        if len(digits) == 9 and digits.startswith('9'):
-            return f'+56{digits}'
-        return ''
+        if telefono is None: return ''
+        telefono_str = str(telefono).strip()
+        # Remove common prefixes like +56, 56, 569 etc.
+        if telefono_str.startswith('+56'):
+            telefono_str = telefono_str[3:]
+        elif telefono_str.startswith('56'):
+             telefono_str = telefono_str[2:]
+        # Remove leading 9 if present after prefix removal
+        if telefono_str.startswith('9') and len(telefono_str) == 9:
+             pass # Keep the 9 digits
+        elif len(telefono_str) == 8: # Assume mobile without leading 9
+             telefono_str = '9' + telefono_str
+
+        solo_numeros = ''.join(filter(str.isdigit, telefono_str))
+
+        # Return last 9 digits if valid, otherwise empty
+        return solo_numeros if len(solo_numeros) == 9 else ''
     except Exception:
         return ''
 
@@ -293,239 +295,3 @@ def process_batch(batch_data, clientes_nuevos, clientes_actualizados, errores):
                  Cliente.objects.bulk_update(clients_to_update, list(all_update_fields))
             except Exception as e:
                  errores.append(f"Error en bulk_update: {str(e)}")
-
-
-# ========================
-# Importadores CSV (Company & Contact)
-# ========================
-
-@login_required
-@user_passes_test(es_administrador)
-def importar_companies_csv(request):
-    """Importa empresas desde un CSV con columnas: name,industry,city,website"""
-    BATCH_SIZE = 500
-    if request.method == 'POST' and request.FILES.get('archivo_csv'):
-        import csv, io
-        archivo = request.FILES['archivo_csv']
-        if not archivo.name.endswith('.csv'):
-            messages.error(request, 'Formato inválido. Suba un archivo .csv')
-            return render(request, 'ventas/importar_companies.html')
-
-        try:
-            data = archivo.read().decode('utf-8')
-            reader = csv.DictReader(io.StringIO(data))
-
-            required_cols = {'name'}
-            if not required_cols.issubset(set(h.strip() for h in reader.fieldnames or [])):
-                messages.error(request, 'El CSV debe incluir al menos la columna "name".')
-                return render(request, 'ventas/importar_companies.html')
-
-            to_create = []
-            to_update = []
-            created, updated = 0, 0
-            cache_names = {c['name'] for c in reader if c.get('name')}
-            existing = {c.name.lower(): c for c in Company.objects.filter(name__in=list(cache_names))}
-
-            # Reiterar desde el inicio (reader fue consumido para cache_names)
-            data_io = io.StringIO(data)
-            reader = csv.DictReader(data_io)
-            batch = []
-            for row in reader:
-                name = (row.get('name') or '').strip()
-                if not name:
-                    continue
-                industry = (row.get('industry') or '').strip() or None
-                city = (row.get('city') or '').strip() or None
-                website = (row.get('website') or '').strip() or None
-
-                existing_obj = existing.get(name.lower())
-                if existing_obj:
-                    changed = False
-                    if industry and getattr(existing_obj, 'industry', None) != industry:
-                        setattr(existing_obj, 'industry', industry)
-                        changed = True
-                    if city and getattr(existing_obj, 'city', None) != city:
-                        setattr(existing_obj, 'city', city)
-                        changed = True
-                    if website and getattr(existing_obj, 'website', None) != website:
-                        setattr(existing_obj, 'website', website)
-                        changed = True
-                    if changed:
-                        to_update.append(existing_obj)
-                else:
-                    obj = Company(name=name)
-                    if hasattr(obj, 'industry'): obj.industry = industry
-                    if hasattr(obj, 'city'): obj.city = city
-                    if hasattr(obj, 'website'): obj.website = website
-                    to_create.append(obj)
-
-                if len(to_create) + len(to_update) >= BATCH_SIZE:
-                    if to_create:
-                        Company.objects.bulk_create(to_create, ignore_conflicts=True)
-                        created += len(to_create)
-                        to_create = []
-                    if to_update:
-                        # Actualiza campos comunes si existen en el modelo
-                        fields = [f for f in ['industry', 'city', 'website'] if hasattr(Company, f)]
-                        if fields:
-                            Company.objects.bulk_update(to_update, fields)
-                        updated += len(to_update)
-                        to_update = []
-
-            if to_create:
-                Company.objects.bulk_create(to_create, ignore_conflicts=True)
-                created += len(to_create)
-            if to_update:
-                fields = [f for f in ['industry', 'city', 'website'] if hasattr(Company, f)]
-                if fields:
-                    Company.objects.bulk_update(to_update, fields)
-                updated += len(to_update)
-
-            messages.success(request, f'Empresas importadas. Nuevas: {created}, Actualizadas: {updated}.')
-        except Exception as e:
-            messages.error(request, f'Error importando CSV: {e}')
-
-    return render(request, 'ventas/importar_companies.html')
-
-
-@login_required
-@user_passes_test(es_administrador)
-def importar_contacts_csv(request):
-    """Importa contactos desde CSV. Acepta encabezados en inglés o español.
-    Columnas soportadas (sin ordenar):
-      - first_name | nombre
-      - last_name  | apellido
-      - email (obligatoria)
-      - phone | celular
-      - job_title | cargo (opcional)
-      - company_name | empresa (opcional)
-      - city | ciudad (opcional, se guarda en notas si no hay empresa)
-    """
-    BATCH_SIZE = 500
-    if request.method == 'POST' and request.FILES.get('archivo_csv'):
-        import csv, io
-        archivo = request.FILES['archivo_csv']
-        if not archivo.name.endswith('.csv'):
-            messages.error(request, 'Formato inválido. Suba un archivo .csv')
-            return render(request, 'ventas/importar_contacts.html')
-
-        try:
-            data = archivo.read().decode('utf-8')
-            data_io = io.StringIO(data)
-            reader = csv.DictReader(data_io)
-
-            headers = [h.strip().lower() for h in (reader.fieldnames or [])]
-            if 'email' not in headers:
-                messages.error(request, 'El CSV debe incluir la columna "email".')
-                return render(request, 'ventas/importar_contacts.html')
-
-            # Utilidades de lectura tolerantes a español/inglés
-            def val(row, *keys):
-                for k in keys:
-                    if k in row and row.get(k) not in (None, ''):
-                        return str(row.get(k)).strip()
-                return ''
-
-            # Pre-cargar companies existentes
-            data_io.seek(0); reader = csv.DictReader(data_io)
-            company_names = { val(r, 'company_name', 'empresa') for r in reader if val(r, 'company_name', 'empresa') }
-            existing_companies = {c.name.lower(): c for c in Company.objects.filter(name__in=list(company_names))}
-
-            # Pre-cargar contactos por email
-            data_io.seek(0); reader = csv.DictReader(data_io)
-            emails = { (val(r, 'email') or '').lower() for r in reader if val(r, 'email') }
-            existing_contacts = {c.email.lower(): c for c in Contact.objects.filter(email__in=list(emails))}
-
-            data_io.seek(0); reader = csv.DictReader(data_io)
-
-            to_create_c = []
-            to_update_c = []
-            created, updated = 0, 0
-
-            for row in reader:
-                # Campos normalizados
-                email = limpiar_email(val(row, 'email'))
-                if not email:
-                    continue
-                first_name = val(row, 'first_name', 'nombre')
-                last_name = val(row, 'last_name', 'apellido')
-                # Si solo viene "nombre", separarlo en nombre/apellido
-                if first_name and not last_name and ' ' in first_name:
-                    parts = first_name.split()
-                    first_name, last_name = parts[0], ' '.join(parts[1:])
-                phone = limpiar_telefono(val(row, 'phone', 'celular')) or None
-                job_title = val(row, 'job_title', 'cargo') or None
-                industry_val = val(row, 'industry', 'rubro')
-                company_name = val(row, 'company_name', 'empresa')
-                city_val = val(row, 'city', 'ciudad')
-
-                company_obj = None
-                if company_name:
-                    company_obj = existing_companies.get(company_name.lower())
-                    if not company_obj:
-                        company_obj = Company.objects.create(name=company_name)
-                        existing_companies[company_name.lower()] = company_obj
-                    # Actualizar rubro/industry si viene
-                    if industry_val and hasattr(company_obj, 'industry') and getattr(company_obj, 'industry', None) != industry_val:
-                        company_obj.industry = industry_val
-                        company_obj.save(update_fields=['industry'])
-
-                existing_contact = existing_contacts.get(email)
-                if existing_contact:
-                    changed = False
-                    if first_name and existing_contact.first_name != first_name:
-                        existing_contact.first_name = first_name; changed = True
-                    if last_name and existing_contact.last_name != last_name:
-                        existing_contact.last_name = last_name; changed = True
-                    if phone and existing_contact.phone != phone:
-                        existing_contact.phone = phone; changed = True
-                    if job_title and getattr(existing_contact, 'job_title', None) != job_title:
-                        existing_contact.job_title = job_title; changed = True
-                    if company_obj and existing_contact.company_id != company_obj.id:
-                        existing_contact.company = company_obj; changed = True
-                    if changed:
-                        to_update_c.append(existing_contact)
-                else:
-                    notes = ''
-                    parts = []
-                    if city_val:
-                        parts.append(f"Ciudad: {city_val}")
-                    if industry_val:
-                        parts.append(f"Rubro: {industry_val}")
-                    if parts:
-                        notes = '; '.join(parts)
-                    c = Contact(
-                        first_name=first_name or '-',
-                        last_name=last_name or '',
-                        email=email,
-                        phone=phone,
-                        job_title=job_title if hasattr(Contact, 'job_title') else None,
-                        company=company_obj,
-                        notes=notes if hasattr(Contact, 'notes') else None
-                    )
-                    to_create_c.append(c)
-
-                if len(to_create_c) + len(to_update_c) >= BATCH_SIZE:
-                    if to_create_c:
-                        Contact.objects.bulk_create(to_create_c, ignore_conflicts=True)
-                        created += len(to_create_c)
-                        to_create_c = []
-                    if to_update_c:
-                        fields = [f for f in ['first_name', 'last_name', 'phone', 'job_title', 'company', 'notes'] if hasattr(Contact, f)]
-                        Contact.objects.bulk_update(to_update_c, fields)
-                        updated += len(to_update_c)
-                        to_update_c = []
-
-            if to_create_c:
-                Contact.objects.bulk_create(to_create_c, ignore_conflicts=True)
-                created += len(to_create_c)
-            if to_update_c:
-                fields = [f for f in ['first_name', 'last_name', 'phone', 'job_title', 'company', 'notes'] if hasattr(Contact, f)]
-                Contact.objects.bulk_update(to_update_c, fields)
-                updated += len(to_update_c)
-
-            messages.success(request, f'Contactos importados. Nuevos: {created}, Actualizados: {updated}.')
-        except Exception as e:
-            messages.error(request, f'Error importando CSV: {e}')
-
-    return render(request, 'ventas/importar_contacts.html')

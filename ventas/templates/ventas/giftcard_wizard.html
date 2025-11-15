@@ -1,0 +1,606 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Regala una Experiencia Aremko - GiftCards Personalizadas{% endblock %}
+
+{% block meta_description %}
+<meta name="description" content="Regala momentos inolvidables en Aremko. GiftCards personalizadas con mensajes únicos generados por IA. Tinas calientes, masajes y más.">
+{% endblock %}
+
+{% block extra_style %}
+<style>
+    /* GiftCard Wizard Styles */
+    .wizard-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 40px 20px;
+    }
+
+    .wizard-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .wizard-header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--dark-gray);
+        margin-bottom: 10px;
+    }
+
+    .wizard-header p {
+        font-size: 1.1rem;
+        color: var(--light-gray);
+    }
+
+    /* Progress Bar */
+    .wizard-progress {
+        margin-bottom: 40px;
+    }
+
+    .progress-steps {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+        margin-bottom: 10px;
+    }
+
+    .progress-step {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #e0e0e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        color: #999;
+        z-index: 2;
+        position: relative;
+    }
+
+    .progress-step.active {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .progress-step.completed {
+        background-color: #4CAF50;
+        color: white;
+    }
+
+    .progress-line {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background-color: #e0e0e0;
+        z-index: 1;
+        transform: translateY(-50%);
+    }
+
+    .progress-line-fill {
+        height: 100%;
+        background-color: var(--primary-color);
+        transition: width 0.3s ease;
+    }
+
+    /* Wizard Content */
+    .wizard-content {
+        background-color: white;
+        border-radius: 12px;
+        padding: 40px;
+        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .step-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--dark-gray);
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    .step-subtitle {
+        font-size: 1.1rem;
+        color: var(--light-gray);
+        margin-bottom: 30px;
+        text-align: center;
+    }
+
+    /* Experience Cards */
+    .experience-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .experience-card {
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 20px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-align: center;
+    }
+
+    .experience-card:hover {
+        border-color: var(--primary-color);
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .experience-card.selected {
+        border-color: var(--primary-color);
+        background-color: rgba(160, 82, 45, 0.05);
+    }
+
+    .experience-card img {
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+
+    .experience-card h3 {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--dark-gray);
+        margin-bottom: 10px;
+    }
+
+    .experience-card p {
+        font-size: 0.9rem;
+        color: var(--light-gray);
+        margin-bottom: 15px;
+    }
+
+    /* Amount Selection */
+    .amount-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+
+    .amount-btn {
+        padding: 15px 20px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        background-color: white;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+    }
+
+    .amount-btn:hover {
+        border-color: var(--primary-color);
+        background-color: rgba(160, 82, 45, 0.05);
+    }
+
+    .amount-btn.selected {
+        border-color: var(--primary-color);
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .custom-amount {
+        margin-top: 20px;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+    }
+
+    .custom-amount input {
+        font-size: 1.2rem;
+        padding: 12px;
+        border-radius: 8px;
+        border: 2px solid #e0e0e0;
+    }
+
+    /* Navigation Buttons */
+    .wizard-navigation {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 40px;
+    }
+
+    .btn-wizard {
+        padding: 12px 30px;
+        font-weight: 600;
+        font-size: 1.1rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-wizard-next {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+        color: white;
+    }
+
+    .btn-wizard-next:hover {
+        background-color: #8B4513;
+        border-color: #8B4513;
+    }
+
+    .btn-wizard-prev {
+        background-color: white;
+        border: 2px solid var(--primary-color);
+        color: var(--primary-color);
+    }
+
+    .btn-wizard-prev:hover {
+        background-color: rgba(160, 82, 45, 0.05);
+    }
+
+    /* Steps Hidden by Default */
+    .wizard-step {
+        display: none;
+    }
+
+    .wizard-step.active {
+        display: block;
+    }
+
+    /* Icon Styles */
+    .experience-card i {
+        font-size: 3rem;
+        color: var(--primary-color);
+        margin-bottom: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wizard-container">
+    <!-- Header -->
+    <div class="wizard-header">
+        <h1><i class="fas fa-gift me-2"></i>Regala una Experiencia Inolvidable</h1>
+        <p>Crea una GiftCard personalizada con un mensaje único generado por IA</p>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="wizard-progress">
+        <div class="progress-steps">
+            <div class="progress-line">
+                <div class="progress-line-fill" id="progressFill" style="width: 16.67%;"></div>
+            </div>
+            <div class="progress-step active" data-step="1">1</div>
+            <div class="progress-step" data-step="2">2</div>
+            <div class="progress-step" data-step="3">3</div>
+            <div class="progress-step" data-step="4">4</div>
+            <div class="progress-step" data-step="5">5</div>
+            <div class="progress-step" data-step="6">6</div>
+        </div>
+        <div class="text-center mt-2">
+            <small class="text-muted">Paso <span id="currentStep">1</span> de 6</small>
+        </div>
+    </div>
+
+    <!-- Wizard Content -->
+    <div class="wizard-content">
+        <!-- STEP 1: Seleccionar Experiencia y Monto -->
+        <div class="wizard-step active" id="step1">
+            <h2 class="step-title">Elige la Experiencia</h2>
+            <p class="step-subtitle">Selecciona qué experiencia quieres regalar</p>
+
+            <div class="experience-grid" id="experienceGrid">
+                {% for exp in experiencias %}
+                <div class="experience-card" data-experience="{{ exp.id }}" onclick="selectExperience('{{ exp.id }}')">
+                    <i class="fas {% if exp.id == 'tinas' %}fa-hot-tub{% elif exp.id == 'masajes' %}fa-spa{% elif exp.id == 'cabanas' %}fa-home{% elif exp.id == 'ritual_rio' %}fa-water{% elif exp.id == 'celebracion' %}fa-champagne-glasses{% else %}fa-gift{% endif %}"></i>
+                    <h3>{{ exp.nombre }}</h3>
+                    <p>{{ exp.descripcion }}</p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div id="amountSelection" style="display:none;">
+                <h3 class="text-center mb-3">Selecciona el Monto</h3>
+                <div class="amount-options" id="amountOptions"></div>
+
+                <div class="custom-amount">
+                    <label class="form-label fw-bold">O ingresa un monto personalizado:</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control custom-amount-input" id="customAmount" placeholder="Ej: 85000" min="10000" step="1000">
+                    </div>
+                    <small class="text-muted">Monto mínimo: $10.000</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 2: Datos del Destinatario -->
+        <div class="wizard-step" id="step2">
+            <h2 class="step-title">Datos del Destinatario</h2>
+            <p class="step-subtitle">¿Para quién es este regalo?</p>
+
+            <form id="destinatarioForm">
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Nombre o Apodo del Destinatario *</label>
+                    <input type="text" class="form-control" id="destinatarioNombre" placeholder="Ej: María" required>
+                    <small class="text-muted">Este nombre aparecerá en el mensaje personalizado</small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Relación Contigo *</label>
+                    <input type="text" class="form-control" id="destinatarioRelacion" placeholder="Ej: esposa, mejor amiga, madre" required>
+                    <small class="text-muted">Ayuda a la IA a crear un mensaje más personal</small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Email del Destinatario (Opcional)</label>
+                    <input type="email" class="form-control" id="destinatarioEmail" placeholder="maria@ejemplo.com">
+                    <small class="text-muted">Para enviar la giftcard directamente</small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Teléfono del Destinatario (Opcional)</label>
+                    <input type="tel" class="form-control" id="destinatarioTelefono" placeholder="+56 9 1234 5678">
+                </div>
+            </form>
+        </div>
+
+        <!-- STEP 3: Tipo de Mensaje -->
+        <div class="wizard-step" id="step3">
+            <h2 class="step-title">Elige el Tipo de Mensaje</h2>
+            <p class="step-subtitle">¿Para qué ocasión es este regalo?</p>
+
+            <div class="experience-grid">
+                {% for tipo in tipos_mensaje %}
+                <div class="experience-card" data-tipo="{{ tipo.id }}" onclick="selectTipoMensaje('{{ tipo.id }}')">
+                    <i class="fas {{ tipo.icono }}"></i>
+                    <h3>{{ tipo.nombre }}</h3>
+                    <p>{{ tipo.descripcion }}</p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="mt-4">
+                <label class="form-label fw-bold">Detalle Especial (Opcional)</label>
+                <textarea class="form-control" id="detalleEspecial" rows="3" placeholder="Ej: Celebrando 10 años juntos, siempre me apoya en momentos difíciles..."></textarea>
+                <small class="text-muted">Este detalle hará el mensaje aún más personal y único</small>
+            </div>
+        </div>
+
+        <!-- STEP 4: Generar Mensajes con IA (Se implementará después) -->
+        <div class="wizard-step" id="step4">
+            <h2 class="step-title">Mensaje Personalizado</h2>
+            <p class="step-subtitle">Generando mensajes únicos con IA...</p>
+            <div class="text-center py-5">
+                <p class="text-muted">Este paso se implementará en la siguiente fase</p>
+            </div>
+        </div>
+
+        <!-- STEP 5: Preview (Se implementará después) -->
+        <div class="wizard-step" id="step5">
+            <h2 class="step-title">Vista Previa</h2>
+            <p class="step-subtitle">Así se verá tu GiftCard</p>
+            <div class="text-center py-5">
+                <p class="text-muted">Preview se implementará en la siguiente fase</p>
+            </div>
+        </div>
+
+        <!-- STEP 6: Checkout (Se implementará después) -->
+        <div class="wizard-step" id="step6">
+            <h2 class="step-title">Finalizar Compra</h2>
+            <p class="step-subtitle">Completa tu información de pago</p>
+            <div class="text-center py-5">
+                <p class="text-muted">Checkout se implementará en la siguiente fase</p>
+            </div>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="wizard-navigation">
+            <button type="button" class="btn btn-wizard-prev" id="prevBtn" onclick="previousStep()" style="display:none;">
+                <i class="fas fa-arrow-left me-2"></i>Anterior
+            </button>
+            <div></div> <!-- Spacer -->
+            <button type="button" class="btn btn-wizard-next" id="nextBtn" onclick="nextStep()">
+                Siguiente<i class="fas fa-arrow-right ms-2"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Wizard State
+let wizardData = {
+    paso: 1,
+    experiencia: null,
+    monto: null,
+    destinatario: {},
+    tipoMensaje: null,
+    detalleEspecial: '',
+    mensajeSeleccionado: null
+};
+
+// Datos de experiencias (desde el backend)
+const experiencias = {{ experiencias|safe }};
+
+// Seleccionar Experiencia
+function selectExperience(expId) {
+    // Remover selección anterior
+    document.querySelectorAll('.experience-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+
+    // Seleccionar nueva experiencia
+    const card = document.querySelector(`[data-experience="${expId}"]`);
+    card.classList.add('selected');
+
+    wizardData.experiencia = expId;
+
+    // Mostrar selector de monto
+    const exp = experiencias.find(e => e.id === expId);
+    showAmountOptions(exp.montos_sugeridos);
+
+    // Habilitar botón siguiente
+    updateNextButton();
+}
+
+// Mostrar opciones de monto
+function showAmountOptions(montos) {
+    const amountSelection = document.getElementById('amountSelection');
+    const amountOptions = document.getElementById('amountOptions');
+
+    amountSelection.style.display = 'block';
+    amountOptions.innerHTML = '';
+
+    montos.forEach(monto => {
+        const btn = document.createElement('button');
+        btn.className = 'amount-btn';
+        btn.textContent = `$${monto.toLocaleString('es-CL')}`;
+        btn.onclick = () => selectAmount(monto);
+        amountOptions.appendChild(btn);
+    });
+}
+
+// Seleccionar Monto
+function selectAmount(amount) {
+    // Remover selección anterior
+    document.querySelectorAll('.amount-btn').forEach(btn => {
+        btn.classList.remove('selected');
+    });
+
+    // Seleccionar nuevo monto
+    event.target.classList.add('selected');
+    wizardData.monto = amount;
+
+    // Limpiar custom amount
+    document.getElementById('customAmount').value = '';
+
+    updateNextButton();
+}
+
+// Monto personalizado
+document.getElementById('customAmount')?.addEventListener('input', function() {
+    const amount = parseInt(this.value);
+    if (amount >= 10000) {
+        wizardData.monto = amount;
+
+        // Deseleccionar botones de monto
+        document.querySelectorAll('.amount-btn').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+
+        updateNextButton();
+    }
+});
+
+// Seleccionar Tipo de Mensaje
+function selectTipoMensaje(tipoId) {
+    // Remover selección anterior
+    document.querySelectorAll('[data-tipo]').forEach(card => {
+        card.classList.remove('selected');
+    });
+
+    // Seleccionar nuevo tipo
+    const card = document.querySelector(`[data-tipo="${tipoId}"]`);
+    card.classList.add('selected');
+
+    wizardData.tipoMensaje = tipoId;
+
+    updateNextButton();
+}
+
+// Actualizar botón siguiente
+function updateNextButton() {
+    const nextBtn = document.getElementById('nextBtn');
+    const currentStep = wizardData.paso;
+
+    let canProceed = false;
+
+    if (currentStep === 1) {
+        canProceed = wizardData.experiencia && wizardData.monto;
+    } else if (currentStep === 2) {
+        const nombre = document.getElementById('destinatarioNombre')?.value;
+        const relacion = document.getElementById('destinatarioRelacion')?.value;
+        canProceed = nombre && relacion;
+    } else if (currentStep === 3) {
+        canProceed = wizardData.tipoMensaje;
+    } else {
+        canProceed = true; // Otros pasos siempre pueden avanzar por ahora
+    }
+
+    nextBtn.disabled = !canProceed;
+}
+
+// Siguiente Paso
+function nextStep() {
+    const currentStep = wizardData.paso;
+
+    // Guardar datos del paso actual
+    if (currentStep === 2) {
+        wizardData.destinatario = {
+            nombre: document.getElementById('destinatarioNombre').value,
+            relacion: document.getElementById('destinatarioRelacion').value,
+            email: document.getElementById('destinatarioEmail').value,
+            telefono: document.getElementById('destinatarioTelefono').value
+        };
+    } else if (currentStep === 3) {
+        wizardData.detalleEspecial = document.getElementById('detalleEspecial').value;
+    }
+
+    // Avanzar paso
+    if (currentStep < 6) {
+        wizardData.paso++;
+        updateWizardUI();
+    }
+}
+
+// Paso Anterior
+function previousStep() {
+    if (wizardData.paso > 1) {
+        wizardData.paso--;
+        updateWizardUI();
+    }
+}
+
+// Actualizar UI del Wizard
+function updateWizardUI() {
+    const currentStep = wizardData.paso;
+
+    // Ocultar todos los pasos
+    document.querySelectorAll('.wizard-step').forEach(step => {
+        step.classList.remove('active');
+    });
+
+    // Mostrar paso actual
+    document.getElementById(`step${currentStep}`).classList.add('active');
+
+    // Actualizar progress bar
+    document.querySelectorAll('.progress-step').forEach((step, index) => {
+        step.classList.remove('active', 'completed');
+        if (index + 1 < currentStep) {
+            step.classList.add('completed');
+        } else if (index + 1 === currentStep) {
+            step.classList.add('active');
+        }
+    });
+
+    const progressPercentage = ((currentStep - 1) / 5) * 100;
+    document.getElementById('progressFill').style.width = `${progressPercentage}%`;
+    document.getElementById('currentStep').textContent = currentStep;
+
+    // Mostrar/ocultar botón anterior
+    document.getElementById('prevBtn').style.display = currentStep > 1 ? 'block' : 'none';
+
+    // Actualizar estado del botón siguiente
+    updateNextButton();
+}
+
+// Validar inputs en tiempo real
+document.getElementById('destinatarioNombre')?.addEventListener('input', updateNextButton);
+document.getElementById('destinatarioRelacion')?.addEventListener('input', updateNextButton);
+
+// Inicializar
+updateNextButton();
+</script>
+{% endblock %}

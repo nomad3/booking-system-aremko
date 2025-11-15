@@ -67,4 +67,3 @@ def homepage(request):
         # ... other context variables ...
     }
     return render(request, 'ventas/homepage.html', context)
-

@@ -29,23 +29,14 @@ class RedvoissService:
         self.password = getattr(settings, 'REDVOISS_PASSWORD', '')
         
         if not self.username or not self.password:
-            logger.warning("Credenciales de Redvoiss no configuradas en settings - SMS deshabilitado")
-            self.credentials_configured = False
-        else:
-            self.credentials_configured = True
+            logger.error("Credenciales de Redvoiss no configuradas en settings")
+            raise ValueError("Credenciales de Redvoiss no configuradas")
     
     def greet(self):
         """
         Prueba la conexión con la API de Redvoiss usando el endpoint greet
         Returns: dict con status y mensaje
         """
-        if not self.credentials_configured:
-            return {
-                'success': False,
-                'message': 'Credenciales de Redvoiss no configuradas',
-                'status_code': None
-            }
-        
         try:
             url = f"{self.base_url}/greet"
             response = requests.get(
@@ -89,13 +80,6 @@ class RedvoissService:
         Returns:
             dict: Resultado del envío con batch_id y detalles
         """
-        if not self.credentials_configured:
-            return {
-                'success': False,
-                'error': 'Credenciales de Redvoiss no configuradas',
-                'batch_id': None
-            }
-        
         try:
             # Limpiar número de destino (remover espacios, guiones, etc.)
             destination = self._clean_phone_number(destination)
@@ -336,13 +320,6 @@ class RedvoissService:
         Returns:
             dict: Resultado del envío con capacidad de respuesta
         """
-        if not self.credentials_configured:
-            return {
-                'success': False,
-                'error': 'Credenciales de Redvoiss no configuradas',
-                'batch_id': None
-            }
-        
         try:
             destination = self._clean_phone_number(destination)
             

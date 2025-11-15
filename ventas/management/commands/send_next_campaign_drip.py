@@ -1,137 +1,136 @@
+# -*- coding: utf-8 -*-
+"""
+Management command para ejecutar el siguiente envío de la campaña drip
+Uso: python manage.py send_next_campaign_drip
+"""
+
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
 from django.conf import settings
-from ventas.models import CommunicationLog, Contact
+from django.core.cache import cache
+import logging
+import time
+
+from ventas.models import CommunicationLog, Contact, Company
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Envía emails PENDING de campaña (goteo por lotes)."
-
-    def add_arguments(self, parser):
-        parser.add_argument("--template-path", default="/app/email_prueba.html",
-                            help="Ruta del archivo HTML a usar como cuerpo (default: /app/email_prueba.html)")
-        parser.add_argument("--subject", default="🌿 Reuniones con Resultados: Productividad + Bienestar en un solo lugar",
-                            help="Asunto del correo")
-        parser.add_argument("--batch-size", type=int, default=5,
-                            help="Número de emails a enviar por ejecución (default: 5)")
-        parser.add_argument("--use-stored-content", action="store_true",
-                            help="Usar asunto y contenido almacenado en cada CommunicationLog")
+    help = 'Envía el siguiente email de la campaña de prospección drip'
 
     def handle(self, *args, **options):
-        # Respetar flag global si existe
-        if hasattr(settings, 'COMMUNICATION_EMAIL_ENABLED') and not settings.COMMUNICATION_EMAIL_ENABLED:
-            self.stdout.write(self.style.WARNING("COMMUNICATION_EMAIL_ENABLED=False. Saliendo."))
-            return
-
-        batch_size = options["batch_size"]
-        use_stored_content = options["use_stored_content"]
-        fallback_subject = options["subject"]
-        template_path = options["template_path"]
-
-        # Cargar plantilla de fallback
-        fallback_body = "Hola [Nombre],"
+        """
+        Busca y envía el siguiente email pendiente de la campaña drip
+        """
         try:
-            with open(template_path, encoding="utf-8") as f:
-                fallback_body = f.read()
-        except Exception:
-            pass
-
-        # Buscar pendientes
-        msg_types = dict(CommunicationLog.MESSAGE_TYPES)
-        promo_key = 'PROMOTIONAL' if 'PROMOTIONAL' in msg_types else 'PROMOCIONAL'
-
-        pending_logs = CommunicationLog.objects.filter(
-            communication_type='EMAIL',
-            message_type=promo_key,
-            status='PENDING'
-        ).order_by('created_at', 'id')[:batch_size]
-
-        if not pending_logs:
-            self.stdout.write("Sin pendientes.")
-            return
-
-        sent_count = 0
-        failed_count = 0
-        from_email = getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
-        reply_to = [getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')]
-
-        for log in pending_logs:
-            try:
-                # Determinar asunto y contenido
-                if use_stored_content and log.subject and log.content:
-                    subject = log.subject
-                    body_template = log.content
-                else:
-                    subject = fallback_subject
-                    body_template = fallback_body
-
-                # Personalización básica
-                contact = Contact.objects.filter(email=log.destination).first()
-                nombre = (contact.first_name if contact and contact.first_name else '').strip()
-                body = body_template.replace('[Nombre]', nombre or 'Hola')
-
-                # Crear email
-                email = EmailMultiAlternatives(
-                    subject=subject,
-                    body=body,
-                    from_email=from_email,
-                    to=[log.destination],
-                    reply_to=reply_to,
-                )
-                
-                # Adjuntar HTML si corresponde
-                if '<' in body and '>' in body:
-                    email.attach_alternative(body, 'text/html')
-
-                # Enviar
-                email.send()
-                
-                # Marcar como enviado
-                log.subject = subject
-                log.content = body
-                log.mark_as_sent()
-                
-                sent_count += 1
-                self.stdout.write(self.style.SUCCESS(f"Enviado a: {log.destination}"))
-                
-            except Exception as e:
-                log.status = 'FAILED'
-                if not log.subject:
-                    log.subject = subject
-                if not log.content:
-                    log.content = body_template
-                log.save(update_fields=['status', 'content', 'subject'])
-                failed_count += 1
-                self.stderr.write(self.style.ERROR(f"Error enviando a {log.destination}: {e}"))
-
-        # Actualizar progreso en cache
-        from django.core.cache import cache
-        cache_key = 'csv_campaign_progress'
-        progress = cache.get(cache_key, {})
-        if progress and isinstance(progress, dict):
-            progress['sent'] = progress.get('sent', 0) + sent_count
-            progress['failed'] = progress.get('failed', 0) + failed_count
-            
-            # Contar pendientes restantes
-            pending_count = CommunicationLog.objects.filter(
+            # Buscar el siguiente email pendiente en la cola
+            next_email = CommunicationLog.objects.filter(
+                status='PENDING',
                 communication_type='EMAIL',
-                message_type=promo_key,
-                status='PENDING'
+                message_type='PROMOTIONAL'
+            ).order_by('created_at').first()
+            
+            if not next_email:
+                self.stdout.write("Sin pendientes.")
+                return
+            
+            # Enviar el email
+            success = self.send_email(next_email)
+            
+            if success:
+                # Marcar como enviado
+                next_email.mark_as_sent()
+                
+                # Actualizar progreso en cache
+                self.update_progress_cache()
+                
+                self.stdout.write(f"Enviado a: {next_email.destination}")
+                
+                # Log para auditoría
+                logger.info(f"Email enviado exitosamente a {next_email.destination}")
+                
+            else:
+                # Marcar como fallido
+                next_email.mark_as_failed()
+                self.stdout.write(f"Error enviando a: {next_email.destination}")
+                logger.error(f"Falló envío a {next_email.destination}")
+                
+        except Exception as e:
+            self.stdout.write(f"Error en send_next_campaign_drip: {str(e)}")
+            logger.error(f"Error en send_next_campaign_drip: {str(e)}")
+
+    def send_email(self, communication_log):
+        """
+        Envía un email usando la información del CommunicationLog
+        """
+        try:
+            # Verificar que tengamos las configuraciones necesarias
+            if not settings.EMAIL_HOST_USER:
+                logger.error("EMAIL_HOST_USER no configurado")
+                return False
+            
+            # Crear el email
+            email = EmailMultiAlternatives(
+                subject=communication_log.subject,
+                body=communication_log.content,  # Texto plano como fallback
+                from_email=getattr(settings, 'VENTAS_FROM_EMAIL', settings.EMAIL_HOST_USER),
+                to=[communication_log.destination]
+            )
+            
+            # Agregar contenido HTML si existe
+            html_content = communication_log.content
+            if html_content:
+                email.attach_alternative(html_content, "text/html")
+            
+            # Enviar
+            email.send()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error enviando email a {communication_log.destination}: {str(e)}")
+            return False
+
+    def update_progress_cache(self):
+        """
+        Actualiza el progreso de la campaña en cache
+        """
+        try:
+            # Contar emails enviados y pendientes
+            total_sent = CommunicationLog.objects.filter(
+                status='SENT',
+                communication_type='EMAIL',
+                message_type='PROMOTIONAL'
             ).count()
-            progress['pending'] = pending_count
             
-            if pending_count == 0:
-                progress['status'] = 'completed'
-                progress['message'] = f'🎉 Campaña completada! {progress.get("sent", 0)} emails enviados exitosamente.'
+            total_pending = CommunicationLog.objects.filter(
+                status='PENDING',
+                communication_type='EMAIL',
+                message_type='PROMOTIONAL'
+            ).count()
             
-            cache.set(cache_key, progress, 3600)
-
-        # Resumen final
-        total_remaining = CommunicationLog.objects.filter(
-            communication_type='EMAIL',
-            message_type=promo_key,
-            status='PENDING'
-        ).count()
-        
-        self.stdout.write(f"Lote completado: {sent_count} enviados, {failed_count} fallidos. Pendientes restantes: {total_remaining}")
-
+            total_failed = CommunicationLog.objects.filter(
+                status='FAILED',
+                communication_type='EMAIL',
+                message_type='PROMOTIONAL'
+            ).count()
+            
+            total_emails = total_sent + total_pending + total_failed
+            
+            progress_data = {
+                'total': total_emails,
+                'sent': total_sent,
+                'pending': total_pending,
+                'failed': total_failed,
+                'percentage': round((total_sent / total_emails * 100), 2) if total_emails > 0 else 0,
+                'last_updated': timezone.now().isoformat()
+            }
+            
+            # Guardar en cache por 1 hora
+            cache.set('campaign_progress', progress_data, 3600)
+            
+        except Exception as e:
+            logger.error(f"Error actualizando progreso en cache: {str(e)}")

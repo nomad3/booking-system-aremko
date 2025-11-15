@@ -8,7 +8,6 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 import random
 import string
-import re
 from django.db.models import Sum, F, DecimalField, FloatField # Added DecimalField, FloatField
 from solo.models import SingletonModel # Added import for django-solo
 
@@ -62,7 +61,6 @@ class Compra(models.Model):
         ('giftcard', 'GiftCard'),
         ('flow', 'FLOW'),
         ('mercadopago', 'MercadoPago'),
-        ('mercadopago_link', 'Mercado Pago Link'),
         ('scotiabank', 'Transferencia ScotiaBank'), # Keep specific ones for admin use
         ('bancoestado', 'Transferencia BancoEstado'),
         ('cuentarut', 'Transferencia CuentaRut'),
@@ -102,16 +100,96 @@ class GiftCard(models.Model):
     ESTADO_CHOICES = [
         ('por_cobrar', 'Por Cobrar'),
         ('cobrado', 'Cobrado'),
+        ('activo', 'Activo'),
+        ('canjeado', 'Canjeado'),
+        ('expirado', 'Expirado'),
     ]
 
+    TIPO_MENSAJE_CHOICES = [
+        ('romantico', 'Romántico'),
+        ('cumpleanos', 'Cumpleaños'),
+        ('aniversario', 'Aniversario'),
+        ('celebracion', 'Celebración'),
+        ('relajacion', 'Relajación y Bienestar'),
+        ('parejas', 'Parejas'),
+        ('agradecimiento', 'Agradecimiento'),
+        ('amistad', 'Amistad'),
+    ]
+
+    SERVICIO_CHOICES = [
+        ('tinas', 'Tinas Calientes'),
+        ('masajes', 'Masajes'),
+        ('cabanas', 'Alojamiento en Cabaña'),
+        ('ritual_rio', 'Ritual del Río'),
+        ('celebracion', 'Celebración Especial'),
+        ('monto_libre', 'Monto Libre'),
+    ]
+
+    # Campos existentes
     codigo = models.CharField(max_length=12, unique=True, editable=False)
     monto_inicial = models.DecimalField(max_digits=10, decimal_places=0)
     monto_disponible = models.DecimalField(max_digits=10, decimal_places=0)
     fecha_emision = models.DateField(default=timezone.now)
     fecha_vencimiento = models.DateField()
-    estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default='por_cobrar')
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='activo')
     cliente_comprador = models.ForeignKey('Cliente', related_name='giftcards_compradas', on_delete=models.SET_NULL, null=True, blank=True)
     cliente_destinatario = models.ForeignKey('Cliente', related_name='giftcards_recibidas', on_delete=models.SET_NULL, null=True, blank=True)
+
+    # NUEVOS: Datos del comprador (cuando no es cliente registrado)
+    comprador_nombre = models.CharField(max_length=255, blank=True, verbose_name="Nombre del comprador")
+    comprador_email = models.EmailField(blank=True, verbose_name="Email del comprador")
+    comprador_telefono = models.CharField(max_length=20, blank=True, verbose_name="Teléfono del comprador")
+
+    # NUEVOS: Datos del destinatario para personalización IA
+    destinatario_nombre = models.CharField(max_length=100, blank=True, verbose_name="Nombre/Apodo del destinatario")
+    destinatario_email = models.EmailField(blank=True, verbose_name="Email del destinatario")
+    destinatario_telefono = models.CharField(max_length=20, blank=True, verbose_name="Teléfono del destinatario")
+    destinatario_relacion = models.CharField(max_length=100, blank=True, verbose_name="Relación con el comprador")
+    detalle_especial = models.TextField(blank=True, verbose_name="Detalle especial para IA")
+
+    # NUEVOS: Configuración de mensaje IA
+    tipo_mensaje = models.CharField(
+        max_length=50,
+        choices=TIPO_MENSAJE_CHOICES,
+        blank=True,
+        verbose_name="Tipo de mensaje"
+    )
+    mensaje_personalizado = models.TextField(blank=True, verbose_name="Mensaje personalizado generado por IA")
+    mensaje_alternativas = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Mensajes alternativos generados",
+        help_text="Lista de mensajes generados por IA que el usuario puede elegir"
+    )
+
+    # NUEVOS: Servicio asociado
+    servicio_asociado = models.CharField(
+        max_length=50,
+        choices=SERVICIO_CHOICES,
+        blank=True,
+        verbose_name="Servicio/Experiencia"
+    )
+
+    # NUEVOS: PDF y envío
+    pdf_generado = models.FileField(
+        upload_to='giftcards/pdfs/',
+        blank=True,
+        null=True,
+        verbose_name="PDF de la GiftCard"
+    )
+    enviado_email = models.BooleanField(default=False, verbose_name="Enviado por email")
+    enviado_whatsapp = models.BooleanField(default=False, verbose_name="Enviado por WhatsApp")
+    fecha_envio = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de envío")
+
+    # NUEVOS: Tracking de canje
+    fecha_canje = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de canje")
+    reserva_asociada = models.ForeignKey(
+        'VentaReserva',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Reserva donde se canjeó"
+    )
 
     def __str__(self):
         return f"GiftCard {self.codigo} - Saldo: {self.monto_disponible}"
@@ -130,12 +208,25 @@ class GiftCard(models.Model):
                 return codigo
 
     def usar(self, monto):
+        """
+        Usa (canjea) la giftcard descontando el monto especificado
+        """
         if self.fecha_vencimiento < timezone.now().date():
+            self.estado = 'expirado'
+            self.save()
             raise ValueError("La gift card ha expirado.")
+
+        if self.estado == 'canjeado':
+            raise ValueError("La gift card ya fue canjeada completamente.")
+
+        if self.estado == 'expirado':
+            raise ValueError("La gift card ha expirado.")
+
         if self.monto_disponible >= monto:
             self.monto_disponible -= monto
             if self.monto_disponible == 0:
-                self.estado = 'cobrado'
+                self.estado = 'canjeado'  # Nuevo estado
+                self.fecha_canje = timezone.now()
             self.save()
         else:
             raise ValueError("El monto excede el saldo disponible de la gift card.")
@@ -240,167 +331,13 @@ class Servicio(models.Model):
     def horario_valido(self, hora_propuesta):
         return hora_propuesta in self.slots_disponibles
 
-
-# ============================================
-# MODELS DE UBICACIÓN GEOGRÁFICA
-# ============================================
-
-class Region(models.Model):
-    """
-    Regiones oficiales de Chile.
-
-    Chile tiene 16 regiones administrativas, cada una con un código romano
-    y un nombre oficial.
-    """
-    codigo = models.CharField(
-        max_length=10,
-        unique=True,
-        help_text="Código de la región (ej: 'RM', 'X', 'XIV')"
-    )
-    nombre = models.CharField(
-        max_length=100,
-        help_text="Nombre oficial de la región"
-    )
-    orden = models.PositiveIntegerField(
-        default=0,
-        help_text="Orden de visualización (de norte a sur)"
-    )
-
-    class Meta:
-        ordering = ['orden']
-        verbose_name = "Región"
-        verbose_name_plural = "Regiones"
-
-    def __str__(self):
-        return f"{self.nombre}"
-
-
-class Comuna(models.Model):
-    """
-    Comunas de Chile agrupadas por región.
-
-    Chile tiene 346 comunas distribuidas en 16 regiones.
-    """
-    region = models.ForeignKey(
-        Region,
-        on_delete=models.CASCADE,
-        related_name='comunas',
-        help_text="Región a la que pertenece esta comuna"
-    )
-    nombre = models.CharField(
-        max_length=100,
-        help_text="Nombre oficial de la comuna"
-    )
-    codigo = models.CharField(
-        max_length=10,
-        blank=True,
-        null=True,
-        help_text="Código de la comuna (opcional)"
-    )
-
-    class Meta:
-        ordering = ['region__orden', 'nombre']
-        verbose_name = "Comuna"
-        verbose_name_plural = "Comunas"
-        unique_together = [['region', 'nombre']]
-
-    def __str__(self):
-        return f"{self.nombre}, {self.region.nombre}"
-
-
 class Cliente(models.Model):
     nombre = models.CharField(max_length=100)
     email = models.EmailField(blank=True, null=True) # Allow blank email if phone is primary
     telefono = models.CharField(max_length=20, unique=True, help_text="Número de teléfono único (formato internacional preferido)") # Add unique=True
-    documento_identidad = models.CharField(max_length=100, null=True, blank=True, verbose_name="ID/DNI/Passport/RUT")
+    documento_identidad = models.CharField(max_length=20, null=True, blank=True, verbose_name="ID/DNI/Passport/RUT")
     pais = models.CharField(max_length=100, null=True, blank=True)
-
-    # Ubicación (campos legacy y nuevos)
-    ciudad = models.CharField(
-        max_length=100,
-        null=True,
-        blank=True,
-        help_text="Campo legacy de ciudad (texto libre). Se recomienda usar región + comuna."
-    )
-    region = models.ForeignKey(
-        Region,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='clientes',
-        help_text="Región de Chile"
-    )
-    comuna = models.ForeignKey(
-        Comuna,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='clientes',
-        help_text="Comuna de Chile"
-    )
-
-    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
-
-    @staticmethod
-    def normalize_phone(phone_str):
-        """
-        Normaliza número de teléfono a formato estándar CON '+'
-        Para Chile: +56XXXXXXXXX (11-12 dígitos)
-        Para otros países: +CCXXXXXXXXX (código país + número)
-
-        Reglas:
-        - SIEMPRE incluye el signo + al inicio
-        - Sin espacios ni caracteres especiales
-        - Validación estricta de formato
-        - Rechaza números chilenos incompletos (56 + menos de 9 dígitos)
-
-        Returns:
-            str: Teléfono normalizado o None si inválido
-        """
-        if not phone_str or phone_str.strip() == '':
-            return None
-
-        # Limpiar caracteres no numéricos (excepto +)
-        phone = re.sub(r'[^0-9+]', '', str(phone_str))
-
-        # Remover todos los + para limpiar, luego agregarlo al inicio
-        phone = phone.replace('+', '')
-
-        # Validar longitud mínima
-        if len(phone) < 8:
-            return None
-
-        # Si tiene código de país 56 (Chile), validar ESTRICTAMENTE
-        if phone.startswith('56'):
-            # Chile requiere 56 + 9 dígitos (móvil) o 56 + 1 + 8 dígitos (fijo con área)
-            if len(phone) in [11, 12]:
-                return f'+{phone}'
-            else:
-                # Número chileno incompleto - RECHAZAR
-                return None
-
-        # Si tiene 9 dígitos y empieza con 9 (móvil chileno), agregar código país
-        if len(phone) == 9 and phone.startswith('9'):
-            return f'+56{phone}'
-
-        # Si tiene 8 dígitos (fijo chileno), agregar código país y código área 2 (Santiago)
-        if len(phone) == 8:
-            return f'+562{phone}'
-
-        # Para otros países, solo aceptar números completos (10+ dígitos)
-        return f'+{phone}' if len(phone) >= 10 else None
-
-    def save(self, *args, **kwargs):
-        """
-        Override save para normalizar teléfono antes de guardar
-        """
-        if self.telefono:
-            normalized = self.normalize_phone(self.telefono)
-            if normalized:
-                self.telefono = normalized
-            else:
-                raise ValidationError(f"Formato de teléfono inválido: {self.telefono}")
-        super().save(*args, **kwargs)
+    ciudad = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
         return f"{self.nombre} - {self.telefono}"
@@ -549,7 +486,6 @@ class Pago(models.Model):
         ('giftcard', 'GiftCard'),
         ('flow', 'FLOW'),
         ('mercadopago', 'MercadoPago'),
-        ('mercadopago_link', 'Mercado Pago Link'),
         ('scotiabank', 'Transferencia ScotiaBank'), # Keep specific ones for admin use
         ('bancoestado', 'Transferencia BancoEstado'),
         ('cuentarut', 'Transferencia CuentaRut'),
@@ -1364,60 +1300,6 @@ class CommunicationLog(models.Model):
         self.save()
 
 
-class MailParaEnviar(models.Model):
-    """
-    Cola de emails para envío programado con control de horarios
-    """
-    ESTADO_CHOICES = [
-        ('PENDIENTE', 'Pendiente'),
-        ('ENVIADO', 'Enviado'),
-        ('FALLIDO', 'Fallido'),
-        ('PAUSADO', 'Pausado'),
-    ]
-    
-    # Datos del destinatario
-    nombre = models.CharField(max_length=255, verbose_name="Nombre/Empresa")
-    email = models.EmailField(verbose_name="Email")
-    ciudad = models.CharField(max_length=100, blank=True, verbose_name="Ciudad")
-    rubro = models.CharField(max_length=100, blank=True, verbose_name="Rubro")
-    
-    # Contenido del email
-    asunto = models.CharField(max_length=255, verbose_name="Asunto")
-    contenido_html = models.TextField(verbose_name="Contenido HTML")
-    
-    # Control de envío
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='PENDIENTE', verbose_name="Estado")
-    prioridad = models.IntegerField(default=1, verbose_name="Prioridad (1=alta, 5=baja)")
-    
-    # Timestamps
-    creado_en = models.DateTimeField(auto_now_add=True, verbose_name="Creado en")
-    enviado_en = models.DateTimeField(null=True, blank=True, verbose_name="Enviado en")
-    
-    # Metadatos
-    campana = models.CharField(max_length=100, blank=True, verbose_name="Campaña")
-    notas = models.TextField(blank=True, verbose_name="Notas")
-    
-    class Meta:
-        verbose_name = "Mail para Enviar"
-        verbose_name_plural = "Mails para Enviar"
-        ordering = ['prioridad', 'creado_en']
-    
-    def __str__(self):
-        return f"{self.nombre} ({self.email}) - {self.estado}"
-    
-    def marcar_como_enviado(self):
-        """Marca el email como enviado"""
-        from django.utils import timezone
-        self.estado = 'ENVIADO'
-        self.enviado_en = timezone.now()
-        self.save()
-    
-    def marcar_como_fallido(self):
-        """Marca el email como fallido"""
-        self.estado = 'FALLIDO'
-        self.save()
-
-
 class SMSTemplate(models.Model):
     """
     Plantillas predefinidas para diferentes tipos de SMS
@@ -1470,1004 +1352,3 @@ class SMSTemplate(models.Model):
         except KeyError as e:
             logger.warning(f"Variable faltante en plantilla {self.name}: {e}")
             return self.content  # Devolver sin procesar si falta alguna variable
-
-
-class EmailTemplate(models.Model):
-    """Template personalizado de emails para campañas"""
-    name = models.CharField(max_length=200, verbose_name="Nombre del Template")
-    subject = models.CharField(max_length=500, verbose_name="Asunto")
-    body_html = models.TextField(verbose_name="Cuerpo HTML")
-    campaign_type = models.CharField(max_length=50, choices=[
-        ('giftcard', 'Campaña Giftcard'),
-        ('promocional', 'Promocional'),
-        ('recordatorio', 'Recordatorio'),
-    ], default='giftcard')
-    year = models.IntegerField(verbose_name="Año", default=2025)
-    month = models.IntegerField(verbose_name="Mes", default=1)
-    giftcard_amount = models.IntegerField(verbose_name="Monto Giftcard", default=15000)
-    is_active = models.BooleanField(default=True, verbose_name="Activo")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        verbose_name = "Template de Email"
-        verbose_name_plural = "Templates de Email"
-        ordering = ['-created_at']
-    
-    def __str__(self):
-        return f"{self.name} - {self.year}/{self.month:02d}"
-
-
-# =============================================================================
-# MODELOS PARA SISTEMA DE CAMPAÑAS AVANZADO
-# =============================================================================
-
-class EmailCampaign(models.Model):
-    """Campaña de email marketing con criterios avanzados"""
-    
-    CAMPAIGN_STATUS_CHOICES = [
-        ('draft', 'Borrador'),
-        ('ready', 'Lista para envío'),
-        ('sending', 'Enviando'),
-        ('paused', 'Pausada'),
-        ('completed', 'Completada'),
-        ('cancelled', 'Cancelada'),
-    ]
-    
-    # Información básica
-    name = models.CharField(max_length=200, verbose_name="Nombre de la campaña")
-    description = models.TextField(blank=True, verbose_name="Descripción")
-    status = models.CharField(max_length=20, choices=CAMPAIGN_STATUS_CHOICES, default='draft', verbose_name="Estado")
-    
-    # Criterios de selección (almacenados en JSON)
-    criteria = models.JSONField(default=dict, verbose_name="Criterios de selección")
-    # Estructura del JSON criteria:
-    # {
-    #     "month": 1, "year": 2025,
-    #     "spend_min": 50000, "spend_max": 100000,  # opcional
-    #     "visit_count_min": 2, "visit_count_max": 10,  # opcional
-    #     "cities": ["Puerto Varas", "Osorno"],  # opcional
-    # }
-    
-    # Configuración de envío
-    schedule_config = models.JSONField(default=dict, verbose_name="Configuración de horarios")
-    # Estructura del JSON schedule_config:
-    # {
-    #     "start_time": "08:00", "end_time": "21:00",
-    #     "batch_size": 1, "interval_minutes": 3,
-    #     "timezone": "America/Santiago",
-    #     "ai_enabled": true, "ai_timeout": 5
-    # }
-    
-    # Template de email
-    email_subject_template = models.CharField(max_length=500, verbose_name="Template de asunto")
-    email_body_template = models.TextField(verbose_name="Template de cuerpo")
-    
-    # Configuración avanzada
-    ai_variation_enabled = models.BooleanField(default=True, verbose_name="Usar IA para variar contenido")
-    anti_spam_enabled = models.BooleanField(default=True, verbose_name="Medidas anti-spam activas")
-    
-    # Metadatos
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Creado por")
-    
-    # Estadísticas calculadas
-    total_recipients = models.IntegerField(default=0, verbose_name="Total de destinatarios")
-    emails_sent = models.IntegerField(default=0, verbose_name="Emails enviados")
-    emails_delivered = models.IntegerField(default=0, verbose_name="Emails entregados")
-    emails_opened = models.IntegerField(default=0, verbose_name="Emails abiertos")
-    emails_clicked = models.IntegerField(default=0, verbose_name="Clicks en emails")
-    emails_bounced = models.IntegerField(default=0, verbose_name="Emails rebotados")
-    spam_complaints = models.IntegerField(default=0, verbose_name="Quejas de spam")
-    
-    class Meta:
-        verbose_name = "Campaña de Email"
-        verbose_name_plural = "Campañas de Email"
-        ordering = ['-created_at']
-    
-    def __str__(self):
-        return f"{self.name} ({self.get_status_display()})"
-    
-    @property
-    def progress_percentage(self):
-        """Calcula el porcentaje de progreso de la campaña"""
-        if self.total_recipients == 0:
-            return 0
-        return (self.emails_sent / self.total_recipients) * 100
-    
-    @property
-    def delivery_rate(self):
-        """Calcula la tasa de entrega"""
-        if self.emails_sent == 0:
-            return 0
-        return (self.emails_delivered / self.emails_sent) * 100
-    
-    @property
-    def open_rate(self):
-        """Calcula la tasa de apertura"""
-        if self.emails_delivered == 0:
-            return 0
-        return (self.emails_opened / self.emails_delivered) * 100
-    
-    @property
-    def click_rate(self):
-        """Calcula la tasa de clicks"""
-        if self.emails_delivered == 0:
-            return 0
-        return (self.emails_clicked / self.emails_delivered) * 100
-
-
-class EmailRecipient(models.Model):
-    """Destinatario individual de una campaña con email personalizado"""
-    
-    RECIPIENT_STATUS_CHOICES = [
-        ('pending', 'Pendiente'),
-        ('sending', 'Enviando'),
-        ('sent', 'Enviado'),
-        ('delivered', 'Entregado'),
-        ('opened', 'Abierto'),
-        ('clicked', 'Click realizado'),
-        ('bounced', 'Rebotado'),
-        ('failed', 'Fallido'),
-        ('spam_complaint', 'Queja de spam'),
-        ('unsubscribed', 'Desuscrito'),
-        ('excluded', 'Excluido'),
-    ]
-    
-    # Relaciones
-    campaign = models.ForeignKey(EmailCampaign, on_delete=models.CASCADE, related_name='recipients')
-    client = models.ForeignKey(Cliente, on_delete=models.CASCADE, verbose_name="Cliente")
-    
-    # Información del destinatario
-    email = models.EmailField(verbose_name="Email")
-    name = models.CharField(max_length=200, verbose_name="Nombre")
-    
-    # Contenido personalizado (generado por IA o personalización)
-    personalized_subject = models.CharField(max_length=500, verbose_name="Asunto personalizado")
-    personalized_body = models.TextField(verbose_name="Cuerpo personalizado")
-    
-    # Control de envío
-    send_enabled = models.BooleanField(default=True, verbose_name="Habilitado para envío")
-    priority = models.IntegerField(default=1, verbose_name="Prioridad")
-    
-    # Estado y tracking
-    status = models.CharField(max_length=20, choices=RECIPIENT_STATUS_CHOICES, default='pending', verbose_name="Estado")
-    
-    # Metadatos de envío
-    scheduled_at = models.DateTimeField(null=True, blank=True, verbose_name="Programado para")
-    sent_at = models.DateTimeField(null=True, blank=True, verbose_name="Enviado en")
-    delivered_at = models.DateTimeField(null=True, blank=True, verbose_name="Entregado en")
-    opened_at = models.DateTimeField(null=True, blank=True, verbose_name="Abierto en")
-    clicked_at = models.DateTimeField(null=True, blank=True, verbose_name="Click en")
-    
-    # Información adicional
-    error_message = models.TextField(blank=True, verbose_name="Mensaje de error")
-    bounce_reason = models.CharField(max_length=200, blank=True, verbose_name="Razón del rebote")
-    user_agent = models.CharField(max_length=500, blank=True, verbose_name="User Agent")
-    ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name="IP Address")
-    
-    # Datos del cliente para análisis
-    client_total_spend = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Gasto total del cliente")
-    client_visit_count = models.IntegerField(default=0, verbose_name="Número de visitas")
-    client_last_visit = models.DateField(null=True, blank=True, verbose_name="Última visita")
-    client_city = models.CharField(max_length=100, blank=True, verbose_name="Ciudad del cliente")
-    
-    class Meta:
-        verbose_name = "Destinatario de Email"
-        verbose_name_plural = "Destinatarios de Email"
-        ordering = ['priority', 'scheduled_at', 'id']
-        unique_together = ['campaign', 'email']  # Un email por campaña
-    
-    def __str__(self):
-        return f"{self.name} ({self.email}) - {self.campaign.name}"
-    
-    def mark_as_sent(self):
-        """Marca el email como enviado"""
-        self.status = 'sent'
-        self.sent_at = timezone.now()
-        self.save()
-        
-        # Actualizar estadísticas de la campaña
-        self.campaign.emails_sent += 1
-        self.campaign.save()
-    
-    def mark_as_delivered(self):
-        """Marca el email como entregado"""
-        if self.status == 'sent':
-            self.status = 'delivered'
-            self.delivered_at = timezone.now()
-            self.save()
-            
-            # Actualizar estadísticas de la campaña
-            self.campaign.emails_delivered += 1
-            self.campaign.save()
-    
-    def mark_as_opened(self):
-        """Marca el email como abierto"""
-        if self.status in ['delivered', 'opened']:
-            if self.status != 'opened':
-                self.campaign.emails_opened += 1
-            self.status = 'opened'
-            self.opened_at = timezone.now()
-            self.save()
-            self.campaign.save()
-    
-    def mark_as_clicked(self):
-        """Marca el email como clicked"""
-        if self.status in ['delivered', 'opened', 'clicked']:
-            if self.status != 'clicked':
-                self.campaign.emails_clicked += 1
-            self.status = 'clicked'
-            self.clicked_at = timezone.now()
-            self.save()
-            self.campaign.save()
-
-
-class EmailDeliveryLog(models.Model):
-    """Log detallado de entregas de email para análisis y debugging"""
-    
-    LOG_TYPE_CHOICES = [
-        ('send_attempt', 'Intento de envío'),
-        ('delivery_success', 'Entrega exitosa'),
-        ('delivery_failure', 'Falla en entrega'),
-        ('bounce_hard', 'Rebote duro'),
-        ('bounce_soft', 'Rebote suave'),
-        ('spam_complaint', 'Queja de spam'),
-        ('unsubscribe', 'Desuscripción'),
-        ('open_tracking', 'Seguimiento de apertura'),
-        ('click_tracking', 'Seguimiento de clicks'),
-    ]
-    
-    # Relaciones
-    recipient = models.ForeignKey(EmailRecipient, on_delete=models.CASCADE, related_name='delivery_logs')
-    campaign = models.ForeignKey(EmailCampaign, on_delete=models.CASCADE, related_name='delivery_logs')
-    
-    # Información del log
-    log_type = models.CharField(max_length=20, choices=LOG_TYPE_CHOICES, verbose_name="Tipo de log")
-    timestamp = models.DateTimeField(auto_now_add=True, verbose_name="Timestamp")
-    
-    # Detalles técnicos
-    smtp_response = models.TextField(blank=True, verbose_name="Respuesta SMTP")
-    error_code = models.CharField(max_length=10, blank=True, verbose_name="Código de error")
-    error_message = models.TextField(blank=True, verbose_name="Mensaje de error")
-    
-    # Información adicional
-    user_agent = models.CharField(max_length=500, blank=True, verbose_name="User Agent")
-    ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name="IP Address")
-    country_code = models.CharField(max_length=2, blank=True, verbose_name="Código de país")
-    
-    # Metadatos del servidor
-    server_response_time = models.FloatField(null=True, blank=True, verbose_name="Tiempo de respuesta (ms)")
-    retry_count = models.IntegerField(default=0, verbose_name="Número de reintentos")
-    
-    class Meta:
-        verbose_name = "Log de Entrega de Email"
-        verbose_name_plural = "Logs de Entrega de Email"
-        ordering = ['-timestamp']
-    
-    def __str__(self):
-        return f"{self.get_log_type_display()} - {self.recipient.email} ({self.timestamp})"
-
-
-class EmailBlacklist(models.Model):
-    """Lista negra de emails para prevención de spam"""
-    
-    BLACKLIST_REASON_CHOICES = [
-        ('hard_bounce', 'Rebote duro'),
-        ('spam_complaint', 'Queja de spam'),
-        ('unsubscribe', 'Desuscripción'),
-        ('invalid_email', 'Email inválido'),
-        ('domain_blocked', 'Dominio bloqueado'),
-        ('manual_block', 'Bloqueo manual'),
-        ('suspicious_activity', 'Actividad sospechosa'),
-    ]
-    
-    email = models.EmailField(unique=True, verbose_name="Email")
-    reason = models.CharField(max_length=20, choices=BLACKLIST_REASON_CHOICES, verbose_name="Razón del bloqueo")
-    added_at = models.DateTimeField(auto_now_add=True, verbose_name="Agregado en")
-    added_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Agregado por")
-    
-    # Información adicional
-    notes = models.TextField(blank=True, verbose_name="Notas")
-    domain = models.CharField(max_length=100, verbose_name="Dominio")
-    
-    # Control de reactivación
-    is_active = models.BooleanField(default=True, verbose_name="Activo")
-    expires_at = models.DateTimeField(null=True, blank=True, verbose_name="Expira en")
-    
-    class Meta:
-        verbose_name = "Email en Lista Negra"
-        verbose_name_plural = "Emails en Lista Negra"
-        ordering = ['-added_at']
-    
-    def __str__(self):
-        return f"{self.email} ({self.get_reason_display()})"
-    
-    def save(self, *args, **kwargs):
-        if '@' in self.email:
-            self.domain = self.email.split('@')[1].lower()
-        super().save(*args, **kwargs)
-
-
-# ============================================================================
-# MODELOS CRM - HISTORIAL DE SERVICIOS
-# ============================================================================
-
-class ServiceHistory(models.Model):
-    """
-    Historial de servicios históricos importados (2020-2024)
-    Conecta con la tabla crm_service_history en la base de datos.
-    """
-    cliente = models.ForeignKey(
-        Cliente,
-        on_delete=models.CASCADE,
-        related_name='historial_servicios',
-        verbose_name="Cliente"
-    )
-    reserva_id = models.CharField(max_length=50, blank=True, verbose_name="ID Reserva")
-    service_type = models.CharField(max_length=100, verbose_name="Tipo de Servicio")  # Tinas, Masajes, Cabañas
-    service_name = models.CharField(max_length=200, verbose_name="Nombre del Servicio")
-    service_date = models.DateField(verbose_name="Fecha del Servicio")
-    quantity = models.IntegerField(default=1, verbose_name="Cantidad")
-    price_paid = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Precio Pagado")
-    season = models.CharField(max_length=50, blank=True, verbose_name="Estación")  # Verano, Otoño, Invierno, Primavera
-    year = models.IntegerField(null=True, blank=True, verbose_name="Año")
-
-    class Meta:
-        db_table = 'crm_service_history'  # Usa la tabla existente
-        managed = False  # Django no crea/modifica esta tabla
-        ordering = ['-service_date']
-        verbose_name = "Servicio Histórico"
-        verbose_name_plural = "Servicios Históricos"
-
-    def __str__(self):
-        return f"{self.cliente.nombre} - {self.service_name} ({self.service_date})"
-
-    def get_categoria_display(self):
-        """Retorna categoría normalizada"""
-        return self.service_type.title()
-
-    @property
-    def is_recent(self):
-        """Verifica si el servicio es de los últimos 6 meses"""
-        from datetime import datetime, timedelta
-        six_months_ago = datetime.now().date() - timedelta(days=180)
-        return self.service_date >= six_months_ago
-
-
-# ============================================================================
-# MODELOS CRM - ASUNTOS DE EMAIL VARIABLES
-# ============================================================================
-
-class EmailSubjectTemplate(models.Model):
-    """
-    Templates de asuntos para emails personalizados
-    Permite variedad para evitar detección de spam
-    """
-    ESTILO_CHOICES = [
-        ('formal', 'Formal/Profesional'),
-        ('calido', 'Cálido/Emocional'),
-        ('ambos', 'Ambos Estilos'),
-    ]
-    
-    subject_template = models.CharField(
-        max_length=200,
-        verbose_name="Asunto del Email",
-        help_text="Usa {nombre} para insertar el nombre del cliente. Ej: '{nombre}, tenemos algo especial para ti'"
-    )
-    estilo = models.CharField(
-        max_length=10,
-        choices=ESTILO_CHOICES,
-        default='calido',
-        verbose_name="Estilo de Email"
-    )
-    activo = models.BooleanField(
-        default=True,
-        verbose_name="Activo",
-        help_text="Desmarcar para desactivar este asunto temporalmente"
-    )
-    veces_usado = models.IntegerField(
-        default=0,
-        verbose_name="Veces Usado",
-        help_text="Contador automático de cuántas veces se ha usado"
-    )
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Creado")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Actualizado")
-    
-    class Meta:
-        ordering = ['estilo', '-activo', 'veces_usado']
-        verbose_name = "Asunto de Email"
-        verbose_name_plural = "Asuntos de Email"
-    
-    def __str__(self):
-        return f"{self.subject_template} ({self.get_estilo_display()})"
-    
-    @classmethod
-    def get_random_subject(cls, estilo='calido', nombre_cliente=''):
-        """
-        Obtiene un asunto aleatorio para el estilo especificado
-        
-        Args:
-            estilo: 'formal' o 'calido'
-            nombre_cliente: Nombre del cliente para reemplazar {nombre}
-        
-        Returns:
-            String con el asunto personalizado
-        """
-        # Buscar templates activos del estilo o que sirvan para ambos
-        templates = cls.objects.filter(
-            activo=True
-        ).filter(
-            models.Q(estilo=estilo) | models.Q(estilo='ambos')
-        )
-        
-        if templates.exists():
-            # Seleccionar uno al azar (priorizando los menos usados)
-            # Ordenar por veces_usado y tomar uno de los 5 menos usados al azar
-            least_used = list(templates.order_by('veces_usado')[:5])
-            selected = random.choice(least_used)
-            
-            # Incrementar contador
-            selected.veces_usado += 1
-            selected.save(update_fields=['veces_usado'])
-            
-            # Reemplazar {nombre} con el nombre del cliente
-            nombre = nombre_cliente.split()[0] if nombre_cliente else ''
-            subject = selected.subject_template.replace('{nombre}', nombre)
-            
-            return subject
-        else:
-            # Fallback a asuntos default si no hay en la base de datos
-            return cls._get_default_subject(estilo, nombre_cliente)
-    
-    @staticmethod
-    def _get_default_subject(estilo='calido', nombre_cliente=''):
-        """
-        Asuntos default si no hay en la base de datos
-        """
-        nombre = nombre_cliente.split()[0] if nombre_cliente else 'amigo'
-        
-        if estilo == 'calido':
-            subjects = [
-                f"{nombre}, tenemos buenas noticias para ti",
-                f"{nombre}, algo especial te espera en Aremko",
-                f"Hola {nombre}, te extrañamos",
-                f"{nombre}, un regalo especial para ti",
-                f"¡{nombre}! Tu momento de relax te está esperando",
-                f"{nombre}, vuelve a disfrutar de la naturaleza",
-                f"Una sorpresa para ti, {nombre}",
-                f"{nombre}, ¿cuándo vuelves a visitarnos?",
-                f"Tenemos un detalle especial para ti, {nombre}",
-                f"{nombre}, tu escape perfecto te espera",
-                f"Hola {nombre}, reservamos algo para ti",
-                f"{nombre}, es hora de relajarte de nuevo",
-                f"¡{nombre}! Beneficios exclusivos para ti",
-                f"{nombre}, te recordamos con cariño",
-                f"Un mensaje especial para ti, {nombre}",
-                f"{nombre}, ven a renovar tu energía",
-                f"Hola {nombre}, te tenemos presente",
-                f"{nombre}, vuelve a conectar con la naturaleza",
-                f"Tu bienestar es importante, {nombre}",
-                f"{nombre}, momentos únicos te esperan",
-                f"¡{nombre}! Oferta especial solo para ti",
-                f"Hola {nombre}, pensamos en ti",
-                f"{nombre}, tu próxima aventura te llama",
-                f"Un beneficio exclusivo para ti, {nombre}",
-                f"{nombre}, te invitamos a desconectar",
-                f"¡{nombre}! Descubre lo que preparamos para ti",
-                f"Hola {nombre}, hora de mimarte",
-                f"{nombre}, tu refugio natural te espera",
-                f"Algo especial preparado para ti, {nombre}",
-                f"{nombre}, vuelve a enamorarte de Aremko",
-            ]
-        else:  # formal
-            subjects = [
-                f"Propuesta Personalizada para {nombre}",
-                f"Oferta Exclusiva - {nombre}",
-                f"Recomendaciones Especiales - Aremko",
-                f"Beneficios Personalizados para Usted",
-                f"Su Próxima Experiencia en Aremko",
-                f"Propuesta de Valor Especial",
-                f"Servicios Recomendados - {nombre}",
-                f"Oferta Limitada - Aremko Spa",
-                f"Experiencia Premium Personalizada",
-                f"Plan Especial para {nombre}",
-            ]
-        
-        return random.choice(subjects)
-
-
-
-# ============================================================================
-# MODELOS CRM - TEMPLATES DE CONTENIDO DE EMAIL EDITABLES
-# ============================================================================
-
-class EmailContentTemplate(models.Model):
-    """
-    Templates editables para el contenido de los emails de propuestas
-    Permite personalizar cada sección del email desde el admin
-    """
-    ESTILO_CHOICES = [
-        ('formal', 'Formal/Profesional'),
-        ('calido', 'Cálido/Emocional'),
-    ]
-    
-    nombre = models.CharField(
-        max_length=100,
-        verbose_name="Nombre del Template",
-        help_text="Ej: 'Template Cálido Primavera 2025'"
-    )
-    estilo = models.CharField(
-        max_length=10,
-        choices=ESTILO_CHOICES,
-        verbose_name="Estilo de Email"
-    )
-    activo = models.BooleanField(
-        default=True,
-        verbose_name="Activo",
-        help_text="Solo se usa el template activo de cada estilo"
-    )
-    
-    # Estructura del email
-    saludo = models.TextField(
-        verbose_name="Saludo",
-        help_text="Usa {nombre} para el nombre del cliente. Ej: 'Hola {nombre},'",
-        default="Hola {nombre},"
-    )
-    
-    introduccion = models.TextField(
-        verbose_name="Introducción",
-        help_text="Texto de apertura. Usa {servicios_narrativa} para la narrativa del historial.",
-        default="Espero que te encuentres muy bien."
-    )
-    
-    seccion_ofertas_titulo = models.CharField(
-        max_length=200,
-        verbose_name="Título de Ofertas",
-        default="Oferta Especial"
-    )
-    
-    seccion_ofertas_intro = models.TextField(
-        verbose_name="Introducción de Ofertas",
-        help_text="Texto antes de mostrar las ofertas. Usa {mes_actual} para el mes.",
-        default="Este mes tenemos algo especial para ti:"
-    )
-    
-    oferta_texto = models.TextField(
-        verbose_name="Texto de Ofertas",
-        help_text="Usa {oferta_porcentaje} y {oferta_servicios} para ofertas dinámicas.",
-        default="{oferta_porcentaje} de descuento en {oferta_servicios}"
-    )
-    
-    call_to_action_texto = models.CharField(
-        max_length=200,
-        verbose_name="Texto del Botón CTA",
-        default="📱 Reservar por WhatsApp"
-    )
-
-    call_to_action_url = models.URLField(
-        max_length=500,
-        verbose_name="URL del Botón CTA",
-        default="https://wa.me/56957902525?text=Hola%2C%20me%20gustar%C3%ADa%20reservar",
-        help_text="URL completa del botón. Ej: https://wa.me/56957902525?text=..."
-    )
-
-    cierre = models.TextField(
-        verbose_name="Cierre/Despedida",
-        help_text="Texto de cierre del email.",
-        default="¡Esperamos verte pronto!"
-    )
-    
-    firma = models.TextField(
-        verbose_name="Firma",
-        default="Equipo Aremko\nPuerto Varas, Chile"
-    )
-    
-    # Estilos CSS personalizables
-    color_principal = models.CharField(
-        max_length=7,
-        verbose_name="Color Principal",
-        default="#2c5530",
-        help_text="Color hexadecimal (ej: #2c5530)"
-    )
-    
-    color_secundario = models.CharField(
-        max_length=7,
-        verbose_name="Color Secundario",
-        default="#8B7355",
-        help_text="Color hexadecimal (ej: #8B7355)"
-    )
-    
-    fuente_tipografia = models.CharField(
-        max_length=100,
-        verbose_name="Tipografía",
-        default="Georgia, serif",
-        help_text="Fuente CSS (ej: 'Georgia, serif' o 'Arial, sans-serif')"
-    )
-    
-    # Metadata
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Creado")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Actualizado")
-    created_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        verbose_name="Creado por"
-    )
-    
-    class Meta:
-        ordering = ['estilo', '-activo', '-updated_at']
-        verbose_name = "Template de Email"
-        verbose_name_plural = "Templates de Email"
-    
-    def __str__(self):
-        return f"{self.nombre} ({self.get_estilo_display()}) {'✓' if self.activo else '✗'}"
-    
-    @classmethod
-    def get_active_template(cls, estilo='calido'):
-        """
-        Obtiene el template activo para el estilo especificado
-        """
-        try:
-            return cls.objects.filter(estilo=estilo, activo=True).latest('updated_at')
-        except cls.DoesNotExist:
-            return None
-    
-    def safe_format(self, text, context):
-        """
-        Reemplaza placeholders de forma segura, ignorando llaves que no son placeholders
-
-        Args:
-            text: Texto con posibles placeholders {variable}
-            context: Dict con valores para reemplazar
-
-        Returns:
-            Texto con placeholders reemplazados, llaves no-placeholders intactas
-        """
-        import re
-
-        # Solo reemplazar placeholders que existen en el context
-        def replacer(match):
-            key = match.group(1)
-            return str(context.get(key, match.group(0)))
-
-        # Buscar solo placeholders válidos (nombres de variables Python)
-        pattern = r'\{(\w+)\}'
-        return re.sub(pattern, replacer, text)
-
-    def render_email(self, context):
-        """
-        Renderiza el email completo usando el template y el contexto
-
-        Args:
-            context: Dict con variables como:
-                - nombre: Nombre del cliente
-                - servicios_narrativa: Texto generado del historial
-                - ofertas: Dict con porcentajes y servicios
-                - mes_actual: Nombre del mes actual
-
-        Returns:
-            String con HTML completo del email
-        """
-        # Reemplazar placeholders en cada sección de forma segura
-        saludo = self.safe_format(self.saludo, context)
-        introduccion = self.safe_format(self.introduccion, context)
-        ofertas_intro = self.safe_format(self.seccion_ofertas_intro, context)
-        oferta_texto = self.safe_format(self.oferta_texto, context)
-        cierre = self.safe_format(self.cierre, context)
-        firma = self.firma
-        
-        # Construir HTML completo
-        html = f"""
-        <html>
-        <body style="font-family: {self.fuente_tipografia}; line-height: 1.8; color: #333; background-color: #fafafa;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 30px 20px; background-color: #ffffff;">
-                <h2 style="color: {self.color_principal}; font-weight: 400; margin-bottom: 20px;">{saludo}</h2>
-                
-                <p style="font-size: 16px; line-height: 1.8; margin-bottom: 20px;">
-                    {introduccion}
-                </p>
-                
-                <p style="font-size: 16px; line-height: 1.8; margin-bottom: 25px;">
-                    {ofertas_intro}
-                </p>
-                
-                <div style="background-color: #f8f5f0; border-left: 4px solid {self.color_secundario}; padding: 20px; margin: 25px 0;">
-                    <p style="font-size: 16px; line-height: 1.8; margin: 0;">
-                        {oferta_texto}
-                    </p>
-                </div>
-                
-                <div style="text-align: center; margin: 35px 0;">
-                    <a href="{self.call_to_action_url}" style="display: inline-block; background-color: #25d366; color: white; padding: 14px 40px; text-decoration: none; border-radius: 25px; font-size: 16px; font-weight: 500;">{self.call_to_action_texto}</a>
-                </div>
-                
-                <p style="font-size: 16px; line-height: 1.8; margin-bottom: 25px;">
-                    {cierre}
-                </p>
-                
-                <p style="font-size: 15px; line-height: 1.7; color: #666; margin-top: 40px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
-                    {firma.replace(chr(10), '<br>')}
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-        
-        return html.strip()
-
-
-# ============================================================================
-# SISTEMA DE TRAMOS Y PREMIOS
-# ============================================================================
-
-class Premio(models.Model):
-    """
-    Modelo para definir los premios disponibles en el sistema de fidelización
-    """
-    TIPO_CHOICES = [
-        ('descuento_bienvenida', 'Descuento Bienvenida'),
-        ('tinas_gratis', 'Tinas Gratis con Masajes'),
-        ('noche_gratis', 'Noche de Alojamiento'),
-    ]
-    
-    nombre = models.CharField(max_length=200, help_text="Nombre del premio")
-    tipo = models.CharField(max_length=50, choices=TIPO_CHOICES)
-    descripcion_corta = models.TextField(help_text="Descripción para mostrar en emails")
-    descripcion_legal = models.TextField(help_text="Términos y condiciones detallados")
-    
-    # Valores
-    porcentaje_descuento_tinas = models.DecimalField(
-        max_digits=5, 
-        decimal_places=2, 
-        null=True, 
-        blank=True,
-        help_text="% descuento en tinas/cabañas"
-    )
-    porcentaje_descuento_masajes = models.DecimalField(
-        max_digits=5, 
-        decimal_places=2, 
-        null=True, 
-        blank=True,
-        help_text="% descuento en masajes"
-    )
-    valor_monetario = models.DecimalField(
-        max_digits=10, 
-        decimal_places=0, 
-        null=True, 
-        blank=True,
-        help_text="Valor en pesos del premio (ej: vale $60,000)"
-    )
-    
-    # Configuración
-    dias_validez = models.IntegerField(default=30, help_text="Días de validez del premio")
-    tramo_hito = models.IntegerField(
-        null=True,
-        blank=True,
-        help_text="DEPRECATED: Usar tramos_validos. Tramo único antiguo"
-    )
-    tramos_validos = models.JSONField(
-        default=list,
-        blank=True,
-        help_text='Lista de tramos donde aplica este premio. Ej: [5,6,7,8] para premio de tramos 5-8'
-    )
-    restricciones = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text='Restricciones en JSON. Ej: {"no_sabados": true, "no_acumulable": true}'
-    )
-
-    # Metadata
-    activo = models.BooleanField(default=True)
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
-    fecha_modificacion = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        verbose_name = "Premio"
-        verbose_name_plural = "Premios"
-        ordering = ['tipo', 'nombre']
-
-    def __str__(self):
-        return f"{self.get_tipo_display()} - {self.nombre}"
-
-    def obtener_rango_tramo(self):
-        """
-        Retorna el rango de gasto del tramo asociado a este premio
-        """
-        if not self.tramo_hito:
-            return None, None
-
-        from ventas.services.tramo_service import TramoService
-        return TramoService.obtener_rango_tramo(self.tramo_hito)
-
-    def descripcion_tramo(self):
-        """
-        Retorna descripción legible del tramo
-        """
-        if not self.tramo_hito:
-            return "No asignado a tramo"
-
-        min_gasto, max_gasto = self.obtener_rango_tramo()
-        return f"Tramo {self.tramo_hito} (${min_gasto:,} - ${max_gasto:,})"
-
-    def get_tramos_list(self):
-        """
-        Obtiene la lista de tramos válidos para este premio
-        Mantiene compatibilidad con tramo_hito antiguo
-        """
-        if self.tramos_validos:
-            return self.tramos_validos
-        elif self.tramo_hito:
-            return [self.tramo_hito]
-        return []
-
-    def aplica_para_tramo(self, tramo):
-        """
-        Verifica si este premio aplica para un tramo específico
-        """
-        return tramo in self.get_tramos_list()
-
-    def descripcion_tramos_validos(self):
-        """
-        Retorna descripción legible de los tramos válidos
-        """
-        tramos = self.get_tramos_list()
-        if not tramos:
-            return "No asignado a tramos"
-
-        if len(tramos) == 1:
-            return f"Tramo {tramos[0]}"
-
-        # Agrupar tramos consecutivos
-        tramos_sorted = sorted(tramos)
-        if tramos_sorted == list(range(tramos_sorted[0], tramos_sorted[-1] + 1)):
-            return f"Tramos {tramos_sorted[0]} al {tramos_sorted[-1]}"
-        else:
-            return f"Tramos {', '.join(map(str, tramos_sorted))}"
-
-
-class ClientePremio(models.Model):
-    """
-    Modelo para tracking de premios asignados a clientes
-    """
-    ESTADO_CHOICES = [
-        ('pendiente_aprobacion', 'Pendiente Aprobación'),
-        ('aprobado', 'Aprobado'),
-        ('enviado', 'Email Enviado'),
-        ('usado', 'Premio Usado'),
-        ('expirado', 'Expirado'),
-        ('cancelado', 'Cancelado'),
-    ]
-    
-    cliente = models.ForeignKey('Cliente', on_delete=models.CASCADE, related_name='premios')
-    premio = models.ForeignKey(Premio, on_delete=models.PROTECT)
-    estado = models.CharField(max_length=50, choices=ESTADO_CHOICES, default='pendiente_aprobacion')
-    
-    # Fechas
-    fecha_ganado = models.DateTimeField(auto_now_add=True)
-    fecha_aprobacion = models.DateTimeField(null=True, blank=True)
-    fecha_enviado = models.DateTimeField(null=True, blank=True)
-    fecha_envio_whatsapp = models.DateTimeField(null=True, blank=True, help_text="Fecha cuando se envió por WhatsApp")
-    fecha_expiracion = models.DateTimeField(help_text="Calculado automáticamente basado en días de validez")
-    fecha_uso = models.DateTimeField(null=True, blank=True)
-    
-    # Tracking del contexto
-    tramo_al_ganar = models.IntegerField(help_text="Tramo del cliente al momento de ganar el premio")
-    gasto_total_al_ganar = models.DecimalField(
-        max_digits=12, 
-        decimal_places=0,
-        help_text="Gasto total acumulado al momento de ganar"
-    )
-    tramo_anterior = models.IntegerField(
-        null=True, 
-        blank=True,
-        help_text="Tramo anterior (solo si el premio es por subida de tramo)"
-    )
-    
-    # Email
-    asunto_email = models.CharField(max_length=200, blank=True)
-    cuerpo_email = models.TextField(blank=True)
-    
-    # Código único para validar uso
-    codigo_unico = models.CharField(
-        max_length=50, 
-        unique=True, 
-        blank=True,
-        help_text="Código único para validar el uso del premio"
-    )
-    
-    # Relación con venta donde se usó
-    venta_donde_uso = models.ForeignKey(
-        'VentaReserva', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='premios_usados'
-    )
-    
-    # Notas administrativas
-    notas_admin = models.TextField(blank=True, help_text="Notas internas para administración")
-    
-    class Meta:
-        verbose_name = "Premio de Cliente"
-        verbose_name_plural = "Premios de Clientes"
-        ordering = ['-fecha_ganado']
-        indexes = [
-            models.Index(fields=['estado', 'fecha_aprobacion']),
-            models.Index(fields=['cliente', 'estado']),
-            models.Index(fields=['codigo_unico']),
-        ]
-    
-    def __str__(self):
-        return f"{self.cliente.nombre} - {self.premio.nombre} ({self.get_estado_display()})"
-    
-    def save(self, *args, **kwargs):
-        # Generar código único si no existe
-        if not self.codigo_unico:
-            self.codigo_unico = self._generar_codigo_unico()
-        
-        # Calcular fecha de expiración si no existe
-        if not self.fecha_expiracion and self.fecha_ganado:
-            self.fecha_expiracion = self.fecha_ganado + timedelta(days=self.premio.dias_validez)
-        
-        super().save(*args, **kwargs)
-    
-    def _generar_codigo_unico(self):
-        """Genera un código único alfanumérico de 12 caracteres"""
-        while True:
-            codigo = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
-            if not ClientePremio.objects.filter(codigo_unico=codigo).exists():
-                return codigo
-    
-    def marcar_como_usado(self, venta=None):
-        """Marca el premio como usado"""
-        self.estado = 'usado'
-        self.fecha_uso = timezone.now()
-        if venta:
-            self.venta_donde_uso = venta
-        self.save()
-    
-    def esta_vigente(self):
-        """Verifica si el premio está vigente"""
-        if self.estado not in ['aprobado', 'enviado']:
-            return False
-        if timezone.now() > self.fecha_expiracion:
-            return False
-        return True
-
-
-class HistorialTramo(models.Model):
-    """
-    Modelo para tracking histórico de cambios de tramo de clientes
-    """
-    cliente = models.ForeignKey('Cliente', on_delete=models.CASCADE, related_name='historial_tramos')
-    tramo_desde = models.IntegerField(help_text="Tramo anterior")
-    tramo_hasta = models.IntegerField(help_text="Nuevo tramo")
-    fecha_cambio = models.DateTimeField(auto_now_add=True)
-    gasto_en_momento = models.DecimalField(
-        max_digits=12, 
-        decimal_places=0,
-        help_text="Gasto total al momento del cambio"
-    )
-    premio_generado = models.ForeignKey(
-        ClientePremio, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        help_text="Premio generado por este cambio de tramo"
-    )
-    
-    class Meta:
-        verbose_name = "Historial de Tramo"
-        verbose_name_plural = "Historial de Tramos"
-        ordering = ['-fecha_cambio']
-        indexes = [
-            models.Index(fields=['cliente', '-fecha_cambio']),
-        ]
-    
-    def __str__(self):
-        return f"{self.cliente.nombre}: Tramo {self.tramo_desde} → {self.tramo_hasta}"
-
-

@@ -516,7 +516,7 @@ def auditoria_movimientos_view(request):
     context = {
         'movimientos': page_obj, # Pass the page object
         'fecha_inicio': fecha_inicio_str,
-        'fecha_fin': fecha_fin_str,
+        'fecha_fin': fecha_str,
         'tipo_movimiento': tipo_movimiento or '', # Ensure not None
         'usuario_username': usuario_username or '', # Ensure not None
         'usuarios': User.objects.filter(is_active=True).order_by('username'),  # Solo usuarios activos for filter dropdown
@@ -525,209 +525,80 @@ def auditoria_movimientos_view(request):
     return render(request, 'ventas/auditoria_movimientos.html', context)
 
 
-def _get_combined_metrics_for_segmentation():
-    """
-    Helper para obtener métricas combinadas (servicios actuales + históricos) para segmentación
-    Si la tabla histórica no existe, solo usa datos actuales.
-    """
-    from ventas.models import ServiceHistory
-    from django.db import connection
-    import logging
-
-    logger = logging.getLogger(__name__)
-
-    # Verificar si la tabla crm_service_history existe
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables
-                    WHERE table_name = 'crm_service_history'
-                )
-            """)
-            table_exists = cursor.fetchone()[0]
-    except Exception as e:
-        logger.warning(f"Error checking table existence: {e}")
-        table_exists = False
-
-    if not table_exists:
-        logger.info("Tabla crm_service_history no existe, usando solo datos actuales")
-        # Solo usar datos actuales
-        clientes = Cliente.objects.annotate(
-            total_servicios=Count('ventareserva'),
-            total_gasto=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField())
-        ).values('id', 'nombre', 'email', 'total_servicios', 'total_gasto')
-
-        results = []
-        for c in clientes:
-            results.append({
-                'cliente_id': c['id'],
-                'nombre': c['nombre'],
-                'email': c['email'],
-                'servicios_actuales': c['total_servicios'],
-                'gasto_actual': float(c['total_gasto']),
-                'servicios_historicos': 0,
-                'gasto_historico': 0,
-                'total_servicios': c['total_servicios'],
-                'total_gasto': float(c['total_gasto'])
-            })
-        return results
-
-    # Tabla existe, usar query combinada AGRUPADA POR TELEFONO para consolidar duplicados
-    try:
-        query = """
-        WITH clientes_por_telefono AS (
-            -- Agrupar clientes por teléfono y elegir un representante
-            SELECT
-                telefono,
-                MIN(id) as cliente_id_representante,
-                MAX(nombre) as nombre,
-                MAX(email) as email,
-                ARRAY_AGG(id) as todos_los_ids
-            FROM ventas_cliente
-            WHERE telefono IS NOT NULL AND telefono != ''
-            GROUP BY telefono
-        )
-        SELECT
-            cpt.cliente_id_representante as cliente_id,
-            cpt.nombre,
-            cpt.email,
-            cpt.telefono,
-            -- Servicios actuales: SUMAR de TODOS los IDs con ese teléfono
-            (SELECT COUNT(DISTINCT rs2.id)
-             FROM ventas_ventareserva vr2
-             JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
-             WHERE vr2.cliente_id = ANY(cpt.todos_los_ids)
-               AND vr2.estado_pago IN ('pagado', 'parcial')
-            ) as servicios_actuales,
-            (SELECT COALESCE(SUM(CAST(s2.precio_base AS DECIMAL) * COALESCE(rs2.cantidad_personas, 1)), 0)
-             FROM ventas_ventareserva vr2
-             JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
-             JOIN ventas_servicio s2 ON rs2.servicio_id = s2.id
-             WHERE vr2.cliente_id = ANY(cpt.todos_los_ids)
-               AND vr2.estado_pago IN ('pagado', 'parcial')
-            ) as gasto_actual,
-            -- Servicios históricos: SUMAR de TODOS los IDs con ese teléfono
-            -- EXCLUIR servicios con fecha placeholder 2021-01-01 (importación histórica sin fecha real)
-            (SELECT COUNT(DISTINCT sh2.id)
-             FROM crm_service_history sh2
-             WHERE sh2.cliente_id = ANY(cpt.todos_los_ids)
-               AND sh2.service_date != '2021-01-01'
-            ) as servicios_historicos,
-            (SELECT COALESCE(SUM(sh2.price_paid), 0)
-             FROM crm_service_history sh2
-             WHERE sh2.cliente_id = ANY(cpt.todos_los_ids)
-               AND sh2.service_date != '2021-01-01'
-            ) as gasto_historico,
-            -- Totales combinados
-            ((SELECT COUNT(DISTINCT rs2.id)
-              FROM ventas_ventareserva vr2
-              JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
-              WHERE vr2.cliente_id = ANY(cpt.todos_los_ids)
-                AND vr2.estado_pago IN ('pagado', 'parcial')
-             ) +
-             (SELECT COUNT(DISTINCT sh2.id)
-              FROM crm_service_history sh2
-              WHERE sh2.cliente_id = ANY(cpt.todos_los_ids)
-                AND sh2.service_date != '2021-01-01'
-             )) as total_servicios,
-            ((SELECT COALESCE(SUM(CAST(s2.precio_base AS DECIMAL) * COALESCE(rs2.cantidad_personas, 1)), 0)
-              FROM ventas_ventareserva vr2
-              JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
-              JOIN ventas_servicio s2 ON rs2.servicio_id = s2.id
-              WHERE vr2.cliente_id = ANY(cpt.todos_los_ids)
-                AND vr2.estado_pago IN ('pagado', 'parcial')
-             ) +
-             (SELECT COALESCE(SUM(sh2.price_paid), 0)
-              FROM crm_service_history sh2
-              WHERE sh2.cliente_id = ANY(cpt.todos_los_ids)
-                AND sh2.service_date != '2021-01-01'
-             )) as total_gasto
-        FROM clientes_por_telefono cpt
-        ORDER BY total_gasto DESC
-        """
-
-        with connection.cursor() as cursor:
-            cursor.execute(query)
-            columns = [col[0] for col in cursor.description]
-            results = []
-            for row in cursor.fetchall():
-                results.append(dict(zip(columns, row)))
-
-        return results
-    except Exception as e:
-        logger.error(f"Error ejecutando query combinada: {e}")
-        # Fallback a solo datos actuales
-        clientes = Cliente.objects.annotate(
-            total_servicios=Count('ventareserva'),
-            total_gasto=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField())
-        ).values('id', 'nombre', 'email', 'total_servicios', 'total_gasto')
-
-        results = []
-        for c in clientes:
-            results.append({
-                'cliente_id': c['id'],
-                'nombre': c['nombre'],
-                'email': c['email'],
-                'servicios_actuales': c['total_servicios'],
-                'gasto_actual': float(c['total_gasto']),
-                'servicios_historicos': 0,
-                'gasto_historico': 0,
-                'total_servicios': c['total_servicios'],
-                'total_gasto': float(c['total_gasto'])
-            })
-        return results
-
 @login_required
+# @user_passes_test(es_administrador) # Optional: Restrict to admins if needed
 def cliente_segmentation_view(request):
     """
-    Displays client segmentation based ONLY on total spend (no visit count).
-    Incluye tanto servicios actuales como históricos (CSV importados).
+    Displays client segmentation based on visit count and total spend.
     """
     # Define Segmentation Thresholds (adjust as needed)
+    VISIT_THRESHOLD_REGULAR = 2
+    VISIT_THRESHOLD_VIP = 6 # Example: 6 or more visits
     SPEND_THRESHOLD_MEDIUM = 50000 # Example: 50,000 CLP
     SPEND_THRESHOLD_HIGH = 150000 # Example: 150,000 CLP
 
-    # Obtener métricas combinadas (actuales + históricos)
-    clientes_data = _get_combined_metrics_for_segmentation()
+    # Annotate clients with visit count and total spend
+    # Use Coalesce to handle clients with no spending (Sum returns None)
+    clientes_annotated = Cliente.objects.annotate(
+        num_visits=Count('ventareserva'),
+        total_spend=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField()) # Use imported Coalesce
+    ).order_by('-total_spend') # Order for potential display
 
-    # --- Categorize Clients (SOLO POR GASTO) ---
+    # --- Categorize Clients ---
     segments = {
-        'low_spend': {'count': 0, 'label': 'Bajo Gasto (< $50,000)'},
-        'medium_spend': {'count': 0, 'label': 'Gasto Medio ($50,000 - $150,000)'},
-        'high_spend': {'count': 0, 'label': 'Alto Gasto (> $150,000)'},
-        'zero_spend': {'count': 0, 'label': 'Clientes Sin Gasto Registrado'},
+        'new_low_spend': {'count': 0, 'label': 'Nuevos (0-1 Visita, Bajo Gasto)'},
+        'new_medium_spend': {'count': 0, 'label': 'Nuevos (0-1 Visita, Gasto Medio)'},
+        'new_high_spend': {'count': 0, 'label': 'Nuevos (0-1 Visita, Alto Gasto)'},
+        'regular_low_spend': {'count': 0, 'label': f'Regulares ({VISIT_THRESHOLD_REGULAR}-{VISIT_THRESHOLD_VIP-1} Visitas, Bajo Gasto)'},
+        'regular_medium_spend': {'count': 0, 'label': f'Regulares ({VISIT_THRESHOLD_REGULAR}-{VISIT_THRESHOLD_VIP-1} Visitas, Gasto Medio)'},
+        'regular_high_spend': {'count': 0, 'label': f'Regulares ({VISIT_THRESHOLD_REGULAR}-{VISIT_THRESHOLD_VIP-1} Visitas, Alto Gasto)'},
+        'vip_low_spend': {'count': 0, 'label': f'VIP (>{VISIT_THRESHOLD_VIP-1} Visitas, Bajo Gasto)'},
+        'vip_medium_spend': {'count': 0, 'label': f'VIP (>{VISIT_THRESHOLD_VIP-1} Visitas, Gasto Medio)'},
+        'vip_high_spend': {'count': 0, 'label': f'VIP (>{VISIT_THRESHOLD_VIP-1} Visitas, Alto Gasto)'},
+        'zero_spend': {'count': 0, 'label': 'Clientes Sin Gasto Registrado'}, # Clients with no VentaReserva
     }
 
-    for cliente_data in clientes_data:
-        spend = cliente_data['total_gasto']
+    for cliente in clientes_annotated:
+        visits = cliente.num_visits
+        spend = cliente.total_spend
 
-        if spend == 0:
+        if visits == 0 and spend == 0:
              segments['zero_spend']['count'] += 1
-             continue
+             continue # Skip further categorization if no visits/spend
 
-        # Categorize ONLY by Spend
+        # Categorize by Visits
+        if visits < VISIT_THRESHOLD_REGULAR: # 0-1 visits
+            visit_category = 'new'
+        elif visits < VISIT_THRESHOLD_VIP: # 2-5 visits (example)
+            visit_category = 'regular'
+        else: # 6+ visits
+            visit_category = 'vip'
+
+        # Categorize by Spend
         if spend < SPEND_THRESHOLD_MEDIUM:
-            segments['low_spend']['count'] += 1
+            spend_category = 'low_spend'
         elif spend < SPEND_THRESHOLD_HIGH:
-            segments['medium_spend']['count'] += 1
+            spend_category = 'medium_spend'
         else:
-            segments['high_spend']['count'] += 1
+            spend_category = 'high_spend'
 
-    # Obtener comunas únicas para filtro personalizado (usando el nuevo campo estructurado)
-    from ..models import Comuna
-    comunas = Comuna.objects.filter(
-        clientes__isnull=False  # Solo comunas que tienen clientes
-    ).distinct().order_by('nombre').values('id', 'nombre')
+        # Increment the combined segment count
+        segment_key = f"{visit_category}_{spend_category}"
+        if segment_key in segments:
+            segments[segment_key]['count'] += 1
+        else:
+             # This case shouldn't happen with the current logic, but good for safety
+             logger.warning(f"Unexpected segment key generated: {segment_key} for client {cliente.id}")
+
 
     context = {
         'segments': segments,
-        'total_clients': len(clientes_data),
+        'total_clients': clientes_annotated.count(),
         # Pass thresholds for display/info
+        'visit_threshold_regular': VISIT_THRESHOLD_REGULAR,
+        'visit_threshold_vip': VISIT_THRESHOLD_VIP,
         'spend_threshold_medium': SPEND_THRESHOLD_MEDIUM,
         'spend_threshold_high': SPEND_THRESHOLD_HIGH,
-        # Filtro personalizado (ahora usando comunas estructuradas)
-        'comunas': list(comunas),
     }
 
     return render(request, 'ventas/cliente_segmentation.html', context)
@@ -737,149 +608,84 @@ def cliente_segmentation_view(request):
 # @user_passes_test(es_administrador) # Optional: Restrict to admins if needed
 def client_list_by_segment_view(request, segment_name):
     """
-    Displays a list of clients for a specific segment (SOLO BASADO EN GASTO).
-    Incluye tanto servicios actuales como históricos.
+    Displays a list of clients for a specific segment.
     """
-    # Define Segmentation Thresholds
-    SPEND_THRESHOLD_MEDIUM = 50000 # 50,000 CLP
-    SPEND_THRESHOLD_HIGH = 150000 # 150,000 CLP
+    # Define Segmentation Thresholds (adjust as needed)
+    VISIT_THRESHOLD_REGULAR = 2
+    VISIT_THRESHOLD_VIP = 6 # Example: 6 or more visits
+    SPEND_THRESHOLD_MEDIUM = 50000 # Example: 50,000 CLP
+    SPEND_THRESHOLD_HIGH = 150000 # Example: 150,000 CLP
 
-    # Obtener métricas combinadas
-    clientes_data = _get_combined_metrics_for_segmentation()
+    # Annotate clients with visit count and total spend
+    clientes_annotated = Cliente.objects.annotate(
+        num_visits=Count('ventareserva'),
+        total_spend=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField())
+    )
 
-    # Filtrar clientes según el segmento en Python (SOLO POR GASTO)
-    filtered_client_ids = []
-
-    for cliente_data in clientes_data:
-        spend = cliente_data['total_gasto']
-
-        include = False
-
-        if segment_name == 'low_spend':
-            include = 0 < spend < SPEND_THRESHOLD_MEDIUM
-        elif segment_name == 'medium_spend':
-            include = SPEND_THRESHOLD_MEDIUM <= spend < SPEND_THRESHOLD_HIGH
-        elif segment_name == 'high_spend':
-            include = spend >= SPEND_THRESHOLD_HIGH
-        elif segment_name == 'zero_spend':
-            include = spend == 0
-
-        if include:
-            filtered_client_ids.append(cliente_data['cliente_id'])
-
-    # Convertir IDs filtrados de vuelta a queryset de Cliente
-    if filtered_client_ids:
-        clients = Cliente.objects.filter(id__in=filtered_client_ids).annotate(
-            num_visits=Count('ventareserva'),
-            total_spend=Coalesce(Sum('ventareserva__total'), 0, output_field=models.DecimalField())
+    # Filter clients based on segment_name
+    if segment_name == 'new_low_spend':
+        clients = clientes_annotated.filter(
+            num_visits__lt=VISIT_THRESHOLD_REGULAR,
+            total_spend__lt=SPEND_THRESHOLD_MEDIUM
         )
+    elif segment_name == 'new_medium_spend':
+        clients = clientes_annotated.filter(
+            num_visits__lt=VISIT_THRESHOLD_REGULAR,
+            total_spend__gte=SPEND_THRESHOLD_MEDIUM,
+            total_spend__lt=SPEND_THRESHOLD_HIGH
+        )
+    elif segment_name == 'new_high_spend':
+        clients = clientes_annotated.filter(
+            num_visits__lt=VISIT_THRESHOLD_REGULAR,
+            total_spend__gte=SPEND_THRESHOLD_HIGH
+        )
+    elif segment_name == 'regular_low_spend':
+        clients = clientes_annotated.filter(
+            num_visits__gte=VISIT_THRESHOLD_REGULAR,
+            num_visits__lt=VISIT_THRESHOLD_VIP,
+            total_spend__lt=SPEND_THRESHOLD_MEDIUM
+        )
+    elif segment_name == 'regular_medium_spend':
+        clients = clientes_annotated.filter(
+            num_visits__gte=VISIT_THRESHOLD_REGULAR,
+            num_visits__lt=VISIT_THRESHOLD_VIP,
+            total_spend__gte=SPEND_THRESHOLD_MEDIUM,
+            total_spend__lt=SPEND_THRESHOLD_HIGH
+        )
+    elif segment_name == 'regular_high_spend':
+        clients = clientes_annotated.filter(
+            num_visits__gte=VISIT_THRESHOLD_REGULAR,
+            num_visits__lt=VISIT_THRESHOLD_VIP,
+            total_spend__gte=SPEND_THRESHOLD_HIGH
+        )
+    elif segment_name == 'vip_low_spend':
+        clients = clientes_annotated.filter(
+            num_visits__gte=VISIT_THRESHOLD_VIP,
+            total_spend__lt=SPEND_THRESHOLD_MEDIUM
+        )
+    elif segment_name == 'vip_medium_spend':
+        clients = clientes_annotated.filter(
+            num_visits__gte=VISIT_THRESHOLD_VIP,
+            total_spend__gte=SPEND_THRESHOLD_MEDIUM,
+            total_spend__lt=SPEND_THRESHOLD_HIGH
+        )
+    elif segment_name == 'vip_high_spend':
+        clients = clientes_annotated.filter(
+            num_visits__gte=VISIT_THRESHOLD_VIP,
+            total_spend__gte=SPEND_THRESHOLD_HIGH
+        )
+    elif segment_name == 'zero_spend':
+         clients = clientes_annotated.filter(
+             num_visits=0,
+             total_spend=0
+         )
     else:
-        clients = Cliente.objects.none()
-
-    # Mapeo de nombres de segmento para el display
-    segment_labels = {
-        'low_spend': 'Bajo Gasto (< $50,000)',
-        'medium_spend': 'Gasto Medio ($50,000 - $150,000)',
-        'high_spend': 'Alto Gasto (> $150,000)',
-        'zero_spend': 'Sin Gasto Registrado'
-    }
+        # Handle invalid segment name, perhaps return an empty list or an error
+        clients = Cliente.objects.none() # Return an empty queryset
 
     context = {
         'segment_name': segment_name,
-        'segment_label': segment_labels.get(segment_name, segment_name),
         'clients': clients,
-    }
-
-    return render(request, 'ventas/client_list_by_segment.html', context)
-
-
-@login_required
-def client_list_custom_filter_view(request):
-    """
-    Vista para filtro personalizado de clientes por rango de gasto y comuna
-    """
-    # Obtener parámetros del formulario
-    gasto_min = request.GET.get('gasto_min', '0')
-    gasto_max = request.GET.get('gasto_max', '')
-    comuna_id = request.GET.get('comuna', 'todas')  # Cambio de ciudad a comuna
-
-    try:
-        gasto_min = float(gasto_min) if gasto_min else 0
-    except ValueError:
-        gasto_min = 0
-
-    try:
-        gasto_max = float(gasto_max) if gasto_max else float('inf')
-    except ValueError:
-        gasto_max = float('inf')
-
-    # Obtener métricas combinadas
-    clientes_data = _get_combined_metrics_for_segmentation()
-
-    # Filtrar por rango de gasto y crear mapas detallados
-    filtered_client_ids = []
-    gasto_map = {}  # {cliente_id: {'actual': X, 'historico': Y, 'total': Z}}
-
-    for cliente_data in clientes_data:
-        spend_total = cliente_data['total_gasto']
-        spend_actual = cliente_data.get('gasto_actual', 0)
-        spend_historico = cliente_data.get('gasto_historico', 0)
-
-        if gasto_min <= spend_total <= gasto_max:
-            filtered_client_ids.append(cliente_data['cliente_id'])
-            gasto_map[cliente_data['cliente_id']] = {
-                'actual': spend_actual,
-                'historico': spend_historico,
-                'total': spend_total
-            }
-
-    # Convertir a queryset y aplicar filtro de comuna
-    if filtered_client_ids:
-        clients = Cliente.objects.filter(id__in=filtered_client_ids)
-
-        # Filtrar por comuna si no es "todas"
-        if comuna_id and comuna_id != 'todas':
-            clients = clients.filter(comuna_id=int(comuna_id))
-
-        # Agregar gastos detallados a cada cliente
-        clients_list = []
-        for cliente in clients:
-            gastos = gasto_map.get(cliente.id, {'actual': 0, 'historico': 0, 'total': 0})
-            cliente.gasto_actual = gastos['actual']
-            cliente.gasto_historico = gastos['historico']
-            cliente.gasto_total_combinado = gastos['total']
-            clients_list.append(cliente)
-
-        # Ordenar por gasto total descendente (mayor a menor)
-        clients_list.sort(key=lambda c: c.gasto_total_combinado, reverse=True)
-
-        clients = clients_list
-    else:
-        clients = []
-
-    # Generar label descriptivo
-    if gasto_max == float('inf'):
-        segment_label = f'Gasto ≥ ${gasto_min:,.0f}'
-    else:
-        segment_label = f'Gasto: ${gasto_min:,.0f} - ${gasto_max:,.0f}'
-
-    # Agregar nombre de comuna al label si está filtrado
-    if comuna_id and comuna_id != 'todas':
-        from ..models import Comuna
-        try:
-            comuna = Comuna.objects.get(id=int(comuna_id))
-            segment_label += f' | Comuna: {comuna.nombre}'
-        except Comuna.DoesNotExist:
-            pass
-
-    context = {
-        'segment_name': 'custom_filter',
-        'segment_label': segment_label,
-        'clients': clients,
-        'gasto_min': int(gasto_min) if gasto_min else 0,
-        'gasto_max': int(gasto_max) if gasto_max != float('inf') else '',
-        'comuna_id': comuna_id,
-        'is_custom_filter': True,
     }
 
     return render(request, 'ventas/client_list_by_segment.html', context)

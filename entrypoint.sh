@@ -37,10 +37,10 @@ print(f"DB_PORT={db_port}")
 # Extraer DB_HOST y DB_PORT
 extract_db_host_port
 
-# Debugging info (solo mostrar si es necesario)
-# echo "DATABASE_URL: $DATABASE_URL"
-# echo "DB_HOST: $DB_HOST"
-# echo "DB_PORT: $DB_PORT"
+# Debugging: Imprimir DB_HOST y DB_PORT (Eliminar en producción)
+echo "DATABASE_URL: $DATABASE_URL"
+echo "DB_HOST: $DB_HOST"
+echo "DB_PORT: $DB_PORT"
 
 # Esperar a que la base de datos esté disponible
 echo "Esperando a que la base de datos esté disponible en $DB_HOST:$DB_PORT..."
@@ -80,20 +80,10 @@ else:
     print("Variables de entorno para superusuario no están completamente configuradas.")
 EOF
 
-# Verificar si se pasaron argumentos al contenedor (ej: comando de cron job)
-if [ "$#" -gt 0 ]; then
-    # Si hay argumentos, ejecutarlos directamente (para cron jobs)
-    echo "Ejecutando comando: $@"
-    # Usar eval para ejecutar el comando correctamente si contiene espacios
-    eval exec "$@"
-else
-    # Si no hay argumentos, ejecutar comportamiento por defecto (web service)
-    # Recolectar archivos estáticos
-    echo "Recolectando archivos estáticos..."
-    python manage.py collectstatic --noinput
+# Recolectar archivos estáticos
+echo "Recolectando archivos estáticos..."
+python manage.py collectstatic --noinput
 
-    # Iniciar Gunicorn para servir la aplicación, usando el puerto asignado por Render
-    PORT=${PORT:-8000}
-    echo "Iniciando Gunicorn en 0.0.0.0:$PORT con 1 worker, timeout 120s, log-level warning..."
-    exec gunicorn aremko_project.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level warning
-fi
+# Iniciar Gunicorn para servir la aplicación, binding explicitly to port 8000, 1 worker, debug logging
+echo "Iniciando Gunicorn en 0.0.0.0:8000 con 1 worker, timeout 120s, log-level debug..."
+exec gunicorn aremko_project.wsgi:application --bind 0.0.0.0:8000 --workers 1 --timeout 120 --log-level debug

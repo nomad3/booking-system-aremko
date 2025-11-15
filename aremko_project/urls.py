@@ -7,6 +7,7 @@ from django.conf.urls.static import static # Import static
 from django.contrib.auth import views as auth_views # Import auth views
 # Import the specific view function needed for the root URL
 from ventas.views.public_views import homepage_view
+from ventas.views.giftcard_views import giftcard_wizard
 # Removed direct import of ventas.urls
 
 from django.contrib.sitemaps.views import sitemap
@@ -22,10 +23,10 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # Root URL pointing to the homepage view in its new location
     path('', homepage_view, name='homepage'), # Use the directly imported view
+    # GiftCards at root level for cleaner URL
+    path('giftcards/', giftcard_wizard, name='giftcard_wizard'),
     # Include all URLs from the ventas app under the /ventas/ prefix
     path('ventas/', include('ventas.urls')), # Rely on app_name in ventas.urls
-    # Include Control de Gestión URLs
-    path('control_gestion/', include('control_gestion.urls')),
     # Include Django auth urls
     path('accounts/', include('django.contrib.auth.urls')), # Provides login, logout, etc.
 

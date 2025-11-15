@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, Cliente, Pago, ReservaProducto, CategoriaServicio, Servicio, ReservaServicio, Region, Comuna
+from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, Cliente, Pago, ReservaProducto, CategoriaServicio, Servicio, ReservaServicio
 
 
 class ProveedorSerializer(serializers.ModelSerializer):
@@ -32,30 +32,10 @@ class ServicioSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class RegionSerializer(serializers.ModelSerializer):
-    """Serializer para Región"""
-    class Meta:
-        model = Region
-        fields = ['id', 'codigo', 'nombre', 'orden']
-
-
-class ComunaSerializer(serializers.ModelSerializer):
-    """Serializer para Comuna"""
-    region_codigo = serializers.CharField(source='region.codigo', read_only=True)
-    region_nombre = serializers.CharField(source='region.nombre', read_only=True)
-
-    class Meta:
-        model = Comuna
-        fields = ['id', 'nombre', 'region', 'region_codigo', 'region_nombre']
-
-
 class ClienteSerializer(serializers.ModelSerializer):
-    region_nombre = serializers.CharField(source='region.nombre', read_only=True)
-    comuna_nombre = serializers.CharField(source='comuna.nombre', read_only=True)
-
     class Meta:
         model = Cliente
-        fields = ['nombre', 'telefono', 'email', 'documento_identidad', 'ciudad', 'pais', 'region', 'comuna', 'region_nombre', 'comuna_nombre']
+        fields = ['nombre', 'telefono', 'email', 'documento_identidad', 'ciudad', 'pais']
 
 
 class ReservaProductoSerializer(serializers.ModelSerializer):
