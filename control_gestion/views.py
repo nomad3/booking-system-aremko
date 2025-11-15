@@ -115,54 +115,66 @@ def mi_dia(request):
     """
     from django.utils import timezone
     from .models import TimeCriticality
+    import logging
 
+    logger = logging.getLogger(__name__)
     today = timezone.now().date()
 
-    # Tareas URGENTES (CRITICAL) - Con hora específica
-    # Ordenadas cronológicamente para que el usuario vea qué viene primero
-    tareas_urgentes = (
-        Task.objects
-        .filter(owner=request.user, time_criticality=TimeCriticality.CRITICAL)
-        .exclude(state=TaskState.DONE)
-        .filter(promise_due_at__date=today)  # Solo del día de hoy
-        .order_by("promise_due_at")  # Ordenar por hora
-    )
+    try:
+        # Tareas URGENTES (CRITICAL) - Con hora específica
+        # Ordenadas cronológicamente para que el usuario vea qué viene primero
+        tareas_urgentes = (
+            Task.objects
+            .filter(
+                owner=request.user,
+                time_criticality=TimeCriticality.CRITICAL,
+                promise_due_at__isnull=False  # Asegurar que tenga hora
+            )
+            .exclude(state=TaskState.DONE)
+            .filter(promise_due_at__date=today)  # Solo del día de hoy
+            .order_by("promise_due_at")  # Ordenar por hora
+        )
 
-    # Tareas FLEXIBLES (FLEXIBLE) - Sin hora específica
-    # Ordenadas por posición en cola (prioridad)
-    tareas_flexibles = (
-        Task.objects
-        .filter(owner=request.user, time_criticality=TimeCriticality.FLEXIBLE)
-        .exclude(state=TaskState.DONE)
-        .order_by("swimlane", "queue_position", "created_at")
-    )
+        # Tareas FLEXIBLES (FLEXIBLE) - Sin hora específica
+        # Ordenadas por posición en cola (prioridad)
+        tareas_flexibles = (
+            Task.objects
+            .filter(owner=request.user, time_criticality=TimeCriticality.FLEXIBLE)
+            .exclude(state=TaskState.DONE)
+            .order_by("swimlane", "queue_position", "created_at")
+        )
 
-    # Tareas PROGRAMADAS (SCHEDULED) - Con rango horario
-    # Por si en el futuro se usan
-    tareas_programadas = (
-        Task.objects
-        .filter(owner=request.user, time_criticality=TimeCriticality.SCHEDULED)
-        .exclude(state=TaskState.DONE)
-        .order_by("promise_due_at")
-    )
+        # Tareas PROGRAMADAS (SCHEDULED) - Con rango horario
+        # Por si en el futuro se usan
+        tareas_programadas = (
+            Task.objects
+            .filter(owner=request.user, time_criticality=TimeCriticality.SCHEDULED)
+            .exclude(state=TaskState.DONE)
+            .order_by("promise_due_at")
+        )
 
-    context = {
-        'tareas_urgentes': tareas_urgentes,
-        'tareas_flexibles': tareas_flexibles,
-        'tareas_programadas': tareas_programadas,
-        'count_urgentes': tareas_urgentes.count(),
-        'count_flexibles': tareas_flexibles.count(),
-        'count_programadas': tareas_programadas.count(),
-        'user': request.user,
-        'total_pending': (
-            tareas_urgentes.count() +
-            tareas_flexibles.count() +
-            tareas_programadas.count()
-        ),
-        'today': today,
-    }
+        context = {
+            'tareas_urgentes': tareas_urgentes,
+            'tareas_flexibles': tareas_flexibles,
+            'tareas_programadas': tareas_programadas,
+            'count_urgentes': tareas_urgentes.count(),
+            'count_flexibles': tareas_flexibles.count(),
+            'count_programadas': tareas_programadas.count(),
+            'user': request.user,
+            'total_pending': (
+                tareas_urgentes.count() +
+                tareas_flexibles.count() +
+                tareas_programadas.count()
+            ),
+            'today': today,
+        }
 
-    return render(request, "control_gestion/mi_dia.html", context)
+        return render(request, "control_gestion/mi_dia.html", context)
+
+    except Exception as e:
+        logger.error(f"Error en vista mi_dia: {str(e)}", exc_info=True)
+        from django.http import HttpResponse
+        return HttpResponse(f"Error 500: {str(e)}<br><br>Verifica que la migración 0004_add_time_criticality se haya aplicado correctamente.", status=500)
 
 
 @login_required
