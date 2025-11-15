@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views # Import the new admin views module
+    admin_views, giftcard_views  # Import the new admin views module and giftcard views
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -76,6 +76,13 @@ urlpatterns = [
     path('api/get-client-details/', api_views.get_client_details_by_phone, name='get_client_details_by_phone'),
     # Removed URL for get_service_providers as it's no longer needed
     # path('api/get-service-providers/<int:servicio_id>/', api_views.get_service_providers, name='get_service_providers'),
+
+    # --- GiftCard AI API URLs ---
+    path('api/giftcard/generar-mensajes/', giftcard_views.generar_mensajes_ai, name='generar_mensajes_ai'),
+    path('api/giftcard/regenerar-mensaje/', giftcard_views.regenerar_mensaje_ai, name='regenerar_mensaje_ai'),
+    path('api/giftcard/crear/', giftcard_views.crear_giftcard, name='crear_giftcard'),
+    path('api/giftcard/<str:codigo>/', giftcard_views.consultar_giftcard, name='consultar_giftcard'),
+    # --- End GiftCard URLs ---
 
     # --- Remarketing/Automation API URLs ---
     path('api/campaigns/<int:campaign_id>/details/', api_views.get_campaign_details, name='get_campaign_details'), # Added campaign details endpoint
