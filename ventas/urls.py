@@ -137,9 +137,11 @@ urlpatterns = [
     # === END MENSAJES WHATSAPP IA ===
 
     # === GIFTCARD WIZARD ===
-    path('giftcards/', giftcard_views.giftcard_wizard, name='giftcard_wizard'),
+    path('giftcards/', giftcard_views.giftcard_menu, name='giftcard_menu'),  # Página de inicio con 3 opciones
+    path('giftcards/wizard/', giftcard_views.giftcard_wizard, name='giftcard_wizard'),  # Wizard de personalización
     path('api/giftcard/generar-mensajes/', giftcard_views.generar_mensajes_ai, name='generar_mensajes_ai'),
     path('api/giftcard/regenerar-mensaje/', giftcard_views.regenerar_mensaje_ai, name='regenerar_mensaje_ai'),
+    path('api/giftcard/agregar-al-carrito/', giftcard_views.agregar_giftcard_al_carrito, name='agregar_giftcard_al_carrito'),
     # === END GIFTCARD WIZARD ===
 
     # === PREMIOS Y FIDELIZACIÓN ===

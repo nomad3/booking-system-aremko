@@ -18,6 +18,17 @@ from ..services.giftcard_ai_service import GiftCardAIService
 logger = logging.getLogger(__name__)
 
 
+@require_http_methods(["GET"])
+def giftcard_menu(request):
+    """
+    Página de inicio de GiftCards con 3 opciones:
+    1. Comprar y Personalizar 1 GiftCard (activo)
+    2. Comprar Varias GiftCards (próximamente)
+    3. GiftCards para Empresas (próximamente)
+    """
+    return render(request, 'ventas/giftcard_menu.html')
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def generar_mensajes_ai(request):
@@ -479,3 +490,104 @@ def giftcard_wizard(request):
     }
 
     return render(request, 'ventas/giftcard_wizard.html', context)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def agregar_giftcard_al_carrito(request):
+    """
+    Agrega una GiftCard personalizada al carrito de compras
+
+    POST /ventas/api/giftcard/agregar-al-carrito/
+
+    Body JSON:
+    {
+        "experiencia_id": 1,
+        "experiencia_nombre": "Tinas Calientes",
+        "precio": 50000,
+        "destinatario_nombre": "Alda",
+        "destinatario_email": "alda@example.com",
+        "destinatario_telefono": "+56912345678",
+        "tipo_mensaje": "aniversario",
+        "mensaje_seleccionado": "Alda, que estas aguas..."
+    }
+
+    Response:
+    {
+        "success": true,
+        "cart_count": 1,
+        "redirect_url": "/ventas/cart/"
+    }
+    """
+    try:
+        # Parsear body JSON
+        data = json.loads(request.body)
+
+        # Validar campos requeridos
+        required_fields = [
+            'experiencia_id', 'experiencia_nombre', 'precio',
+            'destinatario_nombre', 'destinatario_email',
+            'tipo_mensaje', 'mensaje_seleccionado'
+        ]
+
+        for field in required_fields:
+            if not data.get(field):
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Campo requerido: {field}'
+                }, status=400)
+
+        # Inicializar carrito en sesión si no existe
+        if 'cart' not in request.session:
+            request.session['cart'] = {
+                'servicios': [],
+                'giftcards': []
+            }
+
+        # Generar código único para la GiftCard
+        import string
+        import random
+        codigo_unico = 'GC-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+
+        # Crear item de GiftCard para el carrito
+        giftcard_item = {
+            'tipo': 'giftcard',
+            'codigo_temporal': codigo_unico,
+            'experiencia_id': int(data['experiencia_id']),
+            'experiencia_nombre': data['experiencia_nombre'],
+            'precio': float(data['precio']),
+            'destinatario_nombre': data['destinatario_nombre'],
+            'destinatario_email': data['destinatario_email'],
+            'destinatario_telefono': data.get('destinatario_telefono', ''),
+            'tipo_mensaje': data['tipo_mensaje'],
+            'mensaje_seleccionado': data['mensaje_seleccionado']
+        }
+
+        # Agregar al carrito
+        request.session['cart']['giftcards'].append(giftcard_item)
+        request.session.modified = True
+
+        # Calcular total de items en carrito
+        cart_count = len(request.session['cart']['servicios']) + len(request.session['cart']['giftcards'])
+
+        logger.info(f"GiftCard agregada al carrito: {codigo_unico} para {data['destinatario_nombre']}")
+
+        return JsonResponse({
+            'success': True,
+            'cart_count': cart_count,
+            'redirect_url': '/ventas/cart/',
+            'codigo': codigo_unico
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'JSON inválido'
+        }, status=400)
+
+    except Exception as e:
+        logger.error(f"Error en agregar_giftcard_al_carrito: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': 'Error al agregar GiftCard al carrito'
+        }, status=500)

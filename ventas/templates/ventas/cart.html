@@ -130,8 +130,9 @@
         <h1 class="cart-title">Tu Carrito de Compras</h1>
 
         <div class="row">
-            {% if cart.servicios %}
+            {% if cart.servicios or cart.giftcards %}
                 <div class="col-lg-8">
+                    {# Servicios normales #}
                     {% for item in cart.servicios %}
                         <div class="cart-item">
                             <div class="cart-item-info">
@@ -150,7 +151,35 @@
                                 </p>
                             </div>
                             <div class="cart-item-price">${{ item.subtotal|floatformat:0|intcomma }}</div> {# Apply filters #}
-                            <button class="btn-remove" onclick="removeFromCart({{ forloop.counter0 }})" title="Eliminar item">
+                            <button class="btn-remove" onclick="removeFromCart({{ forloop.counter0 }},'servicio')" title="Eliminar item">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    {% endfor %}
+
+                    {# GiftCards #}
+                    {% for item in cart.giftcards %}
+                        <div class="cart-item" style="border-left: 4px solid #ffc107;">
+                            <div class="cart-item-info">
+                                <h3 class="cart-item-title">
+                                    <i class="fas fa-gift text-warning me-2"></i>
+                                    GiftCard - {{ item.experiencia_nombre }}
+                                    <span class="badge bg-warning text-dark fw-normal">Regalo</span>
+                                </h3>
+                                <p class="cart-item-details">
+                                    <i class="fas fa-user"></i> Para: {{ item.destinatario_nombre }} |
+                                    <i class="far fa-envelope"></i> {{ item.destinatario_email }}
+                                </p>
+                                <p class="cart-item-details fst-italic text-muted small">
+                                    "{{ item.mensaje_seleccionado|truncatewords:15 }}..."
+                                </p>
+                                <p class="cart-item-details text-success small">
+                                    <i class="fas fa-check-circle"></i> Válido por 1 año |
+                                    <i class="fas fa-whatsapp"></i> Canje por WhatsApp
+                                </p>
+                            </div>
+                            <div class="cart-item-price">${{ item.precio|floatformat:0|intcomma }}</div>
+                            <button class="btn-remove" onclick="removeFromCart({{ forloop.counter0 }},'giftcard')" title="Eliminar GiftCard">
                                 <i class="fas fa-trash-alt"></i>
                             </button>
                         </div>
@@ -161,10 +190,19 @@
                     <div class="cart-summary">
                         <h3 class="cart-summary-title">Resumen del Pedido</h3>
 
+                        {# Servicios #}
                         {% for item in cart.servicios %}
                             <div class="cart-summary-row">
                                 <span>{{ item.nombre }} ({{ item.cantidad_personas }})</span>
                                 <span>${{ item.subtotal|floatformat:0|intcomma }}</span> {# Apply filters #}
+                            </div>
+                        {% endfor %}
+
+                        {# GiftCards #}
+                        {% for item in cart.giftcards %}
+                            <div class="cart-summary-row">
+                                <span><i class="fas fa-gift text-warning me-1"></i> GiftCard - {{ item.experiencia_nombre }}</span>
+                                <span>${{ item.precio|floatformat:0|intcomma }}</span>
                             </div>
                         {% endfor %}
 
@@ -175,7 +213,10 @@
 
                         <div class="cart-actions">
                             <a href="{% url 'ventas:homepage' %}#servicios" class="btn btn-outline-secondary">Seguir Comprando</a>
-                            <a href="{% url 'ventas:checkout' %}" class="btn btn-primary">Finalizar Reserva</a>
+                            <a href="{% url 'ventas:giftcard_menu' %}" class="btn btn-outline-warning">
+                                <i class="fas fa-gift me-1"></i>Agregar GiftCard
+                            </a>
+                            <a href="{% url 'ventas:checkout' %}" class="btn btn-primary">Finalizar Compra</a>
                         </div>
                     </div>
                 </div>

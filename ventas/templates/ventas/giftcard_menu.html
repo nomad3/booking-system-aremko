@@ -1,0 +1,168 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+
+{% block title %}GiftCards - Regala Experiencias Inolvidables | Aremko{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <!-- Header Section -->
+    <div class="text-center mb-5">
+        <h1 class="display-4 mb-3">
+            <i class="fas fa-gift text-warning me-3"></i>
+            Regala una Experiencia Inolvidable
+        </h1>
+        <p class="lead text-muted">
+            Crea GiftCards personalizadas con mensajes únicos generados por IA
+        </p>
+    </div>
+
+    <!-- Options Cards -->
+    <div class="row g-4 justify-content-center">
+
+        <!-- Opción 1: Comprar y Personalizar 1 GiftCard (ACTIVA) -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100 shadow-sm border-warning" style="border-width: 3px;">
+                <div class="card-body text-center p-4">
+                    <div class="mb-3">
+                        <i class="fas fa-magic fa-4x text-warning"></i>
+                    </div>
+                    <h3 class="card-title h4 mb-3">
+                        1️⃣ Comprar y Personalizar 1 GiftCard
+                    </h3>
+                    <p class="card-text text-muted mb-4">
+                        ✨ Mensaje único generado con Inteligencia Artificial<br>
+                        🎯 Personalizado para la ocasión perfecta<br>
+                        💝 Entrega inmediata por email
+                    </p>
+
+                    <!-- Precios -->
+                    <div class="mb-4 p-3 bg-light rounded">
+                        <h5 class="mb-3">Experiencias Disponibles:</h5>
+                        <div class="d-flex justify-content-around">
+                            <div>
+                                <i class="fas fa-hot-tub text-primary"></i>
+                                <div><small>Tinas</small></div>
+                                <div><strong>$50.000</strong></div>
+                            </div>
+                            <div>
+                                <i class="fas fa-spa text-success"></i>
+                                <div><small>Masajes</small></div>
+                                <div><strong>$60.000</strong></div>
+                            </div>
+                            <div>
+                                <i class="fas fa-home text-info"></i>
+                                <div><small>Cabañas</small></div>
+                                <div><strong>$100.000</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <a href="{% url 'ventas:giftcard_wizard' %}" class="btn btn-warning btn-lg w-100 text-white fw-bold">
+                        <i class="fas fa-arrow-right me-2"></i>Comenzar Wizard
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Opción 2: Comprar Varias GiftCards (PRÓXIMAMENTE) -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100 shadow-sm" style="opacity: 0.6;">
+                <div class="card-body text-center p-4">
+                    <div class="mb-3">
+                        <i class="fas fa-boxes fa-4x text-secondary"></i>
+                    </div>
+                    <h3 class="card-title h4 mb-3">
+                        2️⃣ Comprar Varias GiftCards
+                    </h3>
+                    <p class="card-text text-muted mb-4">
+                        📦 Ideal para eventos y celebraciones<br>
+                        🎊 Múltiples destinatarios<br>
+                        💰 Descuentos por volumen
+                    </p>
+
+                    <button class="btn btn-secondary btn-lg w-100" disabled>
+                        <i class="fas fa-clock me-2"></i>Próximamente
+                    </button>
+
+                    <div class="mt-3">
+                        <span class="badge bg-info">En Desarrollo</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Opción 3: GiftCards para Empresas (PRÓXIMAMENTE) -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100 shadow-sm" style="opacity: 0.6;">
+                <div class="card-body text-center p-4">
+                    <div class="mb-3">
+                        <i class="fas fa-building fa-4x text-secondary"></i>
+                    </div>
+                    <h3 class="card-title h4 mb-3">
+                        3️⃣ GiftCards para Empresas
+                    </h3>
+                    <p class="card-text text-muted mb-4">
+                        🏢 Regalos corporativos personalizados<br>
+                        📊 Dashboard de gestión empresarial<br>
+                        🎨 Branding personalizado
+                    </p>
+
+                    <button class="btn btn-secondary btn-lg w-100" disabled>
+                        <i class="fas fa-clock me-2"></i>Próximamente
+                    </button>
+
+                    <div class="mt-3">
+                        <span class="badge bg-info">En Desarrollo</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Features Section -->
+    <div class="row mt-5 pt-5 border-top">
+        <div class="col-md-4 text-center mb-4">
+            <i class="fas fa-robot fa-3x text-warning mb-3"></i>
+            <h5>Mensajes con IA</h5>
+            <p class="text-muted">Generamos 3 opciones únicas con DeepSeek AI para que elijas la perfecta</p>
+        </div>
+        <div class="col-md-4 text-center mb-4">
+            <i class="fas fa-calendar-check fa-3x text-success mb-3"></i>
+            <h5>Válido por 1 Año</h5>
+            <p class="text-muted">El destinatario tiene 365 días para disfrutar su experiencia</p>
+        </div>
+        <div class="col-md-4 text-center mb-4">
+            <i class="fas fa-whatsapp fa-3x text-primary mb-3"></i>
+            <h5>Fácil de Canjear</h5>
+            <p class="text-muted">Solo contacta por WhatsApp al +56 9 5790 2525 con el código</p>
+        </div>
+    </div>
+
+    <!-- CTA Bottom -->
+    <div class="text-center mt-5 p-5 bg-light rounded">
+        <h3 class="mb-3">¿Listo para regalar momentos inolvidables?</h3>
+        <p class="text-muted mb-4">Crea tu GiftCard personalizada en menos de 5 minutos</p>
+        <a href="{% url 'ventas:giftcard_wizard' %}" class="btn btn-warning btn-lg px-5 text-white fw-bold">
+            <i class="fas fa-gift me-2"></i>Comenzar Ahora
+        </a>
+    </div>
+</div>
+
+<style>
+    .card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .card:not([style*="opacity"]):hover {
+        transform: translateY(-10px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
+    }
+    .border-warning {
+        animation: pulse-border 2s infinite;
+    }
+    @keyframes pulse-border {
+        0%, 100% { border-color: #ffc107; }
+        50% { border-color: #ff9800; }
+    }
+</style>
+{% endblock %}

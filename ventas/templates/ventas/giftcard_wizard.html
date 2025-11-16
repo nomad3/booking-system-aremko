@@ -438,12 +438,64 @@
             </div>
         </div>
 
-        <!-- STEP 6: Checkout (Se implementará después) -->
+        <!-- STEP 6: Agregar al Carrito -->
         <div class="wizard-step" id="step6">
-            <h2 class="step-title">Finalizar Compra</h2>
-            <p class="step-subtitle">Completa tu información de pago</p>
-            <div class="text-center py-5">
-                <p class="text-muted">Checkout se implementará en la siguiente fase</p>
+            <h2 class="step-title">¡Tu GiftCard está Lista!</h2>
+            <p class="step-subtitle">Agrégala al carrito para continuar con tu compra</p>
+
+            <div class="text-center py-4">
+                <!-- Resumen de la GiftCard -->
+                <div class="card mx-auto" style="max-width: 500px;">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4">
+                            <i class="fas fa-gift text-warning me-2"></i>
+                            Resumen de tu GiftCard
+                        </h5>
+
+                        <div class="text-start">
+                            <p class="mb-2">
+                                <strong>Experiencia:</strong>
+                                <span id="resumen-experiencia"></span>
+                            </p>
+                            <p class="mb-2">
+                                <strong>Para:</strong>
+                                <span id="resumen-destinatario"></span>
+                            </p>
+                            <p class="mb-2">
+                                <strong>Email:</strong>
+                                <span id="resumen-email"></span>
+                            </p>
+                            <p class="mb-2">
+                                <strong>Mensaje:</strong>
+                            </p>
+                            <p class="fst-italic text-muted small" id="resumen-mensaje" style="max-height: 100px; overflow-y: auto;">
+                            </p>
+                            <hr>
+                            <p class="mb-0">
+                                <strong>Precio:</strong>
+                                <span class="text-success fs-4" id="resumen-precio"></span>
+                            </p>
+                        </div>
+
+                        <div class="mt-4">
+                            <button type="button" class="btn btn-warning btn-lg w-100 text-white fw-bold" id="btnAgregarAlCarrito">
+                                <i class="fas fa-shopping-cart me-2"></i>
+                                Agregar al Carrito
+                            </button>
+                            <p class="text-muted small mt-3 mb-0">
+                                Después puedes seguir comprando o finalizar tu compra
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading state -->
+                <div id="loadingCarrito" class="d-none mt-4">
+                    <div class="spinner-border text-warning" role="status">
+                        <span class="visually-hidden">Agregando al carrito...</span>
+                    </div>
+                    <p class="mt-2">Agregando al carrito...</p>
+                </div>
             </div>
         </div>
 
@@ -830,6 +882,100 @@ async function regenerarMensaje() {
         alert('Error al generar nuevo mensaje: ' + error.message);
     }
 }
+
+// Función para actualizar el resumen en Step 6
+function actualizarResumenStep6() {
+    // Obtener el nombre de la experiencia seleccionada
+    const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
+    const expNombre = expCard ? expCard.querySelector('h5').textContent : '';
+
+    document.getElementById('resumen-experiencia').textContent = expNombre;
+    document.getElementById('resumen-destinatario').textContent = wizardData.destinatario.nombre;
+    document.getElementById('resumen-email').textContent = wizardData.destinatario.email;
+    document.getElementById('resumen-mensaje').textContent = wizardData.mensajeSeleccionado;
+    document.getElementById('resumen-precio').textContent = '$' + parseInt(wizardData.monto).toLocaleString('es-CL');
+}
+
+// Event listener para el botón "Agregar al Carrito"
+document.getElementById('btnAgregarAlCarrito').addEventListener('click', async function() {
+    const btn = this;
+    const loadingDiv = document.getElementById('loadingCarrito');
+
+    try {
+        // Mostrar loading
+        btn.disabled = true;
+        loadingDiv.classList.remove('d-none');
+
+        // Obtener el nombre de la experiencia seleccionada
+        const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
+        const expNombre = expCard ? expCard.querySelector('h5').textContent : 'Experiencia Aremko';
+
+        // Preparar datos para enviar
+        const giftcardData = {
+            experiencia_id: wizardData.experiencia,
+            experiencia_nombre: expNombre,
+            precio: wizardData.monto,
+            destinatario_nombre: wizardData.destinatario.nombre,
+            destinatario_email: wizardData.destinatario.email,
+            destinatario_telefono: wizardData.destinatario.telefono || '',
+            tipo_mensaje: wizardData.tipoMensaje,
+            mensaje_seleccionado: wizardData.mensajeSeleccionado
+        };
+
+        console.log('📤 Enviando GiftCard al carrito:', giftcardData);
+
+        // Enviar al backend
+        const response = await fetch('/ventas/api/giftcard/agregar-al-carrito/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(giftcardData)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            console.log('✅ GiftCard agregada al carrito:', data);
+
+            // Actualizar contador del carrito en navbar (si existe)
+            const cartCount = document.getElementById('cartCount');
+            if (cartCount) {
+                cartCount.textContent = data.cart_count;
+            }
+
+            // Mostrar mensaje de éxito
+            alert(`🎉 ¡GiftCard agregada al carrito!\n\nCódigo: ${data.codigo}\n\n¿Deseas ir al carrito o seguir comprando?`);
+
+            // Redirigir al carrito
+            window.location.href = data.redirect_url;
+        } else {
+            throw new Error(data.error || 'Error al agregar al carrito');
+        }
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('Error al agregar la GiftCard al carrito: ' + error.message);
+
+        // Restaurar botón
+        btn.disabled = false;
+        loadingDiv.classList.add('d-none');
+    }
+});
+
+// Modificar nextStep() para actualizar resumen cuando llega a step 6
+const originalNextStep = nextStep;
+nextStep = function() {
+    const currentStep = wizardData.paso;
+
+    // Llamar función original
+    originalNextStep();
+
+    // Si llegamos a step 6, actualizar resumen
+    if (wizardData.paso === 6) {
+        actualizarResumenStep6();
+    }
+};
 
 // Inicializar
 updateNextButton();

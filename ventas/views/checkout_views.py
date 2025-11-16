@@ -15,9 +15,23 @@ from ..signals import validar_disponibilidad_admin
 def cart_view(request):
     """
     Vista que renderiza la página del carrito de compras
+    Soporta servicios y GiftCards
     """
     # Obtener carrito de compras de la sesión o crear uno nuevo
-    cart = request.session.get('cart', {'servicios': [], 'total': 0})
+    cart = request.session.get('cart', {'servicios': [], 'giftcards': [], 'total': 0})
+
+    # Asegurar que existe la clave giftcards (para carritos antiguos)
+    if 'giftcards' not in cart:
+        cart['giftcards'] = []
+
+    # Recalcular total
+    total_servicios = sum(item.get('subtotal', 0) for item in cart['servicios'])
+    total_giftcards = sum(item.get('precio', 0) for item in cart['giftcards'])
+    cart['total'] = total_servicios + total_giftcards
+
+    # Guardar el cart actualizado en la sesión
+    request.session['cart'] = cart
+    request.session.modified = True
 
     context = {
         'cart': cart
