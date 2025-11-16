@@ -177,7 +177,50 @@ def flow_confirmation(request):
                     venta.refresh_from_db() # Refresh to get updated status
                     if venta.estado_pago == 'pagado':
                          print(f"VentaReserva {venta.id} status updated to 'pagado'.")
-                         # TODO: Send confirmation email to client?
+
+                         # Enviar email de GiftCards si existen en la sesión
+                         # NOTA: Usamos la sesión del usuario asociado a la venta
+                         # Como esto es un webhook, no tenemos acceso directo a request.session
+                         # Por eso guardamos los datos en la BD con la VentaReserva
+
+                         # Buscar GiftCards asociadas a esta venta
+                         from ..models import GiftCard
+                         from ..services.giftcard_pdf_service import GiftCardPDFService
+
+                         giftcards = GiftCard.objects.filter(
+                             cliente_comprador=venta.cliente,
+                             fecha_emision=venta.fecha_reserva.date(),
+                             estado='por_cobrar'
+                         )
+
+                         if giftcards.exists():
+                             print(f"📧 Enviando email de {giftcards.count()} GiftCard(s) para venta {venta.id}")
+
+                             # Actualizar estado de GiftCards a 'cobrado'
+                             giftcards.update(estado='cobrado')
+
+                             # Preparar datos para el email
+                             # NOTA: Por ahora enviamos datos básicos
+                             # En una versión futura, guardar metadata completa en el modelo GiftCard
+                             giftcards_data = []
+                             for gc in giftcards:
+                                 giftcards_data.append({
+                                     'codigo': gc.codigo,
+                                     'experiencia_nombre': f'Experiencia Aremko (${int(gc.monto_inicial):,})',
+                                     'destinatario_nombre': 'Destinatario',  # TODO: Guardar en modelo
+                                     'mensaje_seleccionado': 'Disfruta de una experiencia inolvidable en Aremko Spa',
+                                     'precio': gc.monto_inicial,
+                                     'fecha_emision': gc.fecha_emision,
+                                     'fecha_vencimiento': gc.fecha_vencimiento
+                                 })
+
+                             # Enviar email al comprador
+                             GiftCardPDFService.enviar_giftcard_por_email(
+                                 comprador_email=venta.cliente.email,
+                                 comprador_nombre=venta.cliente.nombre,
+                                 giftcards_data=giftcards_data
+                             )
+
                     else:
                          print(f"Warning: VentaReserva {venta.id} status is still {venta.estado_pago} after creating Pago.")
 

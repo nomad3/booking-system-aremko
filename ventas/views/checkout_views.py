@@ -183,15 +183,21 @@ def complete_checkout(request):
             metodo_pago = request.POST.get('metodo_pago') # Get payment method
 
             # Get cart from session
-            cart = request.session.get('cart', {'servicios': [], 'total': 0})
+            cart = request.session.get('cart', {'servicios': [], 'giftcards': [], 'total': 0})
+
+            # Asegurar que existe la clave giftcards
+            if 'giftcards' not in cart:
+                cart['giftcards'] = []
 
             # Debug cart structure
             print("CART STRUCTURE:")
             print(f"Cart type: {type(cart)}")
             print(f"Cart keys: {cart.keys()}")
             print(f"Cart servicios: {cart.get('servicios', [])}")
+            print(f"Cart giftcards: {cart.get('giftcards', [])}")
 
-            if not cart.get('servicios'):
+            # Validar que el carrito no esté vacío (servicios O giftcards)
+            if not cart.get('servicios') and not cart.get('giftcards'):
                 return JsonResponse({'success': False, 'error': 'El carrito está vacío'})
 
             # Validate availability before creating anything
@@ -336,6 +342,44 @@ def complete_checkout(request):
                             cantidad_personas=servicio_item['cantidad_personas']
                         )
 
+                    # Create GiftCard for each giftcard in cart
+                    from ..models import GiftCard
+                    from datetime import timedelta
+
+                    for giftcard_item in cart.get('giftcards', []):
+                        # Calcular fecha de vencimiento (1 año desde hoy)
+                        fecha_vencimiento = timezone.now().date() + timedelta(days=365)
+
+                        # Crear GiftCard
+                        giftcard = GiftCard.objects.create(
+                            monto_inicial=giftcard_item['precio'],
+                            monto_disponible=giftcard_item['precio'],
+                            fecha_emision=timezone.now().date(),
+                            fecha_vencimiento=fecha_vencimiento,
+                            estado='por_cobrar',  # Cambiará a 'cobrado' cuando se pague
+                            cliente_comprador=cliente,
+                            # Guardar datos adicionales en campos personalizados (los agregaremos al modelo después)
+                        )
+
+                        # Guardar metadata de la GiftCard en la sesión para usarla después del pago
+                        if 'giftcards_metadata' not in request.session:
+                            request.session['giftcards_metadata'] = []
+
+                        request.session['giftcards_metadata'].append({
+                            'giftcard_id': giftcard.id,
+                            'codigo': giftcard.codigo,
+                            'experiencia_nombre': giftcard_item['experiencia_nombre'],
+                            'destinatario_nombre': giftcard_item['destinatario_nombre'],
+                            'destinatario_email': giftcard_item['destinatario_email'],
+                            'destinatario_telefono': giftcard_item.get('destinatario_telefono', ''),
+                            'mensaje_seleccionado': giftcard_item['mensaje_seleccionado'],
+                            'tipo_mensaje': giftcard_item['tipo_mensaje'],
+                            'venta_id': venta.id
+                        })
+                        request.session.modified = True
+
+                        print(f"✅ GiftCard creada: {giftcard.codigo} para {giftcard_item['destinatario_nombre']}")
+
                     # Recalculate total based on the services actually added and save
                     venta.calcular_total() # This should save the VentaReserva instance
 
@@ -345,7 +389,7 @@ def complete_checkout(request):
                         venta.save(update_fields=['estado_pago']) # Save only this field change
 
                     # Clear cart
-                    request.session['cart'] = {'servicios': [], 'total': 0}
+                    request.session['cart'] = {'servicios': [], 'giftcards': [], 'total': 0}
                     request.session.modified = True
 
                     # Generate the detail URL
