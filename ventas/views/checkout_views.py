@@ -347,6 +347,56 @@ def complete_checkout(request):
                     from datetime import timedelta
 
                     for giftcard_item in cart.get('giftcards', []):
+                        # Crear Cliente para el DESTINATARIO (quien usará el servicio)
+                        destinatario_telefono = giftcard_item.get('destinatario_telefono', '')
+                        destinatario_email = giftcard_item.get('destinatario_email', '')
+                        destinatario_nombre = giftcard_item.get('destinatario_nombre', 'Destinatario')
+
+                        # Solo crear Cliente si tenemos al menos teléfono o email
+                        cliente_destinatario = None
+                        if destinatario_telefono or destinatario_email:
+                            try:
+                                # Normalizar teléfono del destinatario
+                                if destinatario_telefono:
+                                    dest_telefono_normalizado = destinatario_telefono.replace(' ', '').replace('-', '')
+                                    if not dest_telefono_normalizado.startswith('+'):
+                                        if dest_telefono_normalizado.startswith('9'):
+                                            dest_telefono_normalizado = '+56' + dest_telefono_normalizado
+                                        elif dest_telefono_normalizado.startswith('56'):
+                                            dest_telefono_normalizado = '+' + dest_telefono_normalizado
+                                else:
+                                    dest_telefono_normalizado = ''
+
+                                # Buscar o crear Cliente destinatario
+                                if dest_telefono_normalizado:
+                                    cliente_destinatario, created = Cliente.objects.get_or_create(
+                                        telefono=dest_telefono_normalizado,
+                                        defaults={
+                                            'nombre': destinatario_nombre,
+                                            'email': destinatario_email
+                                        }
+                                    )
+                                    if created:
+                                        print(f"✅ Cliente DESTINATARIO creado: {cliente_destinatario.nombre} ({cliente_destinatario.telefono})")
+                                    else:
+                                        print(f"ℹ️ Cliente DESTINATARIO existente: {cliente_destinatario.nombre}")
+                                else:
+                                    # Si no hay teléfono pero hay email, buscar por email
+                                    if destinatario_email:
+                                        try:
+                                            cliente_destinatario = Cliente.objects.get(email=destinatario_email)
+                                            print(f"ℹ️ Cliente DESTINATARIO encontrado por email: {cliente_destinatario.nombre}")
+                                        except Cliente.DoesNotExist:
+                                            # Crear sin teléfono (puede fallar si teléfono es required)
+                                            print(f"⚠️ No se puede crear Cliente destinatario sin teléfono: {destinatario_nombre}")
+                                        except Cliente.MultipleObjectsReturned:
+                                            cliente_destinatario = Cliente.objects.filter(email=destinatario_email).first()
+                                            print(f"ℹ️ Múltiples clientes con email {destinatario_email}, usando primero")
+
+                            except Exception as e:
+                                print(f"⚠️ Error al crear Cliente destinatario: {e}")
+                                traceback.print_exc()
+
                         # Calcular fecha de vencimiento (1 año desde hoy)
                         fecha_vencimiento = timezone.now().date() + timedelta(days=365)
 
@@ -358,7 +408,8 @@ def complete_checkout(request):
                             fecha_vencimiento=fecha_vencimiento,
                             estado='por_cobrar',  # Cambiará a 'cobrado' cuando se pague
                             cliente_comprador=cliente,
-                            # Guardar datos adicionales en campos personalizados (los agregaremos al modelo después)
+                            # NOTE: cliente_destinatario field doesn't exist in model yet
+                            # Will add in future migration when migrations are enabled
                         )
 
                         # Guardar metadata de la GiftCard en la sesión para usarla después del pago
@@ -372,6 +423,7 @@ def complete_checkout(request):
                             'destinatario_nombre': giftcard_item['destinatario_nombre'],
                             'destinatario_email': giftcard_item['destinatario_email'],
                             'destinatario_telefono': giftcard_item.get('destinatario_telefono', ''),
+                            'destinatario_cliente_id': cliente_destinatario.id if cliente_destinatario else None,
                             'mensaje_seleccionado': giftcard_item['mensaje_seleccionado'],
                             'tipo_mensaje': giftcard_item['tipo_mensaje'],
                             'venta_id': venta.id
