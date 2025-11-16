@@ -429,12 +429,95 @@
             </div>
         </div>
 
-        <!-- STEP 5: Preview (Se implementará después) -->
+        <!-- STEP 5: Preview -->
         <div class="wizard-step" id="step5">
             <h2 class="step-title">Vista Previa</h2>
             <p class="step-subtitle">Así se verá tu GiftCard</p>
-            <div class="text-center py-5">
-                <p class="text-muted">Preview se implementará en la siguiente fase</p>
+
+            <div class="d-flex justify-content-center py-4">
+                <!-- GiftCard Preview Card -->
+                <div class="card shadow-lg" style="max-width: 600px; width: 100%; border: 3px solid #ffc107;">
+                    <div class="card-body p-4" style="background: linear-gradient(135deg, #fff8e1 0%, #ffffff 100%);">
+
+                        <!-- Header -->
+                        <div class="text-center mb-4">
+                            <h3 class="mb-2" style="color: #A0522D; font-weight: 700;">
+                                AREMKO SPA
+                            </h3>
+                            <h4 class="mb-3" style="color: #D2B48C;">
+                                <i class="fas fa-gift me-2"></i>
+                                Certificado de Regalo
+                                <i class="fas fa-gift ms-2"></i>
+                            </h4>
+                            <hr style="border-color: #ffc107; border-width: 2px;">
+                        </div>
+
+                        <!-- Para -->
+                        <div class="mb-4 text-center">
+                            <p class="mb-2" style="color: #A0522D; font-size: 0.9rem;">Para:</p>
+                            <h4 id="preview-destinatario" style="color: #5C4033; font-weight: 600;"></h4>
+                        </div>
+
+                        <!-- Mensaje Personalizado -->
+                        <div class="mb-4 p-3" style="background-color: white; border-left: 4px solid #ffc107; border-radius: 8px;">
+                            <p id="preview-mensaje" class="mb-0 fst-italic" style="color: #5C4033; line-height: 1.6;"></p>
+                        </div>
+
+                        <hr style="border-color: #D2B48C;">
+
+                        <!-- Experiencia -->
+                        <div class="row mb-3">
+                            <div class="col-6 text-center">
+                                <p class="mb-1" style="color: #A0522D; font-size: 0.85rem; font-weight: 600;">EXPERIENCIA</p>
+                                <p id="preview-experiencia" style="color: #5C4033; font-size: 1.1rem; font-weight: 600;"></p>
+                            </div>
+                            <div class="col-6 text-center">
+                                <p class="mb-1" style="color: #A0522D; font-size: 0.85rem; font-weight: 600;">VALOR</p>
+                                <p id="preview-precio" style="color: #16a085; font-size: 1.3rem; font-weight: 700;"></p>
+                            </div>
+                        </div>
+
+                        <!-- Código (simulado) -->
+                        <div class="text-center mb-3">
+                            <p class="mb-1" style="color: #A0522D; font-size: 0.85rem;">CÓDIGO</p>
+                            <p class="mb-0" style="color: #5C4033; font-family: 'Courier New', monospace; font-size: 1.2rem; font-weight: 700; letter-spacing: 2px;">
+                                GC-XXXXXXXX
+                            </p>
+                        </div>
+
+                        <!-- Validez -->
+                        <div class="text-center mb-3">
+                            <p class="mb-1" style="color: #A0522D; font-size: 0.85rem;">VÁLIDO HASTA</p>
+                            <p id="preview-validez" class="mb-0" style="color: #5C4033; font-weight: 600;"></p>
+                        </div>
+
+                        <hr style="border-color: #D2B48C;">
+
+                        <!-- Cómo usar -->
+                        <div class="text-center">
+                            <p class="mb-2" style="color: #A0522D; font-size: 0.85rem; font-weight: 600;">CÓMO USAR</p>
+                            <p class="mb-1" style="color: #5C4033; font-size: 0.9rem;">
+                                <i class="fab fa-whatsapp text-success me-1"></i>
+                                WhatsApp: <strong>+56 9 5790 2525</strong>
+                            </p>
+                            <p class="mb-0 text-muted small">
+                                Menciona tu código para reservar tu experiencia
+                            </p>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="text-center mt-4 pt-3" style="border-top: 1px solid #D2B48C;">
+                            <p class="mb-0 small text-muted">www.aremko.cl | Puerto Varas</p>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nota informativa -->
+            <div class="alert alert-info mx-auto" style="max-width: 600px;">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Nota:</strong> Esta es una vista previa. El código definitivo y el PDF se generarán después del pago.
             </div>
         </div>
 
@@ -883,6 +966,29 @@ async function regenerarMensaje() {
     }
 }
 
+// Función para actualizar el preview en Step 5
+function actualizarPreviewStep5() {
+    // Obtener el nombre de la experiencia seleccionada
+    const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
+    const expNombre = expCard ? expCard.querySelector('h5').textContent : '';
+
+    // Calcular fecha de validez (1 año desde hoy)
+    const hoy = new Date();
+    const validezFecha = new Date(hoy.getFullYear() + 1, hoy.getMonth(), hoy.getDate());
+    const validezStr = validezFecha.toLocaleDateString('es-CL', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+    });
+
+    // Llenar preview
+    document.getElementById('preview-destinatario').textContent = wizardData.destinatario.nombre;
+    document.getElementById('preview-mensaje').textContent = wizardData.mensajeSeleccionado;
+    document.getElementById('preview-experiencia').textContent = expNombre;
+    document.getElementById('preview-precio').textContent = '$' + parseInt(wizardData.monto).toLocaleString('es-CL');
+    document.getElementById('preview-validez').textContent = validezStr;
+}
+
 // Función para actualizar el resumen en Step 6
 function actualizarResumenStep6() {
     // Obtener el nombre de la experiencia seleccionada
@@ -963,13 +1069,18 @@ document.getElementById('btnAgregarAlCarrito').addEventListener('click', async f
     }
 });
 
-// Modificar nextStep() para actualizar resumen cuando llega a step 6
+// Modificar nextStep() para actualizar preview/resumen cuando llega a step 5 o 6
 const originalNextStep = nextStep;
 nextStep = function() {
     const currentStep = wizardData.paso;
 
     // Llamar función original
     originalNextStep();
+
+    // Si llegamos a step 5, actualizar preview
+    if (wizardData.paso === 5) {
+        actualizarPreviewStep5();
+    }
 
     // Si llegamos a step 6, actualizar resumen
     if (wizardData.paso === 6) {
