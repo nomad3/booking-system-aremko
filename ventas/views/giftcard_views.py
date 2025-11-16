@@ -11,6 +11,8 @@ from django.utils import timezone
 from decimal import Decimal
 import json
 import logging
+import string
+import random
 
 from ..models import GiftCard, Cliente
 from ..services.giftcard_ai_service import GiftCardAIService
@@ -553,8 +555,6 @@ def agregar_giftcard_al_carrito(request):
             request.session['cart']['giftcards'] = []
 
         # Generar código único para la GiftCard
-        import string
-        import random
         codigo_unico = 'GC-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
         logger.info(f"🔑 Código generado: {codigo_unico}")
 
@@ -562,7 +562,7 @@ def agregar_giftcard_al_carrito(request):
         giftcard_item = {
             'tipo': 'giftcard',
             'codigo_temporal': codigo_unico,
-            'experiencia_id': int(data['experiencia_id']),
+            'experiencia_id': data['experiencia_id'],  # Keep as string (tinas, masajes, etc)
             'experiencia_nombre': data['experiencia_nombre'],
             'precio': float(data['precio']),
             'destinatario_nombre': data['destinatario_nombre'],
