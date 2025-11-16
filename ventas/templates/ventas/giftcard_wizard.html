@@ -310,9 +310,9 @@
 
             <div class="experience-grid" id="experienceGrid">
                 {% for exp in experiencias %}
-                <div class="experience-card" data-experience="{{ exp.id }}" onclick="selectExperience('{{ exp.id }}')">
+                <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" onclick="selectExperience('{{ exp.id }}')">
                     <i class="fas {% if exp.id == 'tinas' %}fa-hot-tub{% elif exp.id == 'masajes' %}fa-spa{% elif exp.id == 'cabanas' %}fa-home{% elif exp.id == 'ritual_rio' %}fa-water{% elif exp.id == 'celebracion' %}fa-champagne-glasses{% else %}fa-gift{% endif %}"></i>
-                    <h3>{{ exp.nombre }}</h3>
+                    <h5>{{ exp.nombre }}</h5>
                     <p>{{ exp.descripcion }}</p>
                 </div>
                 {% endfor %}
@@ -970,7 +970,7 @@ async function regenerarMensaje() {
 function actualizarPreviewStep5() {
     // Obtener el nombre de la experiencia seleccionada
     const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
-    const expNombre = expCard ? expCard.querySelector('h5').textContent : '';
+    const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
 
     // Calcular fecha de validez (1 año desde hoy)
     const hoy = new Date();
@@ -993,7 +993,7 @@ function actualizarPreviewStep5() {
 function actualizarResumenStep6() {
     // Obtener el nombre de la experiencia seleccionada
     const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
-    const expNombre = expCard ? expCard.querySelector('h5').textContent : '';
+    const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
 
     document.getElementById('resumen-experiencia').textContent = expNombre;
     document.getElementById('resumen-destinatario').textContent = wizardData.destinatario.nombre;
@@ -1013,8 +1013,11 @@ document.getElementById('btnAgregarAlCarrito').addEventListener('click', async f
         loadingDiv.classList.remove('d-none');
 
         // Obtener el nombre de la experiencia seleccionada
+        console.log('🔍 Buscando experiencia con ID:', wizardData.experiencia);
         const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
-        const expNombre = expCard ? expCard.querySelector('h5').textContent : 'Experiencia Aremko';
+        console.log('📋 Elemento encontrado:', expCard);
+        const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
+        console.log('🏷️ Nombre de experiencia extraído:', expNombre);
 
         // Preparar datos para enviar
         const giftcardData = {
@@ -1039,7 +1042,17 @@ document.getElementById('btnAgregarAlCarrito').addEventListener('click', async f
             body: JSON.stringify(giftcardData)
         });
 
+        console.log('📡 Response status:', response.status);
+
+        // Verificar si la respuesta fue exitosa
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Error del servidor:', errorText);
+            throw new Error(`Error del servidor (${response.status}): ${errorText}`);
+        }
+
         const data = await response.json();
+        console.log('📥 Response data:', data);
 
         if (data.success) {
             console.log('✅ GiftCard agregada al carrito:', data);
@@ -1060,7 +1073,7 @@ document.getElementById('btnAgregarAlCarrito').addEventListener('click', async f
         }
 
     } catch (error) {
-        console.error('❌ Error:', error);
+        console.error('❌ Error completo:', error);
         alert('Error al agregar la GiftCard al carrito: ' + error.message);
 
         // Restaurar botón

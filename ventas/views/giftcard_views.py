@@ -522,6 +522,7 @@ def agregar_giftcard_al_carrito(request):
     try:
         # Parsear body JSON
         data = json.loads(request.body)
+        logger.info(f"📥 Datos recibidos en agregar_giftcard_al_carrito: {data}")
 
         # Validar campos requeridos
         required_fields = [
@@ -532,6 +533,7 @@ def agregar_giftcard_al_carrito(request):
 
         for field in required_fields:
             if not data.get(field):
+                logger.warning(f"❌ Campo requerido faltante: {field}")
                 return JsonResponse({
                     'success': False,
                     'error': f'Campo requerido: {field}'
@@ -539,15 +541,22 @@ def agregar_giftcard_al_carrito(request):
 
         # Inicializar carrito en sesión si no existe
         if 'cart' not in request.session:
+            logger.info("🛒 Creando nuevo carrito en sesión")
             request.session['cart'] = {
                 'servicios': [],
                 'giftcards': []
             }
 
+        # Asegurar que existe el array de giftcards
+        if 'giftcards' not in request.session['cart']:
+            logger.info("🎁 Inicializando array de giftcards en carrito")
+            request.session['cart']['giftcards'] = []
+
         # Generar código único para la GiftCard
         import string
         import random
         codigo_unico = 'GC-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        logger.info(f"🔑 Código generado: {codigo_unico}")
 
         # Crear item de GiftCard para el carrito
         giftcard_item = {
@@ -562,15 +571,17 @@ def agregar_giftcard_al_carrito(request):
             'tipo_mensaje': data['tipo_mensaje'],
             'mensaje_seleccionado': data['mensaje_seleccionado']
         }
+        logger.info(f"📦 GiftCard creada: {giftcard_item}")
 
         # Agregar al carrito
         request.session['cart']['giftcards'].append(giftcard_item)
         request.session.modified = True
+        logger.info(f"✅ GiftCard agregada al carrito. Total giftcards: {len(request.session['cart']['giftcards'])}")
 
         # Calcular total de items en carrito
         cart_count = len(request.session['cart']['servicios']) + len(request.session['cart']['giftcards'])
 
-        logger.info(f"GiftCard agregada al carrito: {codigo_unico} para {data['destinatario_nombre']}")
+        logger.info(f"🎉 GiftCard {codigo_unico} agregada exitosamente para {data['destinatario_nombre']}")
 
         return JsonResponse({
             'success': True,
