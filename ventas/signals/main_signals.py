@@ -6,15 +6,15 @@ from django.db import transaction
 from django.db import models
 from django.db.models import Sum, F, DecimalField
 # Import all relevant models, including CRM ones
-from .models import (
+from ..models import (
     VentaReserva, Cliente, ReservaProducto, ReservaServicio, Pago, MovimientoCliente,
     DetalleCompra, Compra, Producto, Servicio, Activity, Lead
 )
 from django.contrib.auth.models import User, AnonymousUser  # Importa el modelo de usuario
-from .middleware import get_current_user  # Importa el middleware
+from ..middleware import get_current_user  # Importa el middleware
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
-from .utils import verificar_disponibilidad  # Import the verificar_disponibilidad function
+from ..utils import verificar_disponibilidad  # Import the verificar_disponibilidad function
 
 logger = logging.getLogger(__name__)
 
