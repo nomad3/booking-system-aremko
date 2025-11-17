@@ -68,7 +68,7 @@ def enviar_giftcards_al_registrar_pago(sender, instance, created, **kwargs):
 
 def enviar_email_giftcards(venta_reserva, giftcards):
     """
-    Envía email al comprador con los PDFs de las GiftCards
+    Envía email al comprador con las GiftCards en formato HTML
 
     Args:
         venta_reserva: VentaReserva instance
@@ -87,111 +87,37 @@ def enviar_email_giftcards(venta_reserva, giftcards):
         logger.error(f"No se puede enviar GiftCards: comprador de VentaReserva #{venta_reserva.id} no tiene email")
         return
 
-    # Preparar email
-    cantidad_giftcards = len(giftcards)
-    plural = "s" if cantidad_giftcards > 1 else ""
-
-    subject = f"Tu{plural} GiftCard{plural} de Aremko Spa - Lista{plural} para Regalar"
-
-    # Cuerpo del email
-    destinatarios_nombres = ", ".join([gc.destinatario_nombre for gc in giftcards if gc.destinatario_nombre])
-
-    body = f"""
-¡Hola {comprador.nombre}!
-
-¡Gracias por tu compra! Tu{plural} GiftCard{plural} de Aremko Aguas Calientes & Spa {"están" if plural else "está"} lista{plural}.
-
-{'Has comprado' if plural else 'Has comprado'} {cantidad_giftcards} GiftCard{plural} para: {destinatarios_nombres}
-
-DETALLES DE TU{'S' if plural else ''} GIFTCARD{plural.upper()}:
-
-"""
-
-    # Agregar detalles de cada GiftCard
-    for i, giftcard in enumerate(giftcards, 1):
-        body += f"""
-{i}. GiftCard para: {giftcard.destinatario_nombre}
-   Código: {giftcard.codigo}
-   Valor: ${int(giftcard.monto_inicial):,}
-   Válida hasta: {giftcard.fecha_vencimiento.strftime('%d/%m/%Y')}
-   Email destinatario: {giftcard.destinatario_email or 'No especificado'}
-
-"""
-
-    body += f"""
-
-CÓMO USAR LA{plural.upper()} GIFTCARD{plural.upper()}:
-
-1. Reenvía este email (con el PDF adjunto) al destinatario
-2. El destinatario debe contactar a Aremko por WhatsApp: +56 9 5790 2525
-3. Mencionar el código de la GiftCard para reservar su experiencia
-
-IMPORTANTE:
-- Cada GiftCard es válida por 1 año desde la fecha de emisión
-- Puede usarse una sola vez por el valor total
-- El destinatario debe presentar el código al momento de reservar
-
-UBICACIÓN:
-Aremko Aguas Calientes & Spa
-Puerto Varas, junto al Río Pescado
-
-CONTACTO:
-WhatsApp: +56 9 5790 2525
-Email: spa@aremko.cl
-Web: www.aremko.cl
-
-¡Gracias por elegir Aremko Spa!
-Un regalo que renueva cuerpo y alma en medio de la naturaleza.
-
----
-Este email fue generado automáticamente.
-Si tienes alguna consulta, contáctanos por WhatsApp.
-"""
-
-    # Crear email
-    email = EmailMessage(
-        subject=subject,
-        body=body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[email_comprador],
-        reply_to=['spa@aremko.cl']
-    )
-
-    # Adjuntar PDFs de las GiftCards
+    # Preparar datos de las GiftCards para el servicio
+    giftcards_data = []
     for giftcard in giftcards:
-        try:
-            # Preparar datos para el PDF
-            giftcard_data = {
-                'codigo': giftcard.codigo,
-                'experiencia_nombre': giftcard.servicio_asociado or 'Experiencia Aremko Spa',
-                'destinatario_nombre': giftcard.destinatario_nombre,
-                'mensaje_seleccionado': giftcard.mensaje_personalizado,
-                'precio': int(giftcard.monto_inicial),
-                'fecha_emision': giftcard.fecha_emision.strftime('%d/%m/%Y'),
-                'fecha_vencimiento': giftcard.fecha_vencimiento.strftime('%d/%m/%Y'),
-            }
+        giftcard_data = {
+            'codigo': giftcard.codigo,
+            'experiencia_nombre': giftcard.servicio_asociado or 'Experiencia Aremko Spa',
+            'destinatario_nombre': giftcard.destinatario_nombre,
+            'mensaje_seleccionado': giftcard.mensaje_personalizado or 'Un regalo especial para ti',
+            'precio': int(giftcard.monto_inicial),
+            'fecha_emision': giftcard.fecha_emision,
+            'fecha_vencimiento': giftcard.fecha_vencimiento,
+        }
+        giftcards_data.append(giftcard_data)
 
-            # Generar PDF
-            pdf_content = GiftCardPDFService.generar_pdf_giftcard(giftcard_data)
-
-            # Adjuntar al email
-            filename = f"GiftCard_Aremko_{giftcard.codigo}.pdf"
-            email.attach(filename, pdf_content, 'application/pdf')
-
-            logger.info(f"PDF de GiftCard {giftcard.codigo} adjuntado al email")
-
-        except Exception as e:
-            logger.error(f"Error al generar PDF de GiftCard {giftcard.codigo}: {str(e)}", exc_info=True)
-
-    # Enviar email
+    # Usar el servicio de GiftCardPDFService para enviar el email con HTML
     try:
-        email.send(fail_silently=False)
-        logger.info(f"Email con {cantidad_giftcards} GiftCard{plural} enviado a {email_comprador}")
+        resultado = GiftCardPDFService.enviar_giftcard_por_email(
+            comprador_email=email_comprador,
+            comprador_nombre=comprador.nombre,
+            giftcards_data=giftcards_data
+        )
 
-        # Marcar GiftCards como enviadas
-        for giftcard in giftcards:
-            giftcard.enviado_email = True
-            giftcard.save()
+        if resultado:
+            logger.info(f"Email HTML con {len(giftcards)} GiftCard(s) enviado a {email_comprador}")
+
+            # Marcar GiftCards como enviadas
+            for giftcard in giftcards:
+                giftcard.enviado_email = True
+                giftcard.save()
+        else:
+            logger.error(f"Falló el envío de email a {email_comprador}")
 
     except Exception as e:
         logger.error(f"Error al enviar email con GiftCards a {email_comprador}: {str(e)}", exc_info=True)
