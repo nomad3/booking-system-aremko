@@ -150,7 +150,7 @@
     <div class="container">
         <h1 class="checkout-title">Finalizar Reserva</h1>
 
-        {% if cart.servicios %}
+        {% if cart.servicios or cart.giftcards %}
             <!-- Row 1: Contact Info & Order Summary -->
             <div class="row mb-4">
                 <div class="col-lg-7"> {# Contact Info takes more space #}
@@ -200,12 +200,23 @@
                 <div class="col-lg-5"> {# Order Summary takes less space #}
                     <div class="cart-summary">
                         <h3 class="cart-summary-title">Resumen del Pedido</h3>
+
+                        <!-- Servicios -->
                         {% for item in cart.servicios %}
                             <div class="cart-summary-row">
                                 <span>{{ item.nombre }} ({{ item.cantidad_personas }} persona(s))</span>
                                 <span>${{ item.subtotal|floatformat:0|intcomma }}</span>
                             </div>
                         {% endfor %}
+
+                        <!-- GiftCards -->
+                        {% for giftcard in cart.giftcards %}
+                            <div class="cart-summary-row">
+                                <span><i class="fas fa-gift me-1"></i> GiftCard - {{ giftcard.experiencia_nombre }}</span>
+                                <span>${{ giftcard.precio|floatformat:0|intcomma }}</span>
+                            </div>
+                        {% endfor %}
+
                         <div class="cart-summary-row cart-summary-total">
                             <span>Total:</span>
                             <span>${{ cart.total|floatformat:0|intcomma }}</span>
@@ -225,7 +236,9 @@
                 <div class="col-lg-6">
                     <!-- Reservation Details -->
                     <div class="checkout-form"> {# Use checkout-form for consistent padding/shadow #}
-                        <h4 class="mb-3">Detalles de la Reserva</h4>
+                        <h4 class="mb-3">Detalles del Pedido</h4>
+
+                        <!-- Servicios -->
                         {% for item in cart.servicios %}
                         <div class="cart-item mb-3"> {# Reduced bottom margin slightly #}
                             <div class="row align-items-center">
@@ -239,6 +252,28 @@
                                 </div>
                                 <div class="col-md-4 text-end">
                                     <p class="cart-item-price mb-0">${{ item.subtotal|floatformat:0|intcomma }}</p> {# Remove bottom margin #}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        <!-- GiftCards -->
+                        {% for giftcard in cart.giftcards %}
+                        <div class="cart-item mb-3" style="border-left: 3px solid #ffc107;">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h5 class="cart-item-title mb-1">
+                                        <i class="fas fa-gift text-warning me-2"></i>GiftCard - {{ giftcard.experiencia_nombre }}
+                                    </h5>
+                                    <p class="cart-item-info mb-1">
+                                        <i class="fas fa-user me-1"></i><strong>Para:</strong> {{ giftcard.destinatario_nombre }}
+                                    </p>
+                                    <p class="cart-item-info mb-0 small text-muted fst-italic">
+                                        "{{ giftcard.mensaje_seleccionado|truncatewords:15 }}"
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <p class="cart-item-price mb-0">${{ giftcard.precio|floatformat:0|intcomma }}</p>
                                 </div>
                             </div>
                         </div>
