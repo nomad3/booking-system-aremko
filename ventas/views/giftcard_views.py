@@ -410,11 +410,11 @@ def giftcard_wizard(request):
             'montos_sugeridos': [80000, 120000, 150000]
         },
         {
-            'id': 'ritual_rio',
-            'nombre': 'Ritual del Río',
-            'descripcion': 'Experiencia completa Ritual del Río',
-            'imagen': 'images/ritual.jpg',
-            'montos_sugeridos': [100000, 150000, 200000]
+            'id': 'alojamiento_tinas',
+            'nombre': 'Alojamiento + Tinas Calientes',
+            'descripcion': 'Paquete completo: estadía en cabaña + tinas calientes',
+            'imagen': 'images/paquete_alojamiento_tinas.jpg',
+            'montos_sugeridos': [120000, 150000, 180000]
         },
         {
             'id': 'celebracion',

@@ -311,7 +311,7 @@
             <div class="experience-grid" id="experienceGrid">
                 {% for exp in experiencias %}
                 <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" onclick="selectExperience('{{ exp.id }}')">
-                    <i class="fas {% if exp.id == 'tinas' %}fa-hot-tub{% elif exp.id == 'masajes' %}fa-spa{% elif exp.id == 'cabanas' %}fa-home{% elif exp.id == 'ritual_rio' %}fa-water{% elif exp.id == 'celebracion' %}fa-champagne-glasses{% else %}fa-gift{% endif %}"></i>
+                    <i class="fas {% if exp.id == 'tinas' %}fa-hot-tub{% elif exp.id == 'masajes' %}fa-spa{% elif exp.id == 'cabanas' %}fa-home{% elif exp.id == 'alojamiento_tinas' %}fa-bed{% elif exp.id == 'celebracion' %}fa-champagne-glasses{% else %}fa-gift{% endif %}"></i>
                     <h5>{{ exp.nombre }}</h5>
                     <p>{{ exp.descripcion }}</p>
                 </div>
