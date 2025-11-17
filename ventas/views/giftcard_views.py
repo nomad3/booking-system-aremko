@@ -391,15 +391,17 @@ def giftcard_wizard(request):
         {
             'id': 'tinas',
             'nombre': 'Tinas Calientes',
-            'descripcion': 'Experiencia de tinas calientes junto al río Pescado',
+            'descripcion': 'Tinas calientes para dos personas en tinas con o sin hidromasaje junto al Río Pescado',
+            'descripcion_giftcard': 'Tinas calientes para dos personas en tinas con o sin hidromasaje junto al Río Pescado',
             'imagen': 'images/tinas.jpg',
-            'monto_fijo': 50000,  # Valor fijo de la GiftCard
-            'montos_sugeridos': []  # No hay opciones, es monto fijo
+            'monto_fijo': 50000,
+            'montos_sugeridos': []
         },
         {
             'id': 'masajes',
             'nombre': 'Masajes Relajantes Para Dos',
             'descripcion': 'Sesión de masajes profesionales para dos personas',
+            'descripcion_giftcard': 'Masajes para dos en domos de Bienestar en medio del antiguo bosque nativo de Aremko, junto al Río Pescado',
             'imagen': 'images/masajes.jpg',
             'monto_fijo': 80000,
             'montos_sugeridos': []
@@ -408,6 +410,7 @@ def giftcard_wizard(request):
             'id': 'cabanas',
             'nombre': 'Alojamiento en Cabaña Para Dos',
             'descripcion': 'Estadía completa en nuestras cabañas para dos personas',
+            'descripcion_giftcard': 'Alojamiento para dos en cabaña de maderas nativas, en medio del antiguo bosque nativo, junto al Río Pescado',
             'imagen': 'images/cabanas.jpg',
             'monto_fijo': 90000,
             'montos_sugeridos': []
@@ -416,6 +419,7 @@ def giftcard_wizard(request):
             'id': 'alojamiento_tinas',
             'nombre': 'Alojamiento + Tinas Para Dos',
             'descripcion': 'Paquete completo: estadía en cabaña + tinas calientes para dos',
+            'descripcion_giftcard': 'Alojamiento para dos en cabaña de maderas nativas + tinas calientes con o sin hidromasaje, en medio del antiguo bosque nativo junto al Río Pescado',
             'imagen': 'images/paquete_alojamiento_tinas.jpg',
             'monto_fijo': 140000,
             'montos_sugeridos': []
@@ -424,6 +428,7 @@ def giftcard_wizard(request):
             'id': 'celebracion',
             'nombre': 'Alojamiento + Tinas + Desayuno + Ambientación Romántica',
             'descripcion': 'Paquete completo romántico con todos los detalles',
+            'descripcion_giftcard': 'Alojamiento para dos en cabaña de maderas nativas + tinas calientes con ambientación romántica (velas y botella de espumante) + desayuno, en medio del antiguo bosque nativo junto al Río Pescado',
             'imagen': 'images/celebracion.jpg',
             'monto_fijo': 150000,
             'montos_sugeridos': []
@@ -432,9 +437,10 @@ def giftcard_wizard(request):
             'id': 'monto_libre',
             'nombre': 'Monto Libre',
             'descripcion': 'El destinatario elige la experiencia',
+            'descripcion_giftcard': 'Vale por el monto indicado para usar en cualquier experiencia de Aremko Spa',
             'imagen': 'images/gift_generic.jpg',
             'monto_fijo': 0,  # 0 indica que NO tiene monto fijo (evitamos None que causa error en JS)
-            'montos_sugeridos': [30000, 50000, 75000, 100000, 150000, 200000]  # Usuario puede elegir o ingresar personalizado
+            'montos_sugeridos': [30000, 50000, 75000, 100000, 150000, 200000]
         }
     ]
 

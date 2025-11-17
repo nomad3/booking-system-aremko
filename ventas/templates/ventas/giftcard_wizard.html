@@ -470,16 +470,10 @@
 
                         <hr style="border-color: #D2B48C;">
 
-                        <!-- Experiencia -->
-                        <div class="row mb-3">
-                            <div class="col-6 text-center">
-                                <p class="mb-1" style="color: #A0522D; font-size: 0.85rem; font-weight: 600;">EXPERIENCIA</p>
-                                <p id="preview-experiencia" style="color: #5C4033; font-size: 1.1rem; font-weight: 600;"></p>
-                            </div>
-                            <div class="col-6 text-center">
-                                <p class="mb-1" style="color: #A0522D; font-size: 0.85rem; font-weight: 600;">VALOR</p>
-                                <p id="preview-precio" style="color: #16a085; font-size: 1.3rem; font-weight: 700;"></p>
-                            </div>
+                        <!-- Experiencia (descripción detallada sin precio) -->
+                        <div class="text-center mb-3">
+                            <p class="mb-2" style="color: #A0522D; font-size: 0.85rem; font-weight: 600;">EXPERIENCIA</p>
+                            <p id="preview-experiencia" style="color: #5C4033; font-size: 0.95rem; font-weight: 500; line-height: 1.5; padding: 0 15px;"></p>
                         </div>
 
                         <!-- Código (simulado) -->
@@ -617,11 +611,6 @@
                             <p class="mb-2">
                                 <strong>Email comprador:</strong>
                                 <span id="resumen-comprador-email"></span>
-                            </p>
-                            <hr>
-                            <p class="mb-0">
-                                <strong>Precio:</strong>
-                                <span class="text-success fs-4" id="resumen-precio"></span>
                             </p>
                         </div>
 
@@ -1080,9 +1069,9 @@ async function regenerarMensaje() {
 
 // Función para actualizar el preview en Step 5
 function actualizarPreviewStep5() {
-    // Obtener el nombre de la experiencia seleccionada
-    const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
-    const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
+    // Obtener la descripción detallada de la experiencia desde el array de experiencias
+    const exp = experiencias.find(e => e.id === wizardData.experiencia);
+    const expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
 
     // Calcular fecha de validez (1 año desde hoy)
     const hoy = new Date();
@@ -1093,40 +1082,37 @@ function actualizarPreviewStep5() {
         year: 'numeric'
     });
 
-    // Llenar preview
+    // Llenar preview (sin mostrar el precio)
     document.getElementById('preview-destinatario').textContent = wizardData.destinatario.nombre;
     document.getElementById('preview-mensaje').textContent = wizardData.mensajeSeleccionado;
-    document.getElementById('preview-experiencia').textContent = expNombre;
-    document.getElementById('preview-precio').textContent = '$' + parseInt(wizardData.monto).toLocaleString('es-CL');
+    document.getElementById('preview-experiencia').textContent = expDescripcion;
     document.getElementById('preview-validez').textContent = validezStr;
 }
 
 // Función para actualizar el resumen en Step 6
 function actualizarResumenStep6() {
-    // Obtener el nombre de la experiencia seleccionada
-    const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
-    const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
+    // Obtener la descripción detallada de la experiencia
+    const exp = experiencias.find(e => e.id === wizardData.experiencia);
+    const expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
 
-    document.getElementById('resumen-experiencia').textContent = expNombre;
+    document.getElementById('resumen-experiencia').textContent = expDescripcion;
     document.getElementById('resumen-destinatario').textContent = wizardData.destinatario.nombre;
     document.getElementById('resumen-email').textContent = wizardData.destinatario.email;
     document.getElementById('resumen-mensaje').textContent = wizardData.mensajeSeleccionado;
-    document.getElementById('resumen-precio').textContent = '$' + parseInt(wizardData.monto).toLocaleString('es-CL');
 }
 
 // Función para actualizar el resumen en Step 8 (resumen final con comprador)
 function actualizarResumenStep8() {
-    // Obtener el nombre de la experiencia seleccionada
-    const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
-    const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
+    // Obtener la descripción detallada de la experiencia
+    const exp = experiencias.find(e => e.id === wizardData.experiencia);
+    const expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
 
-    document.getElementById('resumen-experiencia').textContent = expNombre;
+    document.getElementById('resumen-experiencia').textContent = expDescripcion;
     document.getElementById('resumen-destinatario').textContent = wizardData.destinatario.nombre;
     document.getElementById('resumen-email').textContent = wizardData.destinatario.email;
     document.getElementById('resumen-mensaje').textContent = wizardData.mensajeSeleccionado;
     document.getElementById('resumen-comprador').textContent = wizardData.comprador.nombre;
     document.getElementById('resumen-comprador-email').textContent = wizardData.comprador.email;
-    document.getElementById('resumen-precio').textContent = '$' + parseInt(wizardData.monto).toLocaleString('es-CL');
 }
 
 // Event listener para el botón "Agregar al Carrito"
