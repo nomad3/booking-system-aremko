@@ -433,7 +433,7 @@ def giftcard_wizard(request):
             'nombre': 'Monto Libre',
             'descripcion': 'El destinatario elige la experiencia',
             'imagen': 'images/gift_generic.jpg',
-            'monto_fijo': None,  # No tiene monto fijo
+            'monto_fijo': 0,  # 0 indica que NO tiene monto fijo (evitamos None que causa error en JS)
             'montos_sugeridos': [30000, 50000, 75000, 100000, 150000, 200000]  # Usuario puede elegir o ingresar personalizado
         }
     ]

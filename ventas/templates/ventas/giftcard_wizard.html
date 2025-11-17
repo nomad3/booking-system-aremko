@@ -692,13 +692,13 @@ function selectExperience(expId) {
     // Obtener experiencia seleccionada
     const exp = experiencias.find(e => e.id === expId);
 
-    // Si tiene monto fijo, asignarlo directamente y ocultar selector
-    if (exp.monto_fijo) {
+    // Si tiene monto fijo (> 0), asignarlo directamente y ocultar selector
+    if (exp.monto_fijo && exp.monto_fijo > 0) {
         wizardData.monto = exp.monto_fijo;
         document.getElementById('amountSelection').style.display = 'none';
         console.log(`✅ Experiencia "${exp.nombre}" seleccionada con monto fijo: $${exp.monto_fijo.toLocaleString('es-CL')}`);
     } else {
-        // Mostrar selector de monto para "Monto Libre"
+        // Mostrar selector de monto para "Monto Libre" (monto_fijo = 0)
         showAmountOptions(exp.montos_sugeridos);
     }
 
