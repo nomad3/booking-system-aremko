@@ -12,7 +12,7 @@ Funcionalidad:
 Trigger: post_save en modelo Pago
 """
 
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.mail import EmailMessage
 from django.conf import settings
@@ -195,3 +195,37 @@ Si tienes alguna consulta, contáctanos por WhatsApp.
 
     except Exception as e:
         logger.error(f"Error al enviar email con GiftCards a {email_comprador}: {str(e)}", exc_info=True)
+
+
+# --- Signals para Recalcular Total de VentaReserva ---
+
+@receiver(post_save, sender=GiftCard)
+def recalcular_total_al_crear_giftcard(sender, instance, created, raw, **kwargs):
+    """
+    Recalcula el total de la VentaReserva cuando se crea o actualiza una GiftCard
+
+    Similar a los signals de ReservaServicio y ReservaProducto
+    """
+    # Skip if fixture loading
+    if raw:
+        return
+
+    try:
+        if instance.venta_reserva:
+            logger.info(f"Recalculando total de VentaReserva #{instance.venta_reserva.id} por GiftCard {instance.codigo}")
+            instance.venta_reserva.calcular_total()
+    except Exception as e:
+        logger.error(f"Error recalculando total después de guardar GiftCard {instance.codigo}: {e}", exc_info=True)
+
+
+@receiver(post_delete, sender=GiftCard)
+def recalcular_total_al_eliminar_giftcard(sender, instance, **kwargs):
+    """
+    Recalcula el total de la VentaReserva cuando se elimina una GiftCard
+    """
+    try:
+        if instance.venta_reserva:
+            logger.info(f"Recalculando total de VentaReserva #{instance.venta_reserva.id} tras eliminar GiftCard {instance.codigo}")
+            instance.venta_reserva.calcular_total()
+    except Exception as e:
+        logger.error(f"Error recalculando total después de eliminar GiftCard {instance.codigo}: {e}", exc_info=True)

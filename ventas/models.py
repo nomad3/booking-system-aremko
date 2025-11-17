@@ -495,9 +495,10 @@ class VentaReserva(models.Model):
     def calcular_total(self):
         total_productos = self.reservaproductos.aggregate(total=models.Sum(models.F('producto__precio_base') * models.F('cantidad')))['total'] or 0
         total_servicios = self.reservaservicios.aggregate(total=models.Sum(models.F('servicio__precio_base') * models.F('cantidad_personas')))['total'] or 0
+        total_giftcards = self.giftcards.aggregate(total=models.Sum('monto_inicial'))['total'] or 0
         total_pagos_descuentos = self.pagos.filter(metodo_pago='descuento').aggregate(total=models.Sum('monto'))['total'] or 0  # Considerar descuentos como pagos negativos
 
-        self.total = total_productos + total_servicios - total_pagos_descuentos
+        self.total = total_productos + total_servicios + total_giftcards - total_pagos_descuentos
         self.save()
         self.actualizar_saldo()  # Llama a actualizar_saldo después de calcular_total
 
@@ -546,6 +547,13 @@ class VentaReserva(models.Model):
             total=models.Sum(
                 models.F('producto__precio_base') * models.F('cantidad')
             )
+        )['total'] or 0
+        return total
+
+    @property
+    def total_giftcards(self):
+        total = self.giftcards.aggregate(
+            total=models.Sum('monto_inicial')
         )['total'] or 0
         return total
 
