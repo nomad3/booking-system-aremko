@@ -20,6 +20,16 @@ class VentasConfig(AppConfig):
                 f"No se pudo importar communication_triggers: {exc}"
             )
 
+        # Importar signals principales (validar_disponibilidad, actualizar_tramo, etc.)
+        try:
+            import ventas.signals.main_signals  # noqa: F401
+        except Exception as exc:
+            from django.conf import settings
+            import logging
+            logging.getLogger(__name__).warning(
+                f"No se pudo importar main_signals: {exc}"
+            )
+
         # Importar signals de GiftCards (post_save Pago)
         try:
             import ventas.signals.giftcard_signals  # noqa: F401
