@@ -500,7 +500,7 @@ def giftcard_wizard(request):
         'experiencias': experiencias,
         'tipos_mensaje': tipos_mensaje,
         'paso_actual': 1,
-        'total_pasos': 6  # 1:Experiencia, 2:Destinatario, 3:Tipo, 4:Mensaje, 5:Preview, 6:Comprador
+        'total_pasos': 5  # 1:Experiencia, 2:Destinatario, 3:Tipo, 4:Mensaje, 5:Preview (Comprador ahora en checkout)
     }
 
     return render(request, 'ventas/giftcard_wizard.html', context)

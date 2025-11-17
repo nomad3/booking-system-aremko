@@ -518,10 +518,29 @@
                 <i class="fas fa-info-circle me-2"></i>
                 <strong>Nota:</strong> Esta es una vista previa. El código definitivo y el PDF se generarán después del pago.
             </div>
+
+            <!-- Botón Agregar al Carrito -->
+            <div class="text-center mt-4">
+                <button type="button" class="btn btn-warning btn-lg px-5 text-white fw-bold" id="btnAgregarAlCarritoStep5">
+                    <i class="fas fa-shopping-cart me-2"></i>
+                    Agregar al Carrito
+                </button>
+                <p class="text-muted small mt-3 mb-0">
+                    Después podrás ingresar tus datos de comprador en el checkout
+                </p>
+
+                <!-- Loading state -->
+                <div id="loadingCarritoStep5" class="d-none mt-4">
+                    <div class="spinner-border text-warning" role="status">
+                        <span class="visually-hidden">Agregando al carrito...</span>
+                    </div>
+                    <p class="mt-2">Agregando al carrito...</p>
+                </div>
+            </div>
         </div>
 
-        <!-- STEP 6: Datos del Comprador (antes Step 7) -->
-        <div class="wizard-step" id="step6">
+        <!-- STEP 6: Datos del Comprador (ELIMINADO - ahora se pide en checkout) -->
+        <div class="wizard-step d-none" id="step6">
             <h2 class="step-title">Tus Datos</h2>
             <p class="step-subtitle">Necesitamos tus datos para completar la compra</p>
 
@@ -783,18 +802,6 @@ function updateNextButton() {
         canProceed = wizardData.tipoMensaje;
     } else if (currentStep === 4) {
         canProceed = wizardData.mensajeSeleccionado !== null;
-    } else if (currentStep === 6) {
-        // Validar datos del comprador (solo teléfono, nombre, email - sin región/comuna)
-        const telefono = document.getElementById('compradorTelefono')?.value;
-        const nombre = document.getElementById('compradorNombre')?.value;
-        const email = document.getElementById('compradorEmail')?.value;
-        canProceed = telefono && nombre && email;
-
-        // Habilitar/deshabilitar botón "Agregar al Carrito" en Step 6
-        const btnCarrito = document.getElementById('btnAgregarAlCarritoStep6');
-        if (btnCarrito) {
-            btnCarrito.disabled = !canProceed;
-        }
     } else {
         canProceed = true; // Otros pasos siempre pueden avanzar por ahora
     }
@@ -816,26 +823,21 @@ function nextStep() {
         };
     } else if (currentStep === 3) {
         wizardData.detalleEspecial = document.getElementById('detalleEspecial').value;
-    } else if (currentStep === 6) {
-        // Guardar datos del comprador (sin región/comuna)
-        wizardData.comprador = {
-            telefono: document.getElementById('compradorTelefono').value,
-            nombre: document.getElementById('compradorNombre').value,
-            email: document.getElementById('compradorEmail').value,
-            region_id: null,  // No pedimos región
-            comuna_id: null   // No pedimos comuna
-        };
-        console.log('✅ Datos del comprador guardados:', wizardData.comprador);
     }
 
-    // Avanzar paso
-    if (currentStep < 6) {
+    // Avanzar paso (máximo 5 pasos ahora)
+    if (currentStep < 5) {
         wizardData.paso++;
         updateWizardUI();
 
         // Auto-generar mensajes al llegar a Step 4
         if (wizardData.paso === 4) {
             generarMensajesIA();
+        }
+
+        // Actualizar preview al llegar a Step 5
+        if (wizardData.paso === 5) {
+            actualizarPreviewStep5();
         }
     }
 }
@@ -870,16 +872,16 @@ function updateWizardUI() {
         }
     });
 
-    const progressPercentage = ((currentStep - 1) / 6) * 100;  // Cambio de 5 a 6 (7 pasos - 1)
+    const progressPercentage = ((currentStep - 1) / 4) * 100;  // 5 pasos - 1 = 4
     document.getElementById('progressFill').style.width = `${progressPercentage}%`;
     document.getElementById('currentStep').textContent = currentStep;
 
     // Mostrar/ocultar botón anterior
     document.getElementById('prevBtn').style.display = currentStep > 1 ? 'block' : 'none';
 
-    // Ocultar botón "Siguiente" en Step 6 (tiene su propio botón "Agregar al Carrito")
+    // Ocultar botón "Siguiente" en Step 5 (tiene su propio botón "Agregar al Carrito")
     const nextBtn = document.getElementById('nextBtn');
-    if (currentStep === 6) {
+    if (currentStep === 5) {
         nextBtn.style.display = 'none';
     } else {
         nextBtn.style.display = 'block';
@@ -1209,21 +1211,12 @@ document.getElementById('btnAgregarAlCarrito').addEventListener('click', async f
     }
 });
 
-// Event listener para el botón "Agregar al Carrito" en Step 6
-document.getElementById('btnAgregarAlCarritoStep6')?.addEventListener('click', async function() {
+// Event listener para el botón "Agregar al Carrito" en Step 5
+document.getElementById('btnAgregarAlCarritoStep5')?.addEventListener('click', async function() {
     const btn = this;
-    const loadingDiv = document.getElementById('loadingCarritoStep6');
+    const loadingDiv = document.getElementById('loadingCarritoStep5');
 
     try {
-        // Guardar datos del comprador antes de enviar
-        wizardData.comprador = {
-            telefono: document.getElementById('compradorTelefono').value,
-            nombre: document.getElementById('compradorNombre').value,
-            email: document.getElementById('compradorEmail').value,
-            region_id: null,
-            comuna_id: null
-        };
-
         // Mostrar loading
         btn.disabled = true;
         loadingDiv.classList.remove('d-none');
@@ -1232,7 +1225,7 @@ document.getElementById('btnAgregarAlCarritoStep6')?.addEventListener('click', a
         const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
         const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
 
-        // Preparar datos para enviar (mismos datos que el botón original)
+        // Preparar datos para enviar (SIN datos del comprador - se pedirán en checkout)
         const giftcardData = {
             experiencia_id: wizardData.experiencia,
             experiencia_nombre: expNombre,
@@ -1241,14 +1234,11 @@ document.getElementById('btnAgregarAlCarritoStep6')?.addEventListener('click', a
             destinatario_email: wizardData.destinatario.email,
             destinatario_telefono: wizardData.destinatario.telefono || '',
             tipo_mensaje: wizardData.tipoMensaje,
-            mensaje_seleccionado: wizardData.mensajeSeleccionado,
-            // Agregar datos del comprador
-            comprador_telefono: wizardData.comprador.telefono,
-            comprador_nombre: wizardData.comprador.nombre,
-            comprador_email: wizardData.comprador.email
+            mensaje_seleccionado: wizardData.mensajeSeleccionado
+            // NO enviamos datos del comprador - se pedirán en checkout
         };
 
-        console.log('📤 Enviando GiftCard al carrito desde Step 6:', giftcardData);
+        console.log('📤 Enviando GiftCard al carrito desde Step 5:', giftcardData);
 
         // Enviar al backend
         const response = await fetch('/ventas/api/giftcard/agregar-al-carrito/', {
@@ -1318,128 +1308,8 @@ nextStep = function() {
 };
 
 // ============================================
-// STEP 7: AUTOCOMPLETAR DATOS DEL COMPRADOR
+// STEP 6 ELIMINADO - Datos del comprador ahora se piden en checkout
 // ============================================
-
-// Debounce timer para evitar múltiples requests
-let buscarClienteTimer = null;
-
-document.getElementById('compradorTelefono')?.addEventListener('input', function() {
-    const telefono = this.value.trim();
-    const buscandoDiv = document.getElementById('compradorBuscando');
-    const encontradoDiv = document.getElementById('compradorEncontrado');
-
-    // Limpiar timer anterior
-    clearTimeout(buscarClienteTimer);
-
-    // Ocultar mensajes
-    buscandoDiv.classList.add('d-none');
-    encontradoDiv.classList.add('d-none');
-
-    // Si el teléfono tiene al menos 8 dígitos, buscar
-    const telefonoLimpio = telefono.replace(/[^\d]/g, '');
-    if (telefonoLimpio.length >= 8) {
-        // Mostrar loading
-        buscandoDiv.classList.remove('d-none');
-
-        // Buscar después de 500ms
-        buscarClienteTimer = setTimeout(async () => {
-            try {
-                const response = await fetch('/ventas/api/giftcard/buscar-cliente/', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ telefono: telefono })
-                });
-
-                const data = await response.json();
-
-                buscandoDiv.classList.add('d-none');
-
-                if (data.success && data.encontrado) {
-                    // Cliente encontrado! Autocompletar solo nombre y email
-                    console.log('✅ Cliente encontrado:', data.cliente);
-
-                    document.getElementById('compradorNombre').value = data.cliente.nombre;
-                    document.getElementById('compradorEmail').value = data.cliente.email;
-
-                    // Mostrar mensaje de éxito
-                    encontradoDiv.classList.remove('d-none');
-
-                    // Ocultar mensaje después de 3 segundos
-                    setTimeout(() => {
-                        encontradoDiv.classList.add('d-none');
-                    }, 3000);
-
-                    // Actualizar botón "Agregar al Carrito"
-                    updateNextButton();
-                } else {
-                    console.log('ℹ️ Cliente no encontrado, campos en blanco para nuevo cliente');
-                }
-            } catch (error) {
-                console.error('❌ Error al buscar cliente:', error);
-                buscandoDiv.classList.add('d-none');
-            }
-        }, 500);
-    }
-});
-
-// Cargar regiones para el comprador
-async function cargarRegionesComprador() {
-    try {
-        const response = await fetch('/api/regions/');
-        const regiones = await response.json();
-
-        const select = document.getElementById('compradorRegion');
-        select.innerHTML = '<option value="">Seleccione una región</option>';
-
-        regiones.forEach(region => {
-            const option = document.createElement('option');
-            option.value = region.id;
-            option.textContent = region.nombre;
-            select.appendChild(option);
-        });
-    } catch (error) {
-        console.error('Error al cargar regiones:', error);
-    }
-}
-
-// Cargar comunas para el comprador
-async function cargarComunasComprador(regionId) {
-    try {
-        const response = await fetch(`/api/comunas/${regionId}/`);
-        const comunas = await response.json();
-
-        const select = document.getElementById('compradorComuna');
-        select.innerHTML = '<option value="">Seleccione una comuna</option>';
-        select.disabled = false;
-
-        comunas.forEach(comuna => {
-            const option = document.createElement('option');
-            option.value = comuna.id;
-            option.textContent = comuna.nombre;
-            select.appendChild(option);
-        });
-    } catch (error) {
-        console.error('Error al cargar comunas:', error);
-    }
-}
-
-// Event listener para cambio de región
-document.getElementById('compradorRegion')?.addEventListener('change', function() {
-    const regionId = this.value;
-    if (regionId) {
-        cargarComunasComprador(regionId);
-    } else {
-        const comunaSelect = document.getElementById('compradorComuna');
-        comunaSelect.innerHTML = '<option value="">Primero seleccione una región</option>';
-        comunaSelect.disabled = true;
-    }
-    updateNextButton();
-});
-
-// Event listener para validación de campos del comprador (Step 6)
-document.getElementById('compradorNombre')?.addEventListener('input', updateNextButton);
-document.getElementById('compradorEmail')?.addEventListener('input', updateNextButton);
 
 // Inicializar
 updateNextButton();
