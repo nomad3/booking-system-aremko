@@ -785,7 +785,9 @@ function updateNextButton() {
         const relacion = document.getElementById('destinatarioRelacion')?.value;
         const email = document.getElementById('destinatarioEmail')?.value;
         const telefono = document.getElementById('destinatarioTelefono')?.value;
+        console.log('🔍 Step 2 Validation:', { nombre, relacion, email, telefono });
         canProceed = nombre && relacion && email && telefono;
+        console.log('✅ Can proceed?', canProceed);
     } else if (currentStep === 3) {
         canProceed = wizardData.tipoMensaje;
     } else if (currentStep === 4) {
@@ -884,11 +886,24 @@ function updateWizardUI() {
     updateNextButton();
 }
 
-// Validar inputs en tiempo real
-document.getElementById('destinatarioNombre')?.addEventListener('input', updateNextButton);
-document.getElementById('destinatarioRelacion')?.addEventListener('input', updateNextButton);
-document.getElementById('destinatarioEmail')?.addEventListener('input', updateNextButton);
-document.getElementById('destinatarioTelefono')?.addEventListener('input', updateNextButton);
+// Validar inputs en tiempo real (Step 2)
+console.log('📝 Registrando event listeners para Step 2...');
+const nombreInput = document.getElementById('destinatarioNombre');
+const relacionInput = document.getElementById('destinatarioRelacion');
+const emailInput = document.getElementById('destinatarioEmail');
+const telefonoInput = document.getElementById('destinatarioTelefono');
+
+console.log('Elementos encontrados:', {
+    nombreInput: !!nombreInput,
+    relacionInput: !!relacionInput,
+    emailInput: !!emailInput,
+    telefonoInput: !!telefonoInput
+});
+
+if (nombreInput) nombreInput.addEventListener('input', updateNextButton);
+if (relacionInput) relacionInput.addEventListener('input', updateNextButton);
+if (emailInput) emailInput.addEventListener('input', updateNextButton);
+if (telefonoInput) telefonoInput.addEventListener('input', updateNextButton);
 
 // ============================================
 // STEP 4: GENERAR MENSAJES CON IA
