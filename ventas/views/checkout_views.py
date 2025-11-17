@@ -153,8 +153,21 @@ def remove_from_cart(request):
     return JsonResponse({'success': False, 'error': 'Método no permitido'})
 
 def checkout_view(request):
-    # Get cart from session
-    cart = request.session.get('cart', {'servicios': [], 'total': 0})
+    # Get cart from session (incluye servicios y giftcards)
+    cart = request.session.get('cart', {'servicios': [], 'giftcards': [], 'total': 0})
+
+    # Asegurar que existe la clave giftcards (para carritos antiguos)
+    if 'giftcards' not in cart:
+        cart['giftcards'] = []
+
+    # Recalcular total
+    total_servicios = sum(item.get('subtotal', 0) for item in cart['servicios'])
+    total_giftcards = sum(item.get('precio', 0) for item in cart['giftcards'])
+    cart['total'] = total_servicios + total_giftcards
+
+    # Actualizar sesión
+    request.session['cart'] = cart
+    request.session.modified = True
 
     # Get relevant payment methods for checkout
     # Filter Pago.METODOS_PAGO to only include public-facing options
