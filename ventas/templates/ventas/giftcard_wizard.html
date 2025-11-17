@@ -287,7 +287,7 @@
     <div class="wizard-progress">
         <div class="progress-steps">
             <div class="progress-line">
-                <div class="progress-line-fill" id="progressFill" style="width: 16.67%;"></div>
+                <div class="progress-line-fill" id="progressFill" style="width: 14.28%;"></div>
             </div>
             <div class="progress-step active" data-step="1">1</div>
             <div class="progress-step" data-step="2">2</div>
@@ -295,9 +295,10 @@
             <div class="progress-step" data-step="4">4</div>
             <div class="progress-step" data-step="5">5</div>
             <div class="progress-step" data-step="6">6</div>
+            <div class="progress-step" data-step="7">7</div>
         </div>
         <div class="text-center mt-2">
-            <small class="text-muted">Paso <span id="currentStep">1</span> de 6</small>
+            <small class="text-muted">Paso <span id="currentStep">1</span> de 7</small>
         </div>
     </div>
 
@@ -525,8 +526,59 @@
             </div>
         </div>
 
-        <!-- STEP 6: Agregar al Carrito -->
-        <div class="wizard-step" id="step6">
+        <!-- STEP 6: Preview -->
+        <!-- Ya existe arriba como step5 -->
+
+        <!-- STEP 7: Datos del Comprador -->
+        <div class="wizard-step" id="step7">
+            <h2 class="step-title">Tus Datos</h2>
+            <p class="step-subtitle">Necesitamos tus datos para completar la compra</p>
+
+            <form id="compradorForm" class="mx-auto" style="max-width: 600px;">
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Teléfono del Comprador *</label>
+                    <input type="tel" class="form-control" id="compradorTelefono" placeholder="+56 9 1234 5678" required>
+                    <small class="text-muted">Ingresa tu celular. Si ya eres cliente, autocompletaremos tus datos</small>
+                    <div id="compradorBuscando" class="d-none mt-2">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Buscando...</span>
+                        </div>
+                        <span class="ms-2 text-muted">Buscando tus datos...</span>
+                    </div>
+                    <div id="compradorEncontrado" class="d-none mt-2 alert alert-success py-2">
+                        <i class="fas fa-check-circle me-2"></i>¡Cliente encontrado! Datos autocompletados
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Nombre Completo *</label>
+                    <input type="text" class="form-control" id="compradorNombre" placeholder="Ej: Juan Pérez" required>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Email *</label>
+                    <input type="email" class="form-control" id="compradorEmail" placeholder="tu@email.com" required>
+                    <small class="text-muted">Enviaremos la GiftCard a este correo</small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Región *</label>
+                    <select class="form-select" id="compradorRegion" required>
+                        <option value="">Seleccione una región</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Comuna *</label>
+                    <select class="form-select" id="compradorComuna" required disabled>
+                        <option value="">Primero seleccione una región</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+
+        <!-- STEP 8: Agregar al Carrito (antes era step 6) -->
+        <div class="wizard-step" id="step8">
             <h2 class="step-title">¡Tu GiftCard está Lista!</h2>
             <p class="step-subtitle">Agrégala al carrito para continuar con tu compra</p>
 
@@ -549,13 +601,22 @@
                                 <span id="resumen-destinatario"></span>
                             </p>
                             <p class="mb-2">
-                                <strong>Email:</strong>
+                                <strong>Email destinatario:</strong>
                                 <span id="resumen-email"></span>
                             </p>
                             <p class="mb-2">
                                 <strong>Mensaje:</strong>
                             </p>
                             <p class="fst-italic text-muted small" id="resumen-mensaje" style="max-height: 100px; overflow-y: auto;">
+                            </p>
+                            <hr>
+                            <p class="mb-2">
+                                <strong>Comprador:</strong>
+                                <span id="resumen-comprador"></span>
+                            </p>
+                            <p class="mb-2">
+                                <strong>Email comprador:</strong>
+                                <span id="resumen-comprador-email"></span>
                             </p>
                             <hr>
                             <p class="mb-0">
@@ -608,7 +669,8 @@ let wizardData = {
     destinatario: {},
     tipoMensaje: null,
     detalleEspecial: '',
-    mensajeSeleccionado: null
+    mensajeSeleccionado: null,
+    comprador: {}  // Nuevo: datos del comprador
 };
 
 // Datos de experiencias (desde el backend)
@@ -721,11 +783,21 @@ function updateNextButton() {
     } else if (currentStep === 2) {
         const nombre = document.getElementById('destinatarioNombre')?.value;
         const relacion = document.getElementById('destinatarioRelacion')?.value;
-        canProceed = nombre && relacion;
+        const email = document.getElementById('destinatarioEmail')?.value;
+        const telefono = document.getElementById('destinatarioTelefono')?.value;
+        canProceed = nombre && relacion && email && telefono;
     } else if (currentStep === 3) {
         canProceed = wizardData.tipoMensaje;
     } else if (currentStep === 4) {
         canProceed = wizardData.mensajeSeleccionado !== null;
+    } else if (currentStep === 7) {
+        // Validar datos del comprador
+        const telefono = document.getElementById('compradorTelefono')?.value;
+        const nombre = document.getElementById('compradorNombre')?.value;
+        const email = document.getElementById('compradorEmail')?.value;
+        const region = document.getElementById('compradorRegion')?.value;
+        const comuna = document.getElementById('compradorComuna')?.value;
+        canProceed = telefono && nombre && email && region && comuna;
     } else {
         canProceed = true; // Otros pasos siempre pueden avanzar por ahora
     }
@@ -747,10 +819,20 @@ function nextStep() {
         };
     } else if (currentStep === 3) {
         wizardData.detalleEspecial = document.getElementById('detalleEspecial').value;
+    } else if (currentStep === 7) {
+        // Guardar datos del comprador
+        wizardData.comprador = {
+            telefono: document.getElementById('compradorTelefono').value,
+            nombre: document.getElementById('compradorNombre').value,
+            email: document.getElementById('compradorEmail').value,
+            region_id: document.getElementById('compradorRegion').value,
+            comuna_id: document.getElementById('compradorComuna').value
+        };
+        console.log('✅ Datos del comprador guardados:', wizardData.comprador);
     }
 
     // Avanzar paso
-    if (currentStep < 6) {
+    if (currentStep < 8) {  // Cambio de 6 a 8
         wizardData.paso++;
         updateWizardUI();
 
@@ -791,7 +873,7 @@ function updateWizardUI() {
         }
     });
 
-    const progressPercentage = ((currentStep - 1) / 5) * 100;
+    const progressPercentage = ((currentStep - 1) / 6) * 100;  // Cambio de 5 a 6 (7 pasos - 1)
     document.getElementById('progressFill').style.width = `${progressPercentage}%`;
     document.getElementById('currentStep').textContent = currentStep;
 
@@ -1015,6 +1097,21 @@ function actualizarResumenStep6() {
     document.getElementById('resumen-precio').textContent = '$' + parseInt(wizardData.monto).toLocaleString('es-CL');
 }
 
+// Función para actualizar el resumen en Step 8 (resumen final con comprador)
+function actualizarResumenStep8() {
+    // Obtener el nombre de la experiencia seleccionada
+    const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
+    const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
+
+    document.getElementById('resumen-experiencia').textContent = expNombre;
+    document.getElementById('resumen-destinatario').textContent = wizardData.destinatario.nombre;
+    document.getElementById('resumen-email').textContent = wizardData.destinatario.email;
+    document.getElementById('resumen-mensaje').textContent = wizardData.mensajeSeleccionado;
+    document.getElementById('resumen-comprador').textContent = wizardData.comprador.nombre;
+    document.getElementById('resumen-comprador-email').textContent = wizardData.comprador.email;
+    document.getElementById('resumen-precio').textContent = '$' + parseInt(wizardData.monto).toLocaleString('es-CL');
+}
+
 // Event listener para el botón "Agregar al Carrito"
 document.getElementById('btnAgregarAlCarrito').addEventListener('click', async function() {
     const btn = this;
@@ -1095,7 +1192,7 @@ document.getElementById('btnAgregarAlCarrito').addEventListener('click', async f
     }
 });
 
-// Modificar nextStep() para actualizar preview/resumen cuando llega a step 5 o 6
+// Modificar nextStep() para actualizar preview/resumen cuando llega a step 5, 6, o 8
 const originalNextStep = nextStep;
 nextStep = function() {
     const currentStep = wizardData.paso;
@@ -1108,11 +1205,157 @@ nextStep = function() {
         actualizarPreviewStep5();
     }
 
-    // Si llegamos a step 6, actualizar resumen
+    // Si llegamos a step 6 (preview de GiftCard), actualizar preview
     if (wizardData.paso === 6) {
-        actualizarResumenStep6();
+        actualizarPreviewStep5(); // Reutilizar la misma función de preview
+    }
+
+    // Si llegamos a step 8 (resumen final), actualizar resumen completo
+    if (wizardData.paso === 8) {
+        actualizarResumenStep8();
     }
 };
+
+// ============================================
+// STEP 7: AUTOCOMPLETAR DATOS DEL COMPRADOR
+// ============================================
+
+// Debounce timer para evitar múltiples requests
+let buscarClienteTimer = null;
+
+document.getElementById('compradorTelefono')?.addEventListener('input', function() {
+    const telefono = this.value.trim();
+    const buscandoDiv = document.getElementById('compradorBuscando');
+    const encontradoDiv = document.getElementById('compradorEncontrado');
+
+    // Limpiar timer anterior
+    clearTimeout(buscarClienteTimer);
+
+    // Ocultar mensajes
+    buscandoDiv.classList.add('d-none');
+    encontradoDiv.classList.add('d-none');
+
+    // Si el teléfono tiene al menos 8 dígitos, buscar
+    const telefonoLimpio = telefono.replace(/[^\d]/g, '');
+    if (telefonoLimpio.length >= 8) {
+        // Mostrar loading
+        buscandoDiv.classList.remove('d-none');
+
+        // Buscar después de 500ms
+        buscarClienteTimer = setTimeout(async () => {
+            try {
+                const response = await fetch('/ventas/api/giftcard/buscar-cliente/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ telefono: telefono })
+                });
+
+                const data = await response.json();
+
+                buscandoDiv.classList.add('d-none');
+
+                if (data.success && data.encontrado) {
+                    // Cliente encontrado! Autocompletar campos
+                    console.log('✅ Cliente encontrado:', data.cliente);
+
+                    document.getElementById('compradorNombre').value = data.cliente.nombre;
+                    document.getElementById('compradorEmail').value = data.cliente.email;
+
+                    // Autocompletar región
+                    if (data.cliente.region_id) {
+                        document.getElementById('compradorRegion').value = data.cliente.region_id;
+                        // Trigger change para cargar comunas
+                        await cargarComunasComprador(data.cliente.region_id);
+
+                        if (data.cliente.comuna_id) {
+                            document.getElementById('compradorComuna').value = data.cliente.comuna_id;
+                        }
+                    }
+
+                    // Mostrar mensaje de éxito
+                    encontradoDiv.classList.remove('d-none');
+
+                    // Ocultar mensaje después de 3 segundos
+                    setTimeout(() => {
+                        encontradoDiv.classList.add('d-none');
+                    }, 3000);
+
+                    // Actualizar botón siguiente
+                    updateNextButton();
+                } else {
+                    console.log('ℹ️ Cliente no encontrado, campos en blanco para nuevo cliente');
+                }
+            } catch (error) {
+                console.error('❌ Error al buscar cliente:', error);
+                buscandoDiv.classList.add('d-none');
+            }
+        }, 500);
+    }
+});
+
+// Cargar regiones para el comprador
+async function cargarRegionesComprador() {
+    try {
+        const response = await fetch('/api/regions/');
+        const regiones = await response.json();
+
+        const select = document.getElementById('compradorRegion');
+        select.innerHTML = '<option value="">Seleccione una región</option>';
+
+        regiones.forEach(region => {
+            const option = document.createElement('option');
+            option.value = region.id;
+            option.textContent = region.nombre;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error al cargar regiones:', error);
+    }
+}
+
+// Cargar comunas para el comprador
+async function cargarComunasComprador(regionId) {
+    try {
+        const response = await fetch(`/api/comunas/${regionId}/`);
+        const comunas = await response.json();
+
+        const select = document.getElementById('compradorComuna');
+        select.innerHTML = '<option value="">Seleccione una comuna</option>';
+        select.disabled = false;
+
+        comunas.forEach(comuna => {
+            const option = document.createElement('option');
+            option.value = comuna.id;
+            option.textContent = comuna.nombre;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error al cargar comunas:', error);
+    }
+}
+
+// Event listener para cambio de región
+document.getElementById('compradorRegion')?.addEventListener('change', function() {
+    const regionId = this.value;
+    if (regionId) {
+        cargarComunasComprador(regionId);
+    } else {
+        const comunaSelect = document.getElementById('compradorComuna');
+        comunaSelect.innerHTML = '<option value="">Primero seleccione una región</option>';
+        comunaSelect.disabled = true;
+    }
+    updateNextButton();
+});
+
+// Event listener para validación de campos del comprador
+document.getElementById('compradorNombre')?.addEventListener('input', updateNextButton);
+document.getElementById('compradorEmail')?.addEventListener('input', updateNextButton);
+document.getElementById('compradorComuna')?.addEventListener('change', updateNextButton);
+
+// Cargar regiones al inicializar
+if (document.getElementById('compradorRegion')) {
+    cargarRegionesComprador();
+}
 
 // Inicializar
 updateNextButton();

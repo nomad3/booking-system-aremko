@@ -494,10 +494,92 @@ def giftcard_wizard(request):
         'experiencias': experiencias,
         'tipos_mensaje': tipos_mensaje,
         'paso_actual': 1,
-        'total_pasos': 6
+        'total_pasos': 7  # Actualizado de 6 a 7 pasos
     }
 
     return render(request, 'ventas/giftcard_wizard.html', context)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def buscar_cliente_por_telefono(request):
+    """
+    Busca un cliente por teléfono para autocompletar datos en el wizard
+
+    POST /ventas/api/giftcard/buscar-cliente/
+
+    Body JSON:
+    {
+        "telefono": "+56912345678"
+    }
+
+    Response:
+    {
+        "success": true,
+        "encontrado": true,
+        "cliente": {
+            "nombre": "Juan Pérez",
+            "email": "juan@example.com",
+            "region_id": 10,
+            "comuna_id": 101
+        }
+    }
+    """
+    try:
+        data = json.loads(request.body)
+        telefono = data.get('telefono', '').strip()
+
+        if not telefono:
+            return JsonResponse({
+                'success': False,
+                'error': 'Teléfono requerido'
+            }, status=400)
+
+        # Normalizar teléfono
+        telefono_normalizado = telefono.replace(' ', '').replace('-', '')
+        if not telefono_normalizado.startswith('+'):
+            if telefono_normalizado.startswith('9'):
+                telefono_normalizado = '+56' + telefono_normalizado
+            elif telefono_normalizado.startswith('56'):
+                telefono_normalizado = '+' + telefono_normalizado
+
+        logger.info(f"🔍 Buscando cliente con teléfono: {telefono_normalizado}")
+
+        # Buscar cliente
+        try:
+            cliente = Cliente.objects.get(telefono=telefono_normalizado)
+            logger.info(f"✅ Cliente encontrado: {cliente.nombre} ({cliente.email})")
+
+            return JsonResponse({
+                'success': True,
+                'encontrado': True,
+                'cliente': {
+                    'nombre': cliente.nombre,
+                    'email': cliente.email,
+                    'region_id': cliente.region_id if cliente.region_id else None,
+                    'comuna_id': cliente.comuna_id if cliente.comuna_id else None
+                }
+            })
+
+        except Cliente.DoesNotExist:
+            logger.info(f"ℹ️ Cliente no encontrado con teléfono: {telefono_normalizado}")
+            return JsonResponse({
+                'success': True,
+                'encontrado': False
+            })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'JSON inválido'
+        }, status=400)
+
+    except Exception as e:
+        logger.error(f"Error en buscar_cliente_por_telefono: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': 'Error al buscar cliente'
+        }, status=500)
 
 
 @csrf_exempt
