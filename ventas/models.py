@@ -113,6 +113,9 @@ class GiftCard(models.Model):
     cliente_comprador = models.ForeignKey('Cliente', related_name='giftcards_compradas', on_delete=models.SET_NULL, null=True, blank=True)
     cliente_destinatario = models.ForeignKey('Cliente', related_name='giftcards_recibidas', on_delete=models.SET_NULL, null=True, blank=True)
 
+    # Relación con la venta/reserva donde se compró esta GiftCard
+    venta_reserva = models.ForeignKey('VentaReserva', related_name='giftcards', on_delete=models.SET_NULL, null=True, blank=True)
+
     # Datos del comprador (campos directos para wizard - ahora opcionales ya que se capturan en checkout)
     comprador_nombre = models.CharField(max_length=255, null=True, blank=True)
     comprador_email = models.EmailField(null=True, blank=True)

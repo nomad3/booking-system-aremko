@@ -20,6 +20,16 @@ class VentasConfig(AppConfig):
                 f"No se pudo importar communication_triggers: {exc}"
             )
 
+        # Importar signals de GiftCards (post_save Pago)
+        try:
+            import ventas.signals.giftcard_signals  # noqa: F401
+        except Exception as exc:
+            from django.conf import settings
+            import logging
+            logging.getLogger(__name__).warning(
+                f"No se pudo importar giftcard_signals: {exc}"
+            )
+
         # Import admin classes and models here to avoid circular imports
         from django.contrib import admin
         from . import models

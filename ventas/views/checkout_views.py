@@ -423,6 +423,9 @@ def complete_checkout(request):
                             cliente_comprador=cliente,
                             cliente_destinatario=cliente_destinatario,
 
+                            # Vincular a la VentaReserva
+                            venta_reserva=venta,
+
                             # Datos del comprador (capturados en checkout)
                             comprador_nombre=nombre,
                             comprador_email=email,

@@ -76,6 +76,18 @@ class PagoInline(admin.TabularInline):
     verbose_name = "Pago"
     verbose_name_plural = "Pagos"
 
+class GiftCardInline(admin.TabularInline):
+    model = GiftCard
+    extra = 0
+    fields = ['codigo', 'monto_inicial', 'destinatario_nombre', 'estado', 'enviado_email']
+    readonly_fields = ['codigo', 'monto_inicial', 'destinatario_nombre', 'estado', 'enviado_email']
+    verbose_name = "GiftCard"
+    verbose_name_plural = "GiftCards de esta Venta"
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
 class DetalleCompraInline(admin.TabularInline):
     model = DetalleCompra
     extra = 1
@@ -233,12 +245,12 @@ class VentaReservaAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago',
         'estado_reserva', 'servicios_y_cantidades',
-        'productos_y_cantidades', 'total_servicios',
+        'productos_y_cantidades', 'giftcards_count', 'total_servicios',
         'total_productos', 'total', 'pagado', 'saldo_pendiente', 'pdf_link'
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
-    inlines = [ReservaServicioInline, ReservaProductoInline, PagoInline]
+    inlines = [ReservaServicioInline, ReservaProductoInline, GiftCardInline, PagoInline]
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
         'productos_y_cantidades', 'servicios_y_cantidades',
@@ -283,6 +295,13 @@ class VentaReservaAdmin(admin.ModelAdmin):
         ]
         return ", ".join(productos_list)
     productos_y_cantidades.short_description = 'Productos y Cantidades'
+
+    def giftcards_count(self, obj):
+        count = obj.giftcards.count()
+        if count == 0:
+            return "-"
+        return f"🎁 {count}"
+    giftcards_count.short_description = 'GiftCards'
 
     def total_servicios(self, obj):
         total = sum(
