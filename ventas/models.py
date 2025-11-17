@@ -113,6 +113,26 @@ class GiftCard(models.Model):
     cliente_comprador = models.ForeignKey('Cliente', related_name='giftcards_compradas', on_delete=models.SET_NULL, null=True, blank=True)
     cliente_destinatario = models.ForeignKey('Cliente', related_name='giftcards_recibidas', on_delete=models.SET_NULL, null=True, blank=True)
 
+    # Datos del comprador (campos directos para wizard - ahora opcionales ya que se capturan en checkout)
+    comprador_nombre = models.CharField(max_length=255, null=True, blank=True)
+    comprador_email = models.EmailField(null=True, blank=True)
+    comprador_telefono = models.CharField(max_length=20, null=True, blank=True)
+
+    # Datos del destinatario (para mensajes personalizados)
+    destinatario_nombre = models.CharField(max_length=255, null=True, blank=True)
+    destinatario_email = models.EmailField(null=True, blank=True)
+    destinatario_telefono = models.CharField(max_length=20, null=True, blank=True)
+    destinatario_relacion = models.CharField(max_length=100, null=True, blank=True)  # ej: "pareja", "amigo", "madre"
+    detalle_especial = models.TextField(null=True, blank=True)
+
+    # Configuración de mensaje IA
+    tipo_mensaje = models.CharField(max_length=50, null=True, blank=True)  # ej: "romantico", "cumpleanos"
+    mensaje_personalizado = models.TextField(null=True, blank=True)
+    mensaje_alternativas = models.JSONField(default=list, null=True, blank=True)
+
+    # Servicio asociado (opcional)
+    servicio_asociado = models.CharField(max_length=100, null=True, blank=True)
+
     def __str__(self):
         return f"GiftCard {self.codigo} - Saldo: {self.monto_disponible}"
 

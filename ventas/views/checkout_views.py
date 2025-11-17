@@ -413,7 +413,7 @@ def complete_checkout(request):
                         # Calcular fecha de vencimiento (1 año desde hoy)
                         fecha_vencimiento = timezone.now().date() + timedelta(days=365)
 
-                        # Crear GiftCard
+                        # Crear GiftCard con todos los campos del wizard
                         giftcard = GiftCard.objects.create(
                             monto_inicial=giftcard_item['precio'],
                             monto_disponible=giftcard_item['precio'],
@@ -421,8 +421,24 @@ def complete_checkout(request):
                             fecha_vencimiento=fecha_vencimiento,
                             estado='por_cobrar',  # Cambiará a 'cobrado' cuando se pague
                             cliente_comprador=cliente,
-                            # NOTE: cliente_destinatario field doesn't exist in model yet
-                            # Will add in future migration when migrations are enabled
+                            cliente_destinatario=cliente_destinatario,
+
+                            # Datos del comprador (capturados en checkout)
+                            comprador_nombre=nombre,
+                            comprador_email=email,
+                            comprador_telefono=telefono,
+
+                            # Datos del destinatario (capturados en wizard)
+                            destinatario_nombre=giftcard_item.get('destinatario_nombre', ''),
+                            destinatario_email=giftcard_item.get('destinatario_email', ''),
+                            destinatario_telefono=giftcard_item.get('destinatario_telefono', ''),
+
+                            # Configuración de mensaje IA (capturados en wizard)
+                            tipo_mensaje=giftcard_item.get('tipo_mensaje', ''),
+                            mensaje_personalizado=giftcard_item.get('mensaje_seleccionado', ''),
+
+                            # Servicio asociado (experiencia seleccionada)
+                            servicio_asociado=giftcard_item.get('experiencia_id', '')
                         )
 
                         # Guardar metadata de la GiftCard en la sesión para usarla después del pago
