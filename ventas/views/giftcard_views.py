@@ -392,43 +392,49 @@ def giftcard_wizard(request):
             'id': 'tinas',
             'nombre': 'Tinas Calientes',
             'descripcion': 'Experiencia de tinas calientes junto al río Pescado',
-            'imagen': 'images/tinas.jpg',  # Ajustar ruta según tus imágenes
-            'montos_sugeridos': [30000, 50000, 75000, 100000]
+            'imagen': 'images/tinas.jpg',
+            'monto_fijo': 50000,  # Valor fijo de la GiftCard
+            'montos_sugeridos': []  # No hay opciones, es monto fijo
         },
         {
             'id': 'masajes',
-            'nombre': 'Masajes Relajantes',
-            'descripcion': 'Sesión de masajes profesionales',
+            'nombre': 'Masajes Relajantes Para Dos',
+            'descripcion': 'Sesión de masajes profesionales para dos personas',
             'imagen': 'images/masajes.jpg',
-            'montos_sugeridos': [40000, 60000, 80000]
+            'monto_fijo': 80000,
+            'montos_sugeridos': []
         },
         {
             'id': 'cabanas',
-            'nombre': 'Alojamiento en Cabaña',
-            'descripcion': 'Estadía completa en nuestras cabañas',
+            'nombre': 'Alojamiento en Cabaña Para Dos',
+            'descripcion': 'Estadía completa en nuestras cabañas para dos personas',
             'imagen': 'images/cabanas.jpg',
-            'montos_sugeridos': [80000, 120000, 150000]
+            'monto_fijo': 90000,
+            'montos_sugeridos': []
         },
         {
             'id': 'alojamiento_tinas',
-            'nombre': 'Alojamiento + Tinas Calientes',
-            'descripcion': 'Paquete completo: estadía en cabaña + tinas calientes',
+            'nombre': 'Alojamiento + Tinas Para Dos',
+            'descripcion': 'Paquete completo: estadía en cabaña + tinas calientes para dos',
             'imagen': 'images/paquete_alojamiento_tinas.jpg',
-            'montos_sugeridos': [120000, 150000, 180000]
+            'monto_fijo': 140000,
+            'montos_sugeridos': []
         },
         {
             'id': 'celebracion',
-            'nombre': 'Celebración Especial',
-            'descripcion': 'Paquete personalizado para celebraciones',
+            'nombre': 'Alojamiento + Tinas + Desayuno + Ambientación Romántica',
+            'descripcion': 'Paquete completo romántico con todos los detalles',
             'imagen': 'images/celebracion.jpg',
-            'montos_sugeridos': [120000, 180000, 250000]
+            'monto_fijo': 150000,
+            'montos_sugeridos': []
         },
         {
             'id': 'monto_libre',
             'nombre': 'Monto Libre',
             'descripcion': 'El destinatario elige la experiencia',
             'imagen': 'images/gift_generic.jpg',
-            'montos_sugeridos': [50000, 100000, 150000, 200000]
+            'monto_fijo': None,  # No tiene monto fijo
+            'montos_sugeridos': [30000, 50000, 75000, 100000, 150000, 200000]  # Usuario puede elegir o ingresar personalizado
         }
     ]
 

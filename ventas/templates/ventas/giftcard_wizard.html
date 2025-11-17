@@ -314,6 +314,9 @@
                     <i class="fas {% if exp.id == 'tinas' %}fa-hot-tub{% elif exp.id == 'masajes' %}fa-spa{% elif exp.id == 'cabanas' %}fa-home{% elif exp.id == 'alojamiento_tinas' %}fa-bed{% elif exp.id == 'celebracion' %}fa-champagne-glasses{% else %}fa-gift{% endif %}"></i>
                     <h5>{{ exp.nombre }}</h5>
                     <p>{{ exp.descripcion }}</p>
+                    {% if exp.monto_fijo %}
+                    <p class="text-success fw-bold fs-5 mt-2">${{ exp.monto_fijo|floatformat:0|intcomma }}</p>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
@@ -624,15 +627,24 @@ function selectExperience(expId) {
 
     wizardData.experiencia = expId;
 
-    // Mostrar selector de monto
+    // Obtener experiencia seleccionada
     const exp = experiencias.find(e => e.id === expId);
-    showAmountOptions(exp.montos_sugeridos);
+
+    // Si tiene monto fijo, asignarlo directamente y ocultar selector
+    if (exp.monto_fijo) {
+        wizardData.monto = exp.monto_fijo;
+        document.getElementById('amountSelection').style.display = 'none';
+        console.log(`✅ Experiencia "${exp.nombre}" seleccionada con monto fijo: $${exp.monto_fijo.toLocaleString('es-CL')}`);
+    } else {
+        // Mostrar selector de monto para "Monto Libre"
+        showAmountOptions(exp.montos_sugeridos);
+    }
 
     // Habilitar botón siguiente
     updateNextButton();
 }
 
-// Mostrar opciones de monto
+// Mostrar opciones de monto (solo para "Monto Libre")
 function showAmountOptions(montos) {
     const amountSelection = document.getElementById('amountSelection');
     const amountOptions = document.getElementById('amountOptions');
