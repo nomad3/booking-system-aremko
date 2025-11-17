@@ -58,7 +58,7 @@ class GiftCardAIService:
         tono = GiftCardAIService.TONOS_MENSAJE[tipo_mensaje]
 
         # Construir prompt para DeepSeek
-        prompt = f"""Genera {cantidad} frases breves (entre 25 y 50 palabras), emocionales, elegantes y memorables para una giftcard del Spa "Aremko Aguas Calientes & Spa", localizado en Puerto Varas junto al río Pescado, rodeado de bosque nativo, con tinas calientes y experiencias románticas.
+        prompt = f"""Genera {cantidad} frases breves (entre 25 y 50 palabras), emocionales, elegantes y memorables para una giftcard del Spa "Aremko Aguas Calientes & Spa", localizado en Puerto Varas.
 
 Tono seleccionado: {tono}.
 
@@ -70,11 +70,18 @@ Datos del destinatario:
 Objetivo:
 Crear mensajes únicos, cálidos, inspiradores y personales, dignos de un regalo especial. Deben sonar humanos, íntimos y auténticos. Evita clichés. Cada mensaje debe mencionar el nombre del destinatario de forma natural.
 
-Contexto del spa:
-- Ubicado en Puerto Varas, junto al río Pescado
-- Rodeado de bosque nativo y naturaleza
-- Experiencias de tinas calientes, masajes y relax
-- Ambiente romántico y tranquilo
+Contexto del spa (MUY IMPORTANTE - mencionar en los mensajes):
+- Ubicado en un rincón mágico de Puerto Varas
+- Junto al RUIDOSO RÍO PESCADO (NO es un lugar silencioso, el río suena fuerte)
+- En medio de un ANTIGUO BOSQUE NATIVO (naturaleza virgen, árboles centenarios)
+- Tiene TINAS CON AGUAS CALIENTES (NO son "aguas termales", son "aguas calientes")
+- Experiencias de masajes, relax y romance en la naturaleza
+
+RESTRICCIONES CRÍTICAS:
+- NUNCA uses "aguas termales" → siempre di "aguas calientes"
+- SIEMPRE menciona el bosque nativo o la naturaleza
+- Menciona el río Pescado cuando sea apropiado
+- El ambiente es natural, rústico y conectado con la naturaleza
 
 IMPORTANTE: Retorna SOLO las {cantidad} frases, una por línea, sin numeración, viñetas ni comentarios adicionales. Cada frase debe ser completa y autosuficiente."""
 
@@ -158,7 +165,7 @@ IMPORTANTE: Retorna SOLO las {cantidad} frases, una por línea, sin numeración,
         # Obtener tono
         tono = GiftCardAIService.TONOS_MENSAJE.get(tipo_mensaje, 'cálido y personal')
 
-        prompt = f"""Genera UNA frase breve (entre 25 y 50 palabras), emocional, elegante y memorable para una giftcard del Spa "Aremko Aguas Calientes & Spa", localizado en Puerto Varas junto al río Pescado, rodeado de bosque nativo.
+        prompt = f"""Genera UNA frase breve (entre 25 y 50 palabras), emocional, elegante y memorable para una giftcard del Spa "Aremko Aguas Calientes & Spa", localizado en Puerto Varas.
 
 Tono: {tono}.
 
@@ -168,6 +175,18 @@ Destinatario:
 - Detalle especial: {detalle if detalle else 'No especificado'}
 
 {contexto_previos}
+
+Contexto del spa (MUY IMPORTANTE):
+- Ubicado en un rincón mágico de Puerto Varas
+- Junto al RUIDOSO RÍO PESCADO
+- En medio de un ANTIGUO BOSQUE NATIVO
+- Tiene TINAS CON AGUAS CALIENTES (NO "aguas termales")
+- Ambiente natural, rústico y romántico
+
+RESTRICCIONES CRÍTICAS:
+- NUNCA uses "aguas termales" → siempre di "aguas calientes"
+- SIEMPRE menciona el bosque nativo o la naturaleza
+- Menciona el río Pescado cuando sea apropiado
 
 IMPORTANTE:
 - Retorna SOLO la frase, sin numeración ni comentarios
