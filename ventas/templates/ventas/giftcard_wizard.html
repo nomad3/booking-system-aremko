@@ -447,7 +447,7 @@
                         <!-- Header -->
                         <div class="text-center mb-4">
                             <h3 class="mb-2" style="color: #A0522D; font-weight: 700;">
-                                AREMKO SPA
+                                AREMKO AGUAS CALIENTES & SPA
                             </h3>
                             <h4 class="mb-3" style="color: #D2B48C;">
                                 <i class="fas fa-gift me-2"></i>
@@ -520,11 +520,8 @@
             </div>
         </div>
 
-        <!-- STEP 6: Preview -->
-        <!-- Ya existe arriba como step5 -->
-
-        <!-- STEP 7: Datos del Comprador -->
-        <div class="wizard-step" id="step7">
+        <!-- STEP 6: Datos del Comprador (antes Step 7) -->
+        <div class="wizard-step" id="step6">
             <h2 class="step-title">Tus Datos</h2>
             <p class="step-subtitle">Necesitamos tus datos para completar la compra</p>
 
@@ -781,8 +778,8 @@ function updateNextButton() {
         canProceed = wizardData.tipoMensaje;
     } else if (currentStep === 4) {
         canProceed = wizardData.mensajeSeleccionado !== null;
-    } else if (currentStep === 7) {
-        // Validar datos del comprador
+    } else if (currentStep === 6) {
+        // Validar datos del comprador (antes era step 7)
         const telefono = document.getElementById('compradorTelefono')?.value;
         const nombre = document.getElementById('compradorNombre')?.value;
         const email = document.getElementById('compradorEmail')?.value;
@@ -810,7 +807,7 @@ function nextStep() {
         };
     } else if (currentStep === 3) {
         wizardData.detalleEspecial = document.getElementById('detalleEspecial').value;
-    } else if (currentStep === 7) {
+    } else if (currentStep === 6) {
         // Guardar datos del comprador
         wizardData.comprador = {
             telefono: document.getElementById('compradorTelefono').value,
@@ -823,7 +820,7 @@ function nextStep() {
     }
 
     // Avanzar paso
-    if (currentStep < 8) {  // Cambio de 6 a 8
+    if (currentStep < 6) {
         wizardData.paso++;
         updateWizardUI();
 
