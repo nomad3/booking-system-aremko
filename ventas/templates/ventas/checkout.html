@@ -441,11 +441,15 @@ Email para comprobante: ventas@aremko.cl</pre>
     let isValidatingPhone = false; // Flag para evitar validaciones concurrentes
 
     async function fetchClientData(telefono) {
-        // Evitar validaciones concurrentes
+        // Evitar validaciones concurrentes - cancelar cualquier validación anterior
         if (isValidatingPhone) {
+            console.log('🚫 Cancelando validación concurrente');
             return;
         }
         isValidatingPhone = true;
+
+        // Logging para detectar llamadas múltiples
+        console.log(`🔍 INICIANDO validación para: "${telefono}"`);
 
         const phoneInput = document.getElementById('checkoutTelefono');
         const validationMsg = document.getElementById('phoneValidationMessage');
@@ -558,6 +562,7 @@ Email para comprobante: ventas@aremko.cl</pre>
             errorMsg.style.display = 'block';
         } finally {
             // SIEMPRE liberar el flag de validación
+            console.log(`✅ TERMINANDO validación para: "${telefono}"`);
             isValidatingPhone = false;
         }
     }
@@ -878,15 +883,16 @@ Email para comprobante: ventas@aremko.cl</pre>
             telefonoInput.addEventListener('blur', function() {
                 // Cancelar timeout pendiente para evitar race condition
                 clearTimeout(phoneValidationTimeout);
-                // Validar inmediatamente
-                fetchClientData(this.value);
+                // Validar inmediatamente usando valor actual del campo
+                fetchClientData(telefonoInput.value);
             });
 
             // Validación mientras escribe (con delay de 800ms)
             telefonoInput.addEventListener('input', function() {
                 clearTimeout(phoneValidationTimeout);
                 phoneValidationTimeout = setTimeout(() => {
-                    fetchClientData(this.value);
+                    // Usar valor actual del campo, no el valor del evento
+                    fetchClientData(telefonoInput.value);
                 }, 800);
             });
         } else {
