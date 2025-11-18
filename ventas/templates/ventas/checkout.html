@@ -438,18 +438,8 @@ Email para comprobante: ventas@aremko.cl</pre>
         return cookieValue;
     }
 
-    let isValidatingPhone = false; // Flag para evitar validaciones concurrentes
-
     async function fetchClientData(telefono) {
-        // Evitar validaciones concurrentes - cancelar cualquier validación anterior
-        if (isValidatingPhone) {
-            console.log('🚫 Cancelando validación concurrente');
-            return;
-        }
-        isValidatingPhone = true;
-
-        // Logging para detectar llamadas múltiples
-        console.log(`🔍 INICIANDO validación para: "${telefono}"`);
+        console.log(`🔍 VALIDANDO: "${telefono}"`);
 
         const phoneInput = document.getElementById('checkoutTelefono');
         const validationMsg = document.getElementById('phoneValidationMessage');
@@ -560,10 +550,6 @@ Email para comprobante: ventas@aremko.cl</pre>
             console.error('Error durante fetchClientData:', error);
             errorMsg.textContent = 'Error de conexión. Verifica tu internet.';
             errorMsg.style.display = 'block';
-        } finally {
-            // SIEMPRE liberar el flag de validación
-            console.log(`✅ TERMINANDO validación para: "${telefono}"`);
-            isValidatingPhone = false;
         }
     }
 
@@ -879,21 +865,10 @@ Email para comprobante: ventas@aremko.cl</pre>
         let phoneValidationTimeout;
 
         if (telefonoInput) {
-            // Validación al salir del campo
+            // SOLUCIÓN SIMPLE: Solo validar en blur, NO en input
+            // Esto elimina completamente los race conditions
             telefonoInput.addEventListener('blur', function() {
-                // Cancelar timeout pendiente para evitar race condition
-                clearTimeout(phoneValidationTimeout);
-                // Validar inmediatamente usando valor actual del campo
                 fetchClientData(telefonoInput.value);
-            });
-
-            // Validación mientras escribe (con delay de 800ms)
-            telefonoInput.addEventListener('input', function() {
-                clearTimeout(phoneValidationTimeout);
-                phoneValidationTimeout = setTimeout(() => {
-                    // Usar valor actual del campo, no el valor del evento
-                    fetchClientData(telefonoInput.value);
-                }, 800);
             });
         } else {
             console.error("Telefono input not found");
