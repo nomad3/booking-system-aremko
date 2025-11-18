@@ -462,7 +462,7 @@ class GiftCardPDFService:
     @staticmethod
     def enviar_giftcard_por_email(comprador_email, comprador_nombre, giftcards_data):
         """
-        Envía un email al comprador con las GiftCards como archivo PDF adjunto
+        Envía un email al comprador con PDFs individuales + PDF resumen para múltiples destinatarios
 
         Args:
             comprador_email (str): Email del comprador
@@ -473,38 +473,60 @@ class GiftCardPDFService:
             bool: True si se envió correctamente, False si hubo error
         """
         try:
-            # Generar PDF con todas las GiftCards
-            pdf_bytes = GiftCardPDFService.generar_multiples_pdfs(giftcards_data)
+            # Determinar si son múltiples GiftCards
+            es_multiple = len(giftcards_data) > 1
 
             # Preparar el email
-            subject = f"🎁 Tu{'s' if len(giftcards_data) > 1 else ''} GiftCard{'s' if len(giftcards_data) > 1 else ''} Aremko {'están' if len(giftcards_data) > 1 else 'está'} {'listas' if len(giftcards_data) > 1 else 'lista'}"
+            if es_multiple:
+                subject = f"🎁 Tus {len(giftcards_data)} GiftCards Aremko están listas"
+                mensaje_principal = f"¡Gracias por tu compra de {len(giftcards_data)} GiftCards en Aremko Spa!"
+                explicacion_adjuntos = f"""
+📎 ARCHIVOS ADJUNTOS:
+• Resumen_GiftCards_Aremko.pdf (todas las GiftCards juntas para tu respaldo)
+{chr(10).join([f"• GiftCard_{gc['destinatario_nombre'].replace(' ', '_')}.pdf (individual para entregar)" for gc in giftcards_data])}
 
-            # Mensaje del email (texto plano)
+💡 CÓMO USAR:
+✅ Puedes entregar cada archivo individual a su destinatario
+✅ O usar el archivo de resumen para imprimir todo junto
+✅ Cada PDF contiene las instrucciones de canje
+"""
+            else:
+                subject = f"🎁 Tu GiftCard Aremko está lista"
+                mensaje_principal = "¡Gracias por tu compra en Aremko Spa!"
+                explicacion_adjuntos = """
+📎 ARCHIVO ADJUNTO:
+• Tu GiftCard en formato PDF, lista para imprimir o compartir digitalmente
+"""
+
+            # Lista de códigos
+            lista_codigos = chr(10).join([
+                f"• {gc['codigo']} para {gc['destinatario_nombre']} - {gc['experiencia_nombre'][:50]}{'...' if len(gc['experiencia_nombre']) > 50 else ''}"
+                for gc in giftcards_data
+            ])
+
+            # Mensaje completo del email
             message = f"""Hola {comprador_nombre},
 
-¡Gracias por tu compra en Aremko Spa!
+{mensaje_principal}
 
-Tu{'s' if len(giftcards_data) > 1 else ''} GiftCard{'s' if len(giftcards_data) > 1 else ''} personalizada{'s' if len(giftcards_data) > 1 else ''} {'están' if len(giftcards_data) > 1 else 'está'} {'listas' if len(giftcards_data) > 1 else 'lista'} y {'adjuntas' if len(giftcards_data) > 1 else 'adjunta'} en este email como archivo PDF.
+{'Códigos incluidos' if es_multiple else 'Código incluido'}:
+{lista_codigos}
+{explicacion_adjuntos}
 
-{'Códigos' if len(giftcards_data) > 1 else 'Código'} incluido{'s' if len(giftcards_data) > 1 else ''}:
-{chr(10).join([f"• {gc['codigo']} para {gc['destinatario_nombre']} - {gc['experiencia_nombre']}" for gc in giftcards_data])}
-
-INSTRUCCIONES:
-✅ Descargar e imprimir el certificado PDF adjunto
-✅ Entregar al destinatario en persona o digitalmente
-✅ Para canjear: contactar por WhatsApp al +56 9 5790 2525 con el código
-
-El destinatario debe mencionar su código al momento de reservar para usar la experiencia.
+INSTRUCCIONES DE CANJE:
+✅ El destinatario debe contactar por WhatsApp al +56 9 5790 2525
+✅ Mencionar su código al momento de reservar
+✅ Válido hasta la fecha indicada en cada certificado
 
 ¡Gracias por regalar momentos inolvidables en nuestro spa!
 
-AREMKO Spa
+AREMKO Aguas Calientes & Spa
 Puerto Varas, Chile
 WhatsApp: +56 9 5790 2525
 www.aremko.cl
 
 ---
-Este email contiene {'los certificados' if len(giftcards_data) > 1 else 'tu certificado'} de regalo en formato PDF.
+{'Este email contiene archivos PDF separados para facilitar la entrega individual.' if es_multiple else 'Este email contiene tu certificado de regalo en formato PDF.'}
 """
 
             # Crear el email
@@ -515,18 +537,39 @@ Este email contiene {'los certificados' if len(giftcards_data) > 1 else 'tu cert
                 to=[comprador_email],
             )
 
-            # Nombre del archivo PDF
-            filename = f"GiftCard{'s' if len(giftcards_data) > 1 else ''}_Aremko_{datetime.now().strftime('%Y%m%d')}.pdf"
+            # Generar y adjuntar PDFs
+            if es_multiple:
+                # 1. PDF Resumen con todas las GiftCards
+                pdf_resumen = GiftCardPDFService.generar_multiples_pdfs(giftcards_data)
+                filename_resumen = f"Resumen_GiftCards_Aremko_{datetime.now().strftime('%Y%m%d')}.pdf"
+                email.attach(filename_resumen, pdf_resumen, 'application/pdf')
 
-            # Adjuntar el PDF
-            email.attach(filename, pdf_bytes, 'application/pdf')
+                # 2. PDFs individuales para cada GiftCard
+                for giftcard_data in giftcards_data:
+                    pdf_individual = GiftCardPDFService.generar_pdf_giftcard(giftcard_data)
+                    # Limpiar nombre del destinatario para nombre de archivo
+                    nombre_limpio = giftcard_data['destinatario_nombre'].replace(' ', '_').replace('.', '').replace(',', '')
+                    filename_individual = f"GiftCard_{nombre_limpio}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                    email.attach(filename_individual, pdf_individual, 'application/pdf')
 
-            # Enviar
+                logger.info(f"✅ Generados {len(giftcards_data)} PDFs individuales + 1 PDF resumen")
+            else:
+                # Una sola GiftCard - PDF individual únicamente
+                pdf_individual = GiftCardPDFService.generar_pdf_giftcard(giftcards_data[0])
+                nombre_limpio = giftcards_data[0]['destinatario_nombre'].replace(' ', '_').replace('.', '').replace(',', '')
+                filename_individual = f"GiftCard_{nombre_limpio}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                email.attach(filename_individual, pdf_individual, 'application/pdf')
+
+            # Enviar email
             email.send()
 
-            logger.info(f"✅ Email con PDF de GiftCard enviado a {comprador_email} - Archivo: {filename}")
+            if es_multiple:
+                logger.info(f"✅ Email enviado a {comprador_email} con {len(giftcards_data)} PDFs individuales + 1 resumen")
+            else:
+                logger.info(f"✅ Email enviado a {comprador_email} con 1 PDF individual")
+
             return True
 
         except Exception as e:
-            logger.error(f"❌ Error al enviar email con PDF de GiftCard: {str(e)}", exc_info=True)
+            logger.error(f"❌ Error al enviar email con PDFs de GiftCard: {str(e)}", exc_info=True)
             return False
