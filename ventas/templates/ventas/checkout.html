@@ -485,7 +485,7 @@ Email para comprobante: ventas@aremko.cl</pre>
 
             console.log(`🔍 Enviando al backend: ${cleanedTelefono}`);
             console.log(`🔍 URL encoded: ${encodeURIComponent(cleanedTelefono)}`);
-            const lookupUrl = `{% url 'ventas:get_client_details_by_phone' %}?telefono=${encodeURIComponent(cleanedTelefono)}`;
+            const lookupUrl = `{% url 'ventas:checkout_get_client_details_by_phone' %}?telefono=${encodeURIComponent(cleanedTelefono)}`;
             const response = await fetch(lookupUrl);
 
             if (response.ok) {

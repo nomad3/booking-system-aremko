@@ -95,7 +95,7 @@ urlpatterns = [
     path('cart/', checkout_views.cart_view, name='cart'), # Added cart view URL
     path('checkout/', checkout_views.checkout_view, name='checkout'),
     path('complete-checkout/', checkout_views.complete_checkout, name='complete_checkout'),
-    path('api/cliente-por-telefono/', checkout_views.get_client_details_by_phone, name='get_client_details_by_phone'),
+    path('api/cliente-por-telefono/', checkout_views.get_client_details_by_phone, name='checkout_get_client_details_by_phone'),
     # Flow Payment URLs
     path('api/flow/create/', flow_views.create_flow_payment, name='create_flow_payment'),
     path('payment/confirmation/', flow_views.flow_confirmation, name='flow_confirmation'), # Adjust path as needed
@@ -107,8 +107,8 @@ urlpatterns = [
     path('payment/mercadopago/failure/', mercadopago_views.mercadopago_failure, name='mercadopago_failure'),
     path('payment/mercadopago/pending/', mercadopago_views.mercadopago_pending, name='mercadopago_pending'),
     path('api/mercadopago/status/<int:reserva_id>/', mercadopago_views.mercadopago_payment_status, name='mercadopago_payment_status'),
-    # New API endpoint for client lookup by phone
-    path('api/get-client-details/', api_views.get_client_details_by_phone, name='get_client_details_by_phone'),
+    # New API endpoint for client lookup by phone (simple version for API)
+    path('api/get-client-details/', api_views.get_client_details_by_phone, name='api_get_client_details_by_phone'),
     # Removed URL for get_service_providers as it's no longer needed
     # path('api/get-service-providers/<int:servicio_id>/', api_views.get_service_providers, name='get_service_providers'),
 
