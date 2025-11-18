@@ -504,6 +504,9 @@ def get_client_details_by_phone(request):
             })
 
         try:
+            print("=" * 80)
+            print("🚨 DEBUGGING TELEFONO +56994436882")
+            print("=" * 80)
             print(f"🔍 Backend recibió teléfono: '{telefono_raw}'")
             print(f"   Longitud: {len(telefono_raw)} caracteres")
             print(f"   Contiene espacios: {' ' in telefono_raw}")
@@ -513,6 +516,7 @@ def get_client_details_by_phone(request):
 
             print(f"   Resultado normalización: '{telefono_normalizado}'")
             print(f"   Cliente encontrado: {cliente.nombre if cliente else 'No encontrado'}")
+            print("=" * 80)
 
             if not telefono_normalizado:
                 return JsonResponse({
