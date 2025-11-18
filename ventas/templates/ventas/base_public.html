@@ -745,60 +745,10 @@
                 console.error("Complete checkout button not found");
             }
 
-            // --- Client Lookup via Phone ---
-            const phoneInput = document.getElementById('checkoutTelefono');
-            const nameInput = document.getElementById('checkoutNombre');
-            const emailInput = document.getElementById('checkoutEmail');
-            const docInput = document.getElementById('checkoutDocumento');
-            const loadingIndicator = document.getElementById('checkoutLoading'); // Optional loading indicator
-
-            if (phoneInput && nameInput && emailInput && docInput) {
-                phoneInput.addEventListener('blur', function() { // Trigger on blur (losing focus)
-                    const phoneNumber = this.value.trim();
-                    // Basic validation - adjust length check as needed for Chilean numbers
-                    if (phoneNumber.length >= 9) {
-                        if(loadingIndicator) loadingIndicator.style.display = 'block'; // Show loading
-
-                        // Construct the API URL
-                        const lookupUrl = `{% url 'ventas:get_client_details_by_phone' %}?telefono=${encodeURIComponent(phoneNumber)}`; {# Added ventas: namespace #}
-                        console.log("Looking up client:", lookupUrl);
-
-                        fetch(lookupUrl)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`HTTP error! status: ${response.status}`);
-                                }
-                                return response.json();
-                            })
-                            .then(data => {
-                                console.log("Lookup response:", data);
-                                if (data.found) {
-                                    nameInput.value = data.nombre;
-                                    emailInput.value = data.email;
-                                    docInput.value = data.documento_identidad;
-                                    console.log("Client data populated.");
-                                } else {
-                                    // Optional: Clear fields if client not found, or leave them as is
-                                    // nameInput.value = '';
-                                    // emailInput.value = '';
-                                    // docInput.value = '';
-                                    console.log("Client not found.");
-                                }
-                            })
-                            .catch(error => {
-                                console.error('Error looking up client:', error);
-                                // Optionally inform the user, but avoid annoying alerts
-                            })
-                            .finally(() => {
-                                if(loadingIndicator) loadingIndicator.style.display = 'none'; // Hide loading
-                            });
-                    }
-                });
-                console.log("Event listener added for #checkoutTelefono blur");
-            } else {
-                 console.error("One or more checkout form fields not found for phone lookup.");
-            }
-            // --- End Client Lookup ---
+            // --- Phone Lookup ELIMINADO ---
+            // NOTA: La validación de teléfonos y búsqueda de clientes ahora se maneja
+            // completamente en checkout.html con el sistema robusto de normalización.
+            // Este listener duplicado se eliminó para evitar conflictos y race conditions.
         });
     </script>
     {# Page specific script goes here, outside the main script tag #}
