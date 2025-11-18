@@ -452,6 +452,9 @@ Email para comprobante: ventas@aremko.cl</pre>
         const errorMsg = document.getElementById('phoneErrorMessage');
 
         try {
+            // PRIMERO: Limpiar el teléfono INMEDIATAMENTE al inicio
+            const cleanedTelefono = telefono.replace(/[\s\-]/g, '');
+
             // Reset messages and styles - FORZAR limpieza completa
             validationMsg.textContent = '';
             validationMsg.className = 'form-text';
@@ -462,17 +465,14 @@ Email para comprobante: ventas@aremko.cl</pre>
             // FORZAR reflow para asegurar que los cambios se apliquen
             phoneInput.offsetHeight;
 
-            // Validar que no contenga letras
-            const hasInvalidChars = /[a-zA-Z]/.test(telefono);
+            // Validar que no contenga letras (usando teléfono limpio)
+            const hasInvalidChars = /[a-zA-Z]/.test(cleanedTelefono);
             if (hasInvalidChars) {
                 phoneInput.classList.add('is-invalid');
                 errorMsg.textContent = '❌ Solo acepta números. No uses letras.';
                 errorMsg.style.display = 'block';
                 return;
             }
-
-            // Limpiar espacios, guiones
-            const cleanedTelefono = telefono.replace(/[\s\-]/g, '');
 
             // DEBUG: Mostrar limpieza de teléfono
             console.log(`🔍 DEBUG Teléfono:`);
@@ -490,6 +490,7 @@ Email para comprobante: ventas@aremko.cl</pre>
             }
 
             console.log(`🔍 Enviando al backend: ${cleanedTelefono}`);
+            console.log(`🔍 URL encoded: ${encodeURIComponent(cleanedTelefono)}`);
             const lookupUrl = `{% url 'ventas:get_client_details_by_phone' %}?telefono=${encodeURIComponent(cleanedTelefono)}`;
             const response = await fetch(lookupUrl);
 
