@@ -48,9 +48,9 @@ class GiftCardPDFService:
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
-            padding: 8px;
+            padding: 4px;
             background-color: #f5f5f5;
-            line-height: 1.5;
+            line-height: 1.4;
         }}
         .giftcard-container {{
             max-width: 100%;
@@ -58,81 +58,83 @@ class GiftCardPDFService:
             margin: 0 auto;
             background: linear-gradient(135deg, #fff8e1 0%, #ffffff 100%);
             border: 3px solid #ffc107;
-            border-radius: 16px;
-            padding: 20px;
+            border-radius: 12px;
+            padding: 16px;
             box-sizing: border-box;
             min-height: auto;
         }}
         .header {{
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }}
         .logo {{
             color: #A0522D;
-            font-size: 2rem;
+            font-size: 1.8rem;
             font-weight: 700;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             word-break: break-word;
+            line-height: 1.1;
         }}
         .title {{
             color: #D2B48C;
-            font-size: 1.4rem;
+            font-size: 1.2rem;
             font-weight: 600;
-            line-height: 1.3;
+            line-height: 1.2;
         }}
         .divider {{
             border: 0;
             border-top: 2px solid #ffc107;
-            margin: 16px 0;
+            margin: 12px 0;
         }}
         .para {{
             text-align: center;
             color: #A0522D;
             font-size: 1rem;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             font-weight: 500;
         }}
         .destinatario {{
             text-align: center;
             color: #5C4033;
-            font-size: 1.6rem;
+            font-size: 1.5rem;
             font-weight: 600;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             word-break: break-word;
             line-height: 1.2;
         }}
         .mensaje {{
             background-color: white;
             border-left: 4px solid #ffc107;
-            padding: 16px;
-            margin: 16px 0;
+            padding: 14px;
+            margin: 12px 0;
             border-radius: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }}
         .mensaje-text {{
             color: #5C4033;
             font-style: italic;
-            line-height: 1.6;
-            font-size: 1.1rem;
+            line-height: 1.5;
+            font-size: 1.3rem;
             text-align: left;
             margin: 0;
+            font-weight: 500;
         }}
         .details {{
             display: block;
             width: 100%;
-            margin: 20px 0;
+            margin: 16px 0;
         }}
         .detail-row {{
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            margin-bottom: 16px;
+            gap: 6px;
+            margin-bottom: 12px;
         }}
         .detail-section {{
             background-color: rgba(255, 193, 7, 0.08);
             border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 12px;
+            padding: 14px;
+            margin-bottom: 10px;
             text-align: center;
         }}
         .detail-label {{
@@ -145,22 +147,22 @@ class GiftCardPDFService:
         }}
         .detail-value {{
             color: #5C4033;
-            font-size: 1.2rem;
+            font-size: 1.4rem;
             font-weight: 600;
-            line-height: 1.3;
+            line-height: 1.4;
             word-break: break-word;
         }}
         .codigo-section {{
             background-color: rgba(255, 193, 7, 0.1);
             border-radius: 12px;
-            padding: 20px;
-            margin: 20px 0;
+            padding: 16px;
+            margin: 16px 0;
             text-align: center;
         }}
         .codigo-label {{
             color: #A0522D;
             font-size: 0.9rem;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -168,7 +170,7 @@ class GiftCardPDFService:
         .codigo {{
             color: #5C4033;
             font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             font-weight: 700;
             letter-spacing: 1px;
             word-break: break-all;
@@ -176,10 +178,10 @@ class GiftCardPDFService:
         }}
         .validez {{
             text-align: center;
-            margin: 20px 0;
+            margin: 16px 0;
             background-color: rgba(255, 193, 7, 0.08);
             border-radius: 12px;
-            padding: 16px;
+            padding: 14px;
         }}
         .validez-label {{
             color: #A0522D;
@@ -187,7 +189,7 @@ class GiftCardPDFService:
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }}
         .validez-fecha {{
             color: #5C4033;
@@ -196,8 +198,8 @@ class GiftCardPDFService:
         }}
         .instrucciones {{
             text-align: center;
-            margin: 24px 0;
-            padding: 20px;
+            margin: 16px 0;
+            padding: 16px;
             background-color: rgba(37, 211, 102, 0.1);
             border-radius: 12px;
             border: 1px solid rgba(37, 211, 102, 0.2);
@@ -206,7 +208,7 @@ class GiftCardPDFService:
             color: #A0522D;
             font-size: 1rem;
             font-weight: 600;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }}
@@ -214,16 +216,16 @@ class GiftCardPDFService:
             color: #25D366;
             font-size: 1.2rem;
             font-weight: 700;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }}
         .footer {{
             text-align: center;
-            margin-top: 24px;
-            padding-top: 16px;
+            margin-top: 16px;
+            padding-top: 12px;
             border-top: 1px solid #D2B48C;
             color: #666;
-            font-size: 0.85rem;
-            line-height: 1.4;
+            font-size: 0.8rem;
+            line-height: 1.3;
         }}
         .precio {{
             color: #16a085;
@@ -236,7 +238,7 @@ class GiftCardPDFService:
     <div class="giftcard-container">
         <!-- Header -->
         <div class="header">
-            <div class="logo">AREMKO SPA</div>
+            <div class="logo">AREMKO AGUAS CALIENTES & SPA</div>
             <div class="title">🎁 Certificado de Regalo 🎁</div>
         </div>
 
@@ -253,16 +255,11 @@ class GiftCardPDFService:
 
         <hr class="divider">
 
-        <!-- Experiencia y Valor -->
+        <!-- Experiencia -->
         <div class="details">
             <div class="detail-section">
                 <div class="detail-label">EXPERIENCIA</div>
                 <div class="detail-value">{giftcard_data['experiencia_nombre']}</div>
-            </div>
-
-            <div class="detail-section">
-                <div class="detail-label">VALOR</div>
-                <div class="precio">${int(giftcard_data['precio']):,}</div>
             </div>
         </div>
 
