@@ -474,15 +474,22 @@ Email para comprobante: ventas@aremko.cl</pre>
             // Limpiar espacios, guiones
             const cleanedTelefono = telefono.replace(/[\s\-]/g, '');
 
+            // DEBUG: Mostrar limpieza de teléfono
+            console.log(`🔍 DEBUG Teléfono:`);
+            console.log(`   Original: "${telefono}"`);
+            console.log(`   Limpio: "${cleanedTelefono}"`);
+
             // Validar longitud mínima (contar solo dígitos)
             const digitCount = cleanedTelefono.replace(/[^0-9]/g, '').length;
+            console.log(`   Dígitos: ${digitCount}`);
+
             if (digitCount < 9) {
                 validationMsg.textContent = 'Ingresa al menos 9 dígitos.';
                 validationMsg.className = 'form-text text-muted';
                 return;
             }
 
-            console.log(`Validando teléfono: ${cleanedTelefono}`);
+            console.log(`🔍 Enviando al backend: ${cleanedTelefono}`);
             const lookupUrl = `{% url 'ventas:get_client_details_by_phone' %}?telefono=${encodeURIComponent(cleanedTelefono)}`;
             const response = await fetch(lookupUrl);
 

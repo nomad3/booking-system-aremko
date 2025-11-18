@@ -504,10 +504,15 @@ def get_client_details_by_phone(request):
             })
 
         try:
-            print(f"🔍 Búsqueda robusta de cliente con teléfono: {telefono_raw}")
+            print(f"🔍 Backend recibió teléfono: '{telefono_raw}'")
+            print(f"   Longitud: {len(telefono_raw)} caracteres")
+            print(f"   Contiene espacios: {' ' in telefono_raw}")
 
             # Usar servicio robusto de búsqueda con múltiples variantes
             cliente, telefono_normalizado = ClienteService.buscar_cliente_por_telefono(telefono_raw)
+
+            print(f"   Resultado normalización: '{telefono_normalizado}'")
+            print(f"   Cliente encontrado: {cliente.nombre if cliente else 'No encontrado'}")
 
             if not telefono_normalizado:
                 return JsonResponse({
