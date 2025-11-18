@@ -438,40 +438,51 @@ Email para comprobante: ventas@aremko.cl</pre>
         return cookieValue;
     }
 
+    let isValidatingPhone = false; // Flag para evitar validaciones concurrentes
+
     async function fetchClientData(telefono) {
+        // Evitar validaciones concurrentes
+        if (isValidatingPhone) {
+            return;
+        }
+        isValidatingPhone = true;
+
         const phoneInput = document.getElementById('checkoutTelefono');
         const validationMsg = document.getElementById('phoneValidationMessage');
         const errorMsg = document.getElementById('phoneErrorMessage');
 
-        // Reset messages and styles
-        validationMsg.textContent = '';
-        validationMsg.className = 'form-text';
-        errorMsg.style.display = 'none';
-        phoneInput.classList.remove('is-invalid', 'is-valid');
-
-        // Validar que no contenga letras
-        const hasInvalidChars = /[a-zA-Z]/.test(telefono);
-        if (hasInvalidChars) {
-            phoneInput.classList.add('is-invalid');
-            errorMsg.textContent = '❌ Solo acepta números. No uses letras.';
-            errorMsg.style.display = 'block';
-            return;
-        }
-
-        // Limpiar espacios, guiones
-        const cleanedTelefono = telefono.replace(/[\s\-]/g, '');
-
-        // Validar longitud mínima (contar solo dígitos)
-        const digitCount = cleanedTelefono.replace(/[^0-9]/g, '').length;
-        if (digitCount < 9) {
-            validationMsg.textContent = 'Ingresa al menos 9 dígitos.';
-            validationMsg.className = 'form-text text-muted';
-            return;
-        }
-
-        console.log(`Validando teléfono: ${cleanedTelefono}`);
-
         try {
+            // Reset messages and styles - FORZAR limpieza completa
+            validationMsg.textContent = '';
+            validationMsg.className = 'form-text';
+            errorMsg.textContent = '';
+            errorMsg.style.display = 'none';
+            phoneInput.classList.remove('is-invalid', 'is-valid');
+
+            // FORZAR reflow para asegurar que los cambios se apliquen
+            phoneInput.offsetHeight;
+
+            // Validar que no contenga letras
+            const hasInvalidChars = /[a-zA-Z]/.test(telefono);
+            if (hasInvalidChars) {
+                phoneInput.classList.add('is-invalid');
+                errorMsg.textContent = '❌ Solo acepta números. No uses letras.';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            // Limpiar espacios, guiones
+            const cleanedTelefono = telefono.replace(/[\s\-]/g, '');
+
+            // Validar longitud mínima (contar solo dígitos)
+            const digitCount = cleanedTelefono.replace(/[^0-9]/g, '').length;
+            if (digitCount < 9) {
+                validationMsg.textContent = 'Ingresa al menos 9 dígitos.';
+                validationMsg.className = 'form-text text-muted';
+                return;
+            }
+
+            console.log(`Validando teléfono: ${cleanedTelefono}`);
             const lookupUrl = `{% url 'ventas:get_client_details_by_phone' %}?telefono=${encodeURIComponent(cleanedTelefono)}`;
             const response = await fetch(lookupUrl);
 
@@ -537,6 +548,9 @@ Email para comprobante: ventas@aremko.cl</pre>
             console.error('Error durante fetchClientData:', error);
             errorMsg.textContent = 'Error de conexión. Verifica tu internet.';
             errorMsg.style.display = 'block';
+        } finally {
+            // SIEMPRE liberar el flag de validación
+            isValidatingPhone = false;
         }
     }
 
