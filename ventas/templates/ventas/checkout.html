@@ -491,6 +491,9 @@ Email para comprobante: ventas@aremko.cl</pre>
             if (response.ok) {
                 const data = await response.json();
 
+                // DEBUG: Mostrar respuesta completa del backend
+                console.log("🔍 RESPUESTA COMPLETA del backend:", JSON.stringify(data, null, 2));
+
                 if (!data.valid) {
                     // Teléfono inválido
                     phoneInput.classList.add('is-invalid');
