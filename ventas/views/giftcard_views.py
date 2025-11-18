@@ -16,6 +16,7 @@ import random
 
 from ..models import GiftCard, Cliente
 from ..services.giftcard_ai_service import GiftCardAIService
+from ..services.cliente_service import ClienteService
 
 logger = logging.getLogger(__name__)
 
@@ -511,6 +512,7 @@ def giftcard_wizard(request):
 def buscar_cliente_por_telefono(request):
     """
     Busca un cliente por teléfono para autocompletar datos en el wizard
+    Usa búsqueda robusta con múltiples variantes de formato
 
     POST /ventas/api/giftcard/buscar-cliente/
 
@@ -526,52 +528,53 @@ def buscar_cliente_por_telefono(request):
         "cliente": {
             "nombre": "Juan Pérez",
             "email": "juan@example.com",
+            "telefono": "+56912345678",
+            "telefono_display": "+56 9 1234 5678",
+            "documento_identidad": "12345678-9",
             "region_id": 10,
-            "comuna_id": 101
+            "region_nombre": "Los Lagos",
+            "comuna_id": 101,
+            "comuna_nombre": "Puerto Varas",
+            "pais": "Chile",
+            "numero_visitas": 3,
+            "gasto_total": 150000.0,
+            "datos_completos": true
         }
     }
     """
     try:
         data = json.loads(request.body)
-        telefono = data.get('telefono', '').strip()
+        telefono_input = data.get('telefono', '').strip()
 
-        if not telefono:
+        if not telefono_input:
             return JsonResponse({
                 'success': False,
                 'error': 'Teléfono requerido'
             }, status=400)
 
-        # Normalizar teléfono
-        telefono_normalizado = telefono.replace(' ', '').replace('-', '')
-        if not telefono_normalizado.startswith('+'):
-            if telefono_normalizado.startswith('9'):
-                telefono_normalizado = '+56' + telefono_normalizado
-            elif telefono_normalizado.startswith('56'):
-                telefono_normalizado = '+' + telefono_normalizado
+        logger.info(f"🔍 Búsqueda robusta de cliente con teléfono: {telefono_input}")
 
-        logger.info(f"🔍 Buscando cliente con teléfono: {telefono_normalizado}")
+        # Usar servicio robusto de búsqueda
+        cliente, telefono_normalizado = ClienteService.buscar_cliente_por_telefono(telefono_input)
 
-        # Buscar cliente
-        try:
-            cliente = Cliente.objects.get(telefono=telefono_normalizado)
-            logger.info(f"✅ Cliente encontrado: {cliente.nombre} ({cliente.email})")
+        if cliente:
+            # Obtener datos completos del cliente con relaciones
+            datos_cliente = ClienteService.obtener_datos_completos_cliente(cliente)
+
+            logger.info(f"✅ Cliente encontrado: {cliente.nombre} ({cliente.email}) - Teléfono normalizado: {telefono_normalizado}")
 
             return JsonResponse({
                 'success': True,
                 'encontrado': True,
-                'cliente': {
-                    'nombre': cliente.nombre,
-                    'email': cliente.email,
-                    'region_id': cliente.region_id if cliente.region_id else None,
-                    'comuna_id': cliente.comuna_id if cliente.comuna_id else None
-                }
+                'telefono_normalizado': telefono_normalizado,
+                'cliente': datos_cliente['cliente']
             })
-
-        except Cliente.DoesNotExist:
-            logger.info(f"ℹ️ Cliente no encontrado con teléfono: {telefono_normalizado}")
+        else:
+            logger.info(f"ℹ️ Cliente no encontrado con teléfono: {telefono_input}")
             return JsonResponse({
                 'success': True,
-                'encontrado': False
+                'encontrado': False,
+                'telefono_normalizado': telefono_normalizado
             })
 
     except json.JSONDecodeError:

@@ -11,6 +11,7 @@ from django.contrib import messages
 from ..models import Servicio, Cliente, VentaReserva, ReservaServicio, Pago, Region, Comuna # Relative imports
 # Import the specific signal receiver to disconnect/reconnect
 from ..signals import validar_disponibilidad_admin
+from ..services.cliente_service import ClienteService
 
 def cart_view(request):
     """
@@ -240,82 +241,50 @@ def complete_checkout(request):
                 return JsonResponse({'success': False, 'error': f"Algunos horarios ya no están disponibles: {error_message}"})
 
 
-            # Normalize phone number using Cliente model's method
+            # Crear o actualizar cliente usando el servicio centralizado
             try:
-                formatted_telefono = Cliente.normalize_phone(telefono)
-
-                if not formatted_telefono:
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'Formato de teléfono inválido. Debe tener al menos 9 dígitos.'
-                    })
-            except Exception as e:
-                print(f"Error al normalizar teléfono: {e}")
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Error al validar teléfono: {str(e)}'
-                })
-
-            # Get or create cliente using the normalized phone number
-            try:
-                defaults = {
+                # Preparar datos del cliente para el servicio
+                datos_cliente = {
+                    'telefono': telefono,
                     'nombre': nombre,
-                    'email': email, # Still save email if provided
+                    'email': email,
                     'documento_identidad': documento_identidad
                 }
-                # Add region and comuna if provided
-                if region_id:
-                    defaults['region_id'] = region_id
-                if comuna_id:
-                    defaults['comuna_id'] = comuna_id
 
-                cliente, created = Cliente.objects.get_or_create(
-                    telefono=formatted_telefono, # Use normalized phone number for lookup
-                    defaults=defaults
-                )
+                # Agregar región y comuna si se proporcionaron
+                if region_id:
+                    datos_cliente['region_id'] = int(region_id)
+                if comuna_id:
+                    datos_cliente['comuna_id'] = int(comuna_id)
+
+                # Usar servicio centralizado para crear/actualizar cliente
+                cliente, created, errors = ClienteService.crear_o_actualizar_cliente(datos_cliente)
+
+                if errors:
+                    error_message = "; ".join(errors)
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Error al procesar cliente: {error_message}'
+                    })
+
+                if not cliente:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Error inesperado al procesar datos del cliente'
+                    })
+
+                if created:
+                    print(f"✅ Cliente NUEVO creado en checkout: {cliente.nombre} ({cliente.telefono})")
+                else:
+                    print(f"ℹ️ Cliente EXISTENTE actualizado en checkout: {cliente.nombre} ({cliente.telefono})")
+
             except Exception as e:
-                print(f"Error al crear/obtener cliente: {e}")
+                print(f"❌ Error al crear/obtener cliente en checkout: {e}")
                 traceback.print_exc()
                 return JsonResponse({
                     'success': False,
                     'error': f'Error al procesar datos del cliente: {str(e)}'
                 })
-
-            # If cliente exists, update name/email/region/comuna if they were changed in the form
-            if not created:
-                update_needed = False
-                if cliente.nombre != nombre:
-                    cliente.nombre = nombre
-                    update_needed = True
-                # Update email only if it's provided and different, or if it was null before
-                if email and cliente.email != email:
-                    cliente.email = email
-                    update_needed = True
-                elif not cliente.email and email: # Add email if it was missing
-                    cliente.email = email
-                    update_needed = True
-                # Update document if provided and different
-                if documento_identidad and cliente.documento_identidad != documento_identidad:
-                     cliente.documento_identidad = documento_identidad
-                     update_needed = True
-                elif not cliente.documento_identidad and documento_identidad: # Add doc if missing
-                     cliente.documento_identidad = documento_identidad
-                     update_needed = True
-                # Update region if provided and different
-                if region_id:
-                    region_id_int = int(region_id)
-                    if cliente.region_id != region_id_int:
-                        cliente.region_id = region_id_int
-                        update_needed = True
-                # Update comuna if provided and different
-                if comuna_id:
-                    comuna_id_int = int(comuna_id)
-                    if cliente.comuna_id != comuna_id_int:
-                        cliente.comuna_id = comuna_id_int
-                        update_needed = True
-
-                if update_needed:
-                    cliente.save()
 
             # Create VentaReserva
             with transaction.atomic():
@@ -507,11 +476,11 @@ def complete_checkout(request):
 
 def get_client_details_by_phone(request):
     """
-    API endpoint para buscar cliente por teléfono
-    Normaliza el teléfono y retorna datos del cliente si existe
+    API endpoint para buscar cliente por teléfono usando búsqueda robusta
+    Utiliza múltiples variantes de formato para garantizar encontrar clientes existentes
 
     Respuestas:
-    - found=True, valid=True: Cliente existe, retorna datos
+    - found=True, valid=True: Cliente existe, retorna datos completos
     - found=False, valid=True: Teléfono válido pero cliente no existe
     - found=False, valid=False: Teléfono inválido
     """
@@ -534,31 +503,49 @@ def get_client_details_by_phone(request):
                 'error': 'El teléfono no puede contener letras.'
             })
 
-        # Normalizar teléfono usando el método del modelo Cliente
         try:
-            telefono_normalizado = Cliente.normalize_phone(telefono_raw)
+            print(f"🔍 Búsqueda robusta de cliente con teléfono: {telefono_raw}")
+
+            # Usar servicio robusto de búsqueda con múltiples variantes
+            cliente, telefono_normalizado = ClienteService.buscar_cliente_por_telefono(telefono_raw)
 
             if not telefono_normalizado:
                 return JsonResponse({
                     'found': False,
                     'valid': False,
-                    'error': 'Formato de teléfono inválido. Debe tener al menos 9 dígitos.'
+                    'error': 'Formato de teléfono inválido. Usa formato chileno: +56 9 XXXX XXXX'
                 })
 
-            # Buscar cliente con teléfono normalizado
-            try:
-                cliente = Cliente.objects.get(telefono=telefono_normalizado)
+            if cliente:
+                # Cliente encontrado - retornar datos completos con relaciones
+                datos_cliente = ClienteService.obtener_datos_completos_cliente(cliente)
+
+                print(f"✅ Cliente encontrado en checkout: {cliente.nombre} ({cliente.email}) - Teléfono: {telefono_normalizado}")
+
                 return JsonResponse({
                     'found': True,
                     'valid': True,
-                    'nombre': cliente.nombre,
-                    'email': cliente.email or '',
-                    'ciudad': cliente.ciudad or '',
-                    'documento_identidad': cliente.documento_identidad or '',
-                    'telefono_normalizado': telefono_normalizado
+                    'nombre': datos_cliente['cliente']['nombre'],
+                    'email': datos_cliente['cliente']['email'],
+                    'documento_identidad': datos_cliente['cliente']['documento_identidad'],
+                    'telefono_normalizado': telefono_normalizado,
+
+                    # Datos adicionales para el checkout (región y comuna)
+                    'region_id': datos_cliente['cliente']['region_id'],
+                    'region_nombre': datos_cliente['cliente']['region_nombre'],
+                    'comuna_id': datos_cliente['cliente']['comuna_id'],
+                    'comuna_nombre': datos_cliente['cliente']['comuna_nombre'],
+                    'pais': datos_cliente['cliente']['pais'],
+
+                    # Info adicional del cliente
+                    'numero_visitas': datos_cliente['cliente']['numero_visitas'],
+                    'gasto_total': datos_cliente['cliente']['gasto_total'],
+                    'datos_completos': datos_cliente['cliente']['datos_completos']
                 })
-            except Cliente.DoesNotExist:
+            else:
                 # Cliente no existe, pero teléfono es válido
+                print(f"ℹ️ Cliente nuevo en checkout con teléfono: {telefono_raw} -> normalizado: {telefono_normalizado}")
+
                 return JsonResponse({
                     'found': False,
                     'valid': True,
@@ -567,7 +554,7 @@ def get_client_details_by_phone(request):
                 })
 
         except Exception as e:
-            print(f"Error en get_client_details_by_phone: {e}")
+            print(f"❌ Error en get_client_details_by_phone: {e}")
             traceback.print_exc()
             return JsonResponse({
                 'found': False,

@@ -492,15 +492,36 @@ Email para comprobante: ventas@aremko.cl</pre>
                 }
 
                 if (data.found) {
-                    // Cliente encontrado - auto-fill
+                    // Cliente encontrado - auto-fill con datos completos
                     phoneInput.classList.add('is-valid');
-                    validationMsg.textContent = '✓ Cliente encontrado. Datos cargados.';
+                    validationMsg.textContent = '✓ Cliente encontrado. Datos cargados automáticamente.';
                     validationMsg.className = 'form-text text-success';
 
-                    console.log("Cliente encontrado:", data);
+                    console.log("Cliente encontrado (datos completos):", data);
+
+                    // Llenar campos básicos
                     document.getElementById('checkoutNombre').value = data.nombre || '';
                     document.getElementById('checkoutEmail').value = data.email || '';
                     document.getElementById('checkoutDocumento').value = data.documento_identidad || '';
+
+                    // Auto-completar región si existe
+                    if (data.region_id) {
+                        const regionSelect = document.getElementById('checkoutRegion');
+                        regionSelect.value = data.region_id;
+
+                        // Activar comuna y cargar sus opciones
+                        await loadComunas(data.region_id);
+                        if (data.comuna_id) {
+                            document.getElementById('checkoutComuna').value = data.comuna_id;
+                        }
+
+                        console.log(`✅ Región y comuna cargadas: ${data.region_nombre} - ${data.comuna_nombre}`);
+                    }
+
+                    // Mostrar información adicional del cliente en consola
+                    if (data.numero_visitas > 0) {
+                        console.log(`ℹ️ Cliente fidelizado: ${data.numero_visitas} visitas, gasto total: $${data.gasto_total.toLocaleString('es-CL')}`);
+                    }
                 } else {
                     // Cliente nuevo pero teléfono válido
                     phoneInput.classList.add('is-valid');

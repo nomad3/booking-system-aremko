@@ -371,51 +371,11 @@ class Cliente(models.Model):
     @staticmethod
     def normalize_phone(phone_str):
         """
-        Normaliza número de teléfono a formato estándar CON '+'
-        Para Chile: +56XXXXXXXXX (11-12 dígitos)
-        Para otros países: +CCXXXXXXXXX (código país + número)
-
-        Reglas:
-        - SIEMPRE incluye el signo + al inicio
-        - Sin espacios ni caracteres especiales
-        - Validación estricta de formato
-        - Rechaza números chilenos incompletos (56 + menos de 9 dígitos)
-
-        Returns:
-            str: Teléfono normalizado o None si inválido
+        Normaliza número de teléfono usando servicio centralizado
+        Mantiene compatibilidad con código existente
         """
-        if not phone_str or phone_str.strip() == '':
-            return None
-
-        # Limpiar caracteres no numéricos (excepto +)
-        phone = re.sub(r'[^0-9+]', '', str(phone_str))
-
-        # Remover todos los + para limpiar, luego agregarlo al inicio
-        phone = phone.replace('+', '')
-
-        # Validar longitud mínima
-        if len(phone) < 8:
-            return None
-
-        # Si tiene código de país 56 (Chile), validar ESTRICTAMENTE
-        if phone.startswith('56'):
-            # Chile requiere 56 + 9 dígitos (móvil) o 56 + 1 + 8 dígitos (fijo con área)
-            if len(phone) in [11, 12]:
-                return f'+{phone}'
-            else:
-                # Número chileno incompleto - RECHAZAR
-                return None
-
-        # Si tiene 9 dígitos y empieza con 9 (móvil chileno), agregar código país
-        if len(phone) == 9 and phone.startswith('9'):
-            return f'+56{phone}'
-
-        # Si tiene 8 dígitos (fijo chileno), agregar código país y código área 2 (Santiago)
-        if len(phone) == 8:
-            return f'+562{phone}'
-
-        # Para otros países, solo aceptar números completos (10+ dígitos)
-        return f'+{phone}' if len(phone) >= 10 else None
+        from .services.phone_service import PhoneService
+        return PhoneService.normalize_phone(phone_str)
 
     def save(self, *args, **kwargs):
         """
