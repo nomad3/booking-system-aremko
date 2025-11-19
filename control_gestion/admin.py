@@ -68,9 +68,9 @@ def move_down(modeladmin, request, queryset):
     messages.success(request, f"{queryset.count()} tarea(s) movida(s) abajo en la cola.")
 
 
-@admin.action(description="▶️ Marcar EN CURSO (respeta WIP=1)")
+@admin.action(description="▶️ Marcar EN CURSO")
 def mark_in_progress(modeladmin, request, queryset):
-    """Marca tareas como en curso, respetando WIP=1"""
+    """Marca tareas como en curso"""
     errors = []
     success_count = 0
     
@@ -300,7 +300,7 @@ def export_to_excel(modeladmin, request, queryset):
 
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
-    form = TaskAdminForm  # Usar form personalizado con validación WIP=1
+    form = TaskAdminForm  # Form personalizado (sin restricciones WIP)
     
     list_display = (
         'id',

@@ -2,7 +2,6 @@
 Signals para Control de Gestión
 
 Fase 1 (Etapa 1): Signals internos del módulo
-- Validación WIP=1 (una tarea en curso por persona)
 - Prioridad ALTA va a top de cola
 - Creación automática de logs
 - QA automático al cerrar tarea
@@ -26,25 +25,11 @@ logger = logging.getLogger(__name__)
 def enforce_rules(sender, instance, **kwargs):
     """
     Validación de reglas de negocio antes de guardar una tarea:
-    
-    1. WIP=1: Solo una tarea en curso por persona
-    2. Prioridad ALTA va a posición 1 de la cola
+
+    1. Prioridad ALTA va a posición 1 de la cola
     """
     
-    # Regla WIP=1: Solo una tarea IN_PROGRESS por owner
-    if instance.state == TaskState.IN_PROGRESS:
-        # Verificar si el owner ya tiene otra tarea en curso
-        otras_en_curso = Task.objects.filter(
-            owner=instance.owner,
-            state=TaskState.IN_PROGRESS
-        ).exclude(pk=instance.pk if instance.pk else None)
-        
-        if otras_en_curso.exists():
-            tarea_actual = otras_en_curso.first()
-            raise ValidationError(
-                f"WIP=1: Ya tienes una tarea 'En curso' ('{tarea_actual.title}'). "
-                f"Debes completarla o bloquearla antes de iniciar otra."
-            )
+    # Se eliminó la regla WIP=1 - los usuarios pueden tener múltiples tareas en curso
     
     # Prioridad ALTA va a top de cola
     if instance.priority == Priority.ALTA_CLIENTE_EN_SITIO:
