@@ -193,13 +193,13 @@
         </div>
 
         <div class="form-group">
-            <label for="{{ form.text.id_for_label }}" class="required">{{ form.text.label }}</label>
-            {{ form.text }}
-            {% if form.text.help_text %}
-                <div class="help-text">{{ form.text.help_text }}</div>
+            <label for="{{ form.description.id_for_label }}" class="required">{{ form.description.label }}</label>
+            {{ form.description }}
+            {% if form.description.help_text %}
+                <div class="help-text">{{ form.description.help_text }}</div>
             {% endif %}
-            {% if form.text.errors %}
-                <div class="text-danger">{{ form.text.errors }}</div>
+            {% if form.description.errors %}
+                <div class="text-danger">{{ form.description.errors }}</div>
             {% endif %}
         </div>
 

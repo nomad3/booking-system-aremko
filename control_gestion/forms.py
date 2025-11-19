@@ -83,14 +83,14 @@ class EmergencyTaskForm(forms.ModelForm):
 
     class Meta:
         model = Task
-        fields = ['title', 'text', 'swimlane', 'owner']
+        fields = ['title', 'description', 'swimlane', 'owner']
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Título de la emergencia',
                 'autofocus': True
             }),
-            'text': forms.Textarea(attrs={
+            'description': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 4,
                 'placeholder': 'Descripción completa de la emergencia'
@@ -102,9 +102,9 @@ class EmergencyTaskForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Hacer que el campo text sea requerido
-        self.fields['text'].required = True
-        self.fields['text'].label = "Descripción"
+        # Hacer que el campo description sea requerido
+        self.fields['description'].required = True
+        self.fields['description'].label = "Descripción"
         self.fields['swimlane'].label = "Área"
 
     def save(self, commit=True):
