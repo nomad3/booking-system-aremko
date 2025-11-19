@@ -204,9 +204,14 @@ def equipo_snapshot(request):
             base_query = base_query.filter(swimlane=area_filter)
 
         # Separar tareas EMERGENCIAS - máxima prioridad
-        tareas_emergencias = base_query.filter(
-            time_criticality=TimeCriticality.EMERGENCY
-        ).order_by('created_at')  # Las más recientes primero
+        # Manejo seguro en caso de que la migración no se haya aplicado
+        try:
+            tareas_emergencias = base_query.filter(
+                time_criticality=TimeCriticality.EMERGENCY
+            ).order_by('created_at')  # Las más recientes primero
+        except Exception as e:
+            logger.warning(f"Error filtrando emergencias (migración pendiente?): {str(e)}")
+            tareas_emergencias = Task.objects.none()
 
         # Separar tareas URGENTES (CRITICAL + SCHEDULED) - ordenadas por hora
         tareas_urgentes = base_query.filter(
@@ -240,11 +245,17 @@ def equipo_snapshot(request):
                 logger.warning(f"Error verificando grupo SUPERVISION: {str(e)}")
                 is_supervision = False
 
+        # Contar de forma segura
+        try:
+            count_emergencias = tareas_emergencias.count()
+        except:
+            count_emergencias = 0
+
         context = {
             'tareas_emergencias': tareas_emergencias,
             'tareas_urgentes': tareas_urgentes,
             'tareas_flexibles': tareas_flexibles,
-            'count_emergencias': tareas_emergencias.count(),
+            'count_emergencias': count_emergencias,
             'count_urgentes': tareas_urgentes.count(),
             'count_flexibles': tareas_flexibles.count(),
             'stats': stats,
