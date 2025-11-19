@@ -120,7 +120,7 @@ class EmergencyTaskForm(forms.ModelForm):
         # Configurar valores predefinidos para emergencia
         task.time_criticality = TimeCriticality.EMERGENCY
 
-        task.priority = Priority.ALTA
+        task.priority = Priority.ALTA_CLIENTE_EN_SITIO
         task.queue_position = 1
         task.state = TaskState.BACKLOG
 
