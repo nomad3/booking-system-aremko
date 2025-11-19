@@ -844,18 +844,26 @@ def crear_tarea_emergencia(request):
     if request.method == 'POST':
         form = EmergencyTaskForm(request.POST)
         if form.is_valid():
-            task = form.save(commit=False)
-            # Registrar quién creó la emergencia
-            task.created_by = request.user
-            task.save()
+            try:
+                task = form.save(commit=False)
+                # Registrar quién creó la emergencia
+                task.created_by = request.user
+                task.save()
 
-            # Crear log de creación
-            TaskLog.objects.create(
-                task=task,
-                user=request.user,
-                action='CREATE',
-                details=f'Tarea de EMERGENCIA creada por {request.user.username}'
-            )
+                # Crear log de creación
+                TaskLog.objects.create(
+                    task=task,
+                    user=request.user,
+                    action='CREATE',
+                    details=f'Tarea de EMERGENCIA creada por {request.user.username}'
+                )
+            except Exception as e:
+                logger.error(f"Error creando emergencia: {str(e)}")
+                messages.error(
+                    request,
+                    'Error al crear la emergencia. Por favor, contacta al administrador.'
+                )
+                return render(request, "control_gestion/crear_emergencia.html", {'form': form, 'user': request.user})
 
             messages.success(
                 request,
