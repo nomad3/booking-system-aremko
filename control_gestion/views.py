@@ -203,6 +203,11 @@ def equipo_snapshot(request):
         if area_filter:
             base_query = base_query.filter(swimlane=area_filter)
 
+        # Separar tareas EMERGENCIAS - máxima prioridad
+        tareas_emergencias = base_query.filter(
+            time_criticality=TimeCriticality.EMERGENCY
+        ).order_by('created_at')  # Las más recientes primero
+
         # Separar tareas URGENTES (CRITICAL + SCHEDULED) - ordenadas por hora
         tareas_urgentes = base_query.filter(
             time_criticality__in=[TimeCriticality.CRITICAL, TimeCriticality.SCHEDULED]
@@ -236,8 +241,10 @@ def equipo_snapshot(request):
                 is_supervision = False
 
         context = {
+            'tareas_emergencias': tareas_emergencias,
             'tareas_urgentes': tareas_urgentes,
             'tareas_flexibles': tareas_flexibles,
+            'count_emergencias': tareas_emergencias.count(),
             'count_urgentes': tareas_urgentes.count(),
             'count_flexibles': tareas_flexibles.count(),
             'stats': stats,
@@ -253,8 +260,10 @@ def equipo_snapshot(request):
         logger.error(f"Error en equipo_snapshot: {str(e)}", exc_info=True)
         # Retornar página de error o página vacía
         context = {
+            'tareas_emergencias': Task.objects.none(),
             'tareas_urgentes': Task.objects.none(),
             'tareas_flexibles': Task.objects.none(),
+            'count_emergencias': 0,
             'count_urgentes': 0,
             'count_flexibles': 0,
             'stats': {'total': 0, 'done': 0, 'in_progress': 0, 'blocked': 0, 'backlog': 0},
@@ -807,4 +816,48 @@ def como_usarlo(request):
         'user': request.user,
     }
     return render(request, "control_gestion/como_usarlo.html", context)
+
+
+@login_required
+def crear_tarea_emergencia(request):
+    """
+    Vista para crear tareas de emergencia
+
+    Permite a cualquier usuario crear una tarea marcada como EMERGENCY
+    con prioridad ALTA y posición en cola 1.
+    """
+    from .forms import EmergencyTaskForm
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    if request.method == 'POST':
+        form = EmergencyTaskForm(request.POST)
+        if form.is_valid():
+            task = form.save(commit=False)
+            # Registrar quién creó la emergencia
+            task.created_by = request.user
+            task.save()
+
+            # Crear log de creación
+            TaskLog.objects.create(
+                task=task,
+                user=request.user,
+                action='CREATE',
+                details=f'Tarea de EMERGENCIA creada por {request.user.username}'
+            )
+
+            messages.success(
+                request,
+                f'🚨 ¡Emergencia creada! Tarea #{task.id} - {task.title}'
+            )
+            return redirect('control_gestion:equipo_snapshot')
+    else:
+        form = EmergencyTaskForm()
+
+    context = {
+        'form': form,
+        'user': request.user,
+    }
+
+    return render(request, "control_gestion/crear_emergencia.html", context)
 

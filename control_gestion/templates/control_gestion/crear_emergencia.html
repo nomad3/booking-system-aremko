@@ -1,0 +1,249 @@
+{% extends "control_gestion/base_control.html" %}
+
+{% block title %}Crear Tarea de Emergencia{% endblock %}
+
+{% block extra_head %}
+<style>
+    .emergency-form-container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border: 3px solid #ff0000;
+    }
+
+    .emergency-header {
+        text-align: center;
+        margin-bottom: 30px;
+        color: #ff0000;
+    }
+
+    .emergency-header h1 {
+        font-size: 32px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .emergency-warning {
+        background: #fff5f5;
+        border: 2px solid #ff0000;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+
+    .emergency-warning h3 {
+        color: #ff0000;
+        margin-bottom: 10px;
+    }
+
+    .emergency-warning p {
+        color: #cc0000;
+        margin: 5px 0;
+    }
+
+    .form-group {
+        margin-bottom: 25px;
+    }
+
+    .form-group label {
+        font-weight: 600;
+        color: #2c3e50;
+        display: block;
+        margin-bottom: 8px;
+    }
+
+    .form-group label.required:after {
+        content: " *";
+        color: #ff0000;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px 15px;
+        border: 2px solid #ddd;
+        border-radius: 6px;
+        font-size: 15px;
+        transition: border-color 0.3s;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #ff0000;
+        box-shadow: 0 0 0 3px rgba(255,0,0,0.1);
+    }
+
+    .help-text {
+        font-size: 13px;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+
+    .btn-emergency-submit {
+        background: #ff0000;
+        color: white;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        width: 100%;
+    }
+
+    .btn-emergency-submit:hover {
+        background: #cc0000;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .btn-cancel {
+        background: #6c757d;
+        color: white;
+        padding: 10px 25px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        margin-top: 10px;
+    }
+
+    .btn-cancel:hover {
+        background: #5a6268;
+    }
+
+    .form-actions {
+        text-align: center;
+        margin-top: 30px;
+    }
+
+    .predefined-info {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+    }
+
+    .predefined-info h4 {
+        color: #495057;
+        margin-bottom: 10px;
+    }
+
+    .predefined-info ul {
+        margin: 0;
+        padding-left: 20px;
+    }
+
+    .predefined-info li {
+        color: #6c757d;
+        margin: 5px 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .emergency-form-container {
+            padding: 20px;
+        }
+
+        .emergency-header h1 {
+            font-size: 24px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="emergency-form-container">
+    <div class="emergency-header">
+        <h1>🚨 CREAR TAREA DE EMERGENCIA</h1>
+        <p>Use este formulario SOLO para situaciones que requieren atención inmediata</p>
+    </div>
+
+    <div class="emergency-warning">
+        <h3>⚠️ IMPORTANTE</h3>
+        <p><strong>Las tareas de emergencia deben ser situaciones críticas que no pueden esperar.</strong></p>
+        <p>Ejemplos: Falla del sistema, cliente esperando en sitio con problema grave, pérdida de servicio.</p>
+    </div>
+
+    <div class="predefined-info">
+        <h4>📋 Valores predefinidos para esta tarea:</h4>
+        <ul>
+            <li>Prioridad: <strong>ALTA</strong></li>
+            <li>Criticidad temporal: <strong>EMERGENCIA - Ejecución inmediata</strong></li>
+            <li>Posición en cola: <strong>#1</strong></li>
+            <li>Estado inicial: <strong>Por Ejecutar</strong></li>
+        </ul>
+    </div>
+
+    <form method="post" action="{% url 'control_gestion:crear_tarea_emergencia' %}">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="{{ form.title.id_for_label }}" class="required">Título de la emergencia</label>
+            {{ form.title }}
+            {% if form.title.errors %}
+                <div class="text-danger">{{ form.title.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.text.id_for_label }}" class="required">{{ form.text.label }}</label>
+            {{ form.text }}
+            {% if form.text.help_text %}
+                <div class="help-text">{{ form.text.help_text }}</div>
+            {% endif %}
+            {% if form.text.errors %}
+                <div class="text-danger">{{ form.text.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.swimlane.id_for_label }}" class="required">{{ form.swimlane.label }}</label>
+            {{ form.swimlane }}
+            {% if form.swimlane.errors %}
+                <div class="text-danger">{{ form.swimlane.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.assign_to_group.id_for_label }}">{{ form.assign_to_group.label }}</label>
+            {{ form.assign_to_group }}
+            {% if form.assign_to_group.help_text %}
+                <div class="help-text">{{ form.assign_to_group.help_text }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.owner.id_for_label }}">{{ form.owner.label }}</label>
+            {{ form.owner }}
+            {% if form.owner.help_text %}
+                <div class="help-text">{{ form.owner.help_text }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-emergency-submit">
+                🚨 CREAR EMERGENCIA
+            </button>
+            <br>
+            <a href="{% url 'control_gestion:equipo_snapshot' %}" class="btn-cancel">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<script>
+// Auto-focus en el primer campo
+document.addEventListener('DOMContentLoaded', function() {
+    const titleField = document.getElementById('{{ form.title.id_for_label }}');
+    if (titleField) {
+        titleField.focus();
+    }
+});
+</script>
+{% endblock %}

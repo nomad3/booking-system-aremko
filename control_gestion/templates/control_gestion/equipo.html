@@ -70,6 +70,11 @@
         gap: 10px;
     }
 
+    .section-title.emergency {
+        color: #000000;
+        font-weight: 700;
+    }
+
     .section-title.urgent {
         color: #e74c3c;
     }
@@ -97,6 +102,20 @@
         grid-template-columns: 80px 2fr 1fr 1fr 1fr 100px;
         gap: 15px;
         align-items: center;
+    }
+
+    /* Resaltar las tareas de emergencia */
+    .task-section.emergency {
+        background: #fff5f5;
+        border: 2px solid #ff0000;
+    }
+
+    .task-section.emergency .task-row {
+        background: #fffafa;
+    }
+
+    .task-section.emergency .task-row:hover {
+        background: #ffe8e8;
     }
 
     /* Responsive: Mobile */
@@ -413,6 +432,32 @@
         margin: 0;
         font-size: 16px;
     }
+
+    /* Botón de emergencia */
+    .btn-emergency {
+        background: #ff0000;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-emergency:hover {
+        background: #cc0000;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .emergency-button-container {
+        text-align: center;
+        margin-bottom: 20px;
+    }
 </style>
 <script>
 // Función compartida para cambiar estado
@@ -690,6 +735,81 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="stat-label">Pendientes</div>
     </div>
 </div>
+
+<!-- Botón para crear tarea de emergencia -->
+<div class="emergency-button-container">
+    <a href="{% url 'control_gestion:crear_tarea_emergencia' %}" class="btn-emergency">
+        🚨 CREAR TAREA DE EMERGENCIA
+    </a>
+</div>
+
+<!-- TAREAS EMERGENCIAS -->
+{% if count_emergencias > 0 %}
+<div class="task-section emergency">
+    <div class="section-header">
+        <div class="section-title emergency">
+            ⚠️ TAREAS DE EMERGENCIA
+        </div>
+        <div class="task-count">{{ count_emergencias }} emergencia{{ count_emergencias|pluralize }}</div>
+    </div>
+
+    <div class="task-list">
+        <div class="task-row" style="font-weight: 600; border-bottom: 2px solid #ff0000;">
+            <div>ID</div>
+            <div>Tarea</div>
+            <div>Área</div>
+            <div>Responsable</div>
+            <div>Estado</div>
+            <div>Cola</div>
+        </div>
+
+        {% for task in tareas_emergencias %}
+        <div class="task-row" data-task-id="{{ task.id }}" data-estado="{{ task.state }}"
+             {% if task|can_edit_task:user %}
+             style="cursor: pointer;"
+             {% endif %}>
+            <div style="text-align: center; color: #ff0000; font-family: monospace; font-weight: bold;">
+                {{ task.id }}
+            </div>
+            <div>
+                <a href="/admin/control_gestion/task/{{ task.id }}/change/" style="color: #ff0000; text-decoration: none; font-weight: 700;">
+                    🚨 {{ task.title|truncatewords:10 }}
+                </a>
+                <span style="color: #ff0000; font-size: 12px; font-weight: bold;">
+                    ⚡ INMEDIATO
+                </span>
+                {% if task|can_edit_task:user %}
+                <div class="task-actions-quick">
+                    {% if task.state == 'BACKLOG' %}
+                    <button class="btn-quick btn-quick-start" onclick="cambiarEstadoTarea({{ task.id }}, 'IN_PROGRESS', 'BACKLOG', this)">▶️ Iniciar</button>
+                    {% elif task.state == 'IN_PROGRESS' %}
+                    <button class="btn-quick btn-quick-complete" onclick="cambiarEstadoTarea({{ task.id }}, 'DONE', 'IN_PROGRESS', this)">✅ Completar</button>
+                    <button class="btn-quick btn-quick-block" onclick="cambiarEstadoTarea({{ task.id }}, 'BLOCKED', 'IN_PROGRESS', this)">🚫 Bloquear</button>
+                    {% elif task.state == 'BLOCKED' %}
+                    <button class="btn-quick btn-quick-resume" onclick="cambiarEstadoTarea({{ task.id }}, 'IN_PROGRESS', 'BLOCKED', this)">▶️ Reanudar</button>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            <div>
+                <span class="swimlane-badge swimlane-{{ task.swimlane }}">
+                    {{ task.get_swimlane_display }}
+                </span>
+            </div>
+            <div style="font-weight: 600;">{% if task.owner %}{{ task.owner.username }}{% else %}Sin asignar{% endif %}</div>
+            <div>
+                <span class="state-badge state-{{ task.state }}">
+                    {{ task.get_state_display }}
+                </span>
+            </div>
+            <div style="text-align: center; color: #ff0000; font-weight: bold;">
+                #1
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 
 <!-- TAREAS URGENTES -->
 <div class="task-section">

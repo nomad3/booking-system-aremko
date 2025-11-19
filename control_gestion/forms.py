@@ -7,7 +7,10 @@ errores amigables en el admin.
 
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import Task, TaskState
+from django.contrib.auth import get_user_model
+from .models import Task, TaskState, Priority, TimeCriticality, Swimlane
+
+User = get_user_model()
 
 
 class TaskAdminForm(forms.ModelForm):
@@ -48,4 +51,79 @@ class TaskAdminForm(forms.ModelForm):
                 )
         
         return cleaned_data
+
+
+class EmergencyTaskForm(forms.ModelForm):
+    """
+    Formulario para crear tareas de emergencia
+    """
+
+    # Campo para asignar a grupo (opcional)
+    assign_to_group = forms.CharField(
+        label="Asignar a grupo",
+        required=False,
+        help_text="Nombre del grupo (OPERACIONES, RECEPCION, etc)",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: OPERACIONES, RECEPCION'
+        })
+    )
+
+    # Campo para asignar a usuario específico
+    owner = forms.ModelChoiceField(
+        label="Asignar a usuario específico",
+        queryset=User.objects.filter(is_active=True),
+        required=False,
+        empty_label="Sin asignar",
+        help_text="Si se especifica, ignora el grupo",
+        widget=forms.Select(attrs={
+            'class': 'form-control'
+        })
+    )
+
+    class Meta:
+        model = Task
+        fields = ['title', 'text', 'swimlane', 'owner']
+        widgets = {
+            'title': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Título de la emergencia',
+                'autofocus': True
+            }),
+            'text': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': 'Descripción completa de la emergencia'
+            }),
+            'swimlane': forms.Select(attrs={
+                'class': 'form-control'
+            })
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Hacer que el campo text sea requerido
+        self.fields['text'].required = True
+        self.fields['text'].label = "Descripción"
+        self.fields['swimlane'].label = "Área"
+
+    def save(self, commit=True):
+        task = super().save(commit=False)
+
+        # Configurar valores predefinidos para emergencia
+        task.time_criticality = TimeCriticality.EMERGENCY
+        task.priority = Priority.ALTA
+        task.queue_position = 1
+        task.state = TaskState.BACKLOG
+
+        # Si se especificó un grupo y no un usuario
+        if self.cleaned_data.get('assign_to_group') and not task.owner:
+            # Aquí se podría implementar la lógica para asignar según el grupo
+            # Por ahora lo dejamos sin asignar si no se especifica usuario
+            pass
+
+        if commit:
+            task.save()
+
+        return task
 

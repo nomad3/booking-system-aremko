@@ -49,6 +49,7 @@ class TaskSource(models.TextChoices):
 
 class TimeCriticality(models.TextChoices):
     """Criticidad temporal de la tarea"""
+    EMERGENCY = "EMERGENCY", "Emergencia - Ejecución inmediata"
     CRITICAL = "CRITICAL", "Crítica - Hora exacta"
     SCHEDULED = "SCHEDULED", "Programada - Rango horario"
     FLEXIBLE = "FLEXIBLE", "Flexible - Durante el día"
