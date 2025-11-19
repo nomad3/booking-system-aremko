@@ -118,12 +118,11 @@ class EmergencyTaskForm(forms.ModelForm):
         task = super().save(commit=False)
 
         # Configurar valores predefinidos para emergencia
-        try:
-            # Intentar usar EMERGENCY si está disponible
-            task.time_criticality = TimeCriticality.EMERGENCY
-        except Exception:
-            # Si EMERGENCY no está disponible (migración no aplicada), usar CRITICAL
-            task.time_criticality = TimeCriticality.CRITICAL
+        # TEMPORAL: Usar CRITICAL hasta que se aplique la migración
+        task.time_criticality = TimeCriticality.CRITICAL
+
+        # TODO: Cambiar a EMERGENCY cuando la migración esté aplicada
+        # task.time_criticality = TimeCriticality.EMERGENCY
 
         task.priority = Priority.ALTA
         task.queue_position = 1
