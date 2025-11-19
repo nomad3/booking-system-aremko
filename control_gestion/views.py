@@ -855,7 +855,7 @@ def crear_tarea_emergencia(request):
                     task=task,
                     user=request.user,
                     action='CREATE',
-                    details=f'Tarea de EMERGENCIA/CRÍTICA creada por {request.user.username}'
+                    details=f'Tarea de EMERGENCIA creada por {request.user.username}'
                 )
             except Exception as e:
                 logger.error(f"Error creando emergencia: {str(e)}")
