@@ -256,6 +256,9 @@
             {% if form.assign_to_group.help_text %}
                 <div class="help-text">{{ form.assign_to_group.help_text }}</div>
             {% endif %}
+            {% if form.assign_to_group.errors %}
+                <div class="text-danger">{{ form.assign_to_group.errors }}</div>
+            {% endif %}
         </div>
 
         <div class="form-group">

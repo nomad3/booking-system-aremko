@@ -58,14 +58,23 @@ class EmergencyTaskForm(forms.ModelForm):
     Formulario para crear tareas de emergencia
     """
 
+    # Definir grupos disponibles
+    GRUPOS_CHOICES = [
+        ('', '-- Sin asignar a grupo --'),
+        ('OPERACIONES', 'Operaciones'),
+        ('RECEPCION', 'Recepción'),
+        ('MUCAMAS', 'Mucamas'),
+        ('VENTAS', 'Ventas'),
+    ]
+
     # Campo para asignar a grupo (opcional)
-    assign_to_group = forms.CharField(
+    assign_to_group = forms.ChoiceField(
         label="Asignar a grupo",
+        choices=GRUPOS_CHOICES,
         required=False,
-        help_text="Nombre del grupo (OPERACIONES, RECEPCION, etc)",
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Ej: OPERACIONES, RECEPCION'
+        help_text="Selecciona un grupo para asignar la tarea",
+        widget=forms.Select(attrs={
+            'class': 'form-control'
         })
     )
 
@@ -125,10 +134,16 @@ class EmergencyTaskForm(forms.ModelForm):
         task.state = TaskState.BACKLOG
 
         # Si se especificó un grupo y no un usuario
-        if self.cleaned_data.get('assign_to_group') and not task.owner:
-            # Aquí se podría implementar la lógica para asignar según el grupo
-            # Por ahora lo dejamos sin asignar si no se especifica usuario
-            pass
+        grupo = self.cleaned_data.get('assign_to_group')
+        if grupo and not task.owner:
+            # TODO: Implementar lógica para asignar automáticamente según el grupo
+            # Por ejemplo:
+            # - OPERACIONES: Asignar al operador disponible
+            # - RECEPCION: Asignar al recepcionista de turno
+            # - MUCAMAS: Asignar a la mucama con menos carga
+            # - VENTAS: Asignar al vendedor disponible
+            # Por ahora la tarea queda sin asignar pero con el grupo registrado
+            task.notes = f"[Grupo asignado: {grupo}] {task.notes or ''}"
 
         if commit:
             task.save()
