@@ -20,7 +20,7 @@ import logging
 import os
 
 from .models import (
-    Task, TaskState, Priority, Swimlane, TaskSource, 
+    Task, TaskState, Priority, Swimlane, TaskSource, TimeCriticality,
     ChecklistItem, LocationRef, TaskLog, DailyReport
 )
 from . import ai
@@ -185,31 +185,47 @@ def mi_dia(request):
 def equipo_snapshot(request):
     """
     Vista "Equipo" - Snapshot de todas las tareas del día
-    
+
     Muestra tareas de todo el equipo actualizadas hoy.
+    Separa tareas urgentes (CRITICAL) y flexibles (FLEXIBLE).
     """
-    
+
     today = timezone.localdate()
-    
+
     try:
-        tasks = Task.objects.filter(
+        # Base query para todas las tareas del día
+        base_query = Task.objects.filter(
             updated_at__date=today
-        ).select_related('owner').order_by('swimlane', 'queue_position')
-        
+        ).select_related('owner').exclude(state=TaskState.DONE)
+
         # Filtro por área si se especifica
         area_filter = request.GET.get('area', '')
         if area_filter:
-            tasks = tasks.filter(swimlane=area_filter)
-        
-        # Estadísticas del día
+            base_query = base_query.filter(swimlane=area_filter)
+
+        # Separar tareas URGENTES (CRITICAL + SCHEDULED) - ordenadas por hora
+        tareas_urgentes = base_query.filter(
+            time_criticality__in=[TimeCriticality.CRITICAL, TimeCriticality.SCHEDULED]
+        ).order_by('promise_due_at', 'swimlane', 'queue_position')
+
+        # Tareas FLEXIBLES - ordenadas por swimlane y posición en cola
+        tareas_flexibles = base_query.filter(
+            time_criticality=TimeCriticality.FLEXIBLE
+        ).order_by('swimlane', 'queue_position', 'created_at')
+
+        # Estadísticas del día (incluyendo todas las tareas, incluso las DONE)
+        all_tasks = Task.objects.filter(updated_at__date=today)
+        if area_filter:
+            all_tasks = all_tasks.filter(swimlane=area_filter)
+
         stats = {
-            'total': tasks.count(),
-            'done': tasks.filter(state=TaskState.DONE).count(),
-            'in_progress': tasks.filter(state=TaskState.IN_PROGRESS).count(),
-            'blocked': tasks.filter(state=TaskState.BLOCKED).count(),
-            'backlog': tasks.filter(state=TaskState.BACKLOG).count(),
+            'total': all_tasks.count(),
+            'done': all_tasks.filter(state=TaskState.DONE).count(),
+            'in_progress': all_tasks.filter(state=TaskState.IN_PROGRESS).count(),
+            'blocked': all_tasks.filter(state=TaskState.BLOCKED).count(),
+            'backlog': all_tasks.filter(state=TaskState.BACKLOG).count(),
         }
-        
+
         # Verificar si usuario está en grupo SUPERVISION de forma segura
         is_supervision = False
         if request.user.is_authenticated:
@@ -218,23 +234,29 @@ def equipo_snapshot(request):
             except Exception as e:
                 logger.warning(f"Error verificando grupo SUPERVISION: {str(e)}")
                 is_supervision = False
-        
+
         context = {
-            'tasks': tasks,
+            'tareas_urgentes': tareas_urgentes,
+            'tareas_flexibles': tareas_flexibles,
+            'count_urgentes': tareas_urgentes.count(),
+            'count_flexibles': tareas_flexibles.count(),
             'stats': stats,
             'today': today,
             'area_filter': area_filter,
             'user': request.user,
             'is_supervision': is_supervision
         }
-        
+
         return render(request, "control_gestion/equipo.html", context)
-    
+
     except Exception as e:
         logger.error(f"Error en equipo_snapshot: {str(e)}", exc_info=True)
         # Retornar página de error o página vacía
         context = {
-            'tasks': Task.objects.none(),
+            'tareas_urgentes': Task.objects.none(),
+            'tareas_flexibles': Task.objects.none(),
+            'count_urgentes': 0,
+            'count_flexibles': 0,
             'stats': {'total': 0, 'done': 0, 'in_progress': 0, 'blocked': 0, 'backlog': 0},
             'today': today,
             'area_filter': '',
