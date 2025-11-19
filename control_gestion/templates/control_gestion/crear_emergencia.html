@@ -145,6 +145,31 @@
         margin: 5px 0;
     }
 
+    .alert {
+        padding: 15px;
+        margin-bottom: 20px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+    }
+
+    .alert-danger {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+    }
+
+    .alert-success {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+    }
+
+    .text-danger {
+        color: #ff0000;
+        font-size: 14px;
+        margin-top: 5px;
+    }
+
     /* Responsive */
     @media (max-width: 768px) {
         .emergency-form-container {
@@ -180,6 +205,20 @@
             <li>Estado inicial: <strong>Por Ejecutar</strong></li>
         </ul>
     </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} {% if message.tags == 'error' %}alert-danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
 
     <form method="post" action="{% url 'control_gestion:crear_tarea_emergencia' %}">
         {% csrf_token %}

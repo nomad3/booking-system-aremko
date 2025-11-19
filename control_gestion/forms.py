@@ -102,10 +102,17 @@ class EmergencyTaskForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Hacer que el campo description sea requerido
+        # Hacer que los campos sean requeridos con mensajes personalizados
+        self.fields['title'].required = True
+        self.fields['title'].error_messages = {'required': 'El título de la emergencia es obligatorio'}
+
         self.fields['description'].required = True
         self.fields['description'].label = "Descripción"
+        self.fields['description'].error_messages = {'required': 'La descripción es obligatoria'}
+
         self.fields['swimlane'].label = "Área"
+        self.fields['swimlane'].required = True
+        self.fields['swimlane'].error_messages = {'required': 'Debes seleccionar un área'}
 
     def save(self, commit=True):
         task = super().save(commit=False)
