@@ -853,9 +853,9 @@ def crear_tarea_emergencia(request):
                 # Crear log de creación
                 TaskLog.objects.create(
                     task=task,
-                    user=request.user,
+                    actor=request.user,
                     action='CREATE',
-                    details=f'Tarea de EMERGENCIA creada por {request.user.username}'
+                    note=f'Tarea de EMERGENCIA creada por {request.user.username}'
                 )
             except Exception as e:
                 logger.error(f"Error creando emergencia: {str(e)}")
