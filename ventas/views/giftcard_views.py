@@ -387,55 +387,110 @@ def giftcard_wizard(request):
     6. Checkout
     """
 
-    # Opciones de experiencias/servicios
+    # Opciones de experiencias/servicios organizadas por categorías
     experiencias = [
+        # ========== GRUPO TINAS ==========
         {
             'id': 'tinas',
-            'nombre': 'Tinas Calientes',
-            'descripcion': 'Tinas calientes para dos personas en tinas con o sin hidromasaje junto al Río Pescado',
+            'categoria': 'tinas',
+            'nombre': 'Tina para 2',
+            'descripcion': 'Tinas calientes para dos personas',
             'descripcion_giftcard': 'Tinas calientes para dos personas en tinas con o sin hidromasaje junto al Río Pescado',
             'imagen': 'images/tinas.jpg',
             'monto_fijo': 50000,
             'montos_sugeridos': []
         },
         {
-            'id': 'masajes',
-            'nombre': 'Masajes Relajantes Para Dos',
-            'descripcion': 'Sesión de masajes profesionales para dos personas',
-            'descripcion_giftcard': 'Masajes para dos en domos de Bienestar en medio del antiguo bosque nativo de Aremko, junto al Río Pescado',
-            'imagen': 'images/masajes.jpg',
-            'monto_fijo': 80000,
+            'id': 'tinas_masajes_semana',
+            'categoria': 'tinas',
+            'nombre': 'Tina + Masajes (Dom-Jue)',
+            'descripcion': 'Tina con masajes para dos de domingo a jueves',
+            'descripcion_giftcard': 'Tinas calientes + masajes relajantes para dos personas de domingo a jueves',
+            'imagen': 'images/tinas_masajes.jpg',
+            'monto_fijo': 95000,
             'montos_sugeridos': []
         },
         {
-            'id': 'cabanas',
-            'nombre': 'Alojamiento en Cabaña Para Dos',
-            'descripcion': 'Estadía completa en nuestras cabañas para dos personas',
-            'descripcion_giftcard': 'Alojamiento para dos en cabaña de maderas nativas, en medio del antiguo bosque nativo, junto al Río Pescado',
-            'imagen': 'images/cabanas.jpg',
-            'monto_fijo': 90000,
+            'id': 'tinas_masajes_finde',
+            'categoria': 'tinas',
+            'nombre': 'Tina + Masajes (Vie-Sáb)',
+            'descripcion': 'Tina con masajes para dos viernes o sábado',
+            'descripcion_giftcard': 'Tinas calientes + masajes relajantes para dos personas viernes o sábado',
+            'imagen': 'images/tinas_masajes.jpg',
+            'monto_fijo': 130000,
+            'montos_sugeridos': []
+        },
+
+        # ========== GRUPO SOLO MASAJES ==========
+        {
+            'id': 'masaje_piedras',
+            'categoria': 'masajes',
+            'nombre': 'Masaje Piedras Calientes',
+            'descripcion': 'Masaje con piedras calientes para 1 persona',
+            'descripcion_giftcard': 'Masaje con piedras calientes volcánicas para una persona en domos de bienestar',
+            'imagen': 'images/masaje_piedras.jpg',
+            'monto_fijo': 40000,
             'montos_sugeridos': []
         },
         {
-            'id': 'alojamiento_tinas',
-            'nombre': 'Alojamiento + Tinas Para Dos',
-            'descripcion': 'Paquete completo: estadía en cabaña + tinas calientes para dos',
-            'descripcion_giftcard': 'Alojamiento para dos en cabaña de maderas nativas + tinas calientes con o sin hidromasaje, en medio del antiguo bosque nativo junto al Río Pescado',
-            'imagen': 'images/paquete_alojamiento_tinas.jpg',
-            'monto_fijo': 140000,
+            'id': 'masaje_deportivo',
+            'categoria': 'masajes',
+            'nombre': 'Masaje Deportivo',
+            'descripcion': 'Masaje deportivo profesional para 1 persona',
+            'descripcion_giftcard': 'Masaje deportivo profesional para una persona, ideal para recuperación muscular',
+            'imagen': 'images/masaje_deportivo.jpg',
+            'monto_fijo': 45000,
             'montos_sugeridos': []
         },
         {
-            'id': 'celebracion',
-            'nombre': 'Alojamiento + Tinas + Desayuno + Ambientación Romántica',
-            'descripcion': 'Paquete completo romántico con todos los detalles',
-            'descripcion_giftcard': 'Alojamiento para dos en cabaña de maderas nativas + tinas calientes con ambientación romántica (velas y botella de espumante) + desayuno, en medio del antiguo bosque nativo junto al Río Pescado',
-            'imagen': 'images/celebracion.jpg',
-            'monto_fijo': 150000,
+            'id': 'drenaje_linfatico',
+            'categoria': 'masajes',
+            'nombre': 'Drenaje Linfático',
+            'descripcion': 'Drenaje linfático para 1 persona',
+            'descripcion_giftcard': 'Sesión de drenaje linfático profesional para una persona',
+            'imagen': 'images/drenaje_linfatico.jpg',
+            'monto_fijo': 45000,
             'montos_sugeridos': []
         },
+
+        # ========== GRUPO ALOJAMIENTOS ==========
+        {
+            'id': 'alojamiento_semana',
+            'categoria': 'alojamiento',
+            'nombre': 'Alojamiento + Tinas (Dom-Jue)',
+            'descripcion': 'Alojamiento para dos con tinas de domingo a jueves',
+            'descripcion_giftcard': 'Alojamiento para dos en cabaña + tinas calientes de domingo a jueves',
+            'imagen': 'images/alojamiento_tinas.jpg',
+            'monto_fijo': 95000,
+            'montos_sugeridos': []
+        },
+
+        # ========== GRUPO CELEBRACIONES ==========
+        {
+            'id': 'tina_cumpleanos',
+            'categoria': 'celebraciones',
+            'nombre': 'Tina + Ambientación Cumpleaños',
+            'descripcion': 'Tina más ambientación de cumpleaños para dos',
+            'descripcion_giftcard': 'Tinas calientes + ambientación especial de cumpleaños para dos personas',
+            'imagen': 'images/tina_cumpleanos.jpg',
+            'monto_fijo': 88000,
+            'montos_sugeridos': []
+        },
+        {
+            'id': 'tina_celebracion',
+            'categoria': 'celebraciones',
+            'nombre': 'Tina + Celebración Especial',
+            'descripcion': 'Tina más celebración especial para dos',
+            'descripcion_giftcard': 'Tinas calientes + ambientación para celebración especial para dos personas',
+            'imagen': 'images/tina_celebracion.jpg',
+            'monto_fijo': 82000,
+            'montos_sugeridos': []
+        },
+
+        # ========== MONTO LIBRE ==========
         {
             'id': 'monto_libre',
+            'categoria': 'libre',
             'nombre': 'Monto Libre',
             'descripcion': 'El destinatario elige la experiencia',
             'descripcion_giftcard': 'Vale por el monto indicado para usar en cualquier experiencia de Aremko Spa',

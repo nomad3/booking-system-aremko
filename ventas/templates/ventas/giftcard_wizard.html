@@ -272,6 +272,49 @@
         border-color: #28a745 !important;
         background-color: rgba(40, 167, 69, 0.05);
     }
+
+    /* Category Group Styles */
+    .category-group {
+        padding: 20px 0;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .category-group:last-child {
+        border-bottom: none;
+    }
+
+    .category-title {
+        color: var(--primary-color);
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 25px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Mobile responsiveness for categories */
+    @media (max-width: 768px) {
+        .category-title {
+            font-size: 1.3rem;
+        }
+
+        .experience-grid {
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .experience-card {
+            padding: 15px;
+        }
+
+        .experience-card h3 {
+            font-size: 1rem;
+        }
+
+        .experience-card i {
+            font-size: 2.5rem;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -309,17 +352,88 @@
             <h2 class="step-title">Elige la Experiencia</h2>
             <p class="step-subtitle">Selecciona qué experiencia quieres regalar</p>
 
-            <div class="experience-grid" id="experienceGrid">
-                {% for exp in experiencias %}
-                <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" onclick="selectExperience('{{ exp.id }}')">
-                    <i class="fas {% if exp.id == 'tinas' %}fa-hot-tub{% elif exp.id == 'masajes' %}fa-spa{% elif exp.id == 'cabanas' %}fa-home{% elif exp.id == 'alojamiento_tinas' %}fa-bed{% elif exp.id == 'celebracion' %}fa-champagne-glasses{% else %}fa-gift{% endif %}"></i>
-                    <h5>{{ exp.nombre }}</h5>
-                    <p>{{ exp.descripcion }}</p>
-                    {% if exp.monto_fijo %}
-                    <p class="text-success fw-bold fs-5 mt-2">${{ exp.monto_fijo|floatformat:0|intcomma }}</p>
+            <!-- Grupo TINAS -->
+            <div class="category-group mb-4">
+                <h3 class="category-title text-center mb-3">
+                    <i class="fas fa-hot-tub me-2"></i>TINAS
+                </h3>
+                <div class="experience-grid" id="experienceGrid">
+                    {% for exp in experiencias %}
+                    {% if exp.categoria == 'tinas' %}
+                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" onclick="selectExperience('{{ exp.id }}')">
+                        <i class="fas fa-hot-tub"></i>
+                        <h5>{{ exp.nombre }}</h5>
+                        <p>{{ exp.descripcion }}</p>
+                        {% if exp.monto_fijo %}
+                        <p class="text-success fw-bold fs-5 mt-2">${{ exp.monto_fijo|floatformat:0|intcomma }}</p>
+                        {% endif %}
+                    </div>
                     {% endif %}
+                    {% endfor %}
                 </div>
-                {% endfor %}
+            </div>
+
+            <!-- Grupo MASAJES -->
+            <div class="category-group mb-4">
+                <h3 class="category-title text-center mb-3">
+                    <i class="fas fa-spa me-2"></i>MASAJES
+                </h3>
+                <div class="experience-grid">
+                    {% for exp in experiencias %}
+                    {% if exp.categoria == 'masajes' %}
+                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" onclick="selectExperience('{{ exp.id }}')">
+                        <i class="fas fa-spa"></i>
+                        <h5>{{ exp.nombre }}</h5>
+                        <p>{{ exp.descripcion }}</p>
+                        {% if exp.monto_fijo %}
+                        <p class="text-success fw-bold fs-5 mt-2">${{ exp.monto_fijo|floatformat:0|intcomma }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Grupo ALOJAMIENTOS -->
+            <div class="category-group mb-4">
+                <h3 class="category-title text-center mb-3">
+                    <i class="fas fa-bed me-2"></i>ALOJAMIENTOS
+                </h3>
+                <div class="experience-grid">
+                    {% for exp in experiencias %}
+                    {% if exp.categoria == 'alojamientos' %}
+                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" onclick="selectExperience('{{ exp.id }}')">
+                        <i class="fas fa-bed"></i>
+                        <h5>{{ exp.nombre }}</h5>
+                        <p>{{ exp.descripcion }}</p>
+                        {% if exp.monto_fijo %}
+                        <p class="text-success fw-bold fs-5 mt-2">${{ exp.monto_fijo|floatformat:0|intcomma }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Grupo CELEBRACIONES -->
+            <div class="category-group mb-4">
+                <h3 class="category-title text-center mb-3">
+                    <i class="fas fa-champagne-glasses me-2"></i>CELEBRACIONES
+                </h3>
+                <div class="experience-grid">
+                    {% for exp in experiencias %}
+                    {% if exp.categoria == 'celebraciones' %}
+                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" onclick="selectExperience('{{ exp.id }}')">
+                        <i class="fas fa-champagne-glasses"></i>
+                        <h5>{{ exp.nombre }}</h5>
+                        <p>{{ exp.descripcion }}</p>
+                        {% if exp.monto_fijo %}
+                        <p class="text-success fw-bold fs-5 mt-2">${{ exp.monto_fijo|floatformat:0|intcomma }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
             </div>
 
             <div id="amountSelection" style="display:none;">
