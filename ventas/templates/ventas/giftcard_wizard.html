@@ -90,10 +90,14 @@
 
     /* Wizard Content */
     .wizard-content {
-        background-color: white;
-        border-radius: 12px;
-        padding: 40px;
-        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+        background-color: #ffffff;
+        background-image:
+            radial-gradient(circle at 1px 1px, rgba(160, 82, 45, 0.02) 1px, transparent 1px);
+        background-size: 40px 40px;
+        border-radius: 20px;
+        padding: 50px 40px;
+        box-shadow: 0 4px 25px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(160, 82, 45, 0.08);
     }
 
     .step-title {
@@ -114,29 +118,55 @@
     /* Experience Cards */
     .experience-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 20px;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 25px;
         margin-bottom: 30px;
     }
 
     .experience-card {
-        border: 2px solid #e0e0e0;
-        border-radius: 12px;
-        padding: 20px;
+        background: linear-gradient(145deg, #ffffff 0%, #f9f9f9 100%);
+        border: 1px solid rgba(160, 82, 45, 0.15);
+        border-radius: 16px;
+        padding: 25px;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: all 0.4s ease;
         text-align: center;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    }
+
+    .experience-card::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: linear-gradient(45deg, #A0522D, #D2691E, #CD853F);
+        border-radius: 16px;
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        z-index: -1;
     }
 
     .experience-card:hover {
-        border-color: var(--primary-color);
-        transform: translateY(-5px);
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        transform: translateY(-8px);
+        box-shadow: 0 12px 30px rgba(160, 82, 45, 0.15);
+    }
+
+    .experience-card:hover::before {
+        opacity: 0.15;
     }
 
     .experience-card.selected {
+        background: linear-gradient(145deg, #fff8f0 0%, #ffe8d6 100%);
         border-color: var(--primary-color);
-        background-color: rgba(160, 82, 45, 0.05);
+        box-shadow: 0 8px 25px rgba(160, 82, 45, 0.2);
+    }
+
+    .experience-card.selected::before {
+        opacity: 0.2;
     }
 
     .experience-card img {
@@ -147,17 +177,55 @@
         margin-bottom: 15px;
     }
 
-    .experience-card h3 {
-        font-size: 1.2rem;
+    .experience-card h5 {
+        font-size: 1.3rem;
         font-weight: 700;
-        color: var(--dark-gray);
+        color: #5C4033;
         margin-bottom: 10px;
+        margin-top: 15px;
     }
 
     .experience-card p {
-        font-size: 0.9rem;
-        color: var(--light-gray);
+        font-size: 0.95rem;
+        color: #7a6a5a;
         margin-bottom: 15px;
+        line-height: 1.5;
+    }
+
+    /* Precio con estilo elegante */
+    .experience-card .price-tag {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        font-size: 1.6rem !important;
+        font-weight: 800 !important;
+        margin-top: 15px;
+        padding: 8px 20px;
+        border-radius: 30px;
+        display: inline-block;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .experience-card .price-tag::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .experience-card:hover .price-tag::before {
+        left: 100%;
+    }
+
+    .experience-card:hover .price-tag {
+        transform: scale(1.05);
+        box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
     }
 
     /* Amount Selection */
@@ -251,9 +319,67 @@
 
     /* Icon Styles */
     .experience-card i {
-        font-size: 3rem;
-        color: var(--primary-color);
-        margin-bottom: 15px;
+        font-size: 3.5rem;
+        margin-bottom: 20px;
+        display: inline-block;
+        background: linear-gradient(135deg, #A0522D 0%, #D2691E 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        filter: drop-shadow(0 4px 8px rgba(160, 82, 45, 0.3));
+        transition: all 0.3s ease;
+    }
+
+    .experience-card:hover i {
+        transform: scale(1.1) rotate(5deg);
+        filter: drop-shadow(0 6px 12px rgba(160, 82, 45, 0.4));
+    }
+
+    /* Animación de entrada */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .experience-card {
+        animation: fadeInUp 0.6s ease-out;
+        animation-fill-mode: both;
+    }
+
+    /* Retraso escalonado para animación */
+    .category-group:nth-child(1) .experience-card:nth-child(1) { animation-delay: 0.1s; }
+    .category-group:nth-child(1) .experience-card:nth-child(2) { animation-delay: 0.2s; }
+    .category-group:nth-child(1) .experience-card:nth-child(3) { animation-delay: 0.3s; }
+
+    /* Colores específicos por categoría */
+    .experience-card[data-experience*="tina"] i {
+        background: linear-gradient(135deg, #2E86AB 0%, #4ECDC4 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .experience-card[data-experience*="masaje"] i {
+        background: linear-gradient(135deg, #B8336A 0%, #E63946 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .experience-card[data-experience*="alojamiento"] i {
+        background: linear-gradient(135deg, #2A9D8F 0%, #264653 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .experience-card[data-experience*="celebracion"] i,
+    .experience-card[data-experience*="cumpleanos"] i {
+        background: linear-gradient(135deg, #F77F00 0%, #FCBF49 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
     }
 
     /* Mensaje Card Styles */
@@ -275,21 +401,69 @@
 
     /* Category Group Styles */
     .category-group {
-        padding: 20px 0;
-        border-bottom: 1px solid #e0e0e0;
+        padding: 30px 0;
+        position: relative;
     }
 
-    .category-group:last-child {
-        border-bottom: none;
+    .category-group::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80%;
+        height: 1px;
+        background: linear-gradient(90deg, transparent 0%, rgba(160, 82, 45, 0.2) 50%, transparent 100%);
+    }
+
+    .category-group:last-child::after {
+        display: none;
     }
 
     .category-title {
-        color: var(--primary-color);
-        font-size: 1.5rem;
-        font-weight: 700;
-        margin-bottom: 25px;
+        font-size: 1.8rem;
+        font-weight: 800;
+        margin-bottom: 35px;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 2px;
+        position: relative;
+        display: inline-block;
+        width: 100%;
+        background: linear-gradient(135deg, #5C4033 0%, #A0522D 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .category-title i {
+        font-size: 1.6rem;
+        margin-right: 12px;
+        opacity: 0.9;
+    }
+
+    /* Estilos específicos por categoría */
+    .category-group:nth-child(1) .category-title {
+        background: linear-gradient(135deg, #2E86AB 0%, #4ECDC4 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .category-group:nth-child(2) .category-title {
+        background: linear-gradient(135deg, #B8336A 0%, #E63946 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .category-group:nth-child(3) .category-title {
+        background: linear-gradient(135deg, #2A9D8F 0%, #264653 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .category-group:nth-child(4) .category-title {
+        background: linear-gradient(135deg, #F77F00 0%, #FCBF49 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
     }
 
     /* Mobile responsiveness for categories */
@@ -365,7 +539,7 @@
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
                         {% if exp.monto_fijo %}
-                        <p class="text-success fw-bold fs-5 mt-2">${{ exp.monto_fijo|floatformat:0|intcomma }}</p>
+                        <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
                         {% endif %}
                     </div>
                     {% endif %}
@@ -386,7 +560,7 @@
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
                         {% if exp.monto_fijo %}
-                        <p class="text-success fw-bold fs-5 mt-2">${{ exp.monto_fijo|floatformat:0|intcomma }}</p>
+                        <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
                         {% endif %}
                     </div>
                     {% endif %}
@@ -407,7 +581,7 @@
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
                         {% if exp.monto_fijo %}
-                        <p class="text-success fw-bold fs-5 mt-2">${{ exp.monto_fijo|floatformat:0|intcomma }}</p>
+                        <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
                         {% endif %}
                     </div>
                     {% endif %}
@@ -428,7 +602,7 @@
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
                         {% if exp.monto_fijo %}
-                        <p class="text-success fw-bold fs-5 mt-2">${{ exp.monto_fijo|floatformat:0|intcomma }}</p>
+                        <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
                         {% endif %}
                     </div>
                     {% endif %}
