@@ -235,7 +235,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
     cobrado_display.short_description = 'Cobrado'
 
     def ver_servicios(self, obj):
-        servicios = obj.reservaservicio_set.all()
+        servicios = obj.reservaservicios.all()
         if servicios:
             items = []
             for rs in servicios:
@@ -248,7 +248,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
 
     def mostrar_servicios_reservados(self, obj):
         """Muestra todos los servicios reservados con formato detallado"""
-        servicios = obj.reservaservicio_set.all().select_related('servicio', 'proveedor_asignado')
+        servicios = obj.reservaservicios.all().select_related('servicio', 'proveedor_asignado')
         if not servicios:
             return "No hay servicios reservados"
 
@@ -802,7 +802,7 @@ class ClienteAdmin(admin.ModelAdmin):
 
     def historial_compras(self, obj):
         """Muestra las últimas compras del cliente"""
-        ventas = obj.ventareserva_set.order_by('-fecha')[:10]
+        ventas = obj.ventareserva_set.order_by('-fecha_creacion')[:10]
 
         if not ventas:
             return "No hay compras registradas"
@@ -818,13 +818,13 @@ class ClienteAdmin(admin.ModelAdmin):
         for i, venta in enumerate(ventas):
             bg_color = '#ffffff' if i % 2 == 0 else '#f9f9f9'
             servicios = ', '.join([
-                rs.servicio.nombre for rs in venta.reservaservicio_set.all()
+                rs.servicio.nombre for rs in venta.reservaservicios.all()
             ])
 
             html += f'<tr style="background-color: {bg_color};">'
-            html += f'<td style="padding: 5px;">{venta.fecha.strftime("%d/%m/%Y")}</td>'
+            html += f'<td style="padding: 5px;">{venta.fecha_creacion.strftime("%d/%m/%Y")}</td>'
             html += f'<td style="padding: 5px;">${venta.total:,.0f}</td>'
-            html += f'<td style="padding: 5px;">{venta.estado}</td>'
+            html += f'<td style="padding: 5px;">{venta.estado_reserva}</td>'
             html += f'<td style="padding: 5px; font-size: 0.9em;">{servicios}</td>'
             html += '</tr>'
 
