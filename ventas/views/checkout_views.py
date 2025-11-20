@@ -349,6 +349,34 @@ def complete_checkout(request):
                             cantidad_personas=servicio_item['cantidad_personas']
                         )
 
+                    # Aplicar descuentos por pack como ReservaServicio
+                    if calculos.get('total_descuentos', 0) > 0:
+                        try:
+                            # Buscar servicio especial de descuento
+                            servicio_descuento = Servicio.objects.get(
+                                nombre__icontains='descuento',
+                                precio_base=-1
+                            )
+
+                            # Usar fecha del primer servicio del carrito
+                            fecha_descuento = datetime.strptime(
+                                cart['servicios'][0]['fecha'], '%Y-%m-%d'
+                            ).date()
+
+                            # Crear ReservaServicio con el descuento
+                            ReservaServicio.objects.create(
+                                venta_reserva=venta,
+                                servicio=servicio_descuento,
+                                fecha_agendamiento=fecha_descuento,
+                                hora_inicio='00:00',  # Hora especial para descuentos
+                                cantidad_personas=int(calculos['total_descuentos'])
+                            )
+                            print(f"✅ Descuento pack aplicado: ${calculos['total_descuentos']:,.0f}")
+                        except Servicio.DoesNotExist:
+                            print("⚠️ Servicio de descuento no encontrado. Verifique que existe un servicio con nombre 'descuento' y precio_base=-1")
+                        except Exception as e:
+                            print(f"⚠️ Error al aplicar descuento pack: {e}")
+
                     # Create GiftCard for each giftcard in cart
                     from ..models import GiftCard
                     from datetime import timedelta
