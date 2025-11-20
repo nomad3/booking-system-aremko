@@ -1,5 +1,6 @@
 from django.contrib import admin, messages
 from django import forms
+from django.db import models
 from .forms import PagoInlineForm
 from django.forms import DateTimeInput
 from datetime import date, datetime, timedelta  # Importa date, datetime, y timedelta
