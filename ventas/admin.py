@@ -974,19 +974,28 @@ class CategoriaServicioAdmin(admin.ModelAdmin):
 
 @admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'categoria', 'precio_con_formato', 'duracion_horas',
-                   'capacidad_maxima', 'activo', 'popularidad')
-    list_filter = ('categoria', 'activo', 'duracion_horas')
-    search_fields = ('nombre', 'descripcion')
+    list_display = ('nombre', 'categoria', 'tipo_servicio', 'precio_con_formato', 'duracion_minutos',
+                   'capacidad_maxima', 'activo', 'publicado_web', 'popularidad')
+    list_filter = ('categoria', 'tipo_servicio', 'activo', 'publicado_web')
+    search_fields = ('nombre', 'descripcion_web')
     ordering = ('categoria', 'nombre')
     readonly_fields = ('popularidad',)
 
     fieldsets = (
         ('Información General', {
-            'fields': ('nombre', 'categoria', 'descripcion', 'activo')
+            'fields': ('nombre', 'categoria', 'tipo_servicio', 'descripcion_web', 'imagen')
         }),
-        ('Configuración', {
-            'fields': ('precio', 'duracion_horas', 'capacidad_maxima')
+        ('Configuración de Reserva', {
+            'fields': ('precio_base', 'duracion', 'capacidad_minima', 'capacidad_maxima',
+                      'horario_apertura', 'horario_cierre', 'slots_disponibles')
+        }),
+        ('Proveedores', {
+            'fields': ('proveedores',),
+            'description': 'Selecciona los proveedores que pueden realizar este servicio (ej. masajistas).'
+        }),
+        ('Visibilidad', {
+            'fields': ('activo', 'publicado_web'),
+            'description': 'Activo = disponible internamente. Publicado web = visible en www.aremko.cl'
         }),
         ('Estadísticas', {
             'fields': ('popularidad',),
@@ -995,9 +1004,14 @@ class ServicioAdmin(admin.ModelAdmin):
     )
 
     def precio_con_formato(self, obj):
-        return f"${obj.precio:,.0f}"
+        return f"${obj.precio_base:,.0f}"
     precio_con_formato.short_description = 'Precio'
-    precio_con_formato.admin_order_field = 'precio'
+    precio_con_formato.admin_order_field = 'precio_base'
+
+    def duracion_minutos(self, obj):
+        return f"{obj.duracion} min"
+    duracion_minutos.short_description = 'Duración'
+    duracion_minutos.admin_order_field = 'duracion'
 
     def popularidad(self, obj):
         """Muestra qué tan popular es el servicio"""
