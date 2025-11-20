@@ -172,17 +172,20 @@
                     <i class="fas fa-info-circle"></i>
                     Selecciona categorías generales. El pack aplicará con cualquier servicio de esas categorías.
                 </div>
-                {% for value, label in form.fields.tipo_pack.widget.attrs.tipo_choices %}
-                    <div class="form-check">
-                        <input type="checkbox" name="tipos_servicio"
-                               value="{{ value }}"
-                               id="tipo_{{ value }}"
-                               class="form-check-input">
-                        <label class="form-check-label" for="tipo_{{ value }}">
-                            {{ label }}
-                        </label>
-                    </div>
-                {% endfor %}
+                <div class="tipo-servicio-grid">
+                    {% for value, label in tipo_servicio_choices %}
+                        <div class="form-check">
+                            <input type="checkbox" name="tipos_servicio"
+                                   value="{{ value }}"
+                                   id="tipo_{{ value }}"
+                                   class="form-check-input"
+                                   {% if form.instance.pk and value in form.instance.servicios_requeridos %}checked{% endif %}>
+                            <label class="form-check-label" for="tipo_{{ value }}">
+                                {{ label }}
+                            </label>
+                        </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
 

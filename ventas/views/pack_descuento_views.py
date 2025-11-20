@@ -76,7 +76,8 @@ def pack_create_view(request):
     context = {
         'form': form,
         'title': 'Crear Pack de Descuento',
-        'servicios_por_tipo': servicios_por_tipo
+        'servicios_por_tipo': servicios_por_tipo,
+        'tipo_servicio_choices': PackDescuento.TIPO_SERVICIO_CHOICES
     }
     return render(request, 'ventas/pack_descuento/form.html', context)
 
@@ -132,7 +133,8 @@ def pack_edit_view(request, pk):
         'form': form,
         'pack': pack,
         'title': f'Editar Pack: {pack.nombre}',
-        'servicios_por_tipo': servicios_por_tipo
+        'servicios_por_tipo': servicios_por_tipo,
+        'tipo_servicio_choices': PackDescuento.TIPO_SERVICIO_CHOICES
     }
     return render(request, 'ventas/pack_descuento/form.html', context)
 

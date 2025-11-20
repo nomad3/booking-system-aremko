@@ -104,6 +104,14 @@ class PackDescuentoForm(forms.ModelForm):
         # Personalizar cómo se muestran los servicios en el formulario
         self.fields['servicios_especificos'].label_from_instance = lambda obj: f"{obj.nombre} (${obj.precio_base:,.0f}) {'✓' if obj.activo else '✗'}"
 
+        # SIEMPRE agregar el campo tipos_servicio (no solo cuando editamos)
+        self.fields['tipos_servicio'] = forms.MultipleChoiceField(
+            choices=PackDescuento.TIPO_SERVICIO_CHOICES,
+            widget=forms.CheckboxSelectMultiple,
+            required=False,
+            label='Tipos de servicio requeridos'
+        )
+
         # Si estamos editando
         if self.instance.pk:
             # Cargar días de la semana
@@ -115,13 +123,7 @@ class PackDescuentoForm(forms.ModelForm):
             else:
                 self.fields['tipo_pack'].initial = 'por_tipo'
                 # Cargar tipos de servicio seleccionados
-                self.fields['tipos_servicio'] = forms.MultipleChoiceField(
-                    choices=PackDescuento.TIPO_SERVICIO_CHOICES,
-                    widget=forms.CheckboxSelectMultiple,
-                    initial=self.instance.servicios_requeridos,
-                    required=False,
-                    label='Tipos de servicio requeridos'
-                )
+                self.fields['tipos_servicio'].initial = self.instance.servicios_requeridos
 
     def clean(self):
         cleaned_data = super().clean()
