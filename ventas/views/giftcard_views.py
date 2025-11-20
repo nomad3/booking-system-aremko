@@ -452,16 +452,46 @@ def giftcard_wizard(request):
             'monto_fijo': 45000,
             'montos_sugeridos': []
         },
+        {
+            'id': 'masaje_pareja',
+            'categoria': 'masajes',
+            'nombre': 'Masaje para Dos',
+            'descripcion': 'Masaje relajante o descontracturante para dos personas',
+            'descripcion_giftcard': 'Masaje relajante o descontracturante para dos personas en nuestros domos de bienestar',
+            'imagen': 'images/masaje_pareja.jpg',
+            'monto_fijo': 80000,
+            'montos_sugeridos': []
+        },
 
         # ========== GRUPO ALOJAMIENTOS ==========
         {
             'id': 'alojamiento_semana',
-            'categoria': 'alojamiento',
+            'categoria': 'alojamientos',
             'nombre': 'Alojamiento + Tinas (Dom-Jue)',
             'descripcion': 'Alojamiento para dos con tinas de domingo a jueves',
             'descripcion_giftcard': 'Alojamiento para dos en cabaña + tinas calientes de domingo a jueves',
             'imagen': 'images/alojamiento_tinas.jpg',
             'monto_fijo': 95000,
+            'montos_sugeridos': []
+        },
+        {
+            'id': 'alojamiento_finde',
+            'categoria': 'alojamientos',
+            'nombre': 'Alojamiento + Tinas (Vie-Sáb)',
+            'descripcion': 'Alojamiento para dos con tinas viernes o sábado',
+            'descripcion_giftcard': 'Alojamiento para dos en cabaña + tinas calientes viernes o sábado',
+            'imagen': 'images/alojamiento_tinas.jpg',
+            'monto_fijo': 140000,
+            'montos_sugeridos': []
+        },
+        {
+            'id': 'alojamiento_romantico',
+            'categoria': 'alojamientos',
+            'nombre': 'Paquete Romántico Completo',
+            'descripcion': 'Alojamiento + Tinas + Desayuno + Decoración romántica',
+            'descripcion_giftcard': 'Alojamiento + Tinas calientes + Desayuno + Decoración romántica en tinas cualquier día de la semana',
+            'imagen': 'images/alojamiento_romantico.jpg',
+            'monto_fijo': 150000,
             'montos_sugeridos': []
         },
 
