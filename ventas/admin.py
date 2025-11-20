@@ -4,6 +4,7 @@ from .forms import PagoInlineForm
 from django.forms import DateTimeInput
 from datetime import date, datetime, timedelta
 from django.utils import timezone
+from django.db import models
 from django.db.models import Sum
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
