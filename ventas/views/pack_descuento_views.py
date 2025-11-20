@@ -45,9 +45,8 @@ def pack_create_view(request):
     tipos_permitidos = ['cabana', 'tina', 'masaje']  # Los valores reales en el modelo
 
     servicios_por_tipo = {}
-    # Incluir todos los servicios activos de estas categorías (no solo los publicados en web)
+    # Temporalmente incluir TODOS los servicios (activos e inactivos) para packs
     servicios_query = Servicio.objects.filter(
-        activo=True,
         tipo_servicio__in=tipos_permitidos
     ).order_by('tipo_servicio', 'nombre')
 
@@ -91,9 +90,8 @@ def pack_edit_view(request, pk):
     tipos_permitidos = ['cabana', 'tina', 'masaje']  # Los valores reales en el modelo
 
     servicios_por_tipo = {}
-    # Incluir todos los servicios activos de estas categorías (no solo los publicados en web)
+    # Temporalmente incluir TODOS los servicios (activos e inactivos) para packs
     servicios_query = Servicio.objects.filter(
-        activo=True,
         tipo_servicio__in=tipos_permitidos
     ).order_by('tipo_servicio', 'nombre')
 

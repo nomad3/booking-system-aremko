@@ -30,15 +30,15 @@ class PackDescuentoForm(forms.ModelForm):
     )
 
     # Servicios específicos - Solo mostrar cabañas, tinas y masajes
+    # Temporalmente mostrar TODOS los servicios, incluso inactivos, para diagnóstico
     servicios_especificos = forms.ModelMultipleChoiceField(
         queryset=Servicio.objects.filter(
-            activo=True,
             tipo_servicio__in=['cabana', 'tina', 'masaje']
         ).order_by('tipo_servicio', 'nombre'),
         widget=forms.CheckboxSelectMultiple,
         required=False,
         label='Servicios específicos del pack',
-        help_text='Selecciona los servicios exactos que forman este pack (se muestran todos los servicios activos)'
+        help_text='Selecciona los servicios exactos que forman este pack'
     )
 
     # Tipo de pack
@@ -100,6 +100,9 @@ class PackDescuentoForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # Personalizar cómo se muestran los servicios en el formulario
+        self.fields['servicios_especificos'].label_from_instance = lambda obj: f"{obj.nombre} (${obj.precio_base:,.0f}) {'✓' if obj.activo else '✗'}"
 
         # Si estamos editando
         if self.instance.pk:
