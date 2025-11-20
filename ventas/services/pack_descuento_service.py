@@ -39,6 +39,10 @@ class PackDescuentoService:
         """
         packs_aplicables = []
 
+        print(f"DEBUG PackDescuento: Detectando packs para {len(cart_items)} items")
+        for idx, item in enumerate(cart_items):
+            print(f"  Item {idx}: {item.get('nombre')} - Tipo: {item.get('tipo_servicio')} - Fecha: {item.get('fecha')}")
+
         # Obtener todos los packs activos
         packs_activos = PackDescuento.objects.filter(
             activo=True,
@@ -46,6 +50,8 @@ class PackDescuentoService:
         ).exclude(
             fecha_fin__lt=timezone.now().date()
         ).order_by('-prioridad', '-descuento')
+
+        print(f"DEBUG: Encontrados {packs_activos.count()} packs activos")
 
         # Agrupar items por fecha si es necesario
         items_por_fecha = {}
@@ -58,6 +64,12 @@ class PackDescuentoService:
 
         # Verificar cada pack
         for pack in packs_activos:
+            print(f"\nDEBUG: Verificando pack '{pack.nombre}'")
+            print(f"  - Usa servicios específicos: {pack.usa_servicios_especificos}")
+            print(f"  - Servicios requeridos: {pack.servicios_requeridos}")
+            print(f"  - Días válidos: {pack.dias_semana_validos}")
+            print(f"  - Misma fecha: {pack.misma_fecha}")
+
             # Si el pack requiere misma fecha
             if pack.misma_fecha:
                 # Verificar por cada fecha
@@ -91,15 +103,19 @@ class PackDescuentoService:
         Returns:
             Dict con información del pack si aplica, None si no aplica
         """
+        print(f"\nDEBUG _verificar_pack_para_items: Pack '{pack.nombre}', fecha: {fecha_str}")
+
         # Verificar fecha si es necesario
         if fecha_str and pack.dias_semana_validos:
             try:
                 fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-                if not pack.aplica_para_fecha(timezone.make_aware(
-                    datetime.combine(fecha, datetime.min.time())
-                )):
+                fecha_aware = timezone.make_aware(datetime.combine(fecha, datetime.min.time()))
+                aplica_fecha = pack.aplica_para_fecha(fecha_aware)
+                print(f"  - Fecha {fecha_str} día semana: {fecha.weekday()} - Aplica: {aplica_fecha}")
+                if not aplica_fecha:
                     return None
             except ValueError:
+                print(f"  - Error parseando fecha: {fecha_str}")
                 return None
 
         # Verificar si el pack usa servicios específicos
@@ -158,6 +174,8 @@ class PackDescuentoService:
 
             # Verificar si todos los servicios requeridos están presentes
             servicios_requeridos = set(pack.servicios_requeridos) if pack.servicios_requeridos else set()
+            print(f"  - Servicios requeridos originales: {servicios_requeridos}")
+            print(f"  - Tipos presentes en carrito: {tipos_presentes}")
 
             # Convertir servicios requeridos a mayúsculas para compatibilidad
             servicios_requeridos_upper = set()
@@ -171,7 +189,11 @@ class PackDescuentoService:
                 else:
                     servicios_requeridos_upper.add(servicio.upper())
 
-            if servicios_requeridos_upper and not servicios_requeridos_upper.issubset(set(tipos_presentes.keys())):
+            print(f"  - Servicios requeridos convertidos: {servicios_requeridos_upper}")
+            cumple_requisitos = servicios_requeridos_upper.issubset(set(tipos_presentes.keys()))
+            print(f"  - ¿Cumple requisitos?: {cumple_requisitos}")
+
+            if servicios_requeridos_upper and not cumple_requisitos:
                 return None
 
             # Verificar cantidad mínima de noches para alojamiento
