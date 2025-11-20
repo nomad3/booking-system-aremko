@@ -672,10 +672,21 @@
                 {% endfor %}
             </div>
 
-            <div class="mt-4">
+            <!-- Campo para detalle especial (usado con IA) -->
+            <div class="mt-4" id="detalleEspecialContainer">
                 <label class="form-label fw-bold">Detalle Especial (Opcional)</label>
                 <textarea class="form-control" id="detalleEspecial" rows="3" placeholder="Ej: Celebrando 10 años juntos, siempre me apoya en momentos difíciles..."></textarea>
                 <small class="text-muted">Este detalle hará el mensaje aún más personal y único</small>
+            </div>
+
+            <!-- Campo para mensaje personalizado (solo cuando se elige "Escribir Mi Mensaje") -->
+            <div class="mt-4" id="mensajePersonalizadoContainer" style="display: none;">
+                <label class="form-label fw-bold">Tu Mensaje Personalizado *</label>
+                <textarea class="form-control" id="mensajePersonalizado" rows="5" maxlength="500" placeholder="Escribe aquí tu mensaje personalizado para el destinatario de la Gift Card..."></textarea>
+                <div class="d-flex justify-content-between mt-2">
+                    <small class="text-muted">Mínimo 10 caracteres, máximo 500</small>
+                    <small class="text-muted"><span id="charCounter">0</span>/500</small>
+                </div>
             </div>
         </div>
 
@@ -1066,6 +1077,32 @@ function selectTipoMensaje(tipoId) {
 
     wizardData.tipoMensaje = tipoId;
 
+    // Mostrar/ocultar campos según el tipo de mensaje seleccionado
+    const detalleEspecialContainer = document.getElementById('detalleEspecialContainer');
+    const mensajePersonalizadoContainer = document.getElementById('mensajePersonalizadoContainer');
+    const mensajePersonalizado = document.getElementById('mensajePersonalizado');
+    const charCounter = document.getElementById('charCounter');
+
+    if (tipoId === 'personalizado') {
+        // Ocultar detalle especial (no se usa con mensaje personalizado)
+        detalleEspecialContainer.style.display = 'none';
+        // Mostrar campo de mensaje personalizado
+        mensajePersonalizadoContainer.style.display = 'block';
+
+        // Agregar contador de caracteres y validación
+        mensajePersonalizado.addEventListener('input', function() {
+            charCounter.textContent = this.value.length;
+            updateNextButton(); // Re-validar el botón siguiente
+        });
+    } else {
+        // Mostrar detalle especial (usado con IA)
+        detalleEspecialContainer.style.display = 'block';
+        // Ocultar campo de mensaje personalizado
+        mensajePersonalizadoContainer.style.display = 'none';
+        // Limpiar mensaje personalizado
+        mensajePersonalizado.value = '';
+    }
+
     updateNextButton();
 }
 
@@ -1087,7 +1124,17 @@ function updateNextButton() {
         canProceed = nombre && relacion && email && telefono;
         console.log('✅ Can proceed?', canProceed);
     } else if (currentStep === 3) {
-        canProceed = wizardData.tipoMensaje;
+        // Validar que haya tipo de mensaje seleccionado
+        if (!wizardData.tipoMensaje) {
+            canProceed = false;
+        } else if (wizardData.tipoMensaje === 'personalizado') {
+            // Si es mensaje personalizado, validar que tenga al menos 10 caracteres
+            const mensajePersonalizado = document.getElementById('mensajePersonalizado')?.value || '';
+            canProceed = mensajePersonalizado.length >= 10;
+        } else {
+            // Si es IA, solo validar que haya tipo seleccionado
+            canProceed = true;
+        }
     } else if (currentStep === 4) {
         canProceed = wizardData.mensajeSeleccionado !== null;
     } else {
@@ -1110,16 +1157,33 @@ function nextStep() {
             telefono: document.getElementById('destinatarioTelefono').value
         };
     } else if (currentStep === 3) {
-        wizardData.detalleEspecial = document.getElementById('detalleEspecial').value;
+        // Guardar el detalle especial o mensaje personalizado según corresponda
+        if (wizardData.tipoMensaje === 'personalizado') {
+            // Si es mensaje personalizado, guardarlo directamente
+            wizardData.mensajePersonalizado = document.getElementById('mensajePersonalizado').value;
+            wizardData.detalleEspecial = ''; // No hay detalle especial
+        } else {
+            // Si es IA, guardar el detalle especial
+            wizardData.detalleEspecial = document.getElementById('detalleEspecial').value;
+            wizardData.mensajePersonalizado = ''; // No hay mensaje personalizado
+        }
     }
 
     // Avanzar paso (máximo 5 pasos ahora)
     if (currentStep < 5) {
-        wizardData.paso++;
+        // Si estamos en Step 3 y se eligió mensaje personalizado, saltar al Step 5 (preview)
+        if (currentStep === 3 && wizardData.tipoMensaje === 'personalizado') {
+            wizardData.paso = 5; // Saltar directo a preview
+            // El mensaje seleccionado será el personalizado
+            wizardData.mensajeSeleccionado = wizardData.mensajePersonalizado;
+        } else {
+            wizardData.paso++;
+        }
+
         updateWizardUI();
 
-        // Auto-generar mensajes al llegar a Step 4
-        if (wizardData.paso === 4) {
+        // Auto-generar mensajes al llegar a Step 4 (solo si NO es personalizado)
+        if (wizardData.paso === 4 && wizardData.tipoMensaje !== 'personalizado') {
             generarMensajesIA();
         }
 
@@ -1133,7 +1197,12 @@ function nextStep() {
 // Paso Anterior
 function previousStep() {
     if (wizardData.paso > 1) {
-        wizardData.paso--;
+        // Si estamos en Step 5 y habíamos usado mensaje personalizado, volver a Step 3
+        if (wizardData.paso === 5 && wizardData.tipoMensaje === 'personalizado') {
+            wizardData.paso = 3; // Volver directo a Step 3
+        } else {
+            wizardData.paso--;
+        }
         updateWizardUI();
     }
 }

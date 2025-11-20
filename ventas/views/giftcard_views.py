@@ -599,6 +599,12 @@ def giftcard_wizard(request):
             'nombre': 'Amistad',
             'descripcion': 'Fraternal y cariñoso para amigos',
             'icono': 'fa-user-friends'
+        },
+        {
+            'id': 'personalizado',
+            'nombre': 'Escribir Mi Mensaje',
+            'descripcion': 'Escribe tu propio mensaje personalizado',
+            'icono': 'fa-pen-fancy'
         }
     ]
 
