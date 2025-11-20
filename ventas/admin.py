@@ -8,7 +8,13 @@ from django.db.models import Sum
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.forms import DateInput, TimeInput, Select
-from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, GiftCard, PackDescuento
+from .models import (
+    Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto,
+    Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio,
+    MovimientoCliente, Compra, DetalleCompra, GiftCard, PackDescuento,
+    # CRM Models
+    Lead, Company, Contact, Activity, Campaign, Deal, HomepageConfig
+)
 from django.http import HttpResponse
 import xlwt
 
@@ -314,6 +320,435 @@ admin.site.register(VentaReserva, VentaReservaAdmin)
 admin.site.register(Cliente, ClienteAdmin)
 admin.site.register(Servicio, ServicioAdmin)
 admin.site.register(CategoriaServicio)
+
+# ============================================
+# CRM MODELS ADMIN
+# ============================================
+
+# CRM Models Admin
+@admin.register(Lead)
+class LeadAdmin(admin.ModelAdmin):
+    list_display = ('get_full_name', 'email', 'phone', 'status', 'source',
+                   'created_at', 'company_name')
+    list_filter = ('status', 'source', 'created_at')
+    search_fields = ('first_name', 'last_name', 'email', 'phone', 'company_name', 'notes')
+    date_hierarchy = 'created_at'
+
+    fieldsets = (
+        ('Información de Contacto', {
+            'fields': ('first_name', 'last_name', 'email', 'phone')
+        }),
+        ('Estado del Lead', {
+            'fields': ('status', 'source', 'campaign')
+        }),
+        ('Información Adicional', {
+            'fields': ('company_name', 'notes')
+        })
+    )
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}"
+    get_full_name.short_description = 'Nombre'
+    get_full_name.admin_order_field = 'first_name'
+
+    actions = ['convertir_a_cliente']
+
+    def convertir_a_cliente(self, request, queryset):
+        """Convertir leads seleccionados en clientes"""
+        convertidos = 0
+        for lead in queryset.filter(status='Qualified'):
+            cliente, created = Cliente.objects.get_or_create(
+                email=lead.email,
+                defaults={
+                    'nombre': f"{lead.first_name} {lead.last_name}",
+                    'telefono': lead.phone or '',
+                    'pais': 'Chile',
+                    'ciudad': lead.company_name or ''
+                }
+            )
+            if created:
+                lead.status = 'Converted'
+                lead.save()
+                convertidos += 1
+
+        self.message_user(request, f'{convertidos} leads convertidos a clientes.')
+
+    convertir_a_cliente.short_description = 'Convertir a cliente'
+
+
+@admin.register(Deal)
+class DealAdmin(admin.ModelAdmin):
+    list_display = ('name', 'contact', 'stage', 'amount', 'probability',
+                   'expected_close_date', 'created_at')
+    list_filter = ('stage', 'expected_close_date', 'created_at', 'campaign')
+    search_fields = ('name', 'contact__first_name', 'contact__last_name',
+                    'contact__email', 'notes')
+    date_hierarchy = 'created_at'
+
+    fieldsets = (
+        ('Información de la Oportunidad', {
+            'fields': ('name', 'contact', 'stage')
+        }),
+        ('Detalles Financieros', {
+            'fields': ('amount', 'probability', 'expected_close_date')
+        }),
+        ('Vínculos', {
+            'fields': ('related_booking', 'campaign')
+        }),
+        ('Notas', {
+            'fields': ('notes',)
+        })
+    )
+
+    autocomplete_fields = ['contact', 'related_booking', 'campaign']
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('contact', 'campaign', 'related_booking')
+
+
+@admin.register(Company)
+class CompanyAdmin(admin.ModelAdmin):
+    list_display = ('name', 'industry', 'website', 'created_at')
+    list_filter = ('industry', 'created_at')
+    search_fields = ('name', 'industry', 'website', 'notes')
+    date_hierarchy = 'created_at'
+
+
+@admin.register(Contact)
+class ContactAdmin(admin.ModelAdmin):
+    list_display = ('get_full_name', 'email', 'phone', 'company', 'created_at')
+    list_filter = ('company', 'created_at')
+    search_fields = ('first_name', 'last_name', 'email', 'phone', 'company__name')
+    date_hierarchy = 'created_at'
+    autocomplete_fields = ['company', 'campaign']
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}"
+    get_full_name.short_description = 'Nombre Completo'
+
+
+@admin.register(Activity)
+class ActivityAdmin(admin.ModelAdmin):
+    list_display = ('activity_type', 'subject', 'related_contact', 'campaign',
+                   'created_at', 'created_by')
+    list_filter = ('activity_type', 'created_at', 'campaign')
+    search_fields = ('subject', 'notes', 'related_contact__first_name',
+                    'related_contact__last_name')
+    date_hierarchy = 'created_at'
+    autocomplete_fields = ['related_contact', 'campaign']
+
+
+@admin.register(Campaign)
+class CampaignAdmin(admin.ModelAdmin):
+    list_display = ('name', 'status', 'start_date', 'end_date', 'budget',
+                   'created_at')
+    list_filter = ('status', 'start_date', 'end_date')
+    search_fields = ('name', 'description')
+    date_hierarchy = 'created_at'
+
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('name', 'description', 'status')
+        }),
+        ('Fechas y Presupuesto', {
+            'fields': ('start_date', 'end_date', 'budget')
+        }),
+        ('Segmentación', {
+            'fields': ('target_audience', 'target_min_spend', 'target_comunas')
+        })
+    )
+
+
+@admin.register(CampaignInteraction)
+class CampaignInteractionAdmin(admin.ModelAdmin):
+    list_display = ('interaction_type', 'campaign', 'contact', 'cliente',
+                   'interaction_date', 'response', 'converted')
+    list_filter = ('interaction_type', 'response', 'converted', 'interaction_date')
+    search_fields = ('campaign__name', 'contact__email', 'cliente__email')
+    date_hierarchy = 'interaction_date'
+    autocomplete_fields = ['campaign', 'contact', 'cliente']
+
+
+@admin.register(EmailSubjectTemplate)
+class EmailSubjectTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'subject_line', 'active', 'created_at')
+    list_filter = ('active', 'created_at')
+    search_fields = ('name', 'subject_line')
+
+
+@admin.register(EmailContentTemplate)
+class EmailContentTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'active', 'created_at')
+    list_filter = ('active', 'created_at')
+    search_fields = ('name', 'content')
+    formfield_overrides = {
+        models.TextField: {'widget': forms.Textarea(attrs={'rows': 20, 'cols': 100})},
+    }
+
+
+# Sistema de Premios y Tramos
+
+@admin.register(Premio)
+class PremioAdmin(admin.ModelAdmin):
+    list_display = (
+        'nombre',
+        'tipo',
+        'valor_formateado',
+        'tramo_minimo',
+        'dias_validez',
+        'activo',
+        'stock_display'
+    )
+    list_filter = ('tipo', 'activo', 'tramo_minimo')
+    search_fields = ('nombre', 'descripcion')
+    ordering = ['-activo', 'tramo_minimo', 'nombre']
+
+    fieldsets = (
+        ('Información General', {
+            'fields': ('nombre', 'descripcion', 'tipo', 'activo')
+        }),
+        ('Configuración del Premio', {
+            'fields': ('valor', 'condiciones', 'dias_validez', 'tramo_minimo')
+        }),
+        ('Control de Stock', {
+            'fields': ('stock_disponible', 'stock_inicial'),
+            'description': 'Dejar en blanco para stock ilimitado'
+        })
+    )
+
+    def valor_formateado(self, obj):
+        """Muestra el valor formateado según el tipo"""
+        if obj.tipo == 'descuento_porcentaje':
+            return f'{obj.valor}%'
+        elif obj.tipo in ['descuento_monto', 'credito']:
+            return f'${obj.valor:,.0f}'
+        else:
+            return obj.valor
+    valor_formateado.short_description = 'Valor'
+
+    def stock_display(self, obj):
+        """Muestra el stock disponible"""
+        if obj.stock_disponible is None:
+            return format_html('<span style="color: green;">Ilimitado</span>')
+        elif obj.stock_disponible == 0:
+            return format_html('<span style="color: red;">Agotado</span>')
+        elif obj.stock_disponible < 10:
+            return format_html(
+                '<span style="color: orange;">{} disponibles</span>',
+                obj.stock_disponible
+            )
+        else:
+            return format_html(
+                '<span style="color: green;">{} disponibles</span>',
+                obj.stock_disponible
+            )
+    stock_display.short_description = 'Stock'
+
+@admin.register(ClientePremio)
+class ClientePremioAdmin(admin.ModelAdmin):
+    list_display = (
+        'codigo_link',
+        'cliente_link',
+        'premio',
+        'estado_badge',
+        'fecha_ganado',
+        'fecha_expiracion',
+        'dias_restantes'
+    )
+    list_filter = ('estado', 'premio__tipo', 'fecha_ganado', 'fecha_expiracion')
+    search_fields = (
+        'codigo_unico',
+        'cliente__nombre',
+        'cliente__email',
+        'premio__nombre'
+    )
+    readonly_fields = (
+        'codigo_unico',
+        'fecha_ganado',
+        'fecha_uso',
+        'fecha_expiracion',
+        'venta_donde_uso'
+    )
+    date_hierarchy = 'fecha_ganado'
+
+    fieldsets = (
+        ('Información del Premio', {
+            'fields': ('cliente', 'premio', 'codigo_unico', 'estado')
+        }),
+        ('Fechas', {
+            'fields': ('fecha_ganado', 'fecha_expiracion', 'fecha_uso')
+        }),
+        ('Uso', {
+            'fields': ('venta_donde_uso', 'notas'),
+            'classes': ('collapse',)
+        })
+    )
+
+    def codigo_link(self, obj):
+        """Código con formato monospace"""
+        return format_html(
+            '<code style="background-color: #f5f5f5; padding: 2px 6px; '
+            'border-radius: 3px;">{}</code>',
+            obj.codigo_unico
+        )
+    codigo_link.short_description = 'Código'
+    codigo_link.admin_order_field = 'codigo_unico'
+
+    def cliente_link(self, obj):
+        """Link al cliente"""
+        if obj.cliente:
+            url = reverse('admin:ventas_cliente_change', args=[obj.cliente.id])
+            return format_html('<a href="{}">{}</a>', url, obj.cliente.nombre)
+        return '-'
+    cliente_link.short_description = 'Cliente'
+    cliente_link.admin_order_field = 'cliente__nombre'
+
+    def estado_badge(self, obj):
+        """Badge colorido para el estado"""
+        colors = {
+            'pendiente': '#ffc107',
+            'aprobado': '#28a745',
+            'enviado': '#17a2b8',
+            'usado': '#6c757d',
+            'expirado': '#dc3545',
+            'cancelado': '#dc3545'
+        }
+
+        # Verificar si está expirado
+        if obj.estado in ['aprobado', 'enviado'] and obj.fecha_expiracion < timezone.now():
+            estado_display = 'EXPIRADO'
+            color = colors['expirado']
+        else:
+            estado_display = obj.get_estado_display()
+            color = colors.get(obj.estado, '#6c757d')
+
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; '
+            'border-radius: 3px; font-size: 11px;">{}</span>',
+            color,
+            estado_display
+        )
+    estado_badge.short_description = 'Estado'
+
+    def dias_restantes(self, obj):
+        """Días restantes para usar el premio"""
+        if obj.estado == 'usado':
+            return format_html('<span style="color: gray;">Usado</span>')
+
+        dias = (obj.fecha_expiracion - timezone.now()).days
+
+        if dias < 0:
+            return format_html('<span style="color: red;">Expirado</span>')
+        elif dias == 0:
+            return format_html('<span style="color: red;">Hoy</span>')
+        elif dias <= 7:
+            return format_html('<span style="color: orange;">{} días</span>', dias)
+        else:
+            return format_html('<span style="color: green;">{} días</span>', dias)
+
+    dias_restantes.short_description = 'Vigencia'
+
+    def has_delete_permission(self, request, obj=None):
+        """Solo superusers pueden eliminar"""
+        return request.user.is_superuser
+
+    actions = ['enviar_notificacion', 'extender_vigencia', 'marcar_como_enviado']
+
+    def enviar_notificacion(self, request, queryset):
+        """Enviar notificación del premio al cliente"""
+        enviados = 0
+        for premio in queryset.filter(estado='aprobado'):
+            # Aquí iría la lógica de envío
+            premio.estado = 'enviado'
+            premio.save()
+            enviados += 1
+
+        self.message_user(request, f'{enviados} notificaciones enviadas')
+    enviar_notificacion.short_description = 'Enviar notificación al cliente'
+
+    def extender_vigencia(self, request, queryset):
+        """Extender vigencia por 30 días"""
+        for premio in queryset:
+            premio.fecha_expiracion += timedelta(days=30)
+            premio.save()
+
+        self.message_user(
+            request,
+            f'{queryset.count()} premios extendidos por 30 días'
+        )
+    extender_vigencia.short_description = 'Extender vigencia (+30 días)'
+
+    def marcar_como_enviado(self, request, queryset):
+        """Marcar como enviado"""
+        actualizados = queryset.filter(estado='aprobado').update(estado='enviado')
+        self.message_user(request, f'{actualizados} premios marcados como enviados')
+    marcar_como_enviado.short_description = 'Marcar como enviado'
+
+@admin.register(HistorialTramo)
+class HistorialTramoAdmin(admin.ModelAdmin):
+    list_display = (
+        'cliente_link',
+        'cambio_tramo',
+        'gasto_momento',
+        'fecha_cambio',
+        'premio_link'
+    )
+    list_filter = ('fecha_cambio', 'tramo_hasta')
+    search_fields = ('cliente__nombre', 'cliente__email')
+    readonly_fields = (
+        'cliente',
+        'tramo_desde',
+        'tramo_hasta',
+        'fecha_cambio',
+        'gasto_en_momento',
+        'premio_generado'
+    )
+
+    def cliente_link(self, obj):
+        """Link al cliente"""
+        if obj.cliente:
+            url = reverse('admin:ventas_cliente_change', args=[obj.cliente.id])
+            return format_html('<a href="{}">{}</a>', url, obj.cliente.nombre)
+        return '-'
+    cliente_link.short_description = 'Cliente'
+
+    def cambio_tramo(self, obj):
+        """Visualización del cambio de tramo"""
+        return format_html(
+            '<span style="font-weight: bold;">Tramo {} → {}</span>',
+            obj.tramo_desde,
+            obj.tramo_hasta
+        )
+    cambio_tramo.short_description = 'Cambio'
+
+    def gasto_momento(self, obj):
+        """Gasto formateado"""
+        return f'${obj.gasto_en_momento:,.0f}'
+    gasto_momento.short_description = 'Gasto'
+
+    def premio_link(self, obj):
+        """Link al premio generado"""
+        if obj.premio_generado:
+            url = reverse('admin:ventas_clientepremio_change', args=[obj.premio_generado.id])
+            return format_html(
+                '<a href="{}">{}</a>',
+                url,
+                obj.premio_generado.premio.nombre
+            )
+        return '-'
+    premio_link.short_description = 'Premio Generado'
+
+    def has_add_permission(self, request):
+        """No permitir crear manualmente"""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Solo superusers pueden eliminar"""
+        return request.user.is_superuser
+
+
+
 
 # ============================================
 # PACK DE DESCUENTOS ADMIN
