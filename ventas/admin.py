@@ -264,16 +264,16 @@ class VentaReservaAdmin(admin.ModelAdmin):
 
         total = 0
         for i, rs in enumerate(servicios):
-            subtotal = rs.servicio.precio * rs.cantidad_personas
+            subtotal = rs.servicio.precio_base * rs.cantidad_personas
             total += subtotal
 
             bg_color = '#ffffff' if i % 2 == 0 else '#f9f9f9'
             html += f'<tr style="background-color: {bg_color};">'
             html += f'<td style="padding: 5px;">{rs.servicio.nombre}</td>'
             html += f'<td style="padding: 5px; text-align: center;">{rs.fecha_agendamiento.strftime("%d/%m/%Y") if rs.fecha_agendamiento else "-"}</td>'
-            html += f'<td style="padding: 5px; text-align: center;">{rs.hora_inicio.strftime("%H:%M") if rs.hora_inicio else "-"}</td>'
+            html += f'<td style="padding: 5px; text-align: center;">{rs.hora_inicio if rs.hora_inicio else "-"}</td>'
             html += f'<td style="padding: 5px; text-align: center;">{rs.cantidad_personas}</td>'
-            html += f'<td style="padding: 5px; text-align: right;">${rs.servicio.precio:,.0f}</td>'
+            html += f'<td style="padding: 5px; text-align: right;">${rs.servicio.precio_base:,.0f}</td>'
             html += f'<td style="padding: 5px; text-align: right; font-weight: bold;">${subtotal:,.0f}</td>'
             html += f'<td style="padding: 5px; text-align: center;">{rs.proveedor_asignado.nombre if rs.proveedor_asignado else "-"}</td>'
             html += '</tr>'
