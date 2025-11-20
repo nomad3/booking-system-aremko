@@ -31,7 +31,7 @@ class PackDescuentoForm(forms.ModelForm):
 
     # Servicios específicos
     servicios_especificos = forms.ModelMultipleChoiceField(
-        queryset=Servicio.objects.filter(activo=True, publicado=True).order_by('tipo_servicio', 'nombre'),
+        queryset=Servicio.objects.filter(activo=True, publicado_web=True).order_by('tipo_servicio', 'nombre'),
         widget=forms.CheckboxSelectMultiple,
         required=False,
         label='Servicios específicos del pack',

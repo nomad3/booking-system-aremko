@@ -42,7 +42,7 @@ def pack_create_view(request):
 
     # Agrupar servicios por tipo para mejor visualización
     servicios_por_tipo = {}
-    for servicio in Servicio.objects.filter(activo=True, publicado=True).order_by('tipo_servicio', 'nombre'):
+    for servicio in Servicio.objects.filter(activo=True, publicado_web=True).order_by('tipo_servicio', 'nombre'):
         tipo = servicio.get_tipo_servicio_display()
         if tipo not in servicios_por_tipo:
             servicios_por_tipo[tipo] = []
@@ -72,7 +72,7 @@ def pack_edit_view(request, pk):
 
     # Agrupar servicios por tipo
     servicios_por_tipo = {}
-    for servicio in Servicio.objects.filter(activo=True, publicado=True).order_by('tipo_servicio', 'nombre'):
+    for servicio in Servicio.objects.filter(activo=True, publicado_web=True).order_by('tipo_servicio', 'nombre'):
         tipo = servicio.get_tipo_servicio_display()
         if tipo not in servicios_por_tipo:
             servicios_por_tipo[tipo] = []
