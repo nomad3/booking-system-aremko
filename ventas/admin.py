@@ -34,7 +34,7 @@ admin.site.index_title = _("Bienvenido al Panel de Control")
 class ReservaServicioInlineForm(forms.ModelForm):
     class Meta:
         model = ReservaServicio
-        fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas']
+        fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas', 'proveedor_asignado']
 
     def clean_fecha_agendamiento(self):
         """
@@ -56,6 +56,7 @@ class ReservaServicioInline(admin.TabularInline):
     model = ReservaServicio
     form = ReservaServicioInlineForm
     extra = 1
+    autocomplete_fields = ['proveedor_asignado']
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "servicio":
