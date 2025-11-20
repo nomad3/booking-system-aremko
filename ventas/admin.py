@@ -311,7 +311,10 @@ class ClienteAdmin(admin.ModelAdmin):
     exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
 
 class ServicioAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'precio_base', 'duracion', 'categoria', 'proveedor')
+    list_display = ('nombre', 'precio_base', 'duracion', 'categoria', 'publicado_web')
+    list_filter = ('categoria', 'tipo_servicio', 'activo', 'publicado_web')
+    search_fields = ('nombre', 'descripcion_web')
+    filter_horizontal = ('proveedores',)  # Para manejar ManyToMany de proveedores
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
