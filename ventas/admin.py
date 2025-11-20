@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django import forms
 from .forms import PagoInlineForm
 from django.forms import DateTimeInput
@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta  # Importa date, datetime, y time
 from django.utils import timezone
 from django.db.models import Sum
 from django.utils.safestring import mark_safe
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.forms import DateInput, TimeInput, Select
 from .models import (
@@ -13,7 +14,12 @@ from .models import (
     Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio,
     MovimientoCliente, Compra, DetalleCompra, GiftCard, PackDescuento,
     # CRM Models
-    Lead, Company, Contact, Activity, Campaign, Deal, HomepageConfig
+    Lead, Company, Contact, Activity, Campaign, Deal, CampaignInteraction,
+    HomepageConfig,
+    # Email Templates
+    EmailSubjectTemplate, EmailContentTemplate,
+    # Premios y Tramos
+    Premio, ClientePremio, HistorialTramo
 )
 from django.http import HttpResponse
 import xlwt
