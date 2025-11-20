@@ -34,7 +34,7 @@
 <div class="modern-container mt-4">
     <div class="page-header mb-4">
         <h1>{{ title }}</h1>
-        <p>Gestionar modelos relacionados con Ventas, Reservas, Pagos y Gift Cards.</p>
+        <p>Gestionar modelos relacionados con Ventas, Reservas, Pagos, Gift Cards y Packs de Descuentos.</p>
     </div>
 
     <div class="row g-4">
@@ -75,6 +75,21 @@
                      <div class="card-link-container d-grid gap-2">
                         <a href="{% url 'admin:ventas_giftcard_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
                         <a href="{% url 'admin:ventas_giftcard_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Pack de Descuentos Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-percent card-icon text-info"></i>
+                    <h5 class="card-title">Pack de Descuentos</h5>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:pack_list' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Packs</a>
+                        <a href="{% url 'ventas:pack_create' %}" class="btn btn-sm btn-modern btn-primary-modern">Crear Pack</a>
+                        <small class="text-muted mt-2">Descuentos automáticos por combinaciones</small>
                     </div>
                 </div>
             </div>
