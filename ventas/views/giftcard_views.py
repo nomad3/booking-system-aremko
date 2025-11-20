@@ -420,6 +420,26 @@ def giftcard_wizard(request):
             'monto_fijo': 130000,
             'montos_sugeridos': []
         },
+        {
+            'id': 'pack_4_personas',
+            'categoria': 'tinas',
+            'nombre': 'Pack 4 Personas',
+            'descripcion': '4 horas de tinas + masaje para 4 personas',
+            'descripcion_giftcard': 'Pack completo para 4 personas: 4 horas de tinas calientes + masajes relajantes',
+            'imagen': 'images/tinas_masajes.jpg',
+            'monto_fijo': 190000,
+            'montos_sugeridos': []
+        },
+        {
+            'id': 'pack_6_personas',
+            'categoria': 'tinas',
+            'nombre': 'Pack 6 Personas',
+            'descripcion': '4 horas de tinas + masaje para 6 personas',
+            'descripcion_giftcard': 'Pack completo para 6 personas: 4 horas de tinas calientes + masajes relajantes',
+            'imagen': 'images/tinas_masajes.jpg',
+            'monto_fijo': 285000,
+            'montos_sugeridos': []
+        },
 
         # ========== GRUPO SOLO MASAJES ==========
         {
