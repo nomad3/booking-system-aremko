@@ -40,26 +40,38 @@ def pack_create_view(request):
     else:
         form = PackDescuentoForm()
 
-    # Agrupar servicios por tipo para mejor visualización
-    # Mostrar TODOS los servicios para diagnóstico
+    # Agrupar servicios publicados en web por categoría basada en nombre
     servicios_por_tipo = {}
 
-    # Obtener todos los servicios excepto tipo 'otro'
-    servicios_query = Servicio.objects.all().exclude(
-        tipo_servicio='otro'
-    ).order_by('tipo_servicio', 'nombre')
+    # Obtener SOLO servicios publicados en web
+    servicios_query = Servicio.objects.filter(
+        publicado_web=True
+    ).order_by('nombre')
 
-    # Usar el display del modelo directamente
+    # Agrupar por categoría inferida del nombre
     for servicio in servicios_query:
-        tipo_display = servicio.get_tipo_servicio_display().upper()
-        if tipo_display not in servicios_por_tipo:
-            servicios_por_tipo[tipo_display] = []
-        servicios_por_tipo[tipo_display].append(servicio)
+        nombre_lower = servicio.nombre.lower()
+
+        # Determinar categoría basada en el nombre
+        if any(word in nombre_lower for word in ['tina', 'tinaja', 'termas']):
+            categoria = 'TINAS'
+        elif any(word in nombre_lower for word in ['cabaña', 'cabana', 'torre', 'refugio', 'lodge']):
+            categoria = 'CABAÑAS'
+        elif any(word in nombre_lower for word in ['masaje', 'spa', 'relajación', 'descontracturante']):
+            categoria = 'MASAJES'
+        else:
+            categoria = 'OTROS'
+
+        if categoria not in servicios_por_tipo:
+            servicios_por_tipo[categoria] = []
+        servicios_por_tipo[categoria].append(servicio)
 
     # Debug: imprimir qué encontramos
-    print(f"DEBUG: Tipos encontrados: {list(servicios_por_tipo.keys())}")
-    for tipo, servicios in servicios_por_tipo.items():
-        print(f"  {tipo}: {len(servicios)} servicios")
+    print(f"DEBUG: Categorías encontradas: {list(servicios_por_tipo.keys())}")
+    for categoria, servicios in servicios_por_tipo.items():
+        print(f"  {categoria}: {len(servicios)} servicios")
+        for s in servicios[:3]:  # Mostrar primeros 3 de cada categoría
+            print(f"    - {s.nombre}")
 
     context = {
         'form': form,
@@ -83,26 +95,38 @@ def pack_edit_view(request, pk):
     else:
         form = PackDescuentoForm(instance=pack)
 
-    # Agrupar servicios por tipo
-    # Mostrar TODOS los servicios para diagnóstico
+    # Agrupar servicios publicados en web por categoría basada en nombre
     servicios_por_tipo = {}
 
-    # Obtener todos los servicios excepto tipo 'otro'
-    servicios_query = Servicio.objects.all().exclude(
-        tipo_servicio='otro'
-    ).order_by('tipo_servicio', 'nombre')
+    # Obtener SOLO servicios publicados en web
+    servicios_query = Servicio.objects.filter(
+        publicado_web=True
+    ).order_by('nombre')
 
-    # Usar el display del modelo directamente
+    # Agrupar por categoría inferida del nombre
     for servicio in servicios_query:
-        tipo_display = servicio.get_tipo_servicio_display().upper()
-        if tipo_display not in servicios_por_tipo:
-            servicios_por_tipo[tipo_display] = []
-        servicios_por_tipo[tipo_display].append(servicio)
+        nombre_lower = servicio.nombre.lower()
+
+        # Determinar categoría basada en el nombre
+        if any(word in nombre_lower for word in ['tina', 'tinaja', 'termas']):
+            categoria = 'TINAS'
+        elif any(word in nombre_lower for word in ['cabaña', 'cabana', 'torre', 'refugio', 'lodge']):
+            categoria = 'CABAÑAS'
+        elif any(word in nombre_lower for word in ['masaje', 'spa', 'relajación', 'descontracturante']):
+            categoria = 'MASAJES'
+        else:
+            categoria = 'OTROS'
+
+        if categoria not in servicios_por_tipo:
+            servicios_por_tipo[categoria] = []
+        servicios_por_tipo[categoria].append(servicio)
 
     # Debug: imprimir qué encontramos
-    print(f"DEBUG Edit: Tipos encontrados: {list(servicios_por_tipo.keys())}")
-    for tipo, servicios in servicios_por_tipo.items():
-        print(f"  {tipo}: {len(servicios)} servicios")
+    print(f"DEBUG Edit: Categorías encontradas: {list(servicios_por_tipo.keys())}")
+    for categoria, servicios in servicios_por_tipo.items():
+        print(f"  {categoria}: {len(servicios)} servicios")
+        for s in servicios[:3]:  # Mostrar primeros 3 de cada categoría
+            print(f"    - {s.nombre}")
 
     context = {
         'form': form,

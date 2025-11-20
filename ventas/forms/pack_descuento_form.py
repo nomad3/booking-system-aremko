@@ -29,16 +29,16 @@ class PackDescuentoForm(forms.ModelForm):
         help_text='Selecciona los días en que aplica el descuento'
     )
 
-    # Servicios específicos - Incluir todas las variantes posibles de tipos
-    # Temporalmente mostrar TODOS los servicios para diagnóstico
+    # Servicios específicos - Mostrar SOLO servicios publicados en web
+    # Filtrar por publicado_web=True para mostrar solo servicios visibles en www.aremko.cl
     servicios_especificos = forms.ModelMultipleChoiceField(
-        queryset=Servicio.objects.all().exclude(
-            tipo_servicio='otro'  # Solo excluir 'otro'
-        ).order_by('tipo_servicio', 'nombre'),
+        queryset=Servicio.objects.filter(
+            publicado_web=True  # Solo servicios visibles en la web
+        ).order_by('nombre'),
         widget=forms.CheckboxSelectMultiple,
         required=False,
         label='Servicios específicos del pack',
-        help_text='Mostrando TODOS los servicios disponibles (excepto tipo "otro")'
+        help_text='Selecciona los servicios que forman este pack (solo servicios publicados en web)'
     )
 
     # Tipo de pack
