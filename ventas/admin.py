@@ -1214,6 +1214,15 @@ class CompraAdmin(admin.ModelAdmin):
 
     exportar_compras.short_description = 'Exportar a Excel'
 
+# Homepage Configuration Admin
+@admin.register(HomepageConfig)
+class HomepageConfigAdmin(SingletonModelAdmin):
+    fieldsets = (
+        ('Imágenes', {
+            'fields': ('hero_background_image', 'philosophy_image')
+        }),
+    )
+
 # Homepage Settings Admin
 @admin.register(HomepageSettings)
 class HomepageSettingsAdmin(SingletonModelAdmin):
