@@ -109,10 +109,16 @@ class PackDescuentoService:
         if fecha_str and pack.dias_semana_validos:
             try:
                 fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-                fecha_aware = timezone.make_aware(datetime.combine(fecha, datetime.min.time()))
-                aplica_fecha = pack.aplica_para_fecha(fecha_aware)
-                print(f"  - Fecha {fecha_str} día semana: {fecha.weekday()} - Aplica: {aplica_fecha}")
-                if not aplica_fecha:
+                # En Python: 0=Lunes, 1=Martes... 6=Domingo
+                # Pero en el modelo usamos: 0=Domingo, 1=Lunes... 6=Sábado
+                # Convertir el weekday de Python al formato del modelo
+                dia_python = fecha.weekday()  # 0-6 donde 0=Lunes
+                dia_modelo = (dia_python + 1) % 7  # Convertir a 0=Domingo
+
+                print(f"  - Fecha {fecha_str} día Python: {dia_python}, día modelo: {dia_modelo} (0=Dom, 1=Lun...6=Sab)")
+
+                if dia_modelo not in pack.dias_semana_validos:
+                    print(f"  - Día {dia_modelo} no está en días válidos: {pack.dias_semana_validos}")
                     return None
             except ValueError:
                 print(f"  - Error parseando fecha: {fecha_str}")
@@ -144,26 +150,32 @@ class PackDescuentoService:
                     items_incluidos.extend(indices_por_servicio[servicio_id][:1])  # Solo uno de cada
 
         else:
-            # Lógica original para tipos de servicio
-            tipo_servicio_map = {
-                'cabana': 'ALOJAMIENTO',
-                'cabin': 'ALOJAMIENTO',
-                'alojamiento': 'ALOJAMIENTO',
-                'tina': 'TINA',
-                'hot_tub': 'TINA',
-                'masaje': 'MASAJE',
-                'massage': 'MASAJE',
-                'decoracion': 'DECORACION',
-                'decoration': 'DECORACION'
-            }
+            # Lógica para tipos de servicio
+            # Como todos los servicios están marcados como 'otro' en la BD,
+            # inferimos el tipo basándonos en el nombre del servicio
 
-            # Contar tipos de servicio presentes
+            # Contar tipos de servicio presentes basándonos en nombres
             tipos_presentes = {}
             indices_por_tipo = {}
 
             for idx, item in items_con_indices:
-                tipo_cart = item.get('tipo_servicio', '').lower()
-                tipo_pack = tipo_servicio_map.get(tipo_cart, tipo_cart.upper())
+                nombre_servicio = item.get('nombre', '').lower()
+                tipo_pack = None
+
+                # Identificar tipo basado en el nombre del servicio
+                # Categorías existentes: Cabañas, Tinas, Masajes, Ambientaciones
+                if any(word in nombre_servicio for word in ['cabaña', 'cabana', 'torre', 'refugio', 'lodge']):
+                    tipo_pack = 'cabana'  # Mapea a Cabañas
+                elif any(word in nombre_servicio for word in ['tina', 'tinaja', 'termas', 'hot tub']):
+                    tipo_pack = 'tina'    # Mapea a Tinas
+                elif any(word in nombre_servicio for word in ['masaje', 'spa', 'relajación', 'descontracturante']):
+                    tipo_pack = 'masaje'  # Mapea a Masajes
+                elif any(word in nombre_servicio for word in ['decoración', 'ambientación', 'pétalos', 'velas']):
+                    tipo_pack = 'decoracion'  # Mapea a Ambientaciones
+                else:
+                    tipo_pack = 'otro'
+
+                print(f"  - Item {idx}: {item.get('nombre')} identificado como tipo: {tipo_pack}")
 
                 if tipo_pack not in tipos_presentes:
                     tipos_presentes[tipo_pack] = 0
