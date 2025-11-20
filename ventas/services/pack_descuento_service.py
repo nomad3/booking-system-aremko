@@ -158,24 +158,48 @@ class PackDescuentoService:
 
             # Verificar si todos los servicios requeridos están presentes
             servicios_requeridos = set(pack.servicios_requeridos) if pack.servicios_requeridos else set()
-            if servicios_requeridos and not servicios_requeridos.issubset(set(tipos_presentes.keys())):
+
+            # Convertir servicios requeridos a mayúsculas para compatibilidad
+            servicios_requeridos_upper = set()
+            for servicio in servicios_requeridos:
+                if servicio == 'cabana':
+                    servicios_requeridos_upper.add('ALOJAMIENTO')
+                elif servicio == 'tina':
+                    servicios_requeridos_upper.add('TINA')
+                elif servicio == 'masaje':
+                    servicios_requeridos_upper.add('MASAJE')
+                else:
+                    servicios_requeridos_upper.add(servicio.upper())
+
+            if servicios_requeridos_upper and not servicios_requeridos_upper.issubset(set(tipos_presentes.keys())):
                 return None
 
             # Verificar cantidad mínima de noches para alojamiento
-            if 'ALOJAMIENTO' in servicios_requeridos:
+            if 'ALOJAMIENTO' in servicios_requeridos_upper or 'cabana' in servicios_requeridos:
                 cantidad_alojamientos = tipos_presentes.get('ALOJAMIENTO', 0)
                 if cantidad_alojamientos < pack.cantidad_minima_noches:
                     return None
 
             # Recopilar índices de items incluidos
             items_incluidos = []
-            for tipo in servicios_requeridos:
-                if tipo in indices_por_tipo:
+            for tipo_orig in servicios_requeridos:
+                # Convertir tipo para buscar en indices
+                tipo_buscar = tipo_orig
+                if tipo_orig == 'cabana':
+                    tipo_buscar = 'ALOJAMIENTO'
+                elif tipo_orig == 'tina':
+                    tipo_buscar = 'TINA'
+                elif tipo_orig == 'masaje':
+                    tipo_buscar = 'MASAJE'
+                else:
+                    tipo_buscar = tipo_orig.upper()
+
+                if tipo_buscar in indices_por_tipo:
                     # Solo incluir la cantidad necesaria
                     cantidad_necesaria = 1
-                    if tipo == 'ALOJAMIENTO':
+                    if tipo_buscar == 'ALOJAMIENTO':
                         cantidad_necesaria = pack.cantidad_minima_noches
-                    items_incluidos.extend(indices_por_tipo[tipo][:cantidad_necesaria])
+                    items_incluidos.extend(indices_por_tipo[tipo_buscar][:cantidad_necesaria])
 
         # Crear descripción de aplicación
         items_nombres = []
