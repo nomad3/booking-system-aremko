@@ -186,54 +186,51 @@ class PackDescuentoService:
 
             # Verificar si todos los servicios requeridos están presentes
             servicios_requeridos = set(pack.servicios_requeridos) if pack.servicios_requeridos else set()
-            print(f"  - Servicios requeridos originales: {servicios_requeridos}")
-            print(f"  - Tipos presentes en carrito: {tipos_presentes}")
+            print(f"  - Servicios requeridos del pack: {servicios_requeridos}")
+            print(f"  - Tipos detectados en carrito: {tipos_presentes}")
 
-            # Convertir servicios requeridos a mayúsculas para compatibilidad
-            servicios_requeridos_upper = set()
+            # Normalizar los servicios requeridos del pack para comparar
+            # El pack puede tener: 'ALOJAMIENTO', 'TINA', 'MASAJE' (mayúsculas)
+            # O puede tener: 'cabana', 'tina', 'masaje' (minúsculas)
+            # Los normalizamos todos a minúsculas para la comparación
+            servicios_requeridos_normalized = set()
             for servicio in servicios_requeridos:
-                if servicio == 'cabana':
-                    servicios_requeridos_upper.add('ALOJAMIENTO')
-                elif servicio == 'tina':
-                    servicios_requeridos_upper.add('TINA')
-                elif servicio == 'masaje':
-                    servicios_requeridos_upper.add('MASAJE')
+                servicio_lower = servicio.lower()
+                if servicio_lower == 'alojamiento':
+                    servicios_requeridos_normalized.add('cabana')
+                elif servicio_lower == 'tina':
+                    servicios_requeridos_normalized.add('tina')
+                elif servicio_lower == 'masaje':
+                    servicios_requeridos_normalized.add('masaje')
+                elif servicio_lower == 'decoracion':
+                    servicios_requeridos_normalized.add('decoracion')
                 else:
-                    servicios_requeridos_upper.add(servicio.upper())
+                    servicios_requeridos_normalized.add(servicio_lower)
 
-            print(f"  - Servicios requeridos convertidos: {servicios_requeridos_upper}")
-            cumple_requisitos = servicios_requeridos_upper.issubset(set(tipos_presentes.keys()))
+            print(f"  - Servicios requeridos normalizados: {servicios_requeridos_normalized}")
+            cumple_requisitos = servicios_requeridos_normalized.issubset(set(tipos_presentes.keys()))
             print(f"  - ¿Cumple requisitos?: {cumple_requisitos}")
 
-            if servicios_requeridos_upper and not cumple_requisitos:
+            if servicios_requeridos_normalized and not cumple_requisitos:
                 return None
 
             # Verificar cantidad mínima de noches para alojamiento
-            if 'ALOJAMIENTO' in servicios_requeridos_upper or 'cabana' in servicios_requeridos:
-                cantidad_alojamientos = tipos_presentes.get('ALOJAMIENTO', 0)
+            if 'cabana' in servicios_requeridos_normalized:
+                cantidad_alojamientos = tipos_presentes.get('cabana', 0)
                 if cantidad_alojamientos < pack.cantidad_minima_noches:
+                    print(f"  - Cantidad de cabañas ({cantidad_alojamientos}) < cantidad mínima ({pack.cantidad_minima_noches})")
                     return None
 
             # Recopilar índices de items incluidos
             items_incluidos = []
-            for tipo_orig in servicios_requeridos:
-                # Convertir tipo para buscar en indices
-                tipo_buscar = tipo_orig
-                if tipo_orig == 'cabana':
-                    tipo_buscar = 'ALOJAMIENTO'
-                elif tipo_orig == 'tina':
-                    tipo_buscar = 'TINA'
-                elif tipo_orig == 'masaje':
-                    tipo_buscar = 'MASAJE'
-                else:
-                    tipo_buscar = tipo_orig.upper()
-
-                if tipo_buscar in indices_por_tipo:
+            for tipo_normalizado in servicios_requeridos_normalized:
+                # Los tipos normalizados ya están en minúsculas: cabana, tina, masaje
+                if tipo_normalizado in indices_por_tipo:
                     # Solo incluir la cantidad necesaria
                     cantidad_necesaria = 1
-                    if tipo_buscar == 'ALOJAMIENTO':
+                    if tipo_normalizado == 'cabana':
                         cantidad_necesaria = pack.cantidad_minima_noches
-                    items_incluidos.extend(indices_por_tipo[tipo_buscar][:cantidad_necesaria])
+                    items_incluidos.extend(indices_por_tipo[tipo_normalizado][:cantidad_necesaria])
 
         # Crear descripción de aplicación
         items_nombres = []
