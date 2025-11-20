@@ -41,12 +41,28 @@ def pack_create_view(request):
         form = PackDescuentoForm()
 
     # Agrupar servicios por tipo para mejor visualización
+    # Solo incluir tipos relevantes para packs
+    tipos_permitidos = ['cabana', 'tina', 'masaje']  # Los valores reales en el modelo
+
     servicios_por_tipo = {}
-    for servicio in Servicio.objects.filter(activo=True, publicado_web=True).order_by('tipo_servicio', 'nombre'):
-        tipo = servicio.get_tipo_servicio_display()
-        if tipo not in servicios_por_tipo:
-            servicios_por_tipo[tipo] = []
-        servicios_por_tipo[tipo].append(servicio)
+    # Incluir todos los servicios activos de estas categorías (no solo los publicados en web)
+    servicios_query = Servicio.objects.filter(
+        activo=True,
+        tipo_servicio__in=tipos_permitidos
+    ).order_by('tipo_servicio', 'nombre')
+
+    # Mapeo de tipos a nombres amigables
+    tipo_nombre_map = {
+        'cabana': 'ALOJAMIENTO (CABAÑAS)',
+        'tina': 'TINAS',
+        'masaje': 'MASAJES'
+    }
+
+    for servicio in servicios_query:
+        tipo_display = tipo_nombre_map.get(servicio.tipo_servicio, servicio.get_tipo_servicio_display())
+        if tipo_display not in servicios_por_tipo:
+            servicios_por_tipo[tipo_display] = []
+        servicios_por_tipo[tipo_display].append(servicio)
 
     context = {
         'form': form,
@@ -71,12 +87,28 @@ def pack_edit_view(request, pk):
         form = PackDescuentoForm(instance=pack)
 
     # Agrupar servicios por tipo
+    # Solo incluir tipos relevantes para packs
+    tipos_permitidos = ['cabana', 'tina', 'masaje']  # Los valores reales en el modelo
+
     servicios_por_tipo = {}
-    for servicio in Servicio.objects.filter(activo=True, publicado_web=True).order_by('tipo_servicio', 'nombre'):
-        tipo = servicio.get_tipo_servicio_display()
-        if tipo not in servicios_por_tipo:
-            servicios_por_tipo[tipo] = []
-        servicios_por_tipo[tipo].append(servicio)
+    # Incluir todos los servicios activos de estas categorías (no solo los publicados en web)
+    servicios_query = Servicio.objects.filter(
+        activo=True,
+        tipo_servicio__in=tipos_permitidos
+    ).order_by('tipo_servicio', 'nombre')
+
+    # Mapeo de tipos a nombres amigables
+    tipo_nombre_map = {
+        'cabana': 'ALOJAMIENTO (CABAÑAS)',
+        'tina': 'TINAS',
+        'masaje': 'MASAJES'
+    }
+
+    for servicio in servicios_query:
+        tipo_display = tipo_nombre_map.get(servicio.tipo_servicio, servicio.get_tipo_servicio_display())
+        if tipo_display not in servicios_por_tipo:
+            servicios_por_tipo[tipo_display] = []
+        servicios_por_tipo[tipo_display].append(servicio)
 
     context = {
         'form': form,
