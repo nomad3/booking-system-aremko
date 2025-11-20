@@ -12,11 +12,12 @@ from ..models import Servicio, Cliente, VentaReserva, ReservaServicio, Pago, Reg
 # Import the specific signal receiver to disconnect/reconnect
 from ..signals import validar_disponibilidad_admin
 from ..services.cliente_service import ClienteService
+from ..services.pack_descuento_service import PackDescuentoService
 
 def cart_view(request):
     """
     Vista que renderiza la página del carrito de compras
-    Soporta servicios y GiftCards
+    Soporta servicios y GiftCards con descuentos por packs
     """
     # Obtener carrito de compras de la sesión o crear uno nuevo
     cart = request.session.get('cart', {'servicios': [], 'giftcards': [], 'total': 0})
@@ -25,17 +26,27 @@ def cart_view(request):
     if 'giftcards' not in cart:
         cart['giftcards'] = []
 
-    # Recalcular total
-    total_servicios = sum(item.get('subtotal', 0) for item in cart['servicios'])
-    total_giftcards = sum(item.get('precio', 0) for item in cart['giftcards'])
-    cart['total'] = total_servicios + total_giftcards
+    # Calcular totales con descuentos por packs
+    calculos = PackDescuentoService.calcular_total_con_descuentos(cart)
+
+    # Actualizar carrito con información de descuentos
+    cart['subtotal'] = calculos['subtotal']
+    cart['descuentos'] = calculos['descuentos']
+    cart['total_descuentos'] = calculos['total_descuentos']
+    cart['total'] = calculos['total']
+
+    # Obtener sugerencias de packs
+    sugerencias = []
+    if cart['servicios']:
+        sugerencias = PackDescuentoService.obtener_sugerencias_pack(cart['servicios'])
 
     # Guardar el cart actualizado en la sesión
     request.session['cart'] = cart
     request.session.modified = True
 
     context = {
-        'cart': cart
+        'cart': cart,
+        'sugerencias_pack': sugerencias
     }
     return render(request, 'ventas/cart.html', context)
 
@@ -161,10 +172,14 @@ def checkout_view(request):
     if 'giftcards' not in cart:
         cart['giftcards'] = []
 
-    # Recalcular total
-    total_servicios = sum(item.get('subtotal', 0) for item in cart['servicios'])
-    total_giftcards = sum(item.get('precio', 0) for item in cart['giftcards'])
-    cart['total'] = total_servicios + total_giftcards
+    # Calcular totales con descuentos por packs
+    calculos = PackDescuentoService.calcular_total_con_descuentos(cart)
+
+    # Actualizar carrito con información de descuentos
+    cart['subtotal'] = calculos['subtotal']
+    cart['descuentos'] = calculos['descuentos']
+    cart['total_descuentos'] = calculos['total_descuentos']
+    cart['total'] = calculos['total']
 
     # Actualizar sesión
     request.session['cart'] = cart
@@ -203,12 +218,22 @@ def complete_checkout(request):
             if 'giftcards' not in cart:
                 cart['giftcards'] = []
 
+            # Calcular totales con descuentos por packs
+            calculos = PackDescuentoService.calcular_total_con_descuentos(cart)
+            cart['subtotal'] = calculos['subtotal']
+            cart['descuentos'] = calculos['descuentos']
+            cart['total_descuentos'] = calculos['total_descuentos']
+            cart['total'] = calculos['total']
+
             # Debug cart structure
             print("CART STRUCTURE:")
             print(f"Cart type: {type(cart)}")
             print(f"Cart keys: {cart.keys()}")
             print(f"Cart servicios: {cart.get('servicios', [])}")
             print(f"Cart giftcards: {cart.get('giftcards', [])}")
+            if cart.get('descuentos'):
+                print(f"Descuentos aplicados: {cart['descuentos']}")
+                print(f"Total con descuentos: ${cart['total']:,.0f}")
 
             # Validar que el carrito no esté vacío (servicios O giftcards)
             if not cart.get('servicios') and not cart.get('giftcards'):

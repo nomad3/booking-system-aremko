@@ -2466,3 +2466,111 @@ class HistorialTramo(models.Model):
         return f"{self.cliente.nombre}: Tramo {self.tramo_desde} → {self.tramo_hasta}"
 
 
+class PackDescuento(models.Model):
+    """
+    Modelo para gestionar descuentos por paquetes de servicios
+    Ejemplo: Cabaña + Tinas de domingo a jueves = $45,000 de descuento
+    """
+    nombre = models.CharField(
+        max_length=200,
+        help_text="Nombre del pack, ej: Pack Escapada Semanal"
+    )
+    descripcion = models.TextField(
+        help_text="Descripción detallada del pack y sus beneficios"
+    )
+    descuento = models.DecimalField(
+        max_digits=10,
+        decimal_places=0,
+        help_text="Monto de descuento en pesos chilenos"
+    )
+
+    # Tipos de servicios requeridos
+    TIPO_SERVICIO_CHOICES = [
+        ('ALOJAMIENTO', 'Alojamiento'),
+        ('TINA', 'Tinas Calientes'),
+        ('MASAJE', 'Masaje'),
+        ('DECORACION', 'Decoración'),
+    ]
+
+    servicios_requeridos = models.JSONField(
+        default=list,
+        help_text="Lista de tipos de servicios requeridos, ej: ['ALOJAMIENTO', 'TINA']"
+    )
+
+    # Días de la semana válidos (0=Domingo, 6=Sábado)
+    dias_semana_validos = models.JSONField(
+        default=list,
+        help_text="Lista de días válidos (0-6), ej: [0,1,2,3,4] para Dom-Jue"
+    )
+
+    # Vigencia
+    activo = models.BooleanField(default=True)
+    fecha_inicio = models.DateField(
+        help_text="Fecha desde cuando aplica el descuento"
+    )
+    fecha_fin = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Fecha hasta cuando aplica el descuento (opcional)"
+    )
+
+    # Prioridad
+    prioridad = models.IntegerField(
+        default=0,
+        help_text="Mayor número = mayor prioridad. Se aplica el de mayor prioridad si hay múltiples"
+    )
+
+    # Restricciones adicionales
+    cantidad_minima_noches = models.IntegerField(
+        default=1,
+        help_text="Cantidad mínima de noches para alojamiento"
+    )
+
+    misma_fecha = models.BooleanField(
+        default=True,
+        help_text="¿Los servicios deben ser para la misma fecha?"
+    )
+
+    class Meta:
+        verbose_name = "Pack de Descuento"
+        verbose_name_plural = "Packs de Descuento"
+        ordering = ['-prioridad', '-descuento']
+        indexes = [
+            models.Index(fields=['activo', '-prioridad']),
+            models.Index(fields=['fecha_inicio', 'fecha_fin']),
+        ]
+
+    def __str__(self):
+        return f"{self.nombre} - ${self.descuento:,.0f}"
+
+    def aplica_para_fecha(self, fecha):
+        """Verifica si el pack aplica para una fecha específica"""
+        if not self.activo:
+            return False
+
+        # Verificar vigencia
+        if fecha.date() < self.fecha_inicio:
+            return False
+        if self.fecha_fin and fecha.date() > self.fecha_fin:
+            return False
+
+        # Verificar día de la semana
+        if self.dias_semana_validos:
+            # En Python: 0=Lunes, 6=Domingo, ajustar a 0=Domingo, 6=Sábado
+            dia_semana = (fecha.weekday() + 1) % 7
+            if dia_semana not in self.dias_semana_validos:
+                return False
+
+        return True
+
+    def get_dias_semana_display(self):
+        """Retorna los días de la semana en formato legible"""
+        dias_map = {
+            0: 'Dom', 1: 'Lun', 2: 'Mar', 3: 'Mié',
+            4: 'Jue', 5: 'Vie', 6: 'Sáb'
+        }
+        if not self.dias_semana_validos:
+            return "Todos los días"
+        return ', '.join([dias_map.get(d, '') for d in sorted(self.dias_semana_validos)])
+
+
