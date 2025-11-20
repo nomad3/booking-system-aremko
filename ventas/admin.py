@@ -99,17 +99,13 @@ class VentaReservaForm(forms.ModelForm):
         model = VentaReserva
         fields = '__all__'
         widgets = {
-            'fecha': DateInput(attrs={
+            'fecha_reserva': DateInput(attrs={
                 'type': 'date',
                 'class': 'vDateField',
             }),
-            'fecha_evento': DateInput(attrs={
-                'type': 'date',
-                'class': 'vDateField',
-            }),
-            'hora_evento': TimeInput(attrs={
-                'type': 'time',
-                'class': 'vTimeField',
+            'comentarios': forms.Textarea(attrs={
+                'rows': 3,
+                'style': 'width: 100%;'
             }),
         }
 
@@ -124,6 +120,9 @@ class VentaReservaForm(forms.ModelForm):
         if 'saldo_pendiente' in self.fields:
             self.fields['saldo_pendiente'].widget.attrs['readonly'] = True
             self.fields['saldo_pendiente'].widget.attrs['style'] = 'font-weight: bold; color: red;'
+        if 'pagado' in self.fields:
+            self.fields['pagado'].widget.attrs['readonly'] = True
+            self.fields['pagado'].widget.attrs['style'] = 'font-weight: bold; color: green;'
 
 # --- Admin Classes ---
 
