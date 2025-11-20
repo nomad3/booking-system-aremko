@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views # Import premio_views, cron_views and giftcard_views
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views # Import premio_views, cron_views, giftcard_views and pack_descuento_views
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -176,6 +176,13 @@ urlpatterns = [
     # Control de Gestión - Tareas Automáticas
     path('cron/gen-atencion-clientes/', cron_views.cron_gen_atencion_clientes, name='cron_gen_atencion_clientes'),
     # === END CRON JOBS ===
+
+    # Pack Descuento Management
+    path('packs/', pack_descuento_views.pack_list_view, name='pack_list'),
+    path('packs/crear/', pack_descuento_views.pack_create_view, name='pack_create'),
+    path('packs/<int:pk>/editar/', pack_descuento_views.pack_edit_view, name='pack_edit'),
+    path('packs/<int:pk>/toggle-active/', pack_descuento_views.pack_toggle_active_view, name='pack_toggle_active'),
+    path('packs/<int:pk>/eliminar/', pack_descuento_views.pack_delete_view, name='pack_delete'),
 
     # API Router (Keep this last if possible, or ensure specific paths come first)
     path('', include(router.urls)),

@@ -1,0 +1,279 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .form-section {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 25px;
+        margin-bottom: 20px;
+    }
+    .section-title {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #f0f0f0;
+    }
+    .servicios-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+    .servicio-tipo {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+    }
+    .servicio-tipo h5 {
+        margin-bottom: 10px;
+        color: #495057;
+        font-size: 1.1em;
+    }
+    .form-check {
+        margin-bottom: 8px;
+    }
+    .dias-semana {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+    }
+    .tipo-pack-section {
+        background: #e9ecef;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    .alert-info {
+        font-size: 0.95em;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1>{{ title }}</h1>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <!-- Información General -->
+        <div class="form-section">
+            <h3 class="section-title">Información General</h3>
+
+            <div class="form-group">
+                {{ form.nombre.label_tag }}
+                {{ form.nombre }}
+                {% if form.nombre.errors %}
+                    <div class="text-danger">{{ form.nombre.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                {{ form.descripcion.label_tag }}
+                {{ form.descripcion }}
+                {% if form.descripcion.errors %}
+                    <div class="text-danger">{{ form.descripcion.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        {{ form.descuento.label_tag }}
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text">$</span>
+                            </div>
+                            {{ form.descuento }}
+                        </div>
+                        {% if form.descuento.errors %}
+                            <div class="text-danger">{{ form.descuento.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        {{ form.prioridad.label_tag }}
+                        {{ form.prioridad }}
+                        <small class="form-text text-muted">Mayor número = mayor prioridad</small>
+                        {% if form.prioridad.errors %}
+                            <div class="text-danger">{{ form.prioridad.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <div class="form-check">
+                            {{ form.activo }}
+                            {{ form.activo.label_tag }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tipo de Pack -->
+        <div class="form-section">
+            <h3 class="section-title">Configuración del Pack</h3>
+
+            <div class="tipo-pack-section">
+                <label>{{ form.tipo_pack.label }}</label>
+                {{ form.tipo_pack }}
+            </div>
+
+            <!-- Servicios Específicos -->
+            <div id="servicios-especificos-section">
+                <h4>Selecciona los servicios específicos:</h4>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    Selecciona los servicios exactos que forman este pack. Por ejemplo: "Cabaña Torre + Tina Puyehue + Masaje de Relajación"
+                </div>
+
+                <div class="servicios-grid">
+                    {% for tipo, servicios in servicios_por_tipo.items %}
+                        <div class="servicio-tipo">
+                            <h5>{{ tipo }}</h5>
+                            {% for servicio in servicios %}
+                                <div class="form-check">
+                                    <input type="checkbox" name="servicios_especificos"
+                                           value="{{ servicio.id }}"
+                                           id="servicio_{{ servicio.id }}"
+                                           class="form-check-input"
+                                           {% if servicio in form.instance.servicios_especificos.all %}checked{% endif %}>
+                                    <label class="form-check-label" for="servicio_{{ servicio.id }}">
+                                        {{ servicio.nombre }}
+                                        <small class="text-muted">({{ servicio.precio_base|floatformat:0 }})</small>
+                                    </label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Tipos de Servicio -->
+            <div id="tipos-servicio-section" style="display: none;">
+                <h4>Selecciona los tipos de servicio:</h4>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    Selecciona categorías generales. El pack aplicará con cualquier servicio de esas categorías.
+                </div>
+                {% for value, label in form.fields.tipo_pack.widget.attrs.tipo_choices %}
+                    <div class="form-check">
+                        <input type="checkbox" name="tipos_servicio"
+                               value="{{ value }}"
+                               id="tipo_{{ value }}"
+                               class="form-check-input">
+                        <label class="form-check-label" for="tipo_{{ value }}">
+                            {{ label }}
+                        </label>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Restricciones -->
+        <div class="form-section">
+            <h3 class="section-title">Restricciones y Validez</h3>
+
+            <div class="form-group">
+                {{ form.dias_semana.label_tag }}
+                <div class="dias-semana">
+                    {{ form.dias_semana }}
+                </div>
+                {% if form.dias_semana.errors %}
+                    <div class="text-danger">{{ form.dias_semana.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        {{ form.fecha_inicio.label_tag }}
+                        {{ form.fecha_inicio }}
+                        {% if form.fecha_inicio.errors %}
+                            <div class="text-danger">{{ form.fecha_inicio.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        {{ form.fecha_fin.label_tag }}
+                        {{ form.fecha_fin }}
+                        <small class="form-text text-muted">Opcional</small>
+                        {% if form.fecha_fin.errors %}
+                            <div class="text-danger">{{ form.fecha_fin.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        {{ form.cantidad_minima_noches.label_tag }}
+                        {{ form.cantidad_minima_noches }}
+                        {% if form.cantidad_minima_noches.errors %}
+                            <div class="text-danger">{{ form.cantidad_minima_noches.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-check">
+                {{ form.misma_fecha }}
+                {{ form.misma_fecha.label_tag }}
+                <small class="form-text text-muted">Si está marcado, todos los servicios deben ser reservados para la misma fecha</small>
+            </div>
+        </div>
+
+        <!-- Botones -->
+        <div class="form-group mt-4">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Guardar Pack
+            </button>
+            <a href="{% url 'ventas:pack_list' %}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle entre servicios específicos y tipos
+    const tipoPackRadios = document.getElementsByName('tipo_pack');
+    const serviciosSection = document.getElementById('servicios-especificos-section');
+    const tiposSection = document.getElementById('tipos-servicio-section');
+
+    function toggleSections() {
+        const selectedValue = document.querySelector('input[name="tipo_pack"]:checked').value;
+        if (selectedValue === 'especifico') {
+            serviciosSection.style.display = 'block';
+            tiposSection.style.display = 'none';
+        } else {
+            serviciosSection.style.display = 'none';
+            tiposSection.style.display = 'block';
+        }
+    }
+
+    tipoPackRadios.forEach(radio => {
+        radio.addEventListener('change', toggleSections);
+    });
+
+    // Inicializar
+    toggleSections();
+});
+</script>
+{% endblock %}

@@ -2484,7 +2484,15 @@ class PackDescuento(models.Model):
         help_text="Monto de descuento en pesos chilenos"
     )
 
-    # Tipos de servicios requeridos
+    # Servicios específicos del pack
+    servicios_especificos = models.ManyToManyField(
+        'Servicio',
+        blank=True,
+        related_name='packs_descuento',
+        help_text="Servicios específicos que forman este pack (ej: Cabaña Torre, Tina Puyehue)"
+    )
+
+    # Mantener para compatibilidad y packs por tipo
     TIPO_SERVICIO_CHOICES = [
         ('ALOJAMIENTO', 'Alojamiento'),
         ('TINA', 'Tinas Calientes'),
@@ -2494,7 +2502,13 @@ class PackDescuento(models.Model):
 
     servicios_requeridos = models.JSONField(
         default=list,
-        help_text="Lista de tipos de servicios requeridos, ej: ['ALOJAMIENTO', 'TINA']"
+        blank=True,
+        help_text="Lista de tipos de servicios requeridos (usar solo si no se especifican servicios específicos)"
+    )
+
+    usa_servicios_especificos = models.BooleanField(
+        default=False,
+        help_text="Si está activo, usa servicios específicos en lugar de tipos"
     )
 
     # Días de la semana válidos (0=Domingo, 6=Sábado)
@@ -2572,5 +2586,23 @@ class PackDescuento(models.Model):
         if not self.dias_semana_validos:
             return "Todos los días"
         return ', '.join([dias_map.get(d, '') for d in sorted(self.dias_semana_validos)])
+
+    def get_dias_display(self):
+        """Alias para get_dias_semana_display"""
+        return self.get_dias_semana_display()
+
+    def get_servicios_requeridos_display(self):
+        """Retorna lista legible de servicios requeridos"""
+        if hasattr(self, 'usa_servicios_especificos') and self.usa_servicios_especificos:
+            return [s.nombre for s in self.servicios_especificos.all()]
+        else:
+            # Convertir tipos a nombres legibles
+            tipos_display = []
+            for tipo in self.servicios_requeridos if self.servicios_requeridos else []:
+                for choice_value, choice_label in self.TIPO_SERVICIO_CHOICES:
+                    if choice_value == tipo:
+                        tipos_display.append(choice_label)
+                        break
+            return tipos_display
 
 

@@ -102,54 +102,80 @@ class PackDescuentoService:
             except ValueError:
                 return None
 
-        # Mapear tipos de servicio del carrito a tipos del pack
-        tipo_servicio_map = {
-            'cabana': 'ALOJAMIENTO',
-            'cabin': 'ALOJAMIENTO',
-            'alojamiento': 'ALOJAMIENTO',
-            'tina': 'TINA',
-            'hot_tub': 'TINA',
-            'masaje': 'MASAJE',
-            'massage': 'MASAJE',
-            'decoracion': 'DECORACION',
-            'decoration': 'DECORACION'
-        }
+        # Verificar si el pack usa servicios específicos
+        if hasattr(pack, 'usa_servicios_especificos') and pack.usa_servicios_especificos:
+            # Lógica para servicios específicos
+            servicios_ids_requeridos = set(pack.servicios_especificos.values_list('id', flat=True))
+            servicios_ids_en_carrito = set()
+            indices_por_servicio = {}
 
-        # Contar tipos de servicio presentes
-        tipos_presentes = {}
-        indices_por_tipo = {}
+            for idx, item in items_con_indices:
+                servicio_id = item.get('id')
+                if servicio_id:
+                    servicios_ids_en_carrito.add(servicio_id)
+                    if servicio_id not in indices_por_servicio:
+                        indices_por_servicio[servicio_id] = []
+                    indices_por_servicio[servicio_id].append(idx)
 
-        for idx, item in items_con_indices:
-            tipo_cart = item.get('tipo_servicio', '').lower()
-            tipo_pack = tipo_servicio_map.get(tipo_cart, tipo_cart.upper())
-
-            if tipo_pack not in tipos_presentes:
-                tipos_presentes[tipo_pack] = 0
-                indices_por_tipo[tipo_pack] = []
-
-            tipos_presentes[tipo_pack] += 1
-            indices_por_tipo[tipo_pack].append(idx)
-
-        # Verificar si todos los servicios requeridos están presentes
-        servicios_requeridos = set(pack.servicios_requeridos)
-        if not servicios_requeridos.issubset(set(tipos_presentes.keys())):
-            return None
-
-        # Verificar cantidad mínima de noches para alojamiento
-        if 'ALOJAMIENTO' in servicios_requeridos:
-            cantidad_alojamientos = tipos_presentes.get('ALOJAMIENTO', 0)
-            if cantidad_alojamientos < pack.cantidad_minima_noches:
+            # Verificar si todos los servicios específicos están presentes
+            if not servicios_ids_requeridos.issubset(servicios_ids_en_carrito):
                 return None
 
-        # Recopilar índices de items incluidos
-        items_incluidos = []
-        for tipo in servicios_requeridos:
-            if tipo in indices_por_tipo:
-                # Solo incluir la cantidad necesaria
-                cantidad_necesaria = 1
-                if tipo == 'ALOJAMIENTO':
-                    cantidad_necesaria = pack.cantidad_minima_noches
-                items_incluidos.extend(indices_por_tipo[tipo][:cantidad_necesaria])
+            # Recopilar índices de items incluidos
+            items_incluidos = []
+            for servicio_id in servicios_ids_requeridos:
+                if servicio_id in indices_por_servicio:
+                    items_incluidos.extend(indices_por_servicio[servicio_id][:1])  # Solo uno de cada
+
+        else:
+            # Lógica original para tipos de servicio
+            tipo_servicio_map = {
+                'cabana': 'ALOJAMIENTO',
+                'cabin': 'ALOJAMIENTO',
+                'alojamiento': 'ALOJAMIENTO',
+                'tina': 'TINA',
+                'hot_tub': 'TINA',
+                'masaje': 'MASAJE',
+                'massage': 'MASAJE',
+                'decoracion': 'DECORACION',
+                'decoration': 'DECORACION'
+            }
+
+            # Contar tipos de servicio presentes
+            tipos_presentes = {}
+            indices_por_tipo = {}
+
+            for idx, item in items_con_indices:
+                tipo_cart = item.get('tipo_servicio', '').lower()
+                tipo_pack = tipo_servicio_map.get(tipo_cart, tipo_cart.upper())
+
+                if tipo_pack not in tipos_presentes:
+                    tipos_presentes[tipo_pack] = 0
+                    indices_por_tipo[tipo_pack] = []
+
+                tipos_presentes[tipo_pack] += 1
+                indices_por_tipo[tipo_pack].append(idx)
+
+            # Verificar si todos los servicios requeridos están presentes
+            servicios_requeridos = set(pack.servicios_requeridos) if pack.servicios_requeridos else set()
+            if servicios_requeridos and not servicios_requeridos.issubset(set(tipos_presentes.keys())):
+                return None
+
+            # Verificar cantidad mínima de noches para alojamiento
+            if 'ALOJAMIENTO' in servicios_requeridos:
+                cantidad_alojamientos = tipos_presentes.get('ALOJAMIENTO', 0)
+                if cantidad_alojamientos < pack.cantidad_minima_noches:
+                    return None
+
+            # Recopilar índices de items incluidos
+            items_incluidos = []
+            for tipo in servicios_requeridos:
+                if tipo in indices_por_tipo:
+                    # Solo incluir la cantidad necesaria
+                    cantidad_necesaria = 1
+                    if tipo == 'ALOJAMIENTO':
+                        cantidad_necesaria = pack.cantidad_minima_noches
+                    items_incluidos.extend(indices_por_tipo[tipo][:cantidad_necesaria])
 
         # Crear descripción de aplicación
         items_nombres = []

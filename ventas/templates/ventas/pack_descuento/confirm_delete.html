@@ -1,0 +1,43 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>{{ title }}</h1>
+
+    <div class="alert alert-warning mt-4">
+        <h4>¿Estás seguro?</h4>
+        <p>¿Realmente deseas eliminar el pack <strong>"{{ pack.nombre }}"</strong>?</p>
+        <p>Esta acción no se puede deshacer.</p>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-body">
+            <h5 class="card-title">Detalles del Pack:</h5>
+            <ul>
+                <li><strong>Nombre:</strong> {{ pack.nombre }}</li>
+                <li><strong>Descuento:</strong> ${{ pack.descuento|floatformat:0 }}</li>
+                <li><strong>Estado:</strong> {% if pack.activo %}Activo{% else %}Inactivo{% endif %}</li>
+                <li><strong>Servicios:</strong>
+                    {% if pack.usa_servicios_especificos %}
+                        {{ pack.servicios_especificos.all|join:", " }}
+                    {% else %}
+                        {{ pack.get_servicios_requeridos_display|join:", " }}
+                    {% endif %}
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <form method="post" class="mt-4">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">
+            <i class="fas fa-trash"></i> Sí, eliminar pack
+        </button>
+        <a href="{% url 'ventas:pack_list' %}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Cancelar
+        </a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends "admin/base_site.html" %}
+{% load static humanize %}
+
+{% block title %}Gestión de Packs de Descuento{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .pack-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .pack-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    .pack-title {
+        font-size: 1.3em;
+        font-weight: bold;
+        color: #333;
+    }
+    .pack-descuento {
+        font-size: 1.2em;
+        color: #28a745;
+        font-weight: bold;
+    }
+    .pack-details {
+        color: #666;
+        font-size: 0.95em;
+    }
+    .pack-servicios {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+    }
+    .pack-dias {
+        display: flex;
+        gap: 5px;
+        margin-top: 10px;
+    }
+    .dia-badge {
+        background: #e9ecef;
+        padding: 3px 8px;
+        border-radius: 3px;
+        font-size: 0.85em;
+    }
+    .pack-inactive {
+        opacity: 0.6;
+    }
+    .btn-group-pack {
+        display: flex;
+        gap: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>{{ title }}</h1>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'ventas:pack_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Crear Nuevo Pack
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="close" data-dismiss="alert">
+                    <span>&times;</span>
+                </button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% for pack in packs %}
+        <div class="pack-card {% if not pack.activo %}pack-inactive{% endif %}">
+            <div class="pack-header">
+                <div>
+                    <span class="pack-title">{{ pack.nombre }}</span>
+                    {% if not pack.activo %}
+                        <span class="badge badge-secondary">Inactivo</span>
+                    {% endif %}
+                </div>
+                <span class="pack-descuento">${{ pack.descuento|floatformat:0|intcomma }} descuento</span>
+            </div>
+
+            <p class="pack-details">{{ pack.descripcion }}</p>
+
+            <div class="pack-servicios">
+                <strong>Servicios requeridos:</strong>
+                {{ pack.servicios_display }}
+            </div>
+
+            {% if pack.dias_semana_validos %}
+                <div class="pack-dias">
+                    <strong>Días válidos:</strong>
+                    {% for dia in pack.get_dias_display %}
+                        <span class="dia-badge">{{ dia }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="pack-details mt-3">
+                <small>
+                    Prioridad: {{ pack.prioridad }} |
+                    Vigente desde: {{ pack.fecha_inicio|date:"d/m/Y" }}
+                    {% if pack.fecha_fin %}hasta {{ pack.fecha_fin|date:"d/m/Y" }}{% endif %}
+                </small>
+            </div>
+
+            <div class="btn-group-pack mt-3">
+                <a href="{% url 'ventas:pack_edit' pack.pk %}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-edit"></i> Editar
+                </a>
+                <form method="post" action="{% url 'ventas:pack_toggle_active' pack.pk %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-{% if pack.activo %}warning{% else %}success{% endif %}">
+                        <i class="fas fa-{% if pack.activo %}pause{% else %}play{% endif %}"></i>
+                        {% if pack.activo %}Desactivar{% else %}Activar{% endif %}
+                    </button>
+                </form>
+                <a href="{% url 'ventas:pack_delete' pack.pk %}" class="btn btn-sm btn-danger">
+                    <i class="fas fa-trash"></i> Eliminar
+                </a>
+            </div>
+        </div>
+    {% empty %}
+        <div class="alert alert-info">
+            No hay packs de descuento creados.
+            <a href="{% url 'ventas:pack_create' %}">Crear el primero</a>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
