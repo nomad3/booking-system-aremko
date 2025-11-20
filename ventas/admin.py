@@ -83,6 +83,18 @@ class PagoInline(admin.TabularInline):
             obj.usuario = request.user
         super().save_model(request, obj, form, change)
 
+class GiftCardInline(admin.TabularInline):
+    model = GiftCard
+    extra = 0
+    fields = ['codigo', 'monto_inicial', 'destinatario_nombre', 'estado', 'enviado_email']
+    readonly_fields = ['codigo', 'monto_inicial', 'destinatario_nombre', 'estado', 'enviado_email']
+    verbose_name = "GiftCard"
+    verbose_name_plural = "GiftCards de esta Venta"
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
 # Método para registrar movimientos en el sistema
 def registrar_movimiento(cliente, tipo_movimiento, descripcion, usuario):
     MovimientoCliente.objects.create(
@@ -103,7 +115,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
-    inlines = [ReservaServicioInline, ReservaProductoInline, PagoInline]
+    inlines = [ReservaServicioInline, ReservaProductoInline, GiftCardInline, PagoInline]
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
         'productos_y_cantidades', 'servicios_y_cantidades',
