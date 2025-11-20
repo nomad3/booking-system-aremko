@@ -383,27 +383,31 @@ def get_or_create_system_user():
 # Signals for updating totals (Keep these active)
 
 # Using pre_delete for total updates might be more reliable than post_delete
-@receiver(pre_delete, sender=ReservaProducto)
-def actualizar_total_antes_eliminar_producto(sender, instance, **kwargs):
+@receiver(post_delete, sender=ReservaProducto)
+def actualizar_total_despues_eliminar_producto(sender, instance, **kwargs):
     try:
-        if instance.venta_reserva:
-            # Call calculate total *before* the item is gone
-            # This assumes calcular_total can handle this scenario or is adjusted
-            instance.venta_reserva.calcular_total() # Or pass excluded item?
+        # Guardar referencia a venta_reserva antes de que pueda perderse
+        venta_reserva = instance.venta_reserva
+        if venta_reserva:
+            # Calcular total DESPUÉS de que el producto fue eliminado
+            venta_reserva.calcular_total()
     except ObjectDoesNotExist:
-        logger.warning(f"VentaReserva not found when updating total before ReservaProducto {instance.pk} deletion.")
+        logger.warning(f"VentaReserva not found when updating total after ReservaProducto {instance.pk} deletion.")
     except Exception as e:
-            logger.error(f"Error updating total before ReservaProducto {instance.pk} deletion: {e}")
+            logger.error(f"Error updating total after ReservaProducto {instance.pk} deletion: {e}")
 
-@receiver(pre_delete, sender=ReservaServicio) # Keep this signal for total updates
-def actualizar_total_antes_eliminar_servicio(sender, instance, **kwargs):
+@receiver(post_delete, sender=ReservaServicio) # Keep this signal for total updates
+def actualizar_total_despues_eliminar_servicio(sender, instance, **kwargs):
     try:
-        if instance.venta_reserva:
-            instance.venta_reserva.calcular_total() # Or pass excluded item?
+        # Guardar referencia a venta_reserva antes de que pueda perderse
+        venta_reserva = instance.venta_reserva
+        if venta_reserva:
+            # Calcular total DESPUÉS de que el servicio fue eliminado
+            venta_reserva.calcular_total()
     except ObjectDoesNotExist:
-        logger.warning(f"VentaReserva not found when updating total before ReservaServicio {instance.pk} deletion.")
+        logger.warning(f"VentaReserva not found when updating total after ReservaServicio {instance.pk} deletion.")
     except Exception as e:
-            logger.error(f"Error updating total before ReservaServicio {instance.pk} deletion: {e}")
+            logger.error(f"Error updating total after ReservaServicio {instance.pk} deletion: {e}")
 
 # post_save for adding/updating items should still trigger total calculation
 @receiver(post_save, sender=ReservaServicio) # Keep this signal for total updates
