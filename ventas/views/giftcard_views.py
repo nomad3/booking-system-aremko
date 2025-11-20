@@ -449,7 +449,7 @@ def giftcard_wizard(request):
             'descripcion': 'Masaje con piedras calientes para 1 persona',
             'descripcion_giftcard': 'Masaje con piedras calientes volcánicas para una persona en domos de bienestar',
             'imagen': 'images/masaje_piedras.jpg',
-            'monto_fijo': 40000,
+            'monto_fijo': 45000,
             'montos_sugeridos': []
         },
         {
