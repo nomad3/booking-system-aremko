@@ -535,6 +535,7 @@ www.aremko.cl
                 body=message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[comprador_email],
+                bcc=['ventas@aremko.cl'],  # Copia oculta a ventas
             )
 
             # Generar y adjuntar PDFs
@@ -564,9 +565,9 @@ www.aremko.cl
             email.send()
 
             if es_multiple:
-                logger.info(f"✅ Email enviado a {comprador_email} con {len(giftcards_data)} PDFs individuales + 1 resumen")
+                logger.info(f"✅ Email enviado a {comprador_email} (con copia a ventas@aremko.cl) con {len(giftcards_data)} PDFs individuales + 1 resumen")
             else:
-                logger.info(f"✅ Email enviado a {comprador_email} con 1 PDF individual")
+                logger.info(f"✅ Email enviado a {comprador_email} (con copia a ventas@aremko.cl) con 1 PDF individual")
 
             return True
 
