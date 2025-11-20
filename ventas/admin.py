@@ -34,7 +34,7 @@ admin.site.index_title = _("Bienvenido al Panel de Control")
 class ReservaServicioInlineForm(forms.ModelForm):
     class Meta:
         model = ReservaServicio
-        fields = ['servicio', 'fecha_agendamiento', 'cantidad_personas']
+        fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas']
 
     def clean_fecha_agendamiento(self):
         """
