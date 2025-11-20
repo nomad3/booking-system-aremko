@@ -41,27 +41,25 @@ def pack_create_view(request):
         form = PackDescuentoForm()
 
     # Agrupar servicios por tipo para mejor visualización
-    # Solo incluir tipos relevantes para packs
-    tipos_permitidos = ['cabana', 'tina', 'masaje']  # Los valores reales en el modelo
-
+    # Mostrar TODOS los servicios para diagnóstico
     servicios_por_tipo = {}
-    # Temporalmente incluir TODOS los servicios (activos e inactivos) para packs
-    servicios_query = Servicio.objects.filter(
-        tipo_servicio__in=tipos_permitidos
+
+    # Obtener todos los servicios excepto tipo 'otro'
+    servicios_query = Servicio.objects.all().exclude(
+        tipo_servicio='otro'
     ).order_by('tipo_servicio', 'nombre')
 
-    # Mapeo de tipos a nombres amigables
-    tipo_nombre_map = {
-        'cabana': 'ALOJAMIENTO (CABAÑAS)',
-        'tina': 'TINAS',
-        'masaje': 'MASAJES'
-    }
-
+    # Usar el display del modelo directamente
     for servicio in servicios_query:
-        tipo_display = tipo_nombre_map.get(servicio.tipo_servicio, servicio.get_tipo_servicio_display())
+        tipo_display = servicio.get_tipo_servicio_display().upper()
         if tipo_display not in servicios_por_tipo:
             servicios_por_tipo[tipo_display] = []
         servicios_por_tipo[tipo_display].append(servicio)
+
+    # Debug: imprimir qué encontramos
+    print(f"DEBUG: Tipos encontrados: {list(servicios_por_tipo.keys())}")
+    for tipo, servicios in servicios_por_tipo.items():
+        print(f"  {tipo}: {len(servicios)} servicios")
 
     context = {
         'form': form,
@@ -86,27 +84,25 @@ def pack_edit_view(request, pk):
         form = PackDescuentoForm(instance=pack)
 
     # Agrupar servicios por tipo
-    # Solo incluir tipos relevantes para packs
-    tipos_permitidos = ['cabana', 'tina', 'masaje']  # Los valores reales en el modelo
-
+    # Mostrar TODOS los servicios para diagnóstico
     servicios_por_tipo = {}
-    # Temporalmente incluir TODOS los servicios (activos e inactivos) para packs
-    servicios_query = Servicio.objects.filter(
-        tipo_servicio__in=tipos_permitidos
+
+    # Obtener todos los servicios excepto tipo 'otro'
+    servicios_query = Servicio.objects.all().exclude(
+        tipo_servicio='otro'
     ).order_by('tipo_servicio', 'nombre')
 
-    # Mapeo de tipos a nombres amigables
-    tipo_nombre_map = {
-        'cabana': 'ALOJAMIENTO (CABAÑAS)',
-        'tina': 'TINAS',
-        'masaje': 'MASAJES'
-    }
-
+    # Usar el display del modelo directamente
     for servicio in servicios_query:
-        tipo_display = tipo_nombre_map.get(servicio.tipo_servicio, servicio.get_tipo_servicio_display())
+        tipo_display = servicio.get_tipo_servicio_display().upper()
         if tipo_display not in servicios_por_tipo:
             servicios_por_tipo[tipo_display] = []
         servicios_por_tipo[tipo_display].append(servicio)
+
+    # Debug: imprimir qué encontramos
+    print(f"DEBUG Edit: Tipos encontrados: {list(servicios_por_tipo.keys())}")
+    for tipo, servicios in servicios_por_tipo.items():
+        print(f"  {tipo}: {len(servicios)} servicios")
 
     context = {
         'form': form,

@@ -29,16 +29,16 @@ class PackDescuentoForm(forms.ModelForm):
         help_text='Selecciona los días en que aplica el descuento'
     )
 
-    # Servicios específicos - Solo mostrar cabañas, tinas y masajes
-    # Temporalmente mostrar TODOS los servicios, incluso inactivos, para diagnóstico
+    # Servicios específicos - Incluir todas las variantes posibles de tipos
+    # Temporalmente mostrar TODOS los servicios para diagnóstico
     servicios_especificos = forms.ModelMultipleChoiceField(
-        queryset=Servicio.objects.filter(
-            tipo_servicio__in=['cabana', 'tina', 'masaje']
+        queryset=Servicio.objects.all().exclude(
+            tipo_servicio='otro'  # Solo excluir 'otro'
         ).order_by('tipo_servicio', 'nombre'),
         widget=forms.CheckboxSelectMultiple,
         required=False,
         label='Servicios específicos del pack',
-        help_text='Selecciona los servicios exactos que forman este pack'
+        help_text='Mostrando TODOS los servicios disponibles (excepto tipo "otro")'
     )
 
     # Tipo de pack
