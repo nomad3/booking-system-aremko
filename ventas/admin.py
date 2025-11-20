@@ -146,24 +146,27 @@ class ProductoAdmin(admin.ModelAdmin):
 @admin.register(VentaReserva)
 class VentaReservaAdmin(admin.ModelAdmin):
     form = VentaReservaForm
-    list_display = ('id', 'cliente_info', 'fecha', 'fecha_evento', 'hora_evento',
-                   'total_con_formato', 'saldo_con_formato', 'estado_pago',
-                   'estado', 'tipo_venta', 'ver_servicios', 'es_grupal_display')
-    list_filter = ('estado', 'fecha', 'fecha_evento', 'tipo_venta', 'es_grupal')
+    list_display = ('id', 'cliente_info', 'fecha_creacion', 'fecha_reserva',
+                   'total_con_formato', 'saldo_con_formato', 'estado_pago_display',
+                   'estado_reserva', 'ver_servicios', 'cobrado_display')
+    list_filter = ('estado_reserva', 'estado_pago', 'fecha_creacion', 'fecha_reserva', 'cobrado')
     search_fields = ('cliente__nombre', 'cliente__telefono', 'cliente__email',
-                    'detalles', 'reservaservicio__servicio__nombre')
-    date_hierarchy = 'fecha'
-    ordering = ('-fecha',)
+                    'comentarios', 'reservaservicio__servicio__nombre', 'codigo_giftcard')
+    date_hierarchy = 'fecha_creacion'
+    ordering = ('-fecha_creacion',)
     readonly_fields = ('total_con_formato', 'saldo_con_formato', 'calcular_totales_display',
-                      'fecha_creacion', 'fecha_modificacion', 'mostrar_servicios_reservados')
+                      'fecha_creacion', 'mostrar_servicios_reservados')
 
     fieldsets = (
         ('Información General', {
-            'fields': ('cliente', 'fecha', 'fecha_evento', 'hora_evento',
-                      'tipo_venta', 'es_grupal', 'estado', 'detalles')
+            'fields': ('cliente', 'fecha_reserva', 'estado_reserva', 'comentarios')
         }),
-        ('Totales', {
-            'fields': ('total', 'saldo_pendiente', 'calcular_totales_display'),
+        ('Totales y Pago', {
+            'fields': ('total', 'pagado', 'saldo_pendiente', 'estado_pago', 'cobrado',
+                      'calcular_totales_display')
+        }),
+        ('Gift Card', {
+            'fields': ('codigo_giftcard',),
             'classes': ('collapse',)
         }),
         ('Servicios Reservados', {
@@ -171,7 +174,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
             'classes': ('wide',)
         }),
         ('Información del Sistema', {
-            'fields': ('fecha_creacion', 'fecha_modificacion'),
+            'fields': ('fecha_creacion', 'numero_documento_fiscal'),
             'classes': ('collapse',)
         })
     )
@@ -210,7 +213,8 @@ class VentaReservaAdmin(admin.ModelAdmin):
     saldo_con_formato.short_description = 'Saldo Pendiente'
     saldo_con_formato.admin_order_field = 'saldo_pendiente'
 
-    def estado_pago(self, obj):
+    def estado_pago_display(self, obj):
+        """Muestra el estado de pago con colores"""
         if obj.saldo_pendiente <= 0:
             return format_html(
                 '<span style="color: green; font-weight: bold;">✓ PAGADO</span>'
@@ -221,14 +225,14 @@ class VentaReservaAdmin(admin.ModelAdmin):
                 '<span style="color: orange;">{}% pagado</span>',
                 int(porcentaje)
             )
-    estado_pago.short_description = 'Estado de Pago'
+    estado_pago_display.short_description = 'Estado de Pago'
 
-    def es_grupal_display(self, obj):
-        if obj.es_grupal:
-            return format_html('<span style="color: blue;">👥 GRUPAL</span>')
-        return '-'
-    es_grupal_display.short_description = 'Tipo'
-    es_grupal_display.admin_order_field = 'es_grupal'
+    def cobrado_display(self, obj):
+        """Muestra si fue cobrado con un icono"""
+        if obj.cobrado:
+            return format_html('<span style="color: green;">✓</span>')
+        return format_html('<span style="color: gray;">-</span>')
+    cobrado_display.short_description = 'Cobrado'
 
     def ver_servicios(self, obj):
         servicios = obj.reservaservicio_set.all()
@@ -236,7 +240,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
             items = []
             for rs in servicios:
                 fecha = rs.fecha_agendamiento.strftime('%d/%m') if rs.fecha_agendamiento else 'Sin fecha'
-                hora = rs.hora_inicio.strftime('%H:%M') if rs.hora_inicio else ''
+                hora = rs.hora_inicio if rs.hora_inicio else ''  # hora_inicio es CharField, no TimeField
                 items.append(f"• {rs.servicio.nombre} ({fecha} {hora}) - {rs.cantidad_personas} pers.")
             return format_html('<small>{}</small>', '<br>'.join(items))
         return '-'
