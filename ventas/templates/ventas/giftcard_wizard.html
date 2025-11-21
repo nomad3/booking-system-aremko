@@ -1474,6 +1474,9 @@ async function regenerarMensaje() {
 
 // Función para actualizar el preview en Step 5
 function actualizarPreviewStep5() {
+    console.log('🔍 Actualizando preview Step 5...');
+    console.log('wizardData completo:', wizardData);
+
     // Obtener la descripción detallada de la experiencia desde el array de experiencias
     const exp = experiencias.find(e => e.id === wizardData.experiencia);
     const expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
@@ -1487,11 +1490,18 @@ function actualizarPreviewStep5() {
         year: 'numeric'
     });
 
+    // Obtener el mensaje seleccionado
+    const mensajeFinal = wizardData.mensajeSeleccionado || wizardData.mensajePersonalizado || 'Un regalo especial para ti';
+
+    console.log('Mensaje a mostrar en preview:', mensajeFinal);
+
     // Llenar preview (sin mostrar el precio)
-    document.getElementById('preview-destinatario').textContent = wizardData.destinatario.nombre;
-    document.getElementById('preview-mensaje').textContent = wizardData.mensajeSeleccionado;
+    document.getElementById('preview-destinatario').textContent = wizardData.destinatario.nombre || 'Destinatario';
+    document.getElementById('preview-mensaje').textContent = mensajeFinal;
     document.getElementById('preview-experiencia').textContent = expDescripcion;
     document.getElementById('preview-validez').textContent = validezStr;
+
+    console.log('✅ Preview actualizado');
 }
 
 // Función para actualizar el resumen en Step 6
