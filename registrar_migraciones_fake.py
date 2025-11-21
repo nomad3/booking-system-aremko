@@ -76,12 +76,23 @@ def registrar_migraciones_fake():
             try:
                 print(f"   📝 {app_label}.{migration_name}...", end=" ")
 
-                # Insertar registro en django_migrations
+                # Verificar si ya existe
                 with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM django_migrations
+                        WHERE app = %s AND name = %s
+                    """, [app_label, migration_name])
+
+                    count = cursor.fetchone()[0]
+
+                    if count > 0:
+                        print("⏭️  (ya existe)")
+                        continue
+
+                    # Insertar registro en django_migrations
                     cursor.execute("""
                         INSERT INTO django_migrations (app, name, applied)
                         VALUES (%s, %s, NOW())
-                        ON CONFLICT (app, name) DO NOTHING
                     """, [app_label, migration_name])
 
                 print("✅")
