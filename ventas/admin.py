@@ -13,7 +13,7 @@ from django.forms import DateInput, TimeInput, Select
 from .models import (
     Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto,
     Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio,
-    MovimientoCliente, Compra, DetalleCompra, GiftCard, PackDescuento,
+    MovimientoCliente, Compra, DetalleCompra, GiftCard, GiftCardExperiencia, PackDescuento,
     # CRM Models
     Lead, Company, Contact, Activity, Campaign, Deal, CampaignInteraction,
     HomepageConfig,
@@ -864,7 +864,7 @@ class PackDescuentoAdmin(admin.ModelAdmin):
         js = ('admin/js/jquery.init.js',)
 
 
-@admin.register(models.GiftCardExperiencia)
+@admin.register(GiftCardExperiencia)
 class GiftCardExperienciaAdmin(admin.ModelAdmin):
     """
     Administración de Experiencias para Gift Cards
