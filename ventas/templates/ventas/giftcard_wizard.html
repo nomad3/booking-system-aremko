@@ -1489,8 +1489,13 @@ function actualizarPreviewStep5() {
     console.log('wizardData completo:', wizardData);
 
     // Obtener la descripción detallada de la experiencia desde el array de experiencias
-    const exp = experiencias.find(e => e.id === wizardData.experiencia);
-    const expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
+    let expDescripcion = 'Experiencia Aremko Spa';
+    try {
+        const exp = experiencias.find(e => e.id === wizardData.experiencia);
+        expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
+    } catch (error) {
+        console.error('Error al buscar experiencia:', error);
+    }
 
     // Calcular fecha de validez (1 año desde hoy)
     const hoy = new Date();
@@ -1518,8 +1523,13 @@ function actualizarPreviewStep5() {
 // Función para actualizar el resumen en Step 6
 function actualizarResumenStep6() {
     // Obtener la descripción detallada de la experiencia
-    const exp = experiencias.find(e => e.id === wizardData.experiencia);
-    const expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
+    let expDescripcion = 'Experiencia Aremko Spa';
+    try {
+        const exp = experiencias.find(e => e.id === wizardData.experiencia);
+        expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
+    } catch (error) {
+        console.error('Error al buscar experiencia:', error);
+    }
 
     document.getElementById('resumen-experiencia').textContent = expDescripcion;
     document.getElementById('resumen-destinatario').textContent = wizardData.destinatario.nombre;
@@ -1530,8 +1540,13 @@ function actualizarResumenStep6() {
 // Función para actualizar el resumen en Step 8 (resumen final con comprador)
 function actualizarResumenStep8() {
     // Obtener la descripción detallada de la experiencia
-    const exp = experiencias.find(e => e.id === wizardData.experiencia);
-    const expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
+    let expDescripcion = 'Experiencia Aremko Spa';
+    try {
+        const exp = experiencias.find(e => e.id === wizardData.experiencia);
+        expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
+    } catch (error) {
+        console.error('Error al buscar experiencia:', error);
+    }
 
     document.getElementById('resumen-experiencia').textContent = expDescripcion;
     document.getElementById('resumen-destinatario').textContent = wizardData.destinatario.nombre;
