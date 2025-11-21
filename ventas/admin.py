@@ -494,16 +494,16 @@ class CampaignInteractionAdmin(admin.ModelAdmin):
 
 @admin.register(EmailSubjectTemplate)
 class EmailSubjectTemplateAdmin(admin.ModelAdmin):
-    list_display = ('subject_template', 'estilo', 'activo', 'creado')
-    list_filter = ('activo', 'estilo', 'creado')
+    list_display = ('subject_template', 'estilo', 'activo', 'created_at')
+    list_filter = ('activo', 'estilo', 'created_at')
     search_fields = ('subject_template',)
 
 
 @admin.register(EmailContentTemplate)
 class EmailContentTemplateAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'estilo', 'activo', 'creado')
-    list_filter = ('activo', 'estilo', 'creado')
-    search_fields = ('nombre', 'saludo_inicial', 'parrafo_intro')
+    list_display = ('nombre', 'estilo', 'activo', 'created_at')
+    list_filter = ('activo', 'estilo', 'created_at')
+    search_fields = ('nombre', 'saludo', 'introduccion')
     formfield_overrides = {
         models.TextField: {'widget': forms.Textarea(attrs={'rows': 20, 'cols': 100})},
     }
