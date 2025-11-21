@@ -1156,16 +1156,26 @@ function nextStep() {
             email: document.getElementById('destinatarioEmail').value,
             telefono: document.getElementById('destinatarioTelefono').value
         };
+        console.log('✅ Datos destinatario guardados:', wizardData.destinatario);
     } else if (currentStep === 3) {
         // Guardar el detalle especial o mensaje personalizado según corresponda
         if (wizardData.tipoMensaje === 'personalizado') {
             // Si es mensaje personalizado, guardarlo directamente
             wizardData.mensajePersonalizado = document.getElementById('mensajePersonalizado').value;
+            wizardData.mensajeSeleccionado = wizardData.mensajePersonalizado; // IMPORTANTE: asignar también a mensajeSeleccionado
             wizardData.detalleEspecial = ''; // No hay detalle especial
+            console.log('✅ Mensaje personalizado guardado:', wizardData.mensajePersonalizado);
         } else {
             // Si es IA, guardar el detalle especial
             wizardData.detalleEspecial = document.getElementById('detalleEspecial').value;
             wizardData.mensajePersonalizado = ''; // No hay mensaje personalizado
+            console.log('✅ Detalle especial guardado:', wizardData.detalleEspecial);
+        }
+    } else if (currentStep === 4) {
+        // Guardar mensaje seleccionado al avanzar desde Step 4
+        console.log('📝 Avanzando desde Step 4. Mensaje seleccionado:', wizardData.mensajeSeleccionado);
+        if (!wizardData.mensajeSeleccionado) {
+            console.warn('⚠️ No hay mensaje seleccionado en Step 4');
         }
     }
 
@@ -1174,8 +1184,7 @@ function nextStep() {
         // Si estamos en Step 3 y se eligió mensaje personalizado, saltar al Step 5 (preview)
         if (currentStep === 3 && wizardData.tipoMensaje === 'personalizado') {
             wizardData.paso = 5; // Saltar directo a preview
-            // El mensaje seleccionado será el personalizado
-            wizardData.mensajeSeleccionado = wizardData.mensajePersonalizado;
+            console.log('⏭️ Saltando de Step 3 a Step 5 (mensaje personalizado)');
         } else {
             wizardData.paso++;
         }
@@ -1189,6 +1198,7 @@ function nextStep() {
 
         // Actualizar preview al llegar a Step 5
         if (wizardData.paso === 5) {
+            console.log('🎨 Llegando a Step 5, actualizando preview...');
             actualizarPreviewStep5();
         }
     }
@@ -1382,10 +1392,11 @@ function displayMensajes(mensajes) {
 
 // Seleccionar un mensaje
 function selectMensaje(index, texto) {
-    console.log(`✅ Mensaje ${index + 1} seleccionado`);
+    console.log(`✅ Mensaje ${index + 1} seleccionado: "${texto}"`);
 
     // Guardar en wizardData
     wizardData.mensajeSeleccionado = texto;
+    console.log('📝 wizardData.mensajeSeleccionado actualizado:', wizardData.mensajeSeleccionado);
 
     // Actualizar UI - remover selección previa
     document.querySelectorAll('.mensaje-card').forEach(card => {
