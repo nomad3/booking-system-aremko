@@ -29,6 +29,7 @@ class GiftCardPDFService:
             giftcard_data (dict): Datos de la GiftCard
                 - codigo: Código único de la GiftCard
                 - experiencia_nombre: Nombre de la experiencia
+                - experiencia_imagen_url: URL de la imagen de la experiencia (opcional)
                 - destinatario_nombre: Nombre del destinatario
                 - mensaje_seleccionado: Mensaje personalizado
                 - precio: Valor de la GiftCard
@@ -38,6 +39,20 @@ class GiftCardPDFService:
         Returns:
             str: HTML renderizado
         """
+
+        # Obtener URL de la imagen si existe
+        imagen_url = giftcard_data.get('experiencia_imagen_url', '')
+        tiene_imagen = bool(imagen_url)
+
+        # Generar HTML de la imagen si existe
+        imagen_html = ''
+        if tiene_imagen:
+            imagen_html = f'''
+        <!-- Imagen de la Experiencia -->
+        <div class="imagen-experiencia">
+            <img src="{imagen_url}" alt="{giftcard_data['experiencia_nombre']}" class="experiencia-img">
+        </div>
+        '''
 
         html_template = f"""
 <!DOCTYPE html>
@@ -80,6 +95,20 @@ class GiftCardPDFService:
             font-size: 1.2rem;
             font-weight: 600;
             line-height: 1.2;
+        }}
+        .imagen-experiencia {{
+            width: 100%;
+            margin: 16px 0;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }}
+        .experiencia-img {{
+            width: 100%;
+            height: auto;
+            display: block;
+            object-fit: cover;
+            max-height: 300px;
         }}
         .divider {{
             border: 0;
@@ -247,6 +276,8 @@ class GiftCardPDFService:
         <!-- Destinatario -->
         <div class="para">Para:</div>
         <div class="destinatario">{giftcard_data['destinatario_nombre']}</div>
+
+        {imagen_html}
 
         <!-- Mensaje -->
         <div class="mensaje">

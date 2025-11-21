@@ -16,7 +16,7 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.mail import EmailMessage
 from django.conf import settings
-from ..models import Pago, GiftCard
+from ..models import Pago, GiftCard, GiftCardExperiencia
 from ..services.giftcard_pdf_service import GiftCardPDFService
 import logging
 
@@ -112,9 +112,27 @@ def enviar_email_giftcards(venta_reserva, giftcards):
     # Preparar datos de las GiftCards para el servicio
     giftcards_data = []
     for giftcard in giftcards:
+        # Intentar obtener la imagen de la experiencia desde la BD
+        imagen_url = ''
+        try:
+            if giftcard.servicio_asociado:
+                experiencia = GiftCardExperiencia.objects.filter(
+                    id_experiencia=giftcard.servicio_asociado,
+                    activo=True
+                ).first()
+
+                if experiencia and experiencia.imagen:
+                    # Construir URL completa de la imagen
+                    from django.conf import settings
+                    imagen_url = f"{settings.MEDIA_URL}{experiencia.imagen}"
+                    logger.info(f"Imagen encontrada para {giftcard.servicio_asociado}: {imagen_url}")
+        except Exception as e:
+            logger.warning(f"No se pudo obtener imagen para servicio {giftcard.servicio_asociado}: {e}")
+
         giftcard_data = {
             'codigo': giftcard.codigo,
             'experiencia_nombre': obtener_descripcion_experiencia(giftcard.servicio_asociado),
+            'experiencia_imagen_url': imagen_url,
             'destinatario_nombre': giftcard.destinatario_nombre,
             'mensaje_seleccionado': giftcard.mensaje_personalizado or 'Un regalo especial para ti',
             'precio': int(giftcard.monto_inicial),

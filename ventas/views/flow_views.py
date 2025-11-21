@@ -184,7 +184,7 @@ def flow_confirmation(request):
                          # Por eso guardamos los datos en la BD con la VentaReserva
 
                          # Buscar GiftCards asociadas a esta venta
-                         from ..models import GiftCard
+                         from ..models import GiftCard, GiftCardExperiencia
                          from ..services.giftcard_pdf_service import GiftCardPDFService
 
                          giftcards = GiftCard.objects.filter(
@@ -204,11 +204,26 @@ def flow_confirmation(request):
                              # En una versión futura, guardar metadata completa en el modelo GiftCard
                              giftcards_data = []
                              for gc in giftcards:
+                                 # Intentar obtener imagen de la experiencia
+                                 imagen_url = ''
+                                 try:
+                                     if gc.servicio_asociado:
+                                         experiencia = GiftCardExperiencia.objects.filter(
+                                             id_experiencia=gc.servicio_asociado,
+                                             activo=True
+                                         ).first()
+                                         if experiencia and experiencia.imagen:
+                                             from django.conf import settings
+                                             imagen_url = f"{settings.MEDIA_URL}{experiencia.imagen}"
+                                 except Exception:
+                                     pass
+
                                  giftcards_data.append({
                                      'codigo': gc.codigo,
                                      'experiencia_nombre': f'Experiencia Aremko (${int(gc.monto_inicial):,})',
-                                     'destinatario_nombre': 'Destinatario',  # TODO: Guardar en modelo
-                                     'mensaje_seleccionado': 'Disfruta de una experiencia inolvidable en Aremko Spa',
+                                     'experiencia_imagen_url': imagen_url,
+                                     'destinatario_nombre': gc.destinatario_nombre or 'Destinatario',
+                                     'mensaje_seleccionado': gc.mensaje_personalizado or 'Disfruta de una experiencia inolvidable en Aremko Spa',
                                      'precio': gc.monto_inicial,
                                      'fecha_emision': gc.fecha_emision,
                                      'fecha_vencimiento': gc.fecha_vencimiento
