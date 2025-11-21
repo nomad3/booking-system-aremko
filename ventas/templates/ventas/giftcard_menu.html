@@ -4,9 +4,10 @@
 {% block title %}GiftCards - Regala Experiencias de Bienestar | Aremko Spa{% endblock %}
 
 {% block extra_css %}
-<!-- Version: 2024-11-21-v2 - Mobile Optimized -->
+<!-- Version: 2024-11-21-v3 - REBUILD FORCED - Step Cards Fixed -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
+    /* FORCED REBUILD - Timestamp: <?php echo time(); ?> */
     :root {
         /* Paleta de colores elegante de spa de alto nivel */
         --spa-sage: #8B9D83;           /* Verde salvia suave */
@@ -19,6 +20,11 @@
         --spa-eucalyptus: #94B49F;     /* Eucalipto */
         --spa-lavender: #A89DC9;       /* Lavanda suave */
         --spa-terracotta: #C8A88D;     /* Terracota suave */
+    }
+
+    /* DEBUG: Force white backgrounds */
+    body {
+        background-color: #F5F3EF;
     }
 
     body {
