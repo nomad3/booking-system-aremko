@@ -47,8 +47,8 @@ def registrar_migraciones_fake():
         # Obtener todas las migraciones del grafo
         all_migrations = set(loader.graph.nodes.keys())
 
-        # Obtener migraciones ya aplicadas
-        applied_migrations = recorder.applied_migrations()
+        # Obtener migraciones ya aplicadas (es un dict, convertir a set de keys)
+        applied_migrations = set(recorder.applied_migrations())
 
         # Calcular pendientes
         pending = all_migrations - applied_migrations
