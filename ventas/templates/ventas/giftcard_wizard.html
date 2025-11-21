@@ -1116,13 +1116,13 @@ function updateNextButton() {
     if (currentStep === 1) {
         canProceed = wizardData.experiencia && wizardData.monto;
     } else if (currentStep === 2) {
-        const nombre = document.getElementById('destinatarioNombre')?.value;
-        const relacion = document.getElementById('destinatarioRelacion')?.value;
-        const email = document.getElementById('destinatarioEmail')?.value;
-        const telefono = document.getElementById('destinatarioTelefono')?.value;
+        const nombre = document.getElementById('destinatarioNombre')?.value?.trim();
+        const relacion = document.getElementById('destinatarioRelacion')?.value?.trim();
+        const email = document.getElementById('destinatarioEmail')?.value?.trim();
+        const telefono = document.getElementById('destinatarioTelefono')?.value?.trim();
         console.log('🔍 Step 2 Validation:', { nombre, relacion, email, telefono });
-        canProceed = nombre && relacion && email && telefono;
-        console.log('✅ Can proceed?', canProceed);
+        canProceed = !!(nombre && relacion && email && telefono);
+        console.log('✅ Can proceed?', canProceed, 'Nombre length:', nombre?.length, 'Relacion length:', relacion?.length);
     } else if (currentStep === 3) {
         // Validar que haya tipo de mensaje seleccionado
         if (!wizardData.tipoMensaje) {
@@ -1242,6 +1242,38 @@ function updateWizardUI() {
         nextBtn.style.display = 'none';
     } else {
         nextBtn.style.display = 'block';
+    }
+
+    // NUEVO: Re-registrar event listeners cuando entramos al Step 2
+    if (currentStep === 2) {
+        console.log('📝 Re-registrando event listeners para Step 2 en updateWizardUI...');
+        setTimeout(() => {
+            const nombreInput = document.getElementById('destinatarioNombre');
+            const relacionInput = document.getElementById('destinatarioRelacion');
+            const emailInput = document.getElementById('destinatarioEmail');
+            const telefonoInput = document.getElementById('destinatarioTelefono');
+
+            console.log('Inputs encontrados:', {
+                nombreInput: !!nombreInput,
+                relacionInput: !!relacionInput,
+                emailInput: !!emailInput,
+                telefonoInput: !!telefonoInput,
+                valores: {
+                    nombre: nombreInput?.value,
+                    relacion: relacionInput?.value,
+                    email: emailInput?.value,
+                    telefono: telefonoInput?.value
+                }
+            });
+
+            if (nombreInput) nombreInput.addEventListener('input', updateNextButton);
+            if (relacionInput) relacionInput.addEventListener('input', updateNextButton);
+            if (emailInput) emailInput.addEventListener('input', updateNextButton);
+            if (telefonoInput) telefonoInput.addEventListener('input', updateNextButton);
+
+            // Forzar actualización inmediata
+            updateNextButton();
+        }, 100);
     }
 
     // Actualizar estado del botón siguiente
