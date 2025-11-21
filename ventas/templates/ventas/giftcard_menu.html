@@ -128,53 +128,55 @@
 
     /* How It Works Section */
     .step-card {
-        text-align: center;
-        padding: 2rem 1rem;
-        position: relative;
+        background: var(--spa-white);
+        border-radius: 15px;
+        padding: 2.5rem 2rem;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        height: 100%;
+        transition: all 0.3s ease;
+        border-left: 5px solid var(--spa-gold);
     }
 
-    .step-icon {
-        width: 100px;
-        height: 100px;
-        background: linear-gradient(135deg, var(--spa-sage) 0%, var(--spa-eucalyptus) 100%);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 1.5rem;
-        font-size: 2.5rem;
-        color: var(--spa-white);
-        box-shadow: 0 10px 30px rgba(139, 157, 131, 0.2);
+    .step-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
     }
 
     .step-number {
-        position: absolute;
-        top: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        background: var(--spa-gold);
+        display: inline-block;
+        background: linear-gradient(135deg, var(--spa-gold) 0%, var(--spa-terracotta) 100%);
         color: var(--spa-white);
-        width: 30px;
-        height: 30px;
-        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: 600;
-        font-size: 0.9rem;
+        font-weight: 700;
+        font-size: 1.5rem;
+        margin: 0 auto 1.5rem;
+        box-shadow: 0 5px 15px rgba(184, 147, 95, 0.3);
+    }
+
+    .step-icon {
+        font-size: 2.5rem;
+        color: var(--spa-sage);
+        margin-bottom: 1.5rem;
     }
 
     .step-title {
         font-size: 1.3rem;
-        font-weight: 500;
+        font-weight: 600;
         color: var(--spa-charcoal);
         margin-bottom: 0.75rem;
+        text-align: center;
     }
 
     .step-description {
         font-size: 0.95rem;
         color: var(--spa-stone);
         line-height: 1.6;
+        text-align: center;
     }
 
     /* Experience Cards */
@@ -558,7 +560,7 @@
                     </div>
                     <div class="hero-badge">
                         <i class="fas fa-tag"></i>
-                        <span>Desde $30.000</span>
+                        <span>Desde $50.000</span>
                     </div>
                 </div>
             </div>
@@ -577,8 +579,10 @@
             <div class="col-md-4">
                 <div class="step-card">
                     <div class="step-number">1</div>
-                    <div class="step-icon">
-                        <i class="fas fa-spa"></i>
+                    <div class="text-center">
+                        <div class="step-icon">
+                            <i class="fas fa-spa"></i>
+                        </div>
                     </div>
                     <h3 class="step-title">Elige la Experiencia</h3>
                     <p class="step-description">
@@ -589,8 +593,10 @@
             <div class="col-md-4">
                 <div class="step-card">
                     <div class="step-number">2</div>
-                    <div class="step-icon">
-                        <i class="fas fa-magic"></i>
+                    <div class="text-center">
+                        <div class="step-icon">
+                            <i class="fas fa-magic"></i>
+                        </div>
                     </div>
                     <h3 class="step-title">Personaliza el Mensaje</h3>
                     <p class="step-description">
@@ -601,8 +607,10 @@
             <div class="col-md-4">
                 <div class="step-card">
                     <div class="step-number">3</div>
-                    <div class="step-icon">
-                        <i class="fas fa-paper-plane"></i>
+                    <div class="text-center">
+                        <div class="step-icon">
+                            <i class="fas fa-paper-plane"></i>
+                        </div>
                     </div>
                     <h3 class="step-title">Envío Inmediato</h3>
                     <p class="step-description">
