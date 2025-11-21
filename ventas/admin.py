@@ -432,9 +432,9 @@ class DealAdmin(admin.ModelAdmin):
 
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
-    list_display = ('name', 'industry', 'website', 'created_at')
-    list_filter = ('industry', 'created_at')
-    search_fields = ('name', 'industry', 'website', 'notes')
+    list_display = ('name', 'website', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('name', 'website')
     date_hierarchy = 'created_at'
 
 
@@ -444,7 +444,7 @@ class ContactAdmin(admin.ModelAdmin):
     list_filter = ('company', 'created_at')
     search_fields = ('first_name', 'last_name', 'email', 'phone', 'company__name')
     date_hierarchy = 'created_at'
-    autocomplete_fields = ['company', 'campaign']
+    autocomplete_fields = ['company']
 
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}"
@@ -485,26 +485,25 @@ class CampaignAdmin(admin.ModelAdmin):
 
 @admin.register(CampaignInteraction)
 class CampaignInteractionAdmin(admin.ModelAdmin):
-    list_display = ('interaction_type', 'campaign', 'contact', 'cliente',
-                   'interaction_date', 'response', 'converted')
-    list_filter = ('interaction_type', 'response', 'converted', 'interaction_date')
-    search_fields = ('campaign__name', 'contact__email', 'cliente__email')
-    date_hierarchy = 'interaction_date'
-    autocomplete_fields = ['campaign', 'contact', 'cliente']
+    list_display = ('interaction_type', 'campaign', 'contact', 'timestamp')
+    list_filter = ('interaction_type', 'timestamp')
+    search_fields = ('campaign__name', 'contact__email', 'contact__first_name', 'contact__last_name')
+    date_hierarchy = 'timestamp'
+    autocomplete_fields = ['campaign', 'contact']
 
 
 @admin.register(EmailSubjectTemplate)
 class EmailSubjectTemplateAdmin(admin.ModelAdmin):
-    list_display = ('name', 'subject_line', 'active', 'created_at')
-    list_filter = ('active', 'created_at')
-    search_fields = ('name', 'subject_line')
+    list_display = ('subject_template', 'estilo', 'activo', 'creado')
+    list_filter = ('activo', 'estilo', 'creado')
+    search_fields = ('subject_template',)
 
 
 @admin.register(EmailContentTemplate)
 class EmailContentTemplateAdmin(admin.ModelAdmin):
-    list_display = ('name', 'active', 'created_at')
-    list_filter = ('active', 'created_at')
-    search_fields = ('name', 'content')
+    list_display = ('nombre', 'estilo', 'activo', 'creado')
+    list_filter = ('activo', 'estilo', 'creado')
+    search_fields = ('nombre', 'saludo_inicial', 'parrafo_intro')
     formfield_overrides = {
         models.TextField: {'widget': forms.Textarea(attrs={'rows': 20, 'cols': 100})},
     }
@@ -518,14 +517,14 @@ class PremioAdmin(admin.ModelAdmin):
         'nombre',
         'tipo',
         'valor_formateado',
-        'tramo_minimo',
+        'tramo_hito',
         'dias_validez',
         'activo',
         'stock_display'
     )
-    list_filter = ('tipo', 'activo', 'tramo_minimo')
-    search_fields = ('nombre', 'descripcion')
-    ordering = ['-activo', 'tramo_minimo', 'nombre']
+    list_filter = ('tipo', 'activo', 'tramo_hito')
+    search_fields = ('nombre', 'descripcion_corta')
+    ordering = ['-activo', 'tramo_hito', 'nombre']
 
     fieldsets = (
         ('Información General', {
