@@ -14,7 +14,7 @@ import logging
 import string
 import random
 
-from ..models import GiftCard, Cliente
+from ..models import GiftCard, Cliente, GiftCardExperiencia
 from ..services.giftcard_ai_service import GiftCardAIService
 from ..services.cliente_service import ClienteService
 
@@ -387,168 +387,25 @@ def giftcard_wizard(request):
     6. Checkout
     """
 
-    # Opciones de experiencias/servicios organizadas por categorías
-    experiencias = [
-        # ========== GRUPO TINAS ==========
-        {
-            'id': 'tinas',
-            'categoria': 'tinas',
-            'nombre': 'Tina para 2',
-            'descripcion': 'Tinas calientes para dos personas',
-            'descripcion_giftcard': 'Tinas calientes para dos personas en tinas con o sin hidromasaje junto al Río Pescado',
-            'imagen': 'images/tinas.jpg',
-            'monto_fijo': 50000,
-            'montos_sugeridos': []
-        },
-        {
-            'id': 'tinas_masajes_semana',
-            'categoria': 'tinas',
-            'nombre': 'Tina + Masajes (Dom-Jue)',
-            'descripcion': 'Tina con masajes para dos de domingo a jueves',
-            'descripcion_giftcard': 'Tinas calientes + masajes relajantes para dos personas de domingo a jueves',
-            'imagen': 'images/tinas_masajes.jpg',
-            'monto_fijo': 95000,
-            'montos_sugeridos': []
-        },
-        {
-            'id': 'tinas_masajes_finde',
-            'categoria': 'tinas',
-            'nombre': 'Tina + Masajes (Vie-Sáb)',
-            'descripcion': 'Tina con masajes para dos viernes o sábado',
-            'descripcion_giftcard': 'Tinas calientes + masajes relajantes para dos personas viernes o sábado',
-            'imagen': 'images/tinas_masajes.jpg',
-            'monto_fijo': 130000,
-            'montos_sugeridos': []
-        },
-        {
-            'id': 'pack_4_personas',
-            'categoria': 'tinas',
-            'nombre': 'Pack 4 Personas',
-            'descripcion': '4 horas de tinas + masaje para 4 personas',
-            'descripcion_giftcard': 'Pack completo para 4 personas: 4 horas de tinas calientes + masajes relajantes',
-            'imagen': 'images/tinas_masajes.jpg',
-            'monto_fijo': 190000,
-            'montos_sugeridos': []
-        },
-        {
-            'id': 'pack_6_personas',
-            'categoria': 'tinas',
-            'nombre': 'Pack 6 Personas',
-            'descripcion': '4 horas de tinas + masaje para 6 personas',
-            'descripcion_giftcard': 'Pack completo para 6 personas: 4 horas de tinas calientes + masajes relajantes',
-            'imagen': 'images/tinas_masajes.jpg',
-            'monto_fijo': 285000,
-            'montos_sugeridos': []
-        },
+    # ============================================================
+    # EXPERIENCIAS DESDE BASE DE DATOS
+    # ============================================================
+    # Las experiencias ahora se leen desde la tabla GiftCardExperiencia
+    # en lugar de estar hardcodeadas en el código.
+    # Esto permite editar precios, imágenes y contenido desde el admin.
 
-        # ========== GRUPO SOLO MASAJES ==========
-        {
-            'id': 'masaje_piedras',
-            'categoria': 'masajes',
-            'nombre': 'Masaje Piedras Calientes',
-            'descripcion': 'Masaje con piedras calientes para 1 persona',
-            'descripcion_giftcard': 'Masaje con piedras calientes volcánicas para una persona en domos de bienestar',
-            'imagen': 'images/masaje_piedras.jpg',
-            'monto_fijo': 45000,
-            'montos_sugeridos': []
-        },
-        {
-            'id': 'masaje_deportivo',
-            'categoria': 'masajes',
-            'nombre': 'Masaje Deportivo',
-            'descripcion': 'Masaje deportivo profesional para 1 persona',
-            'descripcion_giftcard': 'Masaje deportivo profesional para una persona, ideal para recuperación muscular',
-            'imagen': 'images/masaje_deportivo.jpg',
-            'monto_fijo': 45000,
-            'montos_sugeridos': []
-        },
-        {
-            'id': 'drenaje_linfatico',
-            'categoria': 'masajes',
-            'nombre': 'Drenaje Linfático',
-            'descripcion': 'Drenaje linfático para 1 persona',
-            'descripcion_giftcard': 'Sesión de drenaje linfático profesional para una persona',
-            'imagen': 'images/drenaje_linfatico.jpg',
-            'monto_fijo': 45000,
-            'montos_sugeridos': []
-        },
-        {
-            'id': 'masaje_pareja',
-            'categoria': 'masajes',
-            'nombre': 'Masaje para Dos',
-            'descripcion': 'Masaje relajante o descontracturante para dos personas',
-            'descripcion_giftcard': 'Masaje relajante o descontracturante para dos personas en nuestros domos de bienestar',
-            'imagen': 'images/masaje_pareja.jpg',
-            'monto_fijo': 80000,
-            'montos_sugeridos': []
-        },
+    experiencias_db = GiftCardExperiencia.objects.filter(activo=True).order_by('categoria', 'orden', 'nombre')
 
-        # ========== GRUPO ALOJAMIENTOS ==========
-        {
-            'id': 'alojamiento_semana',
-            'categoria': 'alojamientos',
-            'nombre': 'Alojamiento + Tinas (Dom-Jue)',
-            'descripcion': 'Alojamiento para dos con tinas de domingo a jueves',
-            'descripcion_giftcard': 'Alojamiento para dos en cabaña + tinas calientes de domingo a jueves',
-            'imagen': 'images/alojamiento_tinas.jpg',
-            'monto_fijo': 95000,
-            'montos_sugeridos': []
-        },
-        {
-            'id': 'alojamiento_finde',
-            'categoria': 'alojamientos',
-            'nombre': 'Alojamiento + Tinas (Vie-Sáb)',
-            'descripcion': 'Alojamiento para dos con tinas viernes o sábado',
-            'descripcion_giftcard': 'Alojamiento para dos en cabaña + tinas calientes viernes o sábado',
-            'imagen': 'images/alojamiento_tinas.jpg',
-            'monto_fijo': 140000,
-            'montos_sugeridos': []
-        },
-        {
-            'id': 'alojamiento_romantico',
-            'categoria': 'alojamientos',
-            'nombre': 'Paquete Romántico Completo',
-            'descripcion': 'Alojamiento + Tinas + Desayuno + Decoración romántica',
-            'descripcion_giftcard': 'Alojamiento + Tinas calientes + Desayuno + Decoración romántica en tinas cualquier día de la semana',
-            'imagen': 'images/alojamiento_romantico.jpg',
-            'monto_fijo': 150000,
-            'montos_sugeridos': []
-        },
+    # Convertir QuerySet a lista de diccionarios compatible con el template
+    # (mismo formato que el array hardcodeado original)
+    experiencias = [exp.to_dict() for exp in experiencias_db]
 
-        # ========== GRUPO CELEBRACIONES ==========
-        {
-            'id': 'tina_cumpleanos',
-            'categoria': 'celebraciones',
-            'nombre': 'Tina + Ambientación Cumpleaños',
-            'descripcion': 'Tina más ambientación de cumpleaños para dos',
-            'descripcion_giftcard': 'Tinas calientes + ambientación especial de cumpleaños para dos personas',
-            'imagen': 'images/tina_cumpleanos.jpg',
-            'monto_fijo': 88000,
-            'montos_sugeridos': []
-        },
-        {
-            'id': 'tina_celebracion',
-            'categoria': 'celebraciones',
-            'nombre': 'Tina + Celebración Especial',
-            'descripcion': 'Tina más celebración especial para dos',
-            'descripcion_giftcard': 'Tinas calientes + ambientación para celebración especial para dos personas',
-            'imagen': 'images/tina_celebracion.jpg',
-            'monto_fijo': 82000,
-            'montos_sugeridos': []
-        },
-
-        # ========== MONTO LIBRE ==========
-        {
-            'id': 'monto_libre',
-            'categoria': 'libre',
-            'nombre': 'Monto Libre',
-            'descripcion': 'El destinatario elige la experiencia',
-            'descripcion_giftcard': 'Vale por el monto indicado para usar en cualquier experiencia de Aremko Spa',
-            'imagen': 'images/gift_generic.jpg',
-            'monto_fijo': 0,  # 0 indica que NO tiene monto fijo (evitamos None que causa error en JS)
-            'montos_sugeridos': [30000, 50000, 75000, 100000, 150000, 200000]
-        }
-    ]
+    # Si no hay experiencias en BD, fallback a array vacío
+    # (evitamos mostrar wizard sin productos)
+    if not experiencias:
+        logger.warning("⚠️ No hay experiencias GiftCard activas en la base de datos")
+        # Podrías redirigir a página de error o mostrar mensaje
+        experiencias = []
 
     # Tipos de mensaje disponibles
     tipos_mensaje = [

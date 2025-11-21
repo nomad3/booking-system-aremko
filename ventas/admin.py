@@ -862,3 +862,94 @@ class PackDescuentoAdmin(admin.ModelAdmin):
             'all': ('admin/css/forms.css',)
         }
         js = ('admin/js/jquery.init.js',)
+
+
+@admin.register(models.GiftCardExperiencia)
+class GiftCardExperienciaAdmin(admin.ModelAdmin):
+    """
+    Administración de Experiencias para Gift Cards
+    """
+    list_display = (
+        'id_experiencia',
+        'nombre',
+        'categoria',
+        'precio_display',
+        'activo',
+        'orden',
+        'modificado'
+    )
+    list_filter = (
+        'categoria',
+        'activo',
+        'creado',
+        'modificado'
+    )
+    search_fields = (
+        'id_experiencia',
+        'nombre',
+        'descripcion',
+        'descripcion_giftcard'
+    )
+    ordering = ('categoria', 'orden', 'nombre')
+    list_editable = ('activo', 'orden')
+
+    fieldsets = (
+        ('Identificación', {
+            'fields': ('id_experiencia', 'categoria', 'nombre')
+        }),
+        ('Descripciones', {
+            'fields': ('descripcion', 'descripcion_giftcard')
+        }),
+        ('Imagen', {
+            'fields': ('imagen',),
+            'description': 'Sube la imagen de la experiencia (recomendado: 800x600px, formato JPG/PNG)'
+        }),
+        ('Precios', {
+            'fields': ('monto_fijo', 'montos_sugeridos'),
+            'description': (
+                'Si tiene monto fijo: ingresar solo "monto_fijo".<br>'
+                'Si es tarjeta de valor: dejar "monto_fijo" vacío y llenar "montos_sugeridos" '
+                'como lista JSON: [30000, 50000, 75000]'
+            )
+        }),
+        ('Configuración', {
+            'fields': ('activo', 'orden')
+        }),
+        ('Metadatos', {
+            'fields': ('creado', 'modificado'),
+            'classes': ('collapse',)
+        })
+    )
+
+    readonly_fields = ('creado', 'modificado')
+
+    def precio_display(self, obj):
+        """Muestra el precio en formato legible"""
+        if obj.monto_fijo:
+            return f"${obj.monto_fijo:,}"
+        elif obj.montos_sugeridos:
+            montos = [f"${m:,}" for m in obj.montos_sugeridos]
+            return f"Variable: {', '.join(montos[:3])}"
+        return "Sin precio"
+    precio_display.short_description = "Precio"
+
+    def save_model(self, request, obj, form, change):
+        """Validaciones al guardar"""
+        # Validar que tenga al menos un tipo de precio
+        if not obj.monto_fijo and not obj.montos_sugeridos:
+            messages.warning(
+                request,
+                'Debes especificar al menos un monto_fijo o montos_sugeridos'
+            )
+
+        super().save_model(request, obj, form, change)
+
+        if not change:
+            messages.success(request, f'✅ Experiencia "{obj.nombre}" creada exitosamente.')
+        else:
+            messages.success(request, f'✅ Experiencia "{obj.nombre}" actualizada.')
+
+    class Media:
+        css = {
+            'all': ('admin/css/forms.css',)
+        }

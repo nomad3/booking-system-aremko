@@ -2606,3 +2606,117 @@ class PackDescuento(models.Model):
             return tipos_display
 
 
+class GiftCardExperiencia(models.Model):
+    """
+    Modelo para las experiencias disponibles en las Gift Cards.
+    Migrado desde el array hardcodeado en giftcard_views.py
+    """
+
+    CATEGORIA_CHOICES = [
+        ('tinas', 'Tinas y Hidromasajes'),
+        ('masajes', 'Masajes'),
+        ('faciales', 'Faciales'),
+        ('packs', 'Packs Spa'),
+        ('valor', 'Tarjetas de Valor'),
+    ]
+
+    # Identificación
+    id_experiencia = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="ID único de la experiencia (ej: 'tinas', 'masaje_relajacion')"
+    )
+    categoria = models.CharField(
+        max_length=20,
+        choices=CATEGORIA_CHOICES,
+        db_index=True
+    )
+
+    # Información básica
+    nombre = models.CharField(max_length=200)
+    descripcion = models.CharField(
+        max_length=500,
+        help_text="Descripción corta para menú"
+    )
+    descripcion_giftcard = models.TextField(
+        help_text="Descripción detallada para la gift card"
+    )
+
+    # Imagen
+    imagen = models.ImageField(
+        upload_to='giftcards/experiencias/',
+        help_text="Imagen de la experiencia (recomendado: 800x600px)"
+    )
+
+    # Precios
+    monto_fijo = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Monto fijo si la experiencia tiene un precio único (ej: $50.000)"
+    )
+    montos_sugeridos = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Lista de montos sugeridos para tarjetas de valor [30000, 50000, 75000]"
+    )
+
+    # Estado
+    activo = models.BooleanField(
+        default=True,
+        help_text="Si está inactivo, no aparece en el wizard"
+    )
+    orden = models.IntegerField(
+        default=0,
+        help_text="Orden de aparición en la lista (menor = primero)"
+    )
+
+    # Metadatos
+    creado = models.DateTimeField(auto_now_add=True)
+    modificado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Experiencia Gift Card"
+        verbose_name_plural = "Experiencias Gift Cards"
+        ordering = ['categoria', 'orden', 'nombre']
+        indexes = [
+            models.Index(fields=['categoria', 'activo']),
+            models.Index(fields=['activo', 'orden']),
+        ]
+
+    def __str__(self):
+        precio = f"${self.monto_fijo:,}" if self.monto_fijo else "Valor variable"
+        return f"{self.nombre} ({self.get_categoria_display()}) - {precio}"
+
+    def tiene_monto_fijo(self):
+        """Retorna True si la experiencia tiene monto fijo"""
+        return self.monto_fijo is not None and self.monto_fijo > 0
+
+    def es_tarjeta_valor(self):
+        """Retorna True si es una tarjeta de valor (montos sugeridos)"""
+        return bool(self.montos_sugeridos)
+
+    def get_precio_minimo(self):
+        """Retorna el precio mínimo de la experiencia"""
+        if self.monto_fijo:
+            return self.monto_fijo
+        elif self.montos_sugeridos:
+            return min(self.montos_sugeridos)
+        return 0
+
+    def to_dict(self):
+        """
+        Convierte el modelo a diccionario compatible con el formato
+        del array hardcodeado original en giftcard_views.py
+        """
+        return {
+            'id': self.id_experiencia,
+            'categoria': self.categoria,
+            'nombre': self.nombre,
+            'descripcion': self.descripcion,
+            'descripcion_giftcard': self.descripcion_giftcard,
+            'imagen': self.imagen.url if self.imagen else '',
+            'monto_fijo': self.monto_fijo,
+            'montos_sugeridos': self.montos_sugeridos or []
+        }
+
+
