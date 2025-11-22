@@ -1,0 +1,30 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard de Estadísticas</title>
+</head>
+<body>
+    <h1>Dashboard de Estadísticas - Aremko</h1>
+
+    <h2>Resumen</h2>
+    <p>Total Ingresos: ${{ resumen.total_ingresos|floatformat:0|intcomma }}</p>
+    <p>Total Reservas: {{ resumen.total_reservas }}</p>
+    <p>Ticket Promedio: ${{ resumen.ticket_promedio|floatformat:0|intcomma }}</p>
+    <p>Período: {{ resumen.periodo }}</p>
+
+    <h2>Debug Info</h2>
+    <p>Year: {{ year }}</p>
+    <p>Month: {{ month }}</p>
+
+    <h2>Ventas por Familia</h2>
+    <ul>
+    {% for item in ventas_por_familia %}
+        <li>{{ item.servicio__categoria__nombre }}: ${{ item.total_ventas|floatformat:0 }}</li>
+    {% empty %}
+        <li>No hay datos</li>
+    {% endfor %}
+    </ul>
+</body>
+</html>

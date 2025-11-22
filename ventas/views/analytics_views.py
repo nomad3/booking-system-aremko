@@ -297,7 +297,8 @@ def dashboard_estadisticas(request):
         ]
     }
 
-    return render(request, 'ventas/analytics_dashboard.html', context)
+    # return render(request, 'ventas/analytics_dashboard.html', context)
+    return render(request, 'ventas/analytics_dashboard_simple.html', context)  # DEBUG
 
 
 def get_month_name(month_number):
