@@ -63,7 +63,7 @@ def dashboard_estadisticas(request):
         .exclude(servicio__isnull=True)
         .values('servicio__categoria__nombre')
         .annotate(
-            total_ventas=Sum('precio_servicio'),
+            total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
             cantidad_servicios=Count('id')
         )
         .order_by('-total_ventas')
@@ -78,7 +78,7 @@ def dashboard_estadisticas(request):
         .exclude(servicio__isnull=True)
         .values('servicio__nombre', 'servicio__categoria__nombre')
         .annotate(
-            total_ventas=Sum('precio_servicio'),
+            total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
             cantidad=Count('id')
         )
         .order_by('-total_ventas')[:15]
@@ -317,7 +317,7 @@ def exportar_estadisticas_csv(request):
 
     if month:
         filtro_base &= Q(fecha_reserva__year=year, fecha_reserva__month=int(month))
-        filename = f"aremko_estadisticas_{year}_{month:02d}.csv"
+        filename = f"aremko_estadisticas_{year}_{int(month):02d}.csv"
     else:
         filtro_base &= Q(fecha_reserva__year=year)
         filename = f"aremko_estadisticas_{year}.csv"
@@ -344,7 +344,7 @@ def exportar_estadisticas_csv(request):
         .exclude(servicio__isnull=True)
         .values('servicio__nombre', 'servicio__categoria__nombre')
         .annotate(
-            total_ventas=Sum('precio_servicio'),
+            total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
             cantidad=Count('id')
         )
         .order_by('-total_ventas')
