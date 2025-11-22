@@ -970,6 +970,22 @@
 </div>
 
 <script>
+// Función helper para obtener CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
 // Wizard State
 let wizardData = {
     paso: 1,
@@ -1283,6 +1299,88 @@ function updateWizardUI() {
 
             // Forzar actualización inmediata
             updateNextButton();
+        }, 100);
+    }
+
+    // NUEVO: Re-registrar event listener del botón "Agregar al Carrito" cuando entramos al Step 5
+    if (currentStep === 5) {
+        console.log('🛒 Re-registrando event listener para botón Agregar al Carrito Step 5...');
+        setTimeout(() => {
+            const btnAgregarCarrito = document.getElementById('btnAgregarAlCarritoStep5');
+            console.log('Botón encontrado:', !!btnAgregarCarrito);
+
+            if (btnAgregarCarrito) {
+                // Remover listener anterior si existe para evitar duplicados
+                const newBtn = btnAgregarCarrito.cloneNode(true);
+                btnAgregarCarrito.parentNode.replaceChild(newBtn, btnAgregarCarrito);
+
+                // Agregar nuevo listener
+                newBtn.addEventListener('click', async function(e) {
+                    console.log('🔘 CLICK en botón Agregar al Carrito Step 5 (listener directo)');
+                    e.preventDefault();
+
+                    const btn = this;
+                    const loadingDiv = document.getElementById('loadingCarritoStep5');
+
+                    try {
+                        // Mostrar loading
+                        btn.disabled = true;
+                        loadingDiv.classList.remove('d-none');
+
+                        // Obtener el nombre de la experiencia seleccionada
+                        const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
+                        const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
+
+                        // Preparar datos para enviar
+                        const giftcardData = {
+                            experiencia_id: wizardData.experiencia,
+                            experiencia_nombre: expNombre,
+                            precio: wizardData.monto,
+                            destinatario_nombre: wizardData.destinatario.nombre,
+                            destinatario_email: wizardData.destinatario.email,
+                            destinatario_telefono: wizardData.destinatario.telefono || '',
+                            tipo_mensaje: wizardData.tipoMensaje,
+                            mensaje_seleccionado: wizardData.mensajeSeleccionado
+                        };
+
+                        console.log('📤 Enviando GiftCard al carrito desde Step 5:', giftcardData);
+
+                        // Enviar al backend
+                        const response = await fetch('/ventas/api/giftcard/agregar-al-carrito/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': getCookie('csrftoken')
+                            },
+                            body: JSON.stringify(giftcardData)
+                        });
+
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            throw new Error(`Error del servidor (${response.status}): ${errorText}`);
+                        }
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            console.log('✅ GiftCard agregada al carrito, redirigiendo...');
+                            window.location.href = data.redirect_url;
+                        } else {
+                            throw new Error(data.error || 'Error al agregar al carrito');
+                        }
+
+                    } catch (error) {
+                        console.error('❌ Error completo:', error);
+                        alert('Error al agregar la GiftCard al carrito: ' + error.message);
+                        btn.disabled = false;
+                        loadingDiv.classList.add('d-none');
+                    }
+                });
+
+                console.log('✅ Event listener registrado para Step 5');
+            } else {
+                console.error('❌ No se encontró el botón btnAgregarAlCarritoStep5');
+            }
         }, 100);
     }
 
@@ -1637,84 +1735,8 @@ document.getElementById('btnAgregarAlCarrito').addEventListener('click', async f
 });
 
 // Event listener para el botón "Agregar al Carrito" en Step 5
-// Usar delegación de eventos para manejar elementos dinámicos
-document.addEventListener('click', async function(e) {
-    // Verificar si el click fue en el botón o en sus hijos
-    const btn = e.target.closest('#btnAgregarAlCarritoStep5');
-
-    if (!btn) return; // Si no es el botón, salir
-
-    console.log('🔘 CLICK en botón Agregar al Carrito Step 5');
-    e.preventDefault();
-
-    const loadingDiv = document.getElementById('loadingCarritoStep5');
-
-        try {
-            // Mostrar loading
-            btn.disabled = true;
-            loadingDiv.classList.remove('d-none');
-
-        // Obtener el nombre de la experiencia seleccionada
-        const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
-        const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
-
-        // Preparar datos para enviar (SIN datos del comprador - se pedirán en checkout)
-        const giftcardData = {
-            experiencia_id: wizardData.experiencia,
-            experiencia_nombre: expNombre,
-            precio: wizardData.monto,
-            destinatario_nombre: wizardData.destinatario.nombre,
-            destinatario_email: wizardData.destinatario.email,
-            destinatario_telefono: wizardData.destinatario.telefono || '',
-            tipo_mensaje: wizardData.tipoMensaje,
-            mensaje_seleccionado: wizardData.mensajeSeleccionado
-            // NO enviamos datos del comprador - se pedirán en checkout
-        };
-
-        console.log('📤 Enviando GiftCard al carrito desde Step 5:', giftcardData);
-
-        // Enviar al backend
-        const response = await fetch('/ventas/api/giftcard/agregar-al-carrito/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(giftcardData)
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ Error del servidor:', errorText);
-            throw new Error(`Error del servidor (${response.status}): ${errorText}`);
-        }
-
-        const data = await response.json();
-        console.log('📥 Response data:', data);
-
-        if (data.success) {
-            console.log('✅ GiftCard agregada al carrito:', data);
-
-            // Actualizar contador del carrito en navbar (si existe)
-            const cartCount = document.getElementById('cartCount');
-            if (cartCount) {
-                cartCount.textContent = data.cart_count;
-            }
-
-            // Redirigir al carrito directamente
-            window.location.href = data.redirect_url;
-        } else {
-            throw new Error(data.error || 'Error al agregar al carrito');
-        }
-
-    } catch (error) {
-        console.error('❌ Error completo:', error);
-        alert('Error al agregar la GiftCard al carrito: ' + error.message);
-
-        // Restaurar botón
-        btn.disabled = false;
-        loadingDiv.classList.add('d-none');
-    }
-});
+// NOTA: Este listener se registra dinámicamente en updateWizardUI() cuando currentStep === 5
+// Ver líneas ~1290-1369 para la implementación
 
 // Modificar nextStep() para actualizar preview/resumen cuando llega a step 5, 6, o 8
 const originalNextStep = nextStep;
