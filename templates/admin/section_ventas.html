@@ -154,6 +154,22 @@
             </div>
         </div>
 
+        {# Estadísticas y Analytics Card (NEW) #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-chart-line card-icon text-info"></i>
+                    <h5 class="card-title">Estadísticas y Analytics</h5>
+                     <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:analytics_dashboard' %}" class="btn btn-sm btn-modern btn-primary-modern">
+                            <i class="fas fa-chart-bar"></i> Ver Dashboard
+                        </a>
+                        <small class="text-muted mt-2">Métricas de ventas, productos y servicios</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 {% endblock %}
