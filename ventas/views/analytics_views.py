@@ -29,10 +29,13 @@ def dashboard_estadisticas(request):
     - start_date: Fecha inicio (YYYY-MM-DD)
     - end_date: Fecha fin (YYYY-MM-DD)
     """
-    import logging
-    logger = logging.getLogger(__name__)
+    from django.http import HttpResponse
+    import traceback
 
     try:
+        import logging
+        logger = logging.getLogger(__name__)
+
         # Obtener parámetros de filtro
         current_year = timezone.now().year
         year = int(request.GET.get('year', current_year))
@@ -40,11 +43,11 @@ def dashboard_estadisticas(request):
         start_date = request.GET.get('start_date', None)
         end_date = request.GET.get('end_date', None)
     except Exception as e:
-        logger.error(f"Error al obtener parámetros: {str(e)}")
-        raise
+        return HttpResponse(f"Error en parámetros: {str(e)}<br><pre>{traceback.format_exc()}</pre>", status=500)
 
-    # Construir filtro base
-    filtro_base = Q(estado_reserva__in=['checkin', 'checkout', 'pendiente']) & Q(estado_pago='pagado')
+    try:
+        # Construir filtro base
+        filtro_base = Q(estado_reserva__in=['checkin', 'checkout', 'pendiente']) & Q(estado_pago='pagado')
 
     # Aplicar filtros de fecha
     if start_date and end_date:
@@ -297,8 +300,10 @@ def dashboard_estadisticas(request):
         ]
     }
 
-    # return render(request, 'ventas/analytics_dashboard.html', context)
-    return render(request, 'ventas/analytics_dashboard_simple.html', context)  # DEBUG
+        # return render(request, 'ventas/analytics_dashboard.html', context)
+        return render(request, 'ventas/analytics_dashboard_simple.html', context)  # DEBUG
+    except Exception as e:
+        return HttpResponse(f"<h1>Error 500</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>", status=500)
 
 
 def get_month_name(month_number):
