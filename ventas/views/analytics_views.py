@@ -29,13 +29,19 @@ def dashboard_estadisticas(request):
     - start_date: Fecha inicio (YYYY-MM-DD)
     - end_date: Fecha fin (YYYY-MM-DD)
     """
+    import logging
+    logger = logging.getLogger(__name__)
 
-    # Obtener parámetros de filtro
-    current_year = timezone.now().year
-    year = int(request.GET.get('year', current_year))
-    month = request.GET.get('month', None)
-    start_date = request.GET.get('start_date', None)
-    end_date = request.GET.get('end_date', None)
+    try:
+        # Obtener parámetros de filtro
+        current_year = timezone.now().year
+        year = int(request.GET.get('year', current_year))
+        month = request.GET.get('month', None)
+        start_date = request.GET.get('start_date', None)
+        end_date = request.GET.get('end_date', None)
+    except Exception as e:
+        logger.error(f"Error al obtener parámetros: {str(e)}")
+        raise
 
     # Construir filtro base
     filtro_base = Q(estado_reserva__in=['checkin', 'checkout', 'pendiente']) & Q(estado_pago='pagado')
@@ -231,6 +237,12 @@ def dashboard_estadisticas(request):
                 # Convertir Decimal a float
                 if isinstance(value, Decimal):
                     value = float(value)
+                # Convertir None a 0 o string vacío según el tipo esperado
+                elif value is None:
+                    value = 0 if 'total' in json_field or 'cantidad' in json_field else ''
+                # Asegurar que sea serializable a JSON
+                elif not isinstance(value, (str, int, float, bool)):
+                    value = str(value)
                 mapped_item[json_field] = value
             result.append(mapped_item)
         return result
