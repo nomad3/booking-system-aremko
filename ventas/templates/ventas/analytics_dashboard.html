@@ -1,9 +1,12 @@
-{% extends 'admin/base_site.html' %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Estadísticas - Aremko</title>
 {% load humanize %}
 {% load static %}
 
-{% block extrastyle %}
-{{ block.super }}
 <style>
     .stats-container {
         padding: 20px;
@@ -221,9 +224,10 @@
         }
     }
 </style>
-{% endblock %}
+</head>
+<body>
 
-{% block content %}
+<!-- CONTENT -->
 <div class="stats-container">
     <!-- Header -->
     <div class="stats-header">
@@ -660,4 +664,6 @@
         });
     }
 </script>
-{% endblock %}
+
+</body>
+</html>
