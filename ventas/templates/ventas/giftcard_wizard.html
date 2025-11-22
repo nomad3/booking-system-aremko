@@ -534,7 +534,7 @@
                 <div class="experience-grid" id="experienceGrid">
                     {% for exp in experiencias %}
                     {% if exp.categoria == 'tinas' %}
-                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" onclick="selectExperience('{{ exp.id }}')">
+                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
                         <i class="fas fa-hot-tub"></i>
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
@@ -555,7 +555,7 @@
                 <div class="experience-grid">
                     {% for exp in experiencias %}
                     {% if exp.categoria == 'masajes' %}
-                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" onclick="selectExperience('{{ exp.id }}')">
+                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
                         <i class="fas fa-spa"></i>
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
@@ -576,7 +576,7 @@
                 <div class="experience-grid">
                     {% for exp in experiencias %}
                     {% if exp.categoria == 'alojamientos' %}
-                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" onclick="selectExperience('{{ exp.id }}')">
+                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
                         <i class="fas fa-bed"></i>
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
@@ -597,7 +597,7 @@
                 <div class="experience-grid">
                     {% for exp in experiencias %}
                     {% if exp.categoria == 'celebraciones' %}
-                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" onclick="selectExperience('{{ exp.id }}')">
+                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
                         <i class="fas fa-champagne-glasses"></i>
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
@@ -1003,6 +1003,8 @@ const experiencias = {{ experiencias|safe }};
 
 // Seleccionar Experiencia
 function selectExperience(expId) {
+    console.log(`📌 selectExperience llamado con: ${expId}`);
+
     // Remover selección anterior
     document.querySelectorAll('.experience-card').forEach(card => {
         card.classList.remove('selected');
@@ -1014,16 +1016,42 @@ function selectExperience(expId) {
 
     wizardData.experiencia = expId;
 
-    // Obtener experiencia seleccionada
-    const exp = experiencias.find(e => e.id === expId);
+    // Obtener experiencia seleccionada con manejo de errores
+    let exp = null;
+    try {
+        exp = experiencias.find(e => e.id === expId);
+        if (!exp) {
+            console.error(`❌ No se encontró experiencia con id: ${expId}`);
+            return;
+        }
+        console.log(`✅ Experiencia encontrada:`, exp);
+    } catch (error) {
+        console.error('❌ Error al buscar experiencia:', error);
+        // Fallback: intentar buscar en el DOM
+        const expCard = document.querySelector(`.experience-card[data-experience="${expId}"]`);
+        if (expCard) {
+            const montoAttr = expCard.getAttribute('data-monto');
+            if (montoAttr && montoAttr !== '0') {
+                wizardData.monto = parseInt(montoAttr);
+                console.log(`✅ Monto obtenido del DOM: $${wizardData.monto}`);
+                document.getElementById('amountSelection').style.display = 'none';
+                updateNextButton();
+                return;
+            }
+        }
+        console.error('❌ No se pudo obtener la experiencia');
+        return;
+    }
 
     // Si tiene monto fijo (> 0), asignarlo directamente y ocultar selector
     if (exp.monto_fijo && exp.monto_fijo > 0) {
         wizardData.monto = exp.monto_fijo;
         document.getElementById('amountSelection').style.display = 'none';
         console.log(`✅ Experiencia "${exp.nombre}" seleccionada con monto fijo: $${exp.monto_fijo.toLocaleString('es-CL')}`);
+        console.log(`📊 wizardData.monto actualizado a: ${wizardData.monto}`);
     } else {
         // Mostrar selector de monto para "Monto Libre" (monto_fijo = 0)
+        console.log(`💰 Mostrando selector de montos para "${exp.nombre}"`);
         showAmountOptions(exp.montos_sugeridos);
     }
 
