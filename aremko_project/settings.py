@@ -114,12 +114,30 @@ WSGI_APPLICATION = 'aremko_project.wsgi.application'
 
 # Configuración de la base de datos
 DATABASES = {
-    'default': dj_database_url.config(default=os.getenv('DATABASE_URL'))
+    'default': {
+        **dj_database_url.config(default=os.getenv('DATABASE_URL')),
+        'CONN_MAX_AGE': 600,  # Reutilizar conexiones por 10 minutos (reduce overhead de handshake)
+        'OPTIONS': {
+            'connect_timeout': 10,  # Timeout de conexión a 10 segundos
+        }
+    }
 }
 
 # Configuraciones adicionales...
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
+
+# Cache configuration (reduce queries repetidas)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000
+        }
+    }
+}
+
 LANGUAGE_CODE = 'es-cl'
 TIME_ZONE = 'America/Santiago'
 USE_I18N = True
