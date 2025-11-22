@@ -1327,6 +1327,29 @@ function updateWizardUI() {
                         btn.disabled = true;
                         loadingDiv.classList.remove('d-none');
 
+                        // Validar wizardData antes de enviar
+                        console.log('📊 wizardData completo antes de enviar:', JSON.stringify(wizardData, null, 2));
+
+                        // Validar campos requeridos
+                        if (!wizardData.experiencia) {
+                            throw new Error('No se seleccionó ninguna experiencia');
+                        }
+                        if (!wizardData.monto) {
+                            throw new Error('No se seleccionó un monto para la GiftCard');
+                        }
+                        if (!wizardData.destinatario?.nombre) {
+                            throw new Error('Falta el nombre del destinatario');
+                        }
+                        if (!wizardData.destinatario?.email) {
+                            throw new Error('Falta el email del destinatario');
+                        }
+                        if (!wizardData.tipoMensaje) {
+                            throw new Error('No se seleccionó un tipo de mensaje');
+                        }
+                        if (!wizardData.mensajeSeleccionado) {
+                            throw new Error('No se seleccionó un mensaje');
+                        }
+
                         // Obtener el nombre de la experiencia seleccionada
                         const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
                         const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
@@ -1335,7 +1358,7 @@ function updateWizardUI() {
                         const giftcardData = {
                             experiencia_id: wizardData.experiencia,
                             experiencia_nombre: expNombre,
-                            precio: wizardData.monto,
+                            precio: parseFloat(wizardData.monto),  // Asegurar que sea número
                             destinatario_nombre: wizardData.destinatario.nombre,
                             destinatario_email: wizardData.destinatario.email,
                             destinatario_telefono: wizardData.destinatario.telefono || '',
@@ -1343,7 +1366,7 @@ function updateWizardUI() {
                             mensaje_seleccionado: wizardData.mensajeSeleccionado
                         };
 
-                        console.log('📤 Enviando GiftCard al carrito desde Step 5:', giftcardData);
+                        console.log('📤 Enviando GiftCard al carrito desde Step 5:', JSON.stringify(giftcardData, null, 2));
 
                         // Enviar al backend
                         const response = await fetch('/ventas/api/giftcard/agregar-al-carrito/', {
