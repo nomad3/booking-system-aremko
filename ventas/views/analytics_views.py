@@ -16,7 +16,7 @@ import json
 from ..models import VentaReserva, ReservaServicio, ReservaProducto, Pago, Servicio, Producto
 
 
-@staff_member_required
+# @staff_member_required  # Temporalmente deshabilitado para debugging
 def dashboard_estadisticas(request):
     """
     Dashboard principal de estadísticas con filtros por año/mes
