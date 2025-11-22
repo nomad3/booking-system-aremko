@@ -1637,14 +1637,17 @@ document.getElementById('btnAgregarAlCarrito').addEventListener('click', async f
 });
 
 // Event listener para el botón "Agregar al Carrito" en Step 5
-const btnAgregarCarritoStep5 = document.getElementById('btnAgregarAlCarritoStep5');
-console.log('🛒 Botón Agregar al Carrito Step 5:', btnAgregarCarritoStep5);
+// Usar delegación de eventos para manejar elementos dinámicos
+document.addEventListener('click', async function(e) {
+    // Verificar si el click fue en el botón o en sus hijos
+    const btn = e.target.closest('#btnAgregarAlCarritoStep5');
 
-if (btnAgregarCarritoStep5) {
-    btnAgregarCarritoStep5.addEventListener('click', async function() {
-        console.log('🔘 CLICK en botón Agregar al Carrito Step 5');
-        const btn = this;
-        const loadingDiv = document.getElementById('loadingCarritoStep5');
+    if (!btn) return; // Si no es el botón, salir
+
+    console.log('🔘 CLICK en botón Agregar al Carrito Step 5');
+    e.preventDefault();
+
+    const loadingDiv = document.getElementById('loadingCarritoStep5');
 
         try {
             // Mostrar loading
@@ -1711,10 +1714,7 @@ if (btnAgregarCarritoStep5) {
         btn.disabled = false;
         loadingDiv.classList.add('d-none');
     }
-    });
-} else {
-    console.error('❌ No se encontró el botón btnAgregarAlCarritoStep5');
-}
+});
 
 // Modificar nextStep() para actualizar preview/resumen cuando llega a step 5, 6, o 8
 const originalNextStep = nextStep;
