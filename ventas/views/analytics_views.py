@@ -102,7 +102,7 @@ def dashboard_estadisticas(request):
             .exclude(producto__isnull=True)
             .values('producto__nombre')
             .annotate(
-                total_ventas=Sum(F('cantidad') * F('precio_unitario')),
+                total_ventas=Sum(F('cantidad') * F('producto__precio_base')),
                 cantidad_vendida=Sum('cantidad')
             )
             .order_by('-total_ventas')[:15]
@@ -388,7 +388,7 @@ def exportar_estadisticas_csv(request):
         .exclude(producto__isnull=True)
         .values('producto__nombre')
         .annotate(
-            total_ventas=Sum(F('cantidad') * F('precio_unitario')),
+            total_ventas=Sum(F('cantidad') * F('producto__precio_base')),
             cantidad_vendida=Sum('cantidad')
         )
         .order_by('-total_ventas')
