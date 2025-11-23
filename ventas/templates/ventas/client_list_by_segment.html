@@ -95,9 +95,9 @@
         </div>
     </div>
 
-    <button id="start-campaign-btn" class="btn btn-primary">Iniciar Campaña con Clientes Seleccionados</button>
+    <button id="start-campaign-btn" class="btn btn-primary">Iniciar Campaña de Email con Clientes Seleccionados</button>
 
-    <form id="start-campaign-form" method="post" action="{% url 'ventas:select_campaign_for_clients' %}" style="display: none;">
+    <form id="start-campaign-form" method="post" action="{% url 'ventas:create_email_campaign' %}" style="display: none;">
         {% csrf_token %}
         <input type="hidden" name="selected_clients" id="selected-clients-input">
     </form>
