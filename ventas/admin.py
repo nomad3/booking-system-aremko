@@ -1016,7 +1016,7 @@ class EmailRecipientAdmin(admin.ModelAdmin):
     list_filter = ('status', 'send_enabled', 'campaign')
     search_fields = ('email', 'name', 'campaign__name')
     
-    readonly_fields = ('sent_at', 'delivered_at', 'opened_at', 'created_at', 'updated_at')
+    readonly_fields = ('sent_at', 'delivered_at', 'opened_at', 'clicked_at')
     
     fieldsets = (
         ('Información', {
