@@ -472,13 +472,21 @@ class CampaignAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Información Básica', {
-            'fields': ('name', 'description', 'status')
+            'fields': ('name', 'description', 'status', 'goal')
         }),
         ('Fechas y Presupuesto', {
             'fields': ('start_date', 'end_date', 'budget')
         }),
         ('Segmentación', {
-            'fields': ('target_audience', 'target_min_spend', 'target_comunas')
+            'fields': ('target_min_visits', 'target_min_spend')
+        }),
+        ('Plantillas de Contenido', {
+            'fields': ('email_subject_template', 'email_body_template', 'sms_template', 'whatsapp_template'),
+            'classes': ('collapse',)
+        }),
+        ('Automatización', {
+            'fields': ('automation_notes',),
+            'classes': ('collapse',)
         })
     )
 
