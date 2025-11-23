@@ -15,6 +15,10 @@ from django.views.decorators.http import require_http_methods
 
 from ventas.models import Cliente, EmailCampaign, EmailRecipient
 import json
+import logging
+
+# Configurar logger
+logger = logging.getLogger(__name__)
 
 
 def es_administrador(user):
@@ -27,7 +31,7 @@ def es_administrador(user):
 def create_email_campaign_from_segment(request):
     """
     Vista mejorada para crear una campaña de email desde clientes segmentados
-    
+
     Flujo:
     1. Recibe IDs de clientes seleccionados
     2. Muestra modal para crear/seleccionar campaña
@@ -35,93 +39,111 @@ def create_email_campaign_from_segment(request):
     4. Crea EmailCampaign y EmailRecipients
     5. Redirige a vista de confirmación
     """
-    
-    # Obtener IDs de clientes seleccionados
-    selected_clients_string = request.POST.get('selected_clients', '')
-    
-    if not selected_clients_string:
-        messages.error(request, _("No se seleccionaron clientes."))
-        return HttpResponseRedirect(reverse('ventas:cliente_segmentation'))
-    
-    # Parsear IDs
+
     try:
-        selected_client_ids = [
-            int(client_id) 
-            for client_id in selected_clients_string.split(',') 
-            if client_id.isdigit()
-        ]
-    except ValueError:
-        messages.error(request, _("IDs de clientes inválidos."))
-        return HttpResponseRedirect(reverse('ventas:cliente_segmentation'))
-    
-    # Obtener clientes
-    clientes = Cliente.objects.filter(id__in=selected_client_ids)
-    
-    if not clientes.exists():
-        messages.error(request, _("No se encontraron clientes con los IDs proporcionados."))
-        return HttpResponseRedirect(reverse('ventas:cliente_segmentation'))
-    
-    # Preparar datos de clientes para la vista
-    clientes_data = []
-    for cliente in clientes:
-        # Saltar clientes sin email
-        if not cliente.email or cliente.email.strip() == '':
-            continue
+        logger.info("=== Iniciando create_email_campaign_from_segment ===")
 
+        # Obtener IDs de clientes seleccionados
+        selected_clients_string = request.POST.get('selected_clients', '')
+        logger.info(f"Selected clients string: {selected_clients_string}")
+
+        if not selected_clients_string:
+            logger.warning("No se seleccionaron clientes")
+            messages.error(request, _("No se seleccionaron clientes."))
+            return HttpResponseRedirect(reverse('ventas:cliente_segmentation'))
+
+        # Parsear IDs
         try:
-            gasto_total = cliente.ventareserva_set.aggregate(
-                total=Sum('total')
-            )['total'] or 0
+            selected_client_ids = [
+                int(client_id)
+                for client_id in selected_clients_string.split(',')
+                if client_id.isdigit()
+            ]
+            logger.info(f"Parsed {len(selected_client_ids)} client IDs")
+        except ValueError as e:
+            logger.error(f"Error parseando IDs: {str(e)}")
+            messages.error(request, _("IDs de clientes inválidos."))
+            return HttpResponseRedirect(reverse('ventas:cliente_segmentation'))
 
-            # Obtener primer nombre de forma segura
-            nombre_completo = (cliente.nombre or 'Cliente').strip()
-            primer_nombre = nombre_completo.split()[0] if nombre_completo and ' ' in nombre_completo else nombre_completo
+        # Obtener clientes
+        logger.info(f"Buscando {len(selected_client_ids)} clientes en la base de datos")
+        clientes = Cliente.objects.filter(id__in=selected_client_ids)
+        logger.info(f"Encontrados {clientes.count()} clientes")
 
-            # Obtener ubicación (preferir comuna sobre ciudad)
-            ubicacion = 'N/A'
-            if cliente.comuna:
-                ubicacion = cliente.comuna.nombre
-            elif cliente.ciudad:
-                ubicacion = cliente.ciudad
+        if not clientes.exists():
+            logger.warning("No se encontraron clientes con los IDs proporcionados")
+            messages.error(request, _("No se encontraron clientes con los IDs proporcionados."))
+            return HttpResponseRedirect(reverse('ventas:cliente_segmentation'))
 
-            clientes_data.append({
-                'id': cliente.id,
-                'nombre_completo': nombre_completo,
-                'primer_nombre': primer_nombre,
-                'email': cliente.email.strip(),
-                'gasto_total': gasto_total,
-                'visitas': cliente.ventareserva_set.count(),
-                'ciudad': ubicacion
+        # Preparar datos de clientes para la vista
+        logger.info("Preparando datos de clientes")
+        clientes_data = []
+        for cliente in clientes:
+            # Saltar clientes sin email
+            if not cliente.email or cliente.email.strip() == '':
+                continue
+
+            try:
+                gasto_total = cliente.ventareserva_set.aggregate(
+                    total=Sum('total')
+                )['total'] or 0
+
+                # Obtener primer nombre de forma segura
+                nombre_completo = (cliente.nombre or 'Cliente').strip()
+                primer_nombre = nombre_completo.split()[0] if nombre_completo and ' ' in nombre_completo else nombre_completo
+
+                # Obtener ubicación (preferir comuna sobre ciudad)
+                ubicacion = 'N/A'
+                if cliente.comuna:
+                    ubicacion = cliente.comuna.nombre
+                elif cliente.ciudad:
+                    ubicacion = cliente.ciudad
+
+                clientes_data.append({
+                    'id': cliente.id,
+                    'nombre_completo': nombre_completo,
+                    'primer_nombre': primer_nombre,
+                    'email': cliente.email.strip(),
+                    'gasto_total': gasto_total,
+                    'visitas': cliente.ventareserva_set.count(),
+                    'ciudad': ubicacion
+                })
+            except Exception as e:
+                # Log el error pero continua con el siguiente cliente
+                logger.error(f"Error procesando cliente {cliente.id}: {str(e)}")
+                continue
+
+        # Verificar que haya al menos un cliente válido con email
+        logger.info(f"Procesados {len(clientes_data)} clientes válidos con email")
+        if not clientes_data:
+            logger.warning("Ninguno de los clientes tiene email válido")
+            messages.error(request, _("Ninguno de los clientes seleccionados tiene email válido. No se puede crear la campaña."))
+            return HttpResponseRedirect(reverse('ventas:cliente_segmentation'))
+
+        # Si es una petición AJAX para obtener datos de clientes
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            logger.info("Petición AJAX, retornando JSON")
+            return JsonResponse({
+                'clientes': clientes_data,
+                'total': len(clientes_data)
             })
-        except Exception as e:
-            # Log el error pero continua con el siguiente cliente
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error procesando cliente {cliente.id}: {str(e)}")
-            continue
 
-    # Verificar que haya al menos un cliente válido con email
-    if not clientes_data:
-        messages.error(request, _("Ninguno de los clientes seleccionados tiene email válido. No se puede crear la campaña."))
-        return HttpResponseRedirect(reverse('ventas:cliente_segmentation'))
-
-    # Si es una petición AJAX para obtener datos de clientes
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse({
+        # Renderizar página de creación de campaña
+        logger.info("Renderizando página de creación de campaña")
+        context = {
             'clientes': clientes_data,
-            'total': len(clientes_data)
-        })
-    
-    # Renderizar página de creación de campaña
-    context = {
-        'clientes': clientes_data,
-        'clientes_json': json.dumps(clientes_data),
-        'total_clientes': len(clientes_data),
-        'selected_client_ids': selected_client_ids,
-        'selected_clients_string': selected_clients_string,
-    }
-    
-    return render(request, 'ventas/email_campaign_creator.html', context)
+            'clientes_json': json.dumps(clientes_data),
+            'total_clientes': len(clientes_data),
+            'selected_client_ids': selected_client_ids,
+            'selected_clients_string': selected_clients_string,
+        }
+
+        return render(request, 'ventas/email_campaign_creator.html', context)
+
+    except Exception as e:
+        logger.error(f"ERROR CRÍTICO en create_email_campaign_from_segment: {str(e)}", exc_info=True)
+        messages.error(request, f"Error al procesar la solicitud: {str(e)}")
+        return HttpResponseRedirect(reverse('ventas:cliente_segmentation'))
 
 
 @login_required
@@ -246,8 +268,6 @@ def save_email_campaign(request):
                     recipients_created += 1
                 except Exception as e:
                     # Log el error pero continua con el siguiente cliente
-                    import logging
-                    logger = logging.getLogger(__name__)
                     logger.error(f"Error creando destinatario para cliente {cliente.id}: {str(e)}")
                     continue
             
