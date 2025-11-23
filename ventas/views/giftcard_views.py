@@ -28,8 +28,31 @@ def giftcard_menu(request):
     1. Comprar y Personalizar 1 GiftCard (activo)
     2. Comprar Varias GiftCards (próximamente)
     3. GiftCards para Empresas (próximamente)
+    
+    Ahora lee las experiencias desde la base de datos para mostrar
+    imágenes y precios actualizados en la landing page.
     """
-    return render(request, 'ventas/giftcard_menu.html')
+    # Obtener experiencias activas desde la base de datos
+    experiencias_db = GiftCardExperiencia.objects.filter(activo=True).order_by('categoria', 'orden', 'nombre')
+    
+    # Convertir a diccionarios para el template
+    experiencias = [exp.to_dict() for exp in experiencias_db]
+    
+    # Agrupar por categoría para facilitar el renderizado en tabs
+    experiencias_por_categoria = {
+        'tinas': [exp for exp in experiencias if exp['categoria'] == 'tinas'],
+        'masajes': [exp for exp in experiencias if exp['categoria'] == 'masajes'],
+        'faciales': [exp for exp in experiencias if exp['categoria'] == 'faciales'],
+        'packs': [exp for exp in experiencias if exp['categoria'] == 'packs'],
+        'valor': [exp for exp in experiencias if exp['categoria'] == 'valor'],
+    }
+    
+    context = {
+        'experiencias': experiencias,
+        'experiencias_por_categoria': experiencias_por_categoria,
+    }
+    
+    return render(request, 'ventas/giftcard_menu.html', context)
 
 
 @csrf_exempt
