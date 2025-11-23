@@ -5,7 +5,8 @@
 {% block title %}Regala una Experiencia Aremko - GiftCards Personalizadas{% endblock %}
 
 {% block meta_description %}
-<meta name="description" content="Regala momentos inolvidables en Aremko. GiftCards personalizadas con mensajes únicos generados por IA. Tinas calientes, masajes y más.">
+<meta name="description"
+    content="Regala momentos inolvidables en Aremko. GiftCards personalizadas con mensajes únicos generados por IA. Tinas calientes, masajes y más.">
 {% endblock %}
 
 {% block extra_style %}
@@ -340,6 +341,7 @@
             opacity: 0;
             transform: translateY(20px);
         }
+
         to {
             opacity: 1;
             transform: translateY(0);
@@ -352,9 +354,17 @@
     }
 
     /* Retraso escalonado para animación */
-    .category-group:nth-child(1) .experience-card:nth-child(1) { animation-delay: 0.1s; }
-    .category-group:nth-child(1) .experience-card:nth-child(2) { animation-delay: 0.2s; }
-    .category-group:nth-child(1) .experience-card:nth-child(3) { animation-delay: 0.3s; }
+    .category-group:nth-child(1) .experience-card:nth-child(1) {
+        animation-delay: 0.1s;
+    }
+
+    .category-group:nth-child(1) .experience-card:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .category-group:nth-child(1) .experience-card:nth-child(3) {
+        animation-delay: 0.3s;
+    }
 
     /* Colores específicos por categoría */
     .experience-card[data-experience*="tina"] i {
@@ -534,7 +544,9 @@
                 <div class="experience-grid" id="experienceGrid">
                     {% for exp in experiencias %}
                     {% if exp.categoria == 'tinas' %}
-                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}"
+                        data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                        <!-- Debug: ID={{ exp.id }} Img={{ exp.imagen }} -->
                         {% if exp.imagen %}
                         <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
                         {% else %}
@@ -542,6 +554,7 @@
                         {% endif %}
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
+                        <small class="text-muted" style="font-size: 0.7rem;">ID: {{ exp.id }}</small>
                         {% if exp.monto_fijo %}
                         <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
                         {% endif %}
@@ -559,7 +572,9 @@
                 <div class="experience-grid">
                     {% for exp in experiencias %}
                     {% if exp.categoria == 'masajes' %}
-                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}"
+                        data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                        <!-- Debug: ID={{ exp.id }} Img={{ exp.imagen }} -->
                         {% if exp.imagen %}
                         <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
                         {% else %}
@@ -567,6 +582,7 @@
                         {% endif %}
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
+                        <small class="text-muted" style="font-size: 0.7rem;">ID: {{ exp.id }}</small>
                         {% if exp.monto_fijo %}
                         <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
                         {% endif %}
@@ -584,7 +600,9 @@
                 <div class="experience-grid">
                     {% for exp in experiencias %}
                     {% if exp.categoria == 'alojamientos' %}
-                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}"
+                        data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                        <!-- Debug: ID={{ exp.id }} Img={{ exp.imagen }} -->
                         {% if exp.imagen %}
                         <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
                         {% else %}
@@ -592,6 +610,7 @@
                         {% endif %}
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
+                        <small class="text-muted" style="font-size: 0.7rem;">ID: {{ exp.id }}</small>
                         {% if exp.monto_fijo %}
                         <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
                         {% endif %}
@@ -609,7 +628,9 @@
                 <div class="experience-grid">
                     {% for exp in experiencias %}
                     {% if exp.categoria == 'celebraciones' %}
-                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}"
+                        data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                        <!-- Debug: ID={{ exp.id }} Img={{ exp.imagen }} -->
                         {% if exp.imagen %}
                         <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
                         {% else %}
@@ -617,6 +638,7 @@
                         {% endif %}
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
+                        <small class="text-muted" style="font-size: 0.7rem;">ID: {{ exp.id }}</small>
                         {% if exp.monto_fijo %}
                         <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
                         {% endif %}
@@ -634,7 +656,8 @@
                     <label class="form-label fw-bold">O ingresa un monto personalizado:</label>
                     <div class="input-group">
                         <span class="input-group-text">$</span>
-                        <input type="number" class="form-control custom-amount-input" id="customAmount" placeholder="Ej: 85000" min="10000" step="1000">
+                        <input type="number" class="form-control custom-amount-input" id="customAmount"
+                            placeholder="Ej: 85000" min="10000" step="1000">
                     </div>
                     <small class="text-muted">Monto mínimo: $10.000</small>
                 </div>
@@ -655,19 +678,22 @@
 
                 <div class="mb-4">
                     <label class="form-label fw-bold">Relación Contigo *</label>
-                    <input type="text" class="form-control" id="destinatarioRelacion" placeholder="Ej: esposa, mejor amiga, madre" required>
+                    <input type="text" class="form-control" id="destinatarioRelacion"
+                        placeholder="Ej: esposa, mejor amiga, madre" required>
                     <small class="text-muted">Ayuda a la IA a crear un mensaje más personal</small>
                 </div>
 
                 <div class="mb-4">
                     <label class="form-label fw-bold">Email del Destinatario *</label>
-                    <input type="email" class="form-control" id="destinatarioEmail" placeholder="maria@ejemplo.com" required>
+                    <input type="email" class="form-control" id="destinatarioEmail" placeholder="maria@ejemplo.com"
+                        required>
                     <small class="text-muted">Necesario para crear el perfil del destinatario como cliente</small>
                 </div>
 
                 <div class="mb-4">
                     <label class="form-label fw-bold">Teléfono del Destinatario *</label>
-                    <input type="tel" class="form-control" id="destinatarioTelefono" placeholder="+56 9 1234 5678" required>
+                    <input type="tel" class="form-control" id="destinatarioTelefono" placeholder="+56 9 1234 5678"
+                        required>
                     <small class="text-muted">Necesario para crear el perfil del destinatario como cliente</small>
                 </div>
             </form>
@@ -691,14 +717,16 @@
             <!-- Campo para detalle especial (usado con IA) -->
             <div class="mt-4" id="detalleEspecialContainer">
                 <label class="form-label fw-bold">Detalle Especial (Opcional)</label>
-                <textarea class="form-control" id="detalleEspecial" rows="3" placeholder="Ej: Celebrando 10 años juntos, siempre me apoya en momentos difíciles..."></textarea>
+                <textarea class="form-control" id="detalleEspecial" rows="3"
+                    placeholder="Ej: Celebrando 10 años juntos, siempre me apoya en momentos difíciles..."></textarea>
                 <small class="text-muted">Este detalle hará el mensaje aún más personal y único</small>
             </div>
 
             <!-- Campo para mensaje personalizado (solo cuando se elige "Escribir Mi Mensaje") -->
             <div class="mt-4" id="mensajePersonalizadoContainer" style="display: none;">
                 <label class="form-label fw-bold">Tu Mensaje Personalizado *</label>
-                <textarea class="form-control" id="mensajePersonalizado" rows="5" maxlength="500" placeholder="Escribe aquí tu mensaje personalizado para el destinatario de la Gift Card..."></textarea>
+                <textarea class="form-control" id="mensajePersonalizado" rows="5" maxlength="500"
+                    placeholder="Escribe aquí tu mensaje personalizado para el destinatario de la Gift Card..."></textarea>
                 <div class="d-flex justify-content-between mt-2">
                     <small class="text-muted">Mínimo 10 caracteres, máximo 500</small>
                     <small class="text-muted"><span id="charCounter">0</span>/500</small>
@@ -779,22 +807,28 @@
                         </div>
 
                         <!-- Mensaje Personalizado -->
-                        <div class="mb-4 p-3" style="background-color: white; border-left: 4px solid #ffc107; border-radius: 8px;">
-                            <p id="preview-mensaje" class="mb-0 fst-italic" style="color: #5C4033; line-height: 1.6;"></p>
+                        <div class="mb-4 p-3"
+                            style="background-color: white; border-left: 4px solid #ffc107; border-radius: 8px;">
+                            <p id="preview-mensaje" class="mb-0 fst-italic" style="color: #5C4033; line-height: 1.6;">
+                            </p>
                         </div>
 
                         <hr style="border-color: #D2B48C;">
 
                         <!-- Experiencia (descripción detallada sin precio) -->
                         <div class="text-center mb-3">
-                            <p class="mb-2" style="color: #A0522D; font-size: 0.85rem; font-weight: 600;">EXPERIENCIA</p>
-                            <p id="preview-experiencia" style="color: #5C4033; font-size: 0.95rem; font-weight: 500; line-height: 1.5; padding: 0 15px;"></p>
+                            <p class="mb-2" style="color: #A0522D; font-size: 0.85rem; font-weight: 600;">EXPERIENCIA
+                            </p>
+                            <p id="preview-experiencia"
+                                style="color: #5C4033; font-size: 0.95rem; font-weight: 500; line-height: 1.5; padding: 0 15px;">
+                            </p>
                         </div>
 
                         <!-- Código (simulado) -->
                         <div class="text-center mb-3">
                             <p class="mb-1" style="color: #A0522D; font-size: 0.85rem;">CÓDIGO</p>
-                            <p class="mb-0" style="color: #5C4033; font-family: 'Courier New', monospace; font-size: 1.2rem; font-weight: 700; letter-spacing: 2px;">
+                            <p class="mb-0"
+                                style="color: #5C4033; font-family: 'Courier New', monospace; font-size: 1.2rem; font-weight: 700; letter-spacing: 2px;">
                                 GC-XXXXXXXX
                             </p>
                         </div>
@@ -831,12 +865,14 @@
             <!-- Nota informativa -->
             <div class="alert alert-info mx-auto" style="max-width: 600px;">
                 <i class="fas fa-info-circle me-2"></i>
-                <strong>Nota:</strong> Esta es una vista previa. El código definitivo y el PDF se generarán después del pago.
+                <strong>Nota:</strong> Esta es una vista previa. El código definitivo y el PDF se generarán después del
+                pago.
             </div>
 
             <!-- Botón Agregar al Carrito -->
             <div class="text-center mt-4">
-                <button type="button" class="btn btn-warning btn-lg px-5 text-white fw-bold" id="btnAgregarAlCarritoStep5">
+                <button type="button" class="btn btn-warning btn-lg px-5 text-white fw-bold"
+                    id="btnAgregarAlCarritoStep5">
                     <i class="fas fa-shopping-cart me-2"></i>
                     Agregar al Carrito
                 </button>
@@ -862,8 +898,10 @@
             <form id="compradorForm" class="mx-auto" style="max-width: 600px;">
                 <div class="mb-4">
                     <label class="form-label fw-bold">Teléfono del Comprador *</label>
-                    <input type="tel" class="form-control" id="compradorTelefono" placeholder="+56 9 1234 5678" required>
-                    <small class="text-muted">Ingresa tu celular. Si ya eres cliente, autocompletaremos tus datos</small>
+                    <input type="tel" class="form-control" id="compradorTelefono" placeholder="+56 9 1234 5678"
+                        required>
+                    <small class="text-muted">Ingresa tu celular. Si ya eres cliente, autocompletaremos tus
+                        datos</small>
                     <div id="compradorBuscando" class="d-none mt-2">
                         <div class="spinner-border spinner-border-sm text-primary" role="status">
                             <span class="visually-hidden">Buscando...</span>
@@ -889,7 +927,8 @@
 
             <!-- Botón Agregar al Carrito -->
             <div class="text-center mt-4">
-                <button type="button" class="btn btn-warning btn-lg px-5 text-white fw-bold" id="btnAgregarAlCarritoStep6" disabled>
+                <button type="button" class="btn btn-warning btn-lg px-5 text-white fw-bold"
+                    id="btnAgregarAlCarritoStep6" disabled>
                     <i class="fas fa-shopping-cart me-2"></i>
                     Agregar al Carrito
                 </button>
@@ -937,7 +976,8 @@
                             <p class="mb-2">
                                 <strong>Mensaje:</strong>
                             </p>
-                            <p class="fst-italic text-muted small" id="resumen-mensaje" style="max-height: 100px; overflow-y: auto;">
+                            <p class="fst-italic text-muted small" id="resumen-mensaje"
+                                style="max-height: 100px; overflow-y: auto;">
                             </p>
                             <hr>
                             <p class="mb-2">
@@ -951,7 +991,8 @@
                         </div>
 
                         <div class="mt-4">
-                            <button type="button" class="btn btn-warning btn-lg w-100 text-white fw-bold" id="btnAgregarAlCarrito">
+                            <button type="button" class="btn btn-warning btn-lg w-100 text-white fw-bold"
+                                id="btnAgregarAlCarrito">
                                 <i class="fas fa-shopping-cart me-2"></i>
                                 Agregar al Carrito
                             </button>
@@ -974,7 +1015,8 @@
 
         <!-- Navigation Buttons -->
         <div class="wizard-navigation">
-            <button type="button" class="btn btn-wizard-prev" id="prevBtn" onclick="previousStep()" style="display:none;">
+            <button type="button" class="btn btn-wizard-prev" id="prevBtn" onclick="previousStep()"
+                style="display:none;">
                 <i class="fas fa-arrow-left me-2"></i>Anterior
             </button>
             <div></div> <!-- Spacer -->
@@ -986,555 +1028,555 @@
 </div>
 
 <script>
-// Función helper para obtener CSRF token
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
+    // Función helper para obtener CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
             }
         }
+        return cookieValue;
     }
-    return cookieValue;
-}
 
-// Wizard State
-let wizardData = {
-    paso: 1,
-    experiencia: null,
-    monto: null,
-    destinatario: {},
-    tipoMensaje: null,
-    detalleEspecial: '',
-    mensajeSeleccionado: null,
-    comprador: {}  // Nuevo: datos del comprador
-};
+    // Wizard State
+    let wizardData = {
+        paso: 1,
+        experiencia: null,
+        monto: null,
+        destinatario: {},
+        tipoMensaje: null,
+        detalleEspecial: '',
+        mensajeSeleccionado: null,
+        comprador: {}  // Nuevo: datos del comprador
+    };
 
-// Datos de experiencias (desde el backend)
-const experiencias = {{ experiencias|safe }};
+    // Datos de experiencias (desde el backend)
+    const experiencias = {{ experiencias| safe }};
 
-// Seleccionar Experiencia
-function selectExperience(expId) {
-    console.log(`📌 selectExperience llamado con: ${expId}`);
+    // Seleccionar Experiencia
+    function selectExperience(expId) {
+        console.log(`📌 selectExperience llamado con: ${expId}`);
 
-    // Remover selección anterior
-    document.querySelectorAll('.experience-card').forEach(card => {
-        card.classList.remove('selected');
-    });
+        // Remover selección anterior
+        document.querySelectorAll('.experience-card').forEach(card => {
+            card.classList.remove('selected');
+        });
 
-    // Seleccionar nueva experiencia
-    const card = document.querySelector(`[data-experience="${expId}"]`);
-    card.classList.add('selected');
+        // Seleccionar nueva experiencia
+        const card = document.querySelector(`[data-experience="${expId}"]`);
+        card.classList.add('selected');
 
-    wizardData.experiencia = expId;
+        wizardData.experiencia = expId;
 
-    // Obtener experiencia seleccionada con manejo de errores
-    let exp = null;
-    try {
-        exp = experiencias.find(e => e.id === expId);
-        if (!exp) {
-            console.error(`❌ No se encontró experiencia con id: ${expId}`);
-            return;
-        }
-        console.log(`✅ Experiencia encontrada:`, exp);
-    } catch (error) {
-        console.error('❌ Error al buscar experiencia:', error);
-        // Fallback: intentar buscar en el DOM
-        const expCard = document.querySelector(`.experience-card[data-experience="${expId}"]`);
-        if (expCard) {
-            const montoAttr = expCard.getAttribute('data-monto');
-            if (montoAttr && montoAttr !== '0') {
-                wizardData.monto = parseInt(montoAttr);
-                console.log(`✅ Monto obtenido del DOM: $${wizardData.monto}`);
-                document.getElementById('amountSelection').style.display = 'none';
-                updateNextButton();
+        // Obtener experiencia seleccionada con manejo de errores
+        let exp = null;
+        try {
+            exp = experiencias.find(e => e.id === expId);
+            if (!exp) {
+                console.error(`❌ No se encontró experiencia con id: ${expId}`);
                 return;
             }
+            console.log(`✅ Experiencia encontrada:`, exp);
+        } catch (error) {
+            console.error('❌ Error al buscar experiencia:', error);
+            // Fallback: intentar buscar en el DOM
+            const expCard = document.querySelector(`.experience-card[data-experience="${expId}"]`);
+            if (expCard) {
+                const montoAttr = expCard.getAttribute('data-monto');
+                if (montoAttr && montoAttr !== '0') {
+                    wizardData.monto = parseInt(montoAttr);
+                    console.log(`✅ Monto obtenido del DOM: $${wizardData.monto}`);
+                    document.getElementById('amountSelection').style.display = 'none';
+                    updateNextButton();
+                    return;
+                }
+            }
+            console.error('❌ No se pudo obtener la experiencia');
+            return;
         }
-        console.error('❌ No se pudo obtener la experiencia');
-        return;
+
+        // Si tiene monto fijo (> 0), asignarlo directamente y ocultar selector
+        if (exp.monto_fijo && exp.monto_fijo > 0) {
+            wizardData.monto = exp.monto_fijo;
+            document.getElementById('amountSelection').style.display = 'none';
+            console.log(`✅ Experiencia "${exp.nombre}" seleccionada con monto fijo: $${exp.monto_fijo.toLocaleString('es-CL')}`);
+            console.log(`📊 wizardData.monto actualizado a: ${wizardData.monto}`);
+        } else {
+            // Mostrar selector de monto para "Monto Libre" (monto_fijo = 0)
+            console.log(`💰 Mostrando selector de montos para "${exp.nombre}"`);
+            showAmountOptions(exp.montos_sugeridos);
+        }
+
+        // Habilitar botón siguiente
+        updateNextButton();
     }
 
-    // Si tiene monto fijo (> 0), asignarlo directamente y ocultar selector
-    if (exp.monto_fijo && exp.monto_fijo > 0) {
-        wizardData.monto = exp.monto_fijo;
-        document.getElementById('amountSelection').style.display = 'none';
-        console.log(`✅ Experiencia "${exp.nombre}" seleccionada con monto fijo: $${exp.monto_fijo.toLocaleString('es-CL')}`);
-        console.log(`📊 wizardData.monto actualizado a: ${wizardData.monto}`);
-    } else {
-        // Mostrar selector de monto para "Monto Libre" (monto_fijo = 0)
-        console.log(`💰 Mostrando selector de montos para "${exp.nombre}"`);
-        showAmountOptions(exp.montos_sugeridos);
+    // Mostrar opciones de monto (solo para "Monto Libre")
+    function showAmountOptions(montos) {
+        const amountSelection = document.getElementById('amountSelection');
+        const amountOptions = document.getElementById('amountOptions');
+
+        amountSelection.style.display = 'block';
+        amountOptions.innerHTML = '';
+
+        montos.forEach(monto => {
+            const btn = document.createElement('button');
+            btn.className = 'amount-btn';
+            btn.textContent = `$${monto.toLocaleString('es-CL')}`;
+            btn.onclick = () => selectAmount(monto);
+            amountOptions.appendChild(btn);
+        });
     }
 
-    // Habilitar botón siguiente
-    updateNextButton();
-}
-
-// Mostrar opciones de monto (solo para "Monto Libre")
-function showAmountOptions(montos) {
-    const amountSelection = document.getElementById('amountSelection');
-    const amountOptions = document.getElementById('amountOptions');
-
-    amountSelection.style.display = 'block';
-    amountOptions.innerHTML = '';
-
-    montos.forEach(monto => {
-        const btn = document.createElement('button');
-        btn.className = 'amount-btn';
-        btn.textContent = `$${monto.toLocaleString('es-CL')}`;
-        btn.onclick = () => selectAmount(monto);
-        amountOptions.appendChild(btn);
-    });
-}
-
-// Seleccionar Monto
-function selectAmount(amount) {
-    // Remover selección anterior
-    document.querySelectorAll('.amount-btn').forEach(btn => {
-        btn.classList.remove('selected');
-    });
-
-    // Seleccionar nuevo monto
-    event.target.classList.add('selected');
-    wizardData.monto = amount;
-
-    // Limpiar custom amount
-    document.getElementById('customAmount').value = '';
-
-    updateNextButton();
-}
-
-// Monto personalizado
-document.getElementById('customAmount')?.addEventListener('input', function() {
-    const amount = parseInt(this.value);
-    if (amount >= 10000) {
-        wizardData.monto = amount;
-
-        // Deseleccionar botones de monto
+    // Seleccionar Monto
+    function selectAmount(amount) {
+        // Remover selección anterior
         document.querySelectorAll('.amount-btn').forEach(btn => {
             btn.classList.remove('selected');
         });
 
+        // Seleccionar nuevo monto
+        event.target.classList.add('selected');
+        wizardData.monto = amount;
+
+        // Limpiar custom amount
+        document.getElementById('customAmount').value = '';
+
         updateNextButton();
     }
-});
 
-// Seleccionar Tipo de Mensaje
-function selectTipoMensaje(tipoId) {
-    // Remover selección anterior
-    document.querySelectorAll('[data-tipo]').forEach(card => {
-        card.classList.remove('selected');
-    });
+    // Monto personalizado
+    document.getElementById('customAmount')?.addEventListener('input', function () {
+        const amount = parseInt(this.value);
+        if (amount >= 10000) {
+            wizardData.monto = amount;
 
-    // Seleccionar nuevo tipo
-    const card = document.querySelector(`[data-tipo="${tipoId}"]`);
-    card.classList.add('selected');
-
-    wizardData.tipoMensaje = tipoId;
-
-    // Mostrar/ocultar campos según el tipo de mensaje seleccionado
-    const detalleEspecialContainer = document.getElementById('detalleEspecialContainer');
-    const mensajePersonalizadoContainer = document.getElementById('mensajePersonalizadoContainer');
-    const mensajePersonalizado = document.getElementById('mensajePersonalizado');
-    const charCounter = document.getElementById('charCounter');
-
-    if (tipoId === 'personalizado') {
-        // Ocultar detalle especial (no se usa con mensaje personalizado)
-        detalleEspecialContainer.style.display = 'none';
-        // Mostrar campo de mensaje personalizado
-        mensajePersonalizadoContainer.style.display = 'block';
-
-        // Agregar contador de caracteres y validación
-        mensajePersonalizado.addEventListener('input', function() {
-            charCounter.textContent = this.value.length;
-            updateNextButton(); // Re-validar el botón siguiente
-        });
-    } else {
-        // Mostrar detalle especial (usado con IA)
-        detalleEspecialContainer.style.display = 'block';
-        // Ocultar campo de mensaje personalizado
-        mensajePersonalizadoContainer.style.display = 'none';
-        // Limpiar mensaje personalizado
-        mensajePersonalizado.value = '';
-    }
-
-    updateNextButton();
-}
-
-// Actualizar botón siguiente
-function updateNextButton() {
-    const nextBtn = document.getElementById('nextBtn');
-    const currentStep = wizardData.paso;
-
-    let canProceed = false;
-
-    if (currentStep === 1) {
-        canProceed = wizardData.experiencia && wizardData.monto;
-    } else if (currentStep === 2) {
-        const nombre = document.getElementById('destinatarioNombre')?.value?.trim();
-        const relacion = document.getElementById('destinatarioRelacion')?.value?.trim();
-        const email = document.getElementById('destinatarioEmail')?.value?.trim();
-        const telefono = document.getElementById('destinatarioTelefono')?.value?.trim();
-        console.log('🔍 Step 2 Validation:', { nombre, relacion, email, telefono });
-        canProceed = !!(nombre && relacion && email && telefono);
-        console.log('✅ Can proceed?', canProceed, 'Nombre length:', nombre?.length, 'Relacion length:', relacion?.length);
-    } else if (currentStep === 3) {
-        // Validar que haya tipo de mensaje seleccionado
-        if (!wizardData.tipoMensaje) {
-            canProceed = false;
-        } else if (wizardData.tipoMensaje === 'personalizado') {
-            // Si es mensaje personalizado, validar que tenga al menos 10 caracteres
-            const mensajePersonalizado = document.getElementById('mensajePersonalizado')?.value || '';
-            canProceed = mensajePersonalizado.length >= 10;
-        } else {
-            // Si es IA, solo validar que haya tipo seleccionado
-            canProceed = true;
-        }
-    } else if (currentStep === 4) {
-        canProceed = wizardData.mensajeSeleccionado !== null;
-    } else {
-        canProceed = true; // Otros pasos siempre pueden avanzar por ahora
-    }
-
-    nextBtn.disabled = !canProceed;
-}
-
-// Siguiente Paso
-function nextStep() {
-    const currentStep = wizardData.paso;
-
-    // Guardar datos del paso actual
-    if (currentStep === 2) {
-        wizardData.destinatario = {
-            nombre: document.getElementById('destinatarioNombre').value,
-            relacion: document.getElementById('destinatarioRelacion').value,
-            email: document.getElementById('destinatarioEmail').value,
-            telefono: document.getElementById('destinatarioTelefono').value
-        };
-        console.log('✅ Datos destinatario guardados:', wizardData.destinatario);
-    } else if (currentStep === 3) {
-        // Guardar el detalle especial o mensaje personalizado según corresponda
-        if (wizardData.tipoMensaje === 'personalizado') {
-            // Si es mensaje personalizado, guardarlo directamente
-            wizardData.mensajePersonalizado = document.getElementById('mensajePersonalizado').value;
-            wizardData.mensajeSeleccionado = wizardData.mensajePersonalizado; // IMPORTANTE: asignar también a mensajeSeleccionado
-            wizardData.detalleEspecial = ''; // No hay detalle especial
-            console.log('✅ Mensaje personalizado guardado:', wizardData.mensajePersonalizado);
-        } else {
-            // Si es IA, guardar el detalle especial
-            wizardData.detalleEspecial = document.getElementById('detalleEspecial').value;
-            wizardData.mensajePersonalizado = ''; // No hay mensaje personalizado
-            console.log('✅ Detalle especial guardado:', wizardData.detalleEspecial);
-        }
-    } else if (currentStep === 4) {
-        // Guardar mensaje seleccionado al avanzar desde Step 4
-        console.log('📝 Avanzando desde Step 4. Mensaje seleccionado:', wizardData.mensajeSeleccionado);
-        if (!wizardData.mensajeSeleccionado) {
-            console.warn('⚠️ No hay mensaje seleccionado en Step 4');
-        }
-    }
-
-    // Avanzar paso (máximo 5 pasos ahora)
-    if (currentStep < 5) {
-        // Si estamos en Step 3 y se eligió mensaje personalizado, saltar al Step 5 (preview)
-        if (currentStep === 3 && wizardData.tipoMensaje === 'personalizado') {
-            wizardData.paso = 5; // Saltar directo a preview
-            console.log('⏭️ Saltando de Step 3 a Step 5 (mensaje personalizado)');
-        } else {
-            wizardData.paso++;
-        }
-
-        updateWizardUI();
-
-        // Auto-generar mensajes al llegar a Step 4 (solo si NO es personalizado)
-        if (wizardData.paso === 4 && wizardData.tipoMensaje !== 'personalizado') {
-            generarMensajesIA();
-        }
-
-        // Actualizar preview al llegar a Step 5
-        if (wizardData.paso === 5) {
-            console.log('🎨 Llegando a Step 5, actualizando preview...');
-            actualizarPreviewStep5();
-        }
-    }
-}
-
-// Paso Anterior
-function previousStep() {
-    if (wizardData.paso > 1) {
-        // Si estamos en Step 5 y habíamos usado mensaje personalizado, volver a Step 3
-        if (wizardData.paso === 5 && wizardData.tipoMensaje === 'personalizado') {
-            wizardData.paso = 3; // Volver directo a Step 3
-        } else {
-            wizardData.paso--;
-        }
-        updateWizardUI();
-    }
-}
-
-// Actualizar UI del Wizard
-function updateWizardUI() {
-    const currentStep = wizardData.paso;
-
-    // Ocultar todos los pasos
-    document.querySelectorAll('.wizard-step').forEach(step => {
-        step.classList.remove('active');
-    });
-
-    // Mostrar paso actual
-    document.getElementById(`step${currentStep}`).classList.add('active');
-
-    // Actualizar progress bar
-    document.querySelectorAll('.progress-step').forEach((step, index) => {
-        step.classList.remove('active', 'completed');
-        if (index + 1 < currentStep) {
-            step.classList.add('completed');
-        } else if (index + 1 === currentStep) {
-            step.classList.add('active');
-        }
-    });
-
-    const progressPercentage = ((currentStep - 1) / 4) * 100;  // 5 pasos - 1 = 4
-    document.getElementById('progressFill').style.width = `${progressPercentage}%`;
-    document.getElementById('currentStep').textContent = currentStep;
-
-    // Mostrar/ocultar botón anterior
-    document.getElementById('prevBtn').style.display = currentStep > 1 ? 'block' : 'none';
-
-    // Ocultar botón "Siguiente" en Step 5 (tiene su propio botón "Agregar al Carrito")
-    const nextBtn = document.getElementById('nextBtn');
-    if (currentStep === 5) {
-        nextBtn.style.display = 'none';
-    } else {
-        nextBtn.style.display = 'block';
-    }
-
-    // NUEVO: Re-registrar event listeners cuando entramos al Step 2
-    if (currentStep === 2) {
-        console.log('📝 Re-registrando event listeners para Step 2 en updateWizardUI...');
-        setTimeout(() => {
-            const nombreInput = document.getElementById('destinatarioNombre');
-            const relacionInput = document.getElementById('destinatarioRelacion');
-            const emailInput = document.getElementById('destinatarioEmail');
-            const telefonoInput = document.getElementById('destinatarioTelefono');
-
-            console.log('Inputs encontrados:', {
-                nombreInput: !!nombreInput,
-                relacionInput: !!relacionInput,
-                emailInput: !!emailInput,
-                telefonoInput: !!telefonoInput,
-                valores: {
-                    nombre: nombreInput?.value,
-                    relacion: relacionInput?.value,
-                    email: emailInput?.value,
-                    telefono: telefonoInput?.value
-                }
+            // Deseleccionar botones de monto
+            document.querySelectorAll('.amount-btn').forEach(btn => {
+                btn.classList.remove('selected');
             });
 
-            if (nombreInput) nombreInput.addEventListener('input', updateNextButton);
-            if (relacionInput) relacionInput.addEventListener('input', updateNextButton);
-            if (emailInput) emailInput.addEventListener('input', updateNextButton);
-            if (telefonoInput) telefonoInput.addEventListener('input', updateNextButton);
-
-            // Forzar actualización inmediata
             updateNextButton();
-        }, 100);
+        }
+    });
+
+    // Seleccionar Tipo de Mensaje
+    function selectTipoMensaje(tipoId) {
+        // Remover selección anterior
+        document.querySelectorAll('[data-tipo]').forEach(card => {
+            card.classList.remove('selected');
+        });
+
+        // Seleccionar nuevo tipo
+        const card = document.querySelector(`[data-tipo="${tipoId}"]`);
+        card.classList.add('selected');
+
+        wizardData.tipoMensaje = tipoId;
+
+        // Mostrar/ocultar campos según el tipo de mensaje seleccionado
+        const detalleEspecialContainer = document.getElementById('detalleEspecialContainer');
+        const mensajePersonalizadoContainer = document.getElementById('mensajePersonalizadoContainer');
+        const mensajePersonalizado = document.getElementById('mensajePersonalizado');
+        const charCounter = document.getElementById('charCounter');
+
+        if (tipoId === 'personalizado') {
+            // Ocultar detalle especial (no se usa con mensaje personalizado)
+            detalleEspecialContainer.style.display = 'none';
+            // Mostrar campo de mensaje personalizado
+            mensajePersonalizadoContainer.style.display = 'block';
+
+            // Agregar contador de caracteres y validación
+            mensajePersonalizado.addEventListener('input', function () {
+                charCounter.textContent = this.value.length;
+                updateNextButton(); // Re-validar el botón siguiente
+            });
+        } else {
+            // Mostrar detalle especial (usado con IA)
+            detalleEspecialContainer.style.display = 'block';
+            // Ocultar campo de mensaje personalizado
+            mensajePersonalizadoContainer.style.display = 'none';
+            // Limpiar mensaje personalizado
+            mensajePersonalizado.value = '';
+        }
+
+        updateNextButton();
     }
 
-    // NUEVO: Re-registrar event listener del botón "Agregar al Carrito" cuando entramos al Step 5
-    if (currentStep === 5) {
-        console.log('🛒 Re-registrando event listener para botón Agregar al Carrito Step 5...');
-        setTimeout(() => {
-            const btnAgregarCarrito = document.getElementById('btnAgregarAlCarritoStep5');
-            console.log('Botón encontrado:', !!btnAgregarCarrito);
+    // Actualizar botón siguiente
+    function updateNextButton() {
+        const nextBtn = document.getElementById('nextBtn');
+        const currentStep = wizardData.paso;
 
-            if (btnAgregarCarrito) {
-                // Remover listener anterior si existe para evitar duplicados
-                const newBtn = btnAgregarCarrito.cloneNode(true);
-                btnAgregarCarrito.parentNode.replaceChild(newBtn, btnAgregarCarrito);
+        let canProceed = false;
 
-                // Agregar nuevo listener
-                newBtn.addEventListener('click', async function(e) {
-                    console.log('🔘 CLICK en botón Agregar al Carrito Step 5 (listener directo)');
-                    e.preventDefault();
+        if (currentStep === 1) {
+            canProceed = wizardData.experiencia && wizardData.monto;
+        } else if (currentStep === 2) {
+            const nombre = document.getElementById('destinatarioNombre')?.value?.trim();
+            const relacion = document.getElementById('destinatarioRelacion')?.value?.trim();
+            const email = document.getElementById('destinatarioEmail')?.value?.trim();
+            const telefono = document.getElementById('destinatarioTelefono')?.value?.trim();
+            console.log('🔍 Step 2 Validation:', { nombre, relacion, email, telefono });
+            canProceed = !!(nombre && relacion && email && telefono);
+            console.log('✅ Can proceed?', canProceed, 'Nombre length:', nombre?.length, 'Relacion length:', relacion?.length);
+        } else if (currentStep === 3) {
+            // Validar que haya tipo de mensaje seleccionado
+            if (!wizardData.tipoMensaje) {
+                canProceed = false;
+            } else if (wizardData.tipoMensaje === 'personalizado') {
+                // Si es mensaje personalizado, validar que tenga al menos 10 caracteres
+                const mensajePersonalizado = document.getElementById('mensajePersonalizado')?.value || '';
+                canProceed = mensajePersonalizado.length >= 10;
+            } else {
+                // Si es IA, solo validar que haya tipo seleccionado
+                canProceed = true;
+            }
+        } else if (currentStep === 4) {
+            canProceed = wizardData.mensajeSeleccionado !== null;
+        } else {
+            canProceed = true; // Otros pasos siempre pueden avanzar por ahora
+        }
 
-                    const btn = this;
-                    const loadingDiv = document.getElementById('loadingCarritoStep5');
+        nextBtn.disabled = !canProceed;
+    }
 
-                    try {
-                        // Mostrar loading
-                        btn.disabled = true;
-                        loadingDiv.classList.remove('d-none');
+    // Siguiente Paso
+    function nextStep() {
+        const currentStep = wizardData.paso;
 
-                        // Validar wizardData antes de enviar
-                        console.log('📊 wizardData completo antes de enviar:', JSON.stringify(wizardData, null, 2));
+        // Guardar datos del paso actual
+        if (currentStep === 2) {
+            wizardData.destinatario = {
+                nombre: document.getElementById('destinatarioNombre').value,
+                relacion: document.getElementById('destinatarioRelacion').value,
+                email: document.getElementById('destinatarioEmail').value,
+                telefono: document.getElementById('destinatarioTelefono').value
+            };
+            console.log('✅ Datos destinatario guardados:', wizardData.destinatario);
+        } else if (currentStep === 3) {
+            // Guardar el detalle especial o mensaje personalizado según corresponda
+            if (wizardData.tipoMensaje === 'personalizado') {
+                // Si es mensaje personalizado, guardarlo directamente
+                wizardData.mensajePersonalizado = document.getElementById('mensajePersonalizado').value;
+                wizardData.mensajeSeleccionado = wizardData.mensajePersonalizado; // IMPORTANTE: asignar también a mensajeSeleccionado
+                wizardData.detalleEspecial = ''; // No hay detalle especial
+                console.log('✅ Mensaje personalizado guardado:', wizardData.mensajePersonalizado);
+            } else {
+                // Si es IA, guardar el detalle especial
+                wizardData.detalleEspecial = document.getElementById('detalleEspecial').value;
+                wizardData.mensajePersonalizado = ''; // No hay mensaje personalizado
+                console.log('✅ Detalle especial guardado:', wizardData.detalleEspecial);
+            }
+        } else if (currentStep === 4) {
+            // Guardar mensaje seleccionado al avanzar desde Step 4
+            console.log('📝 Avanzando desde Step 4. Mensaje seleccionado:', wizardData.mensajeSeleccionado);
+            if (!wizardData.mensajeSeleccionado) {
+                console.warn('⚠️ No hay mensaje seleccionado en Step 4');
+            }
+        }
 
-                        // Validar campos requeridos
-                        if (!wizardData.experiencia) {
-                            throw new Error('No se seleccionó ninguna experiencia');
-                        }
-                        if (!wizardData.monto) {
-                            throw new Error('No se seleccionó un monto para la GiftCard');
-                        }
-                        if (!wizardData.destinatario?.nombre) {
-                            throw new Error('Falta el nombre del destinatario');
-                        }
-                        if (!wizardData.destinatario?.email) {
-                            throw new Error('Falta el email del destinatario');
-                        }
-                        if (!wizardData.tipoMensaje) {
-                            throw new Error('No se seleccionó un tipo de mensaje');
-                        }
-                        if (!wizardData.mensajeSeleccionado) {
-                            throw new Error('No se seleccionó un mensaje');
-                        }
+        // Avanzar paso (máximo 5 pasos ahora)
+        if (currentStep < 5) {
+            // Si estamos en Step 3 y se eligió mensaje personalizado, saltar al Step 5 (preview)
+            if (currentStep === 3 && wizardData.tipoMensaje === 'personalizado') {
+                wizardData.paso = 5; // Saltar directo a preview
+                console.log('⏭️ Saltando de Step 3 a Step 5 (mensaje personalizado)');
+            } else {
+                wizardData.paso++;
+            }
 
-                        // Obtener el nombre de la experiencia seleccionada
-                        const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
-                        const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
+            updateWizardUI();
 
-                        // Preparar datos para enviar
-                        const giftcardData = {
-                            experiencia_id: wizardData.experiencia,
-                            experiencia_nombre: expNombre,
-                            precio: parseFloat(wizardData.monto),  // Asegurar que sea número
-                            destinatario_nombre: wizardData.destinatario.nombre,
-                            destinatario_email: wizardData.destinatario.email,
-                            destinatario_telefono: wizardData.destinatario.telefono || '',
-                            tipo_mensaje: wizardData.tipoMensaje,
-                            mensaje_seleccionado: wizardData.mensajeSeleccionado
-                        };
+            // Auto-generar mensajes al llegar a Step 4 (solo si NO es personalizado)
+            if (wizardData.paso === 4 && wizardData.tipoMensaje !== 'personalizado') {
+                generarMensajesIA();
+            }
 
-                        console.log('📤 Enviando GiftCard al carrito desde Step 5:', JSON.stringify(giftcardData, null, 2));
+            // Actualizar preview al llegar a Step 5
+            if (wizardData.paso === 5) {
+                console.log('🎨 Llegando a Step 5, actualizando preview...');
+                actualizarPreviewStep5();
+            }
+        }
+    }
 
-                        // Enviar al backend
-                        const response = await fetch('/ventas/api/giftcard/agregar-al-carrito/', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': getCookie('csrftoken')
-                            },
-                            body: JSON.stringify(giftcardData)
-                        });
+    // Paso Anterior
+    function previousStep() {
+        if (wizardData.paso > 1) {
+            // Si estamos en Step 5 y habíamos usado mensaje personalizado, volver a Step 3
+            if (wizardData.paso === 5 && wizardData.tipoMensaje === 'personalizado') {
+                wizardData.paso = 3; // Volver directo a Step 3
+            } else {
+                wizardData.paso--;
+            }
+            updateWizardUI();
+        }
+    }
 
-                        if (!response.ok) {
-                            const errorText = await response.text();
-                            throw new Error(`Error del servidor (${response.status}): ${errorText}`);
-                        }
+    // Actualizar UI del Wizard
+    function updateWizardUI() {
+        const currentStep = wizardData.paso;
 
-                        const data = await response.json();
+        // Ocultar todos los pasos
+        document.querySelectorAll('.wizard-step').forEach(step => {
+            step.classList.remove('active');
+        });
 
-                        if (data.success) {
-                            console.log('✅ GiftCard agregada al carrito, redirigiendo...');
-                            window.location.href = data.redirect_url;
-                        } else {
-                            throw new Error(data.error || 'Error al agregar al carrito');
-                        }
+        // Mostrar paso actual
+        document.getElementById(`step${currentStep}`).classList.add('active');
 
-                    } catch (error) {
-                        console.error('❌ Error completo:', error);
-                        alert('Error al agregar la GiftCard al carrito: ' + error.message);
-                        btn.disabled = false;
-                        loadingDiv.classList.add('d-none');
+        // Actualizar progress bar
+        document.querySelectorAll('.progress-step').forEach((step, index) => {
+            step.classList.remove('active', 'completed');
+            if (index + 1 < currentStep) {
+                step.classList.add('completed');
+            } else if (index + 1 === currentStep) {
+                step.classList.add('active');
+            }
+        });
+
+        const progressPercentage = ((currentStep - 1) / 4) * 100;  // 5 pasos - 1 = 4
+        document.getElementById('progressFill').style.width = `${progressPercentage}%`;
+        document.getElementById('currentStep').textContent = currentStep;
+
+        // Mostrar/ocultar botón anterior
+        document.getElementById('prevBtn').style.display = currentStep > 1 ? 'block' : 'none';
+
+        // Ocultar botón "Siguiente" en Step 5 (tiene su propio botón "Agregar al Carrito")
+        const nextBtn = document.getElementById('nextBtn');
+        if (currentStep === 5) {
+            nextBtn.style.display = 'none';
+        } else {
+            nextBtn.style.display = 'block';
+        }
+
+        // NUEVO: Re-registrar event listeners cuando entramos al Step 2
+        if (currentStep === 2) {
+            console.log('📝 Re-registrando event listeners para Step 2 en updateWizardUI...');
+            setTimeout(() => {
+                const nombreInput = document.getElementById('destinatarioNombre');
+                const relacionInput = document.getElementById('destinatarioRelacion');
+                const emailInput = document.getElementById('destinatarioEmail');
+                const telefonoInput = document.getElementById('destinatarioTelefono');
+
+                console.log('Inputs encontrados:', {
+                    nombreInput: !!nombreInput,
+                    relacionInput: !!relacionInput,
+                    emailInput: !!emailInput,
+                    telefonoInput: !!telefonoInput,
+                    valores: {
+                        nombre: nombreInput?.value,
+                        relacion: relacionInput?.value,
+                        email: emailInput?.value,
+                        telefono: telefonoInput?.value
                     }
                 });
 
-                console.log('✅ Event listener registrado para Step 5');
-            } else {
-                console.error('❌ No se encontró el botón btnAgregarAlCarritoStep5');
-            }
-        }, 100);
-    }
+                if (nombreInput) nombreInput.addEventListener('input', updateNextButton);
+                if (relacionInput) relacionInput.addEventListener('input', updateNextButton);
+                if (emailInput) emailInput.addEventListener('input', updateNextButton);
+                if (telefonoInput) telefonoInput.addEventListener('input', updateNextButton);
 
-    // Actualizar estado del botón siguiente
-    updateNextButton();
-}
-
-// Validar inputs en tiempo real (Step 2)
-console.log('📝 Registrando event listeners para Step 2...');
-const nombreInput = document.getElementById('destinatarioNombre');
-const relacionInput = document.getElementById('destinatarioRelacion');
-const emailInput = document.getElementById('destinatarioEmail');
-const telefonoInput = document.getElementById('destinatarioTelefono');
-
-console.log('Elementos encontrados:', {
-    nombreInput: !!nombreInput,
-    relacionInput: !!relacionInput,
-    emailInput: !!emailInput,
-    telefonoInput: !!telefonoInput
-});
-
-if (nombreInput) nombreInput.addEventListener('input', updateNextButton);
-if (relacionInput) relacionInput.addEventListener('input', updateNextButton);
-if (emailInput) emailInput.addEventListener('input', updateNextButton);
-if (telefonoInput) telefonoInput.addEventListener('input', updateNextButton);
-
-// ============================================
-// STEP 4: GENERAR MENSAJES CON IA
-// ============================================
-
-// Generar mensajes personalizados con DeepSeek AI
-async function generarMensajesIA() {
-    console.log('🤖 Generando mensajes con IA...');
-
-    // Mostrar loading, ocultar mensajes y errores
-    document.getElementById('mensajesLoading').style.display = 'block';
-    document.getElementById('mensajesContainer').style.display = 'none';
-    document.getElementById('mensajesError').style.display = 'none';
-
-    try {
-        const response = await fetch('/ventas/api/giftcard/generar-mensajes/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                tipo_mensaje: wizardData.tipoMensaje,
-                nombre: wizardData.destinatario.nombre,
-                relacion: wizardData.destinatario.relacion,
-                detalle: wizardData.detalleEspecial || '',
-                cantidad: 3
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            console.log(`✅ ${data.cantidad_generada} mensajes generados`);
-            displayMensajes(data.mensajes);
-        } else {
-            throw new Error(data.error || 'Error al generar mensajes');
+                // Forzar actualización inmediata
+                updateNextButton();
+            }, 100);
         }
-    } catch (error) {
-        console.error('❌ Error:', error);
 
-        // Mostrar error
-        document.getElementById('mensajesLoading').style.display = 'none';
-        document.getElementById('mensajesError').style.display = 'block';
-        document.getElementById('mensajesErrorText').textContent = error.message;
+        // NUEVO: Re-registrar event listener del botón "Agregar al Carrito" cuando entramos al Step 5
+        if (currentStep === 5) {
+            console.log('🛒 Re-registrando event listener para botón Agregar al Carrito Step 5...');
+            setTimeout(() => {
+                const btnAgregarCarrito = document.getElementById('btnAgregarAlCarritoStep5');
+                console.log('Botón encontrado:', !!btnAgregarCarrito);
+
+                if (btnAgregarCarrito) {
+                    // Remover listener anterior si existe para evitar duplicados
+                    const newBtn = btnAgregarCarrito.cloneNode(true);
+                    btnAgregarCarrito.parentNode.replaceChild(newBtn, btnAgregarCarrito);
+
+                    // Agregar nuevo listener
+                    newBtn.addEventListener('click', async function (e) {
+                        console.log('🔘 CLICK en botón Agregar al Carrito Step 5 (listener directo)');
+                        e.preventDefault();
+
+                        const btn = this;
+                        const loadingDiv = document.getElementById('loadingCarritoStep5');
+
+                        try {
+                            // Mostrar loading
+                            btn.disabled = true;
+                            loadingDiv.classList.remove('d-none');
+
+                            // Validar wizardData antes de enviar
+                            console.log('📊 wizardData completo antes de enviar:', JSON.stringify(wizardData, null, 2));
+
+                            // Validar campos requeridos
+                            if (!wizardData.experiencia) {
+                                throw new Error('No se seleccionó ninguna experiencia');
+                            }
+                            if (!wizardData.monto) {
+                                throw new Error('No se seleccionó un monto para la GiftCard');
+                            }
+                            if (!wizardData.destinatario?.nombre) {
+                                throw new Error('Falta el nombre del destinatario');
+                            }
+                            if (!wizardData.destinatario?.email) {
+                                throw new Error('Falta el email del destinatario');
+                            }
+                            if (!wizardData.tipoMensaje) {
+                                throw new Error('No se seleccionó un tipo de mensaje');
+                            }
+                            if (!wizardData.mensajeSeleccionado) {
+                                throw new Error('No se seleccionó un mensaje');
+                            }
+
+                            // Obtener el nombre de la experiencia seleccionada
+                            const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
+                            const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
+
+                            // Preparar datos para enviar
+                            const giftcardData = {
+                                experiencia_id: wizardData.experiencia,
+                                experiencia_nombre: expNombre,
+                                precio: parseFloat(wizardData.monto),  // Asegurar que sea número
+                                destinatario_nombre: wizardData.destinatario.nombre,
+                                destinatario_email: wizardData.destinatario.email,
+                                destinatario_telefono: wizardData.destinatario.telefono || '',
+                                tipo_mensaje: wizardData.tipoMensaje,
+                                mensaje_seleccionado: wizardData.mensajeSeleccionado
+                            };
+
+                            console.log('📤 Enviando GiftCard al carrito desde Step 5:', JSON.stringify(giftcardData, null, 2));
+
+                            // Enviar al backend
+                            const response = await fetch('/ventas/api/giftcard/agregar-al-carrito/', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRFToken': getCookie('csrftoken')
+                                },
+                                body: JSON.stringify(giftcardData)
+                            });
+
+                            if (!response.ok) {
+                                const errorText = await response.text();
+                                throw new Error(`Error del servidor (${response.status}): ${errorText}`);
+                            }
+
+                            const data = await response.json();
+
+                            if (data.success) {
+                                console.log('✅ GiftCard agregada al carrito, redirigiendo...');
+                                window.location.href = data.redirect_url;
+                            } else {
+                                throw new Error(data.error || 'Error al agregar al carrito');
+                            }
+
+                        } catch (error) {
+                            console.error('❌ Error completo:', error);
+                            alert('Error al agregar la GiftCard al carrito: ' + error.message);
+                            btn.disabled = false;
+                            loadingDiv.classList.add('d-none');
+                        }
+                    });
+
+                    console.log('✅ Event listener registrado para Step 5');
+                } else {
+                    console.error('❌ No se encontró el botón btnAgregarAlCarritoStep5');
+                }
+            }, 100);
+        }
+
+        // Actualizar estado del botón siguiente
+        updateNextButton();
     }
-}
 
-// Mostrar mensajes generados como cards seleccionables
-function displayMensajes(mensajes) {
-    const container = document.getElementById('mensajesList');
-    container.innerHTML = '';
+    // Validar inputs en tiempo real (Step 2)
+    console.log('📝 Registrando event listeners para Step 2...');
+    const nombreInput = document.getElementById('destinatarioNombre');
+    const relacionInput = document.getElementById('destinatarioRelacion');
+    const emailInput = document.getElementById('destinatarioEmail');
+    const telefonoInput = document.getElementById('destinatarioTelefono');
 
-    mensajes.forEach((mensaje, index) => {
-        const col = document.createElement('div');
-        col.className = 'col-12';
+    console.log('Elementos encontrados:', {
+        nombreInput: !!nombreInput,
+        relacionInput: !!relacionInput,
+        emailInput: !!emailInput,
+        telefonoInput: !!telefonoInput
+    });
 
-        const card = document.createElement('div');
-        card.className = 'card mensaje-card';
-        card.style.cursor = 'pointer';
-        card.onclick = () => selectMensaje(index, mensaje);
+    if (nombreInput) nombreInput.addEventListener('input', updateNextButton);
+    if (relacionInput) relacionInput.addEventListener('input', updateNextButton);
+    if (emailInput) emailInput.addEventListener('input', updateNextButton);
+    if (telefonoInput) telefonoInput.addEventListener('input', updateNextButton);
 
-        card.innerHTML = `
+    // ============================================
+    // STEP 4: GENERAR MENSAJES CON IA
+    // ============================================
+
+    // Generar mensajes personalizados con DeepSeek AI
+    async function generarMensajesIA() {
+        console.log('🤖 Generando mensajes con IA...');
+
+        // Mostrar loading, ocultar mensajes y errores
+        document.getElementById('mensajesLoading').style.display = 'block';
+        document.getElementById('mensajesContainer').style.display = 'none';
+        document.getElementById('mensajesError').style.display = 'none';
+
+        try {
+            const response = await fetch('/ventas/api/giftcard/generar-mensajes/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    tipo_mensaje: wizardData.tipoMensaje,
+                    nombre: wizardData.destinatario.nombre,
+                    relacion: wizardData.destinatario.relacion,
+                    detalle: wizardData.detalleEspecial || '',
+                    cantidad: 3
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                console.log(`✅ ${data.cantidad_generada} mensajes generados`);
+                displayMensajes(data.mensajes);
+            } else {
+                throw new Error(data.error || 'Error al generar mensajes');
+            }
+        } catch (error) {
+            console.error('❌ Error:', error);
+
+            // Mostrar error
+            document.getElementById('mensajesLoading').style.display = 'none';
+            document.getElementById('mensajesError').style.display = 'block';
+            document.getElementById('mensajesErrorText').textContent = error.message;
+        }
+    }
+
+    // Mostrar mensajes generados como cards seleccionables
+    function displayMensajes(mensajes) {
+        const container = document.getElementById('mensajesList');
+        container.innerHTML = '';
+
+        mensajes.forEach((mensaje, index) => {
+            const col = document.createElement('div');
+            col.className = 'col-12';
+
+            const card = document.createElement('div');
+            card.className = 'card mensaje-card';
+            card.style.cursor = 'pointer';
+            card.onclick = () => selectMensaje(index, mensaje);
+
+            card.innerHTML = `
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-2">
                     <h6 class="card-subtitle text-muted mb-0">
@@ -1546,83 +1588,83 @@ function displayMensajes(mensajes) {
             </div>
         `;
 
-        col.appendChild(card);
-        container.appendChild(col);
-    });
-
-    // Ocultar loading, mostrar mensajes
-    document.getElementById('mensajesLoading').style.display = 'none';
-    document.getElementById('mensajesContainer').style.display = 'block';
-}
-
-// Seleccionar un mensaje
-function selectMensaje(index, texto) {
-    console.log(`✅ Mensaje ${index + 1} seleccionado: "${texto}"`);
-
-    // Guardar en wizardData
-    wizardData.mensajeSeleccionado = texto;
-    console.log('📝 wizardData.mensajeSeleccionado actualizado:', wizardData.mensajeSeleccionado);
-
-    // Actualizar UI - remover selección previa
-    document.querySelectorAll('.mensaje-card').forEach(card => {
-        card.classList.remove('border-success');
-        card.style.borderWidth = '1px';
-    });
-
-    document.querySelectorAll('[id^="check-"]').forEach(check => {
-        check.style.display = 'none';
-    });
-
-    // Marcar card seleccionada
-    const cards = document.querySelectorAll('.mensaje-card');
-    cards[index].classList.add('border-success');
-    cards[index].style.borderWidth = '2px';
-    document.getElementById(`check-${index}`).style.display = 'block';
-
-    // Mostrar mensaje seleccionado
-    document.getElementById('mensajeSeleccionadoText').textContent = texto;
-    document.getElementById('mensajeSeleccionadoDiv').style.display = 'block';
-
-    // Habilitar botón siguiente
-    updateNextButton();
-}
-
-// Regenerar mensaje (genera 1 mensaje adicional)
-async function regenerarMensaje() {
-    console.log('🔄 Regenerando mensaje...');
-
-    try {
-        const response = await fetch('/ventas/api/giftcard/regenerar-mensaje/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                tipo_mensaje: wizardData.tipoMensaje,
-                nombre: wizardData.destinatario.nombre,
-                relacion: wizardData.destinatario.relacion,
-                detalle: wizardData.detalleEspecial || ''
-            })
+            col.appendChild(card);
+            container.appendChild(col);
         });
 
-        const data = await response.json();
+        // Ocultar loading, mostrar mensajes
+        document.getElementById('mensajesLoading').style.display = 'none';
+        document.getElementById('mensajesContainer').style.display = 'block';
+    }
 
-        if (data.success) {
-            console.log('✅ Nuevo mensaje generado');
+    // Seleccionar un mensaje
+    function selectMensaje(index, texto) {
+        console.log(`✅ Mensaje ${index + 1} seleccionado: "${texto}"`);
 
-            // Agregar nuevo mensaje al array existente
-            const container = document.getElementById('mensajesList');
-            const currentMessages = container.children.length;
+        // Guardar en wizardData
+        wizardData.mensajeSeleccionado = texto;
+        console.log('📝 wizardData.mensajeSeleccionado actualizado:', wizardData.mensajeSeleccionado);
 
-            const col = document.createElement('div');
-            col.className = 'col-12';
+        // Actualizar UI - remover selección previa
+        document.querySelectorAll('.mensaje-card').forEach(card => {
+            card.classList.remove('border-success');
+            card.style.borderWidth = '1px';
+        });
 
-            const card = document.createElement('div');
-            card.className = 'card mensaje-card';
-            card.style.cursor = 'pointer';
-            card.onclick = () => selectMensaje(currentMessages, data.mensaje);
+        document.querySelectorAll('[id^="check-"]').forEach(check => {
+            check.style.display = 'none';
+        });
 
-            card.innerHTML = `
+        // Marcar card seleccionada
+        const cards = document.querySelectorAll('.mensaje-card');
+        cards[index].classList.add('border-success');
+        cards[index].style.borderWidth = '2px';
+        document.getElementById(`check-${index}`).style.display = 'block';
+
+        // Mostrar mensaje seleccionado
+        document.getElementById('mensajeSeleccionadoText').textContent = texto;
+        document.getElementById('mensajeSeleccionadoDiv').style.display = 'block';
+
+        // Habilitar botón siguiente
+        updateNextButton();
+    }
+
+    // Regenerar mensaje (genera 1 mensaje adicional)
+    async function regenerarMensaje() {
+        console.log('🔄 Regenerando mensaje...');
+
+        try {
+            const response = await fetch('/ventas/api/giftcard/regenerar-mensaje/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    tipo_mensaje: wizardData.tipoMensaje,
+                    nombre: wizardData.destinatario.nombre,
+                    relacion: wizardData.destinatario.relacion,
+                    detalle: wizardData.detalleEspecial || ''
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                console.log('✅ Nuevo mensaje generado');
+
+                // Agregar nuevo mensaje al array existente
+                const container = document.getElementById('mensajesList');
+                const currentMessages = container.children.length;
+
+                const col = document.createElement('div');
+                col.className = 'col-12';
+
+                const card = document.createElement('div');
+                card.className = 'card mensaje-card';
+                card.style.cursor = 'pointer';
+                card.onclick = () => selectMensaje(currentMessages, data.mensaje);
+
+                card.innerHTML = `
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <h6 class="card-subtitle text-muted mb-0">
@@ -1634,206 +1676,206 @@ async function regenerarMensaje() {
                 </div>
             `;
 
-            col.appendChild(card);
-            container.appendChild(col);
+                col.appendChild(card);
+                container.appendChild(col);
 
-            // Scroll al nuevo mensaje
-            col.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        } else {
-            throw new Error(data.error || 'Error al regenerar mensaje');
+                // Scroll al nuevo mensaje
+                col.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+                throw new Error(data.error || 'Error al regenerar mensaje');
+            }
+        } catch (error) {
+            console.error('❌ Error:', error);
+            alert('Error al generar nuevo mensaje: ' + error.message);
         }
-    } catch (error) {
-        console.error('❌ Error:', error);
-        alert('Error al generar nuevo mensaje: ' + error.message);
-    }
-}
-
-// Función para actualizar el preview en Step 5
-function actualizarPreviewStep5() {
-    console.log('🔍 Actualizando preview Step 5...');
-    console.log('wizardData completo:', wizardData);
-
-    // Obtener la descripción detallada de la experiencia desde el array de experiencias
-    let expDescripcion = 'Experiencia Aremko Spa';
-    try {
-        const exp = experiencias.find(e => e.id === wizardData.experiencia);
-        expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
-    } catch (error) {
-        console.error('Error al buscar experiencia:', error);
     }
 
-    // Calcular fecha de validez (1 año desde hoy)
-    const hoy = new Date();
-    const validezFecha = new Date(hoy.getFullYear() + 1, hoy.getMonth(), hoy.getDate());
-    const validezStr = validezFecha.toLocaleDateString('es-CL', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric'
-    });
+    // Función para actualizar el preview en Step 5
+    function actualizarPreviewStep5() {
+        console.log('🔍 Actualizando preview Step 5...');
+        console.log('wizardData completo:', wizardData);
 
-    // Obtener el mensaje seleccionado
-    const mensajeFinal = wizardData.mensajeSeleccionado || wizardData.mensajePersonalizado || 'Un regalo especial para ti';
+        // Obtener la descripción detallada de la experiencia desde el array de experiencias
+        let expDescripcion = 'Experiencia Aremko Spa';
+        try {
+            const exp = experiencias.find(e => e.id === wizardData.experiencia);
+            expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
+        } catch (error) {
+            console.error('Error al buscar experiencia:', error);
+        }
 
-    console.log('Mensaje a mostrar en preview:', mensajeFinal);
-
-    // Llenar preview (sin mostrar el precio)
-    document.getElementById('preview-destinatario').textContent = wizardData.destinatario.nombre || 'Destinatario';
-    document.getElementById('preview-mensaje').textContent = mensajeFinal;
-    document.getElementById('preview-experiencia').textContent = expDescripcion;
-    document.getElementById('preview-validez').textContent = validezStr;
-
-    console.log('✅ Preview actualizado');
-}
-
-// Función para actualizar el resumen en Step 6
-function actualizarResumenStep6() {
-    // Obtener la descripción detallada de la experiencia
-    let expDescripcion = 'Experiencia Aremko Spa';
-    try {
-        const exp = experiencias.find(e => e.id === wizardData.experiencia);
-        expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
-    } catch (error) {
-        console.error('Error al buscar experiencia:', error);
-    }
-
-    document.getElementById('resumen-experiencia').textContent = expDescripcion;
-    document.getElementById('resumen-destinatario').textContent = wizardData.destinatario.nombre;
-    document.getElementById('resumen-email').textContent = wizardData.destinatario.email;
-    document.getElementById('resumen-mensaje').textContent = wizardData.mensajeSeleccionado;
-}
-
-// Función para actualizar el resumen en Step 8 (resumen final con comprador)
-function actualizarResumenStep8() {
-    // Obtener la descripción detallada de la experiencia
-    let expDescripcion = 'Experiencia Aremko Spa';
-    try {
-        const exp = experiencias.find(e => e.id === wizardData.experiencia);
-        expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
-    } catch (error) {
-        console.error('Error al buscar experiencia:', error);
-    }
-
-    document.getElementById('resumen-experiencia').textContent = expDescripcion;
-    document.getElementById('resumen-destinatario').textContent = wizardData.destinatario.nombre;
-    document.getElementById('resumen-email').textContent = wizardData.destinatario.email;
-    document.getElementById('resumen-mensaje').textContent = wizardData.mensajeSeleccionado;
-    document.getElementById('resumen-comprador').textContent = wizardData.comprador.nombre;
-    document.getElementById('resumen-comprador-email').textContent = wizardData.comprador.email;
-}
-
-// Event listener para el botón "Agregar al Carrito"
-document.getElementById('btnAgregarAlCarrito').addEventListener('click', async function() {
-    const btn = this;
-    const loadingDiv = document.getElementById('loadingCarrito');
-
-    try {
-        // Mostrar loading
-        btn.disabled = true;
-        loadingDiv.classList.remove('d-none');
-
-        // Obtener el nombre de la experiencia seleccionada
-        console.log('🔍 Buscando experiencia con ID:', wizardData.experiencia);
-        const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
-        console.log('📋 Elemento encontrado:', expCard);
-        const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
-        console.log('🏷️ Nombre de experiencia extraído:', expNombre);
-
-        // Preparar datos para enviar
-        const giftcardData = {
-            experiencia_id: wizardData.experiencia,
-            experiencia_nombre: expNombre,
-            precio: wizardData.monto,
-            destinatario_nombre: wizardData.destinatario.nombre,
-            destinatario_email: wizardData.destinatario.email,
-            destinatario_telefono: wizardData.destinatario.telefono || '',
-            tipo_mensaje: wizardData.tipoMensaje,
-            mensaje_seleccionado: wizardData.mensajeSeleccionado
-        };
-
-        console.log('📤 Enviando GiftCard al carrito:', giftcardData);
-
-        // Enviar al backend
-        const response = await fetch('/ventas/api/giftcard/agregar-al-carrito/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(giftcardData)
+        // Calcular fecha de validez (1 año desde hoy)
+        const hoy = new Date();
+        const validezFecha = new Date(hoy.getFullYear() + 1, hoy.getMonth(), hoy.getDate());
+        const validezStr = validezFecha.toLocaleDateString('es-CL', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric'
         });
 
-        console.log('📡 Response status:', response.status);
+        // Obtener el mensaje seleccionado
+        const mensajeFinal = wizardData.mensajeSeleccionado || wizardData.mensajePersonalizado || 'Un regalo especial para ti';
 
-        // Verificar si la respuesta fue exitosa
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ Error del servidor:', errorText);
-            throw new Error(`Error del servidor (${response.status}): ${errorText}`);
+        console.log('Mensaje a mostrar en preview:', mensajeFinal);
+
+        // Llenar preview (sin mostrar el precio)
+        document.getElementById('preview-destinatario').textContent = wizardData.destinatario.nombre || 'Destinatario';
+        document.getElementById('preview-mensaje').textContent = mensajeFinal;
+        document.getElementById('preview-experiencia').textContent = expDescripcion;
+        document.getElementById('preview-validez').textContent = validezStr;
+
+        console.log('✅ Preview actualizado');
+    }
+
+    // Función para actualizar el resumen en Step 6
+    function actualizarResumenStep6() {
+        // Obtener la descripción detallada de la experiencia
+        let expDescripcion = 'Experiencia Aremko Spa';
+        try {
+            const exp = experiencias.find(e => e.id === wizardData.experiencia);
+            expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
+        } catch (error) {
+            console.error('Error al buscar experiencia:', error);
         }
 
-        const data = await response.json();
-        console.log('📥 Response data:', data);
+        document.getElementById('resumen-experiencia').textContent = expDescripcion;
+        document.getElementById('resumen-destinatario').textContent = wizardData.destinatario.nombre;
+        document.getElementById('resumen-email').textContent = wizardData.destinatario.email;
+        document.getElementById('resumen-mensaje').textContent = wizardData.mensajeSeleccionado;
+    }
 
-        if (data.success) {
-            console.log('✅ GiftCard agregada al carrito:', data);
+    // Función para actualizar el resumen en Step 8 (resumen final con comprador)
+    function actualizarResumenStep8() {
+        // Obtener la descripción detallada de la experiencia
+        let expDescripcion = 'Experiencia Aremko Spa';
+        try {
+            const exp = experiencias.find(e => e.id === wizardData.experiencia);
+            expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
+        } catch (error) {
+            console.error('Error al buscar experiencia:', error);
+        }
 
-            // Actualizar contador del carrito en navbar (si existe)
-            const cartCount = document.getElementById('cartCount');
-            if (cartCount) {
-                cartCount.textContent = data.cart_count;
+        document.getElementById('resumen-experiencia').textContent = expDescripcion;
+        document.getElementById('resumen-destinatario').textContent = wizardData.destinatario.nombre;
+        document.getElementById('resumen-email').textContent = wizardData.destinatario.email;
+        document.getElementById('resumen-mensaje').textContent = wizardData.mensajeSeleccionado;
+        document.getElementById('resumen-comprador').textContent = wizardData.comprador.nombre;
+        document.getElementById('resumen-comprador-email').textContent = wizardData.comprador.email;
+    }
+
+    // Event listener para el botón "Agregar al Carrito"
+    document.getElementById('btnAgregarAlCarrito').addEventListener('click', async function () {
+        const btn = this;
+        const loadingDiv = document.getElementById('loadingCarrito');
+
+        try {
+            // Mostrar loading
+            btn.disabled = true;
+            loadingDiv.classList.remove('d-none');
+
+            // Obtener el nombre de la experiencia seleccionada
+            console.log('🔍 Buscando experiencia con ID:', wizardData.experiencia);
+            const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
+            console.log('📋 Elemento encontrado:', expCard);
+            const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
+            console.log('🏷️ Nombre de experiencia extraído:', expNombre);
+
+            // Preparar datos para enviar
+            const giftcardData = {
+                experiencia_id: wizardData.experiencia,
+                experiencia_nombre: expNombre,
+                precio: wizardData.monto,
+                destinatario_nombre: wizardData.destinatario.nombre,
+                destinatario_email: wizardData.destinatario.email,
+                destinatario_telefono: wizardData.destinatario.telefono || '',
+                tipo_mensaje: wizardData.tipoMensaje,
+                mensaje_seleccionado: wizardData.mensajeSeleccionado
+            };
+
+            console.log('📤 Enviando GiftCard al carrito:', giftcardData);
+
+            // Enviar al backend
+            const response = await fetch('/ventas/api/giftcard/agregar-al-carrito/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(giftcardData)
+            });
+
+            console.log('📡 Response status:', response.status);
+
+            // Verificar si la respuesta fue exitosa
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Error del servidor:', errorText);
+                throw new Error(`Error del servidor (${response.status}): ${errorText}`);
             }
 
-            // Mostrar mensaje de éxito
-            alert(`🎉 ¡GiftCard agregada al carrito!\n\nCódigo: ${data.codigo}\n\n¿Deseas ir al carrito o seguir comprando?`);
+            const data = await response.json();
+            console.log('📥 Response data:', data);
 
-            // Redirigir al carrito
-            window.location.href = data.redirect_url;
-        } else {
-            throw new Error(data.error || 'Error al agregar al carrito');
+            if (data.success) {
+                console.log('✅ GiftCard agregada al carrito:', data);
+
+                // Actualizar contador del carrito en navbar (si existe)
+                const cartCount = document.getElementById('cartCount');
+                if (cartCount) {
+                    cartCount.textContent = data.cart_count;
+                }
+
+                // Mostrar mensaje de éxito
+                alert(`🎉 ¡GiftCard agregada al carrito!\n\nCódigo: ${data.codigo}\n\n¿Deseas ir al carrito o seguir comprando?`);
+
+                // Redirigir al carrito
+                window.location.href = data.redirect_url;
+            } else {
+                throw new Error(data.error || 'Error al agregar al carrito');
+            }
+
+        } catch (error) {
+            console.error('❌ Error completo:', error);
+            alert('Error al agregar la GiftCard al carrito: ' + error.message);
+
+            // Restaurar botón
+            btn.disabled = false;
+            loadingDiv.classList.add('d-none');
+        }
+    });
+
+    // Event listener para el botón "Agregar al Carrito" en Step 5
+    // NOTA: Este listener se registra dinámicamente en updateWizardUI() cuando currentStep === 5
+    // Ver líneas ~1290-1369 para la implementación
+
+    // Modificar nextStep() para actualizar preview/resumen cuando llega a step 5, 6, o 8
+    const originalNextStep = nextStep;
+    nextStep = function () {
+        const currentStep = wizardData.paso;
+
+        // Llamar función original
+        originalNextStep();
+
+        // Si llegamos a step 5, actualizar preview
+        if (wizardData.paso === 5) {
+            actualizarPreviewStep5();
         }
 
-    } catch (error) {
-        console.error('❌ Error completo:', error);
-        alert('Error al agregar la GiftCard al carrito: ' + error.message);
+        // Si llegamos a step 6 (preview de GiftCard), actualizar preview
+        if (wizardData.paso === 6) {
+            actualizarPreviewStep5(); // Reutilizar la misma función de preview
+        }
 
-        // Restaurar botón
-        btn.disabled = false;
-        loadingDiv.classList.add('d-none');
-    }
-});
+        // Si llegamos a step 8 (resumen final), actualizar resumen completo
+        if (wizardData.paso === 8) {
+            actualizarResumenStep8();
+        }
+    };
 
-// Event listener para el botón "Agregar al Carrito" en Step 5
-// NOTA: Este listener se registra dinámicamente en updateWizardUI() cuando currentStep === 5
-// Ver líneas ~1290-1369 para la implementación
+    // ============================================
+    // STEP 6 ELIMINADO - Datos del comprador ahora se piden en checkout
+    // ============================================
 
-// Modificar nextStep() para actualizar preview/resumen cuando llega a step 5, 6, o 8
-const originalNextStep = nextStep;
-nextStep = function() {
-    const currentStep = wizardData.paso;
-
-    // Llamar función original
-    originalNextStep();
-
-    // Si llegamos a step 5, actualizar preview
-    if (wizardData.paso === 5) {
-        actualizarPreviewStep5();
-    }
-
-    // Si llegamos a step 6 (preview de GiftCard), actualizar preview
-    if (wizardData.paso === 6) {
-        actualizarPreviewStep5(); // Reutilizar la misma función de preview
-    }
-
-    // Si llegamos a step 8 (resumen final), actualizar resumen completo
-    if (wizardData.paso === 8) {
-        actualizarResumenStep8();
-    }
-};
-
-// ============================================
-// STEP 6 ELIMINADO - Datos del comprador ahora se piden en checkout
-// ============================================
-
-// Inicializar
-updateNextButton();
+    // Inicializar
+    updateNextButton();
 </script>
 {% endblock %}
