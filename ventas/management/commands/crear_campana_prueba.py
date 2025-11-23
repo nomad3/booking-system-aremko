@@ -65,8 +65,8 @@ class Command(BaseCommand):
         # Crear EmailCampaign
         campaign = EmailCampaign.objects.create(
             name=nombre_campana,
-            subject_template='Hola {nombre_cliente}, tenemos una oferta especial para ti',
-            body_template_html=body_template,
+            email_subject_template='Hola {nombre_cliente}, tenemos una oferta especial para ti',
+            email_body_template=body_template,
             status='draft',
             schedule_config={
                 "start_time": "08:00",
@@ -90,8 +90,8 @@ class Command(BaseCommand):
             )['total'] or 0
             
             # Personalizar subject y body
-            subject = campaign.subject_template.replace('{nombre_cliente}', cliente.nombre)
-            body = campaign.body_template_html.replace('{nombre_cliente}', cliente.nombre)
+            subject = campaign.email_subject_template.replace('{nombre_cliente}', cliente.nombre)
+            body = campaign.email_body_template.replace('{nombre_cliente}', cliente.nombre)
             body = body.replace('{gasto_total}', f'{gasto_total:,.0f}')
             
             recipient = EmailRecipient.objects.create(
