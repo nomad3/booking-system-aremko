@@ -20,7 +20,9 @@ from .models import (
     # Email Templates
     EmailSubjectTemplate, EmailContentTemplate,
     # Premios y Tramos
-    Premio, ClientePremio, HistorialTramo
+    Premio, ClientePremio, HistorialTramo,
+    # Email Campaigns
+    EmailCampaign, EmailRecipient, EmailDeliveryLog
 )
 from django.http import HttpResponse
 import xlwt
@@ -960,3 +962,85 @@ class GiftCardExperienciaAdmin(admin.ModelAdmin):
         css = {
             'all': ('admin/css/forms.css',)
         }
+
+# ============================================
+# EMAIL CAMPAIGN ADMIN
+# ============================================
+
+@admin.register(EmailCampaign)
+class EmailCampaignAdmin(admin.ModelAdmin):
+    """Admin para gestionar campañas de email"""
+    
+    list_display = (
+        'name',
+        'status',
+        'total_recipients',
+        'emails_sent',
+        'created_at'
+    )
+    
+    list_filter = ('status', 'ai_variation_enabled', 'created_at')
+    search_fields = ('name', 'description')
+    
+    readonly_fields = (
+        'total_recipients', 'emails_sent', 'emails_delivered',
+        'emails_opened', 'emails_clicked', 'emails_bounced',
+        'spam_complaints', 'created_at', 'updated_at'
+    )
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('name', 'description', 'status', 'created_by')
+        }),
+        ('Template de Email', {
+            'fields': ('email_subject_template', 'email_body_template')
+        }),
+        ('Configuración', {
+            'fields': ('schedule_config', 'ai_variation_enabled', 'anti_spam_enabled')
+        }),
+        ('Estadísticas', {
+            'fields': (
+                'total_recipients', 'emails_sent', 'emails_delivered',
+                'emails_opened', 'emails_clicked', 'emails_bounced', 'spam_complaints'
+            ),
+            'classes': ('collapse',)
+        })
+    )
+
+
+@admin.register(EmailRecipient)
+class EmailRecipientAdmin(admin.ModelAdmin):
+    """Admin para gestionar destinatarios"""
+    
+    list_display = ('email', 'name', 'campaign', 'status', 'send_enabled', 'sent_at')
+    list_filter = ('status', 'send_enabled', 'campaign')
+    search_fields = ('email', 'name', 'campaign__name')
+    
+    readonly_fields = ('sent_at', 'delivered_at', 'opened_at', 'created_at', 'updated_at')
+    
+    fieldsets = (
+        ('Información', {
+            'fields': ('campaign', 'email', 'name', 'status', 'send_enabled')
+        }),
+        ('Contenido', {
+            'fields': ('personalized_subject', 'personalized_body'),
+            'classes': ('collapse',)
+        }),
+        ('Eventos', {
+            'fields': ('sent_at', 'delivered_at', 'opened_at'),
+            'classes': ('collapse',)
+        })
+    )
+
+
+@admin.register(EmailDeliveryLog)
+class EmailDeliveryLogAdmin(admin.ModelAdmin):
+    """Admin para logs de entrega"""
+    
+    list_display = ('recipient', 'campaign', 'log_type', 'timestamp')
+    list_filter = ('log_type', 'timestamp')
+    search_fields = ('recipient__email', 'campaign__name')
+    readonly_fields = ('recipient', 'campaign', 'log_type', 'timestamp', 'smtp_response', 'error_message')
+    
+    def has_add_permission(self, request):
+        return False
