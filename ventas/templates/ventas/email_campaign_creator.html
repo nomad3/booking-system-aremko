@@ -1,0 +1,400 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Crear Campaña de Email{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .campaign-creator {
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 20px;
+    }
+
+    .step-indicator {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 40px;
+        padding: 0 20px;
+    }
+
+    .step {
+        flex: 1;
+        text-align: center;
+        position: relative;
+    }
+
+    .step::after {
+        content: '';
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        width: 100%;
+        height: 2px;
+        background: #ddd;
+        z-index: -1;
+    }
+
+    .step:last-child::after {
+        display: none;
+    }
+
+    .step-number {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #ddd;
+        color: #666;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+
+    .step.active .step-number {
+        background: #417690;
+        color: white;
+    }
+
+    .step.completed .step-number {
+        background: #28a745;
+        color: white;
+    }
+
+    .campaign-form {
+        background: white;
+        border-radius: 8px;
+        padding: 30px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-section {
+        margin-bottom: 30px;
+    }
+
+    .form-section h3 {
+        color: #417690;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #f0f0f0;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #333;
+    }
+
+    .form-group input[type="text"],
+    .form-group textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .form-group textarea {
+        min-height: 400px;
+        font-family: monospace;
+    }
+
+    .preview-panel {
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+
+    .preview-panel h4 {
+        margin-top: 0;
+        color: #417690;
+    }
+
+    .preview-content {
+        background: white;
+        padding: 20px;
+        border-radius: 4px;
+        margin-top: 10px;
+    }
+
+    .clients-list {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 15px;
+    }
+
+    .client-item {
+        padding: 10px;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .client-item:last-child {
+        border-bottom: none;
+    }
+
+    .client-info {
+        flex: 1;
+    }
+
+    .client-name {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .client-email {
+        color: #666;
+        font-size: 13px;
+    }
+
+    .client-stats {
+        text-align: right;
+        font-size: 13px;
+        color: #666;
+    }
+
+    .btn-primary {
+        background: #417690;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 4px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+    .btn-primary:hover {
+        background: #2f5a6f;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 4px;
+        font-size: 16px;
+        cursor: pointer;
+        margin-right: 10px;
+    }
+
+    .actions {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 2px solid #f0f0f0;
+    }
+
+    .variable-hint {
+        background: #e7f3ff;
+        border-left: 4px solid #417690;
+        padding: 15px;
+        margin-top: 10px;
+        border-radius: 4px;
+    }
+
+    .variable-hint strong {
+        color: #417690;
+    }
+
+    .variable-hint code {
+        background: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: monospace;
+        color: #d63384;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="campaign-creator">
+    <h1>📧 Crear Campaña de Email</h1>
+
+    <!-- Step Indicator -->
+    <div class="step-indicator">
+        <div class="step active">
+            <div class="step-number">1</div>
+            <div class="step-label">Seleccionar Clientes</div>
+        </div>
+        <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-label">Crear Contenido</div>
+        </div>
+        <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-label">Vista Previa</div>
+        </div>
+        <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-label">Enviar</div>
+        </div>
+    </div>
+
+    <!-- Campaign Form -->
+    <div class="campaign-form">
+        <form id="campaignForm" method="post" action="{% url 'ventas:save_email_campaign' %}">
+            {% csrf_token %}
+            <input type="hidden" name="selected_clients" value="{{ selected_clients_string }}">
+
+            <!-- Sección: Clientes Seleccionados -->
+            <div class="form-section">
+                <h3>👥 Clientes Seleccionados ({{ total_clientes }})</h3>
+                <div class="clients-list">
+                    {% for cliente in clientes %}
+                    <div class="client-item">
+                        <div class="client-info">
+                            <div class="client-name">{{ cliente.nombre_completo }}</div>
+                            <div class="client-email">{{ cliente.email }}</div>
+                        </div>
+                        <div class="client-stats">
+                            <div>Gasto: ${{ cliente.gasto_total|floatformat:0 }}</div>
+                            <div>Visitas: {{ cliente.visitas }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Sección: Información de la Campaña -->
+            <div class="form-section">
+                <h3>📝 Información de la Campaña</h3>
+
+                <div class="form-group">
+                    <label for="campaign_name">Nombre de la Campaña *</label>
+                    <input type="text" id="campaign_name" name="campaign_name" required
+                        placeholder="Ej: Black Friday 2025">
+                </div>
+            </div>
+
+            <!-- Sección: Contenido del Email -->
+            <div class="form-section">
+                <h3>✉️ Contenido del Email</h3>
+
+                <div class="form-group">
+                    <label for="email_subject">Asunto del Email *</label>
+                    <input type="text" id="email_subject" name="email_subject" required
+                        placeholder="Hola {nombre_cliente}, tenemos una oferta especial para ti">
+
+                    <div class="variable-hint">
+                        <strong>💡 Variables disponibles:</strong><br>
+                        <code>{nombre_cliente}</code> - Primer nombre del cliente<br>
+                        <code>{gasto_total}</code> - Gasto total histórico
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="email_body">Cuerpo del Email (HTML) *</label>
+                    <textarea id="email_body" name="email_body" required></textarea>
+
+                    <div class="variable-hint">
+                        Puedes usar las mismas variables: <code>{nombre_cliente}</code> y <code>{gasto_total}</code>
+                    </div>
+                </div>
+
+                <button type="button" class="btn-secondary" onclick="loadDefaultTemplate()">
+                    📄 Cargar Template por Defecto
+                </button>
+            </div>
+
+            <!-- Sección: Configuración de Envío -->
+            <div class="form-section">
+                <h3>⚙️ Configuración de Envío</h3>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label for="start_time">Hora de Inicio</label>
+                        <input type="time" id="start_time" name="start_time" value="08:00">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="end_time">Hora de Fin</label>
+                        <input type="time" id="end_time" name="end_time" value="21:00">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="batch_size">Emails por Lote</label>
+                        <input type="number" id="batch_size" name="batch_size" value="5" min="1" max="50">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="interval_minutes">Intervalo entre Lotes (minutos)</label>
+                        <input type="number" id="interval_minutes" name="interval_minutes" value="6" min="1" max="60">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="ai_enabled" value="true">
+                        Usar IA para variar el contenido (experimental)
+                    </label>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="actions">
+                <button type="button" class="btn-secondary" onclick="window.history.back()">
+                    ← Volver
+                </button>
+                <button type="submit" class="btn-primary">
+                    Guardar y Continuar →
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Cargar template por defecto
+    function loadDefaultTemplate() {
+        fetch("{% static 'email/campaign_template_example.html' %}")
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('email_body').value = html;
+            })
+            .catch(error => {
+                alert('No se pudo cargar el template por defecto');
+            });
+    }
+
+    // Manejar envío del formulario
+    document.getElementById('campaignForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+
+        fetch(this.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Error al guardar la campaña: ' + error);
+            });
+    });
+</script>
+{% endblock %}

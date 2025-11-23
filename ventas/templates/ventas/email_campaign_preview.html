@@ -1,0 +1,312 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Vista Previa de Campaña{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .preview-container {
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 20px;
+    }
+
+    .campaign-header {
+        background: white;
+        border-radius: 8px;
+        padding: 30px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .campaign-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .stat-card {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 32px;
+        font-weight: bold;
+        color: #417690;
+    }
+
+    .stat-label {
+        color: #666;
+        margin-top: 5px;
+    }
+
+    .preview-section {
+        background: white;
+        border-radius: 8px;
+        padding: 30px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .email-preview {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 20px;
+        background: #f8f9fa;
+        margin-top: 20px;
+    }
+
+    .email-subject {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #ddd;
+    }
+
+    .email-body {
+        background: white;
+        padding: 20px;
+        border-radius: 4px;
+        min-height: 300px;
+    }
+
+    .recipients-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+    .recipients-table th {
+        background: #f8f9fa;
+        padding: 12px;
+        text-align: left;
+        border-bottom: 2px solid #ddd;
+        font-weight: 600;
+    }
+
+    .recipients-table td {
+        padding: 12px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .recipients-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .btn-primary {
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 15px 40px;
+        border-radius: 4px;
+        font-size: 18px;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+    .btn-primary:hover {
+        background: #218838;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 15px 40px;
+        border-radius: 4px;
+        font-size: 18px;
+        cursor: pointer;
+        margin-right: 10px;
+    }
+
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .actions {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 2px solid #f0f0f0;
+    }
+
+    .warning-box {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 4px;
+    }
+
+    .success-box {
+        background: #d4edda;
+        border-left: 4px solid #28a745;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="preview-container">
+    <div class="campaign-header">
+        <h1>📧 {{ campaign.name }}</h1>
+        <p style="color: #666; margin-top: 10px;">
+            Estado: <strong>{{ campaign.get_status_display }}</strong>
+        </p>
+
+        <div class="campaign-stats">
+            <div class="stat-card">
+                <div class="stat-value">{{ total_recipients }}</div>
+                <div class="stat-label">Destinatarios</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ campaign.schedule_config.batch_size }}</div>
+                <div class="stat-label">Emails por Lote</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ campaign.schedule_config.interval_minutes }}</div>
+                <div class="stat-label">Minutos entre Lotes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">
+                    {{ campaign.schedule_config.start_time }} - {{ campaign.schedule_config.end_time }}
+                </div>
+                <div class="stat-label">Horario de Envío</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vista Previa del Email -->
+    <div class="preview-section">
+        <h2>✉️ Vista Previa del Email</h2>
+
+        {% if sample_recipient %}
+        <div class="warning-box">
+            <strong>💡 Vista Previa:</strong> Este es un ejemplo de cómo se verá el email para
+            <strong>{{ sample_recipient.name }}</strong> ({{ sample_recipient.email }})
+        </div>
+
+        <div class="email-preview">
+            <div class="email-subject">
+                <strong>Asunto:</strong> {{ sample_recipient.personalized_subject }}
+            </div>
+            <div class="email-body">
+                {{ sample_recipient.personalized_body|safe }}
+            </div>
+        </div>
+        {% else %}
+        <p>No hay destinatarios para mostrar vista previa.</p>
+        {% endif %}
+    </div>
+
+    <!-- Lista de Destinatarios -->
+    <div class="preview-section">
+        <h2>👥 Destinatarios ({{ total_recipients }})</h2>
+
+        <table class="recipients-table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Email</th>
+                    <th>Gasto Total</th>
+                    <th>Visitas</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for recipient in recipients %}
+                <tr>
+                    <td>{{ recipient.name }}</td>
+                    <td>{{ recipient.email }}</td>
+                    <td>${{ recipient.client_total_spend|floatformat:0 }}</td>
+                    <td>{{ recipient.client_visit_count }}</td>
+                    <td>
+                        <span style="color: #ffc107;">⏳ {{ recipient.get_status_display }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Confirmación de Envío -->
+    <div class="preview-section">
+        <h2>🚀 Confirmar Envío</h2>
+
+        <div class="warning-box">
+            <strong>⚠️ Importante:</strong> Una vez que inicies el envío, los emails se enviarán automáticamente
+            según la configuración establecida. Este proceso no se puede detener fácilmente.
+        </div>
+
+        <div class="success-box">
+            <strong>✅ Todo listo:</strong> La campaña está configurada y lista para enviar.
+            Los emails se enviarán en lotes de {{ campaign.schedule_config.batch_size }}
+            cada {{ campaign.schedule_config.interval_minutes }} minutos.
+        </div>
+
+        <div class="actions">
+            <div>
+                <a href="{% url 'admin:ventas_emailcampaign_change' campaign.id %}" class="btn-secondary">
+                    ✏️ Editar Campaña
+                </a>
+                <button type="button" class="btn-danger" onclick="deleteCampaign()">
+                    🗑️ Eliminar
+                </button>
+            </div>
+            <button type="button" class="btn-primary" onclick="sendCampaign()">
+                📤 Enviar Campaña Ahora
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function sendCampaign() {
+        if (!confirm('¿Estás seguro de que quieres enviar esta campaña a {{ total_recipients }} destinatarios?')) {
+            return;
+        }
+
+        fetch("{% url 'ventas:send_email_campaign' campaign.id %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    window.location.href = "{% url 'admin:ventas_emailcampaign_change' campaign.id %}";
+                } else {
+                    alert('❌ Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('❌ Error al enviar la campaña: ' + error);
+            });
+    }
+
+    function deleteCampaign() {
+        if (!confirm('¿Estás seguro de que quieres eliminar esta campaña?')) {
+            return;
+        }
+
+        window.location.href = "{% url 'admin:ventas_emailcampaign_delete' campaign.id %}";
+    }
+</script>
+{% endblock %}

@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views # Import premio_views, cron_views, giftcard_views, pack_descuento_views, and analytics_views
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views # Import email_campaign_views
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -58,6 +58,11 @@ urlpatterns = [
     path('admin/campaign/setup/', admin_views.campaign_setup_view, name='campaign_setup_add'), # For adding new
     path('admin/campaign/setup/<int:campaign_id>/', admin_views.campaign_setup_view, name='campaign_setup_change'), # For editing existing
     path('admin/campaign/select-for-clients/', admin_views.select_campaign_for_clients_view, name='select_campaign_for_clients'),
+    # Email Campaign URLs (Flujo Mejorado)
+    path('email-campaign/create/', email_campaign_views.create_email_campaign_from_segment, name='create_email_campaign'),
+    path('email-campaign/save/', email_campaign_views.save_email_campaign, name='save_email_campaign'),
+    path('email-campaign/<int:campaign_id>/preview/', email_campaign_views.email_campaign_preview, name='email_campaign_preview'),
+    path('email-campaign/<int:campaign_id>/send/', email_campaign_views.send_email_campaign, name='send_email_campaign'),
     # Admin Section URLs
     path('admin/section/crm/', admin_views.admin_section_crm_view, name='admin_section_crm'),
     path('admin/section/crm/csv-campaign/', admin_views.csv_campaign_uploader, name='csv_campaign_uploader'),
