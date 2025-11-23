@@ -535,7 +535,11 @@
                     {% for exp in experiencias %}
                     {% if exp.categoria == 'tinas' %}
                     <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                        {% if exp.imagen %}
+                        <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
+                        {% else %}
                         <i class="fas fa-hot-tub"></i>
+                        {% endif %}
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
                         {% if exp.monto_fijo %}
@@ -556,7 +560,11 @@
                     {% for exp in experiencias %}
                     {% if exp.categoria == 'masajes' %}
                     <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                        {% if exp.imagen %}
+                        <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
+                        {% else %}
                         <i class="fas fa-spa"></i>
+                        {% endif %}
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
                         {% if exp.monto_fijo %}
@@ -577,7 +585,11 @@
                     {% for exp in experiencias %}
                     {% if exp.categoria == 'alojamientos' %}
                     <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                        {% if exp.imagen %}
+                        <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
+                        {% else %}
                         <i class="fas fa-bed"></i>
+                        {% endif %}
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
                         {% if exp.monto_fijo %}
@@ -598,7 +610,11 @@
                     {% for exp in experiencias %}
                     {% if exp.categoria == 'celebraciones' %}
                     <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}" data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                        {% if exp.imagen %}
+                        <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
+                        {% else %}
                         <i class="fas fa-champagne-glasses"></i>
+                        {% endif %}
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
                         {% if exp.monto_fijo %}
