@@ -16,8 +16,8 @@ class Command(BaseCommand):
     help = "Envía campaña de giftcard cada 6 minutos (2 emails por ejecución)"
 
     def add_arguments(self, parser):
-        parser.add_argument("--batch-size", type=int, default=2,
-                            help="Número de emails a enviar por ejecución (default: 2)")
+        parser.add_argument("--batch-size", type=int, default=50,
+                            help="Número de emails a enviar por ejecución (default: 50)")
         parser.add_argument("--ignore-schedule", action="store_true",
                             help="Ignorar horario y enviar siempre")
 

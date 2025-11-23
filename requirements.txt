@@ -50,3 +50,6 @@ pytz>=2024.1  # Timezone support for reminder emails
 
 # PDF Generation
 WeasyPrint>=62.3  # PDF generation
+
+# Email Service
+django-anymail[sendgrid]>=10.3  # SendGrid integration

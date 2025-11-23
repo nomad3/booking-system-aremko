@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'storages', # Add django-storages
     'solo',     # Add django-solo
+    'anymail',  # Email integration
 ]
 
 # MIDDLEWARE
@@ -220,11 +221,21 @@ EMAIL_MONTHLY_LIMIT_PER_CLIENT = int(os.getenv('EMAIL_MONTHLY_LIMIT_PER_CLIENT',
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'comunicaciones@aremko.cl')
 VENTAS_FROM_EMAIL = os.getenv('VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
 # Email Backend - usar console para desarrollo si no hay credenciales
-if not os.getenv('EMAIL_HOST_USER') or not os.getenv('EMAIL_HOST_PASSWORD'):
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Muestra emails en logs
-    logger.warning("⚠️ EMAIL_HOST_USER/PASSWORD no configurados - usando console backend")
+# Email Backend - SendGrid (Anymail)
+if os.getenv('SENDGRID_API_KEY'):
+    EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
+    ANYMAIL = {
+        "SENDGRID_API_KEY": os.getenv('SENDGRID_API_KEY'),
+    }
+    logger.info("✅ Usando SendGrid para envío de correos")
+elif not os.getenv('EMAIL_HOST_USER') or not os.getenv('EMAIL_HOST_PASSWORD'):
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    logger.warning("⚠️ SENDGRID_API_KEY ni SMTP configurados - usando console backend")
 else:
+    # Fallback a SMTP si no hay SendGrid pero sí SMTP
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    logger.info("ℹ️ Usando SMTP clásico (Gmail) como fallback")
+
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
