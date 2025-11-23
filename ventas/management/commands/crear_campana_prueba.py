@@ -89,15 +89,18 @@ class Command(BaseCommand):
                 total=Sum('total')
             )['total'] or 0
             
+            # Extraer solo el primer nombre para personalización más cercana
+            primer_nombre = cliente.nombre.split()[0] if cliente.nombre else 'Cliente'
+            
             # Personalizar subject y body
-            subject = campaign.email_subject_template.replace('{nombre_cliente}', cliente.nombre)
-            body = campaign.email_body_template.replace('{nombre_cliente}', cliente.nombre)
+            subject = campaign.email_subject_template.replace('{nombre_cliente}', primer_nombre)
+            body = campaign.email_body_template.replace('{nombre_cliente}', primer_nombre)
             body = body.replace('{gasto_total}', f'{gasto_total:,.0f}')
             
             recipient = EmailRecipient.objects.create(
                 campaign=campaign,
                 email=cliente.email,
-                name=cliente.nombre,
+                name=primer_nombre,  # Guardar solo el primer nombre
                 personalized_subject=subject,
                 personalized_body=body,
                 client_total_spend=gasto_total,
