@@ -22,7 +22,7 @@ from .models import (
     # Premios y Tramos
     Premio, ClientePremio, HistorialTramo,
     # Email Campaigns
-    EmailTemplate, EmailCampaign, EmailRecipient, EmailDeliveryLog
+    CampaignEmailTemplate, EmailCampaign, EmailRecipient, EmailDeliveryLog
 )
 from django.http import HttpResponse
 import xlwt
@@ -964,12 +964,12 @@ class GiftCardExperienciaAdmin(admin.ModelAdmin):
         }
 
 # ============================================
-# EMAIL TEMPLATE ADMIN
+# CAMPAIGN EMAIL TEMPLATE ADMIN
 # ============================================
 
-@admin.register(EmailTemplate)
-class EmailTemplateAdmin(admin.ModelAdmin):
-    """Admin para gestionar templates de email reutilizables"""
+@admin.register(CampaignEmailTemplate)
+class CampaignEmailTemplateAdmin(admin.ModelAdmin):
+    """Admin para gestionar templates de email reutilizables para campañas"""
 
     list_display = (
         'name',

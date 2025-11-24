@@ -1497,8 +1497,8 @@ class EmailTemplate(models.Model):
 # MODELOS PARA SISTEMA DE CAMPAÑAS AVANZADO
 # =============================================================================
 
-class EmailTemplate(models.Model):
-    """Template reutilizable para emails de campañas"""
+class CampaignEmailTemplate(models.Model):
+    """Template reutilizable para emails de campañas de marketing"""
 
     name = models.CharField(max_length=200, verbose_name="Nombre del template")
     description = models.TextField(blank=True, verbose_name="Descripción")
@@ -1518,11 +1518,11 @@ class EmailTemplate(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Creado el")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Actualizado el")
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
-                                   related_name='email_templates_created', verbose_name="Creado por")
+                                   related_name='campaign_email_templates_created', verbose_name="Creado por")
 
     class Meta:
-        verbose_name = "Template de Email"
-        verbose_name_plural = "Templates de Email"
+        verbose_name = "Template de Campaña Email"
+        verbose_name_plural = "Templates de Campaña Email"
         ordering = ['-is_default', '-updated_at']
 
     def __str__(self):
@@ -1532,7 +1532,7 @@ class EmailTemplate(models.Model):
     def save(self, *args, **kwargs):
         # Si este template se marca como default, desmarcar los demás
         if self.is_default:
-            EmailTemplate.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
+            CampaignEmailTemplate.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
         super().save(*args, **kwargs)
 
 

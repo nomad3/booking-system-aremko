@@ -4,7 +4,7 @@ Comando para inicializar el template de email por defecto
 """
 
 from django.core.management.base import BaseCommand
-from ventas.models import EmailTemplate
+from ventas.models import CampaignEmailTemplate
 
 
 class Command(BaseCommand):
@@ -50,7 +50,7 @@ class Command(BaseCommand):
   </div>'''
 
         # Buscar si ya existe un template por defecto
-        default_template = EmailTemplate.objects.filter(is_default=True).first()
+        default_template = CampaignEmailTemplate.objects.filter(is_default=True).first()
 
         if default_template:
             # Actualizar el existente
@@ -63,7 +63,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f'✅ Template "{default_template.name}" actualizado exitosamente'))
         else:
             # Crear uno nuevo
-            template = EmailTemplate.objects.create(
+            template = CampaignEmailTemplate.objects.create(
                 name="Template Por Defecto - Promoción Aremko",
                 description="Template con formato HTML profesional para campañas de promoción",
                 subject_template=subject,

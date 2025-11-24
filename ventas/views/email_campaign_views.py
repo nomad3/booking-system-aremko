@@ -14,7 +14,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_http_methods
 from django.core.serializers.json import DjangoJSONEncoder
 
-from ventas.models import Cliente, EmailCampaign, EmailRecipient, EmailTemplate
+from ventas.models import Cliente, EmailCampaign, EmailRecipient, CampaignEmailTemplate
 import json
 import logging
 
@@ -135,9 +135,9 @@ def create_email_campaign_from_segment(request):
         # Cargar template por defecto si existe (safe para cuando la tabla no existe aún)
         default_template = None
         try:
-            default_template = EmailTemplate.objects.filter(is_default=True, is_active=True).first()
+            default_template = CampaignEmailTemplate.objects.filter(is_default=True, is_active=True).first()
         except Exception as e:
-            logger.warning(f"No se pudo cargar EmailTemplate (tabla aún no existe?): {e}")
+            logger.warning(f"No se pudo cargar CampaignEmailTemplate (tabla aún no existe?): {e}")
 
         context = {
             'clientes': clientes_data,
