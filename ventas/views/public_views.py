@@ -114,6 +114,14 @@ def masajes_view(request):
     return categoria_detail_view(request, categoria_id=2)
 
 
+def alojamientos_view(request):
+    """
+    Vista para acceso directo a la categoría de Alojamientos
+    Redirige a la vista de categoría con ID=3 (Alojamientos)
+    """
+    return categoria_detail_view(request, categoria_id=3)
+
+
 def empresas_view(request):
     """
     Vista para la landing page de servicios empresariales

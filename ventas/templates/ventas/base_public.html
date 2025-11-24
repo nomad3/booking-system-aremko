@@ -360,6 +360,9 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'masajes' %}">Masajes</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'alojamientos' %}">Alojamientos</a>
+                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownServicios" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             Servicios
@@ -371,9 +374,6 @@
                             <li><a class="dropdown-item" href="{% url 'ventas:categoria_detail' cat.id %}">{{ cat.nombre }}</a></li> {# Added ventas: namespace #}
                             {% endfor %}
                         </ul>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'homepage' %}#testimonios">Testimonios</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'homepage' %}#contacto">Contacto</a>
