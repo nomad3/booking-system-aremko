@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nueva Cotización Empresarial - Aremko</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 20px;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        .title {
+            color: #dc3545;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .alert-badge {
+            display: inline-block;
+            background: #dc3545;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .details {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        .label {
+            font-weight: 600;
+            color: #495057;
+        }
+        .value {
+            color: #007bff;
+            font-weight: 500;
+        }
+        .message-box {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+            margin: 20px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .highlight {
+            background: #e8f5e8;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .mensaje-adicional {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            margin: 15px 0;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="alert-badge">🚨 ACCIÓN REQUERIDA</div>
+            <div class="logo">🏨 AREMKO</div>
+            <h1 class="title">Nueva Cotización Empresarial</h1>
+        </div>
+
+        <p><strong>Equipo de Ventas,</strong></p>
+
+        <p>Se ha recibido una nueva solicitud de cotización para servicios empresariales. Por favor, responder dentro de las próximas 24 horas.</p>
+
+        <div class="highlight">
+            <strong>📊 Resumen Rápido:</strong><br>
+            <strong>{{ cotizacion.nombre_empresa }}</strong> solicita <strong>{{ servicio_nombre }}</strong> para <strong>{{ cotizacion.numero_personas }} personas</strong>
+            {% if cotizacion.fecha_tentativa %}
+                el <strong>{{ fecha_formateada }}</strong>
+            {% endif %}
+        </div>
+
+        <div class="details">
+            <h3 style="margin-top: 0; color: #495057;">🏢 Datos de la Empresa</h3>
+            <div class="detail-row">
+                <span class="label">Empresa:</span>
+                <span class="value">{{ cotizacion.nombre_empresa }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Contacto:</span>
+                <span class="value">{{ cotizacion.nombre_contacto }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">📧 Email:</span>
+                <span class="value">{{ cotizacion.email }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">📱 Teléfono:</span>
+                <span class="value">{{ cotizacion.telefono }}</span>
+            </div>
+        </div>
+
+        <div class="details">
+            <h3 style="margin-top: 0; color: #495057;">🎯 Detalles del Servicio</h3>
+            <div class="detail-row">
+                <span class="label">Servicio solicitado:</span>
+                <span class="value">{{ servicio_nombre }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Número de personas:</span>
+                <span class="value">{{ cotizacion.numero_personas }} personas</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Fecha tentativa:</span>
+                <span class="value">{{ fecha_formateada }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Fecha de solicitud:</span>
+                <span class="value">{{ cotizacion.creado|date:"d/m/Y H:i" }}</span>
+            </div>
+        </div>
+
+        {% if cotizacion.mensaje_adicional %}
+        <div class="mensaje-adicional">
+            <strong>💬 Mensaje del cliente:</strong><br><br>
+            {{ cotizacion.mensaje_adicional|linebreaks }}
+        </div>
+        {% endif %}
+
+        <div class="message-box">
+            <strong>⚡ Próximos pasos:</strong><br>
+            1. Revisar disponibilidad para la fecha solicitada<br>
+            2. Preparar cotización personalizada<br>
+            3. Contactar al cliente dentro de 24 horas<br>
+            4. Actualizar estado en el admin panel
+        </div>
+
+        <div style="text-align: center;">
+            <a href="{{ admin_url }}" class="cta-button">
+                Ver en Admin Panel 🔗
+            </a>
+        </div>
+
+        <div class="footer">
+            <strong>Sistema de Gestión Aremko</strong><br>
+            <p style="margin-top: 15px; font-size: 12px; color: #adb5bd;">
+                Este es un email automático generado por el formulario de cotizaciones empresariales en www.aremko.cl/empresas
+            </p>
+            <p style="font-size: 12px; color: #adb5bd;">
+                ID de cotización: #{{ cotizacion.id }}
+            </p>
+        </div>
+    </div>
+</body>
+</html>

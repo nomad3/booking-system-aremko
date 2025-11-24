@@ -2759,3 +2759,123 @@ class GiftCardExperiencia(models.Model):
         }
 
 
+# =============================================================================
+# MODELOS PARA COTIZACIONES EMPRESARIALES
+# =============================================================================
+
+class CotizacionEmpresa(models.Model):
+    """
+    Modelo para manejar solicitudes de cotización de servicios empresariales
+    desde la landing page /empresas/
+    """
+
+    SERVICIOS_CHOICES = [
+        ('experiencia_completa', 'Experiencia Completa (Desayuno + Reunión + Tinas)'),
+        ('desayuno_relax', 'Desayuno & Relax (Desayuno + Tinas)'),
+        ('solo_tinas', 'Solo Tinas (Team Building)'),
+    ]
+
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('contactado', 'Contactado'),
+        ('cotizado', 'Cotizado'),
+        ('convertido', 'Convertido a Reserva'),
+        ('rechazado', 'Rechazado'),
+    ]
+
+    # Datos de la empresa
+    nombre_empresa = models.CharField(
+        max_length=200,
+        verbose_name="Nombre de la Empresa"
+    )
+    nombre_contacto = models.CharField(
+        max_length=200,
+        verbose_name="Nombre del Contacto"
+    )
+    email = models.EmailField(
+        verbose_name="Email Corporativo"
+    )
+    telefono = models.CharField(
+        max_length=20,
+        verbose_name="Teléfono de Contacto"
+    )
+
+    # Detalles del servicio
+    servicio_interes = models.CharField(
+        max_length=50,
+        choices=SERVICIOS_CHOICES,
+        verbose_name="Servicio de Interés"
+    )
+    numero_personas = models.PositiveIntegerField(
+        verbose_name="Número de Personas"
+    )
+    fecha_tentativa = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha Tentativa"
+    )
+    mensaje_adicional = models.TextField(
+        blank=True,
+        verbose_name="Mensaje Adicional"
+    )
+
+    # Estado y seguimiento
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default='pendiente',
+        verbose_name="Estado de la Cotización"
+    )
+    notas_internas = models.TextField(
+        blank=True,
+        verbose_name="Notas Internas (uso del equipo)"
+    )
+
+    # Metadatos
+    creado = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de Solicitud"
+    )
+    actualizado = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Última Actualización"
+    )
+    atendido_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Atendido Por"
+    )
+
+    class Meta:
+        verbose_name = "Cotización Empresarial"
+        verbose_name_plural = "Cotizaciones Empresariales"
+        ordering = ['-creado']
+        indexes = [
+            models.Index(fields=['estado', '-creado']),
+            models.Index(fields=['fecha_tentativa']),
+        ]
+
+    def __str__(self):
+        return f"{self.nombre_empresa} - {self.get_servicio_interes_display()} ({self.numero_personas} pax)"
+
+    def get_servicio_display_corto(self):
+        """Retorna nombre corto del servicio"""
+        mapping = {
+            'experiencia_completa': 'Exp. Completa',
+            'desayuno_relax': 'Desayuno & Relax',
+            'solo_tinas': 'Solo Tinas',
+        }
+        return mapping.get(self.servicio_interes, self.servicio_interes)
+
+    def dias_desde_solicitud(self):
+        """Retorna días transcurridos desde la solicitud"""
+        delta = timezone.now() - self.creado
+        return delta.days
+
+    def es_urgente(self):
+        """Marca como urgente si lleva más de 2 días sin atender"""
+        return self.estado == 'pendiente' and self.dias_desde_solicitud() > 2
+
+

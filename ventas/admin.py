@@ -24,7 +24,9 @@ from .models import (
     # Email Campaigns
     CampaignEmailTemplate, EmailCampaign, EmailRecipient, EmailDeliveryLog,
     # Communication System
-    CommunicationLog, CommunicationLimit, ClientPreferences, SMSTemplate
+    CommunicationLog, CommunicationLimit, ClientPreferences, SMSTemplate,
+    # Corporate Services
+    CotizacionEmpresa
 )
 from django.http import HttpResponse
 import xlwt
@@ -502,6 +504,141 @@ class CampaignInteractionAdmin(admin.ModelAdmin):
     search_fields = ('campaign__name', 'contact__email', 'contact__first_name', 'contact__last_name')
     date_hierarchy = 'timestamp'
     autocomplete_fields = ['campaign', 'contact']
+
+
+@admin.register(CotizacionEmpresa)
+class CotizacionEmpresaAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'nombre_empresa',
+        'nombre_contacto',
+        'get_servicio_display',
+        'numero_personas',
+        'fecha_tentativa',
+        'get_estado_badge',
+        'get_urgencia_badge',
+        'creado'
+    )
+    list_filter = (
+        'estado',
+        'servicio_interes',
+        'creado',
+        'fecha_tentativa',
+        'atendido_por'
+    )
+    search_fields = (
+        'nombre_empresa',
+        'nombre_contacto',
+        'email',
+        'telefono',
+        'mensaje_adicional',
+        'notas_internas'
+    )
+    date_hierarchy = 'creado'
+    readonly_fields = ('creado', 'actualizado', 'get_dias_desde_solicitud')
+    autocomplete_fields = ['atendido_por']
+
+    fieldsets = (
+        ('📋 Información de la Empresa', {
+            'fields': ('nombre_empresa', 'nombre_contacto', 'email', 'telefono')
+        }),
+        ('🎯 Detalles del Servicio Solicitado', {
+            'fields': ('servicio_interes', 'numero_personas', 'fecha_tentativa', 'mensaje_adicional')
+        }),
+        ('📊 Estado y Seguimiento', {
+            'fields': ('estado', 'atendido_por', 'notas_internas')
+        }),
+        ('🕐 Información de Tiempo', {
+            'fields': ('creado', 'actualizado', 'get_dias_desde_solicitud'),
+            'classes': ('collapse',)
+        })
+    )
+
+    actions = ['marcar_contactado', 'marcar_cotizado', 'marcar_pendiente']
+
+    def get_servicio_display(self, obj):
+        """Muestra el servicio de forma más legible"""
+        return obj.get_servicio_interes_display()
+    get_servicio_display.short_description = 'Servicio'
+    get_servicio_display.admin_order_field = 'servicio_interes'
+
+    def get_estado_badge(self, obj):
+        """Muestra el estado con un badge colorido"""
+        colores = {
+            'pendiente': '#ffc107',
+            'contactado': '#17a2b8',
+            'cotizado': '#007bff',
+            'convertido': '#28a745',
+            'rechazado': '#dc3545',
+        }
+        color = colores.get(obj.estado, '#6c757d')
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; '
+            'border-radius: 12px; font-size: 11px; font-weight: bold;">{}</span>',
+            color,
+            obj.get_estado_display()
+        )
+    get_estado_badge.short_description = 'Estado'
+    get_estado_badge.admin_order_field = 'estado'
+
+    def get_urgencia_badge(self, obj):
+        """Muestra si la cotización es urgente"""
+        if obj.es_urgente():
+            return format_html(
+                '<span style="background-color: #dc3545; color: white; padding: 3px 10px; '
+                'border-radius: 12px; font-size: 11px; font-weight: bold;">🚨 URGENTE</span>'
+            )
+        return format_html(
+            '<span style="color: #28a745; font-weight: bold;">✓ Al día</span>'
+        )
+    get_urgencia_badge.short_description = 'Urgencia'
+
+    def get_dias_desde_solicitud(self, obj):
+        """Muestra cuántos días han pasado desde la solicitud"""
+        dias = obj.dias_desde_solicitud()
+        if dias == 0:
+            return 'Hoy'
+        elif dias == 1:
+            return '1 día'
+        else:
+            return f'{dias} días'
+    get_dias_desde_solicitud.short_description = 'Tiempo desde solicitud'
+
+    def get_queryset(self, request):
+        """Optimiza las consultas"""
+        qs = super().get_queryset(request)
+        return qs.select_related('atendido_por')
+
+    # Acciones personalizadas
+    def marcar_contactado(self, request, queryset):
+        """Marca las cotizaciones seleccionadas como contactadas"""
+        updated = queryset.update(estado='contactado')
+        self.message_user(
+            request,
+            f'{updated} cotización(es) marcada(s) como contactadas.',
+            messages.SUCCESS
+        )
+    marcar_contactado.short_description = '✓ Marcar como contactado'
+
+    def marcar_cotizado(self, request, queryset):
+        """Marca las cotizaciones seleccionadas como cotizadas"""
+        updated = queryset.update(estado='cotizado')
+        self.message_user(
+            request,
+            f'{updated} cotización(es) marcada(s) como cotizadas.',
+            messages.SUCCESS
+        )
+    marcar_cotizado.short_description = '💰 Marcar como cotizado'
+
+    def marcar_pendiente(self, request, queryset):
+        """Marca las cotizaciones seleccionadas como pendientes"""
+        updated = queryset.update(estado='pendiente')
+        self.message_user(
+            request,
+            f'{updated} cotización(es) marcada(s) como pendientes.',
+            messages.WARNING
+        )
+    marcar_pendiente.short_description = '⏸ Marcar como pendiente'
 
 
 @admin.register(EmailSubjectTemplate)
