@@ -221,8 +221,8 @@ class CommunicationService:
             email = EmailMultiAlternatives(
                 subject=f'Reserva por confirmar - {subject_service_name}',
                 body=f'Estimado/a {cliente.nombre}, su reserva para {servicio_nombre} el {fecha_str} a las {hora_str} ha sido confirmada.',
-                # Usamos el usuario autenticado en SMTP para máxima entregabilidad
-                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                # Usar VENTAS_FROM_EMAIL verificado en SendGrid
+                from_email=getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
                 to=[cliente.email],
                 bcc=['aremkospa@gmail.com', getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copias a aremkospa@gmail.com y ventas@aremko.cl
                 reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
@@ -326,7 +326,7 @@ class CommunicationService:
             email = EmailMultiAlternatives(
                 subject=f"Recordatorio: tu reserva es mañana - {subject_service_name}",
                 body=f"Hola {cliente.nombre}, te recordamos tu reserva de mañana.",
-                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                from_email=getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
                 to=[cliente.email],
                 bcc=['aremkospa@gmail.com', getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copias a aremkospa@gmail.com y ventas@aremko.cl
                 reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
@@ -458,7 +458,7 @@ class CommunicationService:
             email = EmailMultiAlternatives(
                 subject=subject,
                 body=f"Hola {cliente.nombre}, registramos tu pago y tu reserva quedó pagada al 100%.",
-                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                from_email=getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
                 to=[cliente.email],
                 bcc=['aremkospa@gmail.com', getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copias a aremkospa@gmail.com y ventas@aremko.cl
                 reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
@@ -566,7 +566,7 @@ class CommunicationService:
                     f"Te regalamos una Gift Card de $10.000 para cualquier servicio (vigente hasta {context['fecha_limite']}).\n"
                     f"Para activarla, escríbenos por WhatsApp al +56 9 5790 2525 indicando 'cobro de Gift Card por visita de hace 90 días a Aremko'."
                 ),
-                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                from_email=getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
                 to=[cliente.email] if cliente.email else [],
                 reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
             )
@@ -658,7 +658,7 @@ class CommunicationService:
                     f"Cuéntanos cómo te fue respondiendo esta encuesta: {survey_url}. "
                     f"Si quieres, también puedes dejarnos tu opinión en TripAdvisor: {trip_url}."
                 ),
-                from_email=getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                from_email=getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
                 to=[cliente.email] if cliente.email else [],
                 reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
             )
