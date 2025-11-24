@@ -363,18 +363,6 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'alojamientos' %}">Alojamientos</a>
                     </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownServicios" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            Servicios
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarDropdownServicios">
-                            <li><a class="dropdown-item" href="{% url 'homepage' %}#servicios">Todos los Servicios</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            {% for cat in todas_las_categorias %}
-                            <li><a class="dropdown-item" href="{% url 'ventas:categoria_detail' cat.id %}">{{ cat.nombre }}</a></li> {# Added ventas: namespace #}
-                            {% endfor %}
-                        </ul>
-                    </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'homepage' %}#contacto">Contacto</a>
                     </li>
