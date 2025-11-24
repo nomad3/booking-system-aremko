@@ -90,16 +90,22 @@ class Command(BaseCommand):
         )
 
         self.stdout.write("")
-        if result['success']:
+        if result and result.get('success'):
             self.stdout.write(self.style.SUCCESS("✅ EMAIL ENVIADO EXITOSAMENTE"))
-            if result.get('email_result', {}).get('success'):
+            email_result = result.get('email_result') or {}
+            sms_result = result.get('sms_result') or {}
+
+            if email_result.get('success'):
                 self.stdout.write(f"   📧 Email enviado a: {cliente.email}")
-            if result.get('sms_result', {}).get('success'):
+            if sms_result.get('success'):
                 self.stdout.write(f"   📱 SMS enviado a: {cliente.telefono}")
         else:
             self.stdout.write(self.style.ERROR("❌ ERROR AL ENVIAR"))
-            self.stdout.write(f"   Razón: {result.get('reason', 'unknown')}")
-            if 'error' in result:
-                self.stdout.write(f"   Error: {result['error']}")
+            if result:
+                self.stdout.write(f"   Razón: {result.get('reason', 'unknown')}")
+                if 'error' in result:
+                    self.stdout.write(f"   Error: {result['error']}")
+            else:
+                self.stdout.write("   No se recibió respuesta del servicio")
 
         self.stdout.write("")
