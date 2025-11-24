@@ -62,14 +62,14 @@ class Command(BaseCommand):
         try:
             subject = '[TEST] Email HTML desde Aremko'
             text_content = 'Este es un email de prueba con HTML.'
-            html_content = '''
+            html_content = f'''
             <html>
             <head>
                 <style>
-                    body { font-family: Arial, sans-serif; }
-                    .header { background-color: #417690; color: white; padding: 20px; }
-                    .content { padding: 20px; }
-                    .footer { background-color: #f0f0f0; padding: 10px; text-align: center; }
+                    body {{ font-family: Arial, sans-serif; }}
+                    .header {{ background-color: #417690; color: white; padding: 20px; }}
+                    .content {{ padding: 20px; }}
+                    .footer {{ background-color: #f0f0f0; padding: 10px; text-align: center; }}
                 </style>
             </head>
             <body>
@@ -92,7 +92,7 @@ class Command(BaseCommand):
                 </div>
             </body>
             </html>
-            '''.format(from_email=from_email)
+            '''
 
             msg = EmailMultiAlternatives(
                 subject=subject,
