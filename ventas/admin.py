@@ -22,7 +22,9 @@ from .models import (
     # Premios y Tramos
     Premio, ClientePremio, HistorialTramo,
     # Email Campaigns
-    CampaignEmailTemplate, EmailCampaign, EmailRecipient, EmailDeliveryLog
+    CampaignEmailTemplate, EmailCampaign, EmailRecipient, EmailDeliveryLog,
+    # Communication System
+    CommunicationLog, CommunicationLimit, ClientPreferences, SMSTemplate
 )
 from django.http import HttpResponse
 import xlwt
@@ -1083,11 +1085,177 @@ class EmailRecipientAdmin(admin.ModelAdmin):
 @admin.register(EmailDeliveryLog)
 class EmailDeliveryLogAdmin(admin.ModelAdmin):
     """Admin para logs de entrega"""
-    
+
     list_display = ('recipient', 'campaign', 'log_type', 'timestamp')
     list_filter = ('log_type', 'timestamp')
     search_fields = ('recipient__email', 'campaign__name')
     readonly_fields = ('recipient', 'campaign', 'log_type', 'timestamp', 'smtp_response', 'error_message')
-    
+
     def has_add_permission(self, request):
         return False
+
+
+# ============================================
+# COMMUNICATION SYSTEM ADMIN
+# ============================================
+
+@admin.register(CommunicationLog)
+class CommunicationLogAdmin(admin.ModelAdmin):
+    """Admin para logs de comunicación (SMS, Email, etc)"""
+
+    list_display = (
+        'id',
+        'cliente',
+        'communication_type',
+        'message_type',
+        'status',
+        'destination',
+        'booking_id',
+        'created_at'
+    )
+
+    list_filter = (
+        'communication_type',
+        'message_type',
+        'status',
+        'created_at'
+    )
+
+    search_fields = (
+        'cliente__nombre',
+        'destination',
+        'subject',
+        'booking_id'
+    )
+
+    readonly_fields = (
+        'cliente',
+        'campaign',
+        'communication_type',
+        'message_type',
+        'subject',
+        'content',
+        'destination',
+        'external_id',
+        'booking_id',
+        'cost',
+        'status',
+        'triggered_by',
+        'created_at',
+        'sent_at',
+        'delivered_at',
+        'opened_at',
+        'clicked_at',
+        'failed_at',
+        'error_message'
+    )
+
+    fieldsets = (
+        ('Información General', {
+            'fields': ('id', 'cliente', 'campaign', 'booking_id')
+        }),
+        ('Tipo de Comunicación', {
+            'fields': ('communication_type', 'message_type', 'status')
+        }),
+        ('Contenido', {
+            'fields': ('subject', 'content', 'destination')
+        }),
+        ('Tracking', {
+            'fields': (
+                'external_id',
+                'sent_at',
+                'delivered_at',
+                'opened_at',
+                'clicked_at',
+                'failed_at',
+                'error_message'
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('cost', 'triggered_by', 'created_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def has_add_permission(self, request):
+        return False  # Los logs se crean automáticamente
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser  # Solo superusers pueden eliminar
+
+
+@admin.register(CommunicationLimit)
+class CommunicationLimitAdmin(admin.ModelAdmin):
+    """Admin para límites de comunicación anti-spam"""
+
+    list_display = (
+        'cliente',
+        'sms_count_today',
+        'sms_count_month',
+        'email_count_week',
+        'email_count_month',
+        'last_sms_sent',
+        'last_email_sent'
+    )
+
+    search_fields = ('cliente__nombre', 'cliente__telefono', 'cliente__email')
+
+    readonly_fields = (
+        'cliente',
+        'sms_count_today',
+        'sms_count_month',
+        'email_count_week',
+        'email_count_month',
+        'last_sms_sent',
+        'last_email_sent',
+        'last_birthday_sms_year',
+        'last_reactivation_email_sent'
+    )
+
+
+@admin.register(ClientPreferences)
+class ClientPreferencesAdmin(admin.ModelAdmin):
+    """Admin para preferencias de comunicación de clientes"""
+
+    list_display = (
+        'cliente',
+        'accepts_sms',
+        'accepts_email',
+        'accepts_promotional',
+        'accepts_booking_confirmations'
+    )
+
+    list_filter = (
+        'accepts_sms',
+        'accepts_email',
+        'accepts_promotional',
+        'accepts_booking_confirmations'
+    )
+
+    search_fields = ('cliente__nombre', 'cliente__telefono', 'cliente__email')
+
+
+@admin.register(SMSTemplate)
+class SMSTemplateAdmin(admin.ModelAdmin):
+    """Admin para templates de SMS"""
+
+    list_display = ('name', 'message_type', 'is_active', 'created_at')
+    list_filter = ('message_type', 'is_active')
+    search_fields = ('name', 'content')
+
+    fieldsets = (
+        ('Información', {
+            'fields': ('name', 'message_type', 'is_active')
+        }),
+        ('Contenido', {
+            'fields': ('content',),
+            'description': 'Puedes usar variables como {nombre}, {servicio}, {fecha}, {hora}'
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    readonly_fields = ('created_at', 'updated_at')
