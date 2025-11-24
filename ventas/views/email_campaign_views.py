@@ -12,6 +12,7 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_http_methods
+from django.core.serializers.json import DjangoJSONEncoder
 
 from ventas.models import Cliente, EmailCampaign, EmailRecipient
 import json
@@ -132,7 +133,7 @@ def create_email_campaign_from_segment(request):
         logger.info("Renderizando página de creación de campaña")
         context = {
             'clientes': clientes_data,
-            'clientes_json': json.dumps(clientes_data),
+            'clientes_json': json.dumps(clientes_data, cls=DjangoJSONEncoder),
             'total_clientes': len(clientes_data),
             'selected_client_ids': selected_client_ids,
             'selected_clients_string': selected_clients_string,
