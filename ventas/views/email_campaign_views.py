@@ -132,8 +132,12 @@ def create_email_campaign_from_segment(request):
         # Renderizar página de creación de campaña
         logger.info("Renderizando página de creación de campaña")
 
-        # Cargar template por defecto si existe
-        default_template = EmailTemplate.objects.filter(is_default=True, is_active=True).first()
+        # Cargar template por defecto si existe (safe para cuando la tabla no existe aún)
+        default_template = None
+        try:
+            default_template = EmailTemplate.objects.filter(is_default=True, is_active=True).first()
+        except Exception as e:
+            logger.warning(f"No se pudo cargar EmailTemplate (tabla aún no existe?): {e}")
 
         context = {
             'clientes': clientes_data,
