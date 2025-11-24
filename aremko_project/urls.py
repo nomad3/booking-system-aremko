@@ -6,7 +6,7 @@ from django.conf.urls.static import static # Import static
 # from ventas import views
 from django.contrib.auth import views as auth_views # Import auth views
 # Import the specific view functions needed for root URLs
-from ventas.views.public_views import homepage_view, empresas_view, solicitar_cotizacion_empresa
+from ventas.views.public_views import homepage_view, empresas_view, solicitar_cotizacion_empresa, tinas_view
 # Removed direct import of ventas.urls
 
 from django.contrib.sitemaps.views import sitemap
@@ -22,6 +22,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # Root URL pointing to the homepage view in its new location
     path('', homepage_view, name='homepage'), # Use the directly imported view
+    # Direct category access (without /ventas/ prefix)
+    path('tinas/', tinas_view, name='tinas'),
     # Corporate landing pages (direct URLs without /ventas/ prefix)
     path('empresas/', empresas_view, name='empresas'),
     path('empresas/solicitar-cotizacion/', solicitar_cotizacion_empresa, name='solicitar_cotizacion_empresa'),

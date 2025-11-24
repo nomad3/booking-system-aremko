@@ -98,6 +98,14 @@ def categoria_detail_view(request, categoria_id):
     return render(request, 'ventas/category_detail.html', context)
 
 
+def tinas_view(request):
+    """
+    Vista para acceso directo a la categoría de Tinas Calientes
+    Redirige a la vista de categoría con ID=1 (Tinas)
+    """
+    return categoria_detail_view(request, categoria_id=1)
+
+
 def empresas_view(request):
     """
     Vista para la landing page de servicios empresariales
