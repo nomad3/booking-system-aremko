@@ -288,7 +288,8 @@
                 <div class="form-group">
                     <label for="email_subject">Asunto del Email *</label>
                     <input type="text" id="email_subject" name="email_subject" required
-                        placeholder="Hola {nombre_cliente}, tenemos una oferta especial para ti">
+                        placeholder="Hola {nombre_cliente}, tenemos una oferta especial para ti"
+                        value="{% if default_template %}{{ default_template.subject_template }}{% endif %}">
 
                     <div class="variable-hint">
                         <strong>💡 Variables disponibles:</strong><br>
@@ -299,7 +300,7 @@
 
                 <div class="form-group">
                     <label for="email_body">Cuerpo del Email (HTML) *</label>
-                    <textarea id="email_body" name="email_body" required></textarea>
+                    <textarea id="email_body" name="email_body" required>{% if default_template %}{{ default_template.body_template }}{% endif %}</textarea>
 
                     <div class="variable-hint">
                         Puedes usar las mismas variables: <code>{nombre_cliente}</code> y <code>{gasto_total}</code>
