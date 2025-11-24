@@ -306,9 +306,10 @@
                     </div>
                 </div>
 
-                <button type="button" class="btn-secondary" onclick="loadDefaultTemplate()">
+                <!-- Botón de template por defecto comentado temporalmente -->
+                <!-- <button type="button" class="btn-secondary" onclick="loadDefaultTemplate()">
                     📄 Cargar Template por Defecto
-                </button>
+                </button> -->
             </div>
 
             <!-- Sección: Configuración de Envío -->
@@ -359,7 +360,8 @@
 </div>
 
 <script>
-    // Cargar template por defecto
+    // Función loadDefaultTemplate comentada temporalmente (falta archivo estático)
+    /*
     function loadDefaultTemplate() {
         fetch("{% static 'email/campaign_template_example.html' %}")
             .then(response => response.text())
@@ -370,6 +372,7 @@
                 alert('No se pudo cargar el template por defecto');
             });
     }
+    */
 
     // Manejar envío del formulario
     document.getElementById('campaignForm').addEventListener('submit', function (e) {
