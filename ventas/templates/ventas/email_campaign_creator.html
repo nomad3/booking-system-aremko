@@ -360,19 +360,11 @@
 </div>
 
 <script>
-    // Función loadDefaultTemplate comentada temporalmente (falta archivo estático)
-    /*
-    function loadDefaultTemplate() {
-        fetch("{% static 'email/campaign_template_example.html' %}")
-            .then(response => response.text())
-            .then(html => {
-                document.getElementById('email_body').value = html;
-            })
-            .catch(error => {
-                alert('No se pudo cargar el template por defecto');
-            });
-    }
-    */
+    // Función loadDefaultTemplate removida temporalmente (falta archivo estático)
+    // Para habilitarla en el futuro:
+    // 1. Crear el archivo static/email/campaign_template_example.html
+    // 2. Ejecutar python manage.py collectstatic
+    // 3. Descomentar la función y el botón
 
     // Manejar envío del formulario
     document.getElementById('campaignForm').addEventListener('submit', function (e) {
