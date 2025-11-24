@@ -22,7 +22,7 @@ from .models import (
     # Premios y Tramos
     Premio, ClientePremio, HistorialTramo,
     # Email Campaigns
-    EmailCampaign, EmailRecipient, EmailDeliveryLog
+    EmailTemplate, EmailCampaign, EmailRecipient, EmailDeliveryLog
 )
 from django.http import HttpResponse
 import xlwt
@@ -962,6 +962,53 @@ class GiftCardExperienciaAdmin(admin.ModelAdmin):
         css = {
             'all': ('admin/css/forms.css',)
         }
+
+# ============================================
+# EMAIL TEMPLATE ADMIN
+# ============================================
+
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(admin.ModelAdmin):
+    """Admin para gestionar templates de email reutilizables"""
+
+    list_display = (
+        'name',
+        'is_default_badge',
+        'is_active',
+        'updated_at',
+        'created_by'
+    )
+
+    list_filter = ('is_default', 'is_active', 'created_at')
+    search_fields = ('name', 'description')
+
+    readonly_fields = ('created_at', 'updated_at', 'created_by')
+
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('name', 'description', 'is_default', 'is_active')
+        }),
+        ('Contenido del Template', {
+            'fields': ('subject_template', 'body_template'),
+            'description': 'Usa {nombre_cliente} para el nombre y {gasto_total} para el gasto total'
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at', 'created_by'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def is_default_badge(self, obj):
+        if obj.is_default:
+            return format_html('<span style="color: green; font-weight: bold;">✓ POR DEFECTO</span>')
+        return '-'
+    is_default_badge.short_description = 'Template por Defecto'
+
+    def save_model(self, request, obj, form, change):
+        if not obj.pk:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
 
 # ============================================
 # EMAIL CAMPAIGN ADMIN

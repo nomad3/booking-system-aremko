@@ -14,7 +14,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_http_methods
 from django.core.serializers.json import DjangoJSONEncoder
 
-from ventas.models import Cliente, EmailCampaign, EmailRecipient
+from ventas.models import Cliente, EmailCampaign, EmailRecipient, EmailTemplate
 import json
 import logging
 
@@ -131,12 +131,17 @@ def create_email_campaign_from_segment(request):
 
         # Renderizar página de creación de campaña
         logger.info("Renderizando página de creación de campaña")
+
+        # Cargar template por defecto si existe
+        default_template = EmailTemplate.objects.filter(is_default=True, is_active=True).first()
+
         context = {
             'clientes': clientes_data,
             'clientes_json': json.dumps(clientes_data, cls=DjangoJSONEncoder),
             'total_clientes': len(clientes_data),
             'selected_client_ids': selected_client_ids,
             'selected_clients_string': selected_clients_string,
+            'default_template': default_template,
         }
 
         return render(request, 'ventas/email_campaign_creator.html', context)

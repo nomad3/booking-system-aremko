@@ -1497,6 +1497,45 @@ class EmailTemplate(models.Model):
 # MODELOS PARA SISTEMA DE CAMPAÑAS AVANZADO
 # =============================================================================
 
+class EmailTemplate(models.Model):
+    """Template reutilizable para emails de campañas"""
+
+    name = models.CharField(max_length=200, verbose_name="Nombre del template")
+    description = models.TextField(blank=True, verbose_name="Descripción")
+
+    # Contenido del template
+    subject_template = models.CharField(max_length=500, verbose_name="Asunto (template)",
+                                       help_text="Puedes usar {nombre_cliente} y {gasto_total}")
+    body_template = models.TextField(verbose_name="Cuerpo HTML (template)",
+                                     help_text="Puedes usar {nombre_cliente} y {gasto_total}")
+
+    # Configuración
+    is_default = models.BooleanField(default=False, verbose_name="Template por defecto",
+                                     help_text="Solo puede haber un template por defecto")
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Creado el")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Actualizado el")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='email_templates_created', verbose_name="Creado por")
+
+    class Meta:
+        verbose_name = "Template de Email"
+        verbose_name_plural = "Templates de Email"
+        ordering = ['-is_default', '-updated_at']
+
+    def __str__(self):
+        default_marker = " [POR DEFECTO]" if self.is_default else ""
+        return f"{self.name}{default_marker}"
+
+    def save(self, *args, **kwargs):
+        # Si este template se marca como default, desmarcar los demás
+        if self.is_default:
+            EmailTemplate.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
+
+
 class EmailCampaign(models.Model):
     """Campaña de email marketing con criterios avanzados"""
     
