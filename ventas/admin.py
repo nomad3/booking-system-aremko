@@ -1144,15 +1144,14 @@ class CommunicationLogAdmin(admin.ModelAdmin):
         'created_at',
         'sent_at',
         'delivered_at',
-        'opened_at',
-        'clicked_at',
-        'failed_at',
-        'error_message'
+        'read_at',
+        'replied_at',
+        'updated_at'
     )
 
     fieldsets = (
         ('Información General', {
-            'fields': ('id', 'cliente', 'campaign', 'booking_id')
+            'fields': ('cliente', 'campaign', 'booking_id')
         }),
         ('Tipo de Comunicación', {
             'fields': ('communication_type', 'message_type', 'status')
@@ -1165,15 +1164,13 @@ class CommunicationLogAdmin(admin.ModelAdmin):
                 'external_id',
                 'sent_at',
                 'delivered_at',
-                'opened_at',
-                'clicked_at',
-                'failed_at',
-                'error_message'
+                'read_at',
+                'replied_at'
             ),
             'classes': ('collapse',)
         }),
         ('Metadata', {
-            'fields': ('cost', 'triggered_by', 'created_at'),
+            'fields': ('cost', 'triggered_by', 'created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
@@ -1191,26 +1188,27 @@ class CommunicationLimitAdmin(admin.ModelAdmin):
 
     list_display = (
         'cliente',
-        'sms_count_today',
-        'sms_count_month',
-        'email_count_week',
-        'email_count_month',
-        'last_sms_sent',
-        'last_email_sent'
+        'sms_count_daily',
+        'sms_count_monthly',
+        'email_count_weekly',
+        'email_count_monthly',
+        'last_sms_date',
+        'last_email_date'
     )
 
     search_fields = ('cliente__nombre', 'cliente__telefono', 'cliente__email')
 
     readonly_fields = (
         'cliente',
-        'sms_count_today',
-        'sms_count_month',
-        'email_count_week',
-        'email_count_month',
-        'last_sms_sent',
-        'last_email_sent',
+        'sms_count_daily',
+        'sms_count_monthly',
+        'email_count_weekly',
+        'email_count_monthly',
+        'last_sms_date',
+        'last_email_date',
         'last_birthday_sms_year',
-        'last_reactivation_email_sent'
+        'created_at',
+        'updated_at'
     )
 
 
