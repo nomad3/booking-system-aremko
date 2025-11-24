@@ -106,6 +106,14 @@ def tinas_view(request):
     return categoria_detail_view(request, categoria_id=1)
 
 
+def masajes_view(request):
+    """
+    Vista para acceso directo a la categoría de Masajes
+    Redirige a la vista de categoría con ID=2 (Masajes)
+    """
+    return categoria_detail_view(request, categoria_id=2)
+
+
 def empresas_view(request):
     """
     Vista para la landing page de servicios empresariales
