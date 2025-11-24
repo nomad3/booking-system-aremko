@@ -769,25 +769,25 @@ textarea.form-control-premium {
         <div class="row">
             <div class="col-lg-3 col-md-6">
                 <div class="stat-item">
-                    <div class="stat-number" data-target="43">0</div>
+                    <div class="stat-number">43+</div>
                     <div class="stat-label">Empresas Atendidas</div>
                 </div>
             </div>
             <div class="col-lg-3 col-md-6">
                 <div class="stat-item">
-                    <div class="stat-number" data-target="90">0</div>
+                    <div class="stat-number">90%</div>
                     <div class="stat-label">% Satisfacción</div>
                 </div>
             </div>
             <div class="col-lg-3 col-md-6">
                 <div class="stat-item">
-                    <div class="stat-number" data-target="18">0</div>
+                    <div class="stat-number">18+</div>
                     <div class="stat-label">Capacidad Máxima</div>
                 </div>
             </div>
             <div class="col-lg-3 col-md-6">
                 <div class="stat-item">
-                    <div class="stat-number" data-target="100">0</div>
+                    <div class="stat-number">100%</div>
                     <div class="stat-label">% Natural</div>
                 </div>
             </div>
@@ -1409,7 +1409,8 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     });
 });
 
-// Counter animation for stats
+// Counter animation removed - using static values instead
+/*
 function animateCounter(element) {
     const target = parseInt(element.getAttribute('data-target'));
     const duration = 2000;
@@ -1427,7 +1428,6 @@ function animateCounter(element) {
     }, 16);
 }
 
-// Intersection Observer for counters
 const counterObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
         if (entry.isIntersecting && !entry.target.classList.contains('counted')) {
@@ -1440,6 +1440,7 @@ const counterObserver = new IntersectionObserver((entries) => {
 document.querySelectorAll('.stat-number').forEach(counter => {
     counterObserver.observe(counter);
 });
+*/
 
 // FAQ Accordion
 document.querySelectorAll('.faq-question').forEach(question => {
