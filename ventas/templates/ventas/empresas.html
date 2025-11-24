@@ -1003,7 +1003,7 @@ textarea.form-control-premium {
 
             <div id="formMessages"></div>
 
-            <form id="quoteForm" method="POST" action="{% url 'ventas:solicitar_cotizacion_empresa' %}">
+            <form id="quoteForm" method="POST" action="{% url 'solicitar_cotizacion_empresa' %}">
                 {% csrf_token %}
                 <div class="row g-3">
                     <div class="col-md-6">
@@ -1472,7 +1472,7 @@ document.getElementById('quoteForm').addEventListener('submit', function(e) {
     submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Enviando...';
     messagesDiv.innerHTML = '';
 
-    fetch('{% url "ventas:solicitar_cotizacion_empresa" %}', {
+    fetch('{% url "solicitar_cotizacion_empresa" %}', {
         method: 'POST',
         body: formData,
         headers: {
