@@ -796,12 +796,13 @@ def client_list_by_segment_view(request, segment_name):
 @login_required
 def client_list_custom_filter_view(request):
     """
-    Vista para filtro personalizado de clientes por rango de gasto y comuna
+    Vista para filtro personalizado de clientes por rango de gasto, comuna y email
     """
     # Obtener parámetros del formulario
     gasto_min = request.GET.get('gasto_min', '0')
     gasto_max = request.GET.get('gasto_max', '')
     comuna_id = request.GET.get('comuna', 'todas')  # Cambio de ciudad a comuna
+    email_filter = request.GET.get('email_filter', 'todos')  # Nuevo filtro de email
 
     try:
         gasto_min = float(gasto_min) if gasto_min else 0
@@ -841,6 +842,13 @@ def client_list_custom_filter_view(request):
         if comuna_id and comuna_id != 'todas':
             clients = clients.filter(comuna_id=int(comuna_id))
 
+        # Filtrar por email si se especificó
+        from django.db.models import Q
+        if email_filter == 'con_email':
+            clients = clients.exclude(Q(email__isnull=True) | Q(email=''))
+        elif email_filter == 'sin_email':
+            clients = clients.filter(Q(email__isnull=True) | Q(email=''))
+
         # Agregar gastos detallados a cada cliente
         clients_list = []
         for cliente in clients:
@@ -872,6 +880,12 @@ def client_list_custom_filter_view(request):
         except Comuna.DoesNotExist:
             pass
 
+    # Agregar filtro de email al label si está especificado
+    if email_filter == 'con_email':
+        segment_label += ' | Con email'
+    elif email_filter == 'sin_email':
+        segment_label += ' | Sin email'
+
     context = {
         'segment_name': 'custom_filter',
         'segment_label': segment_label,
@@ -879,6 +893,7 @@ def client_list_custom_filter_view(request):
         'gasto_min': int(gasto_min) if gasto_min else 0,
         'gasto_max': int(gasto_max) if gasto_max != float('inf') else '',
         'comuna_id': comuna_id,
+        'email_filter': email_filter,
         'is_custom_filter': True,
     }
 
