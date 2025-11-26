@@ -1,5 +1,6 @@
-from django.shortcuts import render, get_object_or_404
-from ..models import Servicio, CategoriaServicio, HomepageConfig # Relative import, ADD HomepageConfig
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
+from ..models import Servicio, CategoriaServicio, HomepageConfig, Lead # Relative import, ADD HomepageConfig, Lead
 
 
 def homepage_view(request):
@@ -130,7 +131,72 @@ def empresas_view(request):
         'page_title': 'Reuniones con Resultados: Productividad + Bienestar',
         'meta_description': 'Espacios únicos para reuniones empresariales en Puerto Varas. Sala de reuniones, desayuno sureño y tinas calientes para tu equipo.',
     }
-    return render(request, 'ventas/empresas.html', context)
+
+def privacy_policy_view(request):
+    """
+    Vista para la página de Política de Privacidad.
+    Requerida para cumplimiento con proveedores de email marketing (SendGrid).
+    """
+    return render(request, 'ventas/privacy_policy.html')
+
+
+def subscribe_view(request):
+    """
+    Maneja la suscripción al newsletter creando un Lead.
+    """
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        if email:
+            # Verificar si ya existe como Lead
+            if not Lead.objects.filter(email=email).exists():
+                Lead.objects.create(
+                    first_name='Suscriptor',
+                    last_name='Newsletter',
+                    email=email,
+                    source='Website Form',
+                    status='New',
+                    notes='Suscripción a newsletter desde footer'
+                )
+                messages.success(request, '¡Gracias por suscribirte a nuestro boletín!')
+            else:
+                messages.info(request, 'Ya estás registrado en nuestra base de datos.')
+        else:
+            messages.error(request, 'Por favor ingresa un correo electrónico válido.')
+    
+    # Redirigir a la página desde donde vino
+    return redirect(request.META.get('HTTP_REFERER', 'homepage'))
+
+
+def unsubscribe_view(request, email):
+    """
+    Maneja la desuscripción eliminando el Lead asociado.
+    Nota: En un sistema más robusto, se usaría un token firmado.
+    """
+    try:
+        # Buscar y eliminar leads con ese email
+        leads = Lead.objects.filter(email=email)
+        count = leads.count()
+        if count > 0:
+            leads.delete()
+            # Opcional: Marcar clientes como no suscritos si existiera el campo
+            messages.success(request, f'Te has dado de baja exitosamente ({email}).')
+        else:
+            messages.info(request, 'No encontramos una suscripción activa con ese correo.')
+    except Exception as e:
+        messages.error(request, 'Ocurrió un error al procesar tu solicitud.')
+    
+    return render(request, 'ventas/unsubscribe_success.html')
+
+
+def email_preview_compliance(request):
+    """
+    Vista auxiliar para que el usuario pueda tomar captura del template de email
+    para enviar a SendGrid como prueba de cumplimiento.
+    """
+    return render(request, 'ventas/email/marketing_base.html', {'email': 'cliente@ejemplo.com'})
+
+
+
 
 
 def solicitar_cotizacion_empresa(request):
