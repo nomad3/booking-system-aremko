@@ -6,95 +6,103 @@
 {% block title %}{{ categoria_actual.nombre }} - Servicios | Aremko Spa Puerto Varas{% endblock %}
 
 {% block meta_description %}
-<meta name="description" content="Explora nuestros servicios de {{ categoria_actual.nombre }} en Aremko Spa Puerto Varas. Reserva tu experiencia de relajación hoy.">
+<meta name="description"
+    content="Explora nuestros servicios de {{ categoria_actual.nombre }} en Aremko Spa Puerto Varas. Reserva tu experiencia de relajación hoy.">
 {% endblock %}
 
 {% block extra_style %}
 <style>
-/* Styles specific to category detail page */
-.category-header {
-    position: relative;
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    padding: 120px 0;
-    margin-bottom: 50px;
-    text-align: center;
-    background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
-}
-
-.category-header::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5); /* Overlay oscuro para contraste */
-    z-index: 1;
-}
-
-.category-header .container {
-    position: relative;
-    z-index: 2;
-}
-
-.category-header h1 {
-    color: #ffffff;
-    font-weight: 700;
-    font-size: 3rem;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-    margin: 0;
-}
-
-@media (max-width: 768px) {
+    /* Styles specific to category detail page */
     .category-header {
-        padding: 80px 0;
+        position: relative;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        padding: 120px 0;
+        margin-bottom: 50px;
+        text-align: center;
+        background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+    }
+
+    .category-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        /* Overlay oscuro para contraste */
+        z-index: 1;
+    }
+
+    .category-header .container {
+        position: relative;
+        z-index: 2;
     }
 
     .category-header h1 {
-        font-size: 2rem;
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 3rem;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        margin: 0;
     }
-}
 
-/* Re-use homepage styles for consistency */
-.service-card .card {
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-}
-.service-card .card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
-}
-.service-card .price {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--primary-color);
-}
-.section-title {
-    text-align: center;
-    font-weight: 700;
-    color: var(--dark-gray);
-    position: relative;
-    padding-bottom: 15px;
-    margin-bottom: 40px;
-}
-.section-title::after {
-    content: '';
-    position: absolute;
-    display: block;
-    width: 60px;
-    height: 3px;
-    background: var(--primary-color);
-    bottom: 0;
-    left: calc(50% - 30px);
-}
+    @media (max-width: 768px) {
+        .category-header {
+            padding: 80px 0;
+        }
+
+        .category-header h1 {
+            font-size: 2rem;
+        }
+    }
+
+    /* Re-use homepage styles for consistency */
+    .service-card .card {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+
+    .service-card .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .service-card .price {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+
+    .section-title {
+        text-align: center;
+        font-weight: 700;
+        color: var(--dark-gray);
+        position: relative;
+        padding-bottom: 15px;
+        margin-bottom: 40px;
+    }
+
+    .section-title::after {
+        content: '';
+        position: absolute;
+        display: block;
+        width: 60px;
+        height: 3px;
+        background: var(--primary-color);
+        bottom: 0;
+        left: calc(50% - 30px);
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 
 <!-- Category Header Hero -->
-<section class="category-header" {% if category_hero_image %}style="background-image: url('{{ category_hero_image }}');"{% endif %}>
+<section class="category-header" {% if category_hero_image
+    %}style="background: url('{{ category_hero_image }}') center/cover no-repeat !important;" {% endif %}>
+    <!-- Debug info: category_hero_image URL is '{{ category_hero_image }}' -->
     <div class="container">
         <h1>{{ categoria_actual.nombre }}</h1>
         {# Optional: Add a short description for the category if available in the model #}
@@ -108,37 +116,42 @@
 
     <div class="row">
         {% for servicio in servicios %}
-            <div class="col-lg-4 col-md-6 mb-4 service-card"> {# Added mb-4 for spacing #}
-                <div class="card h-100">
-                    {% if servicio.imagen %}
-                        <img src="{{ servicio.imagen.url }}" class="card-img-top" alt="{{ servicio.nombre }}">
+        <div class="col-lg-4 col-md-6 mb-4 service-card"> {# Added mb-4 for spacing #}
+            <div class="card h-100">
+                {% if servicio.imagen %}
+                <img src="{{ servicio.imagen.url }}" class="card-img-top" alt="{{ servicio.nombre }}">
+                {% else %}
+                {# Optional: Placeholder if no image #}
+                {# <img src="{% static 'path/to/default/placeholder.png' %}" class="card-img-top"
+                    alt="{{ servicio.nombre }}"> #}
+                {% endif %}
+                <div class="card-body d-flex flex-column"> {# Use flex column for button alignment #}
+                    <h5 class="card-title">{{ servicio.nombre }}</h5>
+                    {# <p class="card-text">{{ servicio.descripcion|truncatewords:15 }}</p> #} {# Optional: Add service
+                    description #}
+                    {% if servicio.tipo_servicio == 'cabana' %}
+                    <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small
+                            class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
                     {% else %}
-                        {# Optional: Placeholder if no image #}
-                        {# <img src="{% static 'path/to/default/placeholder.png' %}" class="card-img-top" alt="{{ servicio.nombre }}"> #}
+                    <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por
+                            persona</small></p>
                     {% endif %}
-                    <div class="card-body d-flex flex-column"> {# Use flex column for button alignment #}
-                        <h5 class="card-title">{{ servicio.nombre }}</h5>
-                        {# <p class="card-text">{{ servicio.descripcion|truncatewords:15 }}</p> #} {# Optional: Add service description #}
-                        {% if servicio.tipo_servicio == 'cabana' %}
-                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
-                        {% else %}
-                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
-                        {% endif %}
-                        <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p> {# Use custom filter #}
-                        <button class="btn btn-primary w-100 mt-auto js-open-booking-modal" {# Use mt-auto to push button down #}
-                                data-servicio-id="{{ servicio.id }}"
-                                data-servicio-nombre="{{ servicio.nombre|escapejs }}"
-                                data-servicio-precio="{{ servicio.precio_base }}"
-                                data-servicio-tipo="{{ servicio.tipo_servicio }}"> {# Add service type #}
-                            <i class="fas fa-calendar-plus me-2"></i>Reservar
-                        </button>
-                    </div>
+                    <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours
+                            }}</small></p> {# Use custom filter #}
+                    <button class="btn btn-primary w-100 mt-auto js-open-booking-modal" {# Use mt-auto to push button
+                        down #} data-servicio-id="{{ servicio.id }}"
+                        data-servicio-nombre="{{ servicio.nombre|escapejs }}"
+                        data-servicio-precio="{{ servicio.precio_base }}"
+                        data-servicio-tipo="{{ servicio.tipo_servicio }}"> {# Add service type #}
+                        <i class="fas fa-calendar-plus me-2"></i>Reservar
+                    </button>
                 </div>
             </div>
+        </div>
         {% empty %}
-            <div class="col-12">
-                <p class="text-center">No hay servicios disponibles en esta categoría en este momento.</p>
-            </div>
+        <div class="col-12">
+            <p class="text-center">No hay servicios disponibles en esta categoría en este momento.</p>
+        </div>
         {% endfor %}
     </div>
 
@@ -171,7 +184,8 @@
 
                     <div class="mb-3">
                         <label for="fecha" class="form-label">Fecha</label>
-                        <input type="text" class="form-control" id="fecha" name="fecha" placeholder="Selecciona una fecha" required>
+                        <input type="text" class="form-control" id="fecha" name="fecha"
+                            placeholder="Selecciona una fecha" required>
                     </div>
 
                     <div class="mb-3">
@@ -232,14 +246,14 @@
 
     // Helper function to format numbers as CLP (dot for thousands, no decimals)
     function formatCLP(value) {
-      const numberValue = Number(value);
-      if (isNaN(numberValue)) {
-        return '0'; // Return '0' if not a valid number
-      }
-      return new Intl.NumberFormat('es-CL', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      }).format(numberValue);
+        const numberValue = Number(value);
+        if (isNaN(numberValue)) {
+            return '0'; // Return '0' if not a valid number
+        }
+        return new Intl.NumberFormat('es-CL', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(numberValue);
     }
 
     // Global variables for the booking modal on this page
@@ -285,7 +299,7 @@
         if (cantidadPersonasSelect && precioTotalInput) {
             const cantidadPersonas = parseInt(cantidadPersonasSelect.value);
             let precioTotal = 0;
-             // Calculate price based on service type
+            // Calculate price based on service type
             if (currentServicioTipo === 'cabana') {
                 precioTotal = currentServicioPrecio; // Fixed price for cabin
             } else {
@@ -365,27 +379,27 @@
             body: formData,
             headers: { 'X-CSRFToken': getCookie('csrftoken') } // Assumes getCookie is global
         })
-        .then(response => {
-            if (!response.ok) {
-                 return response.text().then(text => { throw new Error(`Server responded with ${response.status}: ${text || 'No error info'}`); });
-            }
-            if (response.redirected) {
-                 window.location.href = response.url; // Go to checkout
-            } else {
-                 window.location.href = "{% url 'ventas:checkout' %}"; // Fallback redirect
-            }
-        })
-        .catch(error => {
-            console.error('Error adding to cart:', error);
-            alert(`Error al agregar al carrito: ${error.message}.`);
-        });
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => { throw new Error(`Server responded with ${response.status}: ${text || 'No error info'}`); });
+                }
+                if (response.redirected) {
+                    window.location.href = response.url; // Go to checkout
+                } else {
+                    window.location.href = "{% url 'ventas:checkout' %}"; // Fallback redirect
+                }
+            })
+            .catch(error => {
+                console.error('Error adding to cart:', error);
+                alert(`Error al agregar al carrito: ${error.message}.`);
+            });
     }
 
     // Initialize listeners
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         // Listener for booking modal buttons
         document.querySelectorAll('.js-open-booking-modal').forEach(button => {
-            button.addEventListener('click', function() {
+            button.addEventListener('click', function () {
                 currentServicioId = this.dataset.servicioId;
                 currentServicioNombre = this.dataset.servicioNombre;
                 currentServicioPrecio = parseFloat(this.dataset.servicioPrecio);
@@ -397,7 +411,7 @@
                 document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
                 document.getElementById('hora').disabled = true; // Disable initially
 
-                 // Handle quantity selector based on service type
+                // Handle quantity selector based on service type
                 const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
                 const cantidadPersonasLabel = document.querySelector('label[for="cantidadPersonas"]'); // Get label too
                 if (currentServicioTipo === 'cabana') {
@@ -430,7 +444,7 @@
                 minDate: "today",
                 dateFormat: "Y-m-d",
                 locale: "es",
-                onChange: function(selectedDates, dateStr) {
+                onChange: function (selectedDates, dateStr) {
                     if (currentServicioId) {
                         loadAvailableHours(currentServicioId, dateStr);
                     }
