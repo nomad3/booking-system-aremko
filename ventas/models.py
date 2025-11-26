@@ -2767,6 +2767,45 @@ class GiftCardExperiencia(models.Model):
 # MODELOS PARA COTIZACIONES EMPRESARIALES
 # =============================================================================
 
+class NewsletterSubscriber(models.Model):
+    """
+    Modelo para gestionar suscriptores del newsletter.
+    Separado de Lead para tener una gestión dedicada de marketing por email.
+    """
+    email = models.EmailField(unique=True, verbose_name='Email')
+    first_name = models.CharField(max_length=100, blank=True, verbose_name='Nombre')
+    last_name = models.CharField(max_length=100, blank=True, verbose_name='Apellido')
+    subscribed_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de Suscripción')
+    is_active = models.BooleanField(default=True, verbose_name='Activo')
+    source = models.CharField(
+        max_length=50,
+        default='Website Footer',
+        verbose_name='Fuente',
+        help_text='De dónde proviene la suscripción'
+    )
+    notes = models.TextField(blank=True, verbose_name='Notas')
+    
+    # Campos de seguimiento
+    last_email_sent = models.DateTimeField(null=True, blank=True, verbose_name='Último Email Enviado')
+    email_open_count = models.IntegerField(default=0, verbose_name='Emails Abiertos')
+    email_click_count = models.IntegerField(default=0, verbose_name='Clicks en Emails')
+    
+    class Meta:
+        verbose_name = 'Suscriptor Newsletter'
+        verbose_name_plural = 'Suscriptores Newsletter'
+        ordering = ['-subscribed_at']
+    
+    def __str__(self):
+        if self.first_name or self.last_name:
+            return f"{self.first_name} {self.last_name} ({self.email})"
+        return self.email
+    
+    def get_full_name(self):
+        """Retorna el nombre completo del suscriptor"""
+        if self.first_name or self.last_name:
+            return f"{self.first_name} {self.last_name}".strip()
+        return self.email
+
 class CotizacionEmpresa(models.Model):
     """
     Modelo para manejar solicitudes de cotización de servicios empresariales

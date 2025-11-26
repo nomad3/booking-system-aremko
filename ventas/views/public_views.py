@@ -143,24 +143,31 @@ def privacy_policy_view(request):
 
 def subscribe_view(request):
     """
-    Maneja la suscripción al newsletter creando un Lead.
+    Maneja la suscripción al newsletter creando un NewsletterSubscriber.
     """
     if request.method == 'POST':
         email = request.POST.get('email')
         if email:
-            # Verificar si ya existe como Lead
-            if not Lead.objects.filter(email=email).exists():
-                Lead.objects.create(
-                    first_name='Suscriptor',
-                    last_name='Newsletter',
-                    email=email,
-                    source='Website Form',
-                    status='New',
-                    notes='Suscripción a newsletter desde footer'
-                )
+            from ..models import NewsletterSubscriber
+            # Verificar si ya existe
+            subscriber, created = NewsletterSubscriber.objects.get_or_create(
+                email=email,
+                defaults={
+                    'first_name': '',
+                    'last_name': '',
+                    'source': 'Website Footer',
+                    'is_active': True
+                }
+            )
+            if created:
                 messages.success(request, '¡Gracias por suscribirte a nuestro boletín!')
             else:
-                messages.info(request, 'Ya estás registrado en nuestra base de datos.')
+                if not subscriber.is_active:
+                    subscriber.is_active = True
+                    subscriber.save()
+                    messages.success(request, '¡Tu suscripción ha sido reactivada!')
+                else:
+                    messages.info(request, 'Ya estás suscrito a nuestro boletín.')
         else:
             messages.error(request, 'Por favor ingresa un correo electrónico válido.')
     
@@ -168,18 +175,19 @@ def subscribe_view(request):
     return redirect(request.META.get('HTTP_REFERER', 'homepage'))
 
 
+
 def unsubscribe_view(request, email):
     """
-    Maneja la desuscripción eliminando el Lead asociado.
+    Maneja la desuscripción marcando el NewsletterSubscriber como inactivo.
     Nota: En un sistema más robusto, se usaría un token firmado.
     """
+    from ..models import NewsletterSubscriber
     try:
-        # Buscar y eliminar leads con ese email
-        leads = Lead.objects.filter(email=email)
-        count = leads.count()
+        # Buscar suscriptores con ese email
+        subscribers = NewsletterSubscriber.objects.filter(email=email, is_active=True)
+        count = subscribers.count()
         if count > 0:
-            leads.delete()
-            # Opcional: Marcar clientes como no suscritos si existiera el campo
+            subscribers.update(is_active=False)
             messages.success(request, f'Te has dado de baja exitosamente ({email}).')
         else:
             messages.info(request, 'No encontramos una suscripción activa con ese correo.')

@@ -26,7 +26,9 @@ from .models import (
     # Communication System
     CommunicationLog, CommunicationLimit, ClientPreferences, SMSTemplate,
     # Corporate Services
-    CotizacionEmpresa
+    CotizacionEmpresa,
+    # Newsletter
+    NewsletterSubscriber
 )
 from django.http import HttpResponse
 import xlwt
@@ -639,6 +641,79 @@ class CotizacionEmpresaAdmin(admin.ModelAdmin):
             messages.WARNING
         )
     marcar_pendiente.short_description = '⏸ Marcar como pendiente'
+
+
+@admin.register(NewsletterSubscriber)
+class NewsletterSubscriberAdmin(admin.ModelAdmin):
+    list_display = (
+        'email',
+        'get_full_name',
+        'is_active',
+        'source',
+        'subscribed_at',
+        'email_open_count',
+        'email_click_count',
+        'last_email_sent'
+    )
+    list_filter = ('is_active', 'source', 'subscribed_at')
+    search_fields = ('email', 'first_name', 'last_name', 'notes')
+    date_hierarchy = 'subscribed_at'
+    readonly_fields = ('subscribed_at', 'email_open_count', 'email_click_count', 'last_email_sent')
+    
+    fieldsets = (
+        ('📧 Información del Suscriptor', {
+            'fields': ('email', 'first_name', 'last_name', 'is_active')
+        }),
+        ('📊 Origen y Seguimiento', {
+            'fields': ('source', 'subscribed_at', 'notes')
+        }),
+        ('📈 Estadísticas de Engagement', {
+            'fields': ('last_email_sent', 'email_open_count', 'email_click_count'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    actions = ['activar_suscriptores', 'desactivar_suscriptores', 'exportar_emails']
+    
+    def get_full_name(self, obj):
+        """Muestra el nombre completo si está disponible"""
+        name = obj.get_full_name()
+        if name == obj.email:
+            return '-'
+        return name
+    get_full_name.short_description = 'Nombre'
+    
+    def activar_suscriptores(self, request, queryset):
+        """Activa los suscriptores seleccionados"""
+        updated = queryset.update(is_active=True)
+        self.message_user(
+            request,
+            f'{updated} suscriptor(es) activado(s).',
+            messages.SUCCESS
+        )
+    activar_suscriptores.short_description = '✓ Activar suscriptores'
+    
+    def desactivar_suscriptores(self, request, queryset):
+        """Desactiva los suscriptores seleccionados"""
+        updated = queryset.update(is_active=False)
+        self.message_user(
+            request,
+            f'{updated} suscriptor(es) desactivado(s).',
+            messages.WARNING
+        )
+    desactivar_suscriptores.short_description = '✗ Desactivar suscriptores'
+    
+    def exportar_emails(self, request, queryset):
+        """Exporta los emails de los suscriptores seleccionados"""
+        emails = list(queryset.filter(is_active=True).values_list('email', flat=True))
+        emails_str = ', '.join(emails)
+        
+        self.message_user(
+            request,
+            f'Emails activos ({len(emails)}): {emails_str}',
+            messages.INFO
+        )
+    exportar_emails.short_description = '📋 Copiar emails activos'
 
 
 @admin.register(EmailSubjectTemplate)
