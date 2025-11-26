@@ -20,11 +20,7 @@
     padding: 120px 0;
     margin-bottom: 50px;
     text-align: center;
-    {% if category_hero_image %}
-    background-image: url('{{ category_hero_image }}');
-    {% else %}
     background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
-    {% endif %}
 }
 
 .category-header::before {
@@ -98,7 +94,7 @@
 {% block content %}
 
 <!-- Category Header Hero -->
-<section class="category-header">
+<section class="category-header" {% if category_hero_image %}style="background-image: url('{{ category_hero_image }}');"{% endif %}>
     <div class="container">
         <h1>{{ categoria_actual.nombre }}</h1>
         {# Optional: Add a short description for the category if available in the model #}
