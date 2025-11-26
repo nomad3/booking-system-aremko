@@ -400,8 +400,7 @@
                 <div class="d-flex align-items-center">
                     {% block nav_extra %}
                     <div class="cart-icon me-4" id="cartIconWrapper">
-                        <a href="{% url 'ventas:cart' %}" class="text-decoration-none text-dark"> {# Added ventas:
-                            namespace #}
+                        <a href="{% url 'ventas:cart' %}" class="text-decoration-none text-dark">
                             <i class="fas fa-shopping-cart"></i>
                             <span class="cart-count" id="cartCount">
                                 {{ request.session.cart.servicios|length|default:0 }}
@@ -643,79 +642,79 @@
             formData.append('telefono', telefono);
             formData.append('documento_identidad', documento_identidad);
 
-            console.log("Sending checkout request to:", '{% url "ventas:complete_checkout" %}'); {# Added ventas: namespace # }
+            console.log("Sending checkout request to:", '{% url "ventas:complete_checkout" %}');
             // Enviar petición AJAX
-            fetch('{% url "ventas:complete_checkout" %}', { {# Added ventas: namespace #}
+            fetch('{% url "ventas:complete_checkout" %}', {
                 method: 'POST',
                 body: formData,
                 headers: {
-                'X-CSRFToken': csrfToken
-            }
-            })
-            .then(response => {
-                console.log("Checkout response status:", response.status);
-                if (!response.ok) {
-                    // Log error response text
-                    return response.text().then(text => {
-                        throw new Error(`Server responded with ${response.status}: ${text || 'No additional error info'}`);
-                    });
+                    'X-CSRFToken': csrfToken
                 }
-                return response.json();
             })
-            .then(data => {
-                console.log("Checkout response data:", data);
-                if (data && data.success) { // Check if data and data.success exist
-                    // Cerrar modal de checkout
-                    const checkoutModalEl = document.getElementById('checkoutModal');
-                    if (checkoutModalEl) {
-                        const checkoutModalInstance = bootstrap.Modal.getInstance(checkoutModalEl);
-                        // Check if instance exists before hiding
-                        if (checkoutModalInstance) {
-                            checkoutModalInstance.hide();
-                            console.log("Checkout modal hidden.");
+                .then(response => {
+                    console.log("Checkout response status:", response.status);
+                    if (!response.ok) {
+                        // Log error response text
+                        return response.text().then(text => {
+                            throw new Error(`Server responded with ${response.status}: ${text || 'No additional error info'}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Checkout response data:", data);
+                    if (data && data.success) { // Check if data and data.success exist
+                        // Cerrar modal de checkout
+                        const checkoutModalEl = document.getElementById('checkoutModal');
+                        if (checkoutModalEl) {
+                            const checkoutModalInstance = bootstrap.Modal.getInstance(checkoutModalEl);
+                            // Check if instance exists before hiding
+                            if (checkoutModalInstance) {
+                                checkoutModalInstance.hide();
+                                console.log("Checkout modal hidden.");
+                            } else {
+                                console.warn("Checkout modal instance not found to hide.");
+                            }
                         } else {
-                            console.warn("Checkout modal instance not found to hide.");
+                            console.error("Checkout modal element not found.");
                         }
-                    } else {
-                        console.error("Checkout modal element not found.");
-                    }
 
-                    // Actualizar ID de reserva en el modal de éxito
-                    const reservaIdSpan = document.getElementById('reservaId');
-                    if (reservaIdSpan) {
-                        // Check if reserva_id exists in data
-                        reservaIdSpan.textContent = data.reserva_id ? data.reserva_id : 'N/A';
-                        console.log("Reserva ID set in success modal:", data.reserva_id);
-                    } else {
-                        console.error("Reserva ID span element not found in success modal.");
-                    }
-
-                    // Mostrar modal de éxito
-                    const successModalEl = document.getElementById('successModal');
-                    if (successModalEl) {
-                        // Ensure we get or create an instance correctly
-                        let successModalInstance = bootstrap.Modal.getInstance(successModalEl);
-                        if (!successModalInstance) {
-                            successModalInstance = new bootstrap.Modal(successModalEl);
-                            console.log("New success modal instance created.");
+                        // Actualizar ID de reserva en el modal de éxito
+                        const reservaIdSpan = document.getElementById('reservaId');
+                        if (reservaIdSpan) {
+                            // Check if reserva_id exists in data
+                            reservaIdSpan.textContent = data.reserva_id ? data.reserva_id : 'N/A';
+                            console.log("Reserva ID set in success modal:", data.reserva_id);
+                        } else {
+                            console.error("Reserva ID span element not found in success modal.");
                         }
-                        successModalInstance.show();
-                        console.log("Success modal shown.");
-                    } else {
-                        console.error("Success modal element not found.");
-                    }
-                    // Optionally clear cart display if needed here
-                    const cartCount = document.getElementById('cartCount');
-                    if (cartCount) cartCount.textContent = '0';
 
-                } else {
-                    alert('Error al procesar la reserva: ' + (data ? data.error : 'Respuesta inválida del servidor')); // Improved error message
-                }
-            })
-            .catch(error => {
-                console.error('Error al procesar la reserva:', error);
-                alert(`Error al procesar la reserva: ${error.message}. Por favor, intenta nuevamente.`);
-            });
+                        // Mostrar modal de éxito
+                        const successModalEl = document.getElementById('successModal');
+                        if (successModalEl) {
+                            // Ensure we get or create an instance correctly
+                            let successModalInstance = bootstrap.Modal.getInstance(successModalEl);
+                            if (!successModalInstance) {
+                                successModalInstance = new bootstrap.Modal(successModalEl);
+                                console.log("New success modal instance created.");
+                            }
+                            successModalInstance.show();
+                            console.log("Success modal shown.");
+                        } else {
+                            console.error("Success modal element not found.");
+                        }
+                        // Optionally clear cart display if needed here
+                        const cartCount = document.getElementById('cartCount');
+                        if (cartCount) cartCount.textContent = '0';
+
+                    } else {
+                        alert('Error al procesar la reserva: ' + (data ? data.error : 'Respuesta inválida del servidor')); // Improved error message
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al procesar la reserva:', error);
+                    alert(`Error al procesar la reserva: ${error.message}. Por favor, intenta nuevamente.`);
+                });
         }
 
         // Function to remove from cart (now global)
@@ -732,36 +731,36 @@
             const formData = new FormData();
             formData.append('index', index);
 
-            console.log("Sending remove request to:", '{% url "ventas:remove_from_cart" %}'); {# Added ventas: namespace # }
-            fetch('{% url "ventas:remove_from_cart" %}', { {# Added ventas: namespace #}
+            console.log("Sending remove request to:", '{% url "ventas:remove_from_cart" %}');
+            fetch('{% url "ventas:remove_from_cart" %}', {
                 method: 'POST',
                 body: formData,
                 headers: {
-                'X-CSRFToken': csrfToken
-            }
-            })
-            .then(response => {
-                console.log("Remove response status:", response.status);
-                if (!response.ok) {
-                    // Log error response text
-                    return response.text().then(text => {
-                        throw new Error(`Server responded with ${response.status}: ${text || 'No additional error info'}`);
-                    });
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log("Remove response data:", data);
-                if (data.success) {
-                    window.location.reload();
-                } else {
-                    alert('Error al eliminar del carrito: ' + data.error);
+                    'X-CSRFToken': csrfToken
                 }
             })
-            .catch(error => {
-                console.error('Error al eliminar del carrito:', error);
-                alert('Error al eliminar del carrito. Por favor, intenta nuevamente.');
-            });
+                .then(response => {
+                    console.log("Remove response status:", response.status);
+                    if (!response.ok) {
+                        // Log error response text
+                        return response.text().then(text => {
+                            throw new Error(`Server responded with ${response.status}: ${text || 'No additional error info'}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Remove response data:", data);
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert('Error al eliminar del carrito: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al eliminar del carrito:', error);
+                    alert('Error al eliminar del carrito. Por favor, intenta nuevamente.');
+                });
         }
 
         // Attach event listener after DOM is loaded
