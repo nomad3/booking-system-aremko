@@ -131,6 +131,7 @@ def empresas_view(request):
         'page_title': 'Reuniones con Resultados: Productividad + Bienestar',
         'meta_description': 'Espacios únicos para reuniones empresariales en Puerto Varas. Sala de reuniones, desayuno sureño y tinas calientes para tu equipo.',
     }
+    return render(request, 'ventas/empresas.html', context)
 
 def privacy_policy_view(request):
     """
