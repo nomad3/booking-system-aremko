@@ -600,10 +600,9 @@ def _get_combined_metrics_for_segmentation():
              WHERE vr2.cliente_id = ANY(cpt.todos_los_ids)
                AND vr2.estado_pago IN ('pagado', 'parcial')
             ) as servicios_actuales,
-            (SELECT COALESCE(SUM(CAST(s2.precio_base AS DECIMAL) * COALESCE(rs2.cantidad_personas, 1)), 0)
+            -- Gasto actual: Usar el TOTAL de la VentaReserva (incluye descuentos/ajustes)
+            (SELECT COALESCE(SUM(vr2.total), 0)
              FROM ventas_ventareserva vr2
-             JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
-             JOIN ventas_servicio s2 ON rs2.servicio_id = s2.id
              WHERE vr2.cliente_id = ANY(cpt.todos_los_ids)
                AND vr2.estado_pago IN ('pagado', 'parcial')
             ) as gasto_actual,
@@ -631,10 +630,8 @@ def _get_combined_metrics_for_segmentation():
               WHERE sh2.cliente_id = ANY(cpt.todos_los_ids)
                 AND sh2.service_date != '2021-01-01'
              )) as total_servicios,
-            ((SELECT COALESCE(SUM(CAST(s2.precio_base AS DECIMAL) * COALESCE(rs2.cantidad_personas, 1)), 0)
+            ((SELECT COALESCE(SUM(vr2.total), 0)
               FROM ventas_ventareserva vr2
-              JOIN ventas_reservaservicio rs2 ON vr2.id = rs2.venta_reserva_id
-              JOIN ventas_servicio s2 ON rs2.servicio_id = s2.id
               WHERE vr2.cliente_id = ANY(cpt.todos_los_ids)
                 AND vr2.estado_pago IN ('pagado', 'parcial')
              ) +
