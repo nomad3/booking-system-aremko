@@ -72,8 +72,8 @@ class Command(BaseCommand):
             return
         
         if options['auto']:
-            # Modo automático: procesar todas las campañas listas
-            campaigns = EmailCampaign.objects.filter(status='ready')
+            # Modo automático: procesar todas las campañas listas o en proceso (resuming)
+            campaigns = EmailCampaign.objects.filter(status__in=['ready', 'sending'])
             self.stdout.write(f'📊 Encontradas {campaigns.count()} campañas listas para envío')
             
             for campaign in campaigns:
@@ -83,7 +83,7 @@ class Command(BaseCommand):
             # Modo manual: procesar campaña específica
             try:
                 campaign = EmailCampaign.objects.get(id=options['campaign_id'])
-                if campaign.status != 'ready':
+                if campaign.status not in ['ready', 'sending']:
                     raise CommandError(f'❌ Campaña {campaign.id} no está lista para envío (estado: {campaign.status})')
                 
                 self.process_campaign(campaign, batch_size, interval_minutes, dry_run, ignore_schedule)
