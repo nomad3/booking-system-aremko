@@ -1480,20 +1480,11 @@ class SMSTemplateAdmin(admin.ModelAdmin):
 class HomepageConfigAdmin(SingletonModelAdmin):
     """Admin para configuración global del Homepage (Singleton)"""
     fieldsets = (
-        ('Hero Section', {
-            'fields': ('hero_title', 'hero_subtitle', 'hero_image', 'hero_cta_text', 'hero_cta_link')
+        ('Imágenes Hero y Filosofía', {
+            'fields': ('hero_background_image', 'philosophy_image')
         }),
-        ('About Section', {
-            'fields': ('about_title', 'about_text', 'about_image')
-        }),
-        ('Contact Section', {
-            'fields': ('contact_email', 'contact_phone', 'contact_address', 'google_maps_embed_url')
-        }),
-        ('Social Media', {
-            'fields': ('facebook_url', 'instagram_url', 'whatsapp_number')
-        }),
-        ('SEO', {
-            'fields': ('meta_title', 'meta_description', 'meta_keywords')
+        ('Galería de Espacios', {
+            'fields': ('gallery_image_1', 'gallery_image_2', 'gallery_image_3')
         })
     )
 
@@ -1502,21 +1493,6 @@ class HomepageSettingsAdmin(SingletonModelAdmin):
     """Admin para configuración moderna del Homepage (Singleton)"""
     fieldsets = (
         ('Hero Section', {
-            'fields': ('hero_title', 'hero_subtitle', 'hero_video_url', 'hero_background_image')
+            'fields': ('hero_background_image',)
         }),
-        ('Call to Action Principal', {
-            'fields': ('cta_primary_text', 'cta_primary_url', 'cta_secondary_text', 'cta_secondary_url')
-        }),
-        ('Sección Nosotros', {
-            'fields': ('about_title', 'about_description', 'about_image')
-        }),
-        ('Sección Destacados', {
-            'fields': ('featured_services_title', 'featured_services_subtitle')
-        }),
-        ('Footer y Contacto', {
-            'fields': ('footer_text', 'contact_email', 'contact_phone', 'contact_address')
-        }),
-        ('Redes Sociales', {
-            'fields': ('instagram_url', 'facebook_url', 'tiktok_url', 'whatsapp_number')
-        })
     )
