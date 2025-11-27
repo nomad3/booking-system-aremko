@@ -397,8 +397,14 @@ class Cliente(models.Model):
         return self.ventareserva_set.count() # Assumes default related_name
 
     def gasto_total(self):
-        """Calcula el gasto total de este cliente basado en VentaReserva."""
-        total = self.ventareserva_set.aggregate(total_gastado=Sum('total'))['total_gastado']
+        """
+        Calcula el gasto total de este cliente basado en VentaReserva.
+        Solo cuenta ventas con estado_pago 'pagado' o 'parcial' para consistencia
+        con la segmentación de clientes.
+        """
+        total = self.ventareserva_set.filter(
+            estado_pago__in=['pagado', 'parcial']
+        ).aggregate(total_gastado=Sum('total'))['total_gastado']
         return total or 0
 
 class VentaReserva(models.Model):
