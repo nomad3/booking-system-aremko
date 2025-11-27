@@ -135,7 +135,8 @@ class CRMService:
                 dias_cliente = 0
 
             # Análisis de gasto
-            gasto_total = sum(s['precio'] for s in servicios)
+            # USAR cliente.gasto_total() para consistencia con segmentación y admin
+            gasto_total = float(cliente.gasto_total())
             ticket_promedio = gasto_total / total_servicios if total_servicios > 0 else 0
 
             # Servicios por categoría (combinados)
