@@ -153,15 +153,15 @@ class Command(BaseCommand):
     <meta charset="UTF-8">
     <title>Giftcard Especial - Aremko Hotel Spa</title>
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-        .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }
-        .giftcard { background: #fff; border: 3px dashed #28a745; padding: 20px; margin: 20px 0; text-align: center; border-radius: 10px; }
-        .giftcard-amount { font-size: 2.5em; font-weight: bold; color: #28a745; }
-        .cta-button { background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; font-weight: bold; }
-        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 0.9em; }
-        .highlight { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+        .content {{ background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }}
+        .giftcard {{ background: #fff; border: 3px dashed #28a745; padding: 20px; margin: 20px 0; text-align: center; border-radius: 10px; }}
+        .giftcard-amount {{ font-size: 2.5em; font-weight: bold; color: #28a745; }}
+        .cta-button {{ background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; font-weight: bold; }}
+        .footer {{ margin-top: 40px; padding-top: 30px; border-top: 2px solid #e0e0e0; text-align: center; color: #666; font-size: 13px; line-height: 1.6; }}
+        .highlight {{ background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }}
     </style>
 </head>
 <body>
@@ -198,7 +198,7 @@ class Command(BaseCommand):
             </ol>
             
             <div style="text-align: center;">
-                <a href="https://tu-dominio.com/servicios" class="cta-button">
+                <a href="https://www.aremko.cl" class="cta-button">
                     🗓️ Reservar Ahora
                 </a>
             </div>
@@ -217,12 +217,26 @@ class Command(BaseCommand):
             <strong>El equipo de Aremko Hotel Spa</strong></p>
         </div>
         
+        <!-- Footer Legal Compliant con SendGrid -->
         <div class="footer">
-            <p>📞 +56 9 5790 2525 | 📧 ventas@aremko.cl</p>
-            <p>📍 Río Pescado Km 4, Puerto Varas, Chile</p>
-            <p><small>Si no deseas recibir más emails promocionales, puedes <a href="#">darte de baja aquí</a></small></p>
+            <p style="margin: 10px 0;">
+                <strong>Aremko Spa</strong><br>
+                Rio Pescado Km 4<br>
+                Puerto Varas, Región de Los Lagos<br>
+                Chile
+            </p>
+            <p style="margin: 15px 0;">
+                📞 +56 9 5790 2525 | 📧 ventas@aremko.cl
+            </p>
+            <p style="margin: 15px 0; font-size: 12px;">
+                Estás recibiendo este correo porque eres cliente de Aremko o te suscribiste a nuestro boletín.
+            </p>
+            <p style="margin: 15px 0;">
+                <a href="https://www.aremko.cl/privacy-policy/" style="color: #667eea; text-decoration: none; margin: 0 10px;">Política de Privacidad</a> | 
+                <a href="https://www.aremko.cl/unsubscribe/{email}/" style="color: #667eea; text-decoration: none; margin: 0 10px;">Darse de baja</a>
+            </p>
         </div>
     </div>
 </body>
 </html>
-        """
+"""
