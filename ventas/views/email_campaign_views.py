@@ -259,22 +259,37 @@ def save_email_campaign(request):
                     ultima_venta = cliente.ventareserva_set.order_by('-fecha_reserva').first()
                     ultima_visita = ultima_venta.fecha_reserva if ultima_venta else None
 
-                    # Crear destinatario
-                    EmailRecipient.objects.create(
+                    # Crear o actualizar destinatario (evita duplicados)
+                    recipient, created = EmailRecipient.objects.get_or_create(
                         campaign=campaign,
-                        client=cliente,
                         email=cliente.email.strip(),
-                        name=primer_nombre,
-                        personalized_subject=subject,
-                        personalized_body=body,
-                        client_total_spend=gasto_total,
-                        client_visit_count=cliente.ventareserva_set.count(),
-                        client_last_visit=ultima_visita,
-                        client_city=ubicacion,
-                        status='pending',
-                        send_enabled=True,
-                        priority=1
+                        defaults={
+                            'client': cliente,
+                            'name': primer_nombre,
+                            'personalized_subject': subject,
+                            'personalized_body': body,
+                            'client_total_spend': gasto_total,
+                            'client_visit_count': cliente.ventareserva_set.count(),
+                            'client_last_visit': ultima_visita,
+                            'client_city': ubicacion,
+                            'status': 'pending',
+                            'send_enabled': True,
+                            'priority': 1
+                        }
                     )
+                    
+                    # Si ya existía, actualizar los datos
+                    if not created:
+                        recipient.client = cliente
+                        recipient.name = primer_nombre
+                        recipient.personalized_subject = subject
+                        recipient.personalized_body = body
+                        recipient.client_total_spend = gasto_total
+                        recipient.client_visit_count = cliente.ventareserva_set.count()
+                        recipient.client_last_visit = ultima_visita
+                        recipient.client_city = ubicacion
+                        recipient.save()
+                    
                     recipients_created += 1
                 except Exception as e:
                     # Log el error pero continua con el siguiente cliente
