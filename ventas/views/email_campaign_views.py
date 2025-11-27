@@ -85,9 +85,8 @@ def create_email_campaign_from_segment(request):
                 continue
 
             try:
-                gasto_total = cliente.ventareserva_set.aggregate(
-                    total=Sum('total')
-                )['total'] or 0
+                gasto_total = cliente.gasto_total()
+
 
                 # Obtener primer nombre de forma segura
                 nombre_completo = (cliente.nombre or 'Cliente').strip()
@@ -235,9 +234,8 @@ def save_email_campaign(request):
 
                 try:
                     # Calcular datos del cliente
-                    gasto_total = cliente.ventareserva_set.aggregate(
-                        total=Sum('total')
-                    )['total'] or 0
+                    gasto_total = cliente.gasto_total()
+
 
                     # Obtener primer nombre de forma segura
                     nombre_completo = (cliente.nombre or 'Cliente').strip()
