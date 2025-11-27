@@ -398,14 +398,29 @@ class Cliente(models.Model):
 
     def gasto_total(self):
         """
-        Calcula el gasto total de este cliente basado en VentaReserva.
+        Calcula el gasto total de este cliente basado en VentaReserva + ServiceHistory.
         Solo cuenta ventas con estado_pago 'pagado' o 'parcial' para consistencia
         con la segmentación de clientes.
+        Incluye servicios históricos importados desde CSV.
         """
-        total = self.ventareserva_set.filter(
+        # Gasto actual (ventas del sistema)
+        gasto_actual = self.ventareserva_set.filter(
             estado_pago__in=['pagado', 'parcial']
-        ).aggregate(total_gastado=Sum('total'))['total_gastado']
-        return total or 0
+        ).aggregate(total_gastado=Sum('total'))['total_gastado'] or 0
+        
+        # Gasto histórico (servicios importados)
+        try:
+            from ventas.models import ServiceHistory
+            gasto_historico = ServiceHistory.objects.filter(
+                cliente=self,
+                service_date__gt='2021-01-01'  # Excluir placeholder dates
+            ).aggregate(total_gastado=Sum('price_paid'))['total_gastado'] or 0
+        except Exception:
+            # Si la tabla no existe o hay error, solo usar gasto actual
+            gasto_historico = 0
+        
+        return float(gasto_actual) + float(gasto_historico)
+
 
 class VentaReserva(models.Model):
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE)
