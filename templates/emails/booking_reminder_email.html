@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,29 +15,34 @@
             padding: 20px;
             background-color: #f8f9fa;
         }
+
         .container {
             background: white;
             border-radius: 12px;
             padding: 30px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
+
         .header {
             text-align: center;
             margin-bottom: 30px;
             border-bottom: 2px solid #e9ecef;
             padding-bottom: 20px;
         }
+
         .logo {
             font-size: 28px;
             font-weight: bold;
             color: #007bff;
             margin-bottom: 10px;
         }
+
         .title {
             color: #ffc107;
             font-size: 24px;
             margin-bottom: 10px;
         }
+
         .countdown {
             background: linear-gradient(45deg, #ffc107, #ffeb3b);
             color: #333;
@@ -47,12 +53,14 @@
             font-size: 18px;
             font-weight: bold;
         }
+
         .details {
             background: #f8f9fa;
             padding: 20px;
             border-radius: 8px;
             margin: 20px 0;
         }
+
         .detail-row {
             display: flex;
             justify-content: space-between;
@@ -60,18 +68,22 @@
             padding-bottom: 10px;
             border-bottom: 1px solid #dee2e6;
         }
+
         .detail-row:last-child {
             border-bottom: none;
             margin-bottom: 0;
         }
+
         .label {
             font-weight: 600;
             color: #495057;
         }
+
         .value {
             color: #007bff;
             font-weight: 500;
         }
+
         .reminder-box {
             background: #fff3cd;
             border: 1px solid #ffeaa7;
@@ -79,6 +91,7 @@
             border-radius: 8px;
             margin: 20px 0;
         }
+
         .footer {
             text-align: center;
             margin-top: 30px;
@@ -87,12 +100,14 @@
             color: #6c757d;
             font-size: 14px;
         }
+
         .contact-info {
             margin-top: 15px;
             font-size: 13px;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -157,7 +172,20 @@
             <p style="margin-top: 15px; font-size: 12px; color: #adb5bd;">
                 Este es un recordatorio automático. Si tienes alguna consulta, no dudes en contactarnos.
             </p>
+            <div
+                style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e9ecef; font-size: 12px; color: #6c757d;">
+                <p style="margin: 10px 0;">
+                    Estás recibiendo este correo porque tienes una reserva programada en Aremko.
+                </p>
+                <p style="margin: 10px 0;">
+                    <a href="https://www.aremko.cl/privacy-policy/"
+                        style="color: #007bff; text-decoration: none; margin: 0 10px;">Política de Privacidad</a> |
+                    <a href="https://www.aremko.cl/unsubscribe/{{ email }}/"
+                        style="color: #007bff; text-decoration: none; margin: 0 10px;">Darse de baja</a>
+                </p>
+            </div>
         </div>
     </div>
 </body>
+
 </html>

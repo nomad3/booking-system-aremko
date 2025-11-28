@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,45 +14,45 @@
             margin: 0;
             padding: 0;
         }
-        
+
         .container {
             max-width: 600px;
             margin: 0 auto;
             background-color: #ffffff;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        
+
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 40px 30px;
             text-align: center;
         }
-        
+
         .header h1 {
             margin: 0;
             font-size: 28px;
             font-weight: 300;
         }
-        
+
         .content {
             padding: 40px 30px;
         }
-        
+
         .greeting {
             font-size: 24px;
             color: #2c3e50;
             margin-bottom: 20px;
             font-weight: 300;
         }
-        
+
         .message {
             font-size: 16px;
             line-height: 1.8;
             color: #5a6c7d;
             margin-bottom: 30px;
         }
-        
+
         .highlight-box {
             background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
             padding: 25px;
@@ -60,20 +61,20 @@
             margin: 30px 0;
             border-left: 4px solid #e74c3c;
         }
-        
+
         .offer-title {
             font-size: 20px;
             font-weight: bold;
             color: #c0392b;
             margin-bottom: 10px;
         }
-        
+
         .offer-description {
             font-size: 16px;
             color: #2c3e50;
             margin-bottom: 20px;
         }
-        
+
         .cta-button {
             display: inline-block;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -86,19 +87,19 @@
             transition: transform 0.3s ease;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
-        
+
         .cta-button:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
         }
-        
+
         .services-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 20px;
             margin: 30px 0;
         }
-        
+
         .service-card {
             background: #f8f9fa;
             padding: 20px;
@@ -106,13 +107,13 @@
             text-align: center;
             border-left: 3px solid #667eea;
         }
-        
+
         .service-card h3 {
             color: #2c3e50;
             margin-top: 0;
             font-size: 18px;
         }
-        
+
         .footer {
             background-color: #34495e;
             color: #ecf0f1;
@@ -120,16 +121,16 @@
             text-align: center;
             font-size: 14px;
         }
-        
+
         .footer a {
             color: #3498db;
             text-decoration: none;
         }
-        
+
         .social-links {
             margin: 20px 0;
         }
-        
+
         .social-links a {
             display: inline-block;
             margin: 0 10px;
@@ -137,73 +138,80 @@
             text-decoration: none;
             font-weight: bold;
         }
-        
+
         .unsubscribe {
             margin-top: 20px;
             font-size: 12px;
             color: #95a5a6;
         }
-        
+
         .unsubscribe a {
             color: #95a5a6;
         }
-        
+
         @media (max-width: 600px) {
             .container {
                 margin: 0;
                 border-radius: 0;
             }
-            
-            .header, .content, .footer {
+
+            .header,
+            .content,
+            .footer {
                 padding: 20px;
             }
-            
+
             .greeting {
                 font-size: 20px;
             }
-            
+
             .services-grid {
                 grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
             <h1>💙 Te extrañamos, {{ cliente.nombre }}</h1>
         </div>
-        
+
         <div class="content">
             <div class="greeting">
                 ¡Hola {{ cliente.nombre }}!
             </div>
-            
+
             <div class="message">
-                Hemos notado que no nos has visitado en un tiempo y queríamos contactarte para saber cómo estás. 
-                En {{ company_name }}, valoramos mucho la relación con nuestros clientes y tu experiencia siempre ha sido importante para nosotros.
+                Hemos notado que no nos has visitado en un tiempo y queríamos contactarte para saber cómo estás.
+                En {{ company_name }}, valoramos mucho la relación con nuestros clientes y tu experiencia siempre ha
+                sido importante para nosotros.
             </div>
-            
+
             <div class="message">
-                Recordamos que la última vez disfrutaste de <strong>{{ last_service }}</strong> y esperamos que haya sido una experiencia memorable.
+                Recordamos que la última vez disfrutaste de <strong>{{ last_service }}</strong> y esperamos que haya
+                sido una experiencia memorable.
             </div>
-            
+
             <div class="highlight-box">
                 <div class="offer-title">🎁 Oferta Especial de Bienvenida</div>
                 <div class="offer-description">
-                    Como gesto de aprecio, queremos ofrecerte un <strong>{{ special_offer }}</strong> en tu próxima visita.
+                    Como gesto de aprecio, queremos ofrecerte un <strong>{{ special_offer }}</strong> en tu próxima
+                    visita.
                     Esta oferta es válida por los próximos 30 días.
                 </div>
                 <a href="https://aremko-booking-system.onrender.com" class="cta-button">
                     Reservar Ahora
                 </a>
             </div>
-            
+
             <div class="message">
                 <strong>¿Qué hay de nuevo?</strong><br>
-                Hemos estado trabajando para mejorar nuestros servicios y agregar nuevas opciones que creemos que te encantarán:
+                Hemos estado trabajando para mejorar nuestros servicios y agregar nuevas opciones que creemos que te
+                encantarán:
             </div>
-            
+
             <div class="services-grid">
                 <div class="service-card">
                     <h3>🌟 Nuevos Tratamientos</h3>
@@ -218,49 +226,57 @@
                     <p>Beneficios exclusivos para nuestros clientes más fieles</p>
                 </div>
             </div>
-            
+
             <div class="message">
-                Nos encantaría verte de nuevo y ponerte al día con todo lo que hemos estado preparando. 
+                Nos encantaría verte de nuevo y ponerte al día con todo lo que hemos estado preparando.
                 Nuestro equipo estará encantado de atenderte y asegurarse de que tengas la mejor experiencia posible.
             </div>
-            
+
             <div style="text-align: center; margin: 40px 0;">
                 <a href="https://aremko-booking-system.onrender.com" class="cta-button">
                     Quiero Volver
                 </a>
             </div>
-            
+
             <div class="message">
-                Si tienes alguna pregunta o necesitas ayuda con tu reserva, no dudes en contactarnos. 
+                Si tienes alguna pregunta o necesitas ayuda con tu reserva, no dudes en contactarnos.
                 Estamos aquí para ti.
             </div>
-            
+
             <div style="text-align: center; margin: 30px 0; font-style: italic; color: #7f8c8d;">
                 "Tu bienestar es nuestra pasión"
             </div>
         </div>
-        
+
         <div class="footer">
             <strong>{{ company_name }}</strong><br>
             Tu espacio de bienestar y relajación
-            
+
             <div class="social-links">
                 <a href="#">📧 Email</a>
                 <a href="#">📱 WhatsApp</a>
                 <a href="#">📞 Teléfono</a>
             </div>
-            
+
             <div>
                 📍 Dirección de {{ company_name }}<br>
                 📞 +56 9 XXXX XXXX<br>
                 ✉️ contacto@aremko.cl
             </div>
-            
+
             <div class="unsubscribe">
-                Si no deseas recibir más emails como este, puedes 
-                <a href="https://aremko-booking-system.onrender.com/unsubscribe/{{ cliente.id }}">darte de baja aquí</a>
+                <p style="margin: 10px 0;">
+                    Estás recibiendo este correo porque eres cliente de Aremko y queremos invitarte a volver.
+                </p>
+                <p style="margin: 10px 0;">
+                    <a href="https://www.aremko.cl/privacy-policy/"
+                        style="color: #95a5a6; text-decoration: none; margin: 0 10px;">Política de Privacidad</a> |
+                    <a href="https://www.aremko.cl/unsubscribe/{{ cliente.email }}/"
+                        style="color: #95a5a6; text-decoration: none; margin: 0 10px;">Darse de baja</a>
+                </p>
             </div>
         </div>
     </div>
 </body>
+
 </html>

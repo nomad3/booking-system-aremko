@@ -1,26 +1,73 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Encuesta de Satisfacción - Aremko</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color:#333; line-height:1.6; max-width:600px; margin:0 auto; padding:20px; background:#f8f9fa; }
-    .container { background:#fff; border-radius:12px; padding:28px; box-shadow:0 4px 12px rgba(0,0,0,.08); }
-    .header { text-align:center; border-bottom:2px solid #e9ecef; padding-bottom:16px; margin-bottom:20px; }
-    .title { color:#6f42c1; font-size:22px; margin:0; }
-    .footer { text-align:center; color:#6c757d; font-size:13px; margin-top:24px; border-top:1px solid #e9ecef; padding-top:16px; }
-    .cta { display:inline-block; background:#6f42c1; color:#fff; text-decoration:none; padding:10px 16px; border-radius:8px; }
-    .contact-info div { margin:3px 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      color: #333;
+      line-height: 1.6;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f8f9fa;
+    }
+
+    .container {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .08);
+    }
+
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #e9ecef;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+
+    .title {
+      color: #6f42c1;
+      font-size: 22px;
+      margin: 0;
+    }
+
+    .footer {
+      text-align: center;
+      color: #6c757d;
+      font-size: 13px;
+      margin-top: 24px;
+      border-top: 1px solid #e9ecef;
+      padding-top: 16px;
+    }
+
+    .cta {
+      display: inline-block;
+      background: #6f42c1;
+      color: #fff;
+      text-decoration: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+    }
+
+    .contact-info div {
+      margin: 3px 0;
+    }
   </style>
 </head>
+
 <body>
   <div class="container">
     <div class="header">
       <h1 class="title">🙏 Tu opinión nos ayuda a mejorar</h1>
     </div>
     <p>Hola <strong>{{ nombre }}</strong>,</p>
-    <p>Esperamos que tu experiencia en <strong>Aremko Aguas Calientes & Spa</strong> haya sido excelente. Nos visitaste el <strong>{{ fecha_ultima_estadia }}</strong> y nos encantaría conocer tu opinión.</p>
+    <p>Esperamos que tu experiencia en <strong>Aremko Aguas Calientes & Spa</strong> haya sido excelente. Nos visitaste
+      el <strong>{{ fecha_ultima_estadia }}</strong> y nos encantaría conocer tu opinión.</p>
     <p>
       <a class="cta" href="{{ survey_url }}" target="_blank">Responder encuesta</a>
     </p>
@@ -34,8 +81,19 @@
         <div>💬 Whatsapp +56 9 5790 2525</div>
         <div>🌐 www.aremko.cl</div>
       </div>
-      <p style="font-size:12px;color:#adb5bd;">Si no deseas recibir más mensajes, responde “STOP”.</p>
+      <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e9ecef; font-size: 12px; color: #6c757d;">
+        <p style="margin: 10px 0;">
+          Estás recibiendo este correo porque recientemente visitaste Aremko y queremos conocer tu opinión.
+        </p>
+        <p style="margin: 10px 0;">
+          <a href="https://www.aremko.cl/privacy-policy/"
+            style="color: #007bff; text-decoration: none; margin: 0 10px;">Política de Privacidad</a> |
+          <a href="https://www.aremko.cl/unsubscribe/{{ email }}/"
+            style="color: #007bff; text-decoration: none; margin: 0 10px;">Darse de baja</a>
+        </p>
+      </div>
     </div>
   </div>
 </body>
+
 </html>
