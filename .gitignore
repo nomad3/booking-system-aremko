@@ -9,7 +9,7 @@ __pycache__/
 # Archivos sensibles y de backup
 *.json
 *backup*
-*migration*
+
 *secret*
 *configuracion*
 *.sql

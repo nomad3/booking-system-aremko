@@ -22,6 +22,22 @@ def homepage_view(request):
     gallery_image_2_url = None  # Add variable for gallery image 2
     gallery_image_3_url = None  # Add variable for gallery image 3
 
+    # Default texts (fallback)
+    hero_title = "Desconecta y Renueva Tus Sentidos en Aremko Spa"
+    hero_subtitle = "Sumérgete en un oasis de tranquilidad en Puerto Varas. Descubre experiencias únicas de masajes, tinas calientes y alojamiento diseñadas para tu bienestar total."
+    hero_cta_text = "Descubre Tu Experiencia Ideal"
+    hero_cta_link = "#servicios"
+
+    philosophy_title = "Vive la Experiencia Aremko"
+    philosophy_text_1 = "Más que un spa, somos un refugio para el alma. En Aremko, creemos en el poder sanador de la naturaleza y la desconexión. Nuestra filosofía se centra en ofrecerte un espacio de paz donde puedas renovar tu energía, cuidar tu cuerpo y calmar tu mente."
+    philosophy_text_2 = "Desde masajes terapéuticos hasta la inmersión en nuestras tinajas calientes bajo las estrellas, cada detalle está pensado para tu máximo bienestar. Ven y descubre por qué nuestros visitantes nos eligen como su escape perfecto en Puerto Varas."
+    philosophy_cta_text = "Explora Nuestros Servicios"
+
+    cta_title = "¿Listo para Vivir la Experiencia Aremko?"
+    cta_subtitle = "Regálate el descanso que mereces. Elige tu masaje ideal, sumérgete en nuestras tinajas o planifica tu estancia completa. ¡Tu momento de paz te espera!"
+    cta_button_text = "Reservar Mi Experiencia Ahora"
+
+
     try:
         # HomepageConfig is a singleton, get the instance
         config = HomepageConfig.get_solo()
@@ -38,6 +54,21 @@ def homepage_view(request):
             gallery_image_2_url = config.gallery_image_2.url
         if config.gallery_image_3:
             gallery_image_3_url = config.gallery_image_3.url
+        
+        # Get texts
+        hero_title = config.hero_title
+        hero_subtitle = config.hero_subtitle
+        hero_cta_text = config.hero_cta_text
+        hero_cta_link = config.hero_cta_link
+        
+        philosophy_title = config.philosophy_title
+        philosophy_text_1 = config.philosophy_text_1
+        philosophy_text_2 = config.philosophy_text_2
+        philosophy_cta_text = config.philosophy_cta_text
+        
+        cta_title = config.cta_title
+        cta_subtitle = config.cta_subtitle
+        cta_button_text = config.cta_button_text
 
     except HomepageConfig.DoesNotExist:
         # Handle case where the config hasn't been created yet
@@ -59,6 +90,19 @@ def homepage_view(request):
         'gallery_image_1_url': gallery_image_1_url,   # Add gallery 1 URL to context
         'gallery_image_2_url': gallery_image_2_url,   # Add gallery 2 URL to context
         'gallery_image_3_url': gallery_image_3_url,   # Add gallery 3 URL to context
+        
+        # Text Context
+        'hero_title': hero_title,
+        'hero_subtitle': hero_subtitle,
+        'hero_cta_text': hero_cta_text,
+        'hero_cta_link': hero_cta_link,
+        'philosophy_title': philosophy_title,
+        'philosophy_text_1': philosophy_text_1,
+        'philosophy_text_2': philosophy_text_2,
+        'philosophy_cta_text': philosophy_cta_text,
+        'cta_title': cta_title,
+        'cta_subtitle': cta_subtitle,
+        'cta_button_text': cta_button_text,
         'canonical_url': canonical_url,
     }
     return render(request, 'ventas/homepage.html', context)

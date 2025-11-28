@@ -998,6 +998,24 @@ class HomepageConfig(SingletonModel):
         help_text="Tercera imagen para la galería 'Nuestros Espacios'."
     )
 
+    # Campos de Texto Editables
+    # Hero Section
+    hero_title = models.CharField(max_length=255, default="Desconecta y Renueva Tus Sentidos en Aremko Spa", verbose_name="Título Hero")
+    hero_subtitle = models.TextField(default="Sumérgete en un oasis de tranquilidad en Puerto Varas. Descubre experiencias únicas de masajes, tinas calientes y alojamiento diseñadas para tu bienestar total.", verbose_name="Subtítulo Hero")
+    hero_cta_text = models.CharField(max_length=50, default="Descubre Tu Experiencia Ideal", verbose_name="Texto Botón Hero")
+    hero_cta_link = models.CharField(max_length=255, default="#servicios", verbose_name="Enlace Botón Hero")
+
+    # Philosophy Section
+    philosophy_title = models.CharField(max_length=255, default="Vive la Experiencia Aremko", verbose_name="Título Filosofía")
+    philosophy_text_1 = models.TextField(default="Más que un spa, somos un refugio para el alma. En Aremko, creemos en el poder sanador de la naturaleza y la desconexión. Nuestra filosofía se centra en ofrecerte un espacio de paz donde puedas renovar tu energía, cuidar tu cuerpo y calmar tu mente.", verbose_name="Texto Filosofía 1")
+    philosophy_text_2 = models.TextField(default="Desde masajes terapéuticos hasta la inmersión en nuestras tinajas calientes bajo las estrellas, cada detalle está pensado para tu máximo bienestar. Ven y descubre por qué nuestros visitantes nos eligen como su escape perfecto en Puerto Varas.", verbose_name="Texto Filosofía 2")
+    philosophy_cta_text = models.CharField(max_length=50, default="Explora Nuestros Servicios", verbose_name="Texto Botón Filosofía")
+
+    # CTA Section
+    cta_title = models.CharField(max_length=255, default="¿Listo para Vivir la Experiencia Aremko?", verbose_name="Título CTA Final")
+    cta_subtitle = models.TextField(default="Regálate el descanso que mereces. Elige tu masaje ideal, sumérgete en nuestras tinajas o planifica tu estancia completa. ¡Tu momento de paz te espera!", verbose_name="Subtítulo CTA Final")
+    cta_button_text = models.CharField(max_length=50, default="Reservar Mi Experiencia Ahora", verbose_name="Texto Botón CTA Final")
+
     def __str__(self):
         return "Configuración de la Página Principal"
 

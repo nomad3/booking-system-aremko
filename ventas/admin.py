@@ -1480,11 +1480,17 @@ class SMSTemplateAdmin(admin.ModelAdmin):
 class HomepageConfigAdmin(SingletonModelAdmin):
     """Admin para configuración global del Homepage (Singleton)"""
     fieldsets = (
-        ('Imágenes Hero y Filosofía', {
-            'fields': ('hero_background_image', 'philosophy_image')
+        ('Hero Section', {
+            'fields': ('hero_title', 'hero_subtitle', 'hero_cta_text', 'hero_cta_link', 'hero_background_image')
+        }),
+        ('Sección Filosofía', {
+            'fields': ('philosophy_title', 'philosophy_text_1', 'philosophy_text_2', 'philosophy_cta_text', 'philosophy_image')
         }),
         ('Galería de Espacios', {
             'fields': ('gallery_image_1', 'gallery_image_2', 'gallery_image_3')
+        }),
+        ('CTA Final', {
+            'fields': ('cta_title', 'cta_subtitle', 'cta_button_text')
         })
     )
 
