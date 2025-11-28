@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,30 +15,35 @@
             padding: 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
+
         .container {
             background: white;
             border-radius: 12px;
             padding: 30px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
         }
+
         .header {
             text-align: center;
             margin-bottom: 30px;
             border-bottom: 2px solid #e9ecef;
             padding-bottom: 20px;
         }
+
         .logo {
             font-size: 28px;
             font-weight: bold;
             color: #007bff;
             margin-bottom: 10px;
         }
+
         .title {
             color: #28a745;
             font-size: 28px;
             margin-bottom: 10px;
             line-height: 1.3;
         }
+
         .welcome-message {
             background: linear-gradient(45deg, #4ecdc4, #44a08d);
             color: white;
@@ -47,6 +53,7 @@
             margin: 25px 0;
             font-size: 17px;
         }
+
         .prize-box {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             color: white;
@@ -55,28 +62,33 @@
             text-align: center;
             margin: 25px 0;
         }
+
         .discount-highlight {
             display: flex;
             justify-content: space-around;
             margin: 20px 0;
         }
+
         .discount-item {
-            background: rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.2);
             padding: 15px;
             border-radius: 10px;
             flex: 1;
             margin: 0 5px;
         }
+
         .discount-percent {
             font-size: 36px;
             font-weight: bold;
             display: block;
             margin-bottom: 5px;
         }
+
         .discount-label {
             font-size: 13px;
             opacity: 0.95;
         }
+
         .code-box {
             background: #f8f9fa;
             border: 2px dashed #007bff;
@@ -85,6 +97,7 @@
             text-align: center;
             margin: 25px 0;
         }
+
         .code-label {
             font-size: 14px;
             color: #6c757d;
@@ -93,6 +106,7 @@
             letter-spacing: 1px;
             font-weight: 600;
         }
+
         .code-value {
             background: linear-gradient(45deg, #007bff, #0056b3);
             color: white;
@@ -104,6 +118,7 @@
             letter-spacing: 3px;
             font-family: 'Courier New', monospace;
         }
+
         .expiry-info {
             background: #fff3cd;
             border-left: 4px solid #ffc107;
@@ -111,6 +126,7 @@
             border-radius: 8px;
             margin: 20px 0;
         }
+
         .terms {
             background: #f8f9fa;
             padding: 20px;
@@ -118,19 +134,23 @@
             margin: 20px 0;
             font-size: 14px;
         }
+
         .terms h3 {
             margin-top: 0;
             color: #495057;
             font-size: 16px;
         }
+
         .terms ul {
             margin: 10px 0;
             padding-left: 20px;
         }
+
         .terms li {
             margin-bottom: 8px;
             color: #6c757d;
         }
+
         .cta-button {
             display: inline-block;
             background: linear-gradient(45deg, #007bff, #0056b3);
@@ -142,6 +162,7 @@
             margin: 20px 0;
             transition: transform 0.2s;
         }
+
         .footer {
             text-align: center;
             margin-top: 30px;
@@ -150,13 +171,18 @@
             color: #6c757d;
             font-size: 14px;
         }
+
         .contact-info {
             margin-top: 15px;
             font-size: 13px;
         }
-        .contact-info div { margin: 3px 0; }
+
+        .contact-info div {
+            margin: 3px 0;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -202,11 +228,13 @@
 
         <div class="expiry-info">
             <strong>⏰ Válido hasta: {{ cliente_premio.fecha_expiracion|date:"d/m/Y" }}</strong><br>
-            <span style="font-size: 14px;">No dejes pasar esta oportunidad de volver a disfrutar de nuestros servicios con un descuento especial.</span>
+            <span style="font-size: 14px;">No dejes pasar esta oportunidad de volver a disfrutar de nuestros servicios
+                con un descuento especial.</span>
         </div>
 
         <div style="text-align: center; margin: 30px 0;">
-            <a href="https://wa.me/56957902525?text=Hola!%20Quiero%20reservar%20con%20mi%20código%20de%20descuento" class="cta-button">💬 Contactar por WhatsApp</a>
+            <a href="https://wa.me/56957902525?text=Hola!%20Quiero%20reservar%20con%20mi%20código%20de%20descuento"
+                class="cta-button">💬 Contactar por WhatsApp</a>
         </div>
 
         <div class="terms">
@@ -237,7 +265,21 @@
                 Este premio ha sido generado automáticamente por nuestro sistema de fidelización.
                 Si tienes alguna consulta, no dudes en contactarnos.
             </p>
+            <div
+                style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e9ecef; font-size: 12px; color: #6c757d;">
+                <p style="margin: 10px 0;">
+                    Estás recibiendo este correo porque eres cliente de Aremko y has participado en nuestro programa de
+                    fidelización.
+                </p>
+                <p style="margin: 10px 0;">
+                    <a href="https://www.aremko.cl/privacy-policy/"
+                        style="color: #007bff; text-decoration: none; margin: 0 10px;">Política de Privacidad</a> |
+                    <a href="https://www.aremko.cl/unsubscribe/{{ cliente.email }}/"
+                        style="color: #007bff; text-decoration: none; margin: 0 10px;">Darse de baja</a>
+                </p>
+            </div>
         </div>
     </div>
 </body>
+
 </html>
