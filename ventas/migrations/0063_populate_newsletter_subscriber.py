@@ -12,12 +12,27 @@ from django.utils import timezone
 def create_newsletter_subscribers(apps, schema_editor):
     Cliente = apps.get_model('ventas', 'Cliente')
     NewsletterSubscriber = apps.get_model('ventas', 'NewsletterSubscriber')
+    # Emails to exclude
+    EXCLUDED_EMAILS = {
+        'cliente@aremko.cl',
+        'aremkospa@aremko.cl',
+        'contacto@aremko.cl', 
+        'reservas@aremko.cl',
+        'administracion@aremko.cl'
+    }
+
     # Iterate over all clients with a valid email
     for cliente in Cliente.objects.filter(email__isnull=False).exclude(email=''):
         email = cliente.email.strip().lower()
+        
+        # Skip excluded emails
+        if email in EXCLUDED_EMAILS:
+            continue
+
         # Skip if already present in NewsletterSubscriber (unique constraint on email)
         if NewsletterSubscriber.objects.filter(email=email).exists():
             continue
+        
         # Create subscriber entry
         NewsletterSubscriber.objects.create(
             email=email,
