@@ -1502,3 +1502,201 @@ class HomepageSettingsAdmin(SingletonModelAdmin):
             'fields': ('hero_background_image',)
         }),
     )
+
+
+# =============================================================================
+# VISUAL EMAIL CAMPAIGN SYSTEM
+# =============================================================================
+
+from .models import EmailCampaignTemplate, CampaignSendLog
+
+@admin.register(EmailCampaignTemplate)
+class EmailCampaignTemplateAdmin(admin.ModelAdmin):
+    list_display = (
+        'name',
+        'subject',
+        'get_status_badge',
+        'total_recipients',
+        'progress_percent',
+        'created_at',
+        'created_by'
+    )
+    list_filter = ('status', 'audience_type', 'created_at')
+    search_fields = ('name', 'subject', 'html_content')
+    date_hierarchy = 'created_at'
+    readonly_fields = (
+        'created_at',
+        'updated_at',
+        'started_at',
+        'completed_at',
+        'emails_sent',
+        'emails_delivered',
+        'emails_opened',
+        'emails_clicked',
+        'emails_bounced',
+        'spam_complaints',
+        'progress_percent',
+        'open_rate',
+        'click_rate',
+        'bounce_rate'
+    )
+    
+    fieldsets = (
+        ('📋 Información Básica', {
+            'fields': ('name', 'subject', 'preview_text', 'status')
+        }),
+        ('📝 Contenido HTML', {
+            'fields': ('html_content', 'uses_personalization'),
+            'classes': ('collapse',)
+        }),
+        ('🎯 Audiencia', {
+            'fields': ('audience_type', 'segment_filters','total_recipients')
+        }),
+        ('⚙️ Configuración de Envío', {
+            'fields': ('batch_size', 'batch_delay_minutes', 'scheduled_at')
+        }),
+        ('📊 Estadísticas', {
+            'fields': (
+                'emails_sent',
+                'emails_delivered',
+                'emails_opened',
+                'emails_clicked',
+                'emails_bounced',
+                'spam_complaints',
+                'progress_percent',
+                'open_rate',
+                'click_rate',
+                'bounce_rate'
+            ),
+            'classes': ('collapse',)
+        }),
+        ('🕐 Timestamps', {
+            'fields': ('created_at', 'updated_at', 'started_at', 'completed_at', 'created_by'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    actions = ['marcar_como_lista', 'pausar_campana', 'cancelar_campana']
+    
+    def get_status_badge(self, obj):
+        """Muestra el estado con un badge colorido"""
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; '
+            'border-radius: 12px; font-size: 11px; font-weight: bold;">{}</span>',
+            self._get_status_color(obj.status),
+            obj.get_status_display()
+        )
+    get_status_badge.short_description = 'Estado'
+    get_status_badge.admin_order_field = 'status'
+    
+    def _get_status_color(self, status):
+        colors = {
+            'draft': '#6c757d',
+            'ready': '#17a2b8',
+            'sending': '#007bff',
+            'paused': '#ffc107',
+            'completed': '#28a745',
+            'cancelled': '#dc3545',
+        }
+        return colors.get(status, '#6c757d')
+    
+    def marcar_como_lista(self, request, queryset):
+        """Marca las campañas como listas para envío"""
+        updated = queryset.filter(status='draft').update(status='ready')
+        self.message_user(
+            request,
+            f'{updated} campaña(s) marcada(s) como listas.',
+            messages.SUCCESS
+        )
+    marcar_como_lista.short_description = '✓ Marcar como lista para envío'
+    
+    def pausar_campana(self, request, queryset):        """Pausa las campañas en envío"""
+        updated = queryset.filter(status='sending').update(status='paused')
+        self.message_user(
+            request,
+            f'{updated} campaña(s) pausada(s).',
+            messages.WARNING
+        )
+    pausar_campana.short_description = '⏸ Pausar campañas'
+    
+    def cancelar_campana(self, request, queryset):
+        """Cancela las campañas"""
+        updated = queryset.update(status='cancelled')
+        self.message_user(
+            request,
+            f'{updated} campaña(s) cancelada(s).',
+            messages.ERROR
+        )
+    cancelar_campana.short_description = '✗ Cancelar campañas'
+
+
+@admin.register(CampaignSendLog)
+class CampaignSendLogAdmin(admin.ModelAdmin):
+    list_display = (
+        'campaign',
+        'recipient_email',
+        'recipient_name',
+        'get_status_badge',
+        'sent_at',
+        'opened_at',
+        'clicked_at'
+    )
+    list_filter = ('status', 'sent_at', 'campaign')
+    search_fields = ('recipient_email', 'recipient_name', 'campaign__name')
+    date_hierarchy = 'created_at'
+    readonly_fields = (
+        'campaign',
+        'recipient_email',
+        'recipient_name',
+        'status',
+        'sent_at',
+        'delivered_at',
+        'opened_at',
+        'clicked_at',
+        'error_message',
+        'bounce_reason',
+        'created_at'
+    )
+    
+    fieldsets = (
+        ('📧 Información del Envío', {
+            'fields': ('campaign', 'recipient_email', 'recipient_name', 'status')
+        }),
+        ('⏱️ Eventos', {
+            'fields': ('sent_at', 'delivered_at', 'opened_at', 'clicked_at')
+        }),
+        ('❌ Errores', {
+            'fields': ('error_message', 'bounce_reason'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def get_status_badge(self, obj):
+        """Muestra el estado con un badge colorido"""
+        colors = {
+            'pending': '#6c757d',
+            'sending': '#17a2b8',
+            'sent': '#007bff',
+            'delivered': '#28a745',
+            'opened': '#20c997',
+            'clicked': '#17a2b8',
+            'bounced': '#ffc107',
+            'failed': '#dc3545',
+            'spam': '#dc3545',
+        }
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; '
+            'border-radius: 12px; font-size: 11px; font-weight: bold;">{}</span>',
+            colors.get(obj.status, '#6c757d'),
+            obj.get_status_display()
+        )
+    get_status_badge.short_description = 'Estado'
+    get_status_badge.admin_order_field = 'status'
+    
+    def has_add_permission(self, request):
+        """No permitir crear logs manualmente"""
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """No permitir eliminar logs (solo lectura)"""
+        return False
