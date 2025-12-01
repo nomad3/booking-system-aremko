@@ -601,3 +601,78 @@ def actualizar_tramo_y_premios_on_pago(sender, instance, created, raw, using, up
             f"Cliente {instance.cliente.id}: {e}",
             exc_info=True
         )
+
+# ----------------------------------------------------------------------
+# Signal to keep NewsletterSubscriber in sync with Cliente email changes
+# ----------------------------------------------------------------------
+
+from django.db.models.signals import post_save, pre_save
+from django.dispatch import receiver
+from django.utils import timezone
+import logging
+
+logger = logging.getLogger(__name__)
+
+@receiver(pre_save, sender='ventas.Cliente')
+def cache_previous_email(sender, instance, **kwargs):
+    """Store the previous email before the Cliente is saved so we can detect removals."""
+    if not instance.pk:
+        instance._old_email = None
+        return
+    try:
+        old = sender.objects.get(pk=instance.pk)
+        instance._old_email = (old.email or '').strip().lower()
+    except sender.DoesNotExist:
+        instance._old_email = None
+
+@receiver(post_save, sender='ventas.Cliente')
+def sync_newsletter_subscriber(sender, instance, created, **kwargs):
+    """Create or update a NewsletterSubscriber when a Cliente is saved.
+
+    - If the Cliente has a non‑empty email, ensure a subscriber exists and is active.
+    - If the email is cleared, deactivate the existing subscriber (if any).
+    """
+    # Lazy import to avoid circular imports
+    try:
+        from .models import NewsletterSubscriber
+    except Exception as e:
+        logger.error(f"Unable to import NewsletterSubscriber: {e}")
+        return
+
+    current_email = (instance.email or '').strip().lower()
+
+    # Email removed → deactivate previous subscriber
+    if not current_email:
+        old_email = getattr(instance, "_old_email", None)
+        if old_email:
+            try:
+                sub = NewsletterSubscriber.objects.filter(email=old_email).first()
+                if sub and sub.is_active:
+                    sub.is_active = False
+                    sub.save()
+                    logger.info(
+                        f"Desactivado NewsletterSubscriber {old_email} porque Cliente {instance.pk} quitó su email."
+                    )
+            except Exception as e:
+                logger.error(f"Error desactivando suscriptor {old_email}: {e}")
+        return
+
+    # Email present → create or reactivate subscriber
+    try:
+        subscriber, created_sub = NewsletterSubscriber.objects.get_or_create(
+            email=current_email,
+            defaults={
+                "first_name": instance.nombre or "",
+                "last_name": instance.apellido or "",
+                "subscribed_at": timezone.now(),
+                "source": "Sync via signal (Cliente saved)",
+            },
+        )
+        if not subscriber.is_active:
+            subscriber.is_active = True
+            subscriber.save()
+            logger.info(
+                f"Reactivado NewsletterSubscriber {current_email} por actualización de Cliente {instance.pk}."
+            )
+    except Exception as e:
+        logger.error(f"Error creando/actualizando suscriptor {current_email}: {e}")
