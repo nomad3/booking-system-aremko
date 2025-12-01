@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuevas Gift Cards Digitales Aremko</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #2c5f2d;
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+
+        .highlight {
+            background-color: #e8f5e9;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #2c5f2d;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background-color: #2c5f2d;
+            color: #ffffff;
+            text-decoration: none;
+            padding: 15px 40px;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .cta-button:hover {
+            background-color: #1e4620;
+        }
+
+        .benefits {
+            margin: 20px 0;
+        }
+
+        .benefit-item {
+            margin: 10px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .benefit-item:before {
+            content: "✓";
+            color: #2c5f2d;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+
+        .footer a {
+            color: #2c5f2d;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎁 ¡Llegaron las Gift Cards Digitales!</h1>
+        </div>
+
+        <p>Hola {{ nombre }},</p>
+
+        <p>En <strong>Aremko</strong> siempre buscamos facilitar tus reservas y regalos. Por eso, nos complace
+            anunciarte que ahora puedes comprar <strong>Gift Cards 100% Digitales</strong>.</p>
+
+        <div class="highlight">
+            <h3 style="margin-top: 0; color: #2c5f2d;">¿Qué son las Gift Cards Digitales?</h3>
+            <p>Son tarjetas de regalo que puedes comprar, recibir y canjear completamente online, sin necesidad de
+                acercarte a nuestras instalaciones.</p>
+        </div>
+
+        <div class="benefits">
+            <h3>Beneficios:</h3>
+            <div class="benefit-item">Compra instantánea desde cualquier lugar</div>
+            <div class="benefit-item">Recepción inmediata por email</div>
+            <div class="benefit-item">Regalo perfecto para cumpleaños, aniversarios y ocasiones especiales</div>
+            <div class="benefit-item">Válido para todos nuestros servicios (tinas, masajes, cabañas)</div>
+            <div class="benefit-item">Sin fecha de vencimiento</div>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="https://www.aremko.cl/ventas/giftcards/" class="cta-button">
+                Ver Gift Cards Digitales
+            </a>
+        </div>
+
+        <p>Ya sea que quieras sorprender a alguien especial o reservar para ti mismo, nuestras Gift Cards Digitales son
+            la solución más cómoda y rápida.</p>
+
+        <p style="margin-top: 30px;">
+            Te esperamos,<br>
+            <strong>Equipo Aremko</strong><br>
+            <em>Relájate y Disfruta</em>
+        </p>
+
+        <div class="footer">
+            <p>
+                <a href="https://www.aremko.cl/privacy-policy/" target="_blank">Política de Privacidad</a> |
+                <a href="https://www.aremko.cl/unsubscribe/{{ email }}/" target="_blank">Darse de baja</a>
+            </p>
+            <p style="margin-top: 10px;">
+                Has recibido este correo porque eres cliente de Aremko.<br>
+                Si no deseas recibir más emails promocionales, puedes darte de baja en el enlace superior.
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>
