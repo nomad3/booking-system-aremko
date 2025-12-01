@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views # Import email_campaign_views
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views # Import visual_campaign_views
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -139,6 +139,16 @@ urlpatterns = [
     path('admin/campaigns/<int:campaign_id>/', campaign_views.campaign_detail_view, name='campaign_detail'),
     path('admin/campaigns/preview-recipients/', campaign_views.campaign_preview_recipients_ajax, name='campaign_preview_recipients_ajax'),
     path('admin/campaigns/test-ai/', campaign_views.test_ai_service_ajax, name='campaign_test_ai_ajax'),
+
+    # === VISUAL EMAIL CAMPAIGN SYSTEM (NEW) ===
+    path('crm/campanias/', visual_campaign_views.visual_campaign_dashboard, name='visual_campaign_dashboard'),
+    path('crm/campanias/crear/', visual_campaign_views.visual_campaign_create, name='visual_campaign_create'),
+    path('crm/campanias/<int:pk>/editar/', visual_campaign_views.visual_campaign_edit, name='visual_campaign_edit'),
+    path('crm/campanias/<int:pk>/enviar-prueba/', visual_campaign_views.visual_campaign_send_test, name='visual_campaign_send_test'),
+    path('crm/campanias/<int:pk>/iniciar/', visual_campaign_views.visual_campaign_start, name='visual_campaign_start'),
+    path('crm/campanias/<int:pk>/estadisticas/', visual_campaign_views.visual_campaign_stats, name='visual_campaign_stats'),
+    path('crm/campanias/<int:pk>/pausar/', visual_campaign_views.visual_campaign_pause, name='visual_campaign_pause'),
+    path('crm/campanias/<int:pk>/eliminar/', visual_campaign_views.visual_campaign_delete, name='visual_campaign_delete'),
 
     # === BULK EMAIL SENDER WITH AI ===
     path('crm/bulk-email-sender/', crm_views.bulk_email_sender_view, name='bulk_email_sender'),
