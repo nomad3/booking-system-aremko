@@ -1610,7 +1610,8 @@ class EmailCampaignTemplateAdmin(admin.ModelAdmin):
         )
     marcar_como_lista.short_description = '✓ Marcar como lista para envío'
     
-    def pausar_campana(self, request, queryset):        """Pausa las campañas en envío"""
+    def pausar_campana(self, request, queryset):
+        """Pausa las campañas en envío"""
         updated = queryset.filter(status='sending').update(status='paused')
         self.message_user(
             request,
