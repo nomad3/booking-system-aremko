@@ -1,0 +1,111 @@
+{% extends 'admin/base_site.html' %}
+{% load static %}
+
+{% block title %}Campañas de Email - CRM{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0">Campañas de Email</h1>
+            <p class="text-muted">Gestiona tus comunicaciones masivas</p>
+        </div>
+        <a href="{% url 'ventas:visual_campaign_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Nueva Campaña
+        </a>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted">Total Campañas</h6>
+                    <h3>{{ total_campaigns }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted">Enviando Ahora</h6>
+                    <h3 class="text-primary">{{ active_campaigns }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted">Completadas</h6>
+                    <h3 class="text-success">{{ completed_campaigns }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaigns Grid -->
+    <div class="row">
+        {% for campaign in campañas %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 text-truncate" title="{{ campaign.name }}">{{ campaign.name }}</h5>
+                    <span class="badge bg-{{ campaign.status_color }}">{{ campaign.get_status_display }}</span>
+                </div>
+                <div class="card-body">
+                    <p class="card-text text-muted small mb-2">Asunto: {{ campaign.subject }}</p>
+                    <p class="card-text mb-3">
+                        <small class="text-muted">
+                            <i class="far fa-clock"></i> {{ campaign.created_at|date:"d M Y" }}
+                        </small>
+                    </p>
+
+                    {% if campaign.status == 'sending' or campaign.status == 'completed' or campaign.status == 'paused'
+                    %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span>Progreso</span>
+                            <span>{{ campaign.progress_percent }}%</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar" role="progressbar"
+                                style="width: {{ campaign.progress_percent }}%"></div>
+                        </div>
+                        <div class="mt-2 small text-muted d-flex justify-content-between">
+                            <span><i class="fas fa-paper-plane"></i> {{ campaign.emails_sent }}</span>
+                            <span><i class="fas fa-envelope-open"></i> {{ campaign.open_rate }}%</span>
+                            <span><i class="fas fa-mouse-pointer"></i> {{ campaign.click_rate }}%</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer bg-white border-top-0">
+                    <div class="d-grid gap-2">
+                        {% if campaign.can_edit %}
+                        <a href="{% url 'ventas:visual_campaign_edit' pk=campaign.pk %}"
+                            class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-edit"></i> Editar
+                        </a>
+                        {% endif %}
+
+                        {% if campaign.status == 'sending' or campaign.status == 'completed' or campaign.status ==
+                        'paused' %}
+                        <a href="{% url 'ventas:visual_campaign_stats' pk=campaign.pk %}"
+                            class="btn btn-outline-info btn-sm">
+                            <i class="fas fa-chart-bar"></i> Estadísticas
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                No hay campañas creadas. ¡Crea la primera!
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

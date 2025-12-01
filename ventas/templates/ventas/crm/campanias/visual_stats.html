@@ -1,0 +1,152 @@
+{% extends 'admin/base_site.html' %}
+{% load static %}
+
+{% block title %}Estadísticas - {{ campaign.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0">Estadísticas de Campaña</h1>
+            <p class="text-muted">{{ campaign.name }}</p>
+        </div>
+        <div>
+            <a href="{% url 'ventas:visual_campaign_dashboard' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+            {% if campaign.status == 'sending' %}
+            <form action="{% url 'ventas:visual_campaign_pause' pk=campaign.pk %}" method="post" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-pause"></i> Pausar Envío
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Enviados</h6>
+                    <h2 class="mb-0">{{ campaign.emails_sent }}</h2>
+                    <small class="text-muted">de {{ campaign.total_recipients }}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Tasa de Apertura</h6>
+                    <h2 class="text-primary mb-0">{{ campaign.open_rate }}%</h2>
+                    <small class="text-muted">{{ campaign.emails_opened }} aperturas</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Tasa de Clicks</h6>
+                    <h2 class="text-success mb-0">{{ campaign.click_rate }}%</h2>
+                    <small class="text-muted">{{ campaign.emails_clicked }} clicks</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Rebotes</h6>
+                    <h2 class="text-danger mb-0">{{ campaign.bounce_rate }}%</h2>
+                    <small class="text-muted">{{ campaign.emails_bounced }} rebotes</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">Progreso del Envío</h5>
+            <div class="progress" style="height: 25px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+                    style="width: {{ campaign.progress_percent }}%">
+                    {{ campaign.progress_percent }}%
+                </div>
+            </div>
+            <div class="mt-2 text-muted small">
+                Estado actual: <span class="badge bg-{{ campaign.status_color }}">{{ campaign.get_status_display
+                    }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Recent Activity Log -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Actividad Reciente</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Estado</th>
+                                <th>Hora</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in recent_logs %}
+                            <tr>
+                                <td>{{ log.recipient_email }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ log.get_status_display }}</span>
+                                </td>
+                                <td>{{ log.created_at|date:"H:i:s" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center py-4 text-muted">
+                                    No hay actividad registrada aún.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Breakdown -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Desglose por Estado</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        {% for stat in status_stats %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ stat.status }}
+                            <span class="badge bg-primary rounded-pill">{{ stat.count }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-refresh page every 30 seconds if sending
+    {% if campaign.status == 'sending' %}
+    setTimeout(function () {
+        window.location.reload(1);
+    }, 30000);
+    {% endif %}
+</script>
+{% endblock %}

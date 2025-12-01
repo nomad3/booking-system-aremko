@@ -1,0 +1,125 @@
+{% extends 'admin/base_site.html' %}
+{% load static %}
+
+{% block title %}Editar Campaña - {{ campaign.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0">Editar Campaña</h1>
+            <p class="text-muted">{{ campaign.name }}</p>
+        </div>
+        <div>
+            <a href="{% url 'ventas:visual_campaign_dashboard' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+            <button type="submit" form="campaignForm" class="btn btn-success">
+                <i class="fas fa-save"></i> Guardar Cambios
+            </button>
+        </div>
+    </div>
+
+    <form method="post" id="campaignForm">
+        {% csrf_token %}
+        <div class="row">
+            <!-- Left Column: Editor -->
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Contenido del Email</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="subject" class="form-label">Asunto</label>
+                            <input type="text" class="form-control" id="subject" name="subject"
+                                value="{{ campaign.subject }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="preview_text" class="form-label">Texto de Preview (Preheader)</label>
+                            <input type="text" class="form-control" id="preview_text" name="preview_text"
+                                value="{{ campaign.preview_text }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="html_content" class="form-label">Código HTML</label>
+                            <textarea class="form-control font-monospace" id="html_content" name="html_content"
+                                rows="20" style="font-size: 0.85rem;">{{ campaign.html_content }}</textarea>
+                            <div class="form-text">
+                                Variables disponibles: <code>{{ "{{" }} nombre {{ "}}" }}</code>,
+                                <code>{{ "{{" }} email {{ "}}" }}</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Settings & Actions -->
+            <div class="col-lg-4">
+                <!-- Status Card -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Estado</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="badge bg-{{ campaign.status_color }} me-2">{{ campaign.get_status_display
+                                }}</span>
+                            <small class="text-muted">Creado: {{ campaign.created_at|date:"d M Y" }}</small>
+                        </div>
+
+                        <div class="alert alert-info small">
+                            <i class="fas fa-users"></i> Destinatarios estimados: <strong>{{ total_subs }}</strong>
+                        </div>
+
+                        <hr>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" name="mark_as_ready" value="true" class="btn btn-primary">
+                                <i class="fas fa-check-circle"></i> Marcar como Lista
+                            </button>
+                            <a href="{% url 'ventas:visual_campaign_start' pk=campaign.pk %}"
+                                class="btn btn-success {% if campaign.status != 'ready' %}disabled{% endif %}">
+                                <i class="fas fa-paper-plane"></i> Iniciar Envío
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Test Send Card -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Prueba de Envío</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted">Envía un email de prueba a tu correo ({{ request.user.email }}) para
+                            verificar el diseño.</p>
+                        <button type="submit" formaction="{% url 'ventas:visual_campaign_send_test' pk=campaign.pk %}"
+                            class="btn btn-outline-info w-100">
+                            <i class="fas fa-envelope"></i> Enviar Prueba
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Settings Card -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Configuración de Envío</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="batch_size" class="form-label">Emails por lote</label>
+                            <input type="number" class="form-control" id="batch_size" name="batch_size"
+                                value="{{ campaign.batch_size }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="batch_delay_minutes" class="form-label">Minutos entre lotes</label>
+                            <input type="number" class="form-control" id="batch_delay_minutes"
+                                name="batch_delay_minutes" value="{{ campaign.batch_delay_minutes }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

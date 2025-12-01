@@ -1,0 +1,50 @@
+{% extends 'admin/base_site.html' %}
+{% load static %}
+
+{% block title %}Confirmar Envío - {{ campaign.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body text-center p-5">
+                    <div class="mb-4">
+                        <i class="fas fa-rocket fa-4x text-primary"></i>
+                    </div>
+
+                    <h2 class="mb-3">¿Estás listo para enviar?</h2>
+                    <p class="lead text-muted mb-4">
+                        Estás a punto de iniciar la campaña <strong>"{{ campaign.name }}"</strong>.
+                    </p>
+
+                    <div class="alert alert-warning text-start mb-4">
+                        <h6 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Resumen del Envío:</h6>
+                        <ul class="mb-0 small">
+                            <li><strong>Destinatarios:</strong> {{ campaign.total_recipients }} suscriptores</li>
+                            <li><strong>Lotes:</strong> {{ campaign.batch_size }} emails cada {{
+                                campaign.batch_delay_minutes }} minutos</li>
+                            <li><strong>Asunto:</strong> {{ campaign.subject }}</li>
+                        </ul>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="confirmed" value="true">
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-paper-plane"></i> Sí, Iniciar Campaña
+                            </button>
+                            <a href="{% url 'ventas:visual_campaign_edit' pk=campaign.pk %}"
+                                class="btn btn-outline-secondary">
+                                Cancelar y Volver
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

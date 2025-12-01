@@ -1,0 +1,96 @@
+{% extends 'admin/base_site.html' %}
+{% load static %}
+
+{% block title %}Nueva Campaña - CRM{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h4 class="mb-0">Crear Nueva Campaña</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Nombre de la Campaña</label>
+                            <input type="text" class="form-control" id="name" name="name" required
+                                placeholder="Ej: Newsletter Diciembre 2025">
+                            <div class="form-text">Nombre interno para identificar la campaña.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="subject" class="form-label">Asunto del Email</label>
+                            <input type="text" class="form-control" id="subject" name="subject"
+                                placeholder="Ej: ¡Tenemos novedades para ti!">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">Selecciona una Plantilla Base</label>
+                            <div class="row g-3">
+                                <!-- Blank Template -->
+                                <div class="col-md-6">
+                                    <div class="form-check card-radio">
+                                        <input class="form-check-input" type="radio" name="template_type"
+                                            id="template_blank" value="blank" checked>
+                                        <label class="form-check-label card h-100 p-3" for="template_blank">
+                                            <div class="text-center mb-2">
+                                                <i class="far fa-file fa-3x text-muted"></i>
+                                            </div>
+                                            <h6 class="text-center">En Blanco</h6>
+                                            <small class="text-muted text-center">Empieza desde cero con un editor HTML
+                                                limpio.</small>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Gift Card Template -->
+                                <div class="col-md-6">
+                                    <div class="form-check card-radio">
+                                        <input class="form-check-input" type="radio" name="template_type"
+                                            id="template_giftcard" value="giftcard_digital">
+                                        <label class="form-check-label card h-100 p-3" for="template_giftcard">
+                                            <div class="text-center mb-2">
+                                                <i class="fas fa-gift fa-3x text-primary"></i>
+                                            </div>
+                                            <h6 class="text-center">Gift Cards Digitales</h6>
+                                            <small class="text-muted text-center">Plantilla oficial de lanzamiento de
+                                                Gift Cards.</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'ventas:visual_campaign_dashboard' %}"
+                                class="btn btn-outline-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">Crear y Editar Contenido</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card-radio .form-check-input {
+        display: none;
+    }
+
+    .card-radio .card {
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+    }
+
+    .card-radio .form-check-input:checked+.card {
+        border-color: #0d6efd;
+        background-color: #f8f9fa;
+    }
+</style>
+{% endblock %}
