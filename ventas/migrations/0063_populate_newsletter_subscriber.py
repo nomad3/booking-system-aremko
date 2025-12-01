@@ -80,11 +80,17 @@ def create_newsletter_subscribers(apps, schema_editor):
         if NewsletterSubscriber.objects.filter(email=email).exists():
             continue
         
+        # Split nombre into first and last name
+        nombre_completo = (cliente.nombre or '').strip()
+        parts = nombre_completo.split(' ', 1)
+        first_name = parts[0]
+        last_name = parts[1] if len(parts) > 1 else ''
+        
         # Create subscriber entry
         NewsletterSubscriber.objects.create(
             email=email,
-            first_name=cliente.nombre or '',
-            last_name=cliente.apellido or '',
+            first_name=first_name,
+            last_name=last_name,
             subscribed_at=timezone.now(),
             is_active=True,
             source='Migration - existing clientes',

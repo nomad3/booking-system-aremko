@@ -659,11 +659,16 @@ def sync_newsletter_subscriber(sender, instance, created, **kwargs):
 
     # Email present → create or reactivate subscriber
     try:
+        nombre_completo = (instance.nombre or '').strip()
+        parts = nombre_completo.split(' ', 1)
+        first_name_val = parts[0]
+        last_name_val = parts[1] if len(parts) > 1 else ''
+
         subscriber, created_sub = NewsletterSubscriber.objects.get_or_create(
             email=current_email,
             defaults={
-                "first_name": instance.nombre or "",
-                "last_name": instance.apellido or "",
+                "first_name": first_name_val,
+                "last_name": last_name_val,
                 "subscribed_at": timezone.now(),
                 "source": "Sync via signal (Cliente saved)",
             },
