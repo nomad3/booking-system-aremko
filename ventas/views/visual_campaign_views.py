@@ -32,21 +32,29 @@ def is_staff_user(user):
 @user_passes_test(is_staff_user)
 def visual_campaign_dashboard(request):
     """Dashboard visual con cards de todas las campañas"""
-    campañas = EmailCampaignTemplate.objects.all()
-    
-    # Estadísticas generales
-    total_campaigns = campañas.count()
-    active_campaigns = campañas.filter(status='sending').count()
-    completed_campaigns = campañas.filter(status='completed').count()
-    
-    context = {
-        'campañas': campañas,
-        'total_campaigns': total_campaigns,
-        'active_campaigns': active_campaigns,
-        'completed_campaigns': completed_campaigns,
-    }
-    
-    return render(request, 'ventas/crm/campanias/visual_dashboard.html', context)
+    try:
+        campañas = EmailCampaignTemplate.objects.all()
+        
+        # Estadísticas generales
+        total_campaigns = campañas.count()
+        active_campaigns = campañas.filter(status='sending').count()
+        completed_campaigns = campañas.filter(status='completed').count()
+        
+        context = {
+            'campañas': campañas,
+            'total_campaigns': total_campaigns,
+            'active_campaigns': active_campaigns,
+            'completed_campaigns': completed_campaigns,
+            'site_header': 'Aremko Admin',
+            'site_title': 'Aremko Admin',
+            'has_permission': True,
+        }
+        
+        return render(request, 'ventas/crm/campanias/visual_dashboard.html', context)
+    except Exception as e:
+        logger.error(f"Error en visual_campaign_dashboard: {e}")
+        messages.error(request, f"Error cargando dashboard: {e}")
+        return redirect('admin:index')
 
 
 @login_required
@@ -85,7 +93,10 @@ def visual_campaign_create(request):
             return redirect('visual_campaign_dashboard')
     
     # GET - Mostrar modal/formulario de creación
-    context = {}
+    context = {
+        'site_header': 'Aremko Admin',
+        'site_title': 'Aremko Admin',
+    }
     return render(request, 'ventas/crm/campanias/visual_create.html', context)
 
 
@@ -123,7 +134,9 @@ def visual_campaign_edit(request, pk):
     
     context = {
         'campaign': campaign,
-        'total_subs': NewsletterSubscriber.objects.filter(is_active=True).count()
+        'total_subs': NewsletterSubscriber.objects.filter(is_active=True).count(),
+        'site_header': 'Aremko Admin',
+        'site_title': 'Aremko Admin',
     }
     
     return render(request, 'ventas/crm/campanias/visual_edit.html', context)
@@ -193,7 +206,11 @@ def visual_campaign_start(request, pk):
             messages.error(request, f'Error: {str(e)}')
     
     # GET - Mostrar confirmación
-    context = {'campaign': campaign}
+    context = {
+        'campaign': campaign,
+        'site_header': 'Aremko Admin',
+        'site_title': 'Aremko Admin',
+    }
     return render(request, 'ventas/crm/campanias/visual_confirm_send.html', context)
 
 
@@ -280,6 +297,8 @@ def visual_campaign_stats(request, pk):
         'campaign': campaign,
         'recent_logs': recent_logs,
         'status_stats': status_stats,
+        'site_header': 'Aremko Admin',
+        'site_title': 'Aremko Admin',
     }
     
     return render(request, 'ventas/crm/campanias/visual_stats.html', context)
