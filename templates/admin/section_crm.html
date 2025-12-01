@@ -2,31 +2,35 @@
 {% load static i18n %}
 
 {% block extrahead %}
-    {{ block.super }}
-    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
-    <style>
-        .card-hover:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .card-title {
-            font-weight: 600;
-        }
-        .card-icon {
-            font-size: 2rem; /* Smaller icon size for model cards */
-            margin-bottom: 0.75rem;
-        }
-        .card-link-container {
-            margin-top: 1rem;
-        }
-    </style>
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/modern.css' %}">
+<style>
+    .card-hover:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .card-title {
+        font-weight: 600;
+    }
+
+    .card-icon {
+        font-size: 2rem;
+        /* Smaller icon size for model cards */
+        margin-bottom: 0.75rem;
+    }
+
+    .card-link-container {
+        margin-top: 1rem;
+    }
+</style>
 {% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
-&rsaquo; {{ title }}
+    <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+    &rsaquo; {{ title }}
 </div>
 {% endblock %}
 
@@ -45,8 +49,10 @@
                     <i class="fas fa-user-friends card-icon text-primary-modern"></i>
                     <h5 class="card-title">Clientes</h5>
                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'admin:ventas_cliente_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
-                        <a href="{% url 'admin:ventas_cliente_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                        <a href="{% url 'admin:ventas_cliente_changelist' %}"
+                            class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_cliente_add' %}"
+                            class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
                     </div>
                 </div>
             </div>
@@ -58,9 +64,11 @@
                 <div class="card-body">
                     <i class="fas fa-filter card-icon text-primary-modern"></i>
                     <h5 class="card-title">Leads (Prospectos)</h5>
-                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'admin:ventas_lead_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
-                        <a href="{% url 'admin:ventas_lead_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_lead_changelist' %}"
+                            class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_lead_add' %}"
+                            class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
                     </div>
                 </div>
             </div>
@@ -72,9 +80,11 @@
                 <div class="card-body">
                     <i class="fas fa-address-book card-icon text-primary-modern"></i>
                     <h5 class="card-title">Contactos</h5>
-                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'admin:ventas_contact_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
-                        <a href="{% url 'admin:ventas_contact_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_contact_changelist' %}"
+                            class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_contact_add' %}"
+                            class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
                     </div>
                 </div>
             </div>
@@ -86,9 +96,11 @@
                 <div class="card-body">
                     <i class="fas fa-building card-icon text-primary-modern"></i>
                     <h5 class="card-title">Compañías</h5>
-                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'admin:ventas_company_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
-                        <a href="{% url 'admin:ventas_company_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_company_changelist' %}"
+                            class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_company_add' %}"
+                            class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
                     </div>
                 </div>
             </div>
@@ -100,9 +112,11 @@
                 <div class="card-body">
                     <i class="fas fa-handshake card-icon text-primary-modern"></i>
                     <h5 class="card-title">Oportunidades (Deals)</h5>
-                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'admin:ventas_deal_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
-                        <a href="{% url 'admin:ventas_deal_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_deal_changelist' %}"
+                            class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_deal_add' %}"
+                            class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
                     </div>
                 </div>
             </div>
@@ -114,9 +128,11 @@
                 <div class="card-body">
                     <i class="fas fa-tasks card-icon text-primary-modern"></i>
                     <h5 class="card-title">Actividades</h5>
-                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'admin:ventas_activity_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
-                        <a href="{% url 'admin:ventas_activity_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_activity_changelist' %}"
+                            class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_activity_add' %}"
+                            class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
                     </div>
                 </div>
             </div>
@@ -128,36 +144,42 @@
                 <div class="card-body">
                     <i class="fas fa-bullseye card-icon text-primary-modern"></i>
                     <h5 class="card-title">Campañas</h5>
-                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'admin:ventas_campaign_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
-                        <a href="{% url 'ventas:campaign_setup_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo (Setup)</a> {# Link to custom setup view #}
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_campaign_changelist' %}"
+                            class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'ventas:campaign_setup_add' %}"
+                            class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo (Setup)</a> {# Link to custom
+                        setup view #}
                     </div>
                 </div>
             </div>
         </div>
 
         {# Campaign Interaction Card #}
-         <div class="col-lg-3 col-md-4 col-sm-6">
+        <div class="col-lg-3 col-md-4 col-sm-6">
             <div class="card h-100 text-center card-hover">
                 <div class="card-body">
                     <i class="fas fa-comments card-icon text-primary-modern"></i>
                     <h5 class="card-title">Interacciones Campaña</h5>
-                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'admin:ventas_campaigninteraction_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
-                        <a href="{% url 'admin:ventas_campaigninteraction_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_campaigninteraction_changelist' %}"
+                            class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_campaigninteraction_add' %}"
+                            class="btn btn-sm btn-modern btn-primary-modern">Agregar Nuevo</a>
                     </div>
                 </div>
             </div>
         </div>
 
-         {# Segmentación Clientes Card (Custom View) #}
-         <div class="col-lg-3 col-md-4 col-sm-6">
+        {# Segmentación Clientes Card (Custom View) #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
             <div class="card h-100 text-center card-hover">
                 <div class="card-body">
                     <i class="fas fa-chart-pie card-icon text-primary-modern"></i>
                     <h5 class="card-title">Segmentación Clientes</h5>
-                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'ventas:cliente_segmentation' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Segmentación</a>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:cliente_segmentation' %}"
+                            class="btn btn-sm btn-modern btn-secondary-modern">Ver Segmentación</a>
                         {# No 'Add' link for this view #}
                     </div>
                 </div>
@@ -171,7 +193,8 @@
                     <i class="fas fa-file-upload card-icon text-primary-modern"></i>
                     <h5 class="card-title">Campaña por CSV (beta)</h5>
                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'ventas:csv_campaign_uploader' %}" class="btn btn-sm btn-modern btn-primary-modern">Subir CSV y Enviar</a>
+                        <a href="{% url 'ventas:csv_campaign_uploader' %}"
+                            class="btn btn-sm btn-modern btn-primary-modern">Subir CSV y Enviar</a>
                     </div>
                 </div>
             </div>
@@ -184,8 +207,31 @@
                     <i class="fas fa-envelope-open-text card-icon text-success"></i>
                     <h5 class="card-title">Emails Programados</h5>
                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'ventas:mail_csv_uploader' %}" class="btn btn-sm btn-modern btn-success-modern">📧 Importar CSV</a>
-                        <a href="/admin/ventas/mailparaenviar/" class="btn btn-sm btn-modern btn-outline-success">Ver Cola</a>
+                        <a href="{% url 'ventas:mail_csv_uploader' %}"
+                            class="btn btn-sm btn-modern btn-success-modern">📧 Importar CSV</a>
+                        <a href="/admin/ventas/mailparaenviar/" class="btn btn-sm btn-modern btn-outline-success">Ver
+                            Cola</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Visual Email Campaigns (New System) #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-mail-bulk card-icon text-info"></i>
+                    <h5 class="card-title">Campañas Visuales</h5>
+                    <p class="card-text small">Nuevo sistema con editor visual y cards</p>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:visual_campaign_dashboard' %}"
+                            class="btn btn-sm btn-modern btn-info-modern">
+                            <i class="fas fa-th-large"></i> Dashboard
+                        </a>
+                        <a href="{% url 'ventas:visual_campaign_create' %}"
+                            class="btn btn-sm btn-modern btn-primary-modern">
+                            <i class="fas fa-plus"></i> Nueva Campaña
+                        </a>
                     </div>
                 </div>
             </div>
@@ -199,8 +245,10 @@
                     <h5 class="card-title">Campañas Avanzadas</h5>
                     <p class="card-text small">Sistema completo de email marketing</p>
                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'ventas:campaign_list' %}" class="btn btn-sm btn-modern btn-success-modern">📧 Ver Campañas</a>
-                        <a href="{% url 'ventas:campaign_create' %}" class="btn btn-sm btn-modern btn-primary-modern">➕ Nueva Campaña</a>
+                        <a href="{% url 'ventas:campaign_list' %}" class="btn btn-sm btn-modern btn-success-modern">📧
+                            Ver Campañas</a>
+                        <a href="{% url 'ventas:campaign_create' %}" class="btn btn-sm btn-modern btn-primary-modern">➕
+                            Nueva Campaña</a>
                     </div>
                 </div>
             </div>
@@ -214,10 +262,14 @@
                     <h5 class="card-title">Mail con IA</h5>
                     <p class="card-text small">Sistema completo de emails con IA</p>
                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'ventas:crm_dashboard' %}" class="btn btn-sm btn-modern btn-primary-modern">👥 Gestión de Clientes</a>
-                        <a href="{% url 'admin:ventas_emailcontenttemplate_changelist' %}" class="btn btn-sm btn-modern btn-info-modern">🤖 Ver Templates</a>
-                        <a href="{% url 'admin:ventas_emailsubjecttemplate_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">📝 Asuntos Email</a>
-                        <a href="{% url 'ventas:bulk_email_sender' %}" class="btn btn-sm btn-modern btn-success-modern">📧 Enviar Emails Masivos</a>
+                        <a href="{% url 'ventas:crm_dashboard' %}" class="btn btn-sm btn-modern btn-primary-modern">👥
+                            Gestión de Clientes</a>
+                        <a href="{% url 'admin:ventas_emailcontenttemplate_changelist' %}"
+                            class="btn btn-sm btn-modern btn-info-modern">🤖 Ver Templates</a>
+                        <a href="{% url 'admin:ventas_emailsubjecttemplate_changelist' %}"
+                            class="btn btn-sm btn-modern btn-secondary-modern">📝 Asuntos Email</a>
+                        <a href="{% url 'ventas:bulk_email_sender' %}"
+                            class="btn btn-sm btn-modern btn-success-modern">📧 Enviar Emails Masivos</a>
                     </div>
                 </div>
             </div>
@@ -231,12 +283,15 @@
                     <h5 class="card-title">Perfil del Cliente</h5>
                     <p class="card-text small">WhatsApp personalizado con IA</p>
                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'ventas:crm_buscar' %}" class="btn btn-sm btn-modern btn-primary-modern">🔍 Buscar Cliente</a>
-                        <a href="{% url 'ventas:crm_dashboard' %}" class="btn btn-sm btn-modern" style="background-color: #128C7E; border-color: #128C7E; color: white;">
+                        <a href="{% url 'ventas:crm_buscar' %}" class="btn btn-sm btn-modern btn-primary-modern">🔍
+                            Buscar Cliente</a>
+                        <a href="{% url 'ventas:crm_dashboard' %}" class="btn btn-sm btn-modern"
+                            style="background-color: #128C7E; border-color: #128C7E; color: white;">
                             <i class="fas fa-robot me-1"></i>
                             <i class="fab fa-whatsapp me-1"></i> WhatsApp con IA
                         </a>
-                        <a href="{% url 'ventas:clientes_historicos_inactivos' %}" class="btn btn-sm btn-modern btn-warning-modern">
+                        <a href="{% url 'ventas:clientes_historicos_inactivos' %}"
+                            class="btn btn-sm btn-modern btn-warning-modern">
                             <i class="fas fa-user-clock me-1"></i> Clientes Inactivos
                         </a>
                     </div>
@@ -252,7 +307,8 @@
                     <h5 class="card-title">Campaña Giftcard</h5>
                     <p class="card-text small">Clientes Enero 2025 (Legacy)</p>
                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'ventas:giftcard_campaign_dashboard' %}" class="btn btn-sm btn-modern btn-warning-modern">🎁 Ver Campaña</a>
+                        <a href="{% url 'ventas:giftcard_campaign_dashboard' %}"
+                            class="btn btn-sm btn-modern btn-warning-modern">🎁 Ver Campaña</a>
                     </div>
                 </div>
             </div>
@@ -266,10 +322,14 @@
                     <h5 class="card-title">Premios y Fidelización</h5>
                     <p class="card-text small">Sistema de premios por tramos</p>
                     <div class="card-link-container d-grid gap-2">
-                        <a href="{% url 'ventas:premio_dashboard' %}" class="btn btn-sm btn-modern btn-warning-modern">🎁 Dashboard Premios</a>
-                        <a href="{% url 'ventas:premios_pendientes' %}" class="btn btn-sm btn-modern btn-info-modern">✅ Aprobar Premios</a>
-                        <a href="{% url 'ventas:clientes_con_premios' %}" class="btn btn-sm btn-modern btn-primary-modern">👥 Clientes</a>
-                        <a href="{% url 'ventas:historial_tramos' %}" class="btn btn-sm btn-modern btn-secondary-modern">📈 Historial</a>
+                        <a href="{% url 'ventas:premio_dashboard' %}"
+                            class="btn btn-sm btn-modern btn-warning-modern">🎁 Dashboard Premios</a>
+                        <a href="{% url 'ventas:premios_pendientes' %}" class="btn btn-sm btn-modern btn-info-modern">✅
+                            Aprobar Premios</a>
+                        <a href="{% url 'ventas:clientes_con_premios' %}"
+                            class="btn btn-sm btn-modern btn-primary-modern">👥 Clientes</a>
+                        <a href="{% url 'ventas:historial_tramos' %}"
+                            class="btn btn-sm btn-modern btn-secondary-modern">📈 Historial</a>
                     </div>
                 </div>
             </div>
