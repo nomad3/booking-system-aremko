@@ -1,14 +1,14 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 {% load humanize %}
-<!-- Cache-bust: v2.2 - 2025-12-02 - Add PACKS SPA category section -->
+<!-- Cache-bust: v2.3 - 2025-12-02 - Fix DOMContentLoaded timing issue -->
 
 {% block title %}Regala una Experiencia Aremko - GiftCards Personalizadas{% endblock %}
 
 {% block meta_description %}
 <meta name="description"
     content="Regala momentos inolvidables en Aremko. GiftCards personalizadas con mensajes únicos generados por IA. Tinas calientes, masajes y más.">
-<meta name="version" content="2.2-{% now "U" %}">
+<meta name="version" content="2.3-{% now "U" %}">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1102,21 +1102,35 @@
     // Si hay experiencia pre-seleccionada, auto-seleccionarla al cargar la página
     if (experienciaPreseleccionada) {
         console.log(`🎯 Auto-seleccionando experiencia: ${experienciaPreseleccionada}`);
-        // Esperar a que el DOM esté completamente cargado
-        window.addEventListener('DOMContentLoaded', function() {
-            // Pequeño delay para asegurar que todo el DOM está renderizado
+
+        // Función para ejecutar la selección
+        function ejecutarAutoSeleccion() {
+            console.log('🔄 Ejecutando auto-selección...');
+            console.log('📊 document.readyState:', document.readyState);
+
             setTimeout(() => {
                 const expCard = document.querySelector(`[data-experience="${experienciaPreseleccionada}"]`);
                 if (expCard) {
-                    console.log(`✅ Tarjeta encontrada, seleccionando...`);
+                    console.log(`✅ Tarjeta encontrada con selector [data-experience="${experienciaPreseleccionada}"]`);
                     selectExperience(experienciaPreseleccionada);
                     // Scroll suave hacia la experiencia seleccionada
                     expCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 } else {
-                    console.warn(`⚠️ No se encontró tarjeta con data-experience="${experienciaPreseleccionada}"`);
+                    console.error(`❌ No se encontró tarjeta con data-experience="${experienciaPreseleccionada}"`);
+                    console.log(`📋 Tarjetas disponibles:`, Array.from(document.querySelectorAll('[data-experience]')).map(el => el.getAttribute('data-experience')));
                 }
-            }, 300);
-        });
+            }, 100);
+        }
+
+        // Si el DOM ya está listo (script al final del body), ejecutar inmediatamente
+        // Si no, esperar al DOMContentLoaded
+        if (document.readyState === 'loading') {
+            console.log('⏳ DOM aún cargando, esperando DOMContentLoaded...');
+            document.addEventListener('DOMContentLoaded', ejecutarAutoSeleccion);
+        } else {
+            console.log('✅ DOM ya está listo, ejecutando inmediatamente...');
+            ejecutarAutoSeleccion();
+        }
     }
 
     // Seleccionar Experiencia
