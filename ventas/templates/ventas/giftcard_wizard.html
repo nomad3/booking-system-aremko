@@ -1060,7 +1060,11 @@
     const experiencias = {{ experiencias| safe }};
 
     // Pre-selección de experiencia si viene parámetro ?exp= en la URL
-    const experienciaPreseleccionada = {% if experiencia_preseleccionada %}'{{ experiencia_preseleccionada }}'{% else %}null{% endif %};
+    {% if experiencia_preseleccionada %}
+    const experienciaPreseleccionada = '{{ experiencia_preseleccionada }}';
+    {% else %}
+    const experienciaPreseleccionada = null;
+    {% endif %}
 
     // Si hay experiencia pre-seleccionada, auto-seleccionarla al cargar la página
     if (experienciaPreseleccionada) {
