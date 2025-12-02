@@ -1,14 +1,14 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 {% load humanize %}
-<!-- Cache-bust: v2.1 - 2025-12-02 - Fix None to null -->
+<!-- Cache-bust: v2.2 - 2025-12-02 - Add PACKS SPA category section -->
 
 {% block title %}Regala una Experiencia Aremko - GiftCards Personalizadas{% endblock %}
 
 {% block meta_description %}
 <meta name="description"
     content="Regala momentos inolvidables en Aremko. GiftCards personalizadas con mensajes únicos generados por IA. Tinas calientes, masajes y más.">
-<meta name="version" content="2.1-{% now "U" %}">
+<meta name="version" content="2.2-{% now "U" %}">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -584,6 +584,34 @@
                         <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
                         {% else %}
                         <i class="fas fa-spa"></i>
+                        {% endif %}
+                        <h5>{{ exp.nombre }}</h5>
+                        <p>{{ exp.descripcion }}</p>
+                        <small class="text-muted" style="font-size: 0.7rem;">ID: {{ exp.id }}</small>
+                        {% if exp.monto_fijo %}
+                        <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Grupo PACKS SPA -->
+            <div class="category-group mb-4">
+                <h3 class="category-title text-center mb-3">
+                    <i class="fas fa-box-open me-2"></i>PACKS SPA
+                </h3>
+                <div class="experience-grid">
+                    {% for exp in experiencias %}
+                    {% if exp.categoria == 'packs' %}
+                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}"
+                        data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                        <!-- Debug: ID={{ exp.id }} Img={{ exp.imagen }} -->
+                        {% if exp.imagen %}
+                        <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
+                        {% else %}
+                        <i class="fas fa-box-open"></i>
                         {% endif %}
                         <h5>{{ exp.nombre }}</h5>
                         <p>{{ exp.descripcion }}</p>
