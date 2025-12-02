@@ -417,8 +417,8 @@
                     {% endif %}
                     {% else %}
                     <a href="{% url 'login' %}" class="btn btn-outline-secondary btn-sm me-2">Ingresar</a>
-                    <a href="{% url 'ventas:inicio_sistema' %}" class="btn btn-primary btn-sm"> {# Added ventas:
-                        namespace #}
+                    {# Added ventas: namespace for consistency #}
+                    <a href="{% url 'ventas:inicio_sistema' %}" class="btn btn-primary btn-sm">
                         <i class="fas fa-user me-1"></i>Acceso Admin/Staff
                     </a>
                     {% endif %}
