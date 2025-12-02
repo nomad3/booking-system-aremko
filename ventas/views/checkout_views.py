@@ -133,26 +133,44 @@ def remove_from_cart(request):
     if request.method == 'POST':
         try:
             index = int(request.POST.get('index', ''))
-            cart = request.session.get('cart', {'servicios': [], 'total': 0})
+            item_type = request.POST.get('type', 'servicio')  # 'servicio' o 'giftcard'
+            cart = request.session.get('cart', {'servicios': [], 'giftcards': [], 'total': 0})
 
-            if 'servicios' in cart and 0 <= index < len(cart['servicios']):
-                del cart['servicios'][index]
-                found = True
-            else:
-                found = False
-                print(f"Error removing from cart: Index {index} out of bounds or 'servicios' key missing.")
+            # Asegurar que existe la clave giftcards (para carritos antiguos)
+            if 'giftcards' not in cart:
+                cart['giftcards'] = []
 
-            # Recalculate total
-            total = sum(float(item.get('subtotal', 0)) for item in cart.get('servicios', []))
-            cart['total'] = total
+            found = False
+
+            # Eliminar según el tipo de item
+            if item_type == 'giftcard':
+                if 'giftcards' in cart and 0 <= index < len(cart['giftcards']):
+                    removed_item = cart['giftcards'][index]
+                    del cart['giftcards'][index]
+                    found = True
+                    print(f"✅ GiftCard removida: {removed_item.get('experiencia_nombre', 'Unknown')}")
+            else:  # servicio
+                if 'servicios' in cart and 0 <= index < len(cart['servicios']):
+                    removed_item = cart['servicios'][index]
+                    del cart['servicios'][index]
+                    found = True
+                    print(f"✅ Servicio removido: {removed_item.get('nombre', 'Unknown')}")
+
+            if not found:
+                print(f"❌ Error removing from cart: Index {index} out of bounds for type {item_type}")
+
+            # Recalcular total incluyendo servicios y giftcards
+            total_servicios = sum(float(item.get('subtotal', 0)) for item in cart.get('servicios', []))
+            total_giftcards = sum(float(item.get('precio', 0)) for item in cart.get('giftcards', []))
+            cart['total'] = total_servicios + total_giftcards
 
             request.session['cart'] = cart
             request.session.modified = True
 
             if found:
-                return JsonResponse({'success': True})
+                return JsonResponse({'success': True, 'cart_count': len(cart['servicios']) + len(cart['giftcards'])})
             else:
-                return JsonResponse({'success': False, 'error': 'Ítem no encontrado en el carrito.'})
+                return JsonResponse({'success': False, 'error': f'Ítem no encontrado en el carrito (tipo: {item_type}, índice: {index}).'})
 
         except ValueError:
              print("Error removing from cart: Invalid index format.")

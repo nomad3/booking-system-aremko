@@ -375,8 +375,8 @@
     }
 
     // Función para eliminar del carrito
-    function removeFromCart(index) {
-        console.log("Attempting to remove item at index:", index);
+    function removeFromCart(index, itemType = 'servicio') {
+        console.log(`Attempting to remove ${itemType} at index:`, index);
         const csrfToken = getCookie('csrftoken');
         console.log("CSRF Token for remove:", csrfToken);
         if (!csrfToken) {
@@ -387,9 +387,10 @@
 
         const formData = new FormData();
         formData.append('index', index);
+        formData.append('type', itemType);
 
         const removeUrl = '{% url "ventas:remove_from_cart" %}';
-        console.log("Sending remove request to:", removeUrl);
+        console.log(`Sending remove request for ${itemType} to:`, removeUrl);
 
         fetch(removeUrl, {
             method: 'POST',

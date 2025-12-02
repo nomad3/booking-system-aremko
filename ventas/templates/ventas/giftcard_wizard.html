@@ -1,14 +1,14 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 {% load humanize %}
-<!-- Cache-bust: v2.3 - 2025-12-02 - Fix DOMContentLoaded timing issue -->
+<!-- Cache-bust: v2.4 - 2025-12-02 - Store experience name in wizardData -->
 
 {% block title %}Regala una Experiencia Aremko - GiftCards Personalizadas{% endblock %}
 
 {% block meta_description %}
 <meta name="description"
     content="Regala momentos inolvidables en Aremko. GiftCards personalizadas con mensajes únicos generados por IA. Tinas calientes, masajes y más.">
-<meta name="version" content="2.3-{% now "U" %}">
+<meta name="version" content="2.4-{% now "U" %}">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1081,6 +1081,7 @@
     let wizardData = {
         paso: 1,
         experiencia: null,
+        experienciaNombre: null,  // NUEVO: guardar el nombre de la experiencia
         monto: null,
         destinatario: {},
         tipoMensaje: null,
@@ -1157,6 +1158,10 @@
                 return;
             }
             console.log(`✅ Experiencia encontrada:`, exp);
+
+            // NUEVO: Guardar el nombre de la experiencia
+            wizardData.experienciaNombre = exp.nombre;
+            console.log(`📝 Nombre de experiencia guardado: ${wizardData.experienciaNombre}`);
         } catch (error) {
             console.error('❌ Error al buscar experiencia:', error);
             // Fallback: intentar buscar en el DOM
@@ -1510,9 +1515,9 @@
                                 throw new Error('No se seleccionó un mensaje');
                             }
 
-                            // Obtener el nombre de la experiencia seleccionada
-                            const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
-                            const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
+                            // Usar el nombre guardado de la experiencia
+                            const expNombre = wizardData.experienciaNombre || 'Experiencia Aremko';
+                            console.log(`📋 Usando nombre guardado: ${expNombre}`);
 
                             // Preparar datos para enviar
                             const giftcardData = {
@@ -1847,12 +1852,9 @@
             btn.disabled = true;
             loadingDiv.classList.remove('d-none');
 
-            // Obtener el nombre de la experiencia seleccionada
-            console.log('🔍 Buscando experiencia con ID:', wizardData.experiencia);
-            const expCard = document.querySelector(`.exp-card[data-exp-id="${wizardData.experiencia}"]`);
-            console.log('📋 Elemento encontrado:', expCard);
-            const expNombre = expCard ? expCard.querySelector('h5').textContent.trim() : 'Experiencia Aremko';
-            console.log('🏷️ Nombre de experiencia extraído:', expNombre);
+            // Usar el nombre guardado de la experiencia
+            const expNombre = wizardData.experienciaNombre || 'Experiencia Aremko';
+            console.log('🏷️ Nombre de experiencia guardado:', expNombre);
 
             // Preparar datos para enviar
             const giftcardData = {
