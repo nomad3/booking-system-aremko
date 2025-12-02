@@ -1059,6 +1059,29 @@
     // Datos de experiencias (desde el backend)
     const experiencias = {{ experiencias| safe }};
 
+    // Pre-selección de experiencia si viene parámetro ?exp= en la URL
+    const experienciaPreseleccionada = {% if experiencia_preseleccionada %}'{{ experiencia_preseleccionada }}'{% else %}null{% endif %};
+
+    // Si hay experiencia pre-seleccionada, auto-seleccionarla al cargar la página
+    if (experienciaPreseleccionada) {
+        console.log(`🎯 Auto-seleccionando experiencia: ${experienciaPreseleccionada}`);
+        // Esperar a que el DOM esté completamente cargado
+        window.addEventListener('DOMContentLoaded', function() {
+            // Pequeño delay para asegurar que todo el DOM está renderizado
+            setTimeout(() => {
+                const expCard = document.querySelector(`[data-experience="${experienciaPreseleccionada}"]`);
+                if (expCard) {
+                    console.log(`✅ Tarjeta encontrada, seleccionando...`);
+                    selectExperience(experienciaPreseleccionada);
+                    // Scroll suave hacia la experiencia seleccionada
+                    expCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    console.warn(`⚠️ No se encontró tarjeta con data-experience="${experienciaPreseleccionada}"`);
+                }
+            }, 300);
+        });
+    }
+
     // Seleccionar Experiencia
     function selectExperience(expId) {
         console.log(`📌 selectExperience llamado con: ${expId}`);

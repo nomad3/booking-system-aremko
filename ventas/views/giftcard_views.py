@@ -400,6 +400,7 @@ def giftcard_wizard(request):
     Página principal del wizard de compra de GiftCards
 
     GET /giftcards/
+    GET /giftcards/?exp=alojamiento_semana  (pre-selecciona experiencia)
 
     Wizard de 6 pasos:
     1. Seleccionar experiencia/monto
@@ -429,6 +430,25 @@ def giftcard_wizard(request):
         logger.warning("⚠️ No hay experiencias GiftCard activas en la base de datos")
         # Podrías redirigir a página de error o mostrar mensaje
         experiencias = []
+
+    # ============================================================
+    # MANEJAR PARÁMETRO ?exp= PARA PRE-SELECCIÓN
+    # ============================================================
+    # Si viene ?exp=alojamiento_semana en la URL, pre-seleccionamos esa experiencia
+    experiencia_preseleccionada = None
+    exp_id = request.GET.get('exp')
+
+    if exp_id:
+        logger.info(f"🔍 Parámetro ?exp={exp_id} detectado, buscando experiencia...")
+        # Buscar si existe una experiencia con ese ID
+        experiencia_obj = experiencias_db.filter(id_experiencia=exp_id).first()
+
+        if experiencia_obj:
+            experiencia_preseleccionada = exp_id
+            logger.info(f"✅ Experiencia '{experiencia_obj.nombre}' encontrada y pre-seleccionada")
+        else:
+            logger.warning(f"⚠️ Experiencia con id_experiencia='{exp_id}' no encontrada o inactiva")
+            # No redirigir ni mostrar error, simplemente ignorar y mostrar todas las experiencias
 
     # Tipos de mensaje disponibles
     tipos_mensaje = [
@@ -491,6 +511,7 @@ def giftcard_wizard(request):
     context = {
         'experiencias': experiencias,
         'tipos_mensaje': tipos_mensaje,
+        'experiencia_preseleccionada': experiencia_preseleccionada,  # Nuevo: para pre-selección
         'paso_actual': 1,
         'total_pasos': 5  # 1:Experiencia, 2:Destinatario, 3:Tipo, 4:Mensaje, 5:Preview (Comprador ahora en checkout)
     }
