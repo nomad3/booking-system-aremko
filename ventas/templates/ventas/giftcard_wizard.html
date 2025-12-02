@@ -1,14 +1,14 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 {% load humanize %}
-<!-- Cache-bust: v2.4 - 2025-12-02 - Store experience name in wizardData -->
+<!-- Cache-bust: v2.5 - 2025-12-02 - Fix monto_fijo handling for packs -->
 
 {% block title %}Regala una Experiencia Aremko - GiftCards Personalizadas{% endblock %}
 
 {% block meta_description %}
 <meta name="description"
     content="Regala momentos inolvidables en Aremko. GiftCards personalizadas con mensajes únicos generados por IA. Tinas calientes, masajes y más.">
-<meta name="version" content="2.4-{% now "U" %}">
+<meta name="version" content="2.5-{% now "U" %}">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1180,16 +1180,30 @@
             return;
         }
 
-        // Si tiene monto fijo (> 0), asignarlo directamente y ocultar selector
-        if (exp.monto_fijo && exp.monto_fijo > 0) {
-            wizardData.monto = exp.monto_fijo;
+        // Manejar asignación de monto con verificación robusta
+        // Convertir monto_fijo a número si es necesario
+        const montoFijo = exp.monto_fijo ? Number(exp.monto_fijo) : null;
+
+        console.log(`🔍 Verificando monto - monto_fijo original: ${exp.monto_fijo}, tipo: ${typeof exp.monto_fijo}`);
+        console.log(`🔢 Monto convertido a número: ${montoFijo}`);
+
+        // Si tiene monto fijo válido (número mayor a 0), asignarlo directamente
+        if (montoFijo && montoFijo > 0) {
+            wizardData.monto = montoFijo;
             document.getElementById('amountSelection').style.display = 'none';
-            console.log(`✅ Experiencia "${exp.nombre}" seleccionada con monto fijo: $${exp.monto_fijo.toLocaleString('es-CL')}`);
+            console.log(`✅ Experiencia "${exp.nombre}" seleccionada con monto fijo: $${montoFijo.toLocaleString('es-CL')}`);
             console.log(`📊 wizardData.monto actualizado a: ${wizardData.monto}`);
-        } else {
-            // Mostrar selector de monto para "Monto Libre" (monto_fijo = 0)
+        } else if (exp.montos_sugeridos && exp.montos_sugeridos.length > 0) {
+            // Si tiene montos sugeridos (Monto Libre), mostrar selector
             console.log(`💰 Mostrando selector de montos para "${exp.nombre}"`);
+            wizardData.monto = null; // Resetear monto para forzar selección
             showAmountOptions(exp.montos_sugeridos);
+        } else {
+            // Caso especial: experiencia sin precio configurado
+            console.error(`❌ ERROR: Experiencia "${exp.nombre}" sin precio configurado`);
+            console.log(`📋 Datos de la experiencia:`, exp);
+            alert(`Error: La experiencia "${exp.nombre}" no tiene precio configurado. Por favor, contacta al administrador.`);
+            wizardData.monto = null;
         }
 
         // Habilitar botón siguiente

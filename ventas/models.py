@@ -2797,7 +2797,7 @@ class GiftCardExperiencia(models.Model):
             'descripcion': self.descripcion,
             'descripcion_giftcard': self.descripcion_giftcard,
             'imagen': self.imagen.url if self.imagen else '',
-            'monto_fijo': self.monto_fijo,
+            'monto_fijo': float(self.monto_fijo) if self.monto_fijo else None,
             'montos_sugeridos': self.montos_sugeridos or []
         }
 

@@ -422,7 +422,17 @@ def giftcard_wizard(request):
 
     # Convertir QuerySet a lista de diccionarios compatible con el template
     # (mismo formato que el array hardcodeado original)
-    experiencias = [exp.to_dict() for exp in experiencias_db]
+    experiencias = []
+    for exp in experiencias_db:
+        exp_dict = exp.to_dict()
+        # Asegurar que monto_fijo se maneje correctamente
+        if exp_dict.get('monto_fijo') is not None:
+            # Convertir a float explícitamente para JavaScript
+            exp_dict['monto_fijo'] = float(exp_dict['monto_fijo'])
+        else:
+            # Mantener None que se convertirá a null en JavaScript
+            exp_dict['monto_fijo'] = None
+        experiencias.append(exp_dict)
 
     # Si no hay experiencias en BD, fallback a array vacío
     # (evitamos mostrar wizard sin productos)
