@@ -1,12 +1,17 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 {% load humanize %}
+<!-- Cache-bust: v2.1 - 2025-12-02 - Fix None to null -->
 
 {% block title %}Regala una Experiencia Aremko - GiftCards Personalizadas{% endblock %}
 
 {% block meta_description %}
 <meta name="description"
     content="Regala momentos inolvidables en Aremko. GiftCards personalizadas con mensajes únicos generados por IA. Tinas calientes, masajes y más.">
+<meta name="version" content="2.1-{% now "U" %}">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 {% endblock %}
 
 {% block extra_style %}
