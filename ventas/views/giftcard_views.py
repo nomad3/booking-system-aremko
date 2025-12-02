@@ -516,7 +516,15 @@ def giftcard_wizard(request):
         'total_pasos': 5  # 1:Experiencia, 2:Destinatario, 3:Tipo, 4:Mensaje, 5:Preview (Comprador ahora en checkout)
     }
 
-    return render(request, 'ventas/giftcard_wizard.html', context)
+    # Renderizar respuesta con headers anti-caché para Cloudflare
+    response = render(request, 'ventas/giftcard_wizard.html', context)
+
+    # Headers para prevenir caché por Cloudflare y navegadores
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+
+    return response
 
 
 @csrf_exempt
