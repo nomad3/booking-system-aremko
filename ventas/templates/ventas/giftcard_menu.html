@@ -5,7 +5,7 @@
 {% block title %}GiftCards - Regala Experiencias de Bienestar | Aremko Spa{% endblock %}
 
 {% block extra_style %}
-<!-- Version: 2024-11-21-v3 - REBUILD FORCED - Step Cards Fixed -->
+<!-- Version: 2024-12-02-v4 - Fixed Django comment visibility issue -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
     /* FORCED REBUILD - Timestamp: <?php echo time(); ?> */
@@ -753,14 +753,6 @@
                     <i class="fas fa-home me-2"></i>Alojamientos
                 </button>
             </li>
-{# ELIMINADO: Pestaña Celebraciones - las celebraciones están incluidas en otras categorías
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="celebraciones-tab" data-bs-toggle="tab" data-bs-target="#celebraciones"
-                    type="button">
-                    <i class="fas fa-birthday-cake me-2"></i>Celebraciones
-                </button>
-            </li>
-            #}
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="libre-tab" data-bs-toggle="tab" data-bs-target="#libre" type="button">
                     <i class="fas fa-gift me-2"></i>Monto Libre
@@ -887,48 +879,6 @@
                     {% endfor %}
                 </div>
             </div>
-
-{# ELIMINADO: Tab de Celebraciones - las celebraciones están incluidas en otras categorías
-            <!-- CELEBRACIONES TAB -->
-            <div class="tab-pane fade" id="celebraciones" role="tabpanel">
-                <div class="row g-4 justify-content-center">
-                    {% for exp in experiencias_por_categoria.faciales %}
-                    <div class="col-md-6 col-lg-4">
-                        <div class="experience-card">
-                            {% if exp.imagen %}
-                            <div class="experience-image"
-                                style="background-image: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('{{ exp.imagen }}');">
-                            </div>
-                            {% else %}
-                            <div class="experience-image"
-                                style="background: linear-gradient(135deg, var(--spa-sage), var(--spa-eucalyptus)); display: flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-birthday-cake"
-                                    style="font-size: 4rem; color: white; opacity: 0.5;"></i>
-                            </div>
-                            {% endif %}
-                            <div class="experience-body">
-                                <h4 class="experience-title">{{ exp.nombre }}</h4>
-                                <p class="experience-description">{{ exp.descripcion }}</p>
-                                {% if exp.monto_fijo %}
-                                <div class="experience-price">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
-                                {% else %}
-                                <div class="experience-price">Monto Libre</div>
-                                {% endif %}
-                                <a href="{% url 'ventas:giftcard_wizard' %}?exp={{ exp.id }}"
-                                    class="btn btn-experience">
-                                    Regalar Esta Experiencia
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="col-12 text-center py-5">
-                        <p class="text-muted">No hay experiencias de celebración disponibles en este momento.</p>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            #}
 
             <!-- MONTO LIBRE TAB -->
             <div class="tab-pane fade" id="libre" role="tabpanel">
