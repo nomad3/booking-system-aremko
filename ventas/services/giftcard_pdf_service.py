@@ -9,8 +9,15 @@ from django.template.loader import render_to_string
 from datetime import datetime
 import logging
 import io
-from weasyprint import HTML, CSS
-from weasyprint.text.fonts import FontConfiguration
+try:
+    from weasyprint import HTML, CSS
+    from weasyprint.text.fonts import FontConfiguration
+    WEASYPRINT_AVAILABLE = True
+except ImportError:
+    WEASYPRINT_AVAILABLE = False
+    HTML = None
+    CSS = None
+    FontConfiguration = None
 
 logger = logging.getLogger(__name__)
 
@@ -339,6 +346,10 @@ class GiftCardPDFService:
         Returns:
             bytes: Contenido del PDF en bytes
         """
+        if not WEASYPRINT_AVAILABLE:
+            logger.warning("WeasyPrint not available - PDF generation disabled")
+            return None
+
         try:
             # Generar HTML
             html_content = GiftCardPDFService.generar_html_giftcard(giftcard_data)
@@ -416,6 +427,10 @@ class GiftCardPDFService:
         Returns:
             bytes: Contenido del PDF combinado en bytes
         """
+        if not WEASYPRINT_AVAILABLE:
+            logger.warning("WeasyPrint not available - PDF generation disabled")
+            return None
+
         try:
             # Si es solo una GiftCard, usar función simple
             if len(giftcards_data) == 1:

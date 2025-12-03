@@ -12,7 +12,12 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import transaction # Import transaction
 from django.db import models # Import models for Q lookup
 from django.template.loader import render_to_string
-from weasyprint import HTML
+try:
+    from weasyprint import HTML
+    WEASYPRINT_AVAILABLE = True
+except ImportError:
+    WEASYPRINT_AVAILABLE = False
+    # Temporary fallback while weasyprint dependencies are being fixed
 
 from ..models import Cliente, Contact, Campaign, Company, Activity, VentaReserva, CommunicationLog # Added CommunicationLog
 from django.core.mail import EmailMultiAlternatives
@@ -452,8 +457,15 @@ def admin_section_config_view(request):
 def generate_reserva_pdf(request, reserva_id):
     reserva = get_object_or_404(VentaReserva, pk=reserva_id)
     rendered = render_to_string('ventas/reserva_summary_pdf.html', {'reserva': reserva})
-    html = HTML(string=rendered, base_url=request.build_absolute_uri())
-    pdf = html.write_pdf()
-    response = HttpResponse(pdf, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="reserva_{reserva_id}.pdf"'
+
+    if WEASYPRINT_AVAILABLE:
+        html = HTML(string=rendered, base_url=request.build_absolute_uri())
+        pdf = html.write_pdf()
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="reserva_{reserva_id}.pdf"'
+    else:
+        # Fallback: return HTML instead of PDF when weasyprint is not available
+        response = HttpResponse(rendered, content_type='text/html')
+        messages.warning(request, 'PDF generation is temporarily unavailable. Showing HTML version.')
+
     return response

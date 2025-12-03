@@ -1,17 +1,98 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 {% load humanize %}
-{% load ventas_extras %} {# Load custom filters #}
+{% load ventas_extras %}
 
-{% block title %}{{ categoria_actual.nombre }} - Servicios | Aremko Spa Puerto Varas{% endblock %}
+{% block title %}
+{% if seo_content and seo_content.meta_title %}
+    {{ seo_content.meta_title }}
+{% else %}
+    {{ categoria_actual.nombre }} en Puerto Varas | Aremko Spa - Relajación y Bienestar
+{% endif %}
+{% endblock %}
 
 {% block meta_description %}
-<meta name="description" content="Explora nuestros servicios de {{ categoria_actual.nombre }} en Aremko Spa Puerto Varas. Reserva tu experiencia de relajación hoy.">
+{% if seo_content and seo_content.meta_description %}
+    <meta name="description" content="{{ seo_content.meta_description }}">
+{% else %}
+    <meta name="description" content="Descubre los mejores {{ categoria_actual.nombre|lower }} en Aremko Spa Puerto Varas. Experiencias únicas de relajación y bienestar. Reserva online y disfruta de promociones exclusivas.">
+{% endif %}
+{% endblock %}
+
+{% block extra_head %}
+<!-- Open Graph Tags -->
+<meta property="og:title" content="{% if seo_content and seo_content.meta_title %}{{ seo_content.meta_title }}{% else %}{{ categoria_actual.nombre }} | Aremko Spa Puerto Varas{% endif %}">
+<meta property="og:description" content="{% if seo_content and seo_content.meta_description %}{{ seo_content.meta_description }}{% else %}Experiencias únicas de {{ categoria_actual.nombre|lower }} en Puerto Varas{% endif %}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ canonical_url }}">
+{% if category_hero_image %}
+<meta property="og:image" content="{{ category_hero_image }}">
+{% endif %}
+
+<!-- Schema.org JSON-LD -->
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": "Aremko Spa - {{ categoria_actual.nombre }}",
+    "description": "{% if seo_content and seo_content.meta_description %}{{ seo_content.meta_description }}{% else %}Servicios de {{ categoria_actual.nombre|lower }} en Puerto Varas{% endif %}",
+    "url": "{{ canonical_url }}",
+    {% if category_hero_image %}"image": "{{ category_hero_image }}",{% endif %}
+    "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Puerto Varas",
+        "addressRegion": "Los Lagos",
+        "addressCountry": "CL"
+    },
+    "priceRange": "$$",
+    {% if servicios %}
+    "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "{{ categoria_actual.nombre }}",
+        "itemListElement": [
+            {% for servicio in servicios %}
+            {
+                "@type": "Offer",
+                "itemOffered": {
+                    "@type": "Service",
+                    "name": "{{ servicio.nombre }}",
+                    "description": "{{ servicio.nombre }} - Duración: {{ servicio.duracion|duration_in_hours }}"
+                },
+                "price": "{{ servicio.precio_base }}",
+                "priceCurrency": "CLP"
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+    }
+    {% endif %}
+}
+</script>
+
+{% if seo_content and seo_content.get_faqs %}
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+        {% for faq in seo_content.get_faqs %}
+        {
+            "@type": "Question",
+            "name": "{{ faq.pregunta }}",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "{{ faq.respuesta }}"
+            }
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ]
+}
+</script>
+{% endif %}
 {% endblock %}
 
 {% block extra_style %}
 <style>
-/* Styles specific to category detail page */
+/* Category header styles */
 .category-header {
     position: relative;
     background-size: cover;
@@ -30,7 +111,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5); /* Overlay oscuro para contraste */
+    background: rgba(0, 0, 0, 0.5);
     z-index: 1;
 }
 
@@ -47,29 +128,66 @@
     margin: 0;
 }
 
-@media (max-width: 768px) {
-    .category-header {
-        padding: 80px 0;
-    }
-
-    .category-header h1 {
-        font-size: 2rem;
-    }
+.category-subtitle {
+    color: #ffffff;
+    font-size: 1.2rem;
+    margin-top: 15px;
+    opacity: 0.95;
 }
 
-/* Re-use homepage styles for consistency */
+/* Main content section */
+.content-section {
+    padding: 60px 0;
+    background-color: #f8f9fa;
+}
+
+.content-text {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: #333;
+    margin-bottom: 30px;
+}
+
+/* Benefits section */
+.benefits-section {
+    padding: 40px 0;
+}
+
+.benefit-card {
+    background: white;
+    border-radius: 10px;
+    padding: 30px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    transition: transform 0.3s ease;
+}
+
+.benefit-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+}
+
+.benefit-card h3 {
+    color: var(--primary-color);
+    margin-bottom: 15px;
+}
+
+/* Services section */
 .service-card .card {
     transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
+
 .service-card .card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
 }
+
 .service-card .price {
     font-size: 1.1rem;
     font-weight: 600;
     color: var(--primary-color);
 }
+
 .section-title {
     text-align: center;
     font-weight: 700;
@@ -78,6 +196,7 @@
     padding-bottom: 15px;
     margin-bottom: 40px;
 }
+
 .section-title::after {
     content: '';
     position: absolute;
@@ -88,6 +207,85 @@
     bottom: 0;
     left: calc(50% - 30px);
 }
+
+/* FAQ Section */
+.faq-section {
+    padding: 60px 0;
+    background-color: #fff;
+}
+
+.faq-item {
+    margin-bottom: 20px;
+}
+
+.faq-question {
+    background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.faq-question:hover {
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+}
+
+.faq-question::after {
+    content: '+';
+    font-size: 1.5rem;
+    transition: transform 0.3s ease;
+}
+
+.faq-item.active .faq-question::after {
+    transform: rotate(45deg);
+}
+
+.faq-answer {
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 0 0 5px 5px;
+    display: none;
+}
+
+.faq-item.active .faq-answer {
+    display: block;
+}
+
+/* CTA Section */
+.cta-section {
+    background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+    color: white;
+    padding: 60px 0;
+    text-align: center;
+    margin-top: 60px;
+}
+
+.cta-section h2 {
+    margin-bottom: 20px;
+}
+
+.cta-section .btn {
+    font-size: 1.1rem;
+    padding: 12px 30px;
+}
+
+@media (max-width: 768px) {
+    .category-header {
+        padding: 80px 0;
+    }
+
+    .category-header h1 {
+        font-size: 2rem;
+    }
+
+    .content-text {
+        font-size: 1rem;
+    }
+}
 </style>
 {% endblock %}
 
@@ -97,39 +295,88 @@
 <section class="category-header" {% if category_hero_image %}style="background-image: url('{{ category_hero_image }}');"{% endif %}>
     <div class="container">
         <h1>{{ categoria_actual.nombre }}</h1>
-        {# Optional: Add a short description for the category if available in the model #}
-        {# <p class="lead text-white-50 mt-3">{{ categoria_actual.descripcion }}</p> #}
+        {% if seo_content and seo_content.subtitulo_principal %}
+            <p class="category-subtitle">{{ seo_content.subtitulo_principal }}</p>
+        {% else %}
+            <p class="category-subtitle">Experiencias únicas de relajación en Puerto Varas</p>
+        {% endif %}
     </div>
 </section>
 
-<!-- Services in Category Section -->
+<!-- Main Content Section -->
+{% if seo_content and seo_content.contenido_principal %}
+<section class="content-section">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="content-text">
+                    {{ seo_content.contenido_principal|linebreaks }}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% else %}
+<!-- Default content when SEO content is not available -->
+<section class="content-section">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="content-text">
+                    <p>Descubre nuestros servicios de {{ categoria_actual.nombre|lower }} en Aremko Spa Puerto Varas. Ofrecemos experiencias únicas diseñadas para tu bienestar y relajación total. Nuestro equipo de profesionales está comprometido con brindarte momentos inolvidables en un ambiente de tranquilidad y armonía.</p>
+                    <p>Cada servicio está cuidadosamente diseñado para proporcionarte los máximos beneficios, utilizando técnicas especializadas y productos de la más alta calidad. Ya sea que busques relajación profunda, alivio del estrés o simplemente un momento para ti, tenemos la experiencia perfecta para ti.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- Benefits Section -->
+{% if seo_content and seo_content.get_beneficios %}
+<section class="benefits-section">
+    <div class="container">
+        <h2 class="section-title mb-5">Beneficios de Nuestros {{ categoria_actual.nombre }}</h2>
+        <div class="row">
+            {% for beneficio in seo_content.get_beneficios %}
+            <div class="col-md-4 mb-4">
+                <div class="benefit-card">
+                    <h3>{{ beneficio.titulo }}</h3>
+                    <p>{{ beneficio.descripcion }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- Services Section -->
 <section class="container mb-5" id="servicios-categoria">
     <h2 class="section-title mb-4">Servicios Disponibles</h2>
 
     <div class="row">
         {% for servicio in servicios %}
-            <div class="col-lg-4 col-md-6 mb-4 service-card"> {# Added mb-4 for spacing #}
+            <div class="col-lg-4 col-md-6 mb-4 service-card">
                 <div class="card h-100">
                     {% if servicio.imagen %}
-                        <img src="{{ servicio.imagen.url }}" class="card-img-top" alt="{{ servicio.nombre }}">
-                    {% else %}
-                        {# Optional: Placeholder if no image #}
-                        {# <img src="{% static 'path/to/default/placeholder.png' %}" class="card-img-top" alt="{{ servicio.nombre }}"> #}
+                        <img src="{{ servicio.imagen.url }}" class="card-img-top"
+                             alt="{{ servicio.nombre }} en Aremko Spa Puerto Varas"
+                             loading="lazy">
                     {% endif %}
-                    <div class="card-body d-flex flex-column"> {# Use flex column for button alignment #}
-                        <h5 class="card-title">{{ servicio.nombre }}</h5>
-                        {# <p class="card-text">{{ servicio.descripcion|truncatewords:15 }}</p> #} {# Optional: Add service description #}
+                    <div class="card-body d-flex flex-column">
+                        <h3 class="card-title h5">{{ servicio.nombre }}</h3>
                         {% if servicio.tipo_servicio == 'cabana' %}
                             <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
                         {% else %}
                             <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
                         {% endif %}
-                        <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p> {# Use custom filter #}
-                        <button class="btn btn-primary w-100 mt-auto js-open-booking-modal" {# Use mt-auto to push button down #}
+                        <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p>
+                        <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                 data-servicio-id="{{ servicio.id }}"
                                 data-servicio-nombre="{{ servicio.nombre|escapejs }}"
                                 data-servicio-precio="{{ servicio.precio_base }}"
-                                data-servicio-tipo="{{ servicio.tipo_servicio }}"> {# Add service type #}
+                                data-servicio-tipo="{{ servicio.tipo_servicio }}">
                             <i class="fas fa-calendar-plus me-2"></i>Reservar
                         </button>
                     </div>
@@ -141,17 +388,87 @@
             </div>
         {% endfor %}
     </div>
+</section>
 
-    {# Optional: Link back to all services or homepage #}
-    <div class="text-center mt-4">
-        <a href="{% url 'ventas:homepage' %}#servicios" class="btn btn-outline-secondary">Ver Todos los Servicios</a>
+<!-- FAQ Section -->
+{% if seo_content and seo_content.get_faqs %}
+<section class="faq-section">
+    <div class="container">
+        <h2 class="section-title mb-5">Preguntas Frecuentes</h2>
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                {% for faq in seo_content.get_faqs %}
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>{{ faq.pregunta }}</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>{{ faq.respuesta }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</section>
+{% else %}
+<!-- Default FAQs when SEO content is not available -->
+<section class="faq-section">
+    <div class="container">
+        <h2 class="section-title mb-5">Preguntas Frecuentes</h2>
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>¿Cómo puedo hacer una reserva?</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Puedes hacer tu reserva directamente desde nuestra página web seleccionando el servicio deseado, eligiendo fecha y hora disponible, o contactándonos por WhatsApp.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>¿Cuál es la política de cancelación?</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Puedes cancelar o reprogramar tu reserva con al menos 24 horas de anticipación sin costo alguno. Cancelaciones con menos de 24 horas están sujetas a penalización.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>¿Qué debo llevar para mi sesión?</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Para tu comodidad, proporcionamos todo lo necesario: toallas, batas, sandalias y productos de higiene. Solo necesitas traer tu traje de baño si reservaste servicios de tina.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>¿Ofrecen descuentos para grupos?</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Sí, ofrecemos tarifas especiales para grupos de 4 personas o más. Contáctanos directamente para recibir una cotización personalizada.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- CTA Section -->
+<section class="cta-section">
+    <div class="container">
+        <h2>¿Listo para tu experiencia de relajación?</h2>
+        <p class="mb-4">Reserva ahora y disfruta de un momento único en Aremko Spa</p>
+        <a href="{% url 'ventas:homepage' %}#servicios" class="btn btn-light btn-lg">Ver Todos los Servicios</a>
     </div>
 </section>
 
 {% endblock %}
 
 {% block modals %}
-<!-- Booking Modal (Copied from homepage for consistency) -->
+<!-- Booking Modal -->
 <div class="modal fade" id="bookingModal" tabindex="-1" aria-labelledby="bookingModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -178,7 +495,6 @@
                         <label for="hora" class="form-label">Hora</label>
                         <select class="form-select" id="hora" name="hora" required>
                             <option value="">Selecciona una hora</option>
-                            <!-- Las horas disponibles se cargarán dinámicamente -->
                         </select>
                     </div>
 
@@ -212,7 +528,6 @@
 {% endblock %}
 
 {% block extra_script %}
-{# Include the same booking script logic as the homepage #}
 <script>
     // Function to get CSRF token from cookies
     function getCookie(name) {
@@ -230,27 +545,41 @@
         return cookieValue;
     }
 
-    // Helper function to format numbers as CLP (dot for thousands, no decimals)
+    // Helper function to format numbers as CLP
     function formatCLP(value) {
-      const numberValue = Number(value);
-      if (isNaN(numberValue)) {
-        return '0'; // Return '0' if not a valid number
-      }
-      return new Intl.NumberFormat('es-CL', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      }).format(numberValue);
+        const numberValue = Number(value);
+        if (isNaN(numberValue)) {
+            return '0';
+        }
+        return new Intl.NumberFormat('es-CL', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(numberValue);
     }
 
-    // Global variables for the booking modal on this page
+    // FAQ Accordion functionality
+    document.querySelectorAll('.faq-question').forEach(question => {
+        question.addEventListener('click', () => {
+            const faqItem = question.parentElement;
+            faqItem.classList.toggle('active');
+
+            // Close other FAQs
+            document.querySelectorAll('.faq-item').forEach(item => {
+                if (item !== faqItem) {
+                    item.classList.remove('active');
+                }
+            });
+        });
+    });
+
+    // Global variables for the booking modal
     let currentServicioId = null;
     let currentServicioNombre = null;
     let currentServicioPrecio = 0;
-    let currentServicioTipo = 'otro'; // Add type
+    let currentServicioTipo = 'otro';
 
     // Function to load available hours
     function loadAvailableHours(servicioId, fecha) {
-        console.log("Loading available hours for:", servicioId, fecha);
         const horaSelect = document.getElementById('hora');
         if (!horaSelect) return;
         horaSelect.innerHTML = '<option value="">Cargando horas...</option>';
@@ -285,15 +614,15 @@
         if (cantidadPersonasSelect && precioTotalInput) {
             const cantidadPersonas = parseInt(cantidadPersonasSelect.value);
             let precioTotal = 0;
-             // Calculate price based on service type
+
             if (currentServicioTipo === 'cabana') {
-                precioTotal = currentServicioPrecio; // Fixed price for cabin
+                precioTotal = currentServicioPrecio;
             } else {
-                precioTotal = currentServicioPrecio * cantidadPersonas; // Price per person for others
+                precioTotal = currentServicioPrecio * cantidadPersonas;
             }
             precioTotalInput.value = formatCLP(precioTotal);
         }
-        // Also validate the slot when quantity changes, if time is already selected
+
         const horaSelect = document.getElementById('hora');
         if (horaSelect && horaSelect.value) {
             validateSelectedSlot();
@@ -363,16 +692,16 @@
         fetch('{% url "ventas:add_to_cart" %}', {
             method: 'POST',
             body: formData,
-            headers: { 'X-CSRFToken': getCookie('csrftoken') } // Assumes getCookie is global
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
         })
         .then(response => {
             if (!response.ok) {
-                 return response.text().then(text => { throw new Error(`Server responded with ${response.status}: ${text || 'No error info'}`); });
+                return response.text().then(text => { throw new Error(`Server responded with ${response.status}: ${text || 'No error info'}`); });
             }
             if (response.redirected) {
-                 window.location.href = response.url; // Go to checkout
+                window.location.href = response.url;
             } else {
-                 window.location.href = "{% url 'ventas:checkout' %}"; // Fallback redirect
+                window.location.href = "{% url 'ventas:checkout' %}";
             }
         })
         .catch(error => {
@@ -389,31 +718,29 @@
                 currentServicioId = this.dataset.servicioId;
                 currentServicioNombre = this.dataset.servicioNombre;
                 currentServicioPrecio = parseFloat(this.dataset.servicioPrecio);
-                currentServicioTipo = this.dataset.servicioTipo || 'otro'; // Get service type
+                currentServicioTipo = this.dataset.servicioTipo || 'otro';
 
                 document.getElementById('servicioId').value = currentServicioId;
                 document.getElementById('servicioNombre').value = currentServicioNombre;
                 document.getElementById('fecha').value = '';
                 document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
-                document.getElementById('hora').disabled = true; // Disable initially
+                document.getElementById('hora').disabled = true;
 
-                 // Handle quantity selector based on service type
                 const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
-                const cantidadPersonasLabel = document.querySelector('label[for="cantidadPersonas"]'); // Get label too
+                const cantidadPersonasLabel = document.querySelector('label[for="cantidadPersonas"]');
                 if (currentServicioTipo === 'cabana') {
-                    cantidadPersonasSelect.value = '2'; // Default/max for cabin
-                    cantidadPersonasSelect.disabled = true; // Disable quantity selection
-                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none'; // Hide label
-                    cantidadPersonasSelect.style.display = 'none'; // Hide select
-                    document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio); // Show fixed price
+                    cantidadPersonasSelect.value = '2';
+                    cantidadPersonasSelect.disabled = true;
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none';
+                    cantidadPersonasSelect.style.display = 'none';
+                    document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio);
                 } else {
-                    cantidadPersonasSelect.value = '1'; // Default for others
-                    cantidadPersonasSelect.disabled = false; // Enable quantity selection
-                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'block'; // Show label
-                    cantidadPersonasSelect.style.display = 'block'; // Show select
-                    document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio); // Show initial price per person
+                    cantidadPersonasSelect.value = '1';
+                    cantidadPersonasSelect.disabled = false;
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'block';
+                    cantidadPersonasSelect.style.display = 'block';
+                    document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio);
                 }
-
 
                 const bookingModalEl = document.getElementById('bookingModal');
                 if (bookingModalEl) {

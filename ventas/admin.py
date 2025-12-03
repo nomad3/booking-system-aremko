@@ -29,7 +29,9 @@ from .models import (
     # Corporate Services
     CotizacionEmpresa,
     # Newsletter
-    NewsletterSubscriber
+    NewsletterSubscriber,
+    # SEO
+    SEOContent
 )
 from django.http import HttpResponse
 import xlwt
@@ -352,6 +354,63 @@ admin.site.register(VentaReserva, VentaReservaAdmin)
 admin.site.register(Cliente, ClienteAdmin)
 admin.site.register(Servicio, ServicioAdmin)
 admin.site.register(CategoriaServicio)
+
+
+# ============================================
+# SEO CONTENT ADMIN
+# ============================================
+@admin.register(SEOContent)
+class SEOContentAdmin(admin.ModelAdmin):
+    list_display = ('categoria', 'meta_title', 'updated_at')
+    list_filter = ('categoria', 'updated_at')
+    search_fields = ('meta_title', 'meta_description', 'contenido_principal', 'keywords')
+
+    fieldsets = (
+        ('Categoría', {
+            'fields': ('categoria',)
+        }),
+        ('Meta Tags SEO', {
+            'fields': ('meta_title', 'meta_description', 'keywords'),
+            'description': 'Optimización para motores de búsqueda'
+        }),
+        ('Contenido Principal', {
+            'fields': ('subtitulo_principal', 'contenido_principal'),
+            'description': 'Texto principal que aparecerá en la página (180-300 palabras recomendadas)'
+        }),
+        ('Beneficios/Características', {
+            'fields': (
+                ('beneficio_1_titulo', 'beneficio_1_descripcion'),
+                ('beneficio_2_titulo', 'beneficio_2_descripcion'),
+                ('beneficio_3_titulo', 'beneficio_3_descripcion'),
+            ),
+            'classes': ('collapse',),
+            'description': 'Destaca los principales beneficios del servicio'
+        }),
+        ('Preguntas Frecuentes', {
+            'fields': (
+                ('faq_1_pregunta', 'faq_1_respuesta'),
+                ('faq_2_pregunta', 'faq_2_respuesta'),
+                ('faq_3_pregunta', 'faq_3_respuesta'),
+                ('faq_4_pregunta', 'faq_4_respuesta'),
+                ('faq_5_pregunta', 'faq_5_respuesta'),
+                ('faq_6_pregunta', 'faq_6_respuesta'),
+            ),
+            'classes': ('collapse',),
+            'description': 'Agrega entre 4-6 preguntas frecuentes para mejorar el SEO'
+        }),
+    )
+
+    def save_model(self, request, obj, form, change):
+        """Override to add validation for word count in contenido_principal"""
+        word_count = len(obj.contenido_principal.split())
+        if word_count < 180 or word_count > 300:
+            messages.warning(
+                request,
+                f'El contenido principal tiene {word_count} palabras. '
+                f'Se recomienda entre 180-300 palabras para mejor SEO.'
+            )
+        super().save_model(request, obj, form, change)
+
 
 # ============================================
 # CRM MODELS ADMIN

@@ -211,6 +211,104 @@ class CategoriaServicio(models.Model):
     def __str__(self):
         return self.nombre
 
+
+class SEOContent(models.Model):
+    """
+    Modelo para gestionar contenido SEO para cada categoría de servicio.
+    Incluye meta tags, contenido principal, FAQs y Schema.org data.
+    """
+    categoria = models.OneToOneField(
+        CategoriaServicio,
+        on_delete=models.CASCADE,
+        related_name='seo_content'
+    )
+
+    # Meta tags SEO
+    meta_title = models.CharField(
+        max_length=70,
+        help_text="Título SEO (máx. 70 caracteres)"
+    )
+    meta_description = models.CharField(
+        max_length=160,
+        help_text="Meta descripción SEO (máx. 160 caracteres)"
+    )
+
+    # Contenido principal de la página
+    contenido_principal = models.TextField(
+        help_text="Texto principal de la categoría (180-300 palabras)"
+    )
+    subtitulo_principal = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Subtítulo descriptivo para la categoría"
+    )
+
+    # Sección de beneficios/características
+    beneficio_1_titulo = models.CharField(max_length=100, blank=True)
+    beneficio_1_descripcion = models.TextField(blank=True)
+    beneficio_2_titulo = models.CharField(max_length=100, blank=True)
+    beneficio_2_descripcion = models.TextField(blank=True)
+    beneficio_3_titulo = models.CharField(max_length=100, blank=True)
+    beneficio_3_descripcion = models.TextField(blank=True)
+
+    # FAQs (Preguntas frecuentes)
+    faq_1_pregunta = models.CharField(max_length=200, blank=True)
+    faq_1_respuesta = models.TextField(blank=True)
+    faq_2_pregunta = models.CharField(max_length=200, blank=True)
+    faq_2_respuesta = models.TextField(blank=True)
+    faq_3_pregunta = models.CharField(max_length=200, blank=True)
+    faq_3_respuesta = models.TextField(blank=True)
+    faq_4_pregunta = models.CharField(max_length=200, blank=True)
+    faq_4_respuesta = models.TextField(blank=True)
+    faq_5_pregunta = models.CharField(max_length=200, blank=True)
+    faq_5_respuesta = models.TextField(blank=True)
+    faq_6_pregunta = models.CharField(max_length=200, blank=True)
+    faq_6_respuesta = models.TextField(blank=True)
+
+    # Keywords para Schema.org
+    keywords = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Palabras clave separadas por comas"
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Contenido SEO"
+        verbose_name_plural = "Contenidos SEO"
+
+    def __str__(self):
+        return f"SEO: {self.categoria.nombre}"
+
+    def get_faqs(self):
+        """Retorna las FAQs como una lista de diccionarios para facilitar el uso en templates."""
+        faqs = []
+        for i in range(1, 7):
+            pregunta = getattr(self, f'faq_{i}_pregunta', '')
+            respuesta = getattr(self, f'faq_{i}_respuesta', '')
+            if pregunta and respuesta:
+                faqs.append({
+                    'pregunta': pregunta,
+                    'respuesta': respuesta
+                })
+        return faqs
+
+    def get_beneficios(self):
+        """Retorna los beneficios como una lista de diccionarios."""
+        beneficios = []
+        for i in range(1, 4):
+            titulo = getattr(self, f'beneficio_{i}_titulo', '')
+            descripcion = getattr(self, f'beneficio_{i}_descripcion', '')
+            if titulo and descripcion:
+                beneficios.append({
+                    'titulo': titulo,
+                    'descripcion': descripcion
+                })
+        return beneficios
+
 class Servicio(models.Model):
     nombre = models.CharField(max_length=100)
     precio_base = models.DecimalField(max_digits=10, decimal_places=0)

@@ -132,6 +132,14 @@ def categoria_detail_view(request, categoria_id):
         # File exists in DB but not in cloud storage - gracefully handle
         pass
 
+    # Get SEO content if available (optional - handles case when migration hasn't run)
+    seo_content = None
+    try:
+        if hasattr(categoria, 'seo_content'):
+            seo_content = categoria.seo_content
+    except Exception:
+        pass
+
     context = {
         'categoria_actual': categoria,
         'servicios': servicios,
@@ -139,6 +147,7 @@ def categoria_detail_view(request, categoria_id):
         'cart': request.session.get('cart', {'servicios': [], 'total': 0}), # Include cart context
         'canonical_url': canonical_url,
         'category_hero_image': category_hero_image,
+        'seo_content': seo_content,  # Pass SEO content to template
     }
     return render(request, 'ventas/category_detail.html', context)
 
