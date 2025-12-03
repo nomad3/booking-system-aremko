@@ -383,7 +383,6 @@ class SEOContentAdmin(admin.ModelAdmin):
                 ('beneficio_2_titulo', 'beneficio_2_descripcion'),
                 ('beneficio_3_titulo', 'beneficio_3_descripcion'),
             ),
-            'classes': ('collapse',),
             'description': 'Destaca los principales beneficios del servicio'
         }),
         ('Preguntas Frecuentes', {
@@ -395,7 +394,6 @@ class SEOContentAdmin(admin.ModelAdmin):
                 ('faq_5_pregunta', 'faq_5_respuesta'),
                 ('faq_6_pregunta', 'faq_6_respuesta'),
             ),
-            'classes': ('collapse',),
             'description': 'Agrega entre 4-6 preguntas frecuentes para mejorar el SEO'
         }),
     )
