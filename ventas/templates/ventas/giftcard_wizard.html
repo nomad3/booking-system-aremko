@@ -1,14 +1,14 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 {% load humanize %}
-<!-- Cache-bust: v2.5 - 2025-12-02 - Fix monto_fijo handling for packs -->
+<!-- Cache-bust: v2.6 - 2025-12-02 - Remove Celebraciones category -->
 
 {% block title %}Regala una Experiencia Aremko - GiftCards Personalizadas{% endblock %}
 
 {% block meta_description %}
 <meta name="description"
     content="Regala momentos inolvidables en Aremko. GiftCards personalizadas con mensajes únicos generados por IA. Tinas calientes, masajes y más.">
-<meta name="version" content="2.5-{% now "U" %}">
+<meta name="version" content="2.6-{% now "U" %}">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -653,6 +653,7 @@
                 </div>
             </div>
 
+{# ELIMINADO: Grupo Celebraciones - Las celebraciones están incluidas en otras categorías de experiencias
             <!-- Grupo CELEBRACIONES -->
             <div class="category-group mb-4">
                 <h3 class="category-title text-center mb-3">
@@ -680,6 +681,7 @@
                     {% endfor %}
                 </div>
             </div>
+            #}
 
             <div id="amountSelection" style="display:none;">
                 <h3 class="text-center mb-3">Selecciona el Monto</h3>

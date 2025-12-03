@@ -753,12 +753,14 @@
                     <i class="fas fa-home me-2"></i>Alojamientos
                 </button>
             </li>
+{# ELIMINADO: Pestaña Celebraciones - las celebraciones están incluidas en otras categorías
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="celebraciones-tab" data-bs-toggle="tab" data-bs-target="#celebraciones"
                     type="button">
                     <i class="fas fa-birthday-cake me-2"></i>Celebraciones
                 </button>
             </li>
+            #}
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="libre-tab" data-bs-toggle="tab" data-bs-target="#libre" type="button">
                     <i class="fas fa-gift me-2"></i>Monto Libre
@@ -886,6 +888,7 @@
                 </div>
             </div>
 
+{# ELIMINADO: Tab de Celebraciones - las celebraciones están incluidas en otras categorías
             <!-- CELEBRACIONES TAB -->
             <div class="tab-pane fade" id="celebraciones" role="tabpanel">
                 <div class="row g-4 justify-content-center">
@@ -925,6 +928,7 @@
                     {% endfor %}
                 </div>
             </div>
+            #}
 
             <!-- MONTO LIBRE TAB -->
             <div class="tab-pane fade" id="libre" role="tabpanel">
