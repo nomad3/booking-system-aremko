@@ -9,7 +9,7 @@
    - Campos para meta tags, contenido principal, beneficios y FAQs
    - Métodos helper para facilitar el uso en templates
 
-2. **Migración Creada** (`ventas/migrations/0063_seocontent.py`)
+2. **Migración Creada** (`ventas/migrations/0065_seocontent.py`)
    - Lista para ejecutar cuando se resuelva el problema de weasyprint
 
 3. **Admin Configurado** (`ventas/admin.py`)
@@ -76,7 +76,7 @@ Ejecuta una de las opciones anteriores para resolver el problema de weasyprint.
 
 ### 2. Ejecutar la Migración
 ```bash
-python manage.py migrate ventas 0063
+python manage.py migrate ventas 0065
 ```
 
 ### 3. Poblar Contenido SEO Inicial

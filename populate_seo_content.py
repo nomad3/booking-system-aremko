@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Script para poblar contenido SEO inicial para las categorías de servicio.
-Ejecutar después de aplicar la migración 0063_seocontent.
+Ejecutar después de aplicar la migración 0065_seocontent.
 
 Uso:
     python populate_seo_content.py

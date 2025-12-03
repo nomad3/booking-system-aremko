@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ventas', '0062_visualcampaign_visualcampaignrecipient_and_more'),
+        ('ventas', '0064_visual_campaign_system'),
     ]
 
     operations = [
