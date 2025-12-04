@@ -131,19 +131,18 @@ class PackDescuentoService:
             servicios_ids_en_carrito = set()
             indices_por_servicio = {}
 
-            # LÓGICA ESPECIAL PARA PACK TINA + MASAJE (Sin depender del campo cantidad_minima_personas)
-            requiere_minimo_personas = False
-            cantidad_minima_requerida = 1
+            # LÓGICA ESPECIAL PARA PACK TINA + MASAJE
+            es_pack_tina_masaje_35k = False
+            total_personas_en_tinas = 0
+            total_masajes = 0
 
             # Detectar si es el pack de Tina + Masaje basado en el descuento o nombre
             if pack.descuento == 35000 or (
                 'tina' in pack.nombre.lower() and 'masaje' in pack.nombre.lower()
             ):
-                requiere_minimo_personas = True
-                cantidad_minima_requerida = 2
-                print(f"  - Pack {pack.nombre} (${pack.descuento}) requiere mínimo {cantidad_minima_requerida} personas")
+                es_pack_tina_masaje_35k = True
+                print(f"  - Pack {pack.nombre} ($35,000) - Verificando condiciones especiales")
 
-            algun_item_no_cumple = False
             for idx, item in items_con_indices:
                 servicio_id = item.get('id')
                 cantidad_personas = item.get('cantidad_personas', 1)
@@ -151,12 +150,12 @@ class PackDescuentoService:
 
                 print(f"    DEBUG: Evaluando '{item.get('nombre')}' con {cantidad_personas} personas")
 
-                # Verificar cantidad mínima para servicios de tina o masaje
-                if requiere_minimo_personas:
-                    if any(word in nombre_servicio for word in ['tina', 'masaje', 'hidromasaje']):
-                        if cantidad_personas < cantidad_minima_requerida:
-                            print(f"    ⚠️ Servicio {item.get('nombre')} no cumple cantidad mínima: {cantidad_personas} < {cantidad_minima_requerida}")
-                            algun_item_no_cumple = True
+                # Contar para validación del pack $35,000
+                if es_pack_tina_masaje_35k:
+                    if any(word in nombre_servicio for word in ['tina', 'hidromasaje']):
+                        total_personas_en_tinas += cantidad_personas
+                    elif any(word in nombre_servicio for word in ['masaje', 'relajación', 'descontracturante']):
+                        total_masajes += 1
 
                 if servicio_id:
                     servicios_ids_en_carrito.add(servicio_id)
@@ -164,10 +163,25 @@ class PackDescuentoService:
                         indices_por_servicio[servicio_id] = []
                     indices_por_servicio[servicio_id].append(idx)
 
-            # Si algún item no cumple con la cantidad mínima, el pack no aplica
-            if algun_item_no_cumple:
-                print(f"    ❌ Pack {pack.nombre} NO aplica debido a cantidad insuficiente de personas")
-                return None
+            # Validación especial para pack Tina + Masaje de $35,000
+            if es_pack_tina_masaje_35k:
+                print(f"    📊 Validación Pack $35,000 (servicios específicos):")
+                print(f"       - Total personas en tinas: {total_personas_en_tinas}")
+                print(f"       - Total masajes: {total_masajes}")
+
+                cumple_condiciones = (
+                    total_personas_en_tinas >= 2 and
+                    total_masajes >= 2
+                )
+
+                if not cumple_condiciones:
+                    if total_personas_en_tinas < 2:
+                        print(f"    ❌ No cumple: necesita al menos 2 personas en tinas (tiene {total_personas_en_tinas})")
+                    if total_masajes < 2:
+                        print(f"    ❌ No cumple: necesita al menos 2 masajes (tiene {total_masajes})")
+                    return None
+                else:
+                    print(f"    ✅ Cumple condiciones para descuento de $35,000")
 
             # Verificar si todos los servicios específicos están presentes
             if not servicios_ids_requeridos.issubset(servicios_ids_en_carrito):
@@ -189,21 +203,23 @@ class PackDescuentoService:
             indices_por_tipo = {}
             items_validos_por_personas = []  # Items que cumplen con cantidad mínima de personas
 
-            # LÓGICA ESPECIAL PARA PACK TINA + MASAJE (Sin depender del campo cantidad_minima_personas)
-            # Si el pack tiene valor de descuento de $35,000, requiere mínimo 2 personas
-            requiere_minimo_personas = False
-            cantidad_minima_requerida = 1
+            # LÓGICA ESPECIAL PARA PACK TINA + MASAJE
+            # Para el pack de $35,000:
+            # - Necesita al menos 2 personas TOTAL en tinas
+            # - Necesita al menos 2 masajes (pueden ser individuales)
+            es_pack_tina_masaje_35k = False
 
             # Detectar si es el pack de Tina + Masaje basado en el descuento o nombre
             if pack.descuento == 35000 or (
                 'tina' in pack.nombre.lower() and 'masaje' in pack.nombre.lower()
             ):
-                requiere_minimo_personas = True
-                cantidad_minima_requerida = 2
-                print(f"  - Pack {pack.nombre} requiere mínimo {cantidad_minima_requerida} personas")
+                es_pack_tina_masaje_35k = True
+                print(f"  - Pack {pack.nombre} ($35,000) - Verificando condiciones especiales")
 
-            # Variable para verificar si todos los items cumplen con cantidad mínima
-            algun_item_no_cumple = False
+            # Contadores para validación especial
+            total_personas_en_tinas = 0
+            total_masajes = 0
+            total_personas_en_masajes = 0
 
             for idx, item in items_con_indices:
                 nombre_servicio = item.get('nombre', '').lower()
@@ -228,11 +244,13 @@ class PackDescuentoService:
 
                 print(f"  - Item {idx}: {item.get('nombre')} identificado como tipo: {tipo_pack}, personas: {cantidad_personas}")
 
-                # Verificar cantidad mínima solo para packs que lo requieren
-                if requiere_minimo_personas and (tipo_pack in ['tina', 'masaje']):
-                    if cantidad_personas < cantidad_minima_requerida:
-                        print(f"    ⚠️ Item {item.get('nombre')} no cumple cantidad mínima: {cantidad_personas} < {cantidad_minima_requerida}")
-                        algun_item_no_cumple = True
+                # Contar para validación especial del pack Tina + Masaje $35,000
+                if es_pack_tina_masaje_35k:
+                    if tipo_pack == 'tina':
+                        total_personas_en_tinas += cantidad_personas
+                    elif tipo_pack == 'masaje':
+                        total_masajes += 1  # Contar cada masaje como 1 unidad
+                        total_personas_en_masajes += cantidad_personas
 
                 # Agregar el item a los tipos presentes
                 if tipo_pack not in tipos_presentes:
@@ -243,10 +261,29 @@ class PackDescuentoService:
                 indices_por_tipo[tipo_pack].append(idx)
                 items_validos_por_personas.append((idx, item))
 
-            # Si algún item no cumple con la cantidad mínima, el pack no aplica
-            if algun_item_no_cumple:
-                print(f"    ❌ Pack {pack.nombre} NO aplica debido a cantidad insuficiente de personas en algún servicio")
-                return None
+            # Validación especial para pack Tina + Masaje de $35,000
+            if es_pack_tina_masaje_35k:
+                print(f"    📊 Validación Pack $35,000:")
+                print(f"       - Total personas en tinas: {total_personas_en_tinas}")
+                print(f"       - Total masajes: {total_masajes}")
+                print(f"       - Total personas en masajes: {total_personas_en_masajes}")
+
+                # Condiciones para aplicar el descuento:
+                # 1. Al menos 2 personas TOTAL entre las tinas
+                # 2. Al menos 2 masajes (sin importar si son individuales)
+                cumple_condiciones = (
+                    total_personas_en_tinas >= 2 and
+                    total_masajes >= 2
+                )
+
+                if not cumple_condiciones:
+                    if total_personas_en_tinas < 2:
+                        print(f"    ❌ No cumple: necesita al menos 2 personas en tinas (tiene {total_personas_en_tinas})")
+                    if total_masajes < 2:
+                        print(f"    ❌ No cumple: necesita al menos 2 masajes (tiene {total_masajes})")
+                    return None
+                else:
+                    print(f"    ✅ Cumple condiciones para descuento de $35,000")
 
             # Verificar si todos los servicios requeridos están presentes
             servicios_requeridos = set(pack.servicios_requeridos) if pack.servicios_requeridos else set()
