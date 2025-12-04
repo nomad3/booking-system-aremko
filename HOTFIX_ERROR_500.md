@@ -1,16 +1,23 @@
 # 🚨 HOTFIX - ERROR 500 EN RESERVAS
 
-## ❗ URGENTE - ACCIÓN INMEDIATA REQUERIDA
+## ❗ URGENTE - SOLUCIÓN COMPLETA APLICADA
 
 ### 📋 Problema
 Error 500 al agregar personas a reservas de tinas debido al intento de acceder al campo `cantidad_minima_personas` que aún no existe en la base de datos.
 
-### ✅ Solución Aplicada (Commit: 827d822)
+### ✅ Solución Aplicada (Commits: 827d822, 6053cb0)
 
-El código ahora maneja de forma segura cuando el campo no existe:
-- Usa try/except para capturar errores de atributo
-- Solo aplica restricciones cuando se requiere más de 1 persona
-- Permite funcionamiento normal antes de aplicar migración
+**Solución implementada SIN depender del campo cantidad_minima_personas:**
+
+1. **Lógica específica para Pack Tina + Masaje ($35,000)**:
+   - Detecta el pack por valor de descuento ($35,000) o nombre
+   - Requiere mínimo 2 personas para aplicar descuento
+   - Si algún servicio tiene solo 1 persona, NO aplica descuento
+
+2. **Funcionamiento**:
+   - Con 1 persona en tina o masaje: NO aplica descuento
+   - Con 2+ personas en tina y masaje: SÍ aplica descuento de $35,000
+   - No requiere migración para funcionar
 
 ## 🔧 PASOS PARA RESOLVER EN PRODUCCIÓN
 
