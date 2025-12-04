@@ -131,20 +131,30 @@ class PackDescuentoService:
             servicios_ids_en_carrito = set()
             indices_por_servicio = {}
 
-            # Obtener cantidad mínima de forma segura
-            try:
-                cantidad_minima_personas = pack.cantidad_minima_personas if hasattr(pack, 'cantidad_minima_personas') else 1
-            except AttributeError:
-                cantidad_minima_personas = 1
+            # LÓGICA ESPECIAL PARA PACK TINA + MASAJE (Sin depender del campo cantidad_minima_personas)
+            requiere_minimo_personas = False
+            cantidad_minima_requerida = 1
+
+            # Detectar si es el pack de Tina + Masaje basado en el descuento o nombre
+            if pack.valor_descuento == 35000 or (
+                'tina' in pack.nombre.lower() and 'masaje' in pack.nombre.lower()
+            ):
+                requiere_minimo_personas = True
+                cantidad_minima_requerida = 2
+                print(f"  - Pack {pack.nombre} requiere mínimo {cantidad_minima_requerida} personas")
 
             for idx, item in items_con_indices:
                 servicio_id = item.get('id')
                 cantidad_personas = item.get('cantidad_personas', 1)
+                nombre_servicio = item.get('nombre', '').lower()
 
-                # Verificar cantidad mínima de personas solo si es mayor a 1
-                if cantidad_minima_personas > 1 and cantidad_personas < cantidad_minima_personas:
-                    print(f"    ⚠️ Servicio {item.get('nombre')} no cumple cantidad mínima: {cantidad_personas} < {cantidad_minima_personas}")
-                    continue
+                # Verificar cantidad mínima para servicios de tina o masaje
+                if requiere_minimo_personas:
+                    if any(word in nombre_servicio for word in ['tina', 'masaje']):
+                        if cantidad_personas < cantidad_minima_requerida:
+                            print(f"    ⚠️ Servicio {item.get('nombre')} no cumple cantidad mínima: {cantidad_personas} < {cantidad_minima_requerida}")
+                            print(f"    ❌ Pack {pack.nombre} NO aplica debido a cantidad insuficiente de personas")
+                            return None  # El pack completo no aplica
 
                 if servicio_id:
                     servicios_ids_en_carrito.add(servicio_id)
@@ -172,6 +182,19 @@ class PackDescuentoService:
             indices_por_tipo = {}
             items_validos_por_personas = []  # Items que cumplen con cantidad mínima de personas
 
+            # LÓGICA ESPECIAL PARA PACK TINA + MASAJE (Sin depender del campo cantidad_minima_personas)
+            # Si el pack tiene valor de descuento de $35,000, requiere mínimo 2 personas
+            requiere_minimo_personas = False
+            cantidad_minima_requerida = 1
+
+            # Detectar si es el pack de Tina + Masaje basado en el descuento o nombre
+            if pack.valor_descuento == 35000 or (
+                'tina' in pack.nombre.lower() and 'masaje' in pack.nombre.lower()
+            ):
+                requiere_minimo_personas = True
+                cantidad_minima_requerida = 2
+                print(f"  - Pack {pack.nombre} requiere mínimo {cantidad_minima_requerida} personas")
+
             for idx, item in items_con_indices:
                 nombre_servicio = item.get('nombre', '').lower()
                 cantidad_personas = item.get('cantidad_personas', 1)
@@ -192,20 +215,14 @@ class PackDescuentoService:
 
                 print(f"  - Item {idx}: {item.get('nombre')} identificado como tipo: {tipo_pack}, personas: {cantidad_personas}")
 
-                # Verificar cantidad mínima de personas (solo si el campo existe)
-                try:
-                    # Intentar obtener el valor del campo si existe
-                    cantidad_minima_personas = pack.cantidad_minima_personas if hasattr(pack, 'cantidad_minima_personas') else 1
-                except AttributeError:
-                    # Si el campo no existe en la BD, usar valor por defecto
-                    cantidad_minima_personas = 1
+                # Verificar cantidad mínima solo para packs que lo requieren
+                if requiere_minimo_personas and (tipo_pack in ['tina', 'masaje']):
+                    if cantidad_personas < cantidad_minima_requerida:
+                        print(f"    ⚠️ Item {item.get('nombre')} no cumple cantidad mínima: {cantidad_personas} < {cantidad_minima_requerida}")
+                        print(f"    ❌ Pack {pack.nombre} NO aplica debido a cantidad insuficiente de personas")
+                        return None  # El pack completo no aplica si algún servicio no cumple
 
-                # Solo aplicar restricción si se requiere más de 1 persona
-                if cantidad_minima_personas > 1 and cantidad_personas < cantidad_minima_personas:
-                    print(f"    ⚠️ Item no cumple cantidad mínima de personas: {cantidad_personas} < {cantidad_minima_personas}")
-                    continue  # No incluir este item si no cumple con la cantidad mínima de personas
-
-                # Solo contar items que cumplen con cantidad mínima de personas
+                # Agregar el item a los tipos presentes
                 if tipo_pack not in tipos_presentes:
                     tipos_presentes[tipo_pack] = 0
                     indices_por_tipo[tipo_pack] = []
