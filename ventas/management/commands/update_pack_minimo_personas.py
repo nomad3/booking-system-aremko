@@ -22,12 +22,12 @@ class Command(BaseCommand):
 
         # Buscar específicamente el pack de 35000 de descuento
         pack_35000 = PackDescuento.objects.filter(
-            valor_descuento=35000
+            descuento=35000
         ).first()
 
         if pack_35000:
             self.stdout.write(f"\n📦 Pack encontrado: {pack_35000.nombre}")
-            self.stdout.write(f"   Descuento: ${pack_35000.valor_descuento:,}")
+            self.stdout.write(f"   Descuento: ${pack_35000.descuento:,}")
             self.stdout.write(f"   Cantidad mínima actual: {getattr(pack_35000, 'cantidad_minima_personas', 1)}")
 
             # Actualizar a mínimo 2 personas
@@ -42,7 +42,7 @@ class Command(BaseCommand):
             for pack in packs_tina_masaje:
                 min_personas = getattr(pack, 'cantidad_minima_personas', 1)
                 self.stdout.write(f"\n   • {pack.nombre}")
-                self.stdout.write(f"     Descuento: ${pack.valor_descuento:,}")
+                self.stdout.write(f"     Descuento: ${pack.descuento:,}")
                 self.stdout.write(f"     Mínimo personas: {min_personas}")
 
                 # Si es un pack combinado y no tiene mínimo configurado, sugerir actualización
@@ -59,7 +59,7 @@ class Command(BaseCommand):
             min_personas = getattr(pack, 'cantidad_minima_personas', 1)
             self.stdout.write(
                 f"\n{estado} {pack.nombre}"
-                f"\n   Descuento: ${pack.valor_descuento:,}"
+                f"\n   Descuento: ${pack.descuento:,}"
                 f"\n   Mínimo personas: {min_personas}"
                 f"\n   Servicios: {', '.join([s.nombre for s in pack.servicios_requeridos.all()[:3]])}"
             )

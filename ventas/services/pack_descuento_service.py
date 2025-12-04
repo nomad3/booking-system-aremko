@@ -136,12 +136,12 @@ class PackDescuentoService:
             cantidad_minima_requerida = 1
 
             # Detectar si es el pack de Tina + Masaje basado en el descuento o nombre
-            if pack.valor_descuento == 35000 or (
+            if pack.descuento == 35000 or (
                 'tina' in pack.nombre.lower() and 'masaje' in pack.nombre.lower()
             ):
                 requiere_minimo_personas = True
                 cantidad_minima_requerida = 2
-                print(f"  - Pack {pack.nombre} (${pack.valor_descuento}) requiere mínimo {cantidad_minima_requerida} personas")
+                print(f"  - Pack {pack.nombre} (${pack.descuento}) requiere mínimo {cantidad_minima_requerida} personas")
 
             algun_item_no_cumple = False
             for idx, item in items_con_indices:
@@ -195,7 +195,7 @@ class PackDescuentoService:
             cantidad_minima_requerida = 1
 
             # Detectar si es el pack de Tina + Masaje basado en el descuento o nombre
-            if pack.valor_descuento == 35000 or (
+            if pack.descuento == 35000 or (
                 'tina' in pack.nombre.lower() and 'masaje' in pack.nombre.lower()
             ):
                 requiere_minimo_personas = True
@@ -310,7 +310,7 @@ class PackDescuentoService:
 
         return {
             'pack': pack,
-            'descuento': pack.valor_descuento,  # Corregido: usar valor_descuento, no descuento
+            'descuento': pack.descuento,  # Campo correcto del modelo
             'items_incluidos': sorted(items_incluidos),
             'descripcion_aplicacion': descripcion
         }
@@ -455,13 +455,13 @@ class PackDescuentoService:
 
                 mensaje = (
                     f"¡Agrega {servicio_legible} y ahorra "
-                    f"${pack.valor_descuento:,.0f} con el {pack.nombre}!"
+                    f"${pack.descuento:,.0f} con el {pack.nombre}!"
                 )
 
                 sugerencias.append({
                     'pack': pack,
                     'servicios_faltantes': servicios_faltantes,
-                    'ahorro_potencial': pack.valor_descuento,
+                    'ahorro_potencial': pack.descuento,
                     'mensaje': mensaje
                 })
 
