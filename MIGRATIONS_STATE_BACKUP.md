@@ -1,7 +1,7 @@
 # 🔄 ESTADO DE MIGRACIONES - RESPALDO
-**Fecha**: 02 de Diciembre 2024
-**Total de Migraciones**: 65
-**Última Migración Aplicada en Producción**: 0065_seocontent
+**Fecha**: 04 de Diciembre 2024
+**Total de Migraciones**: 66
+**Última Migración Aplicada en Producción**: 0065_seocontent (Pendiente: 0066)
 
 ## 📊 RESUMEN DE MIGRACIONES
 
@@ -21,13 +21,14 @@
 - `0059_add_tramos_validos.py` - Validación de tramos
 - `0060_add_giftcard_wizard_fields.py` - Wizard de GiftCards
 
-### Últimas Migraciones (0061-0065)
+### Últimas Migraciones (0061-0066)
 ```
 ✅ 0061_giftcardexperiencia.py        - Sistema de experiencias GiftCard
 ✅ 0062_homepageconfig_text_fields.py  - Configuración de textos homepage
 ✅ 0063_populate_newsletter_subscriber.py - Población de suscriptores
 ✅ 0064_visual_campaign_system.py      - Sistema de campañas visuales
-✅ 0065_seocontent.py                  - Contenido SEO (última)
+✅ 0065_seocontent.py                  - Contenido SEO
+⏳ 0066_packdescuento_cantidad_minima_personas.py - Validación personas mínimas para packs (pendiente)
 ```
 
 ## 🔧 COMANDOS ÚTILES
