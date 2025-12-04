@@ -2720,10 +2720,11 @@ class PackDescuento(models.Model):
         help_text="Cantidad mínima de noches para alojamiento"
     )
 
-    cantidad_minima_personas = models.IntegerField(
-        default=1,
-        help_text="Cantidad mínima de personas por servicio para aplicar el descuento"
-    )
+    # CAMPO PENDIENTE DE MIGRACIÓN 0066 - NO USAR HASTA APLICAR MIGRACIÓN
+    # cantidad_minima_personas = models.IntegerField(
+    #     default=1,
+    #     help_text="Cantidad mínima de personas por servicio para aplicar el descuento"
+    # )
 
     misma_fecha = models.BooleanField(
         default=True,
