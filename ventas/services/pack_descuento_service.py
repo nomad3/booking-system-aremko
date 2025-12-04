@@ -130,14 +130,19 @@ class PackDescuentoService:
             servicios_ids_requeridos = set(pack.servicios_especificos.values_list('id', flat=True))
             servicios_ids_en_carrito = set()
             indices_por_servicio = {}
-            cantidad_minima_personas = getattr(pack, 'cantidad_minima_personas', 1)
+
+            # Obtener cantidad mínima de forma segura
+            try:
+                cantidad_minima_personas = pack.cantidad_minima_personas if hasattr(pack, 'cantidad_minima_personas') else 1
+            except AttributeError:
+                cantidad_minima_personas = 1
 
             for idx, item in items_con_indices:
                 servicio_id = item.get('id')
                 cantidad_personas = item.get('cantidad_personas', 1)
 
-                # Verificar cantidad mínima de personas
-                if cantidad_personas < cantidad_minima_personas:
+                # Verificar cantidad mínima de personas solo si es mayor a 1
+                if cantidad_minima_personas > 1 and cantidad_personas < cantidad_minima_personas:
                     print(f"    ⚠️ Servicio {item.get('nombre')} no cumple cantidad mínima: {cantidad_personas} < {cantidad_minima_personas}")
                     continue
 
@@ -187,9 +192,16 @@ class PackDescuentoService:
 
                 print(f"  - Item {idx}: {item.get('nombre')} identificado como tipo: {tipo_pack}, personas: {cantidad_personas}")
 
-                # Verificar cantidad mínima de personas
-                cantidad_minima_personas = getattr(pack, 'cantidad_minima_personas', 1)
-                if cantidad_personas < cantidad_minima_personas:
+                # Verificar cantidad mínima de personas (solo si el campo existe)
+                try:
+                    # Intentar obtener el valor del campo si existe
+                    cantidad_minima_personas = pack.cantidad_minima_personas if hasattr(pack, 'cantidad_minima_personas') else 1
+                except AttributeError:
+                    # Si el campo no existe en la BD, usar valor por defecto
+                    cantidad_minima_personas = 1
+
+                # Solo aplicar restricción si se requiere más de 1 persona
+                if cantidad_minima_personas > 1 and cantidad_personas < cantidad_minima_personas:
                     print(f"    ⚠️ Item no cumple cantidad mínima de personas: {cantidad_personas} < {cantidad_minima_personas}")
                     continue  # No incluir este item si no cumple con la cantidad mínima de personas
 
