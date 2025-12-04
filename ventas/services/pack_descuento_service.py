@@ -141,26 +141,33 @@ class PackDescuentoService:
             ):
                 requiere_minimo_personas = True
                 cantidad_minima_requerida = 2
-                print(f"  - Pack {pack.nombre} requiere mínimo {cantidad_minima_requerida} personas")
+                print(f"  - Pack {pack.nombre} (${pack.valor_descuento}) requiere mínimo {cantidad_minima_requerida} personas")
 
+            algun_item_no_cumple = False
             for idx, item in items_con_indices:
                 servicio_id = item.get('id')
                 cantidad_personas = item.get('cantidad_personas', 1)
                 nombre_servicio = item.get('nombre', '').lower()
 
+                print(f"    DEBUG: Evaluando '{item.get('nombre')}' con {cantidad_personas} personas")
+
                 # Verificar cantidad mínima para servicios de tina o masaje
                 if requiere_minimo_personas:
-                    if any(word in nombre_servicio for word in ['tina', 'masaje']):
+                    if any(word in nombre_servicio for word in ['tina', 'masaje', 'hidromasaje']):
                         if cantidad_personas < cantidad_minima_requerida:
                             print(f"    ⚠️ Servicio {item.get('nombre')} no cumple cantidad mínima: {cantidad_personas} < {cantidad_minima_requerida}")
-                            print(f"    ❌ Pack {pack.nombre} NO aplica debido a cantidad insuficiente de personas")
-                            return None  # El pack completo no aplica
+                            algun_item_no_cumple = True
 
                 if servicio_id:
                     servicios_ids_en_carrito.add(servicio_id)
                     if servicio_id not in indices_por_servicio:
                         indices_por_servicio[servicio_id] = []
                     indices_por_servicio[servicio_id].append(idx)
+
+            # Si algún item no cumple con la cantidad mínima, el pack no aplica
+            if algun_item_no_cumple:
+                print(f"    ❌ Pack {pack.nombre} NO aplica debido a cantidad insuficiente de personas")
+                return None
 
             # Verificar si todos los servicios específicos están presentes
             if not servicios_ids_requeridos.issubset(servicios_ids_en_carrito):
@@ -195,18 +202,24 @@ class PackDescuentoService:
                 cantidad_minima_requerida = 2
                 print(f"  - Pack {pack.nombre} requiere mínimo {cantidad_minima_requerida} personas")
 
+            # Variable para verificar si todos los items cumplen con cantidad mínima
+            algun_item_no_cumple = False
+
             for idx, item in items_con_indices:
                 nombre_servicio = item.get('nombre', '').lower()
                 cantidad_personas = item.get('cantidad_personas', 1)
+                tipo_original = item.get('tipo_servicio', 'otro')
                 tipo_pack = None
+
+                print(f"    DEBUG: Procesando '{nombre_servicio}' (tipo original: {tipo_original})")
 
                 # Identificar tipo basado en el nombre del servicio
                 # Categorías existentes: Cabañas, Tinas, Masajes, Ambientaciones
-                if any(word in nombre_servicio for word in ['cabaña', 'cabana', 'torre', 'refugio', 'lodge']):
+                if any(word in nombre_servicio for word in ['cabaña', 'cabana', 'torre', 'refugio', 'lodge', 'arrayan']):
                     tipo_pack = 'cabana'  # Mapea a Cabañas
-                elif any(word in nombre_servicio for word in ['tina', 'tinaja', 'termas', 'hot tub']):
+                elif any(word in nombre_servicio for word in ['tina', 'tinaja', 'termas', 'hot tub', 'hidromasaje']):
                     tipo_pack = 'tina'    # Mapea a Tinas
-                elif any(word in nombre_servicio for word in ['masaje', 'spa', 'relajación', 'descontracturante']):
+                elif any(word in nombre_servicio for word in ['masaje', 'spa', 'relajación', 'descontracturante', 'terapéutico']):
                     tipo_pack = 'masaje'  # Mapea a Masajes
                 elif any(word in nombre_servicio for word in ['decoración', 'ambientación', 'pétalos', 'velas']):
                     tipo_pack = 'decoracion'  # Mapea a Ambientaciones
@@ -219,8 +232,7 @@ class PackDescuentoService:
                 if requiere_minimo_personas and (tipo_pack in ['tina', 'masaje']):
                     if cantidad_personas < cantidad_minima_requerida:
                         print(f"    ⚠️ Item {item.get('nombre')} no cumple cantidad mínima: {cantidad_personas} < {cantidad_minima_requerida}")
-                        print(f"    ❌ Pack {pack.nombre} NO aplica debido a cantidad insuficiente de personas")
-                        return None  # El pack completo no aplica si algún servicio no cumple
+                        algun_item_no_cumple = True
 
                 # Agregar el item a los tipos presentes
                 if tipo_pack not in tipos_presentes:
@@ -230,6 +242,11 @@ class PackDescuentoService:
                 tipos_presentes[tipo_pack] += 1
                 indices_por_tipo[tipo_pack].append(idx)
                 items_validos_por_personas.append((idx, item))
+
+            # Si algún item no cumple con la cantidad mínima, el pack no aplica
+            if algun_item_no_cumple:
+                print(f"    ❌ Pack {pack.nombre} NO aplica debido a cantidad insuficiente de personas en algún servicio")
+                return None
 
             # Verificar si todos los servicios requeridos están presentes
             servicios_requeridos = set(pack.servicios_requeridos) if pack.servicios_requeridos else set()
