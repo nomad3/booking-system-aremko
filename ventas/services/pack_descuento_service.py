@@ -281,8 +281,10 @@ class PackDescuentoService:
             # Verificar cantidad mínima de noches para alojamiento
             if 'cabana' in servicios_requeridos_normalized:
                 cantidad_alojamientos = tipos_presentes.get('cabana', 0)
-                if cantidad_alojamientos < pack.cantidad_minima_noches:
-                    print(f"  - Cantidad de cabañas ({cantidad_alojamientos}) < cantidad mínima ({pack.cantidad_minima_noches})")
+                # Obtener cantidad mínima de forma segura
+                cantidad_minima_noches = getattr(pack, 'cantidad_minima_noches', 1)
+                if cantidad_alojamientos < cantidad_minima_noches:
+                    print(f"  - Cantidad de cabañas ({cantidad_alojamientos}) < cantidad mínima ({cantidad_minima_noches})")
                     return None
 
             # Recopilar índices de items incluidos
@@ -293,7 +295,7 @@ class PackDescuentoService:
                     # Solo incluir la cantidad necesaria
                     cantidad_necesaria = 1
                     if tipo_normalizado == 'cabana':
-                        cantidad_necesaria = pack.cantidad_minima_noches
+                        cantidad_necesaria = getattr(pack, 'cantidad_minima_noches', 1)
                     items_incluidos.extend(indices_por_tipo[tipo_normalizado][:cantidad_necesaria])
 
         # Crear descripción de aplicación
@@ -308,7 +310,7 @@ class PackDescuentoService:
 
         return {
             'pack': pack,
-            'descuento': pack.descuento,
+            'descuento': pack.valor_descuento,  # Corregido: usar valor_descuento, no descuento
             'items_incluidos': sorted(items_incluidos),
             'descripcion_aplicacion': descripcion
         }
@@ -453,13 +455,13 @@ class PackDescuentoService:
 
                 mensaje = (
                     f"¡Agrega {servicio_legible} y ahorra "
-                    f"${pack.descuento:,.0f} con el {pack.nombre}!"
+                    f"${pack.valor_descuento:,.0f} con el {pack.nombre}!"
                 )
 
                 sugerencias.append({
                     'pack': pack,
                     'servicios_faltantes': servicios_faltantes,
-                    'ahorro_potencial': pack.descuento,
+                    'ahorro_potencial': pack.valor_descuento,
                     'mensaje': mensaje
                 })
 
