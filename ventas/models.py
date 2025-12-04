@@ -2720,6 +2720,11 @@ class PackDescuento(models.Model):
         help_text="Cantidad mínima de noches para alojamiento"
     )
 
+    cantidad_minima_personas = models.IntegerField(
+        default=1,
+        help_text="Cantidad mínima de personas por servicio para aplicar el descuento"
+    )
+
     misma_fecha = models.BooleanField(
         default=True,
         help_text="¿Los servicios deben ser para la misma fecha?"

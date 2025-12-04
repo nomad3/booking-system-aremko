@@ -130,9 +130,17 @@ class PackDescuentoService:
             servicios_ids_requeridos = set(pack.servicios_especificos.values_list('id', flat=True))
             servicios_ids_en_carrito = set()
             indices_por_servicio = {}
+            cantidad_minima_personas = getattr(pack, 'cantidad_minima_personas', 1)
 
             for idx, item in items_con_indices:
                 servicio_id = item.get('id')
+                cantidad_personas = item.get('cantidad_personas', 1)
+
+                # Verificar cantidad mínima de personas
+                if cantidad_personas < cantidad_minima_personas:
+                    print(f"    ⚠️ Servicio {item.get('nombre')} no cumple cantidad mínima: {cantidad_personas} < {cantidad_minima_personas}")
+                    continue
+
                 if servicio_id:
                     servicios_ids_en_carrito.add(servicio_id)
                     if servicio_id not in indices_por_servicio:
@@ -157,9 +165,11 @@ class PackDescuentoService:
             # Contar tipos de servicio presentes basándonos en nombres
             tipos_presentes = {}
             indices_por_tipo = {}
+            items_validos_por_personas = []  # Items que cumplen con cantidad mínima de personas
 
             for idx, item in items_con_indices:
                 nombre_servicio = item.get('nombre', '').lower()
+                cantidad_personas = item.get('cantidad_personas', 1)
                 tipo_pack = None
 
                 # Identificar tipo basado en el nombre del servicio
@@ -175,14 +185,22 @@ class PackDescuentoService:
                 else:
                     tipo_pack = 'otro'
 
-                print(f"  - Item {idx}: {item.get('nombre')} identificado como tipo: {tipo_pack}")
+                print(f"  - Item {idx}: {item.get('nombre')} identificado como tipo: {tipo_pack}, personas: {cantidad_personas}")
 
+                # Verificar cantidad mínima de personas
+                cantidad_minima_personas = getattr(pack, 'cantidad_minima_personas', 1)
+                if cantidad_personas < cantidad_minima_personas:
+                    print(f"    ⚠️ Item no cumple cantidad mínima de personas: {cantidad_personas} < {cantidad_minima_personas}")
+                    continue  # No incluir este item si no cumple con la cantidad mínima de personas
+
+                # Solo contar items que cumplen con cantidad mínima de personas
                 if tipo_pack not in tipos_presentes:
                     tipos_presentes[tipo_pack] = 0
                     indices_por_tipo[tipo_pack] = []
 
                 tipos_presentes[tipo_pack] += 1
                 indices_por_tipo[tipo_pack].append(idx)
+                items_validos_por_personas.append((idx, item))
 
             # Verificar si todos los servicios requeridos están presentes
             servicios_requeridos = set(pack.servicios_requeridos) if pack.servicios_requeridos else set()
