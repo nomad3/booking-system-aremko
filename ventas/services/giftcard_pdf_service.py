@@ -556,12 +556,6 @@ class GiftCardPDFService:
             line-height: 1.1;
         }}
 
-        .precio-value {{
-            color: #16a085;
-            font-size: 18pt;
-            font-weight: 800;
-        }}
-
         /* WhatsApp CTA */
         .whatsapp-section {{
             background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
@@ -641,6 +635,12 @@ class GiftCardPDFService:
             <div class="recipient-name">{giftcard_data['destinatario_nombre']}</div>
         </div>
 
+        <!-- Experiencia -->
+        <div class="detail-item" style="margin-bottom: 0.1in;">
+            <div class="detail-label">Experiencia</div>
+            <div class="detail-value" style="font-size: 11pt;">{giftcard_data['experiencia_nombre']}</div>
+        </div>
+
         <!-- Imagen si existe -->
         {imagen_html}
 
@@ -655,22 +655,10 @@ class GiftCardPDFService:
             <div class="code-value">{giftcard_data['codigo']}</div>
         </div>
 
-        <!-- Grid de detalles -->
-        <div class="details-grid">
-            <div class="detail-item">
-                <div class="detail-label">Valor</div>
-                <div class="detail-value precio-value">{precio_formateado}</div>
-            </div>
-            <div class="detail-item">
-                <div class="detail-label">Válido hasta</div>
-                <div class="detail-value">{giftcard_data['fecha_vencimiento'].strftime('%d/%m/%Y')}</div>
-            </div>
-        </div>
-
-        <!-- Experiencia -->
+        <!-- Válido hasta (centrado, sin grid) -->
         <div class="detail-item" style="margin-bottom: 0.1in;">
-            <div class="detail-label">Experiencia</div>
-            <div class="detail-value" style="font-size: 11pt;">{giftcard_data['experiencia_nombre']}</div>
+            <div class="detail-label">Válido hasta</div>
+            <div class="detail-value">{giftcard_data['fecha_vencimiento'].strftime('%d/%m/%Y')}</div>
         </div>
 
         <!-- WhatsApp CTA -->
