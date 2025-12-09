@@ -166,6 +166,9 @@ urlpatterns = [
     path('api/giftcard/regenerar-mensaje/', giftcard_views.regenerar_mensaje_ai, name='regenerar_mensaje_ai'),
     path('api/giftcard/buscar-cliente/', giftcard_views.buscar_cliente_por_telefono, name='buscar_cliente_telefono'),
     path('api/giftcard/agregar-al-carrito/', giftcard_views.agregar_giftcard_al_carrito, name='agregar_giftcard_al_carrito'),
+    # Vistas móviles para GiftCards
+    path('giftcard/<str:codigo>/view/', giftcard_views.giftcard_mobile_view, name='giftcard_mobile_view'),
+    path('giftcard/<str:codigo>/download/', giftcard_views.giftcard_download_pdf, name='giftcard_download_pdf'),
     # === END GIFTCARD WIZARD ===
 
     # === PREMIOS Y FIDELIZACIÓN ===

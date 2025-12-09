@@ -729,3 +729,160 @@ def agregar_giftcard_al_carrito(request):
             'success': False,
             'error': 'Error al agregar GiftCard al carrito'
         }, status=500)
+
+
+@require_http_methods(["GET"])
+def giftcard_mobile_view(request, codigo):
+    """
+    Vista web optimizada para móvil de una GiftCard
+    Permite visualizar la GiftCard directamente en el navegador
+    sin necesidad de descargar el PDF
+
+    GET /giftcard/<codigo>/view/
+
+    Retorna una página HTML responsive optimizada para móvil
+    con el diseño de 5.5 x 9.8 pulgadas
+    """
+    try:
+        # Buscar la GiftCard por código
+        giftcard = GiftCard.objects.select_related(
+            'cliente_comprador',
+            'cliente_destinatario',
+            'venta_reserva'
+        ).get(codigo=codigo)
+
+        # Verificar si la GiftCard está activa y válida
+        hoy = timezone.now().date()
+
+        # Calcular días restantes
+        dias_restantes = (giftcard.fecha_vencimiento - hoy).days if giftcard.fecha_vencimiento else 0
+        esta_vencida = dias_restantes < 0
+
+        # Obtener información de la experiencia si existe
+        experiencia_info = None
+        if giftcard.servicio_asociado:
+            try:
+                experiencia = GiftCardExperiencia.objects.get(
+                    id_experiencia=giftcard.servicio_asociado,
+                    activo=True
+                )
+                experiencia_info = {
+                    'nombre': experiencia.nombre,
+                    'descripcion': experiencia.descripcion_giftcard,
+                    'imagen_url': experiencia.imagen.url if experiencia.imagen else None
+                }
+            except GiftCardExperiencia.DoesNotExist:
+                # Usar nombre guardado en GiftCard si no se encuentra la experiencia
+                experiencia_info = {
+                    'nombre': giftcard.servicio_asociado.replace('_', ' ').title(),
+                    'descripcion': None,
+                    'imagen_url': None
+                }
+
+        # Determinar si es móvil desde el user agent
+        user_agent = request.META.get('HTTP_USER_AGENT', '').lower()
+        is_mobile = any(device in user_agent for device in ['mobile', 'android', 'iphone', 'ipad'])
+
+        # Formatear datos para el template
+        context = {
+            'giftcard': giftcard,
+            'experiencia': experiencia_info,
+            'dias_restantes': dias_restantes,
+            'esta_vencida': esta_vencida,
+            'is_mobile': is_mobile,
+            'monto_formateado': f"${giftcard.monto_inicial:,.0f}".replace(',', '.'),
+            'monto_disponible_formateado': f"${giftcard.monto_disponible:,.0f}".replace(',', '.'),
+            'fecha_emision_formateada': giftcard.fecha_emision.strftime('%d de %B de %Y'),
+            'fecha_vencimiento_formateada': giftcard.fecha_vencimiento.strftime('%d de %B de %Y'),
+            'whatsapp_url': f"https://wa.me/56957902525?text=Hola!%20Quiero%20reservar%20con%20mi%20GiftCard%20{giftcard.codigo}",
+            'puede_descargar_pdf': True,  # Siempre permitir descarga del PDF
+            'show_wallet_button': False,  # Por ahora desactivado, activar cuando se implemente Apple/Google Wallet
+        }
+
+        # Renderizar template móvil
+        return render(request, 'ventas/giftcard_mobile_view.html', context)
+
+    except GiftCard.DoesNotExist:
+        # Si no existe la GiftCard, mostrar página de error
+        context = {
+            'error': True,
+            'mensaje': 'La GiftCard que buscas no existe o el código es incorrecto.',
+            'codigo_invalido': codigo
+        }
+        return render(request, 'ventas/giftcard_mobile_view.html', context, status=404)
+
+    except Exception as e:
+        logger.error(f"Error en giftcard_mobile_view para código {codigo}: {str(e)}", exc_info=True)
+        context = {
+            'error': True,
+            'mensaje': 'Ocurrió un error al cargar la GiftCard. Por favor intenta nuevamente.',
+        }
+        return render(request, 'ventas/giftcard_mobile_view.html', context, status=500)
+
+
+@require_http_methods(["GET"])
+def giftcard_download_pdf(request, codigo):
+    """
+    Descarga el PDF de una GiftCard en formato móvil (5.5 x 9.8 pulgadas)
+
+    GET /giftcard/<codigo>/download/
+
+    Retorna el archivo PDF para descargar
+    """
+    try:
+        from django.http import HttpResponse
+        from ..services.giftcard_pdf_service import GiftCardPDFService
+
+        # Buscar la GiftCard
+        giftcard = GiftCard.objects.get(codigo=codigo)
+
+        # Obtener información de la experiencia
+        experiencia_imagen_url = None
+        experiencia_nombre = giftcard.servicio_asociado.replace('_', ' ').title() if giftcard.servicio_asociado else 'Experiencia Aremko'
+
+        if giftcard.servicio_asociado:
+            try:
+                experiencia = GiftCardExperiencia.objects.get(id_experiencia=giftcard.servicio_asociado)
+                if experiencia.imagen:
+                    experiencia_imagen_url = request.build_absolute_uri(experiencia.imagen.url)
+                experiencia_nombre = experiencia.nombre
+            except GiftCardExperiencia.DoesNotExist:
+                pass
+
+        # Preparar datos para el PDF
+        giftcard_data = {
+            'codigo': giftcard.codigo,
+            'experiencia_nombre': experiencia_nombre,
+            'experiencia_imagen_url': experiencia_imagen_url,
+            'destinatario_nombre': giftcard.destinatario_nombre or 'Invitado Especial',
+            'mensaje_seleccionado': giftcard.mensaje_personalizado or f"Te regalo esta experiencia única en Aremko Spa para que disfrutes de un momento de relajación y bienestar en medio de la naturaleza de Puerto Varas.",
+            'precio': giftcard.monto_inicial,
+            'fecha_emision': giftcard.fecha_emision,
+            'fecha_vencimiento': giftcard.fecha_vencimiento,
+        }
+
+        # Generar PDF en formato móvil
+        pdf_bytes = GiftCardPDFService.generar_pdf_giftcard(giftcard_data, formato='mobile')
+
+        if not pdf_bytes:
+            raise Exception("No se pudo generar el PDF")
+
+        # Preparar respuesta HTTP con el PDF
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+
+        # Nombre del archivo para descarga
+        filename = f"GiftCard_Aremko_{codigo}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        return response
+
+    except GiftCard.DoesNotExist:
+        return JsonResponse({
+            'error': 'GiftCard no encontrada'
+        }, status=404)
+
+    except Exception as e:
+        logger.error(f"Error generando PDF para GiftCard {codigo}: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'error': 'Error al generar el PDF'
+        }, status=500)

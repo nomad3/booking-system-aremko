@@ -1,0 +1,743 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <title>{% if error %}Error{% else %}GiftCard {{ giftcard.codigo }} - Aremko Spa{% endif %}</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon-32x32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon-16x16.png' %}">
+
+    <!-- Open Graph para compartir -->
+    {% if not error %}
+    <meta property="og:title" content="GiftCard Aremko Spa - {{ giftcard.destinatario_nombre }}">
+    <meta property="og:description" content="{{ giftcard.mensaje_personalizado|truncatewords:20 }}">
+    <meta property="og:image" content="{% if experiencia.imagen_url %}{{ experiencia.imagen_url }}{% else %}{% static 'images/aremko-spa-og.jpg' %}{% endif %}">
+    <meta property="og:type" content="website">
+    {% endif %}
+
+    <style>
+        /* Reset y configuración base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(180deg, #f8f4e6 0%, #ffffff 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: #333;
+        }
+
+        /* Container principal */
+        .giftcard-wrapper {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 16px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Card container con sombra y bordes */
+        .giftcard-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Decoraciones */
+        .decoration-top {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #ffc107 0%, #ffdb4d 50%, #ffc107 100%);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #A0522D 0%, #8B4513 100%);
+            color: white;
+            text-align: center;
+            padding: 24px 16px;
+            position: relative;
+        }
+
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            right: 0;
+            height: 20px;
+            background: white;
+            border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            font-size: 14px;
+            opacity: 0.95;
+            font-weight: 500;
+        }
+
+        /* Contenido scrolleable */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 16px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Sección destinatario */
+        .recipient-section {
+            text-align: center;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: linear-gradient(135deg, rgba(255,193,7,0.05) 0%, rgba(255,193,7,0.1) 100%);
+            border-radius: 16px;
+        }
+
+        .para-label {
+            color: #A0522D;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .recipient-name {
+            color: #5C4033;
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        /* Imagen de experiencia */
+        .experience-image {
+            width: 100%;
+            height: 200px;
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            background: #f0f0f0;
+        }
+
+        .experience-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .no-image {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+            color: #999;
+            font-size: 48px;
+        }
+
+        /* Mensaje personalizado */
+        .message-section {
+            background: white;
+            border-left: 4px solid #ffc107;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            position: relative;
+        }
+
+        .message-quote {
+            position: absolute;
+            top: -10px;
+            left: 16px;
+            font-size: 40px;
+            color: #ffc107;
+            opacity: 0.3;
+            font-family: Georgia, serif;
+        }
+
+        .message-text {
+            color: #5C4033;
+            font-style: italic;
+            font-size: 16px;
+            line-height: 1.6;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Código destacado */
+        .code-section {
+            background: linear-gradient(135deg, #ffc107 0%, #ffdb4d 100%);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(255,193,7,0.3);
+        }
+
+        .code-label {
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .code-value {
+            background: white;
+            color: #5C4033;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 3px;
+            padding: 16px;
+            border-radius: 12px;
+            word-break: break-all;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Grid de detalles */
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .detail-item {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid rgba(0,0,0,0.05);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .detail-item.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .detail-label {
+            color: #A0522D;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .detail-value {
+            color: #5C4033;
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .precio-value {
+            color: #16a085;
+            font-size: 28px;
+        }
+
+        /* WhatsApp button */
+        .whatsapp-button {
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 16px;
+            padding: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(37,211,102,0.3);
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s;
+        }
+
+        .whatsapp-button:active {
+            transform: scale(0.98);
+        }
+
+        .whatsapp-icon {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+
+        /* Action buttons */
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-download {
+            background: rgba(160,82,45,0.1);
+            color: #A0522D;
+            border: 1px solid rgba(160,82,45,0.2);
+        }
+
+        .btn-share {
+            background: rgba(0,122,255,0.1);
+            color: #007AFF;
+            border: 1px solid rgba(0,122,255,0.2);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 12px;
+            border-top: 1px solid rgba(0,0,0,0.05);
+            background: rgba(255,255,255,0.5);
+        }
+
+        /* Estados */
+        .vencida-badge {
+            background: #ff4444;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+            margin-top: 8px;
+        }
+
+        .dias-restantes {
+            color: #16a085;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        /* Error state */
+        .error-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .error-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .error-title {
+            color: #5C4033;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .error-message {
+            color: #999;
+            font-size: 16px;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+
+        .btn-home {
+            background: #A0522D;
+            color: white;
+            padding: 14px 32px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        /* Loading state */
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            display: none;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f0f0f0;
+            border-top-color: #A0522D;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Media queries para pantallas muy pequeñas */
+        @media (max-width: 380px) {
+            .logo {
+                font-size: 20px;
+            }
+
+            .recipient-name {
+                font-size: 24px;
+            }
+
+            .code-value {
+                font-size: 20px;
+                letter-spacing: 2px;
+            }
+
+            .details-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* PWA install prompt */
+        .install-prompt {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 1000;
+        }
+
+        .install-prompt-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .install-prompt-text {
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .install-prompt-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .install-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .install-btn-primary {
+            background: #A0522D;
+            color: white;
+        }
+
+        .install-btn-secondary {
+            background: #f0f0f0;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading indicator -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="giftcard-wrapper">
+        {% if error %}
+        <!-- Error state -->
+        <div class="giftcard-container">
+            <div class="error-container">
+                <div class="error-icon">❌</div>
+                <h1 class="error-title">GiftCard No Encontrada</h1>
+                <p class="error-message">{{ mensaje }}</p>
+                {% if codigo_invalido %}
+                <p style="color: #999; font-size: 14px; margin-bottom: 24px;">
+                    Código ingresado: <strong>{{ codigo_invalido }}</strong>
+                </p>
+                {% endif %}
+                <a href="/giftcards/" class="btn-home">Volver al Inicio</a>
+            </div>
+        </div>
+        {% else %}
+        <!-- GiftCard válida -->
+        <div class="giftcard-container">
+            <div class="decoration-top"></div>
+
+            <!-- Header -->
+            <div class="header">
+                <div class="logo">AREMKO SPA</div>
+                <div class="subtitle">🎁 Certificado de Regalo 🎁</div>
+            </div>
+
+            <!-- Contenido scrolleable -->
+            <div class="content">
+                <!-- Destinatario -->
+                <div class="recipient-section">
+                    <div class="para-label">Para</div>
+                    <div class="recipient-name">{{ giftcard.destinatario_nombre|default:"Invitado Especial" }}</div>
+                    {% if esta_vencida %}
+                    <span class="vencida-badge">VENCIDA</span>
+                    {% else %}
+                    <div class="dias-restantes">{{ dias_restantes }} días restantes</div>
+                    {% endif %}
+                </div>
+
+                <!-- Imagen de experiencia -->
+                {% if experiencia %}
+                <div class="experience-image">
+                    {% if experiencia.imagen_url %}
+                    <img src="{{ experiencia.imagen_url }}" alt="{{ experiencia.nombre }}" loading="lazy">
+                    {% else %}
+                    <div class="no-image">🌿</div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Mensaje personalizado -->
+                {% if giftcard.mensaje_personalizado %}
+                <div class="message-section">
+                    <span class="message-quote">"</span>
+                    <p class="message-text">{{ giftcard.mensaje_personalizado }}</p>
+                </div>
+                {% endif %}
+
+                <!-- Código -->
+                <div class="code-section">
+                    <div class="code-label">Tu Código Único</div>
+                    <div class="code-value" id="codigo">{{ giftcard.codigo }}</div>
+                </div>
+
+                <!-- Detalles -->
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">Valor</div>
+                        <div class="detail-value precio-value">{{ monto_formateado }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Disponible</div>
+                        <div class="detail-value precio-value">{{ monto_disponible_formateado }}</div>
+                    </div>
+                    {% if experiencia %}
+                    <div class="detail-item full-width">
+                        <div class="detail-label">Experiencia</div>
+                        <div class="detail-value">{{ experiencia.nombre }}</div>
+                    </div>
+                    {% endif %}
+                    <div class="detail-item">
+                        <div class="detail-label">Emitido</div>
+                        <div class="detail-value">{{ giftcard.fecha_emision|date:"d/m/Y" }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Válido hasta</div>
+                        <div class="detail-value">{{ giftcard.fecha_vencimiento|date:"d/m/Y" }}</div>
+                    </div>
+                </div>
+
+                <!-- WhatsApp button -->
+                {% if not esta_vencida %}
+                <a href="{{ whatsapp_url }}" target="_blank" class="whatsapp-button">
+                    <svg class="whatsapp-icon" viewBox="0 0 24 24">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.149-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                    </svg>
+                    Reservar por WhatsApp
+                </a>
+                {% endif %}
+
+                <!-- Action buttons -->
+                <div class="action-buttons">
+                    <a href="{% url 'giftcard_download_pdf' giftcard.codigo %}" class="btn btn-download" id="downloadBtn">
+                        <span>📥</span> Descargar PDF
+                    </a>
+                    <button class="btn btn-share" id="shareBtn">
+                        <span>📤</span> Compartir
+                    </button>
+                </div>
+
+                <!-- Footer -->
+                <div class="footer">
+                    <strong>AREMKO Aguas Calientes & Spa</strong><br>
+                    Puerto Varas, Chile<br>
+                    www.aremko.cl
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- PWA Install Prompt -->
+    <div class="install-prompt" id="installPrompt">
+        <div class="install-prompt-content">
+            <div class="install-prompt-text">
+                <strong>Instalar Aremko GiftCard</strong><br>
+                <small>Accede rápidamente a tu GiftCard</small>
+            </div>
+            <div class="install-prompt-buttons">
+                <button class="install-btn install-btn-secondary" onclick="dismissInstall()">Ahora no</button>
+                <button class="install-btn install-btn-primary" onclick="installPWA()">Instalar</button>
+            </div>
+        </div>
+    </div>
+
+    {% if not error %}
+    <script>
+        // Share functionality
+        document.getElementById('shareBtn').addEventListener('click', async () => {
+            const shareData = {
+                title: 'GiftCard Aremko Spa',
+                text: 'Mira mi GiftCard para {{ giftcard.destinatario_nombre|escapejs }}',
+                url: window.location.href
+            };
+
+            try {
+                if (navigator.share) {
+                    await navigator.share(shareData);
+                } else {
+                    // Fallback: copiar al portapapeles
+                    await navigator.clipboard.writeText(window.location.href);
+                    alert('Link copiado al portapapeles');
+                }
+            } catch (err) {
+                console.log('Error compartiendo:', err);
+            }
+        });
+
+        // Copy code on click
+        document.getElementById('codigo').addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText('{{ giftcard.codigo }}');
+                const original = document.getElementById('codigo').textContent;
+                document.getElementById('codigo').textContent = '¡Copiado!';
+                setTimeout(() => {
+                    document.getElementById('codigo').textContent = original;
+                }, 2000);
+            } catch (err) {
+                console.log('Error copiando código:', err);
+            }
+        });
+
+        // PWA install prompt
+        let deferredPrompt;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            // Mostrar prompt personalizado después de 3 segundos
+            setTimeout(() => {
+                document.getElementById('installPrompt').style.display = 'block';
+            }, 3000);
+        });
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    deferredPrompt = null;
+                    document.getElementById('installPrompt').style.display = 'none';
+                });
+            }
+        }
+
+        function dismissInstall() {
+            document.getElementById('installPrompt').style.display = 'none';
+        }
+
+        // Download PDF with loading indicator
+        document.getElementById('downloadBtn').addEventListener('click', (e) => {
+            document.getElementById('loading').style.display = 'flex';
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+            }, 3000);
+        });
+
+        // Smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Check if standalone mode (PWA)
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            console.log('Running as PWA');
+            // Ocultar botón de instalar si ya está instalado
+            document.getElementById('installPrompt').style.display = 'none';
+        }
+    </script>
+    {% endif %}
+</body>
+</html>
