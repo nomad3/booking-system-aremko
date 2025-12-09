@@ -381,7 +381,7 @@ class GiftCardPDFService:
         /* Configuración de página para 5.5 x 9.8 pulgadas */
         @page {{
             size: 5.5in 9.8in;
-            margin: 0.2in;
+            margin: 0.15in;
         }}
 
         body {{
@@ -389,10 +389,12 @@ class GiftCardPDFService:
             margin: 0;
             padding: 0;
             background: linear-gradient(180deg, #f8f4e6 0%, #ffffff 100%);
-            width: 5.1in;
-            height: 9.4in;
-            font-size: 14pt;
-            line-height: 1.3;
+            width: 5.2in;
+            height: 9.5in;
+            font-size: 13pt;
+            line-height: 1.2;
+            page-break-inside: avoid;
+            page-break-after: avoid;
         }}
 
         .giftcard-mobile {{
@@ -400,69 +402,70 @@ class GiftCardPDFService:
             height: 100%;
             display: flex;
             flex-direction: column;
-            padding: 0.15in;
+            padding: 0.1in;
             position: relative;
             overflow: hidden;
+            page-break-inside: avoid;
         }}
 
         /* Header compacto */
         .header-mobile {{
             text-align: center;
-            padding: 0.2in 0;
+            padding: 0.15in 0;
             background: white;
-            border-radius: 16px;
-            margin-bottom: 0.15in;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            margin-bottom: 0.1in;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
         }}
 
         .logo-mobile {{
             color: #A0522D;
-            font-size: 20pt;
+            font-size: 18pt;
             font-weight: 800;
             letter-spacing: -0.5px;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }}
 
         .subtitle-mobile {{
             color: #D2B48C;
-            font-size: 11pt;
+            font-size: 10pt;
             font-weight: 600;
         }}
 
         /* Sección Para */
         .recipient-section {{
             background: white;
-            border-radius: 16px;
-            padding: 0.2in;
-            margin-bottom: 0.15in;
+            border-radius: 12px;
+            padding: 0.15in;
+            margin-bottom: 0.1in;
             text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
         }}
 
         .para-label {{
             color: #A0522D;
-            font-size: 10pt;
+            font-size: 9pt;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }}
 
         .recipient-name {{
             color: #5C4033;
-            font-size: 22pt;
+            font-size: 20pt;
             font-weight: 700;
-            line-height: 1.1;
+            line-height: 1.0;
         }}
 
         /* Imagen optimizada para móvil */
         .imagen-experiencia-mobile {{
             width: 100%;
-            height: 2.5in;
-            border-radius: 16px;
+            height: 2.0in;
+            border-radius: 12px;
             overflow: hidden;
-            margin-bottom: 0.15in;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            margin-bottom: 0.1in;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.12);
         }}
 
         .experiencia-img-mobile {{
@@ -475,127 +478,128 @@ class GiftCardPDFService:
         /* Mensaje personalizado */
         .message-section {{
             background: white;
-            border-left: 5px solid #ffc107;
-            border-radius: 12px;
-            padding: 0.2in;
-            margin-bottom: 0.15in;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid #ffc107;
+            border-radius: 10px;
+            padding: 0.12in;
+            margin-bottom: 0.1in;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
         }}
 
         .message-text {{
             color: #5C4033;
             font-style: italic;
-            font-size: 13pt;
-            line-height: 1.4;
+            font-size: 11pt;
+            line-height: 1.3;
             text-align: left;
         }}
 
         /* Código destacado */
         .code-section {{
             background: linear-gradient(135deg, #ffc107 0%, #ffdb4d 100%);
-            border-radius: 16px;
-            padding: 0.25in;
-            margin-bottom: 0.15in;
+            border-radius: 12px;
+            padding: 0.18in;
+            margin-bottom: 0.1in;
             text-align: center;
-            box-shadow: 0 4px 12px rgba(255,193,7,0.3);
+            box-shadow: 0 3px 10px rgba(255,193,7,0.25);
         }}
 
         .code-label {{
             color: white;
-            font-size: 10pt;
+            font-size: 9pt;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }}
 
         .code-value {{
             background: white;
             color: #5C4033;
             font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-            font-size: 20pt;
+            font-size: 18pt;
             font-weight: 800;
             letter-spacing: 2px;
-            padding: 12px;
-            border-radius: 12px;
+            padding: 10px;
+            border-radius: 10px;
             word-break: break-all;
         }}
 
         /* Detalles en grid */
         .details-grid {{
             display: flex;
-            gap: 0.1in;
-            margin-bottom: 0.15in;
+            gap: 0.08in;
+            margin-bottom: 0.1in;
         }}
 
         .detail-item {{
             flex: 1;
             background: white;
-            border-radius: 12px;
-            padding: 0.15in;
+            border-radius: 10px;
+            padding: 0.12in;
             text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
         }}
 
         .detail-label {{
             color: #A0522D;
-            font-size: 9pt;
+            font-size: 8pt;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }}
 
         .detail-value {{
             color: #5C4033;
-            font-size: 14pt;
+            font-size: 12pt;
             font-weight: 700;
-            line-height: 1.2;
+            line-height: 1.1;
         }}
 
         .precio-value {{
             color: #16a085;
-            font-size: 22pt;
+            font-size: 18pt;
             font-weight: 800;
         }}
 
         /* WhatsApp CTA */
         .whatsapp-section {{
             background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
-            border-radius: 16px;
-            padding: 0.2in;
-            margin-bottom: 0.15in;
+            border-radius: 12px;
+            padding: 0.15in;
+            margin-bottom: 0.1in;
             text-align: center;
             color: white;
-            box-shadow: 0 4px 12px rgba(37,211,102,0.3);
+            box-shadow: 0 3px 10px rgba(37,211,102,0.25);
         }}
 
         .whatsapp-title {{
-            font-size: 11pt;
+            font-size: 10pt;
             font-weight: 600;
-            margin-bottom: 8px;
+            margin-bottom: 5px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }}
 
         .whatsapp-number {{
-            font-size: 18pt;
+            font-size: 16pt;
             font-weight: 800;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }}
 
         .whatsapp-note {{
-            font-size: 10pt;
+            font-size: 9pt;
             opacity: 0.95;
         }}
 
         /* Footer minimalista */
         .footer-mobile {{
             text-align: center;
-            padding: 0.15in;
+            padding: 0.1in 0.05in;
             color: #999;
-            font-size: 9pt;
+            font-size: 8pt;
             margin-top: auto;
+            line-height: 1.2;
         }}
 
         /* Decoración */
@@ -664,9 +668,9 @@ class GiftCardPDFService:
         </div>
 
         <!-- Experiencia -->
-        <div class="detail-item" style="margin-bottom: 0.15in;">
+        <div class="detail-item" style="margin-bottom: 0.1in;">
             <div class="detail-label">Experiencia</div>
-            <div class="detail-value">{giftcard_data['experiencia_nombre']}</div>
+            <div class="detail-value" style="font-size: 11pt;">{giftcard_data['experiencia_nombre']}</div>
         </div>
 
         <!-- WhatsApp CTA -->
