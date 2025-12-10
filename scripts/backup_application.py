@@ -21,7 +21,7 @@ import django
 django.setup()
 
 from django.conf import settings
-from ventas.models import Servicio, CategoriaServicio, Cabaña, GiftCardExperiencia
+from ventas.models import Servicio, CategoriaServicio, GiftCardExperiencia
 
 print("=" * 60)
 print("BACKUP DE APLICACIÓN AREMKO")
@@ -70,8 +70,8 @@ data_stats = {
         'con_imagen': Servicio.objects.exclude(imagen='').exclude(imagen__isnull=True).count(),
         'categorias': list(CategoriaServicio.objects.values_list('nombre', flat=True)),
     },
-    'cabanas': {
-        'total': Cabaña.objects.count(),
+    'categorias': {
+        'total': CategoriaServicio.objects.count(),
     },
     'giftcards': {
         'total': GiftCardExperiencia.objects.count(),
@@ -84,7 +84,7 @@ with open(stats_file, 'w') as f:
 
 print(f"✅ Estadísticas guardadas en: data_statistics.json")
 print(f"   Servicios: {data_stats['servicios']['total']}")
-print(f"   Cabañas: {data_stats['cabanas']['total']}")
+print(f"   Categorías: {data_stats['categorias']['total']}")
 print(f"   Gift Cards: {data_stats['giftcards']['total']}")
 
 # 3. Backup de lista de imágenes actuales en Cloudinary
@@ -182,7 +182,7 @@ readme_content = f"""# BACKUP AREMKO - {timestamp}
 
 - Servicios totales: {data_stats['servicios']['total']}
 - Servicios con imagen: {data_stats['servicios']['con_imagen']}
-- Cabañas totales: {data_stats['cabanas']['total']}
+- Categorías totales: {data_stats['categorias']['total']}
 - Gift Cards totales: {data_stats['giftcards']['total']}
 - Imágenes en Cloudinary: {len(images_list)}
 
