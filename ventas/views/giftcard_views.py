@@ -851,6 +851,7 @@ def giftcard_download_pdf(request, codigo):
         # Obtener información de la experiencia
         experiencia_imagen_url = None
         experiencia_nombre = giftcard.servicio_asociado.replace('_', ' ').title() if giftcard.servicio_asociado else 'Experiencia Aremko'
+        experiencia_descripcion = None
 
         if giftcard.servicio_asociado:
             try:
@@ -858,6 +859,7 @@ def giftcard_download_pdf(request, codigo):
                 if experiencia.imagen:
                     experiencia_imagen_url = request.build_absolute_uri(experiencia.imagen.url)
                 experiencia_nombre = experiencia.nombre
+                experiencia_descripcion = experiencia.descripcion
             except GiftCardExperiencia.DoesNotExist:
                 pass
 
@@ -865,6 +867,7 @@ def giftcard_download_pdf(request, codigo):
         giftcard_data = {
             'codigo': giftcard.codigo,
             'experiencia_nombre': experiencia_nombre,
+            'experiencia_descripcion': experiencia_descripcion,
             'experiencia_imagen_url': experiencia_imagen_url,
             'destinatario_nombre': giftcard.destinatario_nombre or 'Invitado Especial',
             'mensaje_seleccionado': giftcard.mensaje_personalizado or f"Te regalo esta experiencia única en Aremko Spa para que disfrutes de un momento de relajación y bienestar en medio de la naturaleza de Puerto Varas.",
