@@ -1141,6 +1141,11 @@
     const urlParams = new URLSearchParams(window.location.search);
     const skipStep1 = urlParams.get('skip_step1') === 'true';
 
+    console.log(`🔍 Parámetros URL:`, {
+        experienciaPreseleccionada: experienciaPreseleccionada,
+        skipStep1: skipStep1
+    });
+
     // Si hay experiencia pre-seleccionada, auto-seleccionarla al cargar la página
     if (experienciaPreseleccionada) {
         console.log(`🎯 Auto-seleccionando experiencia: ${experienciaPreseleccionada}`);
@@ -1174,6 +1179,18 @@
                 } else {
                     console.error(`❌ No se encontró tarjeta con data-experience="${experienciaPreseleccionada}"`);
                     console.log(`📋 Tarjetas disponibles:`, Array.from(document.querySelectorAll('[data-experience]')).map(el => el.getAttribute('data-experience')));
+
+                    // Si viene skip_step1=true pero no encontramos la tarjeta, igual avanzar al paso 2
+                    if (skipStep1) {
+                        console.log('⏭️ skip_step1=true pero tarjeta no encontrada, avanzando al paso 2 de todas formas...');
+                        showAutoAdvancing();
+                        setTimeout(() => {
+                            wizardData.paso = 2;
+                            updateWizardUI();
+                            hideAutoAdvancing();
+                            document.getElementById('step2').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 500);
+                    }
                 }
             }, 100);
         }
@@ -1186,6 +1203,28 @@
         } else {
             console.log('✅ DOM ya está listo, ejecutando inmediatamente...');
             ejecutarAutoSeleccion();
+        }
+    } else if (skipStep1) {
+        // NUEVO: Si no hay experiencia preseleccionada PERO viene skip_step1=true,
+        // igual avanzar al paso 2 (puede pasar si el parámetro exp= no coincide)
+        console.log('⏭️ skip_step1=true sin experiencia preseleccionada, avanzando al paso 2...');
+
+        function avanzarAPaso2SinExp() {
+            setTimeout(() => {
+                showAutoAdvancing();
+                setTimeout(() => {
+                    wizardData.paso = 2;
+                    updateWizardUI();
+                    hideAutoAdvancing();
+                    document.getElementById('step2').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 500);
+            }, 100);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', avanzarAPaso2SinExp);
+        } else {
+            avanzarAPaso2SinExp();
         }
     }
 
