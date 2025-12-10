@@ -52,10 +52,6 @@ else:
 
 # Aplicaciones instaladas
 INSTALLED_APPS = [
-    # Cloudinary debe ir ANTES de django.contrib.staticfiles
-    'cloudinary_storage',  # Cloudinary storage
-    'cloudinary',  # Cloudinary
-
     # Aplicaciones de Django por defecto
     'django.contrib.admin',
     'django.contrib.auth',
@@ -77,6 +73,10 @@ INSTALLED_APPS = [
     'storages', # Add django-storages
     'solo',     # Add django-solo
     'anymail',  # Email integration
+
+    # Cloudinary al final para no interferir con static files
+    'cloudinary_storage',  # Cloudinary storage
+    'cloudinary',  # Cloudinary
 ]
 
 # MIDDLEWARE
@@ -163,8 +163,11 @@ CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY')
 CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET')
 
 if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
-    # Usar Cloudinary como storage principal
+    # Usar Cloudinary SOLO para archivos media, NO para static
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+    # IMPORTANTE: Mantener WhiteNoise para archivos estáticos
+    # (No cambiar STATICFILES_STORAGE)
 
     # Configuración de Cloudinary
     CLOUDINARY_STORAGE = {
@@ -175,12 +178,14 @@ if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
         'MEDIA_TAG': 'media',  # Tag para organizar archivos
         'INVALID_VIDEO_ERROR_MESSAGE': 'Por favor sube un archivo de video válido',
         'EXCLUDED_FORMATS': ['pdf', 'doc', 'docx'],  # Excluir documentos
+        'STATIC': False,  # NO manejar archivos estáticos
+        'STATICFILES_MANIFEST_ROOT': os.path.join(BASE_DIR, 'staticfiles'),
     }
 
     # URL base para medios
     MEDIA_URL = f'https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/'
 
-    logger.info(f"✅ Cloudinary configurado: cloud_name={CLOUDINARY_CLOUD_NAME}")
+    logger.info(f"✅ Cloudinary configurado para media: cloud_name={CLOUDINARY_CLOUD_NAME}")
 
 # Fallback a GCS (Prioridad 2 - Retrocompatibilidad)
 elif os.getenv('GCS_CREDENTIALS_JSON'):
