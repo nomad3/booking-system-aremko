@@ -21,7 +21,7 @@ import django
 django.setup()
 
 from django.conf import settings
-from ventas.models import Servicio, CategoriaServicio, Cabana, GiftCardExperiencia
+from ventas.models import Servicio, CategoriaServicio, Cabaña, GiftCardExperiencia
 
 print("=" * 60)
 print("BACKUP DE APLICACIÓN AREMKO")
@@ -71,7 +71,7 @@ data_stats = {
         'categorias': list(CategoriaServicio.objects.values_list('nombre', flat=True)),
     },
     'cabanas': {
-        'total': Cabana.objects.count(),
+        'total': Cabaña.objects.count(),
     },
     'giftcards': {
         'total': GiftCardExperiencia.objects.count(),
