@@ -450,12 +450,19 @@ def giftcard_wizard(request):
 
     if exp_id:
         logger.info(f"🔍 Parámetro ?exp={exp_id} detectado, buscando experiencia...")
-        # Buscar si existe una experiencia con ese ID
+        # Buscar si existe una experiencia con ese ID (buscar por id_experiencia O por nombre)
         experiencia_obj = experiencias_db.filter(id_experiencia=exp_id).first()
 
+        # Si no se encuentra por id_experiencia, intentar buscar por nombre
+        if not experiencia_obj:
+            experiencia_obj = experiencias_db.filter(nombre=exp_id).first()
+            if experiencia_obj:
+                logger.info(f"🔍 Experiencia encontrada por nombre, usando id_experiencia: {experiencia_obj.id_experiencia}")
+
         if experiencia_obj:
-            experiencia_preseleccionada = exp_id
-            logger.info(f"✅ Experiencia '{experiencia_obj.nombre}' encontrada y pre-seleccionada")
+            # IMPORTANTE: Usar el id_experiencia del objeto encontrado, no el parámetro exp_id
+            experiencia_preseleccionada = experiencia_obj.id_experiencia
+            logger.info(f"✅ Experiencia '{experiencia_obj.nombre}' encontrada y pre-seleccionada (ID: {experiencia_preseleccionada})")
         else:
             logger.warning(f"⚠️ Experiencia con id_experiencia='{exp_id}' no encontrada o inactiva")
             # No redirigir ni mostrar error, simplemente ignorar y mostrar todas las experiencias
