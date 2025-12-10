@@ -639,7 +639,7 @@ class GiftCardPDFService:
         <div class="detail-item" style="margin-bottom: 0.1in;">
             <div class="detail-label">Experiencia</div>
             <div class="detail-value" style="font-size: 11pt;">{giftcard_data['experiencia_nombre']}</div>
-            {f'<div style="font-size: 9pt; color: #666; margin-top: 4px; line-height: 1.3;">{giftcard_data["experiencia_descripcion"]}</div>' if giftcard_data.get('experiencia_descripcion') else ''}
+            {f'<div style="font-size: 9pt; color: #666; margin-top: 4px; line-height: 1.3;">{giftcard_data["experiencia_descripcion"].strip()}</div>' if giftcard_data.get('experiencia_descripcion') and giftcard_data['experiencia_descripcion'].strip() else ''}
         </div>
 
         <!-- Imagen si existe -->
