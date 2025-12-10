@@ -70,6 +70,8 @@ INSTALLED_APPS = [
     'storages', # Add django-storages
     'solo',     # Add django-solo
     'anymail',  # Email integration
+    'cloudinary_storage',  # Cloudinary storage
+    'cloudinary',  # Cloudinary
 ]
 
 # MIDDLEWARE
@@ -149,66 +151,61 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Media files configuration (Local vs GCS)
-# Setup de credenciales GCS desde variable de entorno JSON
-GCS_CREDENTIALS_JSON = os.getenv('GCS_CREDENTIALS_JSON')
-if GCS_CREDENTIALS_JSON:
+# Media files configuration (Cloudinary > GCS > Local)
+# Configuración de Cloudinary (Prioridad 1)
+CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME')
+CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY')
+CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET')
+
+if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
+    # Usar Cloudinary como storage principal
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+    # Configuración de Cloudinary
+    CLOUDINARY_STORAGE = {
+        'CLOUD_NAME': CLOUDINARY_CLOUD_NAME,
+        'API_KEY': CLOUDINARY_API_KEY,
+        'API_SECRET': CLOUDINARY_API_SECRET,
+        'SECURE': True,  # Usar HTTPS
+        'MEDIA_TAG': 'media',  # Tag para organizar archivos
+        'INVALID_VIDEO_ERROR_MESSAGE': 'Por favor sube un archivo de video válido',
+        'EXCLUDED_FORMATS': ['pdf', 'doc', 'docx'],  # Excluir documentos
+    }
+
+    # URL base para medios
+    MEDIA_URL = f'https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/'
+
+    logger.info(f"✅ Cloudinary configurado: cloud_name={CLOUDINARY_CLOUD_NAME}")
+
+# Fallback a GCS (Prioridad 2 - Retrocompatibilidad)
+elif os.getenv('GCS_CREDENTIALS_JSON'):
     try:
         import json
-        # Parsear y validar las credenciales
-        credentials_data = json.loads(GCS_CREDENTIALS_JSON)
-
-        # Crear archivo de credenciales en /tmp (escribible en Render)
+        credentials_data = json.loads(os.getenv('GCS_CREDENTIALS_JSON'))
         credentials_path = Path('/tmp/gcs-credentials.json')
         with open(credentials_path, 'w') as f:
             json.dump(credentials_data, f)
-
-        # Configurar variable de entorno para Google Cloud SDK
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = str(credentials_path)
 
-        # Configurar Django Storages para GCS
         DEFAULT_FILE_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
         GS_BUCKET_NAME = os.getenv('GS_BUCKET_NAME', 'aremko-media-prod')
         GS_PROJECT_ID = credentials_data.get('project_id', os.getenv('GS_PROJECT_ID'))
-
-        # Configuración de permisos y comportamiento
-        GS_FILE_OVERWRITE = False  # No sobrescribir archivos con el mismo nombre
-        GS_QUERYSTRING_AUTH = False  # URLs públicas sin autenticación
-        GS_DEFAULT_ACL = 'publicRead'  # Hacer archivos públicos por defecto
-
-        # URL pública para acceder a los archivos
+        GS_FILE_OVERWRITE = False
+        GS_QUERYSTRING_AUTH = False
+        GS_DEFAULT_ACL = 'publicRead'
         MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/'
 
-        logger.info(f"✅ GCS configurado: bucket={GS_BUCKET_NAME}, proyecto={GS_PROJECT_ID}")
-
-    except json.JSONDecodeError as e:
-        logger.error(f"❌ Error parseando GCS_CREDENTIALS_JSON: {e}")
-        # Fallback a almacenamiento local
-        MEDIA_URL = '/media/'
-        MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
+        logger.info(f"✅ GCS configurado: bucket={GS_BUCKET_NAME}")
     except Exception as e:
         logger.error(f"❌ Error configurando GCS: {e}")
-        # Fallback a almacenamiento local
         MEDIA_URL = '/media/'
         MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Intentar con archivo de credenciales tradicional (retrocompatibilidad)
-elif os.getenv('GOOGLE_APPLICATION_CREDENTIALS') and os.path.exists(os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '')):
-    DEFAULT_FILE_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
-    GS_BUCKET_NAME = os.getenv('GS_BUCKET_NAME', 'aremkoweb')
-    GS_PROJECT_ID = os.getenv('GS_PROJECT_ID', 'aremko-e51ae')
-    GS_FILE_OVERWRITE = False
-    GS_QUERYSTRING_AUTH = False
-    GS_DEFAULT_ACL = 'publicRead'
-    MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/'
-    logger.info(f"✅ GCS configurado con archivo: bucket={GS_BUCKET_NAME}")
-
+# Fallback a almacenamiento local (Prioridad 3)
 else:
-    # Almacenamiento local por defecto
     MEDIA_URL = '/media/'
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-    logger.warning("⚠️ GCS no configurado - usando almacenamiento local")
+    logger.warning("⚠️ Cloudinary/GCS no configurados - usando almacenamiento local")
 
 
 REST_FRAMEWORK = {

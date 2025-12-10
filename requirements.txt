@@ -31,8 +31,12 @@ openai>=1.57.0  # OpenAI API client
 dj-database-url>=2.2.0
 whitenoise>=6.8.2  # Static files serving
 django-cors-headers>=4.6.0  # CORS headers
-google-cloud-storage>=2.18.0  # Google Cloud Storage
+google-cloud-storage>=2.18.0  # Google Cloud Storage (mantener por compatibilidad)
 django-storages>=1.14.4  # Django storage backends
+
+# Cloudinary
+cloudinary>=1.41.0  # Cloudinary SDK
+django-cloudinary-storage>=0.3.0  # Django integration for Cloudinary
 
 # Excel & Data
 xlwt==1.3.0  # Para exportación a Excel (XLS viejo)
