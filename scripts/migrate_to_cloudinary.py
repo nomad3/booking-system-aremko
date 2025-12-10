@@ -17,7 +17,7 @@ sys.path.insert(0, str(BASE_DIR))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aremko_project.settings')
 django.setup()
 
-from ventas.models import Servicio, Cabaña, Tina, Masaje, TipoCabaña
+from ventas.models import Servicio, Cabana, Tina, Masaje, TipoCabana
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.conf import settings
@@ -138,10 +138,10 @@ def migrate_model_images(model_class, image_field='imagen'):
                     # Determinar carpeta según el modelo
                     folder_map = {
                         'Servicio': 'servicios',
-                        'Cabaña': 'cabanas',
+                        'Cabana': 'cabanas',
                         'Tina': 'tinas',
                         'Masaje': 'masajes',
-                        'TipoCabaña': 'tipos_cabana'
+                        'TipoCabana': 'tipos_cabana'
                     }
                     folder = folder_map.get(model_name, 'general')
 
@@ -259,10 +259,10 @@ def main():
     # Lista de modelos a migrar con sus campos de imagen
     models_to_migrate = [
         (Servicio, 'imagen'),
-        (Cabaña, 'imagen'),
+        (Cabana, 'imagen'),
         (Tina, 'imagen'),
         (Masaje, 'imagen'),
-        (TipoCabaña, 'imagen'),
+        (TipoCabana, 'imagen'),
     ]
 
     # Migrar cada modelo
