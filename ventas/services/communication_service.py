@@ -217,15 +217,20 @@ class CommunicationService:
             # Renderizar email HTML
             html_content = render_to_string('emails/booking_confirmation_email.html', context)
             
+            # Crear lista de BCC sin duplicados
+            ventas_email = getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
+            bcc_emails = ['aremkospa@gmail.com']
+            if ventas_email not in bcc_emails:
+                bcc_emails.append(ventas_email)
+
             # Crear email
             email = EmailMultiAlternatives(
                 subject=f'Reserva por confirmar - {subject_service_name}',
                 body=f'Estimado/a {cliente.nombre}, su reserva para {servicio_nombre} el {fecha_str} a las {hora_str} ha sido confirmada.',
-                # Usar VENTAS_FROM_EMAIL verificado en SendGrid
-                from_email=getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                from_email=ventas_email,
                 to=[cliente.email],
-                bcc=['aremkospa@gmail.com', getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copias a aremkospa@gmail.com y ventas@aremko.cl
-                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+                bcc=bcc_emails,
+                reply_to=[ventas_email],
             )
             email.attach_alternative(html_content, "text/html")
             
@@ -321,15 +326,21 @@ class CommunicationService:
 
             html_content = render_to_string('emails/booking_reminder_email.html', context)
 
+            # Crear lista de BCC sin duplicados
+            ventas_email = getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
+            bcc_emails = ['aremkospa@gmail.com']
+            if ventas_email not in bcc_emails:
+                bcc_emails.append(ventas_email)
+
             # Asunto
             subject_service_name = servicios_list[0]['nombre'] if servicios_list else servicio_nombre
             email = EmailMultiAlternatives(
                 subject=f"Recordatorio: tu reserva es mañana - {subject_service_name}",
                 body=f"Hola {cliente.nombre}, te recordamos tu reserva de mañana.",
-                from_email=getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                from_email=ventas_email,
                 to=[cliente.email],
-                bcc=['aremkospa@gmail.com', getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copias a aremkospa@gmail.com y ventas@aremko.cl
-                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+                bcc=bcc_emails,
+                reply_to=[ventas_email],
             )
             email.attach_alternative(html_content, "text/html")
             email.send()
