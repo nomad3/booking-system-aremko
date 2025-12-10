@@ -17,7 +17,14 @@ sys.path.insert(0, str(BASE_DIR))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aremko_project.settings')
 django.setup()
 
-from ventas.models import Servicio, CategoriaServicio, GiftCard
+from ventas.models import (
+    Servicio,
+    CategoriaServicio,
+    GiftCard,
+    HomepageConfig,
+    HomepageSettings,
+    GiftCardExperiencia
+)
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.conf import settings
@@ -139,7 +146,10 @@ def migrate_model_images(model_class, image_field='imagen'):
                     folder_map = {
                         'Servicio': 'servicios',
                         'CategoriaServicio': 'categorias',
-                        'GiftCard': 'giftcards'
+                        'GiftCard': 'giftcards',
+                        'GiftCardExperiencia': 'giftcard_experiencias',
+                        'HomepageConfig': 'homepage',
+                        'HomepageSettings': 'homepage'
                     }
                     folder = folder_map.get(model_name, 'general')
 
@@ -259,7 +269,35 @@ def main():
         (Servicio, 'imagen'),
         (CategoriaServicio, 'imagen'),
         (GiftCard, 'imagen'),
+        (GiftCardExperiencia, 'imagen'),
     ]
+
+    # Modelos con múltiples campos de imagen
+    homepage_models = []
+
+    # Verificar si HomepageConfig existe y tiene registros
+    try:
+        if HomepageConfig.objects.exists():
+            config = HomepageConfig.objects.first()
+            if config:
+                homepage_models.append(('HomepageConfig', config, [
+                    'hero_background_image',
+                    'philosophy_image',
+                    'gallery_image_1',
+                    'gallery_image_2',
+                    'gallery_image_3'
+                ]))
+    except:
+        pass
+
+    # Verificar si HomepageSettings existe y tiene registros
+    try:
+        if HomepageSettings.objects.exists():
+            settings_obj = HomepageSettings.objects.first()
+            if settings_obj:
+                homepage_models.append(('HomepageSettings', settings_obj, ['hero_background_image']))
+    except:
+        pass
 
     # Migrar cada modelo
     for model_class, image_field in models_to_migrate:
