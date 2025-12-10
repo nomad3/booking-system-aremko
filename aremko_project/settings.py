@@ -176,15 +176,10 @@ if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
         'API_KEY': CLOUDINARY_API_KEY,
         'API_SECRET': CLOUDINARY_API_SECRET,
         'SECURE': True,  # Usar HTTPS
-        'MEDIA_TAG': 'media',  # Tag para organizar archivos
-        'INVALID_VIDEO_ERROR_MESSAGE': 'Por favor sube un archivo de video válido',
-        'EXCLUDED_FORMATS': ['pdf', 'doc', 'docx'],  # Excluir documentos
-        'STATIC': False,  # NO manejar archivos estáticos
-        'STATICFILES_MANIFEST_ROOT': os.path.join(BASE_DIR, 'staticfiles'),
     }
 
-    # URL base para medios
-    MEDIA_URL = f'https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/'
+    # IMPORTANTE: No configurar MEDIA_URL manualmente
+    # django-cloudinary-storage lo genera automáticamente
 
     logger.info(f"✅ Cloudinary configurado para media: cloud_name={CLOUDINARY_CLOUD_NAME}")
 
