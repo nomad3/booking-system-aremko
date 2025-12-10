@@ -70,7 +70,7 @@ if not pagos.exists():
 else:
     print(f"✅ {pagos.count()} pago(s) registrado(s):")
     for pago in pagos:
-        print(f"   - ${pago.monto} - {pago.metodo} - {pago.fecha_pago}")
+        print(f"   - ${pago.monto} - {pago.metodo_pago} - {pago.fecha_pago}")
 
 # Preguntar si quiere enviar el email
 print("\n" + "=" * 80)
