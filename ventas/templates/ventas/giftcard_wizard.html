@@ -1127,8 +1127,8 @@
         comprador: {}  // Nuevo: datos del comprador
     };
 
-    // Datos de experiencias (desde el backend)
-    const experiencias = {{ experiencias| safe }};
+    // Datos de experiencias (desde el backend - JSON serializado correctamente)
+    const experiencias = {{ experiencias_json|safe }};
 
     // Pre-selección de experiencia si viene parámetro ?exp= en la URL
     {% if experiencia_preseleccionada %}

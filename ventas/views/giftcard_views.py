@@ -525,8 +525,13 @@ def giftcard_wizard(request):
         }
     ]
 
+    # Serializar experiencias a JSON para evitar problemas con None/null
+    import json
+    experiencias_json = json.dumps(experiencias)
+
     context = {
         'experiencias': experiencias,
+        'experiencias_json': experiencias_json,  # Versión JSON serializada
         'tipos_mensaje': tipos_mensaje,
         'experiencia_preseleccionada': experiencia_preseleccionada,  # Nuevo: para pre-selección
         'paso_actual': 1,
