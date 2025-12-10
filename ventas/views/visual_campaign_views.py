@@ -156,14 +156,18 @@ def visual_campaign_send_test(request, pk):
             'email': request.user.email,
         }
         html_content = template.render(Context(context_data))
-        
+
+        # Agregar footer con link de unsubscribe
+        from ventas.utils.email_footer import get_email_footer_html
+        html_content_con_footer = html_content + get_email_footer_html(request.user.email)
+
         email = EmailMultiAlternatives(
             subject=f'[PRUEBA] {campaign.subject}',
             body='Este es un email de prueba.',
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[request.user.email],
         )
-        email.attach_alternative(html_content, "text/html")
+        email.attach_alternative(html_content_con_footer, "text/html")
         email.send()
         
         messages.success(request, f'Email de prueba enviado a {request.user.email}')
@@ -234,14 +238,18 @@ def send_visual_campaign_async(campaign_pk):
                     'email': subscriber.email,
                 }
                 html_content = template.render(Context(context_data))
-                
+
+                # Agregar footer con link de unsubscribe
+                from ventas.utils.email_footer import get_email_footer_html
+                html_content_con_footer = html_content + get_email_footer_html(subscriber.email)
+
                 email = EmailMultiAlternatives(
                     subject=campaign.subject,
                     body='Active visualización HTML.',
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     to=[subscriber.email],
                 )
-                email.attach_alternative(html_content, "text/html")
+                email.attach_alternative(html_content_con_footer, "text/html")
                 email.send()
                 
                 CampaignSendLog.objects.create(

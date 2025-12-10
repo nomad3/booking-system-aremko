@@ -1045,6 +1045,10 @@ www.aremko.cl
 
             # Crear el email con contenido HTML
             from django.core.mail import EmailMultiAlternatives
+            from ventas.utils.email_footer import get_email_footer_html
+
+            # Agregar footer con link de unsubscribe
+            email_html_con_footer = email_html + get_email_footer_html(comprador_email)
 
             email = EmailMultiAlternatives(
                 subject=subject,
@@ -1055,7 +1059,7 @@ www.aremko.cl
             )
 
             # Agregar contenido HTML
-            email.attach_alternative(email_html, "text/html")
+            email.attach_alternative(email_html_con_footer, "text/html")
 
             # Generar y adjuntar PDFs - usando formato móvil por defecto
             if es_multiple:

@@ -377,13 +377,17 @@ def bulk_email_send_view(request):
                 # Generar propuesta con IA
                 propuesta = ai_service.generar_propuesta(cliente.id, estilo=estilo)
 
+                # Agregar footer con link de unsubscribe
+                from ventas.utils.email_footer import get_email_footer_html
+                email_body_con_footer = propuesta['email_body'] + get_email_footer_html(cliente.email)
+
                 # Enviar email
                 send_mail(
                     subject=propuesta['email_subject'],
                     message='',  # No se usa en HTML
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[cliente.email],
-                    html_message=propuesta['email_body'],
+                    html_message=email_body_con_footer,
                     fail_silently=False,
                 )
 

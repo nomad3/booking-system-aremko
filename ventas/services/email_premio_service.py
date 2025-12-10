@@ -166,13 +166,17 @@ class EmailPremioService:
             # Renderizar HTML
             html_content = render_to_string(template_path, context)
 
+            # Agregar footer con link de unsubscribe
+            from ventas.utils.email_footer import get_email_footer_html
+            html_content_con_footer = html_content + get_email_footer_html(cliente_premio.cliente.email)
+
             # Enviar email
             send_mail(
                 subject=asunto,
                 message='',  # Texto plano vacío
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[cliente_premio.cliente.email],
-                html_message=html_content,
+                html_message=html_content_con_footer,
                 fail_silently=False,
             )
 
@@ -347,12 +351,16 @@ class EmailPremioService:
             asunto = f'[TEST] {cls._get_random_subject(tipo_premio)}'
             html_content = render_to_string(template_path, context)
 
+            # Agregar footer con link de unsubscribe
+            from ventas.utils.email_footer import get_email_footer_html
+            html_content_con_footer = html_content + get_email_footer_html(email)
+
             send_mail(
                 subject=asunto,
                 message='Email de prueba',
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[email],
-                html_message=html_content,
+                html_message=html_content_con_footer,
                 fail_silently=False,
             )
 

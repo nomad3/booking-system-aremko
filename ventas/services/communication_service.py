@@ -216,7 +216,11 @@ class CommunicationService:
             
             # Renderizar email HTML
             html_content = render_to_string('emails/booking_confirmation_email.html', context)
-            
+
+            # Agregar footer con link de unsubscribe
+            from ventas.utils.email_footer import get_email_footer_html
+            html_content_con_footer = html_content + get_email_footer_html(cliente.email)
+
             # Crear lista de BCC sin duplicados
             ventas_email = getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
             bcc_emails = ['aremkospa@gmail.com']
@@ -232,7 +236,7 @@ class CommunicationService:
                 bcc=bcc_emails,
                 reply_to=[ventas_email],
             )
-            email.attach_alternative(html_content, "text/html")
+            email.attach_alternative(html_content_con_footer, "text/html")
             
             # Enviar email
             email.send()
@@ -326,6 +330,10 @@ class CommunicationService:
 
             html_content = render_to_string('emails/booking_reminder_email.html', context)
 
+            # Agregar footer con link de unsubscribe
+            from ventas.utils.email_footer import get_email_footer_html
+            html_content_con_footer = html_content + get_email_footer_html(cliente.email)
+
             # Crear lista de BCC sin duplicados
             ventas_email = getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
             bcc_emails = ['aremkospa@gmail.com']
@@ -342,7 +350,7 @@ class CommunicationService:
                 bcc=bcc_emails,
                 reply_to=[ventas_email],
             )
-            email.attach_alternative(html_content, "text/html")
+            email.attach_alternative(html_content_con_footer, "text/html")
             email.send()
 
             # Log
@@ -465,6 +473,10 @@ class CommunicationService:
 
             html_content = render_to_string('emails/payment_complete_email.html', context)
 
+            # Agregar footer con link de unsubscribe
+            from ventas.utils.email_footer import get_email_footer_html
+            html_content_con_footer = html_content + get_email_footer_html(cliente.email)
+
             subject = f"Pago recibido - Reserva #{booking.id} pagada 100%"
 
             # Crear lista de BCC sin duplicados
@@ -481,7 +493,7 @@ class CommunicationService:
                 bcc=bcc_emails,
                 reply_to=[ventas_email],
             )
-            email.attach_alternative(html_content, "text/html")
+            email.attach_alternative(html_content_con_footer, "text/html")
             email.send()
 
             # Usamos el tipo BOOKING_CONFIRMATION para evitar migraciones en choices
