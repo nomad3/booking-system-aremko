@@ -7,6 +7,11 @@ Migra desde Google Cloud Storage o almacenamiento local.
 import os
 import sys
 import django
+from pathlib import Path
+
+# Agregar el directorio raíz del proyecto al path
+BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR))
 
 # Configurar Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aremko_project.settings')
