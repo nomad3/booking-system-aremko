@@ -349,7 +349,8 @@ class GiftCardPDFService:
 
         # Obtener URL de la imagen si existe
         imagen_url = giftcard_data.get('experiencia_imagen_url', '')
-        tiene_imagen = bool(imagen_url)
+        # Validar que la URL sea válida y comience con http (imagen real de Cloudinary)
+        tiene_imagen = bool(imagen_url) and (imagen_url.startswith('http://') or imagen_url.startswith('https://'))
 
         # Generar HTML de la imagen si existe - optimizado para móvil
         imagen_html = ''
