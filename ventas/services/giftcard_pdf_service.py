@@ -356,7 +356,7 @@ class GiftCardPDFService:
         if tiene_imagen:
             imagen_html = f'''
         <div class="imagen-experiencia-mobile">
-            <img src="{imagen_url}" alt="{giftcard_data['experiencia_nombre']}" class="experiencia-img-mobile">
+            <img src="{imagen_url}" alt="" class="experiencia-img-mobile">
         </div>
         '''
 
@@ -964,17 +964,13 @@ class GiftCardPDFService:
                 <h3 style="margin-top: 0;">{'📋 GiftCards incluidas:' if es_multiple else '📋 GiftCard incluida:'}</h3>
 """
 
-            # Agregar cada GiftCard con su botón de visualización
+            # Agregar cada GiftCard
             for gc in giftcards_data:
-                view_url = f"{base_url}/ventas/giftcard/{gc['codigo']}/view/"
                 email_html += f"""
                 <div class="gift-item">
                     <strong>{gc['destinatario_nombre']}</strong><br>
                     Código: <span class="code">{gc['codigo']}</span><br>
-                    Experiencia: {gc['experiencia_nombre']}<br>
-                    <a href="{view_url}" style="color: #25D366; text-decoration: none; font-weight: 600;">
-                        📱 Ver en móvil →
-                    </a>
+                    Experiencia: {gc['experiencia_nombre']}
                 </div>
 """
 
@@ -982,10 +978,7 @@ class GiftCardPDFService:
             </div>
 
             <div class="btn-container">
-                <a href="{base_url}/ventas/giftcard/{giftcards_data[0]['codigo']}/view/" class="btn btn-primary">
-                    📱 Ver {'la primera ' if es_multiple else 'mi '}GiftCard en móvil
-                </a>
-                <a href="https://wa.me/56957902525" class="btn btn-secondary">
+                <a href="https://wa.me/56957902525" class="btn btn-primary">
                     💬 Contactar por WhatsApp
                 </a>
             </div>
@@ -998,7 +991,7 @@ class GiftCardPDFService:
             <div class="instructions">
                 <h3 style="margin-top: 0;">📝 Instrucciones de canje:</h3>
                 <ul style="margin: 10px 0; padding-left: 20px;">
-                    <li>El destinatario puede ver su GiftCard en cualquier dispositivo móvil</li>
+                    <li>Abrir el PDF adjunto (puedes imprimirlo o enviarlo digitalmente)</li>
                     <li>Contactar por WhatsApp al <strong>+56 9 5790 2525</strong></li>
                     <li>Mencionar el código al momento de reservar</li>
                     <li>Válido hasta la fecha indicada en cada certificado</li>
@@ -1030,14 +1023,10 @@ class GiftCardPDFService:
 {'Códigos incluidos' if es_multiple else 'Código incluido'}:
 {lista_codigos}
 
-VER EN MÓVIL:
-{'Las' if es_multiple else 'Tu'} GiftCard{'s' if es_multiple else ''} {'están' if es_multiple else 'está'} {'disponibles' if es_multiple else 'disponible'} para ver en cualquier dispositivo:
-{chr(10).join([f"{base_url}/ventas/giftcard/{gc['codigo']}/view/" for gc in giftcards_data])}
-
 {explicacion_adjuntos}
 
 INSTRUCCIONES DE CANJE:
-✅ Ver la GiftCard en el móvil (link arriba)
+✅ Abrir el PDF adjunto (puedes imprimirlo o enviarlo digitalmente)
 ✅ Contactar por WhatsApp al +56 9 5790 2525
 ✅ Mencionar el código al momento de reservar
 ✅ Válido hasta la fecha indicada en cada certificado
