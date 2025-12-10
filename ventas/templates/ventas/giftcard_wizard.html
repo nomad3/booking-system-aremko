@@ -317,10 +317,58 @@
     /* Steps Hidden by Default */
     .wizard-step {
         display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out;
     }
 
     .wizard-step.active {
         display: block;
+        animation: fadeIn 0.3s ease-in-out;
+        opacity: 1;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Indicador de avance automático */
+    .auto-advancing {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 20px 40px;
+        border-radius: 10px;
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .auto-advancing.show {
+        display: flex;
+    }
+
+    .auto-advancing .spinner {
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
     }
 
     /* Icon Styles */
@@ -1030,6 +1078,12 @@
             </button>
         </div>
     </div>
+
+    <!-- Indicador de avance automático -->
+    <div class="auto-advancing" id="autoAdvancing">
+        <div class="spinner"></div>
+        <span>Avanzando al siguiente paso...</span>
+    </div>
 </div>
 
 <script>
@@ -1047,6 +1101,17 @@
             }
         }
         return cookieValue;
+    }
+
+    // Función para mostrar/ocultar indicador de avance automático
+    function showAutoAdvancing() {
+        const indicator = document.getElementById('autoAdvancing');
+        indicator.classList.add('show');
+    }
+
+    function hideAutoAdvancing() {
+        const indicator = document.getElementById('autoAdvancing');
+        indicator.classList.remove('show');
     }
 
     // Wizard State
@@ -1072,6 +1137,10 @@
     const experienciaPreseleccionada = null;
     {% endif %}
 
+    // Detectar parámetro skip_step1 para saltar directo al paso 2
+    const urlParams = new URLSearchParams(window.location.search);
+    const skipStep1 = urlParams.get('skip_step1') === 'true';
+
     // Si hay experiencia pre-seleccionada, auto-seleccionarla al cargar la página
     if (experienciaPreseleccionada) {
         console.log(`🎯 Auto-seleccionando experiencia: ${experienciaPreseleccionada}`);
@@ -1086,8 +1155,22 @@
                 if (expCard) {
                     console.log(`✅ Tarjeta encontrada con selector [data-experience="${experienciaPreseleccionada}"]`);
                     selectExperience(experienciaPreseleccionada);
-                    // Scroll suave hacia la experiencia seleccionada
-                    expCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                    // Si viene skip_step1=true, avanzar automáticamente al paso 2
+                    if (skipStep1) {
+                        console.log('⏭️ skip_step1=true detectado, avanzando al paso 2...');
+                        showAutoAdvancing();
+                        setTimeout(() => {
+                            wizardData.paso = 2;
+                            updateWizardUI();
+                            hideAutoAdvancing();
+                            // Scroll al top del wizard
+                            document.getElementById('step2').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 500);
+                    } else {
+                        // Scroll suave hacia la experiencia seleccionada
+                        expCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
                 } else {
                     console.error(`❌ No se encontró tarjeta con data-experience="${experienciaPreseleccionada}"`);
                     console.log(`📋 Tarjetas disponibles:`, Array.from(document.querySelectorAll('[data-experience]')).map(el => el.getAttribute('data-experience')));
@@ -1261,6 +1344,8 @@
                 charCounter.textContent = this.value.length;
                 updateNextButton(); // Re-validar el botón siguiente
             });
+
+            // NO avanzar automáticamente - usuario debe escribir su mensaje
         } else {
             // Mostrar detalle especial (usado con IA)
             detalleEspecialContainer.style.display = 'block';
@@ -1268,6 +1353,14 @@
             mensajePersonalizadoContainer.style.display = 'none';
             // Limpiar mensaje personalizado
             mensajePersonalizado.value = '';
+
+            // NUEVO: Avanzar automáticamente al paso 4 después de 500ms (solo si NO es personalizado)
+            console.log(`⏭️ Tipo de mensaje "${tipoId}" seleccionado, avanzando al paso 4...`);
+            showAutoAdvancing();
+            setTimeout(() => {
+                nextStep();
+                hideAutoAdvancing();
+            }, 500);
         }
 
         updateNextButton();
@@ -1692,6 +1785,14 @@
 
         // Habilitar botón siguiente
         updateNextButton();
+
+        // NUEVO: Avanzar automáticamente al paso 5 después de 500ms
+        console.log('⏭️ Avanzando automáticamente al paso 5 (preview)...');
+        showAutoAdvancing();
+        setTimeout(() => {
+            nextStep();
+            hideAutoAdvancing();
+        }, 500);
     }
 
     // Regenerar mensaje (genera 1 mensaje adicional)
