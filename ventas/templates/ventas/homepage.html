@@ -579,8 +579,7 @@
                 {% endif %}
                 <div class="card-body">
                     <h5 class="card-title">{{ servicio.nombre }}</h5>
-                    <p class="card-text text-muted"><small>{{ servicio.categoria.nombre }}</small></p> {# Category name
-                    smaller #}
+                    <p class="card-text text-muted"><small>{{ servicio.categoria.nombre }}</small></p>
                     {# Display web description if it exists - Truncated #}
                     {% if servicio.descripcion_web %}
                     <div class="service-description-wrapper mb-2">
