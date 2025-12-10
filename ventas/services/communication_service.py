@@ -455,13 +455,20 @@ class CommunicationService:
             html_content = render_to_string('emails/payment_complete_email.html', context)
 
             subject = f"Pago recibido - Reserva #{booking.id} pagada 100%"
+
+            # Crear lista de BCC sin duplicados
+            ventas_email = getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
+            bcc_emails = ['aremkospa@gmail.com']
+            if ventas_email not in bcc_emails:
+                bcc_emails.append(ventas_email)
+
             email = EmailMultiAlternatives(
                 subject=subject,
                 body=f"Hola {cliente.nombre}, registramos tu pago y tu reserva quedó pagada al 100%.",
-                from_email=getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl'),
+                from_email=ventas_email,
                 to=[cliente.email],
-                bcc=['aremkospa@gmail.com', getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],  # Copias a aremkospa@gmail.com y ventas@aremko.cl
-                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+                bcc=bcc_emails,
+                reply_to=[ventas_email],
             )
             email.attach_alternative(html_content, "text/html")
             email.send()
