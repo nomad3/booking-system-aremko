@@ -150,37 +150,65 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files configuration (Local vs GCS)
-# Check if GOOGLE_APPLICATION_CREDENTIALS is set (indicating GCS usage)
-if os.getenv('GOOGLE_APPLICATION_CREDENTIALS') and os.path.exists(os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '')):
+# Setup de credenciales GCS desde variable de entorno JSON
+GCS_CREDENTIALS_JSON = os.getenv('GCS_CREDENTIALS_JSON')
+if GCS_CREDENTIALS_JSON:
+    try:
+        import json
+        # Parsear y validar las credenciales
+        credentials_data = json.loads(GCS_CREDENTIALS_JSON)
+
+        # Crear archivo de credenciales en /tmp (escribible en Render)
+        credentials_path = Path('/tmp/gcs-credentials.json')
+        with open(credentials_path, 'w') as f:
+            json.dump(credentials_data, f)
+
+        # Configurar variable de entorno para Google Cloud SDK
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = str(credentials_path)
+
+        # Configurar Django Storages para GCS
+        DEFAULT_FILE_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
+        GS_BUCKET_NAME = os.getenv('GS_BUCKET_NAME', 'aremko-media-prod')
+        GS_PROJECT_ID = credentials_data.get('project_id', os.getenv('GS_PROJECT_ID'))
+
+        # Configuración de permisos y comportamiento
+        GS_FILE_OVERWRITE = False  # No sobrescribir archivos con el mismo nombre
+        GS_QUERYSTRING_AUTH = False  # URLs públicas sin autenticación
+        GS_DEFAULT_ACL = 'publicRead'  # Hacer archivos públicos por defecto
+
+        # URL pública para acceder a los archivos
+        MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/'
+
+        logger.info(f"✅ GCS configurado: bucket={GS_BUCKET_NAME}, proyecto={GS_PROJECT_ID}")
+
+    except json.JSONDecodeError as e:
+        logger.error(f"❌ Error parseando GCS_CREDENTIALS_JSON: {e}")
+        # Fallback a almacenamiento local
+        MEDIA_URL = '/media/'
+        MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+    except Exception as e:
+        logger.error(f"❌ Error configurando GCS: {e}")
+        # Fallback a almacenamiento local
+        MEDIA_URL = '/media/'
+        MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Intentar con archivo de credenciales tradicional (retrocompatibilidad)
+elif os.getenv('GOOGLE_APPLICATION_CREDENTIALS') and os.path.exists(os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '')):
     DEFAULT_FILE_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
-    GS_BUCKET_NAME = os.getenv('GS_BUCKET_NAME', 'aremkoweb') # Use env var or default
-    GS_PROJECT_ID = os.getenv('GS_PROJECT_ID', 'aremko-e51ae') # Use env var or default
-    # Construct the full path to the credentials file relative to BASE_DIR
-    GS_CREDENTIALS_PATH = BASE_DIR / os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-    # Check if the credentials file exists before setting GS_CREDENTIALS
-    if GS_CREDENTIALS_PATH.is_file():
-        # Note: django-storages expects the *path* to the credentials file,
-        # not the content, when using GS_CREDENTIALS setting directly like this.
-        # However, it's often more robust to rely on the GOOGLE_APPLICATION_CREDENTIALS
-        # environment variable being set correctly in the deployment environment,
-        # which google-cloud-storage library picks up automatically.
-        # Setting GS_CREDENTIALS explicitly might be needed in some setups.
-        # For now, we'll rely on the environment variable being set.
-        pass # GS_CREDENTIALS = str(GS_CREDENTIALS_PATH) # Uncomment if needed
-
-    # Make uploaded files publicly readable by default
-    # GS_DEFAULT_ACL = 'publicRead'  # Temporarily disabled to test
-    GS_FILE_OVERWRITE = False # Prevent overwriting files with the same name
-    GS_QUERYSTRING_AUTH = False # Keep this: Generate plain public URLs
-
-    # Update MEDIA_URL for GCS
-    MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/media/'
-    MEDIA_ROOT = f'gs://{GS_BUCKET_NAME}/media' # Optional: For management commands
+    GS_BUCKET_NAME = os.getenv('GS_BUCKET_NAME', 'aremkoweb')
+    GS_PROJECT_ID = os.getenv('GS_PROJECT_ID', 'aremko-e51ae')
+    GS_FILE_OVERWRITE = False
+    GS_QUERYSTRING_AUTH = False
+    GS_DEFAULT_ACL = 'publicRead'
+    MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/'
+    logger.info(f"✅ GCS configurado con archivo: bucket={GS_BUCKET_NAME}")
 
 else:
-    # Default to local file storage if GOOGLE_APPLICATION_CREDENTIALS is not set
+    # Almacenamiento local por defecto
     MEDIA_URL = '/media/'
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+    logger.warning("⚠️ GCS no configurado - usando almacenamiento local")
 
 
 REST_FRAMEWORK = {
