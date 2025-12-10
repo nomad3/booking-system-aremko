@@ -91,6 +91,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'ventas.middleware.ThreadLocalMiddleware',  # Agregar aquí el nuevo middleware
+    'ventas.middleware_debug.DebugImageUploadMiddleware',  # Debug temporal
 ]
 
 ROOT_URLCONF = 'aremko_project.urls'
