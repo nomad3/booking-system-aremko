@@ -36,9 +36,9 @@ try:
     print(f"✅ VentaReserva encontrada:")
     print(f"   Cliente: {venta.cliente.nombre}")
     print(f"   Email: {venta.cliente.email}")
-    print(f"   Total: ${venta.total_con_descuento}")
+    print(f"   Total: ${venta.total}")
     print(f"   Estado pago: {venta.estado_pago}")
-    print(f"   Monto pagado: ${venta.monto_pagado}")
+    print(f"   Monto pagado: ${venta.pagado}")
 except VentaReserva.DoesNotExist:
     print(f"❌ VentaReserva #{venta_id} no encontrada")
     sys.exit(1)
