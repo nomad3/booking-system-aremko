@@ -52,7 +52,10 @@ else:
 
 # Aplicaciones instaladas
 INSTALLED_APPS = [
-    # ... aplicaciones de Django ...
+    # Cloudinary debe ir ANTES de django.contrib.staticfiles
+    'cloudinary_storage',  # Cloudinary storage
+    'cloudinary',  # Cloudinary
+
     # Aplicaciones de Django por defecto
     'django.contrib.admin',
     'django.contrib.auth',
@@ -62,16 +65,18 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize', # Add humanize app
     'django.contrib.sitemaps', # Enable sitemaps
+
+    # Aplicaciones propias
     'ventas',
     'control_gestion',  # Módulo de Control de Gestión
+
+    # Aplicaciones de terceros
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
     'storages', # Add django-storages
     'solo',     # Add django-solo
     'anymail',  # Email integration
-    'cloudinary_storage',  # Cloudinary storage
-    'cloudinary',  # Cloudinary
 ]
 
 # MIDDLEWARE
