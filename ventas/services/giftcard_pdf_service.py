@@ -966,7 +966,7 @@ class GiftCardPDFService:
 
             # Agregar cada GiftCard con su botón de visualización
             for gc in giftcards_data:
-                view_url = f"{base_url}/giftcard/{gc['codigo']}/view/"
+                view_url = f"{base_url}/ventas/giftcard/{gc['codigo']}/view/"
                 email_html += f"""
                 <div class="gift-item">
                     <strong>{gc['destinatario_nombre']}</strong><br>
@@ -982,7 +982,7 @@ class GiftCardPDFService:
             </div>
 
             <div class="btn-container">
-                <a href="{base_url}/giftcard/{giftcards_data[0]['codigo']}/view/" class="btn btn-primary">
+                <a href="{base_url}/ventas/giftcard/{giftcards_data[0]['codigo']}/view/" class="btn btn-primary">
                     📱 Ver {'la primera ' if es_multiple else 'mi '}GiftCard en móvil
                 </a>
                 <a href="https://wa.me/56957902525" class="btn btn-secondary">
@@ -1032,7 +1032,7 @@ class GiftCardPDFService:
 
 VER EN MÓVIL:
 {'Las' if es_multiple else 'Tu'} GiftCard{'s' if es_multiple else ''} {'están' if es_multiple else 'está'} {'disponibles' if es_multiple else 'disponible'} para ver en cualquier dispositivo:
-{chr(10).join([f"{base_url}/giftcard/{gc['codigo']}/view/" for gc in giftcards_data])}
+{chr(10).join([f"{base_url}/ventas/giftcard/{gc['codigo']}/view/" for gc in giftcards_data])}
 
 {explicacion_adjuntos}
 
