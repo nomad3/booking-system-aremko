@@ -353,7 +353,43 @@ admin.site.register(Producto, ProductoAdmin)
 admin.site.register(VentaReserva, VentaReservaAdmin)
 admin.site.register(Cliente, ClienteAdmin)
 admin.site.register(Servicio, ServicioAdmin)
-admin.site.register(CategoriaServicio)
+@admin.register(CategoriaServicio)
+class CategoriaServicioAdmin(admin.ModelAdmin):
+    list_display = ('id', 'nombre', 'imagen_preview')
+    list_display_links = ('id', 'nombre')
+    search_fields = ('nombre',)
+    fields = ('nombre', 'horarios', 'imagen', 'imagen_preview_large')
+    readonly_fields = ('imagen_preview_large',)
+
+    def imagen_preview(self, obj):
+        """Vista previa pequeña de la imagen en la lista"""
+        if obj.imagen:
+            try:
+                return format_html(
+                    '<img src="{}" style="max-height: 50px; max-width: 100px; object-fit: cover; border-radius: 4px;" />',
+                    obj.imagen.url
+                )
+            except:
+                return '-'
+        return '-'
+    imagen_preview.short_description = 'Vista previa'
+
+    def imagen_preview_large(self, obj):
+        """Vista previa grande de la imagen en el formulario de edición"""
+        if obj.imagen:
+            try:
+                return format_html(
+                    '<div style="margin-top: 10px;">'
+                    '<img src="{}" style="max-width: 600px; max-height: 400px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px; padding: 5px;" />'
+                    '<p style="color: #666; font-size: 12px; margin-top: 5px;">URL: {}</p>'
+                    '</div>',
+                    obj.imagen.url,
+                    obj.imagen.url
+                )
+            except:
+                return format_html('<p style="color: #999;">No se puede generar vista previa</p>')
+        return format_html('<p style="color: #999;">No hay imagen cargada</p>')
+    imagen_preview_large.short_description = 'Vista previa actual'
 
 
 # ============================================
@@ -361,13 +397,80 @@ admin.site.register(CategoriaServicio)
 # ============================================
 @admin.register(SEOContent)
 class SEOContentAdmin(admin.ModelAdmin):
-    list_display = ('categoria', 'meta_title', 'updated_at')
+    list_display = ('categoria', 'meta_title', 'imagen_categoria_preview', 'updated_at')
     list_filter = ('categoria', 'updated_at')
     search_fields = ('meta_title', 'meta_description', 'contenido_principal', 'keywords')
+    readonly_fields = ('categoria_imagen_info',)
+
+    def imagen_categoria_preview(self, obj):
+        """Vista previa de la imagen de la categoría en la lista"""
+        if obj.categoria and obj.categoria.imagen:
+            try:
+                return format_html(
+                    '<img src="{}" style="max-height: 40px; max-width: 80px; object-fit: cover; border-radius: 4px;" />',
+                    obj.categoria.imagen.url
+                )
+            except:
+                return '-'
+        return '-'
+    imagen_categoria_preview.short_description = 'Imagen Hero'
+
+    def categoria_imagen_info(self, obj):
+        """Muestra información y vista previa de la imagen hero de la categoría"""
+        if not obj.categoria:
+            return format_html('<p style="color: #999;">Selecciona una categoría primero</p>')
+
+        categoria = obj.categoria
+
+        if categoria.imagen:
+            try:
+                return format_html(
+                    '<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">'
+                    '<h3 style="margin-top: 0; color: #495057;">Imagen Hero Actual</h3>'
+                    '<img src="{}" style="max-width: 100%; max-height: 300px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px;" />'
+                    '<p style="color: #6c757d; font-size: 13px; margin: 5px 0;"><strong>URL:</strong> {}</p>'
+                    '<p style="color: #6c757d; font-size: 13px; margin: 5px 0;"><strong>Path:</strong> {}</p>'
+                    '<a href="/admin/ventas/categoriaservicio/{}/change/" target="_blank" '
+                    'style="display: inline-block; margin-top: 10px; padding: 8px 16px; background: #007bff; color: white; '
+                    'text-decoration: none; border-radius: 4px; font-size: 13px;">'
+                    '📝 Cambiar imagen de la categoría'
+                    '</a>'
+                    '</div>',
+                    categoria.imagen.url,
+                    categoria.imagen.url,
+                    categoria.imagen.name,
+                    categoria.id
+                )
+            except:
+                return format_html(
+                    '<div style="background: #fff3cd; padding: 15px; border-radius: 8px; border: 1px solid #ffc107;">'
+                    '<p style="color: #856404; margin: 0;">⚠️ Hay una imagen configurada pero no se puede cargar</p>'
+                    '<a href="/admin/ventas/categoriaservicio/{}/change/" target="_blank" '
+                    'style="display: inline-block; margin-top: 10px; padding: 8px 16px; background: #007bff; color: white; '
+                    'text-decoration: none; border-radius: 4px; font-size: 13px;">'
+                    '📝 Revisar imagen de la categoría'
+                    '</a>'
+                    '</div>',
+                    categoria.id
+                )
+        else:
+            return format_html(
+                '<div style="background: #f8d7da; padding: 15px; border-radius: 8px; border: 1px solid #f5c6cb;">'
+                '<p style="color: #721c24; margin: 0;">❌ Esta categoría no tiene imagen hero configurada</p>'
+                '<a href="/admin/ventas/categoriaservicio/{}/change/" target="_blank" '
+                'style="display: inline-block; margin-top: 10px; padding: 8px 16px; background: #28a745; color: white; '
+                'text-decoration: none; border-radius: 4px; font-size: 13px;">'
+                '➕ Agregar imagen a la categoría'
+                '</a>'
+                '</div>',
+                categoria.id
+            )
+    categoria_imagen_info.short_description = 'Imagen Hero de la Categoría'
 
     fieldsets = (
         ('Categoría', {
-            'fields': ('categoria',)
+            'fields': ('categoria', 'categoria_imagen_info'),
+            'description': 'Selecciona la categoría y gestiona su imagen hero'
         }),
         ('Meta Tags SEO', {
             'fields': ('meta_title', 'meta_description', 'keywords'),
