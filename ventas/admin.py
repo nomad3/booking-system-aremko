@@ -363,32 +363,32 @@ class CategoriaServicioAdmin(admin.ModelAdmin):
 
     def imagen_preview(self, obj):
         """Vista previa pequeña de la imagen en la lista"""
-        if obj.imagen:
-            try:
-                return format_html(
-                    '<img src="{}" style="max-height: 50px; max-width: 100px; object-fit: cover; border-radius: 4px;" />',
-                    obj.imagen.url
-                )
-            except:
-                return '-'
-        return '-'
+        if not obj or not obj.imagen:
+            return '-'
+        try:
+            return format_html(
+                '<img src="{}" style="max-height: 50px; max-width: 100px; object-fit: cover; border-radius: 4px;" />',
+                obj.imagen.url
+            )
+        except Exception:
+            return '-'
     imagen_preview.short_description = 'Vista previa'
 
     def imagen_preview_large(self, obj):
         """Vista previa grande de la imagen en el formulario de edición"""
-        if obj.imagen:
-            try:
-                return format_html(
-                    '<div style="margin-top: 10px;">'
-                    '<img src="{}" style="max-width: 600px; max-height: 400px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px; padding: 5px;" />'
-                    '<p style="color: #666; font-size: 12px; margin-top: 5px;">URL: {}</p>'
-                    '</div>',
-                    obj.imagen.url,
-                    obj.imagen.url
-                )
-            except:
-                return format_html('<p style="color: #999;">No se puede generar vista previa</p>')
-        return format_html('<p style="color: #999;">No hay imagen cargada</p>')
+        if not obj or not obj.imagen:
+            return format_html('<p style="color: #999;">No hay imagen cargada</p>')
+        try:
+            return format_html(
+                '<div style="margin-top: 10px;">'
+                '<img src="{}" style="max-width: 600px; max-height: 400px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px; padding: 5px;" />'
+                '<p style="color: #666; font-size: 12px; margin-top: 5px;">URL: {}</p>'
+                '</div>',
+                obj.imagen.url,
+                obj.imagen.url
+            )
+        except Exception:
+            return format_html('<p style="color: #999;">No se puede generar vista previa</p>')
     imagen_preview_large.short_description = 'Vista previa actual'
 
 
@@ -404,20 +404,20 @@ class SEOContentAdmin(admin.ModelAdmin):
 
     def imagen_categoria_preview(self, obj):
         """Vista previa de la imagen de la categoría en la lista"""
-        if obj.categoria and obj.categoria.imagen:
-            try:
-                return format_html(
-                    '<img src="{}" style="max-height: 40px; max-width: 80px; object-fit: cover; border-radius: 4px;" />',
-                    obj.categoria.imagen.url
-                )
-            except:
-                return '-'
-        return '-'
+        if not obj or not obj.categoria or not obj.categoria.imagen:
+            return '-'
+        try:
+            return format_html(
+                '<img src="{}" style="max-height: 40px; max-width: 80px; object-fit: cover; border-radius: 4px;" />',
+                obj.categoria.imagen.url
+            )
+        except Exception:
+            return '-'
     imagen_categoria_preview.short_description = 'Imagen Hero'
 
     def categoria_imagen_info(self, obj):
         """Muestra información y vista previa de la imagen hero de la categoría"""
-        if not obj.categoria:
+        if not obj or not obj.categoria:
             return format_html('<p style="color: #999;">Selecciona una categoría primero</p>')
 
         categoria = obj.categoria
@@ -441,7 +441,7 @@ class SEOContentAdmin(admin.ModelAdmin):
                     categoria.imagen.name,
                     categoria.id
                 )
-            except:
+            except Exception:
                 return format_html(
                     '<div style="background: #fff3cd; padding: 15px; border-radius: 8px; border: 1px solid #ffc107;">'
                     '<p style="color: #856404; margin: 0;">⚠️ Hay una imagen configurada pero no se puede cargar</p>'
