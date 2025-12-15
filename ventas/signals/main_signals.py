@@ -14,7 +14,7 @@ from django.contrib.auth.models import User, AnonymousUser  # Importa el modelo 
 from ..middleware import get_current_user  # Importa el middleware
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
-from ..utils import verificar_disponibilidad  # Import the verificar_disponibilidad function
+from ..calendar_utils import verificar_disponibilidad  # Import the verificar_disponibilidad function
 
 logger = logging.getLogger(__name__)
 

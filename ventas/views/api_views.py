@@ -19,7 +19,7 @@ from ..serializers import ( # Relative imports
     ReservaProductoSerializer, ServicioSerializer, ReservaServicioSerializer,
     CategoriaServicioSerializer, RegionSerializer, ComunaSerializer
 )
-from ..utils import verificar_disponibilidad # Relative import
+from ..calendar_utils import verificar_disponibilidad # Relative import
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated # Or custom permission
 from rest_framework import status
