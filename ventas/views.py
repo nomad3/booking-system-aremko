@@ -11,7 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto, Cliente, Pago, CategoriaServicio, Servicio, ReservaServicio, MovimientoCliente, Compra, DetalleCompra, Categoria, HomepageSettings
 from .signals import get_or_create_system_user
-from .utils import verificar_disponibilidad
+from .calendar_utils import verificar_disponibilidad
 from django.utils.timezone import make_aware
 from django.utils.dateparse import parse_date
 from django.db import models
