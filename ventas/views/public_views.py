@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
-from ..models import Servicio, CategoriaServicio, HomepageConfig, Lead, Producto, CategoriaProducto # Relative import, ADD HomepageConfig, Lead, Producto, CategoriaProducto
+from ..models import Servicio, CategoriaServicio, HomepageConfig, Lead, Producto, CategoriaProducto, SeoContent # Relative import, ADD HomepageConfig, Lead, Producto, CategoriaProducto, SeoContent
 
 
 def homepage_view(request):
@@ -201,11 +201,19 @@ def productos_view(request):
     # WhatsApp business number - CAMBIAR AL NÚMERO REAL DE AREMKO
     whatsapp_number = "56912345678"  # TODO: Actualizar con el número real
 
+    # Obtener contenido SEO para la página de productos
+    seo_content = None
+    try:
+        seo_content = SeoContent.objects.filter(page_type='productos').first()
+    except SeoContent.DoesNotExist:
+        pass
+
     context = {
         'productos': productos,
         'categorias': categorias,
         'canonical_url': canonical_url,
         'whatsapp_number': whatsapp_number,
+        'seo_content': seo_content,  # Agregar contenido SEO al contexto
         'cart': request.session.get('cart', {'servicios': [], 'giftcards': [], 'total': 0}),
     }
     return render(request, 'ventas/productos.html', context)
