@@ -1,0 +1,281 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Productos Aremko - Tablas de Queso y Más | Puerto Varas{% endblock %}
+
+{% block meta_description %}
+<meta name="description" content="Descubre nuestros productos exclusivos en Aremko Spa Puerto Varas. Tablas de queso artesanales y más. Consulta disponibilidad vía WhatsApp.">
+{% endblock %}
+
+{% block extra_head %}
+<!-- Open Graph Tags -->
+<meta property="og:title" content="Productos Aremko | Puerto Varas">
+<meta property="og:description" content="Productos exclusivos de Aremko Spa - Tablas de queso artesanales y más">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ canonical_url }}">
+{% if productos.first.imagen %}
+<meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ productos.first.imagen.url }}">
+{% endif %}
+
+<!-- Schema.org JSON-LD -->
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "Store",
+    "name": "Aremko - Productos",
+    "description": "Catálogo de productos exclusivos de Aremko Spa Puerto Varas",
+    "url": "{{ canonical_url }}",
+    "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Puerto Varas",
+        "addressRegion": "Los Lagos",
+        "addressCountry": "CL"
+    }
+}
+</script>
+{% endblock %}
+
+{% block extra_style %}
+<style>
+/* Hero Section */
+.productos-hero {
+    background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+    padding: 100px 0 80px 0;
+    text-align: center;
+    color: white;
+    margin-bottom: 60px;
+}
+
+.productos-hero h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+
+.productos-hero p {
+    font-size: 1.3rem;
+    max-width: 700px;
+    margin: 0 auto;
+    opacity: 0.95;
+}
+
+/* Product Grid */
+.productos-grid {
+    padding: 40px 0;
+}
+
+.producto-card {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    margin-bottom: 30px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.producto-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.producto-imagen {
+    width: 100%;
+    height: 280px;
+    object-fit: cover;
+    background-color: #f5f5f5;
+}
+
+.producto-body {
+    padding: 25px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.producto-categoria {
+    display: inline-block;
+    background-color: var(--secondary-color);
+    color: var(--dark-gray);
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.producto-nombre {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--dark-gray);
+    margin-bottom: 15px;
+}
+
+.producto-descripcion {
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 20px;
+    flex-grow: 1;
+}
+
+.producto-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.producto-precio {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.btn-whatsapp {
+    background-color: #25D366;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-whatsapp:hover {
+    background-color: #128C7E;
+    color: white;
+    transform: scale(1.05);
+}
+
+.empty-productos {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--light-gray);
+}
+
+.empty-productos i {
+    font-size: 5rem;
+    margin-bottom: 20px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .productos-hero h1 {
+        font-size: 2rem;
+    }
+
+    .productos-hero p {
+        font-size: 1.1rem;
+    }
+
+    .producto-imagen {
+        height: 220px;
+    }
+
+    .producto-footer {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+
+    .btn-whatsapp {
+        justify-content: center;
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="productos-hero">
+    <div class="container">
+        <h1>Nuestros Productos</h1>
+        <p>Descubre nuestros productos exclusivos, elaborados con ingredientes de la más alta calidad. Consulta disponibilidad y realiza tu pedido vía WhatsApp.</p>
+    </div>
+</section>
+
+<!-- Products Grid -->
+<section class="productos-grid">
+    <div class="container">
+        {% if productos %}
+            <div class="row">
+                {% for producto in productos %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="producto-card">
+                        {% if producto.imagen %}
+                            <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}" class="producto-imagen">
+                        {% else %}
+                            <div class="producto-imagen" style="display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);">
+                                <i class="fas fa-image" style="font-size: 4rem; color: #ccc;"></i>
+                            </div>
+                        {% endif %}
+
+                        <div class="producto-body">
+                            {% if producto.categoria %}
+                                <span class="producto-categoria">{{ producto.categoria.nombre }}</span>
+                            {% endif %}
+
+                            <h3 class="producto-nombre">{{ producto.nombre }}</h3>
+
+                            {% if producto.descripcion_web %}
+                                <p class="producto-descripcion">{{ producto.descripcion_web|linebreaks }}</p>
+                            {% else %}
+                                <p class="producto-descripcion text-muted">Consulta más detalles por WhatsApp</p>
+                            {% endif %}
+
+                            <div class="producto-footer">
+                                <div class="producto-precio">
+                                    ${{ producto.precio_base|floatformat:0|intcomma }}
+                                </div>
+                                <a href="https://wa.me/{{ whatsapp_number }}?text=Hola!%20Quisiera%20consultar%20por%20el%20producto:%20{{ producto.nombre|urlencode }}%20(${{ producto.precio_base|floatformat:0 }})"
+                                   class="btn-whatsapp"
+                                   target="_blank"
+                                   rel="noopener noreferrer">
+                                    <i class="fab fa-whatsapp"></i>
+                                    Consultar
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-productos">
+                <i class="fas fa-box-open"></i>
+                <h3>Próximamente nuevos productos</h3>
+                <p>Estamos trabajando para ofrecerte productos exclusivos muy pronto.</p>
+                <a href="{% url 'homepage' %}" class="btn btn-primary mt-3">Volver al Inicio</a>
+            </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Call to Action -->
+{% if productos %}
+<section style="background-color: #f8f9fa; padding: 60px 0;">
+    <div class="container text-center">
+        <h2 style="margin-bottom: 20px; color: var(--dark-gray);">¿Tienes alguna consulta?</h2>
+        <p style="font-size: 1.2rem; color: #666; margin-bottom: 30px;">
+            Nuestro equipo está listo para ayudarte a elegir el producto perfecto
+        </p>
+        <a href="https://wa.me/{{ whatsapp_number }}?text=Hola!%20Quisiera%20consultar%20sobre%20los%20productos%20disponibles"
+           class="btn btn-lg btn-whatsapp"
+           target="_blank"
+           rel="noopener noreferrer">
+            <i class="fab fa-whatsapp"></i>
+            Contactar por WhatsApp
+        </a>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

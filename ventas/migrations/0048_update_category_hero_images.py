@@ -10,6 +10,7 @@ def update_category_images(apps, schema_editor):
     CategoriaServicio = apps.get_model('ventas', 'CategoriaServicio')
 
     # Mapeo de categorías a sus imágenes en Cloudinary
+    # Para django-cloudinary-storage, guardamos la ruta relativa desde MEDIA_ROOT
     updates = [
         {
             'id': 1,

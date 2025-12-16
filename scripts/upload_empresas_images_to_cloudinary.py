@@ -60,10 +60,10 @@ cloudinary.config(
 # Directorio de imágenes temporales
 TEMP_DIR = BASE_DIR / 'temp_images_empresas'
 
-# Imágenes a subir
+# Imágenes a subir (buscar con diferentes extensiones)
 IMAGES = [
     'desayuno_empresas_aremko.jpg',
-    '4_amigas_en_la_calbuco.PNG',
+    '4_amigas_en_la_calbuco',  # Buscar .PNG o .png
     'charla_empresas_aremko.jpg'
 ]
 
@@ -73,9 +73,25 @@ print("-" * 80)
 uploaded_urls = {}
 
 for image_name in IMAGES:
-    image_path = TEMP_DIR / image_name
+    # Buscar el archivo con diferentes extensiones si no tiene extensión
+    if '.' not in image_name:
+        # Buscar con varias extensiones posibles
+        possible_paths = [
+            TEMP_DIR / f"{image_name}.PNG",
+            TEMP_DIR / f"{image_name}.png",
+            TEMP_DIR / f"{image_name}.jpg",
+            TEMP_DIR / f"{image_name}.JPG",
+        ]
+        image_path = None
+        for path in possible_paths:
+            if path.exists():
+                image_path = path
+                image_name = path.name  # Usar el nombre real del archivo
+                break
+    else:
+        image_path = TEMP_DIR / image_name
 
-    if not image_path.exists():
+    if not image_path or not image_path.exists():
         print(f"⚠️  {image_name} - NO ENCONTRADA")
         print(f"   Por favor, coloca esta imagen en: {TEMP_DIR}/")
         continue

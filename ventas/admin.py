@@ -282,10 +282,38 @@ class CategoriaProductoAdmin(admin.ModelAdmin):
     search_fields = ('nombre',)  # Añadir search_fields
 
 class ProductoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'precio_base', 'cantidad_disponible', 'proveedor', 'categoria')
-    search_fields = ('nombre', 'categoria__nombre')
-    list_filter = ('categoria', 'proveedor')
-    autocomplete_fields = ['proveedor', 'categoria'] 
+    list_display = ('nombre', 'categoria', 'precio_base', 'publicado_web', 'orden', 'cantidad_disponible', 'vista_previa_imagen')
+    search_fields = ('nombre', 'categoria__nombre', 'descripcion_web')
+    list_filter = ('publicado_web', 'categoria', 'proveedor')
+    list_editable = ('publicado_web', 'orden')
+    autocomplete_fields = ['proveedor', 'categoria']
+    ordering = ('orden', 'nombre')
+
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('nombre', 'categoria', 'proveedor', 'precio_base', 'cantidad_disponible')
+        }),
+        ('Publicación Web', {
+            'fields': ('publicado_web', 'descripcion_web', 'imagen', 'orden'),
+            'description': 'Configuración para mostrar el producto en el catálogo web público. '
+                          'Los clientes verán estos productos y podrán consultar por WhatsApp.',
+            'classes': ('collapse',)
+        }),
+    )
+
+    def vista_previa_imagen(self, obj):
+        """Mostrar miniatura de la imagen en el listado"""
+        from django.utils.html import format_html
+        if obj.imagen:
+            try:
+                return format_html(
+                    '<img src="{}" width="50" height="50" style="object-fit: cover; border-radius: 4px;" />',
+                    obj.imagen.url
+                )
+            except:
+                return format_html('<span style="color: #999;">Error al cargar</span>')
+        return format_html('<span style="color: #999;">Sin imagen</span>')
+    vista_previa_imagen.short_description = 'Imagen' 
 
 class ClienteAdmin(admin.ModelAdmin):
     search_fields = ('nombre', 'telefono', 'email')

@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
-from ..models import Servicio, CategoriaServicio, HomepageConfig, Lead # Relative import, ADD HomepageConfig, Lead
+from ..models import Servicio, CategoriaServicio, HomepageConfig, Lead, Producto, CategoriaProducto # Relative import, ADD HomepageConfig, Lead, Producto, CategoriaProducto
 
 
 def homepage_view(request):
@@ -174,6 +174,41 @@ def alojamientos_view(request):
     Redirige a la vista de categoría con ID=3 (Alojamientos)
     """
     return categoria_detail_view(request, categoria_id=3)
+
+
+def productos_view(request):
+    """
+    Vista para mostrar el catálogo de productos publicados en la web.
+    Los productos se muestran solo como catálogo, no son agregables al carrito.
+    Los clientes contactan vía WhatsApp para comprar.
+    """
+    # Obtener solo productos publicados en web, ordenados
+    productos = Producto.objects.filter(
+        publicado_web=True
+    ).select_related('categoria').order_by('orden', 'nombre')
+
+    # Agrupar por categoría para mejor organización visual
+    categorias = CategoriaProducto.objects.filter(
+        producto__publicado_web=True
+    ).distinct().order_by('nombre')
+
+    # Build canonical URL safely
+    try:
+        canonical_url = request.build_absolute_uri(request.path)
+    except Exception:
+        canonical_url = request.path
+
+    # WhatsApp business number - CAMBIAR AL NÚMERO REAL DE AREMKO
+    whatsapp_number = "56912345678"  # TODO: Actualizar con el número real
+
+    context = {
+        'productos': productos,
+        'categorias': categorias,
+        'canonical_url': canonical_url,
+        'whatsapp_number': whatsapp_number,
+        'cart': request.session.get('cart', {'servicios': [], 'giftcards': [], 'total': 0}),
+    }
+    return render(request, 'ventas/productos.html', context)
 
 
 def empresas_view(request):

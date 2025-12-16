@@ -30,11 +30,42 @@ class CategoriaProducto(models.Model):
         return self.nombre
 
 class Producto(models.Model):
+    # Campos existentes
     nombre = models.CharField(max_length=100)
     precio_base = models.DecimalField(max_digits=10, decimal_places=0)
     cantidad_disponible = models.PositiveIntegerField()
     proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True)
     categoria = models.ForeignKey(CategoriaProducto, on_delete=models.SET_NULL, null=True)
+
+    # Campos para publicación web (todos opcionales para migración segura)
+    publicado_web = models.BooleanField(
+        default=False,
+        verbose_name="Publicado en Web",
+        help_text="Marcar para mostrar este producto en el catálogo web público"
+    )
+    descripcion_web = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Descripción Web",
+        help_text="Descripción detallada del producto para mostrar en la web (ingredientes, preparación, etc.)"
+    )
+    imagen = models.ImageField(
+        upload_to='productos/',
+        blank=True,
+        null=True,
+        verbose_name="Imagen",
+        help_text="Foto del producto para el catálogo web"
+    )
+    orden = models.IntegerField(
+        default=0,
+        verbose_name="Orden",
+        help_text="Orden de visualización en el catálogo (menor número = primero)"
+    )
+
+    class Meta:
+        ordering = ['orden', 'nombre']
+        verbose_name = "Producto"
+        verbose_name_plural = "Productos"
 
     def __str__(self):
         return self.nombre
