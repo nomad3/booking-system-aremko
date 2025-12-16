@@ -296,8 +296,7 @@ class ProductoAdmin(admin.ModelAdmin):
         ('Publicación Web', {
             'fields': ('publicado_web', 'descripcion_web', 'imagen', 'orden'),
             'description': 'Configuración para mostrar el producto en el catálogo web público. '
-                          'Los clientes verán estos productos y podrán consultar por WhatsApp.',
-            'classes': ('collapse',)
+                          'Los clientes verán estos productos y podrán consultar por WhatsApp.'
         }),
     )
 
