@@ -40,13 +40,7 @@
 <style>
 /* Hero Section */
 .productos-hero {
-    {% if seo_content and seo_content.hero_image %}
-    background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('{{ seo_content.hero_image.url }}');
-    background-size: cover;
-    background-position: center;
-    {% else %}
     background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
-    {% endif %}
     padding: 100px 0 80px 0;
     text-align: center;
     color: white;
