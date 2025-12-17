@@ -76,7 +76,8 @@ def calendario_matriz_view(request):
         'resumen': matriz_data['resumen'],
     }
 
-    return render(request, 'ventas/calendario_matriz.html', context)
+    # TEMPORAL: Usar template simple para debug en producción
+    return render(request, 'ventas/calendario_matriz_simple.html', context)
 
 
 def generar_matriz_disponibilidad(fecha, categoria, servicios):

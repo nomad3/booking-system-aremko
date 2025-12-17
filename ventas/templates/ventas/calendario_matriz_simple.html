@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendario Matriz - Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .info {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: center;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        .disponible {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .ocupado {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Calendario Matriz de Disponibilidad - Versión Simple</h1>
+
+        <div class="info">
+            <p><strong>Fecha:</strong> {{ fecha_seleccionada }}</p>
+            <p><strong>Categoría:</strong> {{ categoria_seleccionada.nombre }}</p>
+            <p><strong>Estado:</strong> Vista funcionando correctamente ✅</p>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Horario</th>
+                    {% for recurso in recursos %}
+                    <th>{{ recurso }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for slot in slots_horarios %}
+                <tr>
+                    <td><strong>{{ slot }}</strong></td>
+                    {% for recurso in recursos %}
+                    <td class="disponible">Disponible</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="info">
+            <h3>Resumen de Ocupación</h3>
+            <ul>
+                <li>Total de slots: {{ resumen.total_slots }}</li>
+                <li>Ocupados: {{ resumen.ocupados }}</li>
+                <li>Disponibles: {{ resumen.disponibles }}</li>
+                <li>Porcentaje de ocupación: {{ resumen.porcentaje_ocupacion }}%</li>
+            </ul>
+        </div>
+
+        <div style="margin-top: 30px; text-align: center;">
+            <a href="/admin/" style="padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;">Volver al Admin</a>
+        </div>
+    </div>
+</body>
+</html>

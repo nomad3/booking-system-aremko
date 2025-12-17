@@ -43,7 +43,9 @@ urlpatterns = [
     path('analytics/dashboard/', analytics_views.dashboard_estadisticas, name='analytics_dashboard'),
     path('analytics/export-csv/', analytics_views.exportar_estadisticas_csv, name='analytics_export_csv'),
     # Calendario Matriz Views
+    # TEMPORAL: Usando vista simplificada para debug
     path('calendario-matriz/', calendario_matriz_view.calendario_matriz_view, name='calendario_matriz'),
+    # path('calendario-matriz/', calendario_matriz_view.calendario_matriz_view, name='calendario_matriz'),
     path('calendario-matriz/api/', calendario_matriz_view.calendario_matriz_api, name='calendario_matriz_api'),
     path('calendario-matriz/reservar/', calendario_matriz_view.calendario_matriz_reservar, name='calendario_matriz_reservar'),
     path('venta_reservas/', crud_views.venta_reserva_list, name='venta_reserva_list'),
