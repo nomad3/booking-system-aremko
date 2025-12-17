@@ -33,21 +33,28 @@ def calendario_matriz_view(request):
     """
     # Obtener parámetros de la request
     fecha_str = request.GET.get('fecha', date.today().strftime('%Y-%m-%d'))
-    categoria_id = request.GET.get('categoria', '1')  # Default a Tinas (ID=1)
+
+    # Obtener todas las categorías para el selector
+    categorias = CategoriaServicio.objects.all().order_by('nombre')
+
+    # Buscar la categoría "Tinas Calientes" para usarla como default
+    tinas_categoria = categorias.filter(nombre__icontains='tina').first()
+    default_categoria_id = str(tinas_categoria.id) if tinas_categoria else '1'
+
+    # Obtener el ID de categoría del request o usar Tinas como default
+    categoria_id = request.GET.get('categoria', default_categoria_id)
 
     try:
         fecha_seleccionada = datetime.strptime(fecha_str, '%Y-%m-%d').date()
     except ValueError:
         fecha_seleccionada = date.today()
 
-    # Obtener todas las categorías para el selector
-    categorias = CategoriaServicio.objects.all().order_by('nombre')
-
     # Obtener la categoría seleccionada
     try:
         categoria = CategoriaServicio.objects.get(id=categoria_id)
     except CategoriaServicio.DoesNotExist:
-        categoria = categorias.first()
+        # Si no existe, intentar con Tinas Calientes
+        categoria = tinas_categoria if tinas_categoria else categorias.first()
         categoria_id = categoria.id if categoria else None
 
     # Obtener servicios de la categoría que sean visibles en matriz
@@ -69,7 +76,7 @@ def calendario_matriz_view(request):
         'fecha_seleccionada': fecha_seleccionada,
         'fecha_str': fecha_seleccionada.strftime('%Y-%m-%d'),
         'categoria_seleccionada': categoria,
-        'categoria_id': categoria_id,
+        'categoria_id': int(categoria_id) if categoria_id else None,  # Convertir a int para comparación en template
         'categorias': categorias,
         'matriz': matriz_data['matriz'],
         'slots_horarios': matriz_data['slots'],
