@@ -1,0 +1,622 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Calendario Matriz - Disponibilidad de {{ categoria_seleccionada.nombre }}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* Estilos para el calendario matriz */
+    .calendario-matriz-container {
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin: 20px;
+    }
+
+    .controles-filtro {
+        background-color: #f5f5f5;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        display: flex;
+        gap: 20px;
+        align-items: end;
+        flex-wrap: wrap;
+    }
+
+    .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .control-group label {
+        font-weight: 600;
+        color: #333;
+        font-size: 14px;
+    }
+
+    .control-group input,
+    .control-group select {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        min-width: 150px;
+    }
+
+    .btn-aplicar {
+        background-color: #417690;
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background-color 0.2s;
+    }
+
+    .btn-aplicar:hover {
+        background-color: #2b5177;
+    }
+
+    .resumen-ocupacion {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 25px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+    }
+
+    .resumen-item {
+        text-align: center;
+    }
+
+    .resumen-valor {
+        font-size: 32px;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    .resumen-label {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+
+    .tabla-matriz-wrapper {
+        overflow-x: auto;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+    }
+
+    .tabla-matriz {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 14px;
+    }
+
+    .tabla-matriz thead {
+        background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .tabla-matriz th {
+        padding: 12px;
+        text-align: center;
+        font-weight: 600;
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+        white-space: nowrap;
+        position: relative;
+    }
+
+    .tabla-matriz th:first-child {
+        text-align: left;
+        background-color: #fff;
+        position: sticky;
+        left: 0;
+        z-index: 11;
+        min-width: 120px;
+        border-right: 2px solid #dee2e6;
+    }
+
+    .tabla-matriz tbody tr {
+        border-bottom: 1px solid #e9ecef;
+        transition: background-color 0.2s;
+    }
+
+    .tabla-matriz tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .tabla-matriz td {
+        padding: 8px;
+        text-align: center;
+        border-right: 1px solid #e9ecef;
+        position: relative;
+    }
+
+    .tabla-matriz td:first-child {
+        font-weight: 600;
+        background-color: #f8f9fa;
+        text-align: left;
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        border-right: 2px solid #dee2e6;
+    }
+
+    /* Estados de las celdas */
+    .slot-disponible {
+        background-color: #d4edda;
+        color: #155724;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .slot-disponible:hover {
+        background-color: #c3e6cb;
+        transform: scale(1.02);
+    }
+
+    .slot-ocupado {
+        background-color: #f8d7da;
+        color: #721c24;
+        cursor: not-allowed;
+    }
+
+    .slot-parcial {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+
+    .slot-mantenimiento {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+
+    /* Contenido de celda */
+    .slot-content {
+        padding: 4px;
+        min-height: 60px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .slot-estado {
+        font-weight: 600;
+        font-size: 12px;
+    }
+
+    .slot-cliente {
+        font-size: 11px;
+        opacity: 0.9;
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .slot-info {
+        font-size: 10px;
+        opacity: 0.8;
+    }
+
+    /* Badge de estado de pago */
+    .badge-pago {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-top: 2px;
+    }
+
+    .badge-pagado {
+        background-color: #28a745;
+        color: white;
+    }
+
+    .badge-pendiente {
+        background-color: #ffc107;
+        color: #333;
+    }
+
+    .badge-parcial {
+        background-color: #fd7e14;
+        color: white;
+    }
+
+    /* Leyenda */
+    .leyenda {
+        margin-top: 30px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        display: flex;
+        gap: 30px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .leyenda-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .leyenda-color {
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+    }
+
+    /* Botones de navegación de fecha */
+    .nav-fecha {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .btn-nav-fecha {
+        background-color: #6c757d;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.2s;
+    }
+
+    .btn-nav-fecha:hover {
+        background-color: #5a6268;
+    }
+
+    .btn-hoy {
+        background-color: #28a745;
+    }
+
+    .btn-hoy:hover {
+        background-color: #218838;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .controles-filtro {
+            flex-direction: column;
+        }
+
+        .control-group input,
+        .control-group select {
+            width: 100%;
+        }
+
+        .resumen-ocupacion {
+            grid-template-columns: 1fr;
+        }
+
+        .tabla-matriz {
+            font-size: 12px;
+        }
+
+        .slot-content {
+            min-height: 40px;
+        }
+    }
+
+    /* Loading overlay */
+    .loading-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .loading-overlay.show {
+        display: flex;
+    }
+
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #417690;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="calendario-matriz-container">
+    <h1>Calendario de Disponibilidad - {{ categoria_seleccionada.nombre }}</h1>
+
+    <!-- Controles de filtro -->
+    <div class="controles-filtro">
+        <div class="control-group">
+            <label for="fecha">Fecha:</label>
+            <div class="nav-fecha">
+                <button type="button" class="btn-nav-fecha" onclick="cambiarFecha(-1)">
+                    ← Anterior
+                </button>
+                <input type="date" id="fecha" name="fecha" value="{{ fecha_str }}">
+                <button type="button" class="btn-nav-fecha" onclick="cambiarFecha(1)">
+                    Siguiente →
+                </button>
+                <button type="button" class="btn-nav-fecha btn-hoy" onclick="irAHoy()">
+                    Hoy
+                </button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label for="categoria">Categoría:</label>
+            <select id="categoria" name="categoria">
+                {% for cat in categorias %}
+                <option value="{{ cat.id }}" {% if cat.id == categoria_id %}selected{% endif %}>
+                    {{ cat.nombre }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="button" class="btn-aplicar" onclick="aplicarFiltros()">
+            Aplicar Filtros
+        </button>
+    </div>
+
+    <!-- Resumen de ocupación -->
+    <div class="resumen-ocupacion">
+        <div class="resumen-item">
+            <div class="resumen-valor">{{ resumen.porcentaje_ocupacion }}%</div>
+            <div class="resumen-label">Ocupación</div>
+        </div>
+        <div class="resumen-item">
+            <div class="resumen-valor">{{ resumen.ocupados }}</div>
+            <div class="resumen-label">Slots Ocupados</div>
+        </div>
+        <div class="resumen-item">
+            <div class="resumen-valor">{{ resumen.disponibles }}</div>
+            <div class="resumen-label">Slots Disponibles</div>
+        </div>
+        <div class="resumen-item">
+            <div class="resumen-valor">{{ resumen.total_slots }}</div>
+            <div class="resumen-label">Total Slots</div>
+        </div>
+    </div>
+
+    <!-- Tabla matriz -->
+    <div class="tabla-matriz-wrapper">
+        <table class="tabla-matriz">
+            <thead>
+                <tr>
+                    <th>Horario</th>
+                    {% for recurso in recursos %}
+                    <th>{{ recurso }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for slot in slots_horarios %}
+                <tr>
+                    <td>{{ slot }}</td>
+                    {% for recurso in recursos %}
+                    {% with celda=matriz|get_item:slot|get_item:recurso %}
+                    <td class="slot-{{ celda.estado }}"
+                        data-slot="{{ slot }}"
+                        data-recurso="{{ recurso }}"
+                        {% if celda.estado == 'disponible' %}
+                        onclick="abrirReservaRapida('{{ slot }}', '{{ recurso }}')"
+                        {% endif %}>
+                        <div class="slot-content">
+                            {% if celda.estado == 'ocupado' %}
+                                <div class="slot-estado">OCUPADO</div>
+                                <div class="slot-cliente">{{ celda.cliente }}</div>
+                                <div class="slot-info">{{ celda.personas }} persona(s)</div>
+                                {% if celda.estado_pago == 'pagado' %}
+                                    <span class="badge-pago badge-pagado">Pagado</span>
+                                {% elif celda.estado_pago == 'parcial' %}
+                                    <span class="badge-pago badge-parcial">Parcial</span>
+                                {% else %}
+                                    <span class="badge-pago badge-pendiente">Pendiente</span>
+                                {% endif %}
+                                <div class="slot-info">
+                                    <a href="/admin/ventas/ventareserva/{{ celda.reserva_id }}/change/"
+                                       target="_blank"
+                                       style="font-size: 11px;">
+                                       Ver #{{ celda.reserva_id }}
+                                    </a>
+                                </div>
+                            {% else %}
+                                <div class="slot-estado">DISPONIBLE</div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    {% endwith %}
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Leyenda -->
+    <div class="leyenda">
+        <div class="leyenda-item">
+            <div class="leyenda-color slot-disponible"></div>
+            <span>Disponible</span>
+        </div>
+        <div class="leyenda-item">
+            <div class="leyenda-color slot-ocupado"></div>
+            <span>Ocupado</span>
+        </div>
+        <div class="leyenda-item">
+            <div class="leyenda-color slot-parcial"></div>
+            <span>Parcialmente Ocupado</span>
+        </div>
+        <div class="leyenda-item">
+            <div class="leyenda-color slot-mantenimiento"></div>
+            <span>En Mantenimiento</span>
+        </div>
+    </div>
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+</div>
+
+<!-- Modal para reserva rápida (simplificado) -->
+<div id="modalReservaRapida" style="display:none;">
+    <!-- TODO: Implementar modal para reserva rápida -->
+</div>
+{% endblock %}
+
+{% block extrajs %}
+<script>
+    // Función para aplicar filtros
+    function aplicarFiltros() {
+        const fecha = document.getElementById('fecha').value;
+        const categoria = document.getElementById('categoria').value;
+
+        window.location.href = `?fecha=${fecha}&categoria=${categoria}`;
+    }
+
+    // Función para cambiar fecha
+    function cambiarFecha(dias) {
+        const fechaInput = document.getElementById('fecha');
+        const fechaActual = new Date(fechaInput.value + 'T00:00:00');
+        fechaActual.setDate(fechaActual.getDate() + dias);
+
+        const year = fechaActual.getFullYear();
+        const month = String(fechaActual.getMonth() + 1).padStart(2, '0');
+        const day = String(fechaActual.getDate()).padStart(2, '0');
+
+        fechaInput.value = `${year}-${month}-${day}`;
+        aplicarFiltros();
+    }
+
+    // Función para ir a hoy
+    function irAHoy() {
+        const hoy = new Date();
+        const year = hoy.getFullYear();
+        const month = String(hoy.getMonth() + 1).padStart(2, '0');
+        const day = String(hoy.getDate()).padStart(2, '0');
+
+        document.getElementById('fecha').value = `${year}-${month}-${day}`;
+        aplicarFiltros();
+    }
+
+    // Función para abrir reserva rápida
+    function abrirReservaRapida(slot, recurso) {
+        const fecha = document.getElementById('fecha').value;
+        const categoria = document.getElementById('categoria').value;
+
+        // Por ahora, redirigir al formulario de nueva reserva con parámetros pre-llenados
+        const params = new URLSearchParams({
+            fecha: fecha,
+            hora: slot.split(' - ')[0],
+            categoria: categoria,
+            servicio: recurso
+        });
+
+        // Abrir en nueva pestaña el formulario de reserva
+        window.open(`/admin/ventas/ventareserva/add/?${params.toString()}`, '_blank');
+    }
+
+    // Actualización automática cada 60 segundos
+    let autoRefreshInterval;
+
+    function iniciarAutoRefresh() {
+        autoRefreshInterval = setInterval(() => {
+            actualizarDatos();
+        }, 60000); // 60 segundos
+    }
+
+    function detenerAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+        }
+    }
+
+    // Función para actualizar datos via AJAX
+    async function actualizarDatos() {
+        const fecha = document.getElementById('fecha').value;
+        const categoria = document.getElementById('categoria').value;
+
+        document.getElementById('loadingOverlay').classList.add('show');
+
+        try {
+            const response = await fetch(`/ventas/calendario-matriz/api/?fecha=${fecha}&categoria=${categoria}`);
+            const data = await response.json();
+
+            // TODO: Actualizar la tabla con los nuevos datos sin recargar la página
+            console.log('Datos actualizados:', data);
+
+        } catch (error) {
+            console.error('Error al actualizar datos:', error);
+        } finally {
+            document.getElementById('loadingOverlay').classList.remove('show');
+        }
+    }
+
+    // Eventos de teclado para navegación rápida
+    document.addEventListener('keydown', function(e) {
+        // Alt + Flecha izquierda = día anterior
+        if (e.altKey && e.key === 'ArrowLeft') {
+            e.preventDefault();
+            cambiarFecha(-1);
+        }
+        // Alt + Flecha derecha = día siguiente
+        if (e.altKey && e.key === 'ArrowRight') {
+            e.preventDefault();
+            cambiarFecha(1);
+        }
+        // Alt + H = Ir a hoy
+        if (e.altKey && e.key === 'h') {
+            e.preventDefault();
+            irAHoy();
+        }
+    });
+
+    // Iniciar auto-refresh al cargar la página
+    document.addEventListener('DOMContentLoaded', function() {
+        iniciarAutoRefresh();
+    });
+
+    // Detener auto-refresh al salir de la página
+    window.addEventListener('beforeunload', function() {
+        detenerAutoRefresh();
+    });
+</script>
+{% endblock %}
+
+<!-- Template filter personalizado para acceder a diccionarios anidados -->
+{% load custom_filters %}
