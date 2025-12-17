@@ -133,6 +133,8 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
     recursos = [s.nombre for s in servicios]
 
     # Configurar slots según el tipo de categoría
+    slots_por_servicio = {}  # Inicializar vacío por defecto
+
     if categoria and 'tina' in categoria.nombre.lower():
         # Definir los horarios específicos para tinas
         # Tinas SIN hidromasaje: Hornopiren, Tronador, Calbuco, Osorno
@@ -141,7 +143,6 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         slots_con_hidromasaje = ["14:00", "16:30", "19:00", "21:30"]
 
         # Crear diccionario de slots por servicio
-        slots_por_servicio = {}
         for servicio in servicios:
             nombre_lower = servicio.nombre.lower()
             # Verificar si es tina con hidromasaje
@@ -154,13 +155,19 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         # Para la matriz, usar todos los slots posibles (para las filas)
         slots_set = set(slots_sin_hidromasaje + slots_con_hidromasaje)
         slots = sorted(list(slots_set))
+    elif categoria and 'cabaña' in categoria.nombre.lower():
+        # Para cabañas, solo mostrar el horario de check-in
+        slots = ["16:00"]
     else:
         # Para otras categorías, intentar obtener slots de los servicios
         slots_set = set()
         for servicio in servicios:
             if servicio.slots_disponibles:
                 for slot in servicio.slots_disponibles:
-                    slots_set.add(slot)
+                    # Verificar que no sean días de la semana (bug de datos)
+                    if slot.lower() not in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+                                           'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']:
+                        slots_set.add(slot)
 
         if not slots_set:
             if categoria and 'masaje' in categoria.nombre.lower():
@@ -175,7 +182,6 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
                 slots = ["Check-in 15:00", "Check-out 12:00"]
         else:
             slots = sorted(list(slots_set))
-            slots_por_servicio = {}  # Definir vacío para otras categorías
 
     # Inicializar matriz
     matriz = {}
