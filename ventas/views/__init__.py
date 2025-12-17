@@ -8,3 +8,6 @@ try:
 except Exception:
     # Si falla el parche, continuar de todos modos
     pass
+
+# Importar el módulo calendario_matriz_view para que esté disponible
+from . import calendario_matriz_view
