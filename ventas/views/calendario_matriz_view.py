@@ -158,6 +158,9 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
     elif categoria and 'cabaña' in categoria.nombre.lower():
         # Para cabañas, solo mostrar el horario de check-in
         slots = ["16:00"]
+    elif categoria and 'masaje' in categoria.nombre.lower():
+        # Para masajes, horarios específicos cada 1 hora 15 minutos
+        slots = ["10:30", "11:45", "13:00", "14:15", "15:30", "16:45", "18:00", "19:15", "20:30", "21:45"]
     else:
         # Para otras categorías, intentar obtener slots de los servicios
         slots_set = set()
@@ -170,16 +173,8 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
                         slots_set.add(slot)
 
         if not slots_set:
-            if categoria and 'masaje' in categoria.nombre.lower():
-                # Para masajes, slots cada hora
-                slots = generar_slots_horarios(
-                    hora_inicio="09:00",
-                    hora_fin="21:00",
-                    duracion_minutos=60
-                )
-            else:
-                # Para otros servicios
-                slots = ["Check-in 15:00", "Check-out 12:00"]
+            # Para otros servicios por defecto
+            slots = ["Check-in 15:00", "Check-out 12:00"]
         else:
             slots = sorted(list(slots_set))
 
