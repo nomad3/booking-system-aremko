@@ -51,6 +51,11 @@
             background-color: #f8d7da;
             color: #721c24;
         }
+        .no-aplica {
+            background-color: #e0e0e0;
+            color: #999;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -90,6 +95,8 @@
                                 Ocupado<br>
                                 <small>{{ celda.cliente|default:"" }}</small>
                             </td>
+                        {% elif celda.estado == 'no_aplica' %}
+                            <td class="no-aplica">-</td>
                         {% else %}
                             <td class="disponible">Disponible</td>
                         {% endif %}
