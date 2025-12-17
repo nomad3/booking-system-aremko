@@ -59,35 +59,76 @@ def _generar_texto_resumen(reserva, config):
 
     # Detectar tipo de reserva
     servicios = reserva.reservaservicios.all().select_related('servicio', 'servicio__categoria')
-    tiene_alojamiento = any(s.servicio.tipo_servicio == 'cabana' for s in servicios)
+    productos = reserva.reservaproductos.all().select_related('producto')
+    giftcards = reserva.giftcards.all()
+
+    # Lista de cabañas reales (alojamiento verdadero)
+    CABANAS_REALES = ['torre', 'acantilado', 'laurel', 'tepa', 'arrayan']
+
+    tiene_alojamiento = any(
+        s.servicio.tipo_servicio == 'cabana' and
+        any(cabana in s.servicio.nombre.lower() for cabana in CABANAS_REALES)
+        for s in servicios
+    )
     tiene_tinas = any(s.servicio.tipo_servicio == 'tina' for s in servicios)
     tiene_masajes = any(s.servicio.tipo_servicio == 'masaje' for s in servicios)
 
-    lineas.append("Servicios contratados:")
-    lineas.append("")
+    # Servicios contratados
+    if servicios:
+        lineas.append("Servicios contratados:")
+        lineas.append("")
 
-    # Listar TODOS los servicios con fecha, hora y personas
-    servicios_ordenados = sorted(servicios, key=lambda s: (s.fecha_agendamiento, s.hora_inicio or ''))
+        # Listar TODOS los servicios con fecha, hora y personas
+        servicios_ordenados = sorted(servicios, key=lambda s: (s.fecha_agendamiento, s.hora_inicio or ''))
 
-    for servicio_reserva in servicios_ordenados:
-        nombre = servicio_reserva.servicio.nombre
-        personas = servicio_reserva.cantidad_personas or 1
-        fecha = servicio_reserva.fecha_agendamiento.strftime('%d/%m/%Y')
+        for servicio_reserva in servicios_ordenados:
+            nombre = servicio_reserva.servicio.nombre
+            personas = servicio_reserva.cantidad_personas or 1
+            fecha = servicio_reserva.fecha_agendamiento.strftime('%d/%m/%Y')
 
-        # Formatear hora
-        hora_texto = ""
-        if servicio_reserva.hora_inicio:
-            hora_texto = f" - {servicio_reserva.hora_inicio} hrs"
+            # Formatear hora
+            hora_texto = ""
+            if servicio_reserva.hora_inicio:
+                hora_texto = f" - {servicio_reserva.hora_inicio} hrs"
 
-        # Formato: Nombre del servicio (X personas) - DD/MM/YYYY - HH:MM hrs
-        detalle_servicio = f"{nombre} ({personas} persona{'s' if personas > 1 else ''}) - {fecha}{hora_texto}"
-        lineas.append(detalle_servicio)
+            # Formato: Nombre del servicio (X personas) - DD/MM/YYYY - HH:MM hrs
+            detalle_servicio = f"{nombre} ({personas} persona{'s' if personas > 1 else ''}) - {fecha}{hora_texto}"
+            lineas.append(detalle_servicio)
 
-        # Agregar información adicional del servicio si existe
-        if servicio_reserva.servicio.informacion_adicional:
-            lineas.append(f"  {servicio_reserva.servicio.informacion_adicional}")
+            # Agregar información adicional del servicio si existe
+            if servicio_reserva.servicio.informacion_adicional:
+                lineas.append(f"  {servicio_reserva.servicio.informacion_adicional}")
 
-    lineas.append("")
+        lineas.append("")
+
+    # Productos
+    if productos:
+        lineas.append("Productos:")
+        lineas.append("")
+        for reserva_producto in productos:
+            lineas.append(f"{reserva_producto.producto.nombre} (x{reserva_producto.cantidad})")
+        lineas.append("")
+
+    # Gift Cards
+    if giftcards:
+        lineas.append("Gift Cards incluidas:")
+        lineas.append("")
+        for giftcard in giftcards:
+            destinatario = ""
+            if giftcard.cliente_destinatario:
+                destinatario = f" - Para: {giftcard.cliente_destinatario.nombre}"
+            elif giftcard.destinatario_nombre:
+                destinatario = f" - Para: {giftcard.destinatario_nombre}"
+
+            lineas.append(f"Gift Card ${int(giftcard.monto_inicial):,}{destinatario}")
+        lineas.append("")
+
+    # Comentarios (información específica de la reserva)
+    if reserva.comentarios and reserva.comentarios.strip():
+        lineas.append("Notas importantes:")
+        lineas.append(reserva.comentarios)
+        lineas.append("")
+
     lineas.append("")
 
     # Agregar texto de Tina Yate si hay tinas
@@ -96,9 +137,23 @@ def _generar_texto_resumen(reserva, config):
         lineas.append("")
         lineas.append("")
 
-    # Valor total
+    # Valor total con desglose
     total = reserva.total
+    total_servicios = sum(rs.servicio.precio_base * (rs.cantidad_personas or 1) for rs in servicios)
+    total_productos = sum(rp.producto.precio_base * rp.cantidad for rp in productos)
+    total_giftcards = sum(gc.monto_inicial for gc in giftcards)
+
     lineas.append(f"VALOR TOTAL: ${int(total):,}")
+
+    # Mostrar desglose solo si hay más de un tipo de item
+    items_count = sum([1 if servicios else 0, 1 if productos else 0, 1 if giftcards else 0])
+    if items_count > 1:
+        if servicios:
+            lineas.append(f"  - Servicios: ${int(total_servicios):,}")
+        if productos:
+            lineas.append(f"  - Productos: ${int(total_productos):,}")
+        if giftcards:
+            lineas.append(f"  - Gift Cards: ${int(total_giftcards):,}")
 
     lineas.append("")
     lineas.append("")
@@ -118,12 +173,9 @@ def _generar_texto_resumen(reserva, config):
         lineas.append(config.equipamiento_cabanas)
         lineas.append("")
         lineas.append(config.cortesias_alojamiento)
-        lineas.append("")
-        lineas.append(config.seguridad_pasarela)
     else:
         lineas.append("Detalles Adicionales:")
         lineas.append(config.cortesias_generales)
-        lineas.append(config.seguridad_pasarela)
 
     lineas.append("")
 
