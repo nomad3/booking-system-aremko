@@ -54,7 +54,7 @@ def _generar_texto_resumen(reserva, config):
     lineas.append("")
 
     # Detectar tipo de reserva
-    servicios = reserva.reservaservicio_set.all().select_related('servicio', 'servicio__categoria')
+    servicios = reserva.reservaservicios.all().select_related('servicio', 'servicio__categoria')
     tiene_alojamiento = any(s.servicio.tipo_servicio == 'cabana' for s in servicios)
     tiene_tinas = any(s.servicio.tipo_servicio == 'tina' for s in servicios)
     tiene_masajes = any(s.servicio.tipo_servicio == 'masaje' for s in servicios)
