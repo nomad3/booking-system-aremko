@@ -61,12 +61,17 @@ def _generar_texto_resumen(reserva, config):
 
     # Determinar título del programa
     if tiene_alojamiento:
-        # Obtener el nombre de la cabaña principal
-        servicio_cabana = next((s for s in servicios if s.servicio.tipo_servicio == 'cabana'), None)
-        if servicio_cabana:
-            titulo_programa = f"Programa {servicio_cabana.servicio.nombre}"
+        # Obtener el nombre de la cabaña principal (la primera cabaña, no el desayuno)
+        servicios_cabana = [s for s in servicios if s.servicio.tipo_servicio == 'cabana' and 'desayuno' not in s.servicio.nombre.lower()]
+        if servicios_cabana:
+            titulo_programa = f"Programa {servicios_cabana[0].servicio.nombre}"
         else:
-            titulo_programa = "Programa Alojamiento"
+            # Si no hay cabañas propiamente dichas, buscar cualquier alojamiento
+            servicio_cabana = next((s for s in servicios if s.servicio.tipo_servicio == 'cabana'), None)
+            if servicio_cabana:
+                titulo_programa = f"Programa {servicio_cabana.servicio.nombre}"
+            else:
+                titulo_programa = "Programa Alojamiento"
     elif tiene_tinas and tiene_masajes:
         titulo_programa = "Resumen de su programa en Aremko Spa"
     else:
@@ -98,7 +103,15 @@ def _generar_texto_resumen(reserva, config):
 
     # Listar servicios agrupados
     if tiene_alojamiento:
-        lineas.append(f"Alojamiento: {len([s for s in servicios if s.servicio.tipo_servicio == 'cabana'])} noche(s)")
+        # Contar noches (número de cabañas que NO son desayuno)
+        cabanas_alojamiento = [s for s in servicios if s.servicio.tipo_servicio == 'cabana' and 'desayuno' not in s.servicio.nombre.lower()]
+        lineas.append(f"Alojamiento: {len(cabanas_alojamiento)} noche(s)")
+
+    # Buscar desayuno y otros servicios tipo alojamiento
+    servicios_especiales_alojamiento = [s for s in servicios if s.servicio.tipo_servicio == 'cabana' and 'desayuno' in s.servicio.nombre.lower()]
+    for servicio_especial in servicios_especiales_alojamiento:
+        hora = servicio_especial.hora_inicio if servicio_especial.hora_inicio else ""
+        lineas.append(f"{servicio_especial.servicio.nombre}: {hora} hrs" if hora else servicio_especial.servicio.nombre)
 
     # Listar otros servicios con horarios
     servicios_ordenados = sorted(servicios, key=lambda s: (s.fecha_agendamiento, s.hora_inicio or ''))
@@ -113,16 +126,17 @@ def _generar_texto_resumen(reserva, config):
         # Formatear hora
         hora_texto = ""
         if servicio_reserva.hora_inicio:
-            hora_texto = f"{servicio_reserva.hora_inicio} hrs"
+            hora_texto = f" {servicio_reserva.hora_inicio} hrs"
 
         # Formatear fecha si es diferente
         fecha_texto = ""
         if not tiene_alojamiento or servicio_reserva.fecha_agendamiento != primer_servicio.fecha_agendamiento:
             fecha_texto = f" - {servicio_reserva.fecha_agendamiento.strftime('%d/%m/%Y')}"
 
-        lineas.append(f"{nombre}")
-        if hora_texto:
-            lineas.append(hora_texto)
+        # Incluir número de personas
+        detalle_servicio = f"{nombre} ({personas} persona{'s' if personas > 1 else ''}){hora_texto}{fecha_texto}"
+
+        lineas.append(detalle_servicio)
 
         # Agregar información adicional del servicio si existe
         if servicio_reserva.servicio.informacion_adicional:
@@ -148,8 +162,19 @@ def _generar_texto_resumen(reserva, config):
         lineas.append(f"Valor programa de domingo a jueves ${int(total):,} (pago total al confirmar)")
     else:
         personas_texto = ""
-        # Contar personas totales
-        total_personas = sum(s.cantidad_personas or 1 for s in servicios if s.servicio.tipo_servicio != 'cabana')
+        # Contar personas: tomar el máximo entre todos los servicios (no sumar)
+        # porque si contrata tina para 2 + masaje para 2, son 2 personas, no 4
+        if tiene_alojamiento:
+            # Para alojamiento, usar la cantidad de personas de la cabaña (no el desayuno)
+            servicios_cabana = [s for s in servicios if s.servicio.tipo_servicio == 'cabana' and 'desayuno' not in s.servicio.nombre.lower()]
+            if servicios_cabana:
+                total_personas = max(s.cantidad_personas or 1 for s in servicios_cabana)
+            else:
+                total_personas = max((s.cantidad_personas or 1 for s in servicios if s.servicio.tipo_servicio == 'cabana'), default=2)
+        else:
+            # Para servicios sin alojamiento, tomar el máximo
+            total_personas = max((s.cantidad_personas or 1 for s in servicios), default=1)
+
         if total_personas > 0:
             personas_texto = f" - {total_personas} adulto{'s' if total_personas > 1 else ''}"
 
