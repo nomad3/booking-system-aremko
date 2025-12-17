@@ -117,36 +117,38 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
     # Usar los servicios visibles como recursos (columnas)
     recursos = [s.nombre for s in servicios]
 
-    # Obtener los slots únicos de todos los servicios
-    # Los slots están en el campo slots_disponibles de cada servicio
-    slots_set = set()
-    for servicio in servicios:
-        if servicio.slots_disponibles:
-            for slot in servicio.slots_disponibles:
-                slots_set.add(slot)
+    # Configurar slots según el tipo de categoría
+    if categoria and 'tina' in categoria.nombre.lower():
+        # Definir los horarios específicos para tinas
+        # Tinas SIN hidromasaje: Hornopiren, Tronador, Calbuco, Osorno
+        slots_sin_hidromasaje = ["12:00", "14:30", "17:00", "19:30", "22:00"]
+        # Tinas CON hidromasaje: Puntiagudo, Llaima, Villarrica, Puyehue
+        slots_con_hidromasaje = ["14:00", "16:30", "19:00", "21:30"]
 
-    # Si no hay slots definidos, usar valores por defecto según categoría
-    if not slots_set:
-        if categoria and 'tina' in categoria.nombre.lower():
-            # Para tinas, slots cada 2 horas
-            slots = generar_slots_horarios(
-                hora_inicio="10:00",
-                hora_fin="22:00",
-                duracion_minutos=120
-            )
-        elif categoria and 'masaje' in categoria.nombre.lower():
-            # Para masajes, slots cada hora
-            slots = generar_slots_horarios(
-                hora_inicio="09:00",
-                hora_fin="21:00",
-                duracion_minutos=60
-            )
-        else:
-            # Para otros servicios
-            slots = ["Check-in 15:00", "Check-out 12:00"]
-    else:
-        # Ordenar los slots disponibles
+        # Combinar todos los slots únicos y ordenarlos
+        slots_set = set(slots_sin_hidromasaje + slots_con_hidromasaje)
         slots = sorted(list(slots_set))
+    else:
+        # Para otras categorías, intentar obtener slots de los servicios
+        slots_set = set()
+        for servicio in servicios:
+            if servicio.slots_disponibles:
+                for slot in servicio.slots_disponibles:
+                    slots_set.add(slot)
+
+        if not slots_set:
+            if categoria and 'masaje' in categoria.nombre.lower():
+                # Para masajes, slots cada hora
+                slots = generar_slots_horarios(
+                    hora_inicio="09:00",
+                    hora_fin="21:00",
+                    duracion_minutos=60
+                )
+            else:
+                # Para otros servicios
+                slots = ["Check-in 15:00", "Check-out 12:00"]
+        else:
+            slots = sorted(list(slots_set))
 
     # Inicializar matriz (todos disponibles)
     matriz = {}
