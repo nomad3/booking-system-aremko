@@ -84,8 +84,10 @@ def _generar_texto_resumen(reserva, config):
     lineas.append(f"Reserva Nº {reserva.id}")
 
     # Si es alojamiento, mostrar check-in/check-out
+    primer_servicio = None
     if tiene_alojamiento:
-        servicios_alojamiento = [s for s in servicios if s.servicio.tipo_servicio == 'cabana']
+        # Usar solo cabañas reales (no desayuno) para determinar check-in/check-out
+        servicios_alojamiento = [s for s in servicios if s.servicio.tipo_servicio == 'cabana' and 'desayuno' not in s.servicio.nombre.lower()]
         if servicios_alojamiento:
             primer_servicio = min(servicios_alojamiento, key=lambda s: s.fecha_agendamiento)
             # Calcular check-out (asumiendo 1 noche, ajustar según duración)
@@ -130,7 +132,7 @@ def _generar_texto_resumen(reserva, config):
 
         # Formatear fecha si es diferente
         fecha_texto = ""
-        if not tiene_alojamiento or servicio_reserva.fecha_agendamiento != primer_servicio.fecha_agendamiento:
+        if not tiene_alojamiento or (primer_servicio and servicio_reserva.fecha_agendamiento != primer_servicio.fecha_agendamiento):
             fecha_texto = f" - {servicio_reserva.fecha_agendamiento.strftime('%d/%m/%Y')}"
 
         # Incluir número de personas
