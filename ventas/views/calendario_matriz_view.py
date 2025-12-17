@@ -38,7 +38,13 @@ def calendario_matriz_view(request):
     categorias = CategoriaServicio.objects.all().order_by('nombre')
 
     # Buscar la categoría "Tinas Calientes" para usarla como default
-    tinas_categoria = categorias.filter(nombre__icontains='tina').first()
+    # Primero intentar coincidencia exacta, luego parcial
+    tinas_categoria = categorias.filter(nombre='Tinas Calientes').first()
+    if not tinas_categoria:
+        tinas_categoria = categorias.filter(nombre__icontains='tina').exclude(nombre__icontains='empresarial').first()
+    if not tinas_categoria:
+        tinas_categoria = categorias.filter(nombre__icontains='tina').first()
+
     default_categoria_id = str(tinas_categoria.id) if tinas_categoria else '1'
 
     # Obtener el ID de categoría del request o usar Tinas como default
@@ -108,29 +114,39 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         venta_reserva__estado_pago__in=['pagado', 'parcial', 'pendiente']
     ).select_related('servicio', 'venta_reserva', 'venta_reserva__cliente')
 
-    # Para Tinas Calientes, asumimos 8 tinas disponibles
-    # Para otros servicios, usamos los servicios individuales como recursos
-    if categoria.nombre == "Tinas Calientes":
-        recursos = [f"Tina {i}" for i in range(1, 9)]  # 8 tinas
-        # Generar slots cada 2 horas (duración típica de tina)
-        slots = generar_slots_horarios(
-            hora_inicio="10:00",
-            hora_fin="22:00",
-            duracion_minutos=120
-        )
-    elif categoria.nombre == "Masajes":
-        # Para masajes, cada servicio es un recurso diferente
-        recursos = [s.nombre for s in servicios]
-        # Slots cada hora (duración típica de masaje)
-        slots = generar_slots_horarios(
-            hora_inicio="09:00",
-            hora_fin="21:00",
-            duracion_minutos=60
-        )
+    # Usar los servicios visibles como recursos (columnas)
+    recursos = [s.nombre for s in servicios]
+
+    # Obtener los slots únicos de todos los servicios
+    # Los slots están en el campo slots_disponibles de cada servicio
+    slots_set = set()
+    for servicio in servicios:
+        if servicio.slots_disponibles:
+            for slot in servicio.slots_disponibles:
+                slots_set.add(slot)
+
+    # Si no hay slots definidos, usar valores por defecto según categoría
+    if not slots_set:
+        if categoria and 'tina' in categoria.nombre.lower():
+            # Para tinas, slots cada 2 horas
+            slots = generar_slots_horarios(
+                hora_inicio="10:00",
+                hora_fin="22:00",
+                duracion_minutos=120
+            )
+        elif categoria and 'masaje' in categoria.nombre.lower():
+            # Para masajes, slots cada hora
+            slots = generar_slots_horarios(
+                hora_inicio="09:00",
+                hora_fin="21:00",
+                duracion_minutos=60
+            )
+        else:
+            # Para otros servicios
+            slots = ["Check-in 15:00", "Check-out 12:00"]
     else:
-        # Para alojamientos u otros
-        recursos = [s.nombre for s in servicios]
-        slots = ["Check-in 15:00", "Check-out 12:00"]  # Simplificado para alojamientos
+        # Ordenar los slots disponibles
+        slots = sorted(list(slots_set))
 
     # Inicializar matriz (todos disponibles)
     matriz = {}
@@ -145,43 +161,36 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
 
     # Marcar las reservas existentes en la matriz
     for reserva in reservas:
-        hora_str = reserva.hora_inicio
+        hora_str = reserva.hora_inicio if reserva.hora_inicio else None
 
         # Buscar el slot correspondiente
         slot_encontrado = None
-        for slot in slots:
-            if hora_str in slot:
-                slot_encontrado = slot
-                break
-
-        if slot_encontrado:
-            # Para tinas, asignar automáticamente a la primera disponible
-            if categoria.nombre == "Tinas Calientes":
-                for recurso in recursos:
-                    if matriz[slot_encontrado][recurso]['estado'] == 'disponible':
-                        matriz[slot_encontrado][recurso] = {
-                            'estado': 'ocupado',
-                            'reserva': reserva,
-                            'cliente': reserva.venta_reserva.cliente.nombre if reserva.venta_reserva.cliente else 'Sin cliente',
-                            'servicio': reserva.servicio.nombre,
-                            'personas': reserva.cantidad_personas,
-                            'reserva_id': reserva.venta_reserva.id,
-                            'estado_pago': reserva.venta_reserva.estado_pago
-                        }
-                        break
+        if hora_str:
+            # Buscar coincidencia exacta primero
+            if hora_str in slots:
+                slot_encontrado = hora_str
             else:
-                # Para otros servicios, usar el nombre del servicio
-                recurso_nombre = reserva.servicio.nombre
-                if recurso_nombre in recursos and slot_encontrado in matriz:
-                    matriz[slot_encontrado][recurso_nombre] = {
-                        'estado': 'ocupado',
-                        'reserva': reserva,
-                        'cliente': reserva.venta_reserva.cliente.nombre if reserva.venta_reserva.cliente else 'Sin cliente',
-                        'servicio': reserva.servicio.nombre,
-                        'personas': reserva.cantidad_personas,
-                        'reserva_id': reserva.venta_reserva.id,
-                        'estado_pago': reserva.venta_reserva.estado_pago
-                    }
+                # Buscar si la hora está contenida en algún rango de slot
+                for slot in slots:
+                    if hora_str in slot or slot == hora_str:
+                        slot_encontrado = slot
+                        break
+
+        if slot_encontrado and slot_encontrado in matriz:
+            # Usar el nombre del servicio de la reserva como recurso
+            recurso_nombre = reserva.servicio.nombre
+
+            # Verificar si el recurso existe en la matriz
+            if recurso_nombre in matriz[slot_encontrado]:
+                matriz[slot_encontrado][recurso_nombre] = {
+                    'estado': 'ocupado',
+                    'reserva': reserva,
+                    'cliente': reserva.venta_reserva.cliente.nombre if reserva.venta_reserva.cliente else 'Sin cliente',
+                    'servicio': reserva.servicio.nombre,
+                    'personas': reserva.cantidad_personas,
+                    'reserva_id': reserva.venta_reserva.id,
+                    'estado_pago': reserva.venta_reserva.estado_pago
+                }
 
     # Calcular resumen de ocupación
     total_slots = len(slots) * len(recursos)
