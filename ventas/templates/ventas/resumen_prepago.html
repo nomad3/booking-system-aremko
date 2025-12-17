@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumen de Reserva #{{ reserva.id }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #8B4513;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .info-box {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .info-box strong {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        textarea {
+            width: 100%;
+            min-height: 600px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            line-height: 1.6;
+        }
+        .button-group {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button, .btn {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background-color: #8B4513;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #6d3410;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        .success-message {
+            display: none;
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 10px;
+            border: 1px solid #c3e6cb;
+        }
+        .success-message.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Resumen de Reserva #{{ reserva.id }}</h1>
+
+        <div class="info-box">
+            <strong>Cliente:</strong> {{ reserva.cliente.nombre }}
+            <strong>Teléfono:</strong> {{ reserva.cliente.telefono }}
+            <strong>Email:</strong> {{ reserva.cliente.email }}
+            <strong>Total:</strong> ${{ reserva.total|floatformat:0 }}
+            <strong>Estado Pago:</strong> {{ reserva.get_estado_pago_display }}
+        </div>
+
+        <p style="color: #666; margin-bottom: 15px;">
+            <strong>Instrucciones:</strong> Revisa y edita el texto si es necesario, luego cópialo para enviarlo por WhatsApp o email al cliente.
+        </p>
+
+        <textarea id="textoResumen" rows="30">{{ texto_resumen }}</textarea>
+
+        <div id="successMessage" class="success-message">
+            ✓ Texto copiado al portapapeles
+        </div>
+
+        <div class="button-group">
+            <button class="btn btn-primary" onclick="copiarTexto()">
+                📋 Copiar Texto
+            </button>
+
+            <a href="/admin/ventas/ventareserva/{{ reserva.id }}/change/" class="btn btn-secondary">
+                ← Volver a Reserva
+            </a>
+
+            <a href="/admin/ventas/ventareserva/" class="btn btn-secondary">
+                Ver Todas las Reservas
+            </a>
+        </div>
+    </div>
+
+    <script>
+        function copiarTexto() {
+            const textarea = document.getElementById('textoResumen');
+            textarea.select();
+            textarea.setSelectionRange(0, 99999); // Para móviles
+
+            try {
+                document.execCommand('copy');
+                mostrarMensajeExito();
+            } catch (err) {
+                // Método moderno como fallback
+                navigator.clipboard.writeText(textarea.value).then(function() {
+                    mostrarMensajeExito();
+                }, function(err) {
+                    alert('Error al copiar: ' + err);
+                });
+            }
+        }
+
+        function mostrarMensajeExito() {
+            const mensaje = document.getElementById('successMessage');
+            mensaje.classList.add('show');
+            setTimeout(function() {
+                mensaje.classList.remove('show');
+            }, 3000);
+        }
+
+        // Seleccionar todo el texto al hacer clic en el textarea
+        document.getElementById('textoResumen').addEventListener('click', function() {
+            this.select();
+        });
+    </script>
+</body>
+</html>

@@ -31,7 +31,9 @@ from .models import (
     # Newsletter
     NewsletterSubscriber,
     # SEO
-    SEOContent
+    SEOContent,
+    # Resumen de Reserva
+    ConfiguracionResumen
 )
 from django.http import HttpResponse
 import xlwt
@@ -120,10 +122,11 @@ class VentaReservaAdmin(admin.ModelAdmin):
     list_per_page = 50  
     autocomplete_fields = ['cliente']
     list_display = (
-        'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago', 
-        'estado_reserva', 'servicios_y_cantidades', 
-        'productos_y_cantidades', 'total_servicios', 
-        'total_productos', 'total', 'pagado', 'saldo_pendiente'
+        'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago',
+        'estado_reserva', 'servicios_y_cantidades',
+        'productos_y_cantidades', 'total_servicios',
+        'total_productos', 'total', 'pagado', 'saldo_pendiente',
+        'generar_resumen_link'
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
@@ -236,6 +239,13 @@ class VentaReservaAdmin(admin.ModelAdmin):
         return '-'
     fecha_reserva_corta.short_description = 'Fecha'
     fecha_reserva_corta.admin_order_field = 'fecha_reserva'
+
+    def generar_resumen_link(self, obj):
+        from django.urls import reverse
+        from django.utils.html import format_html
+        url = reverse('ventas:generar_resumen_prepago', args=[obj.id])
+        return format_html('<a class="button" href="{}" target="_blank">📋 Resumen</a>', url)
+    generar_resumen_link.short_description = 'Resumen'
 
     class Media:
         css = {
@@ -1912,3 +1922,32 @@ class CampaignSendLogAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         """No permitir eliminar logs (solo lectura)"""
         return False
+
+
+# Configuración de Resumen de Reserva (Singleton)
+@admin.register(ConfiguracionResumen)
+class ConfiguracionResumenAdmin(SingletonModelAdmin):
+    fieldsets = (
+        ('Encabezado', {
+            'fields': ('encabezado',)
+        }),
+        ('Información de Pago', {
+            'fields': ('datos_transferencia', 'link_pago_mercadopago', 'texto_link_pago')
+        }),
+        ('Cortesías y Garantías', {
+            'fields': ('tina_yate_texto', 'sauna_no_disponible')
+        }),
+        ('Políticas de Cancelación', {
+            'fields': ('politica_alojamiento', 'politica_tinas_masajes')
+        }),
+        ('Información para Alojamiento', {
+            'fields': ('equipamiento_cabanas', 'cortesias_alojamiento', 'seguridad_pasarela')
+        }),
+        ('Cortesías Generales', {
+            'fields': ('cortesias_generales',)
+        }),
+        ('Despedida', {
+            'fields': ('despedida',)
+        }),
+    )
+
