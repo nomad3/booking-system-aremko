@@ -53,96 +53,39 @@ def _generar_texto_resumen(reserva, config):
     lineas.append(f"{config.encabezado} 🌿✨")
     lineas.append("")
 
+    # Número de reserva
+    lineas.append(f"Reserva Nº {reserva.id}")
+    lineas.append("")
+
     # Detectar tipo de reserva
     servicios = reserva.reservaservicios.all().select_related('servicio', 'servicio__categoria')
     tiene_alojamiento = any(s.servicio.tipo_servicio == 'cabana' for s in servicios)
     tiene_tinas = any(s.servicio.tipo_servicio == 'tina' for s in servicios)
     tiene_masajes = any(s.servicio.tipo_servicio == 'masaje' for s in servicios)
 
-    # Determinar título del programa
-    if tiene_alojamiento:
-        # Obtener el nombre de la cabaña principal (la primera cabaña, no el desayuno)
-        servicios_cabana = [s for s in servicios if s.servicio.tipo_servicio == 'cabana' and 'desayuno' not in s.servicio.nombre.lower()]
-        if servicios_cabana:
-            titulo_programa = f"Programa {servicios_cabana[0].servicio.nombre}"
-        else:
-            # Si no hay cabañas propiamente dichas, buscar cualquier alojamiento
-            servicio_cabana = next((s for s in servicios if s.servicio.tipo_servicio == 'cabana'), None)
-            if servicio_cabana:
-                titulo_programa = f"Programa {servicio_cabana.servicio.nombre}"
-            else:
-                titulo_programa = "Programa Alojamiento"
-    elif tiene_tinas and tiene_masajes:
-        titulo_programa = "Resumen de su programa en Aremko Spa"
-    else:
-        titulo_programa = "Confirmación"
+    lineas.append("Servicios contratados:")
+    lineas.append("")
 
-    lineas.append(titulo_programa)
-
-    # Número de reserva y fecha
-    fecha_reserva = reserva.fecha_creacion.strftime('%d/%m/%Y') if reserva.fecha_creacion else datetime.now().strftime('%d/%m/%Y')
-    lineas.append(f"Reserva Nº {reserva.id}")
-
-    # Si es alojamiento, mostrar check-in/check-out
-    primer_servicio = None
-    if tiene_alojamiento:
-        # Usar solo cabañas reales (no desayuno) para determinar check-in/check-out
-        servicios_alojamiento = [s for s in servicios if s.servicio.tipo_servicio == 'cabana' and 'desayuno' not in s.servicio.nombre.lower()]
-        if servicios_alojamiento:
-            primer_servicio = min(servicios_alojamiento, key=lambda s: s.fecha_agendamiento)
-            # Calcular check-out (asumiendo 1 noche, ajustar según duración)
-            fecha_checkout = primer_servicio.fecha_agendamiento
-            # Buscar si hay más de un día de alojamiento
-            dias_alojamiento = len(set(s.fecha_agendamiento for s in servicios_alojamiento))
-
-            lineas.append(f"Check in desde las 16:00hrs. {primer_servicio.fecha_agendamiento.strftime('%d/%m/%Y')}")
-            # Simplificado: asumiendo checkout al día siguiente
-            from datetime import timedelta
-            fecha_checkout = primer_servicio.fecha_agendamiento + timedelta(days=1)
-            lineas.append(f"Check out 11:00 hrs {fecha_checkout.strftime('%d/%m/%Y')}")
-
-    lineas.append("Incluye:")
-
-    # Listar servicios agrupados
-    if tiene_alojamiento:
-        # Contar noches (número de cabañas que NO son desayuno)
-        cabanas_alojamiento = [s for s in servicios if s.servicio.tipo_servicio == 'cabana' and 'desayuno' not in s.servicio.nombre.lower()]
-        lineas.append(f"Alojamiento: {len(cabanas_alojamiento)} noche(s)")
-
-    # Buscar desayuno y otros servicios tipo alojamiento
-    servicios_especiales_alojamiento = [s for s in servicios if s.servicio.tipo_servicio == 'cabana' and 'desayuno' in s.servicio.nombre.lower()]
-    for servicio_especial in servicios_especiales_alojamiento:
-        hora = servicio_especial.hora_inicio if servicio_especial.hora_inicio else ""
-        lineas.append(f"{servicio_especial.servicio.nombre}: {hora} hrs" if hora else servicio_especial.servicio.nombre)
-
-    # Listar otros servicios con horarios
+    # Listar TODOS los servicios con fecha, hora y personas
     servicios_ordenados = sorted(servicios, key=lambda s: (s.fecha_agendamiento, s.hora_inicio or ''))
 
     for servicio_reserva in servicios_ordenados:
-        if servicio_reserva.servicio.tipo_servicio == 'cabana':
-            continue  # Ya lo listamos arriba
-
         nombre = servicio_reserva.servicio.nombre
         personas = servicio_reserva.cantidad_personas or 1
+        fecha = servicio_reserva.fecha_agendamiento.strftime('%d/%m/%Y')
 
         # Formatear hora
         hora_texto = ""
         if servicio_reserva.hora_inicio:
-            hora_texto = f" {servicio_reserva.hora_inicio} hrs"
+            hora_texto = f" - {servicio_reserva.hora_inicio} hrs"
 
-        # Formatear fecha si es diferente
-        fecha_texto = ""
-        if not tiene_alojamiento or (primer_servicio and servicio_reserva.fecha_agendamiento != primer_servicio.fecha_agendamiento):
-            fecha_texto = f" - {servicio_reserva.fecha_agendamiento.strftime('%d/%m/%Y')}"
-
-        # Incluir número de personas
-        detalle_servicio = f"{nombre} ({personas} persona{'s' if personas > 1 else ''}){hora_texto}{fecha_texto}"
-
+        # Formato: Nombre del servicio (X personas) - DD/MM/YYYY - HH:MM hrs
+        detalle_servicio = f"{nombre} ({personas} persona{'s' if personas > 1 else ''}) - {fecha}{hora_texto}"
         lineas.append(detalle_servicio)
 
         # Agregar información adicional del servicio si existe
         if servicio_reserva.servicio.informacion_adicional:
-            lineas.append(servicio_reserva.servicio.informacion_adicional)
+            lineas.append(f"  {servicio_reserva.servicio.informacion_adicional}")
 
     lineas.append("")
     lineas.append("")
@@ -151,36 +94,11 @@ def _generar_texto_resumen(reserva, config):
     if tiene_tinas:
         lineas.append(config.tina_yate_texto)
         lineas.append("")
-
-    # Agregar sauna no disponible si hay alojamiento
-    if tiene_alojamiento:
-        lineas.append(config.sauna_no_disponible)
-        lineas.append("")
         lineas.append("")
 
     # Valor total
     total = reserva.total
-    if tiene_tinas and tiene_masajes and not tiene_alojamiento:
-        lineas.append(f"Valor programa de domingo a jueves ${int(total):,} (pago total al confirmar)")
-    else:
-        personas_texto = ""
-        # Contar personas: tomar el máximo entre todos los servicios (no sumar)
-        # porque si contrata tina para 2 + masaje para 2, son 2 personas, no 4
-        if tiene_alojamiento:
-            # Para alojamiento, usar la cantidad de personas de la cabaña (no el desayuno)
-            servicios_cabana = [s for s in servicios if s.servicio.tipo_servicio == 'cabana' and 'desayuno' not in s.servicio.nombre.lower()]
-            if servicios_cabana:
-                total_personas = max(s.cantidad_personas or 1 for s in servicios_cabana)
-            else:
-                total_personas = max((s.cantidad_personas or 1 for s in servicios if s.servicio.tipo_servicio == 'cabana'), default=2)
-        else:
-            # Para servicios sin alojamiento, tomar el máximo
-            total_personas = max((s.cantidad_personas or 1 for s in servicios), default=1)
-
-        if total_personas > 0:
-            personas_texto = f" - {total_personas} adulto{'s' if total_personas > 1 else ''}"
-
-        lineas.append(f"Valor ${int(total):,}{personas_texto}")
+    lineas.append(f"VALOR TOTAL: ${int(total):,}")
 
     lineas.append("")
     lineas.append("")
