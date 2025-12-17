@@ -92,7 +92,11 @@ def _generar_texto_resumen(reserva, config):
                 hora_texto = f" - {servicio_reserva.hora_inicio} hrs"
 
             # Formato: Nombre del servicio (X personas) - DD/MM/YYYY - HH:MM hrs
-            detalle_servicio = f"{nombre} ({personas} persona{'s' if personas > 1 else ''}) - {fecha}{hora_texto}"
+            # No mostrar personas para Desayuno
+            if 'desayuno' in nombre.lower():
+                detalle_servicio = f"{nombre} - {fecha}{hora_texto}"
+            else:
+                detalle_servicio = f"{nombre} ({personas} persona{'s' if personas > 1 else ''}) - {fecha}{hora_texto}"
             lineas.append(detalle_servicio)
 
             # Agregar información adicional del servicio si existe
