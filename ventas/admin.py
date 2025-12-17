@@ -349,10 +349,34 @@ class ClienteAdmin(admin.ModelAdmin):
     exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
 
 class ServicioAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'precio_base', 'duracion', 'categoria', 'publicado_web')
-    list_filter = ('categoria', 'tipo_servicio', 'activo', 'publicado_web')
+    list_display = ('nombre', 'precio_base', 'duracion', 'categoria', 'publicado_web', 'visible_en_matriz')
+    list_filter = ('categoria', 'tipo_servicio', 'activo', 'publicado_web', 'visible_en_matriz')
+    list_editable = ('publicado_web', 'visible_en_matriz')
     search_fields = ('nombre', 'descripcion_web')
     filter_horizontal = ('proveedores',)  # Para manejar ManyToMany de proveedores
+
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('nombre', 'categoria', 'tipo_servicio', 'precio_base', 'duracion')
+        }),
+        ('Configuración de Capacidad', {
+            'fields': ('capacidad_minima', 'capacidad_maxima')
+        }),
+        ('Horarios', {
+            'fields': ('horario_apertura', 'horario_cierre', 'slots_disponibles')
+        }),
+        ('Proveedores', {
+            'fields': ('proveedores',)
+        }),
+        ('Visibilidad', {
+            'fields': ('activo', 'publicado_web', 'visible_en_matriz'),
+            'description': 'Control de visibilidad del servicio en diferentes partes del sistema'
+        }),
+        ('Información Web', {
+            'fields': ('imagen', 'descripcion_web'),
+            'classes': ('collapse',)
+        })
+    )
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):

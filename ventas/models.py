@@ -365,6 +365,11 @@ class Servicio(models.Model):
         default=True,
         help_text="Marcar si este servicio debe ser visible y reservable en la página web pública."
     )
+    visible_en_matriz = models.BooleanField(
+        default=True,
+        verbose_name="Visible en Calendario Matriz",
+        help_text="Marcar si este servicio debe aparecer en el calendario matriz de disponibilidad."
+    )
     TIPO_SERVICIO_CHOICES = [
         ('tina', 'Tina'),
         ('masaje', 'Masaje'),

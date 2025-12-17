@@ -50,10 +50,11 @@ def calendario_matriz_view(request):
         categoria = categorias.first()
         categoria_id = categoria.id if categoria else None
 
-    # Obtener servicios de la categoría
+    # Obtener servicios de la categoría que sean visibles en matriz
     servicios = Servicio.objects.filter(
         categoria=categoria,
-        activo=True
+        activo=True,
+        visible_en_matriz=True  # Solo mostrar servicios marcados como visibles en matriz
     ).order_by('nombre')
 
     # Generar la matriz de disponibilidad
@@ -92,10 +93,11 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         - resumen: estadísticas de ocupación
     """
 
-    # Obtener todas las reservas del día para esta categoría
+    # Obtener todas las reservas del día para esta categoría (solo de servicios visibles en matriz)
     reservas = ReservaServicio.objects.filter(
         fecha_agendamiento=fecha,
         servicio__categoria=categoria,
+        servicio__visible_en_matriz=True,  # Solo considerar servicios visibles en matriz
         venta_reserva__estado_pago__in=['pagado', 'parcial', 'pendiente']
     ).select_related('servicio', 'venta_reserva', 'venta_reserva__cliente')
 
