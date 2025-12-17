@@ -76,7 +76,7 @@ def calendario_matriz_view(request):
         'resumen': matriz_data['resumen'],
     }
 
-    # TEMPORAL: Usar template simple para debug en producción
+    # Usar template simple que funciona en producción
     return render(request, 'ventas/calendario_matriz_simple.html', context)
 
 

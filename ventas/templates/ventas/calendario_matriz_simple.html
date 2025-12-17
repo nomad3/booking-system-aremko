@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calendario Matriz - Test</title>
+    <title>Calendario Matriz - Disponibilidad</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -55,12 +55,20 @@
 </head>
 <body>
     <div class="container">
-        <h1>Calendario Matriz de Disponibilidad - Versión Simple</h1>
+        <h1>Calendario Matriz de Disponibilidad</h1>
 
         <div class="info">
-            <p><strong>Fecha:</strong> {{ fecha_seleccionada }}</p>
-            <p><strong>Categoría:</strong> {{ categoria_seleccionada.nombre }}</p>
-            <p><strong>Estado:</strong> Vista funcionando correctamente ✅</p>
+            <form method="get" action="">
+                <label for="fecha">Fecha:</label>
+                <input type="date" id="fecha" name="fecha" value="{{ fecha_str }}" onchange="this.form.submit()">
+
+                <label for="categoria" style="margin-left: 20px;">Categoría:</label>
+                <select id="categoria" name="categoria" onchange="this.form.submit()">
+                    {% for cat in categorias %}
+                    <option value="{{ cat.id }}" {% if cat.id == categoria_id %}selected{% endif %}>{{ cat.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </form>
         </div>
 
         <table>
@@ -77,7 +85,7 @@
                 <tr>
                     <td><strong>{{ slot }}</strong></td>
                     {% for recurso in recursos %}
-                    <td class="disponible">Disponible</td>
+                        <td class="disponible">Disponible</td>
                     {% endfor %}
                 </tr>
                 {% endfor %}
