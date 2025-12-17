@@ -77,6 +77,34 @@ def calendario_matriz_view(request):
         servicios
     )
 
+    # Crear una estructura de datos más simple para el template
+    # Lista de listas para representar la matriz
+    matriz_simple = []
+    for slot in matriz_data['slots']:
+        fila = {'slot': slot, 'celdas': []}
+        for recurso in matriz_data['recursos']:
+            if slot in matriz_data['matriz'] and recurso in matriz_data['matriz'][slot]:
+                celda = matriz_data['matriz'][slot][recurso]
+            else:
+                celda = {'estado': 'disponible', 'cliente': None, 'personas': None}
+            fila['celdas'].append(celda)
+        matriz_simple.append(fila)
+
+    # Debug: Imprimir la matriz para verificar
+    print(f"\n=== DEBUG MATRIZ SIMPLE ===")
+    print(f"Fecha: {fecha_seleccionada}")
+    print(f"Categoría: {categoria.nombre if categoria else 'Sin categoría'}")
+    print(f"Slots: {matriz_data['slots']}")
+    print(f"Recursos: {matriz_data['recursos']}")
+    print(f"\nMatriz de ocupación:")
+    for fila in matriz_simple:
+        print(f"\nSlot {fila['slot']}:")
+        for i, celda in enumerate(fila['celdas']):
+            if celda['estado'] == 'ocupado':
+                print(f"  - {matriz_data['recursos'][i]}: OCUPADO - {celda.get('cliente', 'Sin cliente')}")
+            else:
+                print(f"  - {matriz_data['recursos'][i]}: Disponible")
+
     # Contexto para el template
     context = {
         'fecha_seleccionada': fecha_seleccionada,
@@ -85,6 +113,7 @@ def calendario_matriz_view(request):
         'categoria_id': int(categoria_id) if categoria_id else None,  # Convertir a int para comparación en template
         'categorias': categorias,
         'matriz': matriz_data['matriz'],
+        'matriz_simple': matriz_simple,  # Nueva estructura para el template
         'slots_horarios': matriz_data['slots'],
         'recursos': matriz_data['recursos'],
         'resumen': matriz_data['resumen'],
@@ -113,6 +142,14 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         servicio__visible_en_matriz=True,  # Solo considerar servicios visibles en matriz
         venta_reserva__estado_pago__in=['pagado', 'parcial', 'pendiente']
     ).select_related('servicio', 'venta_reserva', 'venta_reserva__cliente')
+
+    print(f"\n=== DEBUG RESERVAS ===")
+    print(f"Total de reservas encontradas: {reservas.count()}")
+    for r in reservas:
+        print(f"  - Servicio: {r.servicio.nombre}")
+        print(f"    Hora inicio: {r.hora_inicio}")
+        print(f"    Cliente: {r.venta_reserva.cliente.nombre if r.venta_reserva.cliente else 'Sin cliente'}")
+        print(f"    Estado pago: {r.venta_reserva.estado_pago}")
 
     # Usar los servicios visibles como recursos (columnas)
     recursos = [s.nombre for s in servicios]
@@ -162,25 +199,40 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
             }
 
     # Marcar las reservas existentes en la matriz
+    print(f"\n=== DEBUG MAPEO DE RESERVAS A MATRIZ ===")
     for reserva in reservas:
         hora_str = reserva.hora_inicio if reserva.hora_inicio else None
+        print(f"\nProcesando reserva:")
+        print(f"  - Hora original: '{hora_str}'")
+        print(f"  - Servicio: {reserva.servicio.nombre}")
 
         # Buscar el slot correspondiente
         slot_encontrado = None
         if hora_str:
-            # Buscar coincidencia exacta primero
-            if hora_str in slots:
-                slot_encontrado = hora_str
+            # Normalizar el formato de hora (asegurar formato HH:MM)
+            if ':' in hora_str:
+                partes = hora_str.split(':')
+                if len(partes) >= 2:
+                    hora = int(partes[0])
+                    minuto = int(partes[1])
+                    hora_normalizada = f"{hora:02d}:{minuto:02d}"
+                    print(f"  - Hora normalizada: '{hora_normalizada}'")
+
+                    # Buscar coincidencia exacta con la hora normalizada
+                    if hora_normalizada in slots:
+                        slot_encontrado = hora_normalizada
+                        print(f"  - Slot encontrado: '{slot_encontrado}'")
+                    else:
+                        print(f"  - ❌ Hora '{hora_normalizada}' no está en los slots disponibles: {slots}")
             else:
-                # Buscar si la hora está contenida en algún rango de slot
-                for slot in slots:
-                    if hora_str in slot or slot == hora_str:
-                        slot_encontrado = slot
-                        break
+                print(f"  - ❌ Formato de hora no válido (no contiene ':')")
+        else:
+            print(f"  - ❌ No hay hora de inicio")
 
         if slot_encontrado and slot_encontrado in matriz:
             # Usar el nombre del servicio de la reserva como recurso
             recurso_nombre = reserva.servicio.nombre
+            print(f"  - Intentando mapear a recurso: '{recurso_nombre}'")
 
             # Verificar si el recurso existe en la matriz
             if recurso_nombre in matriz[slot_encontrado]:
@@ -189,10 +241,19 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
                     'reserva': reserva,
                     'cliente': reserva.venta_reserva.cliente.nombre if reserva.venta_reserva.cliente else 'Sin cliente',
                     'servicio': reserva.servicio.nombre,
-                    'personas': reserva.cantidad_personas,
+                    'personas': reserva.cantidad_personas if reserva.cantidad_personas else 1,
                     'reserva_id': reserva.venta_reserva.id,
                     'estado_pago': reserva.venta_reserva.estado_pago
                 }
+                print(f"  - ✅ Reserva marcada: {slot_encontrado} - {recurso_nombre} - Cliente: {matriz[slot_encontrado][recurso_nombre]['cliente']}")
+            else:
+                print(f"  - ❌ Recurso '{recurso_nombre}' no existe en la matriz para el slot '{slot_encontrado}'")
+                print(f"      Recursos disponibles: {list(matriz[slot_encontrado].keys())}")
+        else:
+            if not slot_encontrado:
+                print(f"  - ❌ No se encontró slot correspondiente")
+            else:
+                print(f"  - ❌ Slot '{slot_encontrado}' no existe en la matriz")
 
     # Calcular resumen de ocupación
     total_slots = len(slots) * len(recursos)

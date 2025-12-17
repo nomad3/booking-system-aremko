@@ -81,11 +81,18 @@
                 </tr>
             </thead>
             <tbody>
-                {% for slot in slots_horarios %}
+                {% for fila in matriz_simple %}
                 <tr>
-                    <td><strong>{{ slot }}</strong></td>
-                    {% for recurso in recursos %}
-                        <td class="disponible">Disponible</td>
+                    <td><strong>{{ fila.slot }}</strong></td>
+                    {% for celda in fila.celdas %}
+                        {% if celda.estado == 'ocupado' %}
+                            <td class="ocupado" title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s)">
+                                Ocupado<br>
+                                <small>{{ celda.cliente|default:"" }}</small>
+                            </td>
+                        {% else %}
+                            <td class="disponible">Disponible</td>
+                        {% endif %}
                     {% endfor %}
                 </tr>
                 {% endfor %}
