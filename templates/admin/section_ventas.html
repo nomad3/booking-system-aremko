@@ -170,6 +170,22 @@
             </div>
         </div>
 
+        {# Calendario Matriz Card (NEW) #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-calendar-alt card-icon text-primary"></i>
+                    <h5 class="card-title">Calendario Matriz</h5>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:calendario_matriz' %}" class="btn btn-sm btn-modern btn-primary-modern">
+                            <i class="fas fa-th"></i> Ver Disponibilidad
+                        </a>
+                        <small class="text-muted mt-2">Vista matriz de slots y recursos</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 {% endblock %}
