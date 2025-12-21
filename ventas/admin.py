@@ -33,7 +33,9 @@ from .models import (
     # SEO
     SEOContent,
     # Resumen de Reserva
-    ConfiguracionResumen
+    ConfiguracionResumen,
+    # Tips Post-Pago
+    ConfiguracionTips
 )
 from django.http import HttpResponse
 import xlwt
@@ -126,7 +128,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         'estado_reserva', 'servicios_y_cantidades',
         'productos_y_cantidades', 'total_servicios',
         'total_productos', 'total', 'pagado', 'saldo_pendiente',
-        'generar_resumen_link'
+        'generar_resumen_link', 'generar_tips_link'
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
@@ -246,6 +248,13 @@ class VentaReservaAdmin(admin.ModelAdmin):
         url = reverse('ventas:generar_resumen_prepago', args=[obj.id])
         return format_html('<a class="button" href="{}" target="_blank">📋 Resumen</a>', url)
     generar_resumen_link.short_description = 'Resumen'
+
+    def generar_tips_link(self, obj):
+        from django.urls import reverse
+        from django.utils.html import format_html
+        url = reverse('ventas:generar_tips_postpago', args=[obj.id])
+        return format_html('<a class="button" href="{}" target="_blank">💡 Tips</a>', url)
+    generar_tips_link.short_description = 'Tips'
 
     class Media:
         css = {
@@ -1948,6 +1957,60 @@ class ConfiguracionResumenAdmin(SingletonModelAdmin):
         }),
         ('Despedida', {
             'fields': ('despedida',)
+        }),
+    )
+
+
+@admin.register(ConfiguracionTips)
+class ConfiguracionTipsAdmin(SingletonModelAdmin):
+    fieldsets = (
+        ('Encabezado', {
+            'fields': ('encabezado', 'intro')
+        }),
+        ('WiFi - Cabañas', {
+            'fields': ('wifi_torre', 'wifi_tepa', 'wifi_acantilado', 'wifi_laurel', 'wifi_arrayan'),
+            'classes': ('collapse',)
+        }),
+        ('WiFi - Otras Áreas', {
+            'fields': ('wifi_tinas', 'wifi_tinajas', 'wifi_masajes'),
+            'classes': ('collapse',)
+        }),
+        ('Normas (Solo Cabañas)', {
+            'fields': ('norma_mascotas', 'norma_cocinar', 'norma_fumar', 'norma_danos'),
+            'classes': ('collapse',)
+        }),
+        ('Check-out (Solo Cabañas)', {
+            'fields': ('checkout_semana', 'checkout_finde'),
+            'classes': ('collapse',)
+        }),
+        ('Tips Tinas/Masajes', {
+            'fields': ('recordatorio_toallas', 'tip_puntualidad', 'info_vestidores', 'ropa_masaje', 'menores_edad'),
+            'classes': ('collapse',)
+        }),
+        ('Uso de Tinas', {
+            'fields': ('uso_tinas_alternancia', 'uso_tinas_prohibiciones', 'recomendacion_ducha_masaje', 'prohibicion_vasos'),
+            'classes': ('collapse',)
+        }),
+        ('Seguridad', {
+            'fields': ('seguridad_pasarelas',)
+        }),
+        ('Horarios', {
+            'fields': (
+                'horario_porton_semana', 'horario_porton_finde', 'telefono_porton',
+                'horario_recepcion_semana', 'horario_recepcion_finde', 'horario_recepcion_domingo',
+                'horario_cafeteria_semana', 'horario_cafeteria_finde'
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Cafetería', {
+            'fields': ('productos_cafeteria', 'menu_cafe'),
+            'classes': ('collapse',)
+        }),
+        ('Ubicación', {
+            'fields': ('direccion', 'como_llegar', 'link_google_maps')
+        }),
+        ('Despedida', {
+            'fields': ('despedida', 'contacto_whatsapp')
         }),
     )
 

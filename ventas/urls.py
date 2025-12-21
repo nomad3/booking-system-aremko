@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, resumen_reserva_view # Import resumen_reserva_view
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, resumen_reserva_view, tips_reserva_view
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -50,6 +50,8 @@ urlpatterns = [
     path('calendario-matriz/reservar/', calendario_matriz_view.calendario_matriz_reservar, name='calendario_matriz_reservar'),
     # Resumen de Reserva (Pre-Pago)
     path('resumen-reserva/<int:reserva_id>/', resumen_reserva_view.generar_resumen_prepago, name='generar_resumen_prepago'),
+    # Tips de Reserva (Post-Pago)
+    path('tips-reserva/<int:reserva_id>/', tips_reserva_view.generar_tips_postpago, name='generar_tips_postpago'),
     path('venta_reservas/', crud_views.venta_reserva_list, name='venta_reserva_list'),
     path('venta_reservas/<int:pk>/', crud_views.venta_reserva_detail, name='venta_reserva_detail'),
     path('compras/', crud_views.compra_list, name='compra_list'),

@@ -3554,3 +3554,327 @@ Gracias por elegir Aremko Spa para tu relax.""",
 
     def __str__(self):
         return "Configuración de Resumen de Reserva"
+
+
+class ConfiguracionTips(SingletonModel):
+    """
+    Configuración para generar tips post-pago (enviados después del pago).
+    Singleton: solo existe una instancia de configuración.
+    """
+    # Encabezado general
+    encabezado = models.TextField(
+        default="Bienvenido a Aremko Spa 🌿",
+        verbose_name="Encabezado",
+        help_text="Título principal de los tips",
+        blank=True
+    )
+
+    intro = models.TextField(
+        default="Gracias por elegirnos para tu estadía. Aquí te compartimos información importante para que disfrutes al máximo tu experiencia:",
+        verbose_name="Introducción",
+        help_text="Texto introductorio",
+        blank=True
+    )
+
+    # ========== TIPS ESPECÍFICOS PARA CABAÑAS ==========
+
+    # WiFi Cabañas
+    wifi_torre = models.CharField(
+        max_length=200,
+        default="Red: Torre / Clave: torre2021",
+        verbose_name="WiFi Cabaña Torre",
+        blank=True
+    )
+
+    wifi_tepa = models.CharField(
+        max_length=200,
+        default="Red: TP-Link_3B26 / Clave: 83718748",
+        verbose_name="WiFi Cabaña Tepa",
+        blank=True
+    )
+
+    wifi_acantilado = models.CharField(
+        max_length=200,
+        default="Red: Acantilado / Clave: acantilado",
+        verbose_name="WiFi Cabaña Acantilado",
+        blank=True
+    )
+
+    wifi_laurel = models.CharField(
+        max_length=200,
+        default="Red: Acantilado / Clave: acantilado",
+        verbose_name="WiFi Cabaña Laurel",
+        blank=True
+    )
+
+    wifi_arrayan = models.CharField(
+        max_length=200,
+        default="Red: tp-link_7e8a / Clave: 19146881",
+        verbose_name="WiFi Cabaña Arrayan",
+        blank=True
+    )
+
+    # Normas cabañas
+    norma_mascotas = models.TextField(
+        default="❌ Prohibido traer mascotas a Aremko",
+        verbose_name="Norma: Mascotas",
+        blank=True
+    )
+
+    norma_cocinar = models.TextField(
+        default="❌ Prohibido cocinar y realizar asados (interior y exterior de cabañas)",
+        verbose_name="Norma: Cocinar/Asados",
+        blank=True
+    )
+
+    norma_fumar = models.TextField(
+        default="""❌ AREMKO ES NO FUMADOR (Ley 20.660)
+Fumar en lugares cerrados está prohibido por ley.
+Multa: 2 UTM (~$70.000) + costo de limpieza profunda.
+El cobro se realiza al momento del check-out.""",
+        verbose_name="Norma: No Fumar",
+        blank=True
+    )
+
+    norma_danos = models.TextField(
+        default="""⚠️ Multas por daños o limpieza extraordinaria:
+Se aplicarán cargos por daños, artículos faltantes o limpieza inesperada (manchas en sábanas, ropa de cama, toallas).
+La cabaña será revisada por personal de Aremko al check-out.""",
+        verbose_name="Norma: Daños y Limpieza",
+        blank=True
+    )
+
+    # Check-out cabañas
+    checkout_semana = models.TextField(
+        default="""Domingo a Jueves (antes de 11:00 hrs):
+→ Deja llaves y controles dentro de la cabaña
+→ Asegúrate de apagar el aire acondicionado
+→ Saldos pendientes: recibirás datos de pago por WhatsApp""",
+        verbose_name="Check-out Domingo-Jueves",
+        blank=True
+    )
+
+    checkout_finde = models.TextField(
+        default="""Viernes y Sábado (desde 10:30 hrs):
+→ Check-out presencial en recepción
+→ Para abrir portón automático, solicitar por WhatsApp""",
+        verbose_name="Check-out Viernes-Sábado",
+        blank=True
+    )
+
+    # ========== TIPS ESPECÍFICOS PARA TINAS/MASAJES ==========
+
+    recordatorio_toallas = models.TextField(
+        default="Recuerde traer toallas. También tenemos toallas para arrendar ($3.000 c/u) o puede usar las de su cabaña si tiene alojamiento.",
+        verbose_name="Recordatorio: Traer Toallas",
+        blank=True
+    )
+
+    tip_puntualidad = models.TextField(
+        default="En Puerto Varas a toda hora hay congestión vehicular. Intente llegar 15 minutos antes de su reserva.",
+        verbose_name="Tip: Puntualidad",
+        blank=True
+    )
+
+    info_vestidores = models.TextField(
+        default="Cada tina tiene su vestidor y también hay vestidores en el spa si gusta utilizar.",
+        verbose_name="Info: Vestidores",
+        blank=True
+    )
+
+    ropa_masaje = models.TextField(
+        default="Para pasajeros que sólo vengan a masaje, traer solamente ropa de interior, no traje de baño.",
+        verbose_name="Info: Ropa para Masaje",
+        blank=True
+    )
+
+    menores_edad = models.TextField(
+        default="Los menores de edad en todo momento deben estar bajo el cuidado de los padres (desde 2 años si utiliza tina de agua caliente o fría, de ser con pañal de agua).",
+        verbose_name="Info: Menores de Edad",
+        blank=True
+    )
+
+    # ========== TIPS COMUNES (TINAS Y CABAÑAS) ==========
+
+    # WiFi otras áreas
+    wifi_tinas = models.CharField(
+        max_length=200,
+        default="Red: Tinas / Clave: 82551551",
+        verbose_name="WiFi Sector Tinas",
+        blank=True
+    )
+
+    wifi_tinajas = models.CharField(
+        max_length=200,
+        default="Red: wifi Tinajas / Clave: 12345678",
+        verbose_name="WiFi Tinajas",
+        blank=True
+    )
+
+    wifi_masajes = models.CharField(
+        max_length=200,
+        default="Red: domo / Clave: Tepa2021",
+        verbose_name="WiFi Sala Masajes",
+        blank=True
+    )
+
+    # Uso de tinas
+    uso_tinas_alternancia = models.TextField(
+        default="""✓ Alterna entre tina caliente y tina fría (Tina Yate - uso libre sin costo)
+✓ Máximo 15 minutos por sesión en agua caliente
+✓ Descansa al borde unos minutos entre sesiones
+✓ Completa hasta 2 horas totales de baño""",
+        verbose_name="Uso de Tinas: Alternancia",
+        blank=True
+    )
+
+    uso_tinas_prohibiciones = models.TextField(
+        default="""❌ NO usar shampoo, jabones, sales, hierbas ni flores
+❌ NO sumergir la cabeza - el agua está clorada (disposición sanitaria)""",
+        verbose_name="Uso de Tinas: Prohibiciones",
+        blank=True
+    )
+
+    recomendacion_ducha_masaje = models.TextField(
+        default="Por recomendación de la masajista, ducharse después del masaje.",
+        verbose_name="Recomendación: Ducha post-masaje",
+        blank=True
+    )
+
+    prohibicion_vasos = models.TextField(
+        default="NO transitar por pasarelas con copas o vasos. Si necesitas, solicita por WhatsApp y te facilitamos vasos para tu hora de tina.",
+        verbose_name="Prohibición: Vasos en Pasarelas",
+        blank=True
+    )
+
+    # Seguridad pasarelas
+    seguridad_pasarelas = models.TextField(
+        default="""⚠️ SEGURIDAD EN PASARELAS (OBLIGATORIO)
+
+Por tu seguridad al transitar por las pasarelas:
+
+✓ Usar zapatos cómodos y antideslizantes
+✓ Uso de pasamanos OBLIGATORIO
+❌ Prohibido: chalas, zapatos con taco o plataforma
+
+Nota: Indicaciones de la autoridad sanitaria""",
+        verbose_name="Seguridad en Pasarelas",
+        blank=True
+    )
+
+    # Horarios
+    horario_porton_semana = models.CharField(
+        max_length=200,
+        default="Domingo a Jueves: 09:00 - 22:00 hrs",
+        verbose_name="Horario Portón (Dom-Jue)",
+        blank=True
+    )
+
+    horario_porton_finde = models.CharField(
+        max_length=200,
+        default="Viernes y Sábado: 09:00 - 00:00 hrs",
+        verbose_name="Horario Portón (Vie-Sáb)",
+        blank=True
+    )
+
+    telefono_porton = models.CharField(
+        max_length=50,
+        default="+56 9 5336 1647",
+        verbose_name="Teléfono para abrir portón",
+        blank=True
+    )
+
+    horario_recepcion_semana = models.CharField(
+        max_length=200,
+        default="Lunes a Jueves: hasta 20:00 hrs",
+        verbose_name="Horario Recepción (Lun-Jue)",
+        blank=True
+    )
+
+    horario_recepcion_finde = models.CharField(
+        max_length=200,
+        default="Viernes y Sábado: hasta 23:30 hrs",
+        verbose_name="Horario Recepción (Vie-Sáb)",
+        blank=True
+    )
+
+    horario_recepcion_domingo = models.CharField(
+        max_length=200,
+        default="Domingo: hasta 19:30 hrs",
+        verbose_name="Horario Recepción (Dom)",
+        blank=True
+    )
+
+    horario_cafeteria_semana = models.CharField(
+        max_length=200,
+        default="Domingo a Jueves: hasta 20:00 hrs",
+        verbose_name="Horario Cafetería (Dom-Jue)",
+        blank=True
+    )
+
+    horario_cafeteria_finde = models.CharField(
+        max_length=200,
+        default="Viernes y Sábado: hasta 23:00 hrs",
+        verbose_name="Horario Cafetería (Vie-Sáb)",
+        blank=True
+    )
+
+    # Cafetería
+    productos_cafeteria = models.TextField(
+        default="Tablas de quesos, jugos naturales, agua con/sin gas, bebidas envasadas",
+        verbose_name="Productos Cafetería",
+        blank=True
+    )
+
+    menu_cafe = models.TextField(
+        default="Café Marley: Capuccino, Mokaccino, Chocolate, Americano, Vainilla, Cortado",
+        verbose_name="Menú de Café",
+        blank=True
+    )
+
+    # Ubicación
+    direccion = models.CharField(
+        max_length=200,
+        default="Río Pescado Km 4, Puerto Varas",
+        verbose_name="Dirección",
+        blank=True
+    )
+
+    como_llegar = models.TextField(
+        default="""Desde Puerto Varas:
+1. Tomar camino Ensenada hasta km 19 (carretera 255)
+2. Encontrarás retén de Carabineros de Río Pescado (a tu derecha)
+3. Frente al retén, tomar camino de tierra hacia Volcán Calbuco
+   (ANTES del Puente Río Pescado - hay 2 retenes, nosotros estamos en el 1°)
+4. Ingresar 4 km por ese camino
+5. Aremko estará a tu izquierda""",
+        verbose_name="Cómo Llegar",
+        blank=True
+    )
+
+    link_google_maps = models.URLField(
+        default="https://maps.google.com/maps?q=-41.2776517%2C-72.7685313&z=17&hl=es",
+        verbose_name="Link Google Maps",
+        blank=True
+    )
+
+    # Despedida
+    despedida = models.TextField(
+        default="¡Disfruta tu estadía en Aremko! 🌿✨",
+        verbose_name="Despedida",
+        blank=True
+    )
+
+    contacto_whatsapp = models.CharField(
+        max_length=50,
+        default="+56 9 5336 1647",
+        verbose_name="WhatsApp de Contacto",
+        blank=True
+    )
+
+    class Meta:
+        verbose_name = "Configuración de Tips Post-Pago"
+        verbose_name_plural = "Configuración de Tips Post-Pago"
+
+    def __str__(self):
+        return "Configuración de Tips Post-Pago"

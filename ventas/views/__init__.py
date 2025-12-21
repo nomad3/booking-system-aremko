@@ -12,3 +12,4 @@ except Exception:
 # Importar el módulo calendario_matriz_view para que esté disponible
 from . import calendario_matriz_view
 from . import resumen_reserva_view
+from . import tips_reserva_view
