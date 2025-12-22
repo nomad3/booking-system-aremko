@@ -63,17 +63,6 @@ def _generar_texto_tips(reserva, config):
     tiene_tinas = any(s.servicio.tipo_servicio == 'tina' for s in servicios)
     tiene_masajes = any(s.servicio.tipo_servicio == 'masaje' for s in servicios)
 
-    # DEBUG: Mostrar información de detección (eliminar en producción)
-    debug_info = []
-    debug_info.append(f"[DEBUG] Reserva ID: {reserva.id}")
-    debug_info.append(f"[DEBUG] Servicios en la reserva:")
-    for s in servicios:
-        debug_info.append(f"  - {s.servicio.nombre} (tipo: {s.servicio.tipo_servicio})")
-    debug_info.append(f"[DEBUG] Detección: Alojamiento={tiene_alojamiento}, Tinas={tiene_tinas}, Masajes={tiene_masajes}")
-    debug_info.append("─" * 40)
-    lineas.extend(debug_info)
-    lineas.append("")
-
     # Determinar qué cabañas específicas tiene
     cabanas_contratadas = set()
     if tiene_alojamiento:
