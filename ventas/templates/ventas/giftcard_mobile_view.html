@@ -9,16 +9,20 @@
 
     <title>{% if error %}Error{% else %}GiftCard {{ giftcard.codigo }} - Aremko Spa{% endif %}</title>
 
-    <!-- Favicons -->
+    <!-- Favicons (comentados hasta tener los archivos) -->
+    {% comment %}
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon-32x32.png' %}">
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon-16x16.png' %}">
+    {% endcomment %}
 
     <!-- Open Graph para compartir -->
     {% if not error %}
     <meta property="og:title" content="GiftCard Aremko Spa - {{ giftcard.destinatario_nombre }}">
     <meta property="og:description" content="{{ giftcard.mensaje_personalizado|truncatewords:20 }}">
-    <meta property="og:image" content="{% if experiencia.imagen_url %}{{ experiencia.imagen_url }}{% else %}{% static 'images/aremko-spa-og.jpg' %}{% endif %}">
+    {% if experiencia.imagen_url %}
+    <meta property="og:image" content="{{ experiencia.imagen_url }}">
+    {% endif %}
     <meta property="og:type" content="website">
     {% endif %}
 
