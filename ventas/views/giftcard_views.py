@@ -795,6 +795,16 @@ def giftcard_mobile_view(request, codigo):
         user_agent = request.META.get('HTTP_USER_AGENT', '').lower()
         is_mobile = any(device in user_agent for device in ['mobile', 'android', 'iphone', 'ipad'])
 
+        # Formatear fechas de manera robusta sin depender del locale
+        meses_es = {
+            1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+            5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+            9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+        }
+
+        fecha_emision_formateada = f"{giftcard.fecha_emision.day} de {meses_es[giftcard.fecha_emision.month]} de {giftcard.fecha_emision.year}"
+        fecha_vencimiento_formateada = f"{giftcard.fecha_vencimiento.day} de {meses_es[giftcard.fecha_vencimiento.month]} de {giftcard.fecha_vencimiento.year}"
+
         # Formatear datos para el template
         context = {
             'giftcard': giftcard,
@@ -804,8 +814,8 @@ def giftcard_mobile_view(request, codigo):
             'is_mobile': is_mobile,
             'monto_formateado': f"${giftcard.monto_inicial:,.0f}".replace(',', '.'),
             'monto_disponible_formateado': f"${giftcard.monto_disponible:,.0f}".replace(',', '.'),
-            'fecha_emision_formateada': giftcard.fecha_emision.strftime('%d de %B de %Y'),
-            'fecha_vencimiento_formateada': giftcard.fecha_vencimiento.strftime('%d de %B de %Y'),
+            'fecha_emision_formateada': fecha_emision_formateada,
+            'fecha_vencimiento_formateada': fecha_vencimiento_formateada,
             'whatsapp_url': f"https://wa.me/56957902525?text=Hola!%20Quiero%20reservar%20con%20mi%20GiftCard%20{giftcard.codigo}",
             'puede_descargar_pdf': True,  # Siempre permitir descarga del PDF
             'show_wallet_button': False,  # Por ahora desactivado, activar cuando se implemente Apple/Google Wallet
