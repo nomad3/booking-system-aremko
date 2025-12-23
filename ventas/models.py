@@ -17,10 +17,75 @@ class Proveedor(models.Model):
     direccion = models.CharField(max_length=255, blank=True, null=True)
     telefono = models.CharField(max_length=20, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
-    # Otros campos relevantes
+
+    # Campos para sistema de pagos a masajistas
+    porcentaje_comision = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=40.00,
+        help_text='Porcentaje de comisión del proveedor (ej: 40.00 para 40%)',
+        verbose_name='Porcentaje Comisión'
+    )
+    es_masajista = models.BooleanField(
+        default=False,
+        help_text='Indica si este proveedor es un masajista',
+        verbose_name='Es Masajista'
+    )
+    rut = models.CharField(
+        max_length=12,
+        blank=True,
+        null=True,
+        help_text='RUT del proveedor para efectos tributarios',
+        verbose_name='RUT'
+    )
+    banco = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text='Banco para transferencias',
+        verbose_name='Banco'
+    )
+    tipo_cuenta = models.CharField(
+        max_length=20,
+        choices=[
+            ('corriente', 'Cuenta Corriente'),
+            ('vista', 'Cuenta Vista'),
+            ('ahorro', 'Cuenta de Ahorro'),
+            ('rut', 'Cuenta RUT'),
+        ],
+        blank=True,
+        null=True,
+        verbose_name='Tipo de Cuenta'
+    )
+    numero_cuenta = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text='Número de cuenta bancaria',
+        verbose_name='Número de Cuenta'
+    )
 
     def __str__(self):
         return self.nombre
+
+    def get_servicios_pendientes_pago(self):
+        """Obtiene los servicios pendientes de pago para este masajista"""
+        from .models import ReservaServicio
+        return ReservaServicio.objects.filter(
+            proveedor_asignado=self,
+            venta_reserva__estado='pagado',
+            pagado_a_proveedor=False
+        ).order_by('fecha_agendamiento')
+
+    def calcular_monto_pendiente(self):
+        """Calcula el monto total pendiente de pago"""
+        servicios = self.get_servicios_pendientes_pago()
+        total = 0
+        for servicio in servicios:
+            precio_servicio = servicio.calcular_precio()
+            monto_masajista = precio_servicio * (self.porcentaje_comision / 100)
+            total += monto_masajista
+        return total
 
 
 class CategoriaProducto(models.Model):
@@ -843,7 +908,156 @@ class ReservaServicio(models.Model):
             # elif self.servicio.tipo_servicio != 'masaje':
             #     self.proveedor_asignado = None # Or raise validation error
 
+    # Campos para sistema de pagos a masajistas
+    pagado_a_proveedor = models.BooleanField(
+        default=False,
+        verbose_name='Pagado al Proveedor',
+        help_text='Indica si el servicio ya fue pagado al proveedor/masajista'
+    )
+    pago_proveedor = models.ForeignKey(
+        'PagoMasajista',
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='servicios_incluidos',
+        verbose_name='Pago Asociado',
+        help_text='Pago en el que se incluyó este servicio'
+    )
+
     # Consider adding validation in save() as well if needed, clean() isn't called automatically everywhere.
+
+
+# --- Modelos para Sistema de Pagos a Masajistas ---
+
+class PagoMasajista(models.Model):
+    """Registro de pagos realizados a masajistas"""
+    proveedor = models.ForeignKey(
+        Proveedor,
+        on_delete=models.CASCADE,
+        related_name='pagos',
+        verbose_name='Masajista'
+    )
+    fecha_pago = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de Pago'
+    )
+    periodo_inicio = models.DateField(
+        verbose_name='Periodo Inicio',
+        help_text='Fecha inicio del periodo a pagar'
+    )
+    periodo_fin = models.DateField(
+        verbose_name='Periodo Fin',
+        help_text='Fecha fin del periodo a pagar'
+    )
+    monto_bruto = models.DecimalField(
+        max_digits=10,
+        decimal_places=0,
+        verbose_name='Monto Bruto',
+        help_text='Total antes de descuentos'
+    )
+    porcentaje_retencion = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=14.5,
+        verbose_name='% Retención',
+        help_text='Porcentaje de retención de impuestos'
+    )
+    monto_retencion = models.DecimalField(
+        max_digits=10,
+        decimal_places=0,
+        verbose_name='Monto Retención',
+        help_text='Monto retenido por impuestos'
+    )
+    monto_neto = models.DecimalField(
+        max_digits=10,
+        decimal_places=0,
+        verbose_name='Monto Neto',
+        help_text='Monto pagado al masajista'
+    )
+    comprobante = models.ImageField(
+        upload_to='pagos_masajistas/',
+        verbose_name='Comprobante de Transferencia',
+        help_text='Imagen del comprobante bancario'
+    )
+    numero_transferencia = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name='Número de Transferencia'
+    )
+    observaciones = models.TextField(
+        blank=True,
+        verbose_name='Observaciones'
+    )
+    creado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name='Creado por'
+    )
+
+    class Meta:
+        verbose_name = 'Pago a Masajista'
+        verbose_name_plural = 'Pagos a Masajistas'
+        ordering = ['-fecha_pago']
+
+    def __str__(self):
+        return f"Pago a {self.proveedor.nombre} - {self.fecha_pago.strftime('%d/%m/%Y')}"
+
+    def calcular_montos(self):
+        """Calcula los montos de retención y neto basados en el monto bruto"""
+        self.monto_retencion = self.monto_bruto * (self.porcentaje_retencion / 100)
+        self.monto_neto = self.monto_bruto - self.monto_retencion
+        return self.monto_neto
+
+    def save(self, *args, **kwargs):
+        """Sobrescribe save para calcular montos automáticamente"""
+        if not self.monto_retencion or not self.monto_neto:
+            self.calcular_montos()
+        super().save(*args, **kwargs)
+
+
+class DetalleServicioPago(models.Model):
+    """Detalle de cada servicio incluido en un pago a masajista"""
+    pago = models.ForeignKey(
+        PagoMasajista,
+        on_delete=models.CASCADE,
+        related_name='detalles'
+    )
+    reserva_servicio = models.ForeignKey(
+        ReservaServicio,
+        on_delete=models.CASCADE
+    )
+    monto_servicio = models.DecimalField(
+        max_digits=10,
+        decimal_places=0,
+        verbose_name='Monto del Servicio'
+    )
+    porcentaje_masajista = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        verbose_name='% Comisión',
+        help_text='Porcentaje que se le pagó al masajista'
+    )
+    monto_masajista = models.DecimalField(
+        max_digits=10,
+        decimal_places=0,
+        verbose_name='Monto para Masajista',
+        help_text='Monto correspondiente al masajista'
+    )
+
+    class Meta:
+        verbose_name = 'Detalle de Servicio en Pago'
+        verbose_name_plural = 'Detalles de Servicios en Pagos'
+
+    def __str__(self):
+        return f"{self.reserva_servicio.servicio.nombre} - ${self.monto_masajista}"
+
+    def save(self, *args, **kwargs):
+        """Calcula el monto del masajista basado en el porcentaje"""
+        if self.monto_servicio and self.porcentaje_masajista:
+            self.monto_masajista = self.monto_servicio * (self.porcentaje_masajista / 100)
+        super().save(*args, **kwargs)
 
 
 # --- Modelos CRM & Marketing ---

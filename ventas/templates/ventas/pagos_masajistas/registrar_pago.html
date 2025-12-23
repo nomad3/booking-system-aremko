@@ -1,0 +1,415 @@
+{% extends 'admin/base_site.html' %}
+{% load humanize %}
+
+{% block title %}Registrar Pago - {{ masajista.nombre }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Inicio</a>
+    › <a href="{% url 'ventas:dashboard_pagos_masajistas' %}">Dashboard Pagos</a>
+    › <a href="{% url 'ventas:servicios_pendientes_masajista' masajista.id %}">Servicios {{ masajista.nombre }}</a>
+    › Registrar Pago
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    .masajista-info {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .masajista-info h2 {
+        margin-top: 0;
+        color: #333;
+    }
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+    .info-item {
+        display: flex;
+        flex-direction: column;
+    }
+    .info-label {
+        color: #666;
+        font-size: 0.9em;
+        margin-bottom: 3px;
+    }
+    .info-value {
+        font-weight: 600;
+        color: #333;
+    }
+    .payment-form {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+    }
+    .services-section {
+        margin: 20px 0;
+    }
+    .service-item {
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 15px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        transition: background 0.3s;
+    }
+    .service-item:hover {
+        background: #f8f9fa;
+    }
+    .service-checkbox {
+        margin-right: 15px;
+    }
+    .service-checkbox input {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+    .service-details {
+        flex: 1;
+    }
+    .service-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+    }
+    .service-date {
+        font-weight: 600;
+        color: #333;
+    }
+    .service-amount {
+        font-weight: bold;
+        color: #28a745;
+    }
+    .service-info {
+        color: #666;
+        font-size: 0.9em;
+    }
+    .totals-section {
+        background: #f8f9fa;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+    }
+    .total-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        padding: 5px 0;
+    }
+    .total-row.final {
+        border-top: 2px solid #333;
+        padding-top: 10px;
+        font-size: 1.2em;
+        font-weight: bold;
+    }
+    .payment-details {
+        margin: 20px 0;
+    }
+    .form-group {
+        margin-bottom: 15px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        color: #333;
+    }
+    .form-group input,
+    .form-group textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    .form-group textarea {
+        min-height: 80px;
+        resize: vertical;
+    }
+    .help-text {
+        font-size: 0.9em;
+        color: #666;
+        margin-top: 3px;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 1em;
+    }
+    .btn-primary {
+        background: #28a745;
+        color: white;
+    }
+    .btn-primary:hover {
+        background: #218838;
+    }
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    .btn-secondary:hover {
+        background: #545b62;
+    }
+    .alert {
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    .alert-warning {
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        color: #856404;
+    }
+    .checkbox-all {
+        margin-bottom: 15px;
+        padding: 10px;
+        background: #e9ecef;
+        border-radius: 4px;
+    }
+    .checkbox-all label {
+        display: flex;
+        align-items: center;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .checkbox-all input {
+        margin-right: 10px;
+        width: 18px;
+        height: 18px;
+    }
+</style>
+
+<div class="container">
+    <h1>Registrar Pago para {{ masajista.nombre }}</h1>
+
+    <!-- Información del Masajista -->
+    <div class="masajista-info">
+        <h2>Información del Masajista</h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Nombre</span>
+                <span class="info-value">{{ masajista.nombre }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">RUT</span>
+                <span class="info-value">{{ masajista.rut|default:"No registrado" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Banco</span>
+                <span class="info-value">{{ masajista.banco|default:"No registrado" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Tipo Cuenta</span>
+                <span class="info-value">{{ masajista.get_tipo_cuenta_display|default:"No registrado" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Número Cuenta</span>
+                <span class="info-value">{{ masajista.numero_cuenta|default:"No registrado" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">% Comisión</span>
+                <span class="info-value">{{ masajista.porcentaje_comision }}%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulario de Pago -->
+    <form method="post" enctype="multipart/form-data" class="payment-form">
+        {% csrf_token %}
+
+        <h2>Seleccionar Servicios a Pagar</h2>
+
+        {% if servicios %}
+        <!-- Checkbox para seleccionar todos -->
+        <div class="checkbox-all">
+            <label>
+                <input type="checkbox" id="select-all">
+                Seleccionar todos los servicios
+            </label>
+        </div>
+
+        <div class="services-section">
+            {% for item in servicios %}
+            <div class="service-item">
+                <div class="service-checkbox">
+                    <input type="checkbox" name="servicios" value="{{ item.servicio.id }}" class="service-check">
+                </div>
+                <div class="service-details">
+                    <div class="service-header">
+                        <span class="service-date">
+                            {{ item.servicio.fecha_agendamiento|date:"d/m/Y" }} - {{ item.servicio.hora_inicio|time:"H:i" }}
+                        </span>
+                        <span class="service-amount">
+                            Neto: ${{ item.monto_neto|floatformat:0|intcomma }}
+                        </span>
+                    </div>
+                    <div class="service-info">
+                        <strong>{{ item.servicio.servicio.nombre }}</strong> -
+                        Cliente: {{ item.servicio.venta_reserva.cliente.nombre }}
+                    </div>
+                    <div class="service-info">
+                        Precio: ${{ item.precio_servicio|floatformat:0|intcomma }} →
+                        Masajista ({{ masajista.porcentaje_comision }}%): ${{ item.monto_masajista|floatformat:0|intcomma }} →
+                        Retención: -${{ item.monto_masajista|mul:0.145|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Resumen de Totales -->
+        <div class="totals-section">
+            <h3>Resumen del Pago</h3>
+            <div class="total-row">
+                <span>Servicios seleccionados:</span>
+                <span id="servicios-count">0</span>
+            </div>
+            <div class="total-row">
+                <span>Monto Bruto:</span>
+                <span id="monto-bruto">$0</span>
+            </div>
+            <div class="total-row">
+                <span>Retención (14.5%):</span>
+                <span id="monto-retencion">$0</span>
+            </div>
+            <div class="total-row final">
+                <span>MONTO NETO A PAGAR:</span>
+                <span id="monto-neto">$0</span>
+            </div>
+        </div>
+
+        <!-- Detalles del Pago -->
+        <div class="payment-details">
+            <h3>Detalles del Pago</h3>
+
+            <div class="form-group">
+                <label for="numero_transferencia">Número de Transferencia</label>
+                <input type="text" name="numero_transferencia" id="numero_transferencia"
+                       placeholder="Ej: TEF-123456789">
+                <div class="help-text">Ingrese el número de transferencia bancaria</div>
+            </div>
+
+            <div class="form-group">
+                <label for="comprobante">Comprobante de Pago (opcional)</label>
+                <input type="file" name="comprobante" id="comprobante"
+                       accept="image/*,application/pdf">
+                <div class="help-text">Suba el comprobante de transferencia (imagen o PDF)</div>
+            </div>
+
+            <div class="form-group">
+                <label for="observaciones">Observaciones (opcional)</label>
+                <textarea name="observaciones" id="observaciones"
+                          placeholder="Alguna observación sobre este pago..."></textarea>
+            </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="action-buttons">
+            <button type="submit" class="btn btn-primary" id="submit-button" disabled>
+                Registrar Pago
+            </button>
+            <a href="{% url 'ventas:servicios_pendientes_masajista' masajista.id %}" class="btn btn-secondary">
+                Cancelar
+            </a>
+        </div>
+
+        {% else %}
+        <div class="alert alert-warning">
+            No hay servicios pendientes de pago para este masajista.
+        </div>
+        <div class="action-buttons">
+            <a href="{% url 'ventas:dashboard_pagos_masajistas' %}" class="btn btn-secondary">
+                Volver al Dashboard
+            </a>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+<script>
+// Datos de servicios para cálculos
+const serviciosData = {
+    {% for item in servicios %}
+    '{{ item.servicio.id }}': {
+        monto_bruto: {{ item.monto_masajista|stringformat:"f" }},
+        monto_retencion: {{ item.monto_masajista|mul:0.145|stringformat:"f" }},
+        monto_neto: {{ item.monto_neto|stringformat:"f" }}
+    },
+    {% endfor %}
+};
+
+// Función para actualizar totales
+function updateTotals() {
+    let total_bruto = 0;
+    let total_retencion = 0;
+    let total_neto = 0;
+    let count = 0;
+
+    document.querySelectorAll('.service-check:checked').forEach(function(checkbox) {
+        const serviceId = checkbox.value;
+        const data = serviciosData[serviceId];
+        if (data) {
+            total_bruto += parseFloat(data.monto_bruto);
+            total_retencion += parseFloat(data.monto_retencion);
+            total_neto += parseFloat(data.monto_neto);
+            count++;
+        }
+    });
+
+    // Actualizar display
+    document.getElementById('servicios-count').textContent = count;
+    document.getElementById('monto-bruto').textContent = '$' + Math.round(total_bruto).toLocaleString('es-CL');
+    document.getElementById('monto-retencion').textContent = '-$' + Math.round(total_retencion).toLocaleString('es-CL');
+    document.getElementById('monto-neto').textContent = '$' + Math.round(total_neto).toLocaleString('es-CL');
+
+    // Habilitar/deshabilitar botón de envío
+    document.getElementById('submit-button').disabled = count === 0;
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Checkbox individual
+    document.querySelectorAll('.service-check').forEach(function(checkbox) {
+        checkbox.addEventListener('change', updateTotals);
+    });
+
+    // Seleccionar todos
+    const selectAll = document.getElementById('select-all');
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            document.querySelectorAll('.service-check').forEach(function(checkbox) {
+                checkbox.checked = selectAll.checked;
+            });
+            updateTotals();
+        });
+    }
+
+    // Actualizar totales inicial
+    updateTotals();
+});
+</script>
+
+{% endblock %}

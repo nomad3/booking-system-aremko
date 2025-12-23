@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, resumen_reserva_view, tips_reserva_view
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, resumen_reserva_view, tips_reserva_view, pagos_masajistas_views
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -219,6 +219,16 @@ urlpatterns = [
     path('packs/<int:pk>/editar/', pack_descuento_views.pack_edit_view, name='pack_edit'),
     path('packs/<int:pk>/toggle-active/', pack_descuento_views.pack_toggle_active_view, name='pack_toggle_active'),
     path('packs/<int:pk>/eliminar/', pack_descuento_views.pack_delete_view, name='pack_delete'),
+
+    # === SISTEMA DE PAGOS A MASAJISTAS ===
+    path('pagos-masajistas/', pagos_masajistas_views.dashboard_pagos_masajistas, name='dashboard_pagos_masajistas'),
+    path('pagos-masajistas/servicios-pendientes/', pagos_masajistas_views.listar_servicios_pendientes, name='listar_servicios_pendientes'),
+    path('pagos-masajistas/servicios-pendientes/<int:masajista_id>/', pagos_masajistas_views.listar_servicios_pendientes, name='servicios_pendientes_masajista'),
+    path('pagos-masajistas/registrar-pago/<int:masajista_id>/', pagos_masajistas_views.registrar_pago, name='registrar_pago'),
+    path('pagos-masajistas/historial/', pagos_masajistas_views.historial_pagos, name='historial_pagos'),
+    path('pagos-masajistas/detalle/<int:pago_id>/', pagos_masajistas_views.detalle_pago, name='detalle_pago'),
+    path('pagos-masajistas/exportar/<int:pago_id>/', pagos_masajistas_views.exportar_liquidacion, name='exportar_liquidacion'),
+    # === END SISTEMA DE PAGOS A MASAJISTAS ===
 
     # API Router (Keep this last if possible, or ensure specific paths come first)
     path('', include(router.urls)),

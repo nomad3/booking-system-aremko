@@ -1,0 +1,324 @@
+{% extends 'admin/base_site.html' %}
+{% load humanize %}
+
+{% block title %}Historial de Pagos{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Inicio</a>
+    › <a href="{% url 'ventas:dashboard_pagos_masajistas' %}">Dashboard Pagos</a>
+    › Historial de Pagos
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+    .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    .filters-section {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .filter-form {
+        display: flex;
+        gap: 15px;
+        align-items: end;
+        flex-wrap: wrap;
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+    .form-group label {
+        margin-bottom: 5px;
+        color: #666;
+        font-size: 0.9em;
+    }
+    .form-group input,
+    .form-group select {
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        min-width: 150px;
+    }
+    .btn {
+        padding: 8px 20px;
+        background: #417690;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+    }
+    .btn:hover {
+        background: #205067;
+    }
+    .btn-secondary {
+        background: #6c757d;
+    }
+    .summary-section {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    .summary-card {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+    }
+    .summary-value {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #333;
+    }
+    .summary-label {
+        color: #666;
+        font-size: 0.9em;
+        margin-top: 5px;
+    }
+    .payments-table {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    th {
+        background: #f8f9fa;
+        padding: 10px;
+        text-align: left;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+    }
+    td {
+        padding: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    tr:hover {
+        background: #f8f9fa;
+    }
+    .text-right {
+        text-align: right;
+    }
+    .text-center {
+        text-align: center;
+    }
+    .payment-status {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 3px;
+        font-size: 0.85em;
+    }
+    .status-completed {
+        background: #d4edda;
+        color: #155724;
+    }
+    .status-pending {
+        background: #fff3cd;
+        color: #856404;
+    }
+    .actions-cell {
+        white-space: nowrap;
+    }
+    .action-link {
+        color: #417690;
+        text-decoration: none;
+        margin-right: 10px;
+    }
+    .action-link:hover {
+        text-decoration: underline;
+    }
+    .no-results {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+    }
+    .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    .page-link {
+        padding: 5px 10px;
+        background: white;
+        border: 1px solid #ddd;
+        color: #417690;
+        text-decoration: none;
+        border-radius: 3px;
+    }
+    .page-link:hover {
+        background: #f8f9fa;
+    }
+    .page-link.active {
+        background: #417690;
+        color: white;
+    }
+    .file-attached {
+        color: #28a745;
+        font-size: 0.9em;
+    }
+    .totals-row {
+        font-weight: bold;
+        background: #f0f0f0;
+    }
+    .totals-row td {
+        border-top: 2px solid #333;
+        padding-top: 15px;
+    }
+</style>
+
+<div class="container">
+    <h1>Historial de Pagos</h1>
+
+    <!-- Filtros -->
+    <div class="filters-section">
+        <form method="get" class="filter-form">
+            <div class="form-group">
+                <label>Masajista</label>
+                <select name="masajista">
+                    <option value="">Todos</option>
+                    {% for m in masajistas %}
+                    <option value="{{ m.id }}" {% if m.id|stringformat:"i" == masajista_id %}selected{% endif %}>
+                        {{ m.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Fecha Desde</label>
+                <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}">
+            </div>
+            <div class="form-group">
+                <label>Fecha Hasta</label>
+                <input type="date" name="fecha_fin" value="{{ fecha_fin }}">
+            </div>
+            <button type="submit" class="btn">Filtrar</button>
+            <a href="{% url 'ventas:historial_pagos' %}" class="btn btn-secondary">Limpiar</a>
+        </form>
+    </div>
+
+    <!-- Resumen de Totales -->
+    {% if totales.total_bruto %}
+    <div class="summary-section">
+        <div class="summary-card">
+            <div class="summary-value">{{ pagos.count }}</div>
+            <div class="summary-label">Pagos</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value">${{ totales.total_bruto|floatformat:0|intcomma }}</div>
+            <div class="summary-label">Total Bruto</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value">${{ totales.total_retencion|floatformat:0|intcomma }}</div>
+            <div class="summary-label">Total Retenciones</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value">${{ totales.total_neto|floatformat:0|intcomma }}</div>
+            <div class="summary-label">Total Neto Pagado</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tabla de Pagos -->
+    <div class="payments-table">
+        <h2>Listado de Pagos</h2>
+
+        {% if pagos %}
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Fecha Pago</th>
+                    <th>Masajista</th>
+                    <th>Periodo</th>
+                    <th class="text-center">Servicios</th>
+                    <th class="text-right">Monto Bruto</th>
+                    <th class="text-right">Retención</th>
+                    <th class="text-right">Monto Neto</th>
+                    <th>Transferencia</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pago in pagos %}
+                <tr>
+                    <td>#{{ pago.id }}</td>
+                    <td>{{ pago.fecha_pago|date:"d/m/Y H:i" }}</td>
+                    <td>{{ pago.proveedor.nombre }}</td>
+                    <td>
+                        {{ pago.periodo_inicio|date:"d/m" }} - {{ pago.periodo_fin|date:"d/m/Y" }}
+                    </td>
+                    <td class="text-center">{{ pago.cantidad_servicios }}</td>
+                    <td class="text-right">${{ pago.monto_bruto|floatformat:0|intcomma }}</td>
+                    <td class="text-right">${{ pago.monto_retencion|floatformat:0|intcomma }}</td>
+                    <td class="text-right">
+                        <strong>${{ pago.monto_neto|floatformat:0|intcomma }}</strong>
+                    </td>
+                    <td>
+                        {{ pago.numero_transferencia|default:"-" }}
+                        {% if pago.comprobante %}
+                        <br><span class="file-attached">📎 Comprobante</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions-cell">
+                        <a href="{% url 'ventas:detalle_pago' pago.id %}" class="action-link">Ver detalle</a>
+                        <a href="{% url 'ventas:exportar_liquidacion' pago.id %}" class="action-link">📥 Excel</a>
+                    </td>
+                </tr>
+                {% endfor %}
+
+                {% if totales.total_bruto %}
+                <tr class="totals-row">
+                    <td colspan="5">TOTALES DEL PERIODO</td>
+                    <td class="text-right">${{ totales.total_bruto|floatformat:0|intcomma }}</td>
+                    <td class="text-right">${{ totales.total_retencion|floatformat:0|intcomma }}</td>
+                    <td class="text-right">${{ totales.total_neto|floatformat:0|intcomma }}</td>
+                    <td colspan="2"></td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        {% else %}
+        <div class="no-results">
+            <p>No se encontraron pagos con los filtros seleccionados.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Paginación si hay muchos resultados -->
+    {% if pagos.has_other_pages %}
+    <div class="pagination">
+        {% if pagos.has_previous %}
+        <a href="?page={{ pagos.previous_page_number }}{% if masajista_id %}&masajista={{ masajista_id }}{% endif %}{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}" class="page-link">Anterior</a>
+        {% endif %}
+
+        {% for num in pagos.paginator.page_range %}
+        {% if pagos.number == num %}
+        <span class="page-link active">{{ num }}</span>
+        {% elif num > pagos.number|add:'-3' and num < pagos.number|add:'3' %}
+        <a href="?page={{ num }}{% if masajista_id %}&masajista={{ masajista_id }}{% endif %}{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}" class="page-link">{{ num }}</a>
+        {% endif %}
+        {% endfor %}
+
+        {% if pagos.has_next %}
+        <a href="?page={{ pagos.next_page_number }}{% if masajista_id %}&masajista={{ masajista_id }}{% endif %}{% if fecha_inicio %}&fecha_inicio={{ fecha_inicio }}{% endif %}{% if fecha_fin %}&fecha_fin={{ fecha_fin }}{% endif %}" class="page-link">Siguiente</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

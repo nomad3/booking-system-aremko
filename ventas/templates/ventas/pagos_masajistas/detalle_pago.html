@@ -1,0 +1,389 @@
+{% extends 'admin/base_site.html' %}
+{% load humanize %}
+
+{% block title %}Detalle de Pago #{{ pago.id }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Inicio</a>
+    › <a href="{% url 'ventas:dashboard_pagos_masajistas' %}">Dashboard Pagos</a>
+    › <a href="{% url 'ventas:historial_pagos' %}">Historial de Pagos</a>
+    › Pago #{{ pago.id }}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    .payment-header {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 20px;
+    }
+    .payment-title {
+        flex: 1;
+    }
+    .payment-title h1 {
+        margin: 0 0 10px 0;
+        color: #333;
+    }
+    .payment-badge {
+        padding: 5px 15px;
+        background: #d4edda;
+        color: #155724;
+        border-radius: 20px;
+        font-weight: bold;
+    }
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+    }
+    .info-item {
+        display: flex;
+        flex-direction: column;
+    }
+    .info-label {
+        color: #666;
+        font-size: 0.9em;
+        margin-bottom: 3px;
+    }
+    .info-value {
+        font-weight: 600;
+        color: #333;
+        font-size: 1.1em;
+    }
+    .payment-amounts {
+        background: #f8f9fa;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .amount-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        font-size: 1.1em;
+    }
+    .amount-row.total {
+        border-top: 2px solid #333;
+        padding-top: 15px;
+        font-weight: bold;
+        font-size: 1.3em;
+    }
+    .services-section {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .services-section h2 {
+        margin-top: 0;
+        color: #333;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+    th {
+        background: #f8f9fa;
+        padding: 10px;
+        text-align: left;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+    }
+    td {
+        padding: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    tr:hover {
+        background: #f8f9fa;
+    }
+    .text-right {
+        text-align: right;
+    }
+    .text-center {
+        text-align: center;
+    }
+    .additional-info {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .additional-info h3 {
+        margin-top: 0;
+        color: #333;
+    }
+    .observaciones-text {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        color: #333;
+        margin-top: 10px;
+    }
+    .comprobante-section {
+        margin-top: 15px;
+    }
+    .comprobante-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 15px;
+        background: #417690;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+    .comprobante-link:hover {
+        background: #205067;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    .btn {
+        padding: 10px 20px;
+        text-decoration: none;
+        border-radius: 4px;
+        display: inline-block;
+    }
+    .btn-primary {
+        background: #28a745;
+        color: white;
+    }
+    .btn-primary:hover {
+        background: #218838;
+    }
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    .btn-secondary:hover {
+        background: #545b62;
+    }
+    .btn-info {
+        background: #17a2b8;
+        color: white;
+    }
+    .btn-info:hover {
+        background: #138496;
+    }
+    .metadata {
+        color: #666;
+        font-size: 0.9em;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #ddd;
+    }
+    .print-button {
+        background: #007bff;
+        color: white;
+    }
+    .print-button:hover {
+        background: #0056b3;
+    }
+</style>
+
+<div class="container">
+    <!-- Encabezado del Pago -->
+    <div class="payment-header">
+        <div class="header-top">
+            <div class="payment-title">
+                <h1>Pago #{{ pago.id }}</h1>
+                <h2>{{ pago.proveedor.nombre }}</h2>
+            </div>
+            <div>
+                <span class="payment-badge">PAGADO</span>
+            </div>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Fecha de Pago</span>
+                <span class="info-value">{{ pago.fecha_pago|date:"d/m/Y H:i" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Periodo</span>
+                <span class="info-value">
+                    {{ pago.periodo_inicio|date:"d/m/Y" }} - {{ pago.periodo_fin|date:"d/m/Y" }}
+                </span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Cantidad de Servicios</span>
+                <span class="info-value">{{ pago.cantidad_servicios }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">N° Transferencia</span>
+                <span class="info-value">{{ pago.numero_transferencia|default:"No registrado" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumen de Montos -->
+    <div class="payment-amounts">
+        <h3>Resumen de Montos</h3>
+        <div class="amount-row">
+            <span>Monto Bruto:</span>
+            <span>${{ pago.monto_bruto|floatformat:0|intcomma }}</span>
+        </div>
+        <div class="amount-row">
+            <span>Retención ({{ pago.porcentaje_retencion }}%):</span>
+            <span>-${{ pago.monto_retencion|floatformat:0|intcomma }}</span>
+        </div>
+        <div class="amount-row total">
+            <span>MONTO NETO PAGADO:</span>
+            <span>${{ pago.monto_neto|floatformat:0|intcomma }}</span>
+        </div>
+    </div>
+
+    <!-- Detalle de Servicios -->
+    <div class="services-section">
+        <h2>Detalle de Servicios Pagados</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Hora</th>
+                    <th>Cliente</th>
+                    <th>Servicio</th>
+                    <th class="text-right">Precio</th>
+                    <th class="text-center">% Comisión</th>
+                    <th class="text-right">Monto Masajista</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for detalle in detalles %}
+                <tr>
+                    <td>{{ detalle.reserva_servicio.fecha_agendamiento|date:"d/m/Y" }}</td>
+                    <td>{{ detalle.reserva_servicio.hora_inicio|time:"H:i" }}</td>
+                    <td>{{ detalle.reserva_servicio.venta_reserva.cliente.nombre }}</td>
+                    <td>{{ detalle.reserva_servicio.servicio.nombre }}</td>
+                    <td class="text-right">${{ detalle.monto_servicio|floatformat:0|intcomma }}</td>
+                    <td class="text-center">{{ detalle.porcentaje_masajista }}%</td>
+                    <td class="text-right">${{ detalle.monto_masajista|floatformat:0|intcomma }}</td>
+                </tr>
+                {% endfor %}
+                <tr style="font-weight: bold; border-top: 2px solid #333;">
+                    <td colspan="6">TOTAL</td>
+                    <td class="text-right">${{ pago.monto_bruto|floatformat:0|intcomma }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Información Adicional -->
+    {% if pago.observaciones or pago.comprobante %}
+    <div class="additional-info">
+        <h3>Información Adicional</h3>
+
+        {% if pago.observaciones %}
+        <div>
+            <strong>Observaciones:</strong>
+            <div class="observaciones-text">
+                {{ pago.observaciones|linebreaks }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if pago.comprobante %}
+        <div class="comprobante-section">
+            <strong>Comprobante de Pago:</strong><br>
+            <a href="{{ pago.comprobante.url }}" target="_blank" class="comprobante-link">
+                📎 Ver Comprobante
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Información del Masajista -->
+    <div class="additional-info">
+        <h3>Información del Masajista</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Nombre</span>
+                <span class="info-value">{{ pago.proveedor.nombre }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">RUT</span>
+                <span class="info-value">{{ pago.proveedor.rut|default:"No registrado" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Banco</span>
+                <span class="info-value">{{ pago.proveedor.banco|default:"No registrado" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Tipo de Cuenta</span>
+                <span class="info-value">{{ pago.proveedor.get_tipo_cuenta_display|default:"No registrado" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Número de Cuenta</span>
+                <span class="info-value">{{ pago.proveedor.numero_cuenta|default:"No registrado" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">% Comisión Actual</span>
+                <span class="info-value">{{ pago.proveedor.porcentaje_comision }}%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metadata -->
+    <div class="metadata">
+        <p>
+            <strong>Registrado por:</strong> {{ pago.creado_por.get_full_name|default:pago.creado_por.username }}<br>
+            <strong>Fecha de registro:</strong> {{ pago.fecha_pago|date:"d/m/Y H:i:s" }}
+        </p>
+    </div>
+
+    <!-- Botones de Acción -->
+    <div class="action-buttons">
+        <a href="{% url 'ventas:exportar_liquidacion' pago.id %}" class="btn btn-primary">
+            📥 Descargar Liquidación Excel
+        </a>
+        <a href="javascript:window.print();" class="btn print-button">
+            🖨️ Imprimir
+        </a>
+        <a href="{% url 'ventas:historial_pagos' %}" class="btn btn-secondary">
+            Volver al Historial
+        </a>
+    </div>
+</div>
+
+<!-- Estilos para impresión -->
+<style media="print">
+    .breadcrumbs,
+    .action-buttons,
+    .btn {
+        display: none !important;
+    }
+    .container {
+        max-width: 100%;
+    }
+    .payment-header,
+    .payment-amounts,
+    .services-section,
+    .additional-info {
+        page-break-inside: avoid;
+    }
+</style>
+
+{% endblock %}

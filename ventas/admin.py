@@ -35,7 +35,9 @@ from .models import (
     # Resumen de Reserva
     ConfiguracionResumen,
     # Tips Post-Pago
-    ConfiguracionTips
+    ConfiguracionTips,
+    # Sistema de Pagos a Masajistas
+    PagoMasajista, DetalleServicioPago
 )
 from django.http import HttpResponse
 import xlwt
@@ -263,8 +265,30 @@ class VentaReservaAdmin(admin.ModelAdmin):
 
 @admin.register(Proveedor)
 class ProveedorAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'direccion', 'telefono', 'email')
-    search_fields = ('nombre',)
+    list_display = ('nombre', 'es_masajista', 'porcentaje_comision', 'telefono', 'email', 'banco')
+    list_filter = ('es_masajista', 'banco')
+    search_fields = ('nombre', 'rut', 'email')
+
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('nombre', 'direccion', 'telefono', 'email')
+        }),
+        ('Configuración de Pagos', {
+            'fields': ('es_masajista', 'porcentaje_comision', 'rut'),
+            'description': 'Configuración para el sistema de pagos a masajistas'
+        }),
+        ('Datos Bancarios', {
+            'fields': ('banco', 'tipo_cuenta', 'numero_cuenta'),
+            'classes': ('collapse',),
+            'description': 'Información bancaria para transferencias'
+        }),
+    )
+
+    def get_list_display(self, request):
+        """Muestra columnas adicionales solo si hay masajistas"""
+        if Proveedor.objects.filter(es_masajista=True).exists():
+            return ('nombre', 'es_masajista', 'porcentaje_comision', 'telefono', 'email', 'banco')
+        return ('nombre', 'telefono', 'email')
 
 class DetalleCompraInline(admin.TabularInline):
     model = DetalleCompra
@@ -2013,4 +2037,156 @@ class ConfiguracionTipsAdmin(SingletonModelAdmin):
             'fields': ('despedida', 'contacto_whatsapp')
         }),
     )
+
+
+# === SISTEMA DE PAGOS A MASAJISTAS ===
+
+class DetalleServicioPagoInline(admin.TabularInline):
+    """Inline para mostrar los servicios incluidos en un pago"""
+    model = DetalleServicioPago
+    extra = 0
+    readonly_fields = ('reserva_servicio', 'monto_servicio', 'porcentaje_masajista', 'monto_masajista')
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(PagoMasajista)
+class PagoMasajistaAdmin(admin.ModelAdmin):
+    """Administración de pagos a masajistas"""
+    list_display = (
+        'id', 'proveedor', 'fecha_pago', 'periodo_display',
+        'monto_bruto_format', 'monto_retencion_format', 'monto_neto_format',
+        'estado_comprobante'
+    )
+    list_filter = ('fecha_pago', 'proveedor', 'periodo_inicio', 'periodo_fin')
+    search_fields = ('proveedor__nombre', 'numero_transferencia')
+    readonly_fields = (
+        'fecha_pago', 'monto_retencion', 'monto_neto',
+        'creado_por', 'preview_comprobante'
+    )
+    inlines = [DetalleServicioPagoInline]
+    date_hierarchy = 'fecha_pago'
+
+    fieldsets = (
+        ('Información del Pago', {
+            'fields': ('proveedor', 'fecha_pago', 'creado_por')
+        }),
+        ('Periodo', {
+            'fields': ('periodo_inicio', 'periodo_fin')
+        }),
+        ('Montos', {
+            'fields': (
+                'monto_bruto', 'porcentaje_retencion',
+                'monto_retencion', 'monto_neto'
+            ),
+            'description': 'El monto de retención y neto se calculan automáticamente'
+        }),
+        ('Comprobante', {
+            'fields': (
+                'comprobante', 'preview_comprobante',
+                'numero_transferencia', 'observaciones'
+            )
+        }),
+    )
+
+    def periodo_display(self, obj):
+        """Muestra el periodo del pago"""
+        return f"{obj.periodo_inicio.strftime('%d/%m/%Y')} - {obj.periodo_fin.strftime('%d/%m/%Y')}"
+    periodo_display.short_description = 'Periodo'
+
+    def monto_bruto_format(self, obj):
+        """Formatea el monto bruto"""
+        return f"${obj.monto_bruto:,.0f}"
+    monto_bruto_format.short_description = 'Monto Bruto'
+
+    def monto_retencion_format(self, obj):
+        """Formatea el monto de retención"""
+        return f"${obj.monto_retencion:,.0f}"
+    monto_retencion_format.short_description = 'Retención (14.5%)'
+
+    def monto_neto_format(self, obj):
+        """Formatea el monto neto"""
+        return format_html(
+            '<strong style="color: green;">${:,.0f}</strong>',
+            obj.monto_neto
+        )
+    monto_neto_format.short_description = 'Monto Neto'
+
+    def estado_comprobante(self, obj):
+        """Muestra si tiene comprobante"""
+        if obj.comprobante:
+            return format_html(
+                '<span style="color: green;">✓ Con comprobante</span>'
+            )
+        return format_html(
+            '<span style="color: red;">✗ Sin comprobante</span>'
+        )
+    estado_comprobante.short_description = 'Comprobante'
+
+    def preview_comprobante(self, obj):
+        """Muestra preview del comprobante"""
+        if obj.comprobante:
+            return format_html(
+                '<img src="{}" style="max-width: 300px; max-height: 200px;" />',
+                obj.comprobante.url
+            )
+        return "Sin comprobante"
+    preview_comprobante.short_description = 'Vista Previa del Comprobante'
+
+    def save_model(self, request, obj, form, change):
+        """Guarda el usuario que crea el pago"""
+        if not change:  # Solo al crear
+            obj.creado_por = request.user
+        super().save_model(request, obj, form, change)
+
+    def get_queryset(self, request):
+        """Optimiza las consultas"""
+        qs = super().get_queryset(request)
+        return qs.select_related('proveedor', 'creado_por')
+
+    actions = ['exportar_a_excel']
+
+    def exportar_a_excel(self, request, queryset):
+        """Exporta los pagos seleccionados a Excel"""
+        import xlwt
+        response = HttpResponse(content_type='application/ms-excel')
+        response['Content-Disposition'] = 'attachment; filename="pagos_masajistas.xls"'
+
+        wb = xlwt.Workbook(encoding='utf-8')
+        ws = wb.add_sheet('Pagos')
+
+        # Encabezados
+        row_num = 0
+        columns = [
+            'ID', 'Masajista', 'RUT', 'Fecha Pago',
+            'Periodo Inicio', 'Periodo Fin',
+            'Monto Bruto', '% Retención', 'Monto Retención',
+            'Monto Neto', 'N° Transferencia', 'Banco'
+        ]
+
+        for col_num, column_title in enumerate(columns):
+            ws.write(row_num, col_num, column_title)
+
+        # Datos
+        for pago in queryset:
+            row_num += 1
+            ws.write(row_num, 0, pago.id)
+            ws.write(row_num, 1, pago.proveedor.nombre)
+            ws.write(row_num, 2, pago.proveedor.rut or '')
+            ws.write(row_num, 3, pago.fecha_pago.strftime('%d/%m/%Y %H:%M'))
+            ws.write(row_num, 4, pago.periodo_inicio.strftime('%d/%m/%Y'))
+            ws.write(row_num, 5, pago.periodo_fin.strftime('%d/%m/%Y'))
+            ws.write(row_num, 6, float(pago.monto_bruto))
+            ws.write(row_num, 7, float(pago.porcentaje_retencion))
+            ws.write(row_num, 8, float(pago.monto_retencion))
+            ws.write(row_num, 9, float(pago.monto_neto))
+            ws.write(row_num, 10, pago.numero_transferencia or '')
+            ws.write(row_num, 11, pago.proveedor.banco or '')
+
+        wb.save(response)
+        return response
+
+    exportar_a_excel.short_description = "Exportar pagos seleccionados a Excel"
 

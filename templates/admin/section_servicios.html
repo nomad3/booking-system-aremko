@@ -94,6 +94,20 @@
             </div>
         </div>
 
+        {# Pagos a Masajistas Card #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-money-check-alt card-icon text-success"></i>
+                    <h5 class="card-title">Pagos a Masajistas</h5>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:dashboard_pagos_masajistas' %}" class="btn btn-sm btn-modern btn-secondary-modern">Dashboard</a>
+                        <a href="{% url 'ventas:listar_servicios_pendientes' %}" class="btn btn-sm btn-modern btn-primary-modern">Servicios Pendientes</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 {% endblock %}
