@@ -104,11 +104,62 @@ class PagoInline(admin.TabularInline):
 class GiftCardInline(admin.TabularInline):
     model = GiftCard
     extra = 0
-    fields = ['codigo', 'monto_inicial', 'destinatario_nombre', 'estado', 'enviado_email']
-    readonly_fields = ['codigo', 'monto_inicial', 'destinatario_nombre', 'estado', 'enviado_email']
+    fields = ['codigo', 'monto_inicial', 'destinatario_nombre', 'estado', 'enviado_email', 'ver_giftcard']
+    readonly_fields = ['codigo', 'monto_inicial', 'destinatario_nombre', 'estado', 'enviado_email', 'ver_giftcard']
     verbose_name = "GiftCard"
     verbose_name_plural = "GiftCards de esta Venta"
     can_delete = False
+
+    def ver_giftcard(self, obj):
+        """Botón para ver la GiftCard"""
+        from django.utils.html import format_html
+        from django.urls import reverse
+        from urllib.parse import quote
+        from django.conf import settings
+
+        if obj and obj.codigo:
+            # URL para ver la GiftCard
+            view_url = reverse('ventas:giftcard_mobile_view', args=[obj.codigo])
+
+            # Construir URL completa
+            # Intentar obtener el dominio de settings, si no usar el de producción
+            base_url = getattr(settings, 'SITE_URL', 'https://aremko-booking-system.onrender.com')
+            full_url = f"{base_url}{view_url}"
+
+            # Obtener información del destinatario y comprador
+            destinatario = obj.destinatario_nombre or "Cliente"
+            telefono_destinatario = getattr(obj, 'cliente_destinatario', None)
+
+            # Mensaje personalizado para WhatsApp
+            if destinatario != "Cliente":
+                mensaje_whatsapp = f"¡Hola {destinatario}! 🎁 Te han regalado una GiftCard de Aremko por ${obj.monto_inicial:,.0f}. Tu código es: {obj.codigo}. Puedes verla y descargarla aquí: {full_url}"
+            else:
+                mensaje_whatsapp = f"¡Hola! 🎁 Te comparto tu GiftCard de Aremko por ${obj.monto_inicial:,.0f}. Tu código es: {obj.codigo}. Puedes verla y descargarla aquí: {full_url}"
+
+            # Si hay teléfono del destinatario, incluirlo en el link de WhatsApp
+            if telefono_destinatario and hasattr(telefono_destinatario, 'telefono'):
+                # Limpiar el número de teléfono (quitar espacios, guiones, etc)
+                telefono = ''.join(filter(str.isdigit, str(telefono_destinatario.telefono)))
+                if telefono.startswith('56'):
+                    whatsapp_url = f"https://wa.me/{telefono}?text={quote(mensaje_whatsapp)}"
+                elif telefono:
+                    # Si no empieza con código de país, asumir Chile (56)
+                    whatsapp_url = f"https://wa.me/56{telefono}?text={quote(mensaje_whatsapp)}"
+                else:
+                    whatsapp_url = f"https://wa.me/?text={quote(mensaje_whatsapp)}"
+            else:
+                # Sin número específico
+                whatsapp_url = f"https://wa.me/?text={quote(mensaje_whatsapp)}"
+
+            return format_html(
+                '<a href="{}" target="_blank" style="background-color: #4CAF50; color: white; padding: 5px 10px; '
+                'text-decoration: none; border-radius: 3px; display: inline-block; margin-right: 10px;">📱 Ver GiftCard</a>'
+                '<a href="{}" target="_blank" style="background-color: #25D366; color: white; padding: 5px 10px; '
+                'text-decoration: none; border-radius: 3px; display: inline-block;" title="Compartir por WhatsApp">📤 WhatsApp</a>',
+                view_url, whatsapp_url
+            )
+        return '-'
+    ver_giftcard.short_description = 'Acciones'
 
     def has_add_permission(self, request, obj=None):
         return False

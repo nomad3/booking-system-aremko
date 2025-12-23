@@ -281,6 +281,9 @@ COMMUNICATION_EMAIL_ENABLED = os.getenv('COMMUNICATION_EMAIL_ENABLED', 'true').l
 SURVEY_PUBLIC_BASE_URL = os.getenv('SURVEY_PUBLIC_BASE_URL', 'https://aremko-booking-system.onrender.com/encuesta')
 TRIPADVISOR_URL = os.getenv('TRIPADVISOR_URL', 'https://www.tripadvisor.com/')
 
+# URL del sitio para generar links completos (GiftCards, etc.)
+SITE_URL = os.getenv('SITE_URL', 'https://aremko-booking-system.onrender.com')
+
 # --- Logging Configuration ---
 LOGGING = {
     'version': 1,
