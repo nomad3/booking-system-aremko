@@ -72,7 +72,7 @@ def listar_servicios_pendientes(request, masajista_id=None):
 
     # Base query
     servicios = ReservaServicio.objects.filter(
-        venta_reserva__estado='pagado',
+        venta_reserva__estado_pago='pagado',
         pagado_a_proveedor=False,
         proveedor_asignado__isnull=False,
         proveedor_asignado__es_masajista=True

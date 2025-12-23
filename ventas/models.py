@@ -70,21 +70,22 @@ class Proveedor(models.Model):
 
     def get_servicios_pendientes_pago(self):
         """Obtiene los servicios pendientes de pago para este masajista"""
-        from .models import ReservaServicio
-        return ReservaServicio.objects.filter(
-            proveedor_asignado=self,
-            venta_reserva__estado='pagado',
+        # No necesitamos importar ReservaServicio porque está en el mismo archivo
+        return self.reservas_asignadas.filter(
+            venta_reserva__estado_pago='pagado',
             pagado_a_proveedor=False
         ).order_by('fecha_agendamiento')
 
     def calcular_monto_pendiente(self):
-        """Calcula el monto total pendiente de pago"""
+        """Calcula el monto total pendiente de pago (con retención aplicada)"""
+        from decimal import Decimal
         servicios = self.get_servicios_pendientes_pago()
-        total = 0
+        total = Decimal('0')
         for servicio in servicios:
             precio_servicio = servicio.calcular_precio()
             monto_masajista = precio_servicio * (self.porcentaje_comision / 100)
-            total += monto_masajista
+            monto_con_retencion = monto_masajista * Decimal('0.855')  # Aplicar retención del 14.5%
+            total += monto_con_retencion
         return total
 
 

@@ -136,7 +136,7 @@ def main():
         # Contar servicios pendientes de pago
         from django.db.models import Count
         servicios_pendientes = ReservaServicio.objects.filter(
-            venta_reserva__estado='pagado',
+            venta_reserva__estado_pago='pagado',
             pagado_a_proveedor=False,
             proveedor_asignado__es_masajista=True
         ).count()
