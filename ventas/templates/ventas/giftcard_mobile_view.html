@@ -617,7 +617,7 @@
 
                 <!-- Action buttons -->
                 <div class="action-buttons">
-                    <a href="{% url 'giftcard_download_pdf' giftcard.codigo %}" class="btn btn-download" id="downloadBtn">
+                    <a href="{% url 'ventas:giftcard_download_pdf' giftcard.codigo %}" class="btn btn-download" id="downloadBtn">
                         <span>📥</span> Descargar PDF
                     </a>
                     <button class="btn btn-share" id="shareBtn">
