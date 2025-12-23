@@ -28,31 +28,102 @@ def staff_required(view_func):
 def dashboard_pagos_masajistas(request):
     """
     Dashboard principal del sistema de pagos a masajistas.
-    Muestra resumen general y accesos rápidos.
+    Muestra resumen general y accesos rápidos con filtros.
     """
-    # Obtener solo masajistas
+    from datetime import date
+    from django.utils import timezone
+
+    # Obtener lista de masajistas para el filtro
     masajistas = Proveedor.objects.filter(es_masajista=True).order_by('nombre')
 
-    # Estadísticas generales
-    total_pendiente = Decimal('0')
-    servicios_pendientes_total = 0
+    # Buscar si existe Diana para establecerla como predeterminada
+    diana = masajistas.filter(nombre__icontains='diana').first()
 
-    for masajista in masajistas:
-        servicios_pendientes = masajista.get_servicios_pendientes_pago()
-        servicios_pendientes_total += servicios_pendientes.count()
-        for servicio in servicios_pendientes:
-            precio_servicio = servicio.calcular_precio()
-            monto_masajista = precio_servicio * (masajista.porcentaje_comision / 100)
+    # Obtener masajista seleccionado del filtro o usar Diana por defecto
+    masajista_id = request.GET.get('masajista')
+    if not masajista_id and diana:
+        masajista_id = str(diana.id)
+
+    masajista_seleccionado = None
+    if masajista_id:
+        try:
+            masajista_seleccionado = masajistas.get(id=masajista_id)
+        except Proveedor.DoesNotExist:
+            pass
+
+    # Obtener fechas del filtro o usar el mes actual por defecto
+    hoy = date.today()
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+
+    if not fecha_inicio:
+        # Primer día del mes actual
+        fecha_inicio = hoy.replace(day=1).strftime('%Y-%m-%d')
+    if not fecha_fin:
+        # Último día del mes actual
+        import calendar
+        ultimo_dia = calendar.monthrange(hoy.year, hoy.month)[1]
+        fecha_fin = hoy.replace(day=ultimo_dia).strftime('%Y-%m-%d')
+
+    # Construir query de servicios pendientes con filtros
+    servicios_pendientes = ReservaServicio.objects.filter(
+        venta_reserva__estado_pago='pagado',
+        pagado_a_proveedor=False,
+        proveedor_asignado__es_masajista=True
+    )
+
+    # Aplicar filtro de masajista si está seleccionado
+    if masajista_seleccionado:
+        servicios_pendientes = servicios_pendientes.filter(
+            proveedor_asignado=masajista_seleccionado
+        )
+
+    # Aplicar filtro de fechas
+    if fecha_inicio:
+        servicios_pendientes = servicios_pendientes.filter(
+            fecha_agendamiento__gte=fecha_inicio
+        )
+    if fecha_fin:
+        servicios_pendientes = servicios_pendientes.filter(
+            fecha_agendamiento__lte=fecha_fin
+        )
+
+    servicios_pendientes = servicios_pendientes.select_related(
+        'servicio', 'proveedor_asignado', 'venta_reserva__cliente'
+    ).order_by('fecha_agendamiento', 'hora_inicio')
+
+    # Calcular totales solo para los servicios filtrados
+    total_pendiente = Decimal('0')
+    servicios_con_montos = []
+
+    for servicio in servicios_pendientes:
+        precio_servicio = servicio.calcular_precio()
+        if servicio.proveedor_asignado:
+            monto_masajista = precio_servicio * (servicio.proveedor_asignado.porcentaje_comision / 100)
             monto_con_retencion = monto_masajista * Decimal('0.855')  # Descuenta 14.5%
             total_pendiente += monto_con_retencion
 
-    # Últimos pagos realizados
-    ultimos_pagos = PagoMasajista.objects.all()[:5]
+            servicios_con_montos.append({
+                'servicio': servicio,
+                'precio': precio_servicio,
+                'monto_masajista': monto_masajista,
+                'monto_neto': monto_con_retencion
+            })
+
+    # Últimos pagos (filtrados por masajista si está seleccionado)
+    ultimos_pagos = PagoMasajista.objects.select_related('proveedor')
+    if masajista_seleccionado:
+        ultimos_pagos = ultimos_pagos.filter(proveedor=masajista_seleccionado)
+    ultimos_pagos = ultimos_pagos.order_by('-fecha_pago')[:5]
 
     context = {
         'masajistas': masajistas,
-        'total_masajistas': masajistas.count(),
-        'servicios_pendientes': servicios_pendientes_total,
+        'masajista_seleccionado': masajista_seleccionado,
+        'masajista_id': masajista_id,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'servicios': servicios_con_montos,
+        'servicios_pendientes_count': len(servicios_con_montos),
         'total_pendiente': total_pendiente,
         'ultimos_pagos': ultimos_pagos,
     }

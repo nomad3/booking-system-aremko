@@ -144,18 +144,60 @@
 <div class="dashboard-container">
     <h1>Dashboard de Pagos a Masajistas</h1>
 
-    <!-- Estadísticas Generales -->
+    <!-- Filtros -->
+    <div class="actions-section">
+        <h2>Filtros</h2>
+        <form method="get" style="display: flex; gap: 15px; align-items: end; flex-wrap: wrap;">
+            <div style="display: flex; flex-direction: column;">
+                <label style="margin-bottom: 5px; color: #666; font-size: 0.9em;">Masajista</label>
+                <select name="masajista" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; min-width: 200px;">
+                    <option value="">Todos los masajistas</option>
+                    {% for m in masajistas %}
+                    <option value="{{ m.id }}" {% if m.id|stringformat:"i" == masajista_id %}selected{% endif %}>
+                        {{ m.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display: flex; flex-direction: column;">
+                <label style="margin-bottom: 5px; color: #666; font-size: 0.9em;">Fecha Inicio</label>
+                <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}"
+                       style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div style="display: flex; flex-direction: column;">
+                <label style="margin-bottom: 5px; color: #666; font-size: 0.9em;">Fecha Fin</label>
+                <input type="date" name="fecha_fin" value="{{ fecha_fin }}"
+                       style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <button type="submit" class="btn">Aplicar Filtros</button>
+            <a href="{% url 'ventas:dashboard_pagos_masajistas' %}" class="btn btn-secondary">Limpiar</a>
+        </form>
+    </div>
+
+    <!-- Estadísticas del Filtro Actual -->
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-label">Total Masajistas</div>
-            <div class="stat-value">{{ total_masajistas }}</div>
+            <div class="stat-label">Masajista</div>
+            <div class="stat-value" style="font-size: 1.2em;">
+                {% if masajista_seleccionado %}
+                    {{ masajista_seleccionado.nombre }}
+                {% else %}
+                    Todos
+                {% endif %}
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Período</div>
+            <div class="stat-value" style="font-size: 1em;">
+                {{ fecha_inicio|slice:"-2:" }}/{{ fecha_inicio|slice:"5:7" }} - {{ fecha_fin|slice:"-2:" }}/{{ fecha_fin|slice:"5:7" }}
+            </div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Servicios Pendientes</div>
-            <div class="stat-value">{{ servicios_pendientes }}</div>
+            <div class="stat-value">{{ servicios_pendientes_count }}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Total por Pagar</div>
+            <div class="stat-label">Total por Pagar (Neto)</div>
             <div class="stat-value">${{ total_pendiente|floatformat:0|intcomma }}</div>
         </div>
     </div>
@@ -164,58 +206,70 @@
     <div class="actions-section">
         <h2>Acciones Rápidas</h2>
         <div class="action-buttons">
+            {% if masajista_seleccionado %}
+            <a href="{% url 'ventas:registrar_pago' masajista_seleccionado.id %}" class="btn">
+                Registrar Pago para {{ masajista_seleccionado.nombre }}
+            </a>
+            <a href="{% url 'ventas:servicios_pendientes_masajista' masajista_seleccionado.id %}" class="btn btn-secondary">
+                Ver Todos los Servicios de {{ masajista_seleccionado.nombre }}
+            </a>
+            {% else %}
             <a href="{% url 'ventas:listar_servicios_pendientes' %}" class="btn">
                 Ver Todos los Servicios Pendientes
             </a>
+            {% endif %}
             <a href="{% url 'ventas:historial_pagos' %}" class="btn btn-secondary">
                 Ver Historial de Pagos
             </a>
         </div>
     </div>
 
-    <!-- Lista de Masajistas -->
+    <!-- Servicios Pendientes del Filtro Actual -->
     <div class="masajistas-list">
-        <h2>Masajistas con Servicios Pendientes</h2>
-        {% for masajista in masajistas %}
-            {% with servicios=masajista.get_servicios_pendientes_pago %}
-            {% if servicios %}
-            <div class="masajista-card">
-                <div class="masajista-info">
-                    <h3>{{ masajista.nombre }}</h3>
-                    <div>Comisión: {{ masajista.porcentaje_comision }}%</div>
-                </div>
-                <div class="masajista-stats">
-                    <div class="masajista-stat">
-                        <div class="masajista-stat-value">{{ servicios.count }}</div>
-                        <div class="masajista-stat-label">Servicios</div>
-                    </div>
-                    <div class="masajista-stat">
-                        <div class="masajista-stat-value">
-                            ${{ masajista.calcular_monto_pendiente|floatformat:0|intcomma }}
-                        </div>
-                        <div class="masajista-stat-label">Por Pagar (neto)</div>
-                    </div>
-                </div>
-                <div>
-                    <a href="{% url 'ventas:servicios_pendientes_masajista' masajista.id %}" class="btn">
-                        Ver Servicios
-                    </a>
-                    <a href="{% url 'ventas:registrar_pago' masajista.id %}" class="btn btn-secondary">
-                        Registrar Pago
-                    </a>
-                </div>
-            </div>
-            {% endif %}
-            {% endwith %}
-        {% empty %}
-            <p>No hay masajistas con servicios pendientes de pago.</p>
-        {% endfor %}
+        <h2>Servicios Pendientes {% if masajista_seleccionado %}de {{ masajista_seleccionado.nombre }}{% endif %}</h2>
+
+        {% if servicios %}
+        <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #f8f9fa;">
+                        <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Fecha</th>
+                        <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Hora</th>
+                        <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Cliente</th>
+                        <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Servicio</th>
+                        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">Precio</th>
+                        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">Comisión</th>
+                        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">Neto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in servicios %}
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 10px;">{{ item.servicio.fecha_agendamiento|date:"d/m/Y" }}</td>
+                        <td style="padding: 10px;">{{ item.servicio.hora_inicio }}</td>
+                        <td style="padding: 10px;">{{ item.servicio.venta_reserva.cliente.nombre }}</td>
+                        <td style="padding: 10px;">{{ item.servicio.servicio.nombre }}</td>
+                        <td style="padding: 10px; text-align: right;">${{ item.precio|floatformat:0|intcomma }}</td>
+                        <td style="padding: 10px; text-align: right;">${{ item.monto_masajista|floatformat:0|intcomma }}</td>
+                        <td style="padding: 10px; text-align: right; font-weight: bold;">${{ item.monto_neto|floatformat:0|intcomma }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr style="font-weight: bold; background: #f0f0f0;">
+                        <td colspan="6" style="padding: 10px; border-top: 2px solid #333;">TOTAL</td>
+                        <td style="padding: 10px; text-align: right; border-top: 2px solid #333;">${{ total_pendiente|floatformat:0|intcomma }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No hay servicios pendientes de pago para el período y masajista seleccionados.</p>
+        {% endif %}
     </div>
 
     <!-- Últimos Pagos -->
     {% if ultimos_pagos %}
     <div class="recent-payments">
-        <h2>Últimos Pagos Realizados</h2>
+        <h2>Últimos Pagos {% if masajista_seleccionado %}de {{ masajista_seleccionado.nombre }}{% else %}Realizados{% endif %}</h2>
         {% for pago in ultimos_pagos %}
         <div class="payment-item">
             <div class="payment-header">
