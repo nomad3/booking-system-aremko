@@ -275,7 +275,7 @@
                         <label for="year">Año</label>
                         <select name="year" id="year">
                             {% for y in years_disponibles %}
-                            <option value="{{ y }}" {% if y==year %}selected{% endif %}>{{ y }}</option>
+                            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
                             {% endfor %}
                         </select>
                     </div>
