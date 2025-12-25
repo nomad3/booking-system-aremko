@@ -16,7 +16,7 @@ import json
 from ..models import VentaReserva, ReservaServicio, ReservaProducto, Pago, Servicio, Producto
 
 
-# @staff_member_required  # Temporalmente deshabilitado para debugging
+@staff_member_required
 def dashboard_estadisticas(request):
     """
     Dashboard principal de estadísticas con filtros por año/mes
@@ -38,7 +38,9 @@ def dashboard_estadisticas(request):
 
         # Obtener parámetros de filtro
         current_year = timezone.now().year
-        year = int(request.GET.get('year', current_year))
+        # Por defecto mostrar datos desde enero 2025
+        default_year = 2025 if current_year >= 2024 else current_year
+        year = int(request.GET.get('year', default_year))
         month = request.GET.get('month', None)
         start_date = request.GET.get('start_date', None)
         end_date = request.GET.get('end_date', None)
@@ -300,8 +302,7 @@ def dashboard_estadisticas(request):
             ]
         }
 
-        # return render(request, 'ventas/analytics_dashboard.html', context)
-        return render(request, 'ventas/analytics_dashboard_simple.html', context)  # DEBUG
+        return render(request, 'ventas/analytics_dashboard.html', context)
     except Exception as e:
         return HttpResponse(f"<h1>Error 500</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>", status=500)
 
