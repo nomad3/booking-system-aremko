@@ -39,8 +39,10 @@ urlpatterns = [
     path('caja-diaria/', reporting_views.caja_diaria_view, name='caja_diaria'),  # Nueva vista de caja diaria
     path('caja-diaria-recepcionistas/', reporting_views.caja_diaria_recepcionistas_view, name='caja_diaria_recepcionistas'), # Added path if needed
     path('auditoria-movimientos/', reporting_views.auditoria_movimientos_view, name='auditoria_movimientos'),  # Nueva vista de auditoría
-    # Analytics Dashboard
-    path('analytics/dashboard/', analytics_views.dashboard_estadisticas, name='analytics_dashboard'),
+    # Analytics Dashboards
+    path('analytics/dashboard/', analytics_views.dashboard_estadisticas, name='analytics_dashboard'),  # Wrapper para compatibilidad
+    path('analytics/dashboard-ventas/', analytics_views.dashboard_ventas, name='analytics_dashboard_ventas'),
+    path('analytics/dashboard-operativo/', analytics_views.dashboard_operativo, name='analytics_dashboard_operativo'),
     path('analytics/export-csv/', analytics_views.exportar_estadisticas_csv, name='analytics_export_csv'),
     # Calendario Matriz Views
     # TEMPORAL: Usando vista simplificada para debug

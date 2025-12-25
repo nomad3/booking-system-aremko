@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Ventas - Aremko</title>
+    <title>Dashboard Operativo - Aremko</title>
 
 <style>
     .stats-container {
@@ -231,32 +231,32 @@
 <div class="stats-container">
     <!-- Header -->
     <div class="stats-header">
-        <h1>💰 Dashboard de Ventas</h1>
-        <p>{{ periodo_texto }} • Análisis de ventas y servicios por fecha de venta</p>
+        <h1>⚙️ Dashboard Operativo</h1>
+        <p>{{ periodo_texto }} • Análisis de servicios por fecha de prestación</p>
     </div>
 
     <!-- Navegador de Dashboards -->
     <div class="filter-card" style="margin-bottom: 20px;">
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="{% url 'ventas:analytics_dashboard_ventas' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}"
+               class="btn-filter" style="text-decoration: none; background: #6b7280;">
+                💰 Dashboard de Ventas
+            </a>
             <a href="#"
                class="btn-filter" style="text-decoration: none; background: #667eea; cursor: default;">
-                💰 Dashboard de Ventas (Actual)
-            </a>
-            <a href="{% url 'ventas:analytics_dashboard_operativo' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}"
-               class="btn-filter" style="text-decoration: none; background: #6b7280;">
-                ⚙️ Dashboard Operativo
+                ⚙️ Dashboard Operativo (Actual)
             </a>
         </div>
         <p style="margin-top: 10px; color: #666; font-size: 0.9rem;">
-            <strong>Nota:</strong> Este dashboard muestra servicios y productos según su <strong>fecha de venta</strong> (cuando se vendieron).
-            Para ver servicios por fecha de prestación, use el Dashboard Operativo.
+            <strong>Nota:</strong> Este dashboard muestra servicios según su <strong>fecha de agendamiento</strong> (cuando se prestan), no cuando se vendieron.
+            Los productos no se incluyen porque no tienen fecha de consumo.
         </p>
     </div>
 
     <!-- Filtros -->
     <div class="filter-card">
         <h3>🔍 Filtros</h3>
-        <form method="GET" action="{% url 'ventas:analytics_dashboard_ventas' %}">
+        <form method="GET" action="{% url 'ventas:analytics_dashboard_operativo' %}">
             <div class="filter-row">
                 <div class="filter-group">
                     <label for="year">Año</label>
