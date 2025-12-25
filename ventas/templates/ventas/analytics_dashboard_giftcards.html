@@ -244,17 +244,22 @@
 
         <!-- Navegador de Dashboards -->
         <div class="filter-card" style="margin-bottom: 20px;">
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <a href="{% url 'ventas:analytics_dashboard_ventas' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}"
-                    class="btn-nav">
-                    💰 Dashboard de Ventas
-                </a>
-                <a href="{% url 'ventas:analytics_dashboard_operativo' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}"
-                    class="btn-nav">
-                    ⚙️ Dashboard Operativo
-                </a>
-                <a href="#" class="btn-nav active">
-                    🎁 Dashboard GiftCards (Actual)
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <a href="{% url 'ventas:analytics_dashboard_ventas' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}"
+                        class="btn-nav">
+                        💰 Dashboard de Ventas
+                    </a>
+                    <a href="{% url 'ventas:analytics_dashboard_operativo' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}"
+                        class="btn-nav">
+                        ⚙️ Dashboard Operativo
+                    </a>
+                    <a href="#" class="btn-nav active">
+                        🎁 Dashboard GiftCards (Actual)
+                    </a>
+                </div>
+                <a href="{% url 'ventas:inicio_sistema' %}" class="btn-nav" style="background: #059669;">
+                    ← Volver al Menú
                 </a>
             </div>
         </div>
@@ -268,7 +273,7 @@
                         <label for="year">Año</label>
                         <select name="year" id="year">
                             {% for y in years_disponibles %}
-                            <option value="{{ y }}" {% if y==year %}selected{% endif %}>{{ y }}</option>
+                            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -278,7 +283,7 @@
                         <select name="month" id="month">
                             <option value="">Todos los meses</option>
                             {% for mes in meses %}
-                            <option value="{{ mes.numero }}" {% if mes.numero==month %}selected{% endif %}>
+                            <option value="{{ mes.numero }}" {% if mes.numero == month %}selected{% endif %}>
                                 {{ mes.nombre }}
                             </option>
                             {% endfor %}
