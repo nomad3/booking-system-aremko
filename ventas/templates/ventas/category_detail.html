@@ -30,6 +30,70 @@
 {% endif %}
 
 <!-- Schema.org JSON-LD -->
+{% if categoria_actual.id == 3 %}
+<!-- Schema específico para Alojamientos/Cabañas -->
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "LodgingBusiness",
+    "name": "Cabañas Aremko - Alojamiento de Lujo en Puerto Varas",
+    "description": "{% if seo_content and seo_content.meta_description %}{{ seo_content.meta_description }}{% else %}Cabañas exclusivas con spa privado en Puerto Varas. Refugio de lujo con vista al Río Pescado, calefacción, WiFi y servicios premium de spa.{% endif %}",
+    "url": "{{ canonical_url }}",
+    {% if category_hero_image %}"image": "{{ category_hero_image }}",{% endif %}
+    "telephone": "+56957902525",
+    "email": "contacto@aremko.cl",
+    "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Río Pescado",
+        "addressLocality": "Puerto Varas",
+        "addressRegion": "Los Lagos",
+        "postalCode": "5550000",
+        "addressCountry": "CL"
+    },
+    "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": -41.3196,
+        "longitude": -72.9818
+    },
+    "amenityFeature": [
+        {"@type": "LocationFeatureSpecification", "name": "WiFi Gratis"},
+        {"@type": "LocationFeatureSpecification", "name": "Calefacción"},
+        {"@type": "LocationFeatureSpecification", "name": "Vista al Río"},
+        {"@type": "LocationFeatureSpecification", "name": "Spa Privado"},
+        {"@type": "LocationFeatureSpecification", "name": "Estacionamiento"},
+        {"@type": "LocationFeatureSpecification", "name": "Desayuno incluido"}
+    ],
+    "starRating": {
+        "@type": "Rating",
+        "ratingValue": "5",
+        "bestRating": "5"
+    },
+    "priceRange": "$150000-$200000 CLP",
+    {% if servicios %}
+    "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Cabañas Disponibles",
+        "itemListElement": [
+            {% for servicio in servicios %}
+            {
+                "@type": "Offer",
+                "itemOffered": {
+                    "@type": "LodgingReservation",
+                    "name": "{{ servicio.nombre }}",
+                    "description": "Cabaña de lujo para 2 personas con todas las comodidades premium"
+                },
+                "price": "{{ servicio.precio_base }}",
+                "priceCurrency": "CLP",
+                "availability": "https://schema.org/InStock"
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+    }
+    {% endif %}
+}
+</script>
+{% else %}
+<!-- Schema estándar para otras categorías -->
 <script type="application/ld+json">
 {
     "@context": "https://schema.org",
@@ -67,6 +131,7 @@
     {% endif %}
 }
 </script>
+{% endif %}
 
 {% if seo_content and seo_content.get_faqs %}
 <script type="application/ld+json">
@@ -255,6 +320,34 @@
     display: block;
 }
 
+/* Smooth scroll behavior */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Amenities icons for cabins */
+.amenities {
+    border-top: 1px solid #eee;
+    padding-top: 8px;
+    margin-top: 8px;
+}
+
+.amenities i {
+    color: var(--primary-color);
+}
+
+/* Lead text style */
+.lead {
+    font-weight: 300;
+    line-height: 1.6;
+}
+
+/* Botón Conoce más */
+.btn-outline-primary:hover {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
 /* CTA Section */
 .cta-section {
     background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
@@ -273,6 +366,11 @@
     padding: 12px 30px;
 }
 
+/* Anchor offset para navegación con header fijo */
+#descripcion-completa {
+    scroll-margin-top: 80px;
+}
+
 @media (max-width: 768px) {
     .category-header {
         padding: 80px 0;
@@ -284,6 +382,10 @@
 
     .content-text {
         font-size: 1rem;
+    }
+
+    .lead {
+        font-size: 1.1rem !important;
     }
 }
 </style>
@@ -303,34 +405,110 @@
     </div>
 </section>
 
-<!-- Main Content Section -->
-{% if seo_content and seo_content.contenido_principal %}
-<section class="content-section">
+<!-- Introducción Breve para Alojamientos -->
+{% if categoria_actual.id == 3 %}
+<section class="content-section py-4">
     <div class="container">
         <div class="row justify-content-center">
-            <div class="col-lg-8">
-                <div class="content-text">
-                    {{ seo_content.contenido_principal|linebreaks }}
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-{% else %}
-<!-- Default content when SEO content is not available -->
-<section class="content-section">
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-lg-8">
-                <div class="content-text">
-                    <p>Descubre nuestros servicios de {{ categoria_actual.nombre|lower }} en Aremko Spa Puerto Varas. Ofrecemos experiencias únicas diseñadas para tu bienestar y relajación total. Nuestro equipo de profesionales está comprometido con brindarte momentos inolvidables en un ambiente de tranquilidad y armonía.</p>
-                    <p>Cada servicio está cuidadosamente diseñado para proporcionarte los máximos beneficios, utilizando técnicas especializadas y productos de la más alta calidad. Ya sea que busques relajación profunda, alivio del estrés o simplemente un momento para ti, tenemos la experiencia perfecta para ti.</p>
-                </div>
+            <div class="col-lg-10 text-center">
+                <p class="lead" style="font-size: 1.2rem; color: #333;">
+                    Vive una experiencia única de alojamiento en nuestras exclusivas cabañas en Puerto Varas.
+                    Refugio de lujo con vista al Río Pescado, combinando el confort moderno con la calidez de la arquitectura patagónica.
+                </p>
+                <a href="#descripcion-completa" class="btn btn-outline-primary mt-3" style="text-decoration: none;">
+                    <i class="fas fa-chevron-down me-2"></i>Conoce más sobre nuestras cabañas
+                </a>
             </div>
         </div>
     </div>
 </section>
 {% endif %}
+
+<!-- Services Section (Movido arriba para mejor UX) -->
+<section class="container mb-5" id="servicios-categoria">
+    <h2 class="section-title mb-4">
+        {% if categoria_actual.id == 3 %}
+            Nuestras Cabañas Disponibles
+        {% else %}
+            Servicios Disponibles
+        {% endif %}
+    </h2>
+
+    <div class="row">
+        {% for servicio in servicios %}
+            <div class="col-lg-4 col-md-6 mb-4 service-card">
+                <div class="card h-100">
+                    {% if servicio.imagen %}
+                        <img src="{{ servicio.imagen.url }}" class="card-img-top"
+                             alt="{% if categoria_actual.id == 3 %}{{ servicio.nombre }} - Cabaña de lujo en Puerto Varas con spa privado{% else %}{{ servicio.nombre }} en Aremko Spa Puerto Varas{% endif %}"
+                             loading="lazy"
+                             title="{{ servicio.nombre }}">
+                    {% endif %}
+                    <div class="card-body d-flex flex-column">
+                        <h3 class="card-title h5">{{ servicio.nombre }}</h3>
+                        {% if servicio.tipo_servicio == 'cabana' %}
+                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
+                            <div class="amenities mb-2">
+                                <small class="text-muted">
+                                    <i class="fas fa-wifi me-1"></i> WiFi •
+                                    <i class="fas fa-temperature-high me-1"></i> Calefacción •
+                                    <i class="fas fa-hot-tub me-1"></i> Spa
+                                </small>
+                            </div>
+                        {% else %}
+                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
+                        {% endif %}
+                        <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p>
+                        <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
+                                data-servicio-id="{{ servicio.id }}"
+                                data-servicio-nombre="{{ servicio.nombre|escapejs }}"
+                                data-servicio-precio="{{ servicio.precio_base }}"
+                                data-servicio-tipo="{{ servicio.tipo_servicio }}">
+                            <i class="fas fa-calendar-plus me-2"></i>Reservar Ahora
+                        </button>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <p class="text-center">No hay servicios disponibles en esta categoría en este momento.</p>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Main Content Section (Movido después de los servicios) -->
+<section class="content-section" id="descripcion-completa">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <h2 class="section-title mb-4">
+                    {% if categoria_actual.id == 3 %}
+                        Sobre Nuestras Cabañas
+                    {% else %}
+                        Acerca de {{ categoria_actual.nombre }}
+                    {% endif %}
+                </h2>
+                {% if seo_content and seo_content.contenido_principal %}
+                    <div class="content-text">
+                        {{ seo_content.contenido_principal|linebreaks }}
+                    </div>
+                {% else %}
+                    <!-- Default content when SEO content is not available -->
+                    <div class="content-text">
+                        {% if categoria_actual.id == 3 %}
+                            <p>Imagina despertar con vista al Río Pescado, disfrutar de un desayuno sureño y terminar el día relajándote en tu tina caliente junto al Río Pescado en medio de un antiguo bosque nativo. Nuestras cabañas están completamente equipadas con todas las comodidades premium: cama de dos plazas, calefacción mediante aire acondicionado, Wi-Fi de alta velocidad con fibra óptica.</p>
+                            <p>Perfectas para lunas de miel, aniversarios o simplemente para reconectar con tu pareja, nuestras cabañas ofrecen el escenario ideal para crear recuerdos inolvidables. Complementa tu estadía con nuestros servicios de masajes.</p>
+                        {% else %}
+                            <p>Descubre nuestros servicios de {{ categoria_actual.nombre|lower }} en Aremko Spa Puerto Varas. Ofrecemos experiencias únicas diseñadas para tu bienestar y relajación total. Nuestro equipo de profesionales está comprometido con brindarte momentos inolvidables en un ambiente de tranquilidad y armonía.</p>
+                            <p>Cada servicio está cuidadosamente diseñado para proporcionarte los máximos beneficios, utilizando técnicas especializadas y productos de la más alta calidad. Ya sea que busques relajación profunda, alivio del estrés o simplemente un momento para ti, tenemos la experiencia perfecta para ti.</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
 
 <!-- Benefits Section -->
 {% if seo_content and seo_content.get_beneficios %}
@@ -350,45 +528,6 @@
     </div>
 </section>
 {% endif %}
-
-<!-- Services Section -->
-<section class="container mb-5" id="servicios-categoria">
-    <h2 class="section-title mb-4">Servicios Disponibles</h2>
-
-    <div class="row">
-        {% for servicio in servicios %}
-            <div class="col-lg-4 col-md-6 mb-4 service-card">
-                <div class="card h-100">
-                    {% if servicio.imagen %}
-                        <img src="{{ servicio.imagen.url }}" class="card-img-top"
-                             alt="{{ servicio.nombre }} en Aremko Spa Puerto Varas"
-                             loading="lazy">
-                    {% endif %}
-                    <div class="card-body d-flex flex-column">
-                        <h3 class="card-title h5">{{ servicio.nombre }}</h3>
-                        {% if servicio.tipo_servicio == 'cabana' %}
-                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
-                        {% else %}
-                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
-                        {% endif %}
-                        <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p>
-                        <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
-                                data-servicio-id="{{ servicio.id }}"
-                                data-servicio-nombre="{{ servicio.nombre|escapejs }}"
-                                data-servicio-precio="{{ servicio.precio_base }}"
-                                data-servicio-tipo="{{ servicio.tipo_servicio }}">
-                            <i class="fas fa-calendar-plus me-2"></i>Reservar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        {% empty %}
-            <div class="col-12">
-                <p class="text-center">No hay servicios disponibles en esta categoría en este momento.</p>
-            </div>
-        {% endfor %}
-    </div>
-</section>
 
 <!-- FAQ Section -->
 {% if seo_content and seo_content.get_faqs %}
