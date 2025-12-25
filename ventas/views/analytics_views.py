@@ -143,17 +143,34 @@ def dashboard_ventas(request):
         # ====================================================================
         # 4. VENTAS POR DÍA DE LA SEMANA
         # ====================================================================
-        ventas_por_dia_semana = (
-            VentaReserva.objects
-            .filter(filtro_base)
-            .annotate(dia_semana=ExtractWeekDay('fecha_reserva'))
-            .values('dia_semana')
-            .annotate(
-                total_ventas=Sum('total'),
-                cantidad_reservas=Count('id')
+        if filtro_categoria:
+            # Si hay filtro de categoría, calcular ventas por día basado en servicios filtrados
+            ventas_por_dia_semana = (
+                ReservaServicio.objects
+                .filter(venta_reserva__in=VentaReserva.objects.filter(filtro_base))
+                .exclude(servicio__isnull=True)
+                .filter(filtro_categoria)
+                .annotate(dia_semana=ExtractWeekDay('venta_reserva__fecha_reserva'))
+                .values('dia_semana')
+                .annotate(
+                    total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
+                    cantidad_reservas=Count('venta_reserva', distinct=True)
+                )
+                .order_by('dia_semana')
             )
-            .order_by('dia_semana')
-        )
+        else:
+            # Sin filtro de categoría, usar totales completos de VentaReserva
+            ventas_por_dia_semana = (
+                VentaReserva.objects
+                .filter(filtro_base)
+                .annotate(dia_semana=ExtractWeekDay('fecha_reserva'))
+                .values('dia_semana')
+                .annotate(
+                    total_ventas=Sum('total'),
+                    cantidad_reservas=Count('id')
+                )
+                .order_by('dia_semana')
+            )
 
         # Mapear números a nombres de días
         dias_semana = {
@@ -179,17 +196,35 @@ def dashboard_ventas(request):
         # 5. VENTAS POR MES (Todo el año)
         # ====================================================================
         if not month:  # Solo si estamos viendo el año completo
-            ventas_por_mes = (
-                VentaReserva.objects
-                .filter(Q(fecha_reserva__year=year) & Q(estado_pago='pagado'))
-                .annotate(mes=TruncMonth('fecha_reserva'))
-                .values('mes')
-                .annotate(
-                    total_ventas=Sum('total'),
-                    cantidad_reservas=Count('id')
+            if filtro_categoria:
+                # Si hay filtro de categoría, calcular ventas mensuales de servicios filtrados
+                query_servicios_mes = ReservaServicio.objects.filter(
+                    venta_reserva__in=VentaReserva.objects.filter(Q(fecha_reserva__year=year) & Q(estado_pago='pagado'))
+                ).exclude(servicio__isnull=True).filter(filtro_categoria)
+
+                ventas_por_mes = (
+                    query_servicios_mes
+                    .annotate(mes=TruncMonth('venta_reserva__fecha_reserva'))
+                    .values('mes')
+                    .annotate(
+                        total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
+                        cantidad_reservas=Count('venta_reserva', distinct=True)
+                    )
+                    .order_by('mes')
                 )
-                .order_by('mes')
-            )
+            else:
+                # Sin filtro de categoría, usar totales completos de VentaReserva
+                ventas_por_mes = (
+                    VentaReserva.objects
+                    .filter(Q(fecha_reserva__year=year) & Q(estado_pago='pagado'))
+                    .annotate(mes=TruncMonth('fecha_reserva'))
+                    .values('mes')
+                    .annotate(
+                        total_ventas=Sum('total'),
+                        cantidad_reservas=Count('id')
+                    )
+                    .order_by('mes')
+                )
 
             ventas_por_mes = [
                 {
@@ -240,12 +275,6 @@ def dashboard_ventas(request):
         # ====================================================================
         # 7. RESUMEN GENERAL (Dashboard de Ventas)
         # ====================================================================
-        # Todo basado en fecha_reserva - cuando se realizó la venta
-        ventas_totales = VentaReserva.objects.filter(filtro_base).aggregate(
-            total_ingresos=Sum('total'),
-            total_reservas=Count('id')
-        )
-
         # Calcular totales de servicios vendidos (con filtro de categoría si aplica)
         query_total_servicios = ReservaServicio.objects.filter(
             venta_reserva__in=VentaReserva.objects.filter(filtro_base)
@@ -267,14 +296,36 @@ def dashboard_ventas(request):
         )
         total_productos = float(total_productos_result['total'] or 0)
 
+        # Calcular total de reservas y total de ingresos
+        if filtro_categoria:
+            # Si hay filtro de categoría, calcular ingresos solo de servicios filtrados + productos
+            total_ingresos = total_servicios + total_productos
+
+            # Contar reservas que tienen al menos un servicio de la categoría filtrada
+            reservas_con_categoria = ReservaServicio.objects.filter(
+                venta_reserva__in=VentaReserva.objects.filter(filtro_base)
+            ).exclude(servicio__isnull=True).filter(filtro_categoria).values_list(
+                'venta_reserva_id', flat=True
+            ).distinct()
+
+            total_reservas = len(set(reservas_con_categoria))
+        else:
+            # Sin filtro de categoría, usar totales completos de VentaReserva
+            ventas_totales = VentaReserva.objects.filter(filtro_base).aggregate(
+                total_ingresos=Sum('total'),
+                total_reservas=Count('id')
+            )
+            total_ingresos = float(ventas_totales['total_ingresos'] or 0)
+            total_reservas = ventas_totales['total_reservas'] or 0
+
         # Ticket promedio
         ticket_promedio = 0
-        if ventas_totales['total_reservas'] and ventas_totales['total_reservas'] > 0:
-            ticket_promedio = float(ventas_totales['total_ingresos'] or 0) / ventas_totales['total_reservas']
+        if total_reservas > 0:
+            ticket_promedio = total_ingresos / total_reservas
 
         resumen = {
-            'total_ingresos': float(ventas_totales['total_ingresos'] or 0),
-            'total_reservas': ventas_totales['total_reservas'] or 0,
+            'total_ingresos': total_ingresos,
+            'total_reservas': total_reservas,
             'ticket_promedio': ticket_promedio,
             'periodo': periodo_texto,
             'total_servicios': total_servicios,
