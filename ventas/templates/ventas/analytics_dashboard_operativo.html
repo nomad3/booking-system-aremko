@@ -238,7 +238,7 @@
     <!-- Navegador de Dashboards -->
     <div class="filter-card" style="margin-bottom: 20px;">
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <a href="{% url 'ventas:analytics_dashboard_ventas' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}"
+            <a href="{% url 'ventas:analytics_dashboard_ventas' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}{% if categoria_id %}&categoria={{ categoria_id }}{% endif %}"
                class="btn-filter" style="text-decoration: none; background: #6b7280;">
                 💰 Dashboard de Ventas
             </a>
@@ -275,6 +275,18 @@
                         {% for mes in meses %}
                         <option value="{{ mes.numero }}" {% if mes.numero == month %}selected{% endif %}>
                             {{ mes.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label for="categoria">Categoría (opcional)</label>
+                    <select name="categoria" id="categoria">
+                        <option value="">Todas las categorías</option>
+                        {% for cat in categorias_disponibles %}
+                        <option value="{{ cat.id }}" {% if cat.id == categoria_id %}selected{% endif %}>
+                            {{ cat.nombre }}
                         </option>
                         {% endfor %}
                     </select>

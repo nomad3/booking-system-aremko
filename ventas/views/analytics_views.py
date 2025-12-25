@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 import json
 
-from ..models import VentaReserva, ReservaServicio, ReservaProducto, Pago, Servicio, Producto
+from ..models import VentaReserva, ReservaServicio, ReservaProducto, Pago, Servicio, Producto, Categoria
 
 
 @staff_member_required
@@ -45,6 +45,7 @@ def dashboard_ventas(request):
         month = request.GET.get('month', None)
         start_date = request.GET.get('start_date', None)
         end_date = request.GET.get('end_date', None)
+        categoria_id = request.GET.get('categoria', None)
     except Exception as e:
         return HttpResponse(f"Error en parámetros: {str(e)}<br><pre>{traceback.format_exc()}</pre>", status=500)
 
@@ -67,13 +68,35 @@ def dashboard_ventas(request):
             filtro_base &= Q(fecha_reserva__year=year)
             periodo_texto = f"Año {year}"
 
+        # Obtener categorías disponibles para el filtro
+        categorias_disponibles = Categoria.objects.filter(
+            servicios__isnull=False
+        ).distinct().order_by('nombre')
+
+        # Aplicar filtro de categoría si se seleccionó una
+        filtro_categoria = Q()
+        categoria_nombre = None
+        if categoria_id:
+            try:
+                categoria = Categoria.objects.get(id=categoria_id)
+                filtro_categoria = Q(servicio__categoria_id=categoria_id)
+                categoria_nombre = categoria.nombre
+                periodo_texto += f" - {categoria.nombre}"
+            except Categoria.DoesNotExist:
+                pass
+
         # ====================================================================
         # 1. VENTAS POR FAMILIA DE SERVICIOS (basado en fecha de venta)
         # ====================================================================
+        query_servicios_base = ReservaServicio.objects.filter(
+            venta_reserva__in=VentaReserva.objects.filter(filtro_base)
+        ).exclude(servicio__isnull=True)
+
+        if filtro_categoria:
+            query_servicios_base = query_servicios_base.filter(filtro_categoria)
+
         ventas_por_familia = (
-            ReservaServicio.objects
-            .filter(venta_reserva__in=VentaReserva.objects.filter(filtro_base))
-            .exclude(servicio__isnull=True)
+            query_servicios_base
             .values('servicio__categoria__nombre')
             .annotate(
                 total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
@@ -85,10 +108,15 @@ def dashboard_ventas(request):
         # ====================================================================
         # 2. VENTAS POR SERVICIO INDIVIDUAL (Top 15) - basado en fecha de venta
         # ====================================================================
+        query_servicios_individual = ReservaServicio.objects.filter(
+            venta_reserva__in=VentaReserva.objects.filter(filtro_base)
+        ).exclude(servicio__isnull=True)
+
+        if filtro_categoria:
+            query_servicios_individual = query_servicios_individual.filter(filtro_categoria)
+
         ventas_por_servicio = (
-            ReservaServicio.objects
-            .filter(venta_reserva__in=VentaReserva.objects.filter(filtro_base))
-            .exclude(servicio__isnull=True)
+            query_servicios_individual
             .values('servicio__nombre', 'servicio__categoria__nombre')
             .annotate(
                 total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
@@ -218,10 +246,15 @@ def dashboard_ventas(request):
             total_reservas=Count('id')
         )
 
-        # Calcular totales de servicios vendidos
-        total_servicios_result = ReservaServicio.objects.filter(
+        # Calcular totales de servicios vendidos (con filtro de categoría si aplica)
+        query_total_servicios = ReservaServicio.objects.filter(
             venta_reserva__in=VentaReserva.objects.filter(filtro_base)
-        ).exclude(servicio__isnull=True).aggregate(
+        ).exclude(servicio__isnull=True)
+
+        if filtro_categoria:
+            query_total_servicios = query_total_servicios.filter(filtro_categoria)
+
+        total_servicios_result = query_total_servicios.aggregate(
             total=Sum(F('servicio__precio_base') * F('cantidad_personas'))
         )
         total_servicios = float(total_servicios_result['total'] or 0)
@@ -314,6 +347,7 @@ def dashboard_ventas(request):
             'month': int(month) if month else None,
             'start_date': start_date,
             'end_date': end_date,
+            'categoria_id': int(categoria_id) if categoria_id else None,
             'periodo_texto': periodo_texto,
 
             # Opciones para filtros
@@ -321,7 +355,8 @@ def dashboard_ventas(request):
             'meses': [
                 {'numero': i, 'nombre': get_month_name(i)}
                 for i in range(1, 13)
-            ]
+            ],
+            'categorias_disponibles': categorias_disponibles
         }
 
         return render(request, 'ventas/analytics_dashboard.html', context)
@@ -369,6 +404,7 @@ def dashboard_operativo(request):
         month = request.GET.get('month', None)
         start_date = request.GET.get('start_date', None)
         end_date = request.GET.get('end_date', None)
+        categoria_id = request.GET.get('categoria', None)
     except Exception as e:
         return HttpResponse(f"Error en parámetros: {str(e)}<br><pre>{traceback.format_exc()}</pre>", status=500)
 
@@ -396,14 +432,35 @@ def dashboard_operativo(request):
             filtro_servicios = Q(fecha_agendamiento__year=year)
             periodo_texto = f"Año {year}"
 
+        # Obtener categorías disponibles para el filtro
+        categorias_disponibles = Categoria.objects.filter(
+            servicios__isnull=False
+        ).distinct().order_by('nombre')
+
+        # Aplicar filtro de categoría si se seleccionó una
+        filtro_categoria = Q()
+        categoria_nombre = None
+        if categoria_id:
+            try:
+                categoria = Categoria.objects.get(id=categoria_id)
+                filtro_categoria = Q(servicio__categoria_id=categoria_id)
+                categoria_nombre = categoria.nombre
+                periodo_texto += f" - {categoria.nombre}"
+            except Categoria.DoesNotExist:
+                pass
+
         # ====================================================================
         # 1. SERVICIOS POR CATEGORÍA (fecha cuando se prestan)
         # ====================================================================
+        query_base = ReservaServicio.objects.filter(
+            venta_reserva__in=ventas_validas
+        ).filter(filtro_servicios).exclude(servicio__isnull=True)
+
+        if filtro_categoria:
+            query_base = query_base.filter(filtro_categoria)
+
         servicios_por_categoria = (
-            ReservaServicio.objects
-            .filter(venta_reserva__in=ventas_validas)
-            .filter(filtro_servicios)
-            .exclude(servicio__isnull=True)
+            query_base
             .values('servicio__categoria__nombre')
             .annotate(
                 total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
@@ -415,11 +472,15 @@ def dashboard_operativo(request):
         # ====================================================================
         # 2. TOP SERVICIOS (fecha cuando se prestan)
         # ====================================================================
+        query_top_servicios = ReservaServicio.objects.filter(
+            venta_reserva__in=ventas_validas
+        ).filter(filtro_servicios).exclude(servicio__isnull=True)
+
+        if filtro_categoria:
+            query_top_servicios = query_top_servicios.filter(filtro_categoria)
+
         top_servicios = (
-            ReservaServicio.objects
-            .filter(venta_reserva__in=ventas_validas)
-            .filter(filtro_servicios)
-            .exclude(servicio__isnull=True)
+            query_top_servicios
             .values('servicio__nombre', 'servicio__categoria__nombre')
             .annotate(
                 total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
@@ -431,11 +492,15 @@ def dashboard_operativo(request):
         # ====================================================================
         # 3. SERVICIOS POR DÍA DE LA SEMANA (cuando se prestan)
         # ====================================================================
+        query_servicios_dia = ReservaServicio.objects.filter(
+            venta_reserva__in=ventas_validas
+        ).filter(filtro_servicios).exclude(servicio__isnull=True)
+
+        if filtro_categoria:
+            query_servicios_dia = query_servicios_dia.filter(filtro_categoria)
+
         servicios_por_dia = (
-            ReservaServicio.objects
-            .filter(venta_reserva__in=ventas_validas)
-            .filter(filtro_servicios)
-            .exclude(servicio__isnull=True)
+            query_servicios_dia
             .annotate(dia_semana=ExtractWeekDay('fecha_agendamiento'))
             .values('dia_semana')
             .annotate(
@@ -470,11 +535,15 @@ def dashboard_operativo(request):
         # ====================================================================
         servicios_por_mes = []
         if not month:  # Solo si estamos viendo el año completo
+            query_servicios_mes = ReservaServicio.objects.filter(
+                venta_reserva__in=ventas_validas
+            ).filter(fecha_agendamiento__year=year).exclude(servicio__isnull=True)
+
+            if filtro_categoria:
+                query_servicios_mes = query_servicios_mes.filter(filtro_categoria)
+
             servicios_por_mes = (
-                ReservaServicio.objects
-                .filter(venta_reserva__in=ventas_validas)
-                .filter(fecha_agendamiento__year=year)
-                .exclude(servicio__isnull=True)
+                query_servicios_mes
                 .annotate(mes=TruncMonth('fecha_agendamiento'))
                 .values('mes')
                 .annotate(
@@ -497,11 +566,15 @@ def dashboard_operativo(request):
         # 5. RESUMEN OPERATIVO
         # ====================================================================
         # Total de servicios agendados en el período
+        query_total_servicios = ReservaServicio.objects.filter(
+            venta_reserva__in=ventas_validas
+        ).filter(filtro_servicios).exclude(servicio__isnull=True)
+
+        if filtro_categoria:
+            query_total_servicios = query_total_servicios.filter(filtro_categoria)
+
         total_servicios_result = (
-            ReservaServicio.objects
-            .filter(venta_reserva__in=ventas_validas)
-            .filter(filtro_servicios)
-            .exclude(servicio__isnull=True)
+            query_total_servicios
             .aggregate(
                 total=Sum(F('servicio__precio_base') * F('cantidad_personas')),
                 cantidad=Count('id'),
@@ -570,6 +643,7 @@ def dashboard_operativo(request):
             'month': int(month) if month else None,
             'start_date': start_date,
             'end_date': end_date,
+            'categoria_id': int(categoria_id) if categoria_id else None,
             'periodo_texto': periodo_texto,
 
             # Opciones para filtros
@@ -577,7 +651,8 @@ def dashboard_operativo(request):
             'meses': [
                 {'numero': i, 'nombre': get_month_name(i)}
                 for i in range(1, 13)
-            ]
+            ],
+            'categorias_disponibles': categorias_disponibles
         }
 
         return render(request, 'ventas/analytics_dashboard_operativo.html', context)
