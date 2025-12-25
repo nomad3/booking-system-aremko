@@ -49,7 +49,8 @@ def dashboard_ventas(request):
         return HttpResponse(f"Error en parámetros: {str(e)}<br><pre>{traceback.format_exc()}</pre>", status=500)
 
     try:
-        # Construir filtro base para VentaReserva
+        # Dashboard de Ventas: Solo incluir ventas PAGADAS (importante para análisis financiero)
+        # A diferencia del dashboard operativo, aquí SÍ filtramos por estado_pago='pagado'
         filtro_base = Q(estado_reserva__in=['checkin', 'checkout', 'pendiente']) & Q(estado_pago='pagado')
 
         # Aplicar filtros de fecha (todo basado en fecha_reserva para dashboard de ventas)
@@ -372,10 +373,12 @@ def dashboard_operativo(request):
         return HttpResponse(f"Error en parámetros: {str(e)}<br><pre>{traceback.format_exc()}</pre>", status=500)
 
     try:
-        # Solo filtrar reservas pagadas (sin filtro de fecha en VentaReserva)
+        # Para dashboard operativo: incluir todas las reservas con servicios agendados
+        # No filtrar por estado_pago porque queremos ver todos los servicios programados
+        # independientemente del estado de pago (importante para planificación operativa)
         ventas_validas = VentaReserva.objects.filter(
-            Q(estado_reserva__in=['checkin', 'checkout', 'pendiente']) &
-            Q(estado_pago='pagado')
+            Q(estado_reserva__in=['checkin', 'checkout', 'pendiente', 'confirmada'])
+            # Removido filtro de estado_pago para dashboard operativo
         )
 
         # Construir filtro para servicios basado en fecha_agendamiento
