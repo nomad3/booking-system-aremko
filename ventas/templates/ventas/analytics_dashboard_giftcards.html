@@ -6,7 +6,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Ventas - Aremko</title>
+    <title>Dashboard de GiftCards - Aremko</title>
 
     <style>
         .stats-container {
@@ -15,7 +15,7 @@
         }
 
         .stats-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             color: white;
             padding: 30px;
             border-radius: 10px;
@@ -82,7 +82,7 @@
 
         .btn-filter {
             padding: 10px 25px;
-            background: #667eea;
+            background: #f5576c;
             color: white;
             border: none;
             border-radius: 5px;
@@ -92,13 +92,13 @@
         }
 
         .btn-filter:hover {
-            background: #5568d3;
+            background: #e0485d;
             transform: translateY(-2px);
         }
 
-        .btn-export {
+        .btn-nav {
             padding: 10px 25px;
-            background: #10b981;
+            background: #6b7280;
             color: white;
             border: none;
             border-radius: 5px;
@@ -109,8 +109,13 @@
             display: inline-block;
         }
 
-        .btn-export:hover {
-            background: #059669;
+        .btn-nav.active {
+            background: #f5576c;
+            cursor: default;
+        }
+
+        .btn-nav:hover:not(.active) {
+            background: #556070;
         }
 
         /* Resumen Cards */
@@ -126,7 +131,7 @@
             padding: 25px;
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #f5576c;
         }
 
         .summary-card h4 {
@@ -233,36 +238,31 @@
     <div class="stats-container">
         <!-- Header -->
         <div class="stats-header">
-            <h1>💰 Dashboard de Ventas</h1>
-            <p>{{ periodo_texto }} • Análisis de ventas y servicios por fecha de venta</p>
+            <h1>🎁 Dashboard de GiftCards</h1>
+            <p>{{ periodo_texto }} • Análisis de ventas y canje de GiftCards</p>
         </div>
 
         <!-- Navegador de Dashboards -->
         <div class="filter-card" style="margin-bottom: 20px;">
             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <a href="#" class="btn-filter" style="text-decoration: none; background: #667eea; cursor: default;">
-                    💰 Dashboard de Ventas (Actual)
+                <a href="{% url 'ventas:analytics_dashboard_ventas' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}"
+                    class="btn-nav">
+                    💰 Dashboard de Ventas
                 </a>
-                <a href="{% url 'ventas:analytics_dashboard_operativo' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}{% if categoria_id %}&categoria={{ categoria_id }}{% endif %}"
-                    class="btn-filter" style="text-decoration: none; background: #6b7280;">
+                <a href="{% url 'ventas:analytics_dashboard_operativo' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}"
+                    class="btn-nav">
                     ⚙️ Dashboard Operativo
                 </a>
-                <a href="{% url 'ventas:analytics_dashboard_giftcards' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}"
-                    class="btn-filter" style="text-decoration: none; background: #f5576c;">
-                    🎁 Dashboard GiftCards
+                <a href="#" class="btn-nav active">
+                    🎁 Dashboard GiftCards (Actual)
                 </a>
             </div>
-            <p style="margin-top: 10px; color: #666; font-size: 0.9rem;">
-                <strong>Nota:</strong> Este dashboard muestra servicios y productos según su <strong>fecha de
-                    venta</strong> (cuando se vendieron).
-                Para ver servicios por fecha de prestación, use el Dashboard Operativo.
-            </p>
         </div>
 
         <!-- Filtros -->
         <div class="filter-card">
             <h3>🔍 Filtros</h3>
-            <form method="GET" action="{% url 'ventas:analytics_dashboard_ventas' %}">
+            <form method="GET" action="{% url 'ventas:analytics_dashboard_giftcards' %}">
                 <div class="filter-row">
                     <div class="filter-group">
                         <label for="year">Año</label>
@@ -286,18 +286,6 @@
                     </div>
 
                     <div class="filter-group">
-                        <label for="categoria">Categoría (opcional)</label>
-                        <select name="categoria" id="categoria">
-                            <option value="">Todas las categorías</option>
-                            {% for cat in categorias_disponibles %}
-                            <option value="{{ cat.id }}" {% if cat.id==categoria_id %}selected{% endif %}>
-                                {{ cat.nombre }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="filter-group">
                         <label for="start_date">Fecha inicio (opcional)</label>
                         <input type="date" name="start_date" id="start_date" value="{{ start_date|default:'' }}">
                     </div>
@@ -310,13 +298,6 @@
                     <div class="filter-group">
                         <button type="submit" class="btn-filter">Aplicar Filtros</button>
                     </div>
-
-                    <div class="filter-group">
-                        <a href="{% url 'ventas:analytics_export_csv' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}"
-                            class="btn-export">
-                            📥 Exportar CSV
-                        </a>
-                    </div>
                 </div>
             </form>
         </div>
@@ -324,74 +305,54 @@
         <!-- Resumen General -->
         <div class="summary-cards">
             <div class="summary-card">
-                <h4>💰 Ingresos Totales</h4>
-                <div class="value">${{ resumen.total_ingresos|floatformat:0|intcomma }}</div>
+                <h4>💰 Ventas Totales</h4>
+                <div class="value">${{ resumen.total_ventas|floatformat:0|intcomma }}</div>
                 <div class="subtitle">{{ periodo_texto }}</div>
             </div>
 
             <div class="summary-card">
-                <h4>📋 Total Reservas</h4>
-                <div class="value">{{ resumen.total_reservas|intcomma }}</div>
-                <div class="subtitle">Reservas pagadas</div>
+                <h4>🎟️ Cantidad Vendida</h4>
+                <div class="value">{{ resumen.cantidad_vendida|intcomma }}</div>
+                <div class="subtitle">GiftCards emitidas</div>
             </div>
 
             <div class="summary-card">
                 <h4>🎯 Ticket Promedio</h4>
                 <div class="value">${{ resumen.ticket_promedio|floatformat:0|intcomma }}</div>
-                <div class="subtitle">Promedio por reserva</div>
+                <div class="subtitle">Promedio por GiftCard</div>
+            </div>
+
+            <div class="summary-card" style="border-left-color: #f093fb;">
+                <h4>⏳ Saldo Por Cobrar</h4>
+                <div class="value">${{ resumen.monto_por_cobrar|floatformat:0|intcomma }}</div>
+                <div class="subtitle">Monto pendiente de uso</div>
             </div>
         </div>
 
         <!-- Gráficos -->
         <div class="chart-grid">
-            <!-- Ventas por Familia -->
+            <!-- Ventas por Tipo -->
             <div class="chart-card">
-                <h3>🏷️ Ventas por Familia de Servicios</h3>
+                <h3>🏷️ Ventas por Tipo de GiftCard</h3>
                 <div class="chart-container small">
-                    <canvas id="chartFamilia"></canvas>
+                    <canvas id="chartTipo"></canvas>
                 </div>
             </div>
 
-            <!-- Ventas por Forma de Pago -->
+            <!-- Estado de Canje -->
             <div class="chart-card">
-                <h3>💳 Ventas por Forma de Pago</h3>
+                <h3>📊 Estado de Canje</h3>
                 <div class="chart-container small">
-                    <canvas id="chartFormaPago"></canvas>
+                    <canvas id="chartEstado"></canvas>
                 </div>
             </div>
 
-            <!-- Ventas por Día de Semana -->
+            {% if ventas_mes %}
+            <!-- Evolución Mensual -->
             <div class="chart-card full-width">
-                <h3>📅 Ventas por Día de la Semana</h3>
-                <div class="chart-container small">
-                    <canvas id="chartDiaSemana"></canvas>
-                </div>
-            </div>
-
-            {% if ventas_por_mes %}
-            <!-- Ventas por Mes (solo si se ve el año completo) -->
-            <div class="chart-card full-width">
-                <h3>📈 Evolución Mensual {{ year }}</h3>
+                <h3>📈 Evolución Mensual de Ventas</h3>
                 <div class="chart-container">
                     <canvas id="chartMensual"></canvas>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Top Servicios -->
-            <div class="chart-card full-width">
-                <h3>🔝 Top 15 Servicios</h3>
-                <div class="chart-container">
-                    <canvas id="chartServicios"></canvas>
-                </div>
-            </div>
-
-            {% if ventas_por_producto %}
-            <!-- Top Productos -->
-            <div class="chart-card full-width">
-                <h3>🛒 Top 15 Productos</h3>
-                <div class="chart-container">
-                    <canvas id="chartProductos"></canvas>
                 </div>
             </div>
             {% endif %}
@@ -399,23 +360,21 @@
 
         <!-- Tablas Detalladas -->
         <div class="chart-card">
-            <h3>📊 Detalle de Servicios</h3>
+            <h3>📋 Detalle por Tipo de GiftCard</h3>
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Servicio</th>
-                        <th>Categoría</th>
-                        <th>Cantidad</th>
+                        <th>Tipo / Servicio</th>
+                        <th>Cantidad Vendida</th>
                         <th>Total Ventas</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in ventas_por_servicio %}
+                    {% for item in ventas_por_tipo %}
                     <tr>
-                        <td>{{ item.servicio__nombre }}</td>
-                        <td>{{ item.servicio__categoria__nombre|default:"Sin categoría" }}</td>
+                        <td>{{ item.tipo }}</td>
                         <td>{{ item.cantidad }}</td>
-                        <td>${{ item.total_ventas|floatformat:0|intcomma }}</td>
+                        <td>${{ item.total|floatformat:0|intcomma }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -430,22 +389,18 @@
 
         // Configuración común de colores
         const colors = {
-            primary: ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe'],
-            gradient: ['#667eea', '#764ba2', '#f5576c', '#fa709a', '#fee140'],
-            success: '#10b981',
-            info: '#3b82f6',
-            warning: '#f59e0b',
-            danger: '#ef4444'
+            primary: ['#f5576c', '#f093fb', '#667eea', '#4facfe', '#fee140'],
+            gradient: ['#f5576c', '#fa709a', '#f093fb', '#a18cd1', '#667eea'],
         };
 
-        // Chart 1: Ventas por Familia
-        if (chartData.ventas_familia.length > 0) {
-            new Chart(document.getElementById('chartFamilia'), {
+        // Chart 1: Ventas por Tipo
+        if (chartData.ventas_tipo.length > 0) {
+            new Chart(document.getElementById('chartTipo'), {
                 type: 'doughnut',
                 data: {
-                    labels: chartData.ventas_familia.map(item => item.familia || 'Sin categoría'),
+                    labels: chartData.ventas_tipo.map(item => item.tipo),
                     datasets: [{
-                        data: chartData.ventas_familia.map(item => item.total),
+                        data: chartData.ventas_tipo.map(item => item.total),
                         backgroundColor: colors.gradient,
                         borderWidth: 2,
                         borderColor: '#fff'
@@ -476,15 +431,15 @@
             });
         }
 
-        // Chart 2: Forma de Pago
-        if (chartData.ventas_forma_pago.length > 0) {
-            new Chart(document.getElementById('chartFormaPago'), {
+        // Chart 2: Estado de Canje
+        if (chartData.estado_canje.length > 0) {
+            new Chart(document.getElementById('chartEstado'), {
                 type: 'pie',
                 data: {
-                    labels: chartData.ventas_forma_pago.map(item => item.metodo),
+                    labels: chartData.estado_canje.map(item => item.estado),
                     datasets: [{
-                        data: chartData.ventas_forma_pago.map(item => item.total_pagos),
-                        backgroundColor: colors.primary,
+                        data: chartData.estado_canje.map(item => item.cantidad),
+                        backgroundColor: ['#f093fb', '#10b981', '#ef4444'], // Por cobrar, Cobrado, Vencido
                         borderWidth: 2,
                         borderColor: '#fff'
                     }]
@@ -500,12 +455,8 @@
                             callbacks: {
                                 label: function (context) {
                                     const label = context.label || '';
-                                    const value = new Intl.NumberFormat('es-CL', {
-                                        style: 'currency',
-                                        currency: 'CLP',
-                                        minimumFractionDigits: 0
-                                    }).format(context.parsed);
-                                    return `${label}: ${value}`;
+                                    const value = context.parsed;
+                                    return `${label}: ${value} GiftCards`;
                                 }
                             }
                         }
@@ -514,53 +465,7 @@
             });
         }
 
-        // Chart 3: Día de Semana
-        if (chartData.ventas_dia_semana.length > 0) {
-            new Chart(document.getElementById('chartDiaSemana'), {
-                type: 'bar',
-                data: {
-                    labels: chartData.ventas_dia_semana.map(item => item.dia),
-                    datasets: [{
-                        label: 'Ventas Totales',
-                        data: chartData.ventas_dia_semana.map(item => item.total_ventas),
-                        backgroundColor: '#667eea',
-                        borderRadius: 8
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function (context) {
-                                    return new Intl.NumberFormat('es-CL', {
-                                        style: 'currency',
-                                        currency: 'CLP',
-                                        minimumFractionDigits: 0
-                                    }).format(context.parsed.y);
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function (value) {
-                                    return '$' + (value / 1000).toFixed(0) + 'K';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        // Chart 4: Mensual (solo si hay datos)
+        // Chart 3: Mensual (solo si hay datos)
         if (chartData.ventas_mes && chartData.ventas_mes.length > 0) {
             new Chart(document.getElementById('chartMensual'), {
                 type: 'line',
@@ -568,9 +473,9 @@
                     labels: chartData.ventas_mes.map(item => item.mes),
                     datasets: [{
                         label: 'Ventas Mensuales',
-                        data: chartData.ventas_mes.map(item => item.total_ventas),
-                        borderColor: '#667eea',
-                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        data: chartData.ventas_mes.map(item => item.total),
+                        borderColor: '#f5576c',
+                        backgroundColor: 'rgba(245, 87, 108, 0.1)',
                         fill: true,
                         tension: 0.4,
                         borderWidth: 3
@@ -594,100 +499,6 @@
                     },
                     scales: {
                         y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function (value) {
-                                    return '$' + (value / 1000000).toFixed(1) + 'M';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        // Chart 5: Top Servicios
-        if (chartData.ventas_servicio.length > 0) {
-            new Chart(document.getElementById('chartServicios'), {
-                type: 'bar',
-                data: {
-                    labels: chartData.ventas_servicio.map(item => item.servicio),
-                    datasets: [{
-                        label: 'Ventas Totales',
-                        data: chartData.ventas_servicio.map(item => item.total),
-                        backgroundColor: '#764ba2',
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function (context) {
-                                    return new Intl.NumberFormat('es-CL', {
-                                        style: 'currency',
-                                        currency: 'CLP',
-                                        minimumFractionDigits: 0
-                                    }).format(context.parsed.x);
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function (value) {
-                                    return '$' + (value / 1000).toFixed(0) + 'K';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        // Chart 6: Top Productos
-        if (chartData.ventas_producto.length > 0) {
-            new Chart(document.getElementById('chartProductos'), {
-                type: 'bar',
-                data: {
-                    labels: chartData.ventas_producto.map(item => item.producto),
-                    datasets: [{
-                        label: 'Ventas Totales',
-                        data: chartData.ventas_producto.map(item => item.total),
-                        backgroundColor: '#f5576c',
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function (context) {
-                                    return new Intl.NumberFormat('es-CL', {
-                                        style: 'currency',
-                                        currency: 'CLP',
-                                        minimumFractionDigits: 0
-                                    }).format(context.parsed.x);
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
                             beginAtZero: true,
                             ticks: {
                                 callback: function (value) {

@@ -43,6 +43,7 @@ urlpatterns = [
     path('analytics/dashboard/', analytics_views.dashboard_estadisticas, name='analytics_dashboard'),  # Wrapper para compatibilidad
     path('analytics/dashboard-ventas/', analytics_views.dashboard_ventas, name='analytics_dashboard_ventas'),
     path('analytics/dashboard-operativo/', analytics_views.dashboard_operativo, name='analytics_dashboard_operativo'),
+    path('analytics/dashboard-giftcards/', analytics_views.dashboard_giftcards, name='analytics_dashboard_giftcards'),
     path('analytics/export-csv/', analytics_views.exportar_estadisticas_csv, name='analytics_export_csv'),
     # Calendario Matriz Views
     # TEMPORAL: Usando vista simplificada para debug

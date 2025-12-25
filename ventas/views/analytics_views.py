@@ -721,6 +721,187 @@ def dashboard_estadisticas(request):
 
 
 @staff_member_required
+def dashboard_giftcards(request):
+    """
+    Dashboard de GIFTCARDS
+    Muestra estadísticas específicas de venta y uso de GiftCards
+
+    GET /ventas/analytics/dashboard-giftcards/
+    """
+    from django.http import HttpResponse
+    import traceback
+
+    try:
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Obtener parámetros de filtro
+        current_year = timezone.now().year
+        default_year = 2025 if current_year >= 2024 else current_year
+        year = int(request.GET.get('year', default_year))
+        month = request.GET.get('month', None)
+        start_date = request.GET.get('start_date', None)
+        end_date = request.GET.get('end_date', None)
+
+        # Filtro base: GiftCards válidas (que tienen código)
+        from ..models import GiftCard
+        filtro_base = Q(codigo__isnull=False)
+
+        # Aplicar filtros de fecha (basado en fecha_emision)
+        if start_date and end_date:
+            filtro_base &= Q(fecha_emision__gte=start_date, fecha_emision__lte=end_date)
+            periodo_texto = f"{start_date} a {end_date}"
+        elif month:
+            filtro_base &= Q(fecha_emision__year=year, fecha_emision__month=int(month))
+            periodo_texto = f"{get_month_name(int(month))} {year}"
+        else:
+            filtro_base &= Q(fecha_emision__year=year)
+            periodo_texto = f"Año {year}"
+
+        # ====================================================================
+        # 1. KPI RESUMEN
+        # ====================================================================
+        resumen_data = GiftCard.objects.filter(filtro_base).aggregate(
+            total_ventas=Sum('monto_inicial'),
+            cantidad_vendida=Count('id'),
+            monto_disponible=Sum('monto_disponible')
+        )
+
+        total_ventas = float(resumen_data['total_ventas'] or 0)
+        cantidad_vendida = resumen_data['cantidad_vendida'] or 0
+        monto_por_cobrar = float(resumen_data['monto_disponible'] or 0) # Aproximación de lo pendiente
+
+        ticket_promedio = 0
+        if cantidad_vendida > 0:
+            ticket_promedio = total_ventas / cantidad_vendida
+
+        resumen = {
+            'total_ventas': total_ventas,
+            'cantidad_vendida': cantidad_vendida,
+            'ticket_promedio': ticket_promedio,
+            'monto_por_cobrar': monto_por_cobrar,
+            'periodo': periodo_texto,
+            'tipo_dashboard': 'giftcards'
+        }
+
+        # ====================================================================
+        # 2. VENTAS POR TIPO (Servicio vs Monto)
+        # ====================================================================
+        # Clasificamos: Si tiene servicio_asociado es "GiftCard Servicio", si no es "GiftCard Monto"
+        # Esto es una aproximación, ajusta según tu lógica exacta
+        
+        # Opción A: Agrupar por servicio_asociado exacto (Top 10)
+        ventas_por_tipo = (
+            GiftCard.objects.filter(filtro_base)
+            .values('servicio_asociado')
+            .annotate(
+                total=Sum('monto_inicial'),
+                cantidad=Count('id')
+            )
+            .order_by('-total')
+        )
+
+        # Procesar para limpiar nombres (None -> "Monto Libre")
+        ventas_por_tipo_clean = []
+        for item in ventas_por_tipo:
+            nombre = item['servicio_asociado']
+            if not nombre:
+                nombre = "Monto Libre (Dinero)"
+            
+            ventas_por_tipo_clean.append({
+                'tipo': nombre,
+                'total': float(item['total'] or 0),
+                'cantidad': item['cantidad']
+            })
+
+        # ====================================================================
+        # 3. ESTADO DE CANJE (Por Cobrar vs Cobrado)
+        # ====================================================================
+        estado_canje = (
+            GiftCard.objects.filter(filtro_base)
+            .values('estado')
+            .annotate(
+                cantidad=Count('id'),
+                monto=Sum('monto_inicial') # Monto original de esas cards
+            )
+        )
+
+        estado_map = {
+            'por_cobrar': 'Por Cobrar',
+            'cobrado': 'Canjeado/Cobrado',
+            'vencido': 'Vencido' # Si existiera este estado
+        }
+
+        estado_canje_data = [
+            {
+                'estado': estado_map.get(item['estado'], item['estado']),
+                'cantidad': item['cantidad'],
+                'monto': float(item['monto'] or 0)
+            }
+            for item in estado_canje
+        ]
+
+        # ====================================================================
+        # 4. EVOLUCIÓN MENSUAL
+        # ====================================================================
+        ventas_mes = []
+        if not month: # Solo si vemos el año completo
+            ventas_mes_qs = (
+                GiftCard.objects.filter(filtro_base)
+                .annotate(mes=TruncMonth('fecha_emision'))
+                .values('mes')
+                .annotate(
+                    total=Sum('monto_inicial'),
+                    cantidad=Count('id')
+                )
+                .order_by('mes')
+            )
+
+            ventas_mes = [
+                {
+                    'mes': item['mes'].strftime('%B'),
+                    'total': float(item['total'] or 0),
+                    'cantidad': item['cantidad']
+                }
+                for item in ventas_mes_qs
+            ]
+
+        # ====================================================================
+        # 5. PREPARAR JSON PARA CHART.JS
+        # ====================================================================
+        chart_data = {
+            'ventas_tipo': ventas_por_tipo_clean[:10], # Top 10 tipos
+            'estado_canje': estado_canje_data,
+            'ventas_mes': ventas_mes
+        }
+
+        context = {
+            'resumen': resumen,
+            'ventas_por_tipo': ventas_por_tipo_clean,
+            'chart_data_json': json.dumps(chart_data),
+            
+            # Filtros
+            'year': year,
+            'month': int(month) if month else None,
+            'start_date': start_date,
+            'end_date': end_date,
+            'periodo_texto': periodo_texto,
+            
+            # Opciones
+            'years_disponibles': range(2020, current_year + 2),
+            'meses': [
+                {'numero': i, 'nombre': get_month_name(i)}
+                for i in range(1, 13)
+            ],
+        }
+
+        return render(request, 'ventas/analytics_dashboard_giftcards.html', context)
+
+    except Exception as e:
+        return HttpResponse(f"<h1>Error 500</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>", status=500)
+
+
+@staff_member_required
 def exportar_estadisticas_csv(request):
     """
     Exporta estadísticas a CSV
