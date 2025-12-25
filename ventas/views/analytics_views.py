@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 import json
 
-from ..models import VentaReserva, ReservaServicio, ReservaProducto, Pago, Servicio, Producto, Categoria
+from ..models import VentaReserva, ReservaServicio, ReservaProducto, Pago, Servicio, Producto, CategoriaServicio
 
 
 @staff_member_required
@@ -69,8 +69,8 @@ def dashboard_ventas(request):
             periodo_texto = f"Año {year}"
 
         # Obtener categorías disponibles para el filtro
-        categorias_disponibles = Categoria.objects.filter(
-            servicios__isnull=False
+        categorias_disponibles = CategoriaServicio.objects.filter(
+            servicio__isnull=False
         ).distinct().order_by('nombre')
 
         # Aplicar filtro de categoría si se seleccionó una
@@ -78,11 +78,11 @@ def dashboard_ventas(request):
         categoria_nombre = None
         if categoria_id:
             try:
-                categoria = Categoria.objects.get(id=categoria_id)
+                categoria = CategoriaServicio.objects.get(id=categoria_id)
                 filtro_categoria = Q(servicio__categoria_id=categoria_id)
                 categoria_nombre = categoria.nombre
                 periodo_texto += f" - {categoria.nombre}"
-            except Categoria.DoesNotExist:
+            except CategoriaServicio.DoesNotExist:
                 pass
 
         # ====================================================================
@@ -433,8 +433,8 @@ def dashboard_operativo(request):
             periodo_texto = f"Año {year}"
 
         # Obtener categorías disponibles para el filtro
-        categorias_disponibles = Categoria.objects.filter(
-            servicios__isnull=False
+        categorias_disponibles = CategoriaServicio.objects.filter(
+            servicio__isnull=False
         ).distinct().order_by('nombre')
 
         # Aplicar filtro de categoría si se seleccionó una
@@ -442,11 +442,11 @@ def dashboard_operativo(request):
         categoria_nombre = None
         if categoria_id:
             try:
-                categoria = Categoria.objects.get(id=categoria_id)
+                categoria = CategoriaServicio.objects.get(id=categoria_id)
                 filtro_categoria = Q(servicio__categoria_id=categoria_id)
                 categoria_nombre = categoria.nombre
                 periodo_texto += f" - {categoria.nombre}"
-            except Categoria.DoesNotExist:
+            except CategoriaServicio.DoesNotExist:
                 pass
 
         # ====================================================================
