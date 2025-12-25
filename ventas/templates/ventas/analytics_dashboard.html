@@ -283,7 +283,7 @@
                         <select name="month" id="month">
                             <option value="">Todos los meses</option>
                             {% for mes in meses %}
-                            <option value="{{ mes.numero }}" {% if mes.numero==month %}selected{% endif %}>
+                            <option value="{{ mes.numero }}" {% if mes.numero == month %}selected{% endif %}>
                                 {{ mes.nombre }}
                             </option>
                             {% endfor %}
@@ -295,7 +295,7 @@
                         <select name="categoria" id="categoria">
                             <option value="">Todas las categorías</option>
                             {% for cat in categorias_disponibles %}
-                            <option value="{{ cat.id }}" {% if cat.id==categoria_id %}selected{% endif %}>
+                            <option value="{{ cat.id }}" {% if cat.id == categoria_id %}selected{% endif %}>
                                 {{ cat.nombre }}
                             </option>
                             {% endfor %}
