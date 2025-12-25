@@ -239,17 +239,22 @@
 
         <!-- Navegador de Dashboards -->
         <div class="filter-card" style="margin-bottom: 20px;">
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <a href="{% url 'ventas:analytics_dashboard_ventas' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}{% if categoria_id %}&categoria={{ categoria_id }}{% endif %}"
-                    class="btn-filter" style="text-decoration: none; background: #6b7280;">
-                    💰 Dashboard de Ventas
-                </a>
-                <a href="#" class="btn-filter" style="text-decoration: none; background: #667eea; cursor: default;">
-                    ⚙️ Dashboard Operativo (Actual)
-                </a>
-                <a href="{% url 'ventas:analytics_dashboard_giftcards' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}"
-                    class="btn-filter" style="text-decoration: none; background: #f5576c;">
-                    🎁 Dashboard GiftCards
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <a href="{% url 'ventas:analytics_dashboard_ventas' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}{% if categoria_id %}&categoria={{ categoria_id }}{% endif %}"
+                        class="btn-filter" style="text-decoration: none; background: #6b7280;">
+                        💰 Dashboard de Ventas
+                    </a>
+                    <a href="#" class="btn-filter" style="text-decoration: none; background: #667eea; cursor: default;">
+                        ⚙️ Dashboard Operativo (Actual)
+                    </a>
+                    <a href="{% url 'ventas:analytics_dashboard_giftcards' %}?year={{ year }}{% if month %}&month={{ month }}{% endif %}"
+                        class="btn-filter" style="text-decoration: none; background: #f5576c;">
+                        🎁 Dashboard GiftCards
+                    </a>
+                </div>
+                <a href="{% url 'ventas:inicio_sistema' %}" class="btn-filter" style="text-decoration: none; background: #059669;">
+                    ← Volver al Menú
                 </a>
             </div>
             <p style="margin-top: 10px; color: #666; font-size: 0.9rem;">
