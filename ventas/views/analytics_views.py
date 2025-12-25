@@ -48,30 +48,56 @@ def dashboard_estadisticas(request):
         return HttpResponse(f"Error en parámetros: {str(e)}<br><pre>{traceback.format_exc()}</pre>", status=500)
 
     try:
-        # Construir filtro base
+        # Construir filtro base para VentaReserva
         filtro_base = Q(estado_reserva__in=['checkin', 'checkout', 'pendiente']) & Q(estado_pago='pagado')
+
+        # Construir filtros de fecha separados para servicios y productos
+        filtro_servicios = None
+        filtro_fecha_venta = None
 
         # Aplicar filtros de fecha
         if start_date and end_date:
             # Rango personalizado
-            filtro_base &= Q(fecha_reserva__gte=start_date, fecha_reserva__lte=end_date)
+            # Para servicios: filtrar por fecha_agendamiento
+            filtro_servicios = Q(fecha_agendamiento__gte=start_date, fecha_agendamiento__lte=end_date)
+            # Para VentaReserva (productos y totales): filtrar por fecha_reserva
+            filtro_fecha_venta = Q(fecha_reserva__gte=start_date, fecha_reserva__lte=end_date)
             periodo_texto = f"{start_date} a {end_date}"
         elif month:
             # Mes específico
-            filtro_base &= Q(fecha_reserva__year=year, fecha_reserva__month=int(month))
+            filtro_servicios = Q(fecha_agendamiento__year=year, fecha_agendamiento__month=int(month))
+            filtro_fecha_venta = Q(fecha_reserva__year=year, fecha_reserva__month=int(month))
             periodo_texto = f"{get_month_name(int(month))} {year}"
         else:
             # Todo el año
-            filtro_base &= Q(fecha_reserva__year=year)
+            filtro_servicios = Q(fecha_agendamiento__year=year)
+            filtro_fecha_venta = Q(fecha_reserva__year=year)
             periodo_texto = f"Año {year}"
+
+        # Aplicar filtro de fecha a VentaReserva para productos y totales
+        if filtro_fecha_venta:
+            filtro_base &= filtro_fecha_venta
 
         # ====================================================================
         # 1. VENTAS POR FAMILIA DE SERVICIOS
         # ====================================================================
+        # Primero obtener las VentaReserva válidas (pagadas)
+        ventas_validas = VentaReserva.objects.filter(
+            Q(estado_reserva__in=['checkin', 'checkout', 'pendiente']) &
+            Q(estado_pago='pagado')
+        )
+
+        # Aplicar filtro de servicios con fecha_agendamiento
+        query_servicios = ReservaServicio.objects.filter(
+            venta_reserva__in=ventas_validas
+        ).exclude(servicio__isnull=True)
+
+        # Aplicar filtro de fecha de agendamiento si existe
+        if filtro_servicios:
+            query_servicios = query_servicios.filter(filtro_servicios)
+
         ventas_por_familia = (
-            ReservaServicio.objects
-            .filter(venta_reserva__in=VentaReserva.objects.filter(filtro_base))
-            .exclude(servicio__isnull=True)
+            query_servicios
             .values('servicio__categoria__nombre')
             .annotate(
                 total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
@@ -83,10 +109,16 @@ def dashboard_estadisticas(request):
         # ====================================================================
         # 2. VENTAS POR SERVICIO INDIVIDUAL (Top 15)
         # ====================================================================
+        # Reutilizar la misma lógica de filtrado
+        query_servicios_individual = ReservaServicio.objects.filter(
+            venta_reserva__in=ventas_validas
+        ).exclude(servicio__isnull=True)
+
+        if filtro_servicios:
+            query_servicios_individual = query_servicios_individual.filter(filtro_servicios)
+
         ventas_por_servicio = (
-            ReservaServicio.objects
-            .filter(venta_reserva__in=VentaReserva.objects.filter(filtro_base))
-            .exclude(servicio__isnull=True)
+            query_servicios_individual
             .values('servicio__nombre', 'servicio__categoria__nombre')
             .annotate(
                 total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
@@ -210,21 +242,75 @@ def dashboard_estadisticas(request):
         # ====================================================================
         # 7. RESUMEN GENERAL
         # ====================================================================
-        ventas_totales = VentaReserva.objects.filter(filtro_base).aggregate(
-            total_ingresos=Sum('total'),
-            total_reservas=Count('id')
+        # Calcular totales de servicios con fecha_agendamiento
+        total_servicios = 0
+        if filtro_servicios:
+            # Si hay filtro de fecha, calcular servicios con fecha_agendamiento
+            servicios_query = ReservaServicio.objects.filter(
+                venta_reserva__in=ventas_validas
+            ).exclude(servicio__isnull=True).filter(filtro_servicios)
+
+            total_servicios_result = servicios_query.aggregate(
+                total=Sum(F('servicio__precio_base') * F('cantidad_personas'))
+            )
+            total_servicios = float(total_servicios_result['total'] or 0)
+        else:
+            # Sin filtro específico, usar todos los servicios del año
+            servicios_query = ReservaServicio.objects.filter(
+                venta_reserva__in=ventas_validas,
+                fecha_agendamiento__year=year
+            ).exclude(servicio__isnull=True)
+
+            total_servicios_result = servicios_query.aggregate(
+                total=Sum(F('servicio__precio_base') * F('cantidad_personas'))
+            )
+            total_servicios = float(total_servicios_result['total'] or 0)
+
+        # Calcular totales de productos con fecha_reserva
+        total_productos = 0
+        productos_query = ReservaProducto.objects.filter(
+            venta_reserva__in=VentaReserva.objects.filter(filtro_base)
+        ).exclude(producto__isnull=True)
+
+        total_productos_result = productos_query.aggregate(
+            total=Sum(F('cantidad') * F('producto__precio_base'))
         )
+        total_productos = float(total_productos_result['total'] or 0)
+
+        # Calcular total de reservas (ventas únicas)
+        # Obtenemos las reservas que tienen servicios o productos en el período
+        reservas_con_servicios = set()
+        reservas_con_productos = set()
+
+        if filtro_servicios:
+            reservas_con_servicios = set(
+                ReservaServicio.objects.filter(
+                    venta_reserva__in=ventas_validas
+                ).filter(filtro_servicios).values_list('venta_reserva_id', flat=True)
+            )
+
+        reservas_con_productos = set(
+            VentaReserva.objects.filter(filtro_base).values_list('id', flat=True)
+        )
+
+        # Total de reservas únicas
+        total_reservas = len(reservas_con_servicios.union(reservas_con_productos))
+
+        # Total ingresos es la suma de servicios y productos
+        total_ingresos = total_servicios + total_productos
 
         # Ticket promedio
         ticket_promedio = 0
-        if ventas_totales['total_reservas'] and ventas_totales['total_reservas'] > 0:
-            ticket_promedio = float(ventas_totales['total_ingresos'] or 0) / ventas_totales['total_reservas']
+        if total_reservas > 0:
+            ticket_promedio = total_ingresos / total_reservas
 
         resumen = {
-            'total_ingresos': float(ventas_totales['total_ingresos'] or 0),
-            'total_reservas': ventas_totales['total_reservas'] or 0,
+            'total_ingresos': total_ingresos,
+            'total_reservas': total_reservas,
             'ticket_promedio': ticket_promedio,
-            'periodo': periodo_texto
+            'periodo': periodo_texto,
+            'total_servicios': total_servicios,
+            'total_productos': total_productos
         }
 
         # ====================================================================
