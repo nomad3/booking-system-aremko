@@ -124,7 +124,7 @@ User-agent: SeznamBot
 Crawl-delay: 5
 
 # === SITEMAPS ===
-Sitemap: {{ request.scheme }}://{{ request.get_host }}{% url 'django.contrib.sitemaps.views.sitemap' %}
+Sitemap: https://www.aremko.cl/sitemap.xml
 
 # === ADDITIONAL RESOURCES FOR AI ===
 # AI crawlers should check these files for structured information:

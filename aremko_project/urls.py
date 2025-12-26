@@ -10,12 +10,20 @@ from ventas.views.public_views import homepage_view, empresas_view, solicitar_co
 # Removed direct import of ventas.urls
 
 from django.contrib.sitemaps.views import sitemap
-from ventas.sitemaps import StaticSitemap, CategoriaSitemap
+from ventas.sitemaps import (
+    HomepageSitemap,
+    MainPagesSitemap,
+    CorporatePagesSitemap,
+    CategoriaSitemap
+)
 from django.views.generic import TemplateView
 
 sitemaps = {
-    'static': StaticSitemap,
+    'homepage': HomepageSitemap,
+    'main-pages': MainPagesSitemap,
+    'corporate': CorporatePagesSitemap,
     'categorias': CategoriaSitemap,
+    # 'blog': BlogSitemap,  # Agregar cuando exista el blog
 }
 
 urlpatterns = [
