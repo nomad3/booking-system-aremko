@@ -197,6 +197,10 @@
             <div class="stat-value">{{ servicios_pendientes_count }}</div>
         </div>
         <div class="stat-card">
+            <div class="stat-label">Boleta de Honorarios (Bruto)</div>
+            <div class="stat-value">${{ total_bruto_comisiones|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="stat-card">
             <div class="stat-label">Total por Pagar (Neto)</div>
             <div class="stat-value">${{ total_pendiente|floatformat:0|intcomma }}</div>
         </div>
@@ -255,8 +259,13 @@
                     </tr>
                     {% endfor %}
                     <tr style="font-weight: bold; background: #f0f0f0;">
-                        <td colspan="6" style="padding: 10px; border-top: 2px solid #333;">TOTAL</td>
-                        <td style="padding: 10px; text-align: right; border-top: 2px solid #333;">${{ total_pendiente|floatformat:0|intcomma }}</td>
+                        <td colspan="5" style="padding: 10px; border-top: 2px solid #333;">TOTAL BRUTO (Boleta de Honorarios)</td>
+                        <td style="padding: 10px; text-align: right; border-top: 2px solid #333;">${{ total_bruto_comisiones|floatformat:0|intcomma }}</td>
+                        <td style="padding: 10px; text-align: right; border-top: 2px solid #333;"></td>
+                    </tr>
+                    <tr style="font-weight: bold; background: #e8f5e9;">
+                        <td colspan="6" style="padding: 10px;">TOTAL NETO (a Pagar)</td>
+                        <td style="padding: 10px; text-align: right;">${{ total_pendiente|floatformat:0|intcomma }}</td>
                     </tr>
                 </tbody>
             </table>

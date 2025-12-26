@@ -93,7 +93,8 @@ def dashboard_pagos_masajistas(request):
     ).order_by('fecha_agendamiento', 'hora_inicio')
 
     # Calcular totales solo para los servicios filtrados
-    total_pendiente = Decimal('0')
+    total_bruto_comisiones = Decimal('0')  # Total bruto para Boleta de Honorarios
+    total_pendiente = Decimal('0')  # Total neto a pagar
     servicios_con_montos = []
 
     for servicio in servicios_pendientes:
@@ -101,6 +102,7 @@ def dashboard_pagos_masajistas(request):
         if servicio.proveedor_asignado:
             monto_masajista = precio_servicio * (servicio.proveedor_asignado.porcentaje_comision / 100)
             monto_con_retencion = monto_masajista * Decimal('0.855')  # Descuenta 14.5%
+            total_bruto_comisiones += monto_masajista  # Suma el total bruto
             total_pendiente += monto_con_retencion
 
             servicios_con_montos.append({
@@ -124,6 +126,7 @@ def dashboard_pagos_masajistas(request):
         'fecha_fin': fecha_fin,
         'servicios': servicios_con_montos,
         'servicios_pendientes_count': len(servicios_con_montos),
+        'total_bruto_comisiones': total_bruto_comisiones,  # Total bruto para Boleta de Honorarios
         'total_pendiente': total_pendiente,
         'ultimos_pagos': ultimos_pagos,
     }
