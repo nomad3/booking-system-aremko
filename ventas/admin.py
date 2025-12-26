@@ -74,6 +74,8 @@ class ReservaServicioInline(admin.TabularInline):
     form = ReservaServicioInlineForm
     extra = 1
     autocomplete_fields = ['proveedor_asignado']
+    fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas', 'mostrar_valor_unitario', 'mostrar_valor_total', 'proveedor_asignado']
+    readonly_fields = ['mostrar_valor_unitario', 'mostrar_valor_total']
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "servicio":

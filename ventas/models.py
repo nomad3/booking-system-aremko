@@ -896,6 +896,18 @@ class ReservaServicio(models.Model):
     def subtotal(self):
         return self.calcular_precio()
 
+    def mostrar_valor_unitario(self):
+        """Muestra el valor unitario del servicio formateado."""
+        valor = self.servicio.precio_base
+        return f"${valor:,.0f}".replace(',', '.')
+    mostrar_valor_unitario.short_description = 'Valor Unitario'
+
+    def mostrar_valor_total(self):
+        """Muestra el valor total calculado formateado."""
+        valor = self.calcular_precio()
+        return f"${valor:,.0f}".replace(',', '.')
+    mostrar_valor_total.short_description = 'Valor Total'
+
     def clean(self):
         # Basic validation example: Ensure assigned provider is valid for the service type
         super().clean()
