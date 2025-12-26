@@ -172,7 +172,7 @@ class Compra(models.Model):
         ('scotiabankalda', 'scotiabank alda'),
         ('copecjorge', 'copec jorge'),
         ('copecalda', 'copec alda'),
-        ('copecmartin', 'copec martin'),
+        ('booking', 'booking'),
     ]
 
     fecha_compra = models.DateField(default=timezone.now)
@@ -784,7 +784,7 @@ class Pago(models.Model):
         ('scotiabankalda', 'scotiabank alda'),
         ('copecjorge', 'copec jorge'),
         ('copecalda', 'copec alda'),
-        ('copecmartin', 'copec martin'),
+        ('booking', 'booking'),
     ]
 
     venta_reserva = models.ForeignKey(VentaReserva, related_name='pagos', on_delete=models.CASCADE)
