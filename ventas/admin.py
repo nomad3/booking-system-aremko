@@ -389,6 +389,13 @@ class GiftCardAdmin(admin.ModelAdmin):
     list_filter = ('estado', 'fecha_emision', 'fecha_vencimiento')
     readonly_fields = ('codigo', 'monto_disponible')
     autocomplete_fields = ['cliente_comprador', 'cliente_destinatario']  # Habilitar autocompletar
+    change_list_template = 'admin/ventas/giftcard/change_list.html'
+
+    def changelist_view(self, request, extra_context=None):
+        """Agregar botón de diagnóstico en la vista de listado"""
+        extra_context = extra_context or {}
+        extra_context['diagnostico_url'] = '/diagnostico/giftcards/'
+        return super().changelist_view(request, extra_context=extra_context)
 
 class CategoriaProductoAdmin(admin.ModelAdmin):
     list_display = ('nombre',)
