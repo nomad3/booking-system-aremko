@@ -21,6 +21,16 @@ class VentaReservaAdminForm(forms.ModelForm):
         model = VentaReserva
         fields = '__all__'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Convertir datetime a date para mostrar en el campo cuando se edita
+        if self.instance and self.instance.pk and self.instance.fecha_reserva:
+            # Si es un datetime, extraer solo la fecha
+            if isinstance(self.instance.fecha_reserva, datetime):
+                self.initial['fecha_reserva'] = self.instance.fecha_reserva.date()
+            else:
+                self.initial['fecha_reserva'] = self.instance.fecha_reserva
+
 class ReservaProductoForm(forms.ModelForm):
     class Meta:
         model = ReservaProducto
