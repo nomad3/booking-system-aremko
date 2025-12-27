@@ -251,7 +251,7 @@
 
             {% for nombre, metrica in diagnostico.metricas.items %}
             <div class="metric">
-                <span class="metric-label">{{ nombre|title|replace:"_":" " }}:</span>
+                <span class="metric-label">{{ nombre|title }}:</span>
                 <div>
                     {% if metrica.valor is not None %}
                         <span class="metric-value">{{ metrica.valor }}</span>
