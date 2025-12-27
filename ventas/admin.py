@@ -204,14 +204,8 @@ class VentaReservaAdmin(admin.ModelAdmin):
                 'total',
                 'pagado',
                 'saldo_pendiente',
-                'servicios_y_cantidades',
-                'productos_y_cantidades',
-                'cobrado',
                 'estado_pago',
-                'estado_reserva',
-                'codigo_giftcard',
-                'total_servicios',
-                'total_productos'
+                'estado_reserva'
             )
         }),
         ('Detalles', {
