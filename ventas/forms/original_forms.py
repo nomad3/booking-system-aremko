@@ -7,19 +7,16 @@ from datetime import datetime, time
 class VentaReservaAdminForm(forms.ModelForm):
     """Formulario personalizado para VentaReserva que solo muestra fecha (sin hora)."""
 
+    # Sobrescribir el campo para usar DateField en lugar de DateTimeField en el formulario
+    fecha_reserva = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        label='Fecha Venta Reserva'
+    )
+
     class Meta:
         model = VentaReserva
         fields = '__all__'
-        widgets = {
-            'fecha_reserva': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Si el campo existe, configurar solo para fecha
-        if 'fecha_reserva' in self.fields:
-            self.fields['fecha_reserva'].input_formats = ['%Y-%m-%d']
-            self.fields['fecha_reserva'].label = 'Fecha Venta Reserva'
 
 class ReservaProductoForm(forms.ModelForm):
     class Meta:
@@ -74,8 +71,19 @@ class PagoInlineForm(forms.ModelForm):
         if metodo_pago == 'giftcard':
             if not giftcard:
                 raise ValidationError("Debe seleccionar una gift card para este método de pago.")
-            if giftcard.monto_disponible < monto:
-                raise ValidationError("El monto excede el saldo disponible en la gift card.")
+
+            # Asegurar que monto y monto_disponible sean del mismo tipo (Decimal)
+            from decimal import Decimal
+            monto_decimal = Decimal(str(monto)) if monto else Decimal('0')
+            saldo_disponible = Decimal(str(giftcard.monto_disponible))
+
+            # Validar saldo disponible
+            if saldo_disponible < monto_decimal:
+                raise ValidationError(
+                    f"El monto ({monto_decimal}) excede el saldo disponible en la gift card ({saldo_disponible})."
+                )
+
+            # Validar fecha de vencimiento
             if giftcard.fecha_vencimiento < timezone.now().date():
                 raise ValidationError("La gift card ha expirado.")
         else:
