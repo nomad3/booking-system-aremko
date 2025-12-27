@@ -16,3 +16,4 @@ from . import tips_reserva_view
 from . import pagos_masajistas_views
 from . import diagnostico_views
 from . import diagnostico_test
+from . import diagnostico_simple
