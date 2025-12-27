@@ -91,7 +91,7 @@ class PagoInlineForm(forms.ModelForm):
 class PagoInlineFormSet(BaseInlineFormSet):
     """
     Formset personalizado para validar múltiples pagos con la misma GiftCard.
-    Considera todos los pagos en el formset para calcular el saldo disponible.
+    Solo valida NUEVOS pagos (sin pk) contra el saldo disponible actual.
     """
 
     def clean(self):
@@ -100,11 +100,18 @@ class PagoInlineFormSet(BaseInlineFormSet):
         if any(self.errors):
             return
 
-        # Agrupar pagos por GiftCard
+        # Agrupar SOLO pagos NUEVOS por GiftCard (que no tienen pk/id)
         giftcard_usage = defaultdict(Decimal)
 
         for form in self.forms:
             if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
+                # IMPORTANTE: Solo validar pagos nuevos (sin pk)
+                # Los pagos existentes ya fueron descontados del saldo
+                instance = form.instance
+                if instance.pk:
+                    # Este pago ya existe en la BD, skip
+                    continue
+
                 metodo_pago = form.cleaned_data.get('metodo_pago')
                 giftcard = form.cleaned_data.get('giftcard')
                 monto = form.cleaned_data.get('monto')
@@ -119,10 +126,10 @@ class PagoInlineFormSet(BaseInlineFormSet):
                             f"La gift card {giftcard.codigo} ha expirado."
                         )
 
-                    # Acumular uso de esta giftcard
+                    # Acumular uso de esta giftcard (solo pagos nuevos)
                     giftcard_usage[giftcard.id] += monto_decimal
 
-        # Validar que cada GiftCard tenga saldo suficiente para todos sus pagos
+        # Validar que cada GiftCard tenga saldo suficiente para los pagos NUEVOS
         for giftcard_id, total_usado in giftcard_usage.items():
             # Buscar la giftcard
             from ..models import GiftCard
@@ -131,7 +138,7 @@ class PagoInlineFormSet(BaseInlineFormSet):
 
             if total_usado > saldo_disponible:
                 raise ValidationError(
-                    f"El total de pagos con la GiftCard {giftcard.codigo} ({total_usado}) "
+                    f"El total de pagos nuevos con la GiftCard {giftcard.codigo} ({total_usado}) "
                     f"excede el saldo disponible ({saldo_disponible})."
                 )
 

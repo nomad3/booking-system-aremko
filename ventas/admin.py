@@ -220,17 +220,23 @@ class VentaReservaAdmin(admin.ModelAdmin):
     # Guardar cambios con registro de movimiento
     def save_model(self, request, obj, form, change):
         # Si fecha_reserva solo tiene fecha (sin hora), agregar hora actual
-        if obj.fecha_reserva and isinstance(obj.fecha_reserva, date) and not isinstance(obj.fecha_reserva, datetime):
-            # Convertir date a datetime con hora actual
-            obj.fecha_reserva = timezone.make_aware(
-                datetime.combine(obj.fecha_reserva, timezone.now().time())
-            )
-        elif obj.fecha_reserva and isinstance(obj.fecha_reserva, datetime):
-            # Si ya es datetime pero no tiene hora específica (00:00:00), usar hora actual
-            if obj.fecha_reserva.time() == datetime.min.time():
+        if obj.fecha_reserva:
+            if isinstance(obj.fecha_reserva, date) and not isinstance(obj.fecha_reserva, datetime):
+                # Es un objeto date, convertir a datetime con hora actual
                 obj.fecha_reserva = timezone.make_aware(
-                    datetime.combine(obj.fecha_reserva.date(), timezone.now().time())
+                    datetime.combine(obj.fecha_reserva, timezone.now().time())
                 )
+            elif isinstance(obj.fecha_reserva, datetime):
+                # Es datetime, verificar si es naive y si tiene hora 00:00:00
+                if timezone.is_naive(obj.fecha_reserva):
+                    # Datetime naive, hacerlo aware con la hora actual si es 00:00:00
+                    if obj.fecha_reserva.time() == datetime.min.time():
+                        obj.fecha_reserva = timezone.make_aware(
+                            datetime.combine(obj.fecha_reserva.date(), timezone.now().time())
+                        )
+                    else:
+                        # Tiene hora específica, solo hacerlo aware
+                        obj.fecha_reserva = timezone.make_aware(obj.fecha_reserva)
 
         # First save the object without checking for usuario
         super().save_model(request, obj, form, change)
