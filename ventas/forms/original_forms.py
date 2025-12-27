@@ -1,7 +1,25 @@
 from django import forms
-from ..models import ReservaProducto, Pago, Campaign
+from ..models import ReservaProducto, Pago, Campaign, VentaReserva
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from datetime import datetime, time
+
+class VentaReservaAdminForm(forms.ModelForm):
+    """Formulario personalizado para VentaReserva que solo muestra fecha (sin hora)."""
+
+    class Meta:
+        model = VentaReserva
+        fields = '__all__'
+        widgets = {
+            'fecha_reserva': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Si el campo existe, configurar solo para fecha
+        if 'fecha_reserva' in self.fields:
+            self.fields['fecha_reserva'].input_formats = ['%Y-%m-%d']
+            self.fields['fecha_reserva'].label = 'Fecha Venta Reserva'
 
 class ReservaProductoForm(forms.ModelForm):
     class Meta:
