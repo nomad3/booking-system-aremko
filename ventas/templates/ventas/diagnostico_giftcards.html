@@ -1,0 +1,364 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico Sistema GiftCards</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .timestamp {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        .metric-label {
+            font-weight: 500;
+            color: #555;
+        }
+
+        .metric-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2196F3;
+        }
+
+        .metric-time {
+            font-size: 12px;
+            color: #999;
+            margin-left: 10px;
+        }
+
+        .query-lenta {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .query-lenta strong {
+            color: #856404;
+        }
+
+        .warning {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            color: #721c24;
+        }
+
+        .recomendacion {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            color: #0c5460;
+        }
+
+        .analisis {
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .severidad-alta {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+
+        .severidad-media {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+        }
+
+        .severidad-baja {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+
+        .bottleneck {
+            background: #f9f9f9;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+
+        .bottleneck h4 {
+            color: #333;
+            margin-bottom: 6px;
+        }
+
+        .bottleneck p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .bottleneck .solucion {
+            color: #2196F3;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .indice {
+            background: #e8f5e9;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            border-left: 3px solid #4caf50;
+        }
+
+        .indice-modelo {
+            font-weight: bold;
+            color: #2e7d32;
+        }
+
+        .indice-campo {
+            color: #1b5e20;
+            font-family: monospace;
+        }
+
+        .json-viewer {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        .badge-danger { background: #f8d7da; color: #721c24; }
+
+        .acciones {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico Sistema GiftCards</h1>
+        <p class="timestamp">Generado: {{ diagnostico.timestamp }}</p>
+
+        <!-- Análisis Automático -->
+        {% if diagnostico.analisis_automatico %}
+        <div class="card">
+            <h2>⚠️ Análisis Automático</h2>
+            {% for analisis in diagnostico.analisis_automatico %}
+            <div class="analisis severidad-{{ analisis.severidad|lower }}">
+                <strong>{{ analisis.severidad }}:</strong> {{ analisis.mensaje }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Métricas Principales -->
+        <div class="card">
+            <h2>📊 Métricas del Sistema</h2>
+
+            {% for nombre, metrica in diagnostico.metricas.items %}
+            <div class="metric">
+                <span class="metric-label">{{ nombre|title|replace:"_":" " }}:</span>
+                <div>
+                    {% if metrica.valor is not None %}
+                        <span class="metric-value">{{ metrica.valor }}</span>
+                    {% elif metrica.valores %}
+                        <span class="metric-value">
+                            {% for estado, count in metrica.valores.items %}
+                                {{ estado }}: {{ count }}{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                        </span>
+                    {% endif %}
+                    <span class="metric-time">{{ metrica.tiempo_ms }}ms</span>
+                </div>
+            </div>
+            {% endfor %}
+
+            <div class="metric">
+                <span class="metric-label">Tiempo total diagnóstico:</span>
+                <span class="metric-value">{{ diagnostico.tiempo_diagnostico_ms }}ms</span>
+            </div>
+        </div>
+
+        <!-- Queries Lentas -->
+        {% if diagnostico.queries_lentas %}
+        <div class="card">
+            <h2>🐌 Queries Lentas Detectadas</h2>
+            {% for query in diagnostico.queries_lentas %}
+            <div class="query-lenta">
+                <strong>{{ query.query }}</strong><br>
+                <span style="color: #856404;">⏱️ Tiempo: {{ query.tiempo_ms }}ms</span><br>
+                <span style="font-size: 13px;">❌ Problema: {{ query.problema }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Warnings -->
+        {% if diagnostico.warnings %}
+        <div class="card">
+            <h2>⚠️ Advertencias</h2>
+            {% for warning in diagnostico.warnings %}
+            <div class="warning">{{ warning }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Recomendaciones -->
+        {% if diagnostico.recomendaciones %}
+        <div class="card">
+            <h2>💡 Recomendaciones</h2>
+            {% for rec in diagnostico.recomendaciones %}
+            <div class="recomendacion">✅ {{ rec }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Bottlenecks Potenciales -->
+        <div class="card">
+            <h2>🚧 Bottlenecks Potenciales</h2>
+            {% for bottleneck in diagnostico.bottlenecks_potenciales %}
+            <div class="bottleneck">
+                <h4>{{ bottleneck.area }}</h4>
+                <p>{{ bottleneck.descripcion }}</p>
+                <p class="solucion">💡 Solución: {{ bottleneck.solucion }}</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Índices Recomendados -->
+        <div class="card">
+            <h2>🗂️ Índices Recomendados</h2>
+            {% for indice in diagnostico.indices_recomendados %}
+            <div class="indice">
+                <span class="indice-modelo">{{ indice.modelo }}</span>.<span class="indice-campo">{{ indice.campo }}</span>
+                <br><span style="font-size: 13px; color: #555;">📝 {{ indice.razon }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Configuración del Servidor -->
+        <div class="card">
+            <h2>⚙️ Configuración del Servidor</h2>
+            <div class="metric">
+                <span class="metric-label">Timeout recomendado:</span>
+                <span class="metric-value" style="font-size: 14px;">{{ diagnostico.configuracion_servidor.timeout_recomendado }}</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Workers recomendado:</span>
+                <span class="metric-value" style="font-size: 14px;">{{ diagnostico.configuracion_servidor.workers_recomendado }}</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Worker class:</span>
+                <span class="metric-value" style="font-size: 14px;">{{ diagnostico.configuracion_servidor.worker_class }}</span>
+            </div>
+        </div>
+
+        <!-- JSON Raw -->
+        <div class="card">
+            <h2>📄 Datos Raw (JSON)</h2>
+            <pre class="json-viewer">{{ diagnostico_json }}</pre>
+        </div>
+
+        <!-- Acciones -->
+        <div class="acciones">
+            <a href="?formato=json" class="btn btn-primary" target="_blank">📥 Descargar JSON</a>
+            <a href="/admin/" class="btn btn-secondary">← Volver al Admin</a>
+            <button onclick="location.reload()" class="btn btn-secondary">🔄 Recargar</button>
+        </div>
+    </div>
+</body>
+</html>
