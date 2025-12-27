@@ -2,7 +2,7 @@ from django.contrib import admin, messages
 from solo.admin import SingletonModelAdmin
 from django import forms
 from django.db import models
-from .forms import PagoInlineForm, VentaReservaAdminForm
+from .forms import PagoInlineForm, PagoInlineFormSet, VentaReservaAdminForm
 from django.forms import DateTimeInput
 from datetime import date, datetime, timedelta  # Importa date, datetime, y timedelta
 from django.utils import timezone
@@ -96,6 +96,7 @@ class ReservaProductoInline(admin.TabularInline):
 class PagoInline(admin.TabularInline):
     model = Pago
     form = PagoInlineForm
+    formset = PagoInlineFormSet
     extra = 1
     fields = ['fecha_pago', 'monto', 'metodo_pago', 'giftcard']
     autocomplete_fields = ['giftcard']

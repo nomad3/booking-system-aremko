@@ -1,8 +1,11 @@
 from django import forms
+from django.forms import BaseInlineFormSet
 from ..models import ReservaProducto, Pago, Campaign, VentaReserva
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import datetime, time
+from decimal import Decimal
+from collections import defaultdict
 
 class VentaReservaAdminForm(forms.ModelForm):
     """Formulario personalizado para VentaReserva que solo muestra fecha (sin hora)."""
@@ -66,26 +69,11 @@ class PagoInlineForm(forms.ModelForm):
         cleaned_data = super().clean()
         metodo_pago = cleaned_data.get('metodo_pago')
         giftcard = cleaned_data.get('giftcard')
-        monto = cleaned_data.get('monto')
 
+        # Validaciones básicas (la validación de saldo se hace en PagoInlineFormSet)
         if metodo_pago == 'giftcard':
             if not giftcard:
                 raise ValidationError("Debe seleccionar una gift card para este método de pago.")
-
-            # Asegurar que monto y monto_disponible sean del mismo tipo (Decimal)
-            from decimal import Decimal
-            monto_decimal = Decimal(str(monto)) if monto else Decimal('0')
-            saldo_disponible = Decimal(str(giftcard.monto_disponible))
-
-            # Validar saldo disponible
-            if saldo_disponible < monto_decimal:
-                raise ValidationError(
-                    f"El monto ({monto_decimal}) excede el saldo disponible en la gift card ({saldo_disponible})."
-                )
-
-            # Validar fecha de vencimiento
-            if giftcard.fecha_vencimiento < timezone.now().date():
-                raise ValidationError("La gift card ha expirado.")
         else:
             if giftcard:
                 raise ValidationError("No debe seleccionar una gift card para este método de pago.")
@@ -99,6 +87,53 @@ class PagoInlineForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+class PagoInlineFormSet(BaseInlineFormSet):
+    """
+    Formset personalizado para validar múltiples pagos con la misma GiftCard.
+    Considera todos los pagos en el formset para calcular el saldo disponible.
+    """
+
+    def clean(self):
+        super().clean()
+
+        if any(self.errors):
+            return
+
+        # Agrupar pagos por GiftCard
+        giftcard_usage = defaultdict(Decimal)
+
+        for form in self.forms:
+            if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
+                metodo_pago = form.cleaned_data.get('metodo_pago')
+                giftcard = form.cleaned_data.get('giftcard')
+                monto = form.cleaned_data.get('monto')
+
+                if metodo_pago == 'giftcard' and giftcard and monto:
+                    # Convertir a Decimal
+                    monto_decimal = Decimal(str(monto))
+
+                    # Validar fecha de vencimiento
+                    if giftcard.fecha_vencimiento < timezone.now().date():
+                        raise ValidationError(
+                            f"La gift card {giftcard.codigo} ha expirado."
+                        )
+
+                    # Acumular uso de esta giftcard
+                    giftcard_usage[giftcard.id] += monto_decimal
+
+        # Validar que cada GiftCard tenga saldo suficiente para todos sus pagos
+        for giftcard_id, total_usado in giftcard_usage.items():
+            # Buscar la giftcard
+            from ..models import GiftCard
+            giftcard = GiftCard.objects.get(id=giftcard_id)
+            saldo_disponible = Decimal(str(giftcard.monto_disponible))
+
+            if total_usado > saldo_disponible:
+                raise ValidationError(
+                    f"El total de pagos con la GiftCard {giftcard.codigo} ({total_usado}) "
+                    f"excede el saldo disponible ({saldo_disponible})."
+                )
 
 class SelectCampaignForm(forms.Form):
     campaign = forms.ModelChoiceField(
