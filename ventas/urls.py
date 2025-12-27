@@ -184,6 +184,7 @@ urlpatterns = [
     path('giftcard/<str:codigo>/download/', giftcard_views.giftcard_download_pdf, name='giftcard_download_pdf'),
     # Diagnóstico de GiftCards (solo staff)
     path('diagnostico/giftcards/', diagnostico_views.diagnostico_giftcards, name='diagnostico_giftcards'),
+    path('diagnostico/test/', diagnostico_test.diagnostico_test, name='diagnostico_test'),
     # === END GIFTCARD WIZARD ===
 
     # === PREMIOS Y FIDELIZACIÓN ===
