@@ -394,7 +394,7 @@ class GiftCardAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         """Agregar botón de diagnóstico en la vista de listado"""
         extra_context = extra_context or {}
-        extra_context['diagnostico_url'] = '/diagnostico/giftcards/'
+        extra_context['diagnostico_url'] = '/ventas/diagnostico/giftcards/'
         return super().changelist_view(request, extra_context=extra_context)
 
 class CategoriaProductoAdmin(admin.ModelAdmin):
