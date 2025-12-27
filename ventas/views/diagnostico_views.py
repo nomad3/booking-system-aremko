@@ -18,8 +18,6 @@ import json
 from ..models import GiftCard, GiftCardExperiencia, VentaReserva, Pago
 
 
-@staff_member_required
-@require_http_methods(["GET"])
 def diagnostico_giftcards(request):
     """
     Endpoint de diagnóstico para identificar problemas de performance
@@ -27,6 +25,10 @@ def diagnostico_giftcards(request):
 
     Solo accesible para staff.
     """
+
+    # Verificar que es usuario staff
+    if not request.user.is_staff:
+        return JsonResponse({'error': 'No autorizado'}, status=403)
 
     # Iniciar medición de tiempo total
     inicio_total = time.time()

@@ -8,8 +8,6 @@ from django.views.decorators.http import require_http_methods
 from django.contrib.admin.views.decorators import staff_member_required
 
 
-@staff_member_required
-@require_http_methods(["GET"])
 def diagnostico_test(request):
     """Vista de prueba simple"""
     return JsonResponse({
