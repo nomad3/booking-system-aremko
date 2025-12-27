@@ -2,7 +2,7 @@ from django.contrib import admin, messages
 from solo.admin import SingletonModelAdmin
 from django import forms
 from django.db import models
-from .forms import PagoInlineForm
+from .forms import PagoInlineForm, VentaReservaAdminForm
 from django.forms import DateTimeInput
 from datetime import date, datetime, timedelta  # Importa date, datetime, y timedelta
 from django.utils import timezone
@@ -178,7 +178,8 @@ def registrar_movimiento(cliente, tipo_movimiento, descripcion, usuario):
     )
 
 class VentaReservaAdmin(admin.ModelAdmin):
-    list_per_page = 50  
+    form = VentaReservaAdminForm
+    list_per_page = 50
     autocomplete_fields = ['cliente']
     list_display = (
         'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago',
@@ -217,9 +218,22 @@ class VentaReservaAdmin(admin.ModelAdmin):
     
     # Guardar cambios con registro de movimiento
     def save_model(self, request, obj, form, change):
+        # Si fecha_reserva solo tiene fecha (sin hora), agregar hora actual
+        if obj.fecha_reserva and isinstance(obj.fecha_reserva, date) and not isinstance(obj.fecha_reserva, datetime):
+            # Convertir date a datetime con hora actual
+            obj.fecha_reserva = timezone.make_aware(
+                datetime.combine(obj.fecha_reserva, timezone.now().time())
+            )
+        elif obj.fecha_reserva and isinstance(obj.fecha_reserva, datetime):
+            # Si ya es datetime pero no tiene hora específica (00:00:00), usar hora actual
+            if obj.fecha_reserva.time() == datetime.min.time():
+                obj.fecha_reserva = timezone.make_aware(
+                    datetime.combine(obj.fecha_reserva.date(), timezone.now().time())
+                )
+
         # First save the object without checking for usuario
         super().save_model(request, obj, form, change)
-        
+
         # Then create the movement record
         if not change:  # Only for new instances
             MovimientoCliente.objects.create(
