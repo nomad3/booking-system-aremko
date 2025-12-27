@@ -10,26 +10,39 @@ from collections import defaultdict
 class VentaReservaAdminForm(forms.ModelForm):
     """Formulario personalizado para VentaReserva que solo muestra fecha (sin hora)."""
 
-    # Sobrescribir el campo para usar DateField en lugar de DateTimeField en el formulario
-    fecha_reserva = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={'type': 'date'}),
-        label='Fecha Venta Reserva'
-    )
-
     class Meta:
         model = VentaReserva
         fields = '__all__'
+        widgets = {
+            'fecha_reserva': forms.DateInput(
+                attrs={'type': 'date'},
+                format='%Y-%m-%d'
+            ),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Convertir datetime a date para mostrar en el campo cuando se edita
-        if self.instance and self.instance.pk and self.instance.fecha_reserva:
-            # Si es un datetime, extraer solo la fecha
-            if isinstance(self.instance.fecha_reserva, datetime):
-                self.initial['fecha_reserva'] = self.instance.fecha_reserva.date()
-            else:
-                self.initial['fecha_reserva'] = self.instance.fecha_reserva
+
+        # Configurar el campo de fecha para aceptar solo fechas
+        if 'fecha_reserva' in self.fields:
+            # Cambiar a DateField en lugar de DateTimeField
+            from django.forms import DateField
+            self.fields['fecha_reserva'] = DateField(
+                required=False,
+                widget=forms.DateInput(
+                    attrs={'type': 'date'},
+                    format='%Y-%m-%d'
+                ),
+                input_formats=['%Y-%m-%d'],
+                label='Fecha Venta Reserva'
+            )
+
+            # Si hay una instancia, establecer el valor inicial
+            if self.instance and self.instance.pk and self.instance.fecha_reserva:
+                if isinstance(self.instance.fecha_reserva, datetime):
+                    self.fields['fecha_reserva'].initial = self.instance.fecha_reserva.date()
+                else:
+                    self.fields['fecha_reserva'].initial = self.instance.fecha_reserva
 
 class ReservaProductoForm(forms.ModelForm):
     class Meta:
