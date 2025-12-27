@@ -856,6 +856,18 @@ class ReservaProducto(models.Model):
     def __str__(self):
         return f"{self.cantidad} x {self.producto.nombre} en Venta/Reserva #{self.venta_reserva.id}"
 
+    def mostrar_valor_unitario(self):
+        """Muestra el valor unitario del producto formateado."""
+        valor = self.producto.precio_base
+        return f"${valor:,.0f}".replace(',', '.')
+    mostrar_valor_unitario.short_description = 'Valor Unitario'
+
+    def mostrar_valor_total(self):
+        """Muestra el valor total calculado formateado."""
+        valor = self.producto.precio_base * self.cantidad
+        return f"${valor:,.0f}".replace(',', '.')
+    mostrar_valor_total.short_description = 'Valor Total'
+
 class ReservaServicio(models.Model):
     venta_reserva = models.ForeignKey(VentaReserva, on_delete=models.CASCADE, related_name='reservaservicios')
     servicio = models.ForeignKey(Servicio, on_delete=models.CASCADE)
