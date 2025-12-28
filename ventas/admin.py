@@ -389,7 +389,7 @@ class GiftCardAdmin(admin.ModelAdmin):
     search_fields = ('codigo', 'cliente_comprador__nombre', 'cliente_destinatario__nombre')
     list_filter = ('estado', 'fecha_emision', 'fecha_vencimiento')
     readonly_fields = ('codigo', 'monto_disponible')
-    autocomplete_fields = ['cliente_comprador', 'cliente_destinatario']  # Habilitar autocompletar
+    autocomplete_fields = ['cliente_comprador', 'cliente_destinatario', 'venta_reserva']  # FIX: Agregar venta_reserva para evitar N+1
     change_list_template = 'admin/ventas/giftcard/change_list.html'
     list_select_related = ('cliente_comprador', 'cliente_destinatario', 'venta_reserva')  # Optimizar list view
 
