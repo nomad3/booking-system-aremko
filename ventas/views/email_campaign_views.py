@@ -248,11 +248,19 @@ def save_email_campaign(request):
 
             recipients_to_create = []
             recipients_created = 0
+            emails_procesados = set()  # Para evitar duplicados de email
 
             for cliente in clientes:
                 # Saltar clientes sin email
                 if not cliente.email or cliente.email.strip() == '':
                     continue
+
+                # OPTIMIZACIÓN: Saltar emails duplicados (si hay múltiples clientes con mismo email)
+                email_normalizado = cliente.email.strip().lower()
+                if email_normalizado in emails_procesados:
+                    logger.debug(f"Saltando email duplicado: {email_normalizado}")
+                    continue
+                emails_procesados.add(email_normalizado)
 
                 try:
                     # Obtener primer nombre de forma segura
@@ -276,7 +284,7 @@ def save_email_campaign(request):
                     recipients_to_create.append(EmailRecipient(
                         campaign=campaign,
                         client=cliente,
-                        email=cliente.email.strip(),
+                        email=email_normalizado,  # Usar email normalizado (lowercase)
                         name=primer_nombre,
                         personalized_subject=subject,
                         personalized_body=body,
