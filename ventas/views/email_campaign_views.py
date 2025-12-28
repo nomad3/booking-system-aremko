@@ -212,20 +212,31 @@ def save_email_campaign(request):
         }
         
         with transaction.atomic():
-            # Crear EmailCampaign
-            campaign = EmailCampaign.objects.create(
+            # OPTIMIZACIÓN: Buscar si ya existe una campaña con este nombre (para permitir re-intentos)
+            campaign, created = EmailCampaign.objects.get_or_create(
                 name=campaign_name,
-                email_subject_template=email_subject,
-                email_body_template=email_body,
-                status='draft',
-                schedule_config=schedule_config,
-                ai_variation_enabled=schedule_config['ai_enabled'],
-                created_by=request.user
+                created_by=request.user,
+                defaults={
+                    'email_subject_template': email_subject,
+                    'email_body_template': email_body,
+                    'status': 'draft',
+                    'schedule_config': schedule_config,
+                    'ai_variation_enabled': schedule_config['ai_enabled'],
+                }
             )
+
+            # Si la campaña ya existía, actualizar sus campos
+            if not created:
+                campaign.email_subject_template = email_subject
+                campaign.email_body_template = email_body
+                campaign.schedule_config = schedule_config
+                campaign.ai_variation_enabled = schedule_config['ai_enabled']
+                campaign.save()
 
             # OPTIMIZACIÓN: Limpiar recipients existentes de esta campaña para evitar duplicados
             # Esto permite re-intentar guardar la campaña sin errores
             EmailRecipient.objects.filter(campaign=campaign).delete()
+            logger.info(f"Limpiados recipients existentes de campaña '{campaign_name}'")
 
             # OPTIMIZACIÓN: Crear EmailRecipients usando bulk_create
             # En lugar de procesar uno por uno, crear todos de una vez
