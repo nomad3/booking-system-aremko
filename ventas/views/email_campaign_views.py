@@ -222,29 +222,33 @@ def save_email_campaign(request):
                 ai_variation_enabled=schedule_config['ai_enabled'],
                 created_by=request.user
             )
-            
-            # Crear EmailRecipients
-            clientes = Cliente.objects.filter(id__in=selected_client_ids)
+
+            # OPTIMIZACIÓN: Crear EmailRecipients usando bulk_create
+            # En lugar de procesar uno por uno, crear todos de una vez
+            clientes = Cliente.objects.filter(
+                id__in=selected_client_ids
+            ).select_related('comuna').only(
+                'id', 'nombre', 'email', 'ciudad', 'comuna'
+            )
+
+            recipients_to_create = []
             recipients_created = 0
-            
+
             for cliente in clientes:
                 # Saltar clientes sin email
                 if not cliente.email or cliente.email.strip() == '':
                     continue
 
                 try:
-                    # Calcular datos del cliente
-                    gasto_total = cliente.gasto_total()
-
-
                     # Obtener primer nombre de forma segura
                     nombre_completo = (cliente.nombre or 'Cliente').strip()
                     primer_nombre = nombre_completo.split()[0] if nombre_completo and ' ' in nombre_completo else nombre_completo
 
-                    # Personalizar contenido
+                    # Personalizar contenido (sin {gasto_total} por ahora para velocidad)
                     subject = email_subject.replace('{nombre_cliente}', primer_nombre)
                     body = email_body.replace('{nombre_cliente}', primer_nombre)
-                    body = body.replace('{gasto_total}', f'{gasto_total:,.0f}')
+                    # Dejar placeholder de gasto_total para calcular después
+                    body = body.replace('{gasto_total}', '[Gasto Total]')
 
                     # Obtener ubicación (preferir comuna sobre ciudad)
                     ubicacion = 'N/A'
@@ -253,47 +257,34 @@ def save_email_campaign(request):
                     elif cliente.ciudad:
                         ubicacion = cliente.ciudad
 
-                    # Obtener última visita de forma segura
-                    ultima_venta = cliente.ventareserva_set.order_by('-fecha_reserva').first()
-                    ultima_visita = ultima_venta.fecha_reserva if ultima_venta else None
-
-                    # Crear o actualizar destinatario (evita duplicados)
-                    recipient, created = EmailRecipient.objects.get_or_create(
+                    # OPTIMIZACIÓN: Crear objeto sin guardarlo todavía
+                    recipients_to_create.append(EmailRecipient(
                         campaign=campaign,
+                        client=cliente,
                         email=cliente.email.strip(),
-                        defaults={
-                            'client': cliente,
-                            'name': primer_nombre,
-                            'personalized_subject': subject,
-                            'personalized_body': body,
-                            'client_total_spend': gasto_total,
-                            'client_visit_count': cliente.ventareserva_set.count(),
-                            'client_last_visit': ultima_visita,
-                            'client_city': ubicacion,
-                            'status': 'pending',
-                            'send_enabled': True,
-                            'priority': 1
-                        }
-                    )
-                    
-                    # Si ya existía, actualizar los datos
-                    if not created:
-                        recipient.client = cliente
-                        recipient.name = primer_nombre
-                        recipient.personalized_subject = subject
-                        recipient.personalized_body = body
-                        recipient.client_total_spend = gasto_total
-                        recipient.client_visit_count = cliente.ventareserva_set.count()
-                        recipient.client_last_visit = ultima_visita
-                        recipient.client_city = ubicacion
-                        recipient.save()
-                    
+                        name=primer_nombre,
+                        personalized_subject=subject,
+                        personalized_body=body,
+                        client_total_spend=0,  # Se calculará después en background
+                        client_visit_count=0,  # Se calculará después en background
+                        client_last_visit=None,  # Se calculará después en background
+                        client_city=ubicacion,
+                        status='pending',
+                        send_enabled=True,
+                        priority=1
+                    ))
+
                     recipients_created += 1
                 except Exception as e:
                     # Log el error pero continua con el siguiente cliente
                     logger.error(f"Error creando destinatario para cliente {cliente.id}: {str(e)}")
                     continue
-            
+
+            # OPTIMIZACIÓN: Guardar todos los recipients de una vez usando bulk_create
+            if recipients_to_create:
+                EmailRecipient.objects.bulk_create(recipients_to_create, batch_size=500)
+                logger.info(f"✅ Creados {len(recipients_to_create)} EmailRecipients usando bulk_create")
+
             # Validar que se haya creado al menos un destinatario
             if recipients_created == 0:
                 # Eliminar la campaña si no hay destinatarios
