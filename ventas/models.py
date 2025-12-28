@@ -204,9 +204,9 @@ class GiftCard(models.Model):
     codigo = models.CharField(max_length=12, unique=True, editable=False)
     monto_inicial = models.DecimalField(max_digits=10, decimal_places=0)
     monto_disponible = models.DecimalField(max_digits=10, decimal_places=0)
-    fecha_emision = models.DateField(default=timezone.now)
+    fecha_emision = models.DateField(default=timezone.now, db_index=True)
     fecha_vencimiento = models.DateField()
-    estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default='por_cobrar')
+    estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default='por_cobrar', db_index=True)
     cliente_comprador = models.ForeignKey('Cliente', related_name='giftcards_compradas', on_delete=models.SET_NULL, null=True, blank=True)
     cliente_destinatario = models.ForeignKey('Cliente', related_name='giftcards_recibidas', on_delete=models.SET_NULL, null=True, blank=True)
 
@@ -790,7 +790,7 @@ class Pago(models.Model):
     venta_reserva = models.ForeignKey(VentaReserva, related_name='pagos', on_delete=models.CASCADE)
     fecha_pago = models.DateTimeField(default=timezone.now)
     monto = models.DecimalField(max_digits=10, decimal_places=0)
-    metodo_pago = models.CharField(max_length=100, choices=METODOS_PAGO)
+    metodo_pago = models.CharField(max_length=100, choices=METODOS_PAGO, db_index=True)
     usuario = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='pagos')  # Permitir nulos
     giftcard = models.ForeignKey(GiftCard, null=True, blank=True, on_delete=models.SET_NULL)
 
@@ -3130,6 +3130,7 @@ class GiftCardExperiencia(models.Model):
     # Estado
     activo = models.BooleanField(
         default=True,
+        db_index=True,
         help_text="Si está inactivo, no aparece en el wizard"
     )
     orden = models.IntegerField(
