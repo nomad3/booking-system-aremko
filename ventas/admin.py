@@ -391,6 +391,40 @@ class GiftCardAdmin(admin.ModelAdmin):
     readonly_fields = ('codigo', 'monto_disponible')
     autocomplete_fields = ['cliente_comprador', 'cliente_destinatario']  # Habilitar autocompletar
     change_list_template = 'admin/ventas/giftcard/change_list.html'
+    list_select_related = ('cliente_comprador', 'cliente_destinatario', 'venta_reserva')  # Optimizar list view
+
+    def get_queryset(self, request):
+        """Optimizar queries con select_related para evitar N+1 queries"""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔍 GiftCardAdmin.get_queryset() llamado para path: {request.path}")
+
+        qs = super().get_queryset(request)
+        return qs.select_related(
+            'cliente_comprador',
+            'cliente_destinatario',
+            'venta_reserva',
+            'venta_reserva__cliente'  # Pre-cargar también el cliente de la venta
+        )
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        """Override para agregar logging y diagnosticar lentitud"""
+        import logging
+        import time
+        logger = logging.getLogger(__name__)
+
+        inicio = time.time()
+        logger.info(f"⏱️  Iniciando change_view para GiftCard ID={object_id}")
+
+        try:
+            response = super().change_view(request, object_id, form_url, extra_context)
+            elapsed = time.time() - inicio
+            logger.info(f"✅ change_view completado en {elapsed:.2f}s para GiftCard ID={object_id}")
+            return response
+        except Exception as e:
+            elapsed = time.time() - inicio
+            logger.error(f"❌ Error en change_view después de {elapsed:.2f}s para GiftCard ID={object_id}: {e}")
+            raise
 
     def changelist_view(self, request, extra_context=None):
         """Agregar botón de diagnóstico en la vista de listado"""

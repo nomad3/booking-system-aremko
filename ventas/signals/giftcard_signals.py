@@ -181,6 +181,12 @@ def recalcular_total_al_crear_giftcard(sender, instance, created, raw, **kwargs)
     if raw:
         return
 
+    # OPTIMIZACIÓN: Solo recalcular en creación, no en cada actualización
+    # Esto evita recálculos innecesarios cuando se edita la GiftCard en admin
+    if not created:
+        logger.debug(f"Saltando recálculo para GiftCard {instance.codigo} (actualización, no creación)")
+        return
+
     try:
         if instance.venta_reserva:
             logger.info(f"Recalculando total de VentaReserva #{instance.venta_reserva.id} por GiftCard {instance.codigo}")
