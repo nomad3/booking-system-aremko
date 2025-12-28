@@ -1,0 +1,306 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <style>
+        /* ===== ESTILOS RESPONSIVOS PARA FORMULARIO DE RESERVAS ===== */
+
+        /* Variables para breakpoints */
+        :root {
+            --mobile-breakpoint: 768px;
+            --tablet-breakpoint: 1024px;
+        }
+
+        /* ===== OPTIMIZACIONES GENERALES ===== */
+
+        /* Hacer que los fieldsets sean más compactos en móvil */
+        @media (max-width: 768px) {
+            .module {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* Hacer formulario principal más compacto */
+            .form-row {
+                display: flex;
+                flex-direction: column;
+                margin-bottom: 15px;
+            }
+
+            .form-row > div {
+                width: 100% !important;
+                padding: 0 !important;
+            }
+
+            /* Labels más visibles */
+            .form-row label {
+                font-weight: 600;
+                font-size: 14px;
+                margin-bottom: 5px;
+                display: block;
+            }
+
+            /* Inputs más grandes para táctil */
+            input[type="text"],
+            input[type="number"],
+            input[type="date"],
+            input[type="time"],
+            select,
+            textarea {
+                font-size: 16px !important; /* Evita zoom automático en iOS */
+                padding: 10px !important;
+                width: 100% !important;
+                box-sizing: border-box;
+            }
+
+            /* Autocomplete más usable */
+            .select2-container {
+                width: 100% !important;
+            }
+
+            .select2-selection {
+                min-height: 44px !important; /* Tamaño mínimo táctil */
+                padding: 8px !important;
+            }
+        }
+
+        /* ===== INLINES RESPONSIVOS ===== */
+
+        @media (max-width: 768px) {
+            /* Contenedor de inlines con scroll horizontal */
+            .inline-group {
+                margin-bottom: 25px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* Título de inline más visible */
+            .inline-group h2 {
+                font-size: 18px;
+                font-weight: 700;
+                padding: 12px;
+                background: #f8f9fa;
+                border-left: 4px solid #417690;
+                margin-bottom: 10px;
+                position: sticky;
+                left: 0;
+            }
+
+            /* Tablas inline con ancho mínimo para scroll */
+            .inline-group table {
+                min-width: 800px; /* Permite scroll horizontal */
+                width: 100%;
+            }
+
+            /* Celdas de tabla más compactas */
+            .inline-group td,
+            .inline-group th {
+                padding: 8px 6px !important;
+                font-size: 13px;
+                white-space: nowrap;
+            }
+
+            /* Inputs en inlines */
+            .inline-group input[type="text"],
+            .inline-group input[type="number"],
+            .inline-group input[type="date"],
+            .inline-group input[type="time"],
+            .inline-group select {
+                min-width: 100px;
+                font-size: 14px !important;
+                padding: 6px !important;
+            }
+
+            /* Botones de agregar/eliminar más grandes */
+            .add-row a,
+            .delete-row,
+            .inline-deletelink {
+                font-size: 14px !important;
+                padding: 10px 15px !important;
+                min-height: 44px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            /* Botón "Agregar otro" más visible */
+            .add-row {
+                margin: 15px 0;
+            }
+
+            .add-row a {
+                background: #417690 !important;
+                color: white !important;
+                border-radius: 4px;
+                text-decoration: none;
+                width: 100%;
+                text-align: center;
+            }
+        }
+
+        /* ===== BOTONES DE ACCIÓN ===== */
+
+        @media (max-width: 768px) {
+            /* Botones de submit más grandes */
+            .submit-row {
+                padding: 15px 10px;
+                overflow-x: auto;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .submit-row input[type="submit"],
+            .submit-row .button,
+            .submit-row a {
+                font-size: 16px !important;
+                padding: 12px 20px !important;
+                min-height: 48px;
+                flex: 1 1 auto;
+                min-width: 140px;
+            }
+
+            /* Botón "Guardar" más prominente */
+            .submit-row input[name="_save"] {
+                background: #28a745 !important;
+                border-color: #28a745 !important;
+                order: -1; /* Aparece primero */
+            }
+        }
+
+        /* ===== MEJORAS DE USABILIDAD ===== */
+
+        @media (max-width: 768px) {
+            /* Área de contenido más ancha */
+            #content {
+                padding: 10px !important;
+            }
+
+            /* Breadcrumbs más compactos */
+            .breadcrumbs {
+                font-size: 12px;
+                padding: 8px 10px;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+
+            /* Mensajes de error más visibles */
+            .errornote,
+            .errorlist {
+                font-size: 14px !important;
+                padding: 12px !important;
+                margin-bottom: 15px !important;
+            }
+
+            /* Campos readonly más compactos */
+            .readonly {
+                padding: 8px;
+                background: #f5f5f5;
+                border-radius: 4px;
+                margin-bottom: 10px;
+            }
+        }
+
+        /* ===== OPTIMIZACIONES PARA TABLET ===== */
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+            /* En tablets, mantener 2 columnas cuando sea posible */
+            .form-row.field-box {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+            }
+
+            /* Inlines con scroll suave */
+            .inline-group {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+
+        /* ===== INDICADOR VISUAL DE SCROLL ===== */
+
+        @media (max-width: 768px) {
+            /* Sombra para indicar que hay contenido scrolleable */
+            .inline-group {
+                position: relative;
+            }
+
+            .inline-group::after {
+                content: '';
+                position: sticky;
+                right: 0;
+                top: 0;
+                bottom: 0;
+                width: 30px;
+                background: linear-gradient(to left, rgba(0,0,0,0.1), transparent);
+                pointer-events: none;
+            }
+
+            /* Ocultar sombra cuando no hay scroll */
+            .inline-group.no-scroll::after {
+                display: none;
+            }
+        }
+
+        /* ===== ACCESIBILIDAD TÁCTIL ===== */
+
+        @media (max-width: 768px) {
+            /* Aumentar área táctil de checkboxes y radios */
+            input[type="checkbox"],
+            input[type="radio"] {
+                width: 20px;
+                height: 20px;
+                margin: 5px;
+            }
+
+            /* Labels de checkbox/radio más fáciles de tocar */
+            .vCheckboxLabel {
+                padding: 10px;
+                display: inline-block;
+            }
+
+            /* Espaciado entre elementos táctiles */
+            .form-row .vCheckboxLabel + .vCheckboxLabel {
+                margin-left: 15px;
+            }
+        }
+
+        /* ===== MODO LANDSCAPE EN MÓVIL ===== */
+
+        @media (max-width: 768px) and (orientation: landscape) {
+            /* Optimizar altura en landscape */
+            .module {
+                max-height: 70vh;
+                overflow-y: auto;
+            }
+
+            .inline-group h2 {
+                position: sticky;
+                top: 0;
+                z-index: 10;
+                background: #f8f9fa;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block footer %}
+    {{ block.super }}
+    <script>
+        // Script para detectar si los inlines tienen scroll
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.innerWidth <= 768) {
+                const inlineGroups = document.querySelectorAll('.inline-group');
+
+                inlineGroups.forEach(function(group) {
+                    const table = group.querySelector('table');
+                    if (table && table.scrollWidth <= group.clientWidth) {
+                        group.classList.add('no-scroll');
+                    }
+                });
+            }
+        });
+    </script>
+{% endblock %}
