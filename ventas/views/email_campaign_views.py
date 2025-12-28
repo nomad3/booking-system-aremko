@@ -223,6 +223,10 @@ def save_email_campaign(request):
                 created_by=request.user
             )
 
+            # OPTIMIZACIÓN: Limpiar recipients existentes de esta campaña para evitar duplicados
+            # Esto permite re-intentar guardar la campaña sin errores
+            EmailRecipient.objects.filter(campaign=campaign).delete()
+
             # OPTIMIZACIÓN: Crear EmailRecipients usando bulk_create
             # En lugar de procesar uno por uno, crear todos de una vez
             clientes = Cliente.objects.filter(
