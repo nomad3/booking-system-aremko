@@ -65,14 +65,12 @@
             }
         }
 
-        /* ===== INLINES RESPONSIVOS ===== */
+        /* ===== INLINES RESPONSIVOS - FORMATO TARJETA ===== */
 
         @media (max-width: 768px) {
-            /* Contenedor de inlines con scroll horizontal */
+            /* Contenedor de inlines */
             .inline-group {
                 margin-bottom: 25px;
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
             }
 
             /* Título de inline más visible */
@@ -80,36 +78,108 @@
                 font-size: 18px;
                 font-weight: 700;
                 padding: 12px;
-                background: #f8f9fa;
-                border-left: 4px solid #417690;
-                margin-bottom: 10px;
-                position: sticky;
-                left: 0;
+                background: #417690;
+                color: white;
+                border-radius: 6px 6px 0 0;
+                margin-bottom: 0;
             }
 
-            /* Tablas inline con ancho mínimo para scroll */
-            .inline-group table {
-                min-width: 800px; /* Permite scroll horizontal */
-                width: 100%;
+            /* Convertir tabla en layout de tarjetas */
+            .inline-group table,
+            .inline-group thead,
+            .inline-group tbody,
+            .inline-group tr,
+            .inline-group th,
+            .inline-group td {
+                display: block;
             }
 
-            /* Celdas de tabla más compactas */
-            .inline-group td,
-            .inline-group th {
-                padding: 8px 6px !important;
+            /* Ocultar encabezados de tabla */
+            .inline-group thead tr {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+
+            /* Cada fila es una tarjeta */
+            .inline-group tbody tr {
+                background: white;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                padding: 15px;
+                margin-bottom: 15px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+
+            /* Cada celda muestra su label */
+            .inline-group td {
+                border: none !important;
+                padding: 10px 0 !important;
+                position: relative;
+                padding-left: 0 !important;
+            }
+
+            /* Agregar label antes de cada campo usando el texto del th */
+            .inline-group td::before {
+                content: attr(data-label);
+                font-weight: 600;
                 font-size: 13px;
-                white-space: nowrap;
+                color: #666;
+                display: block;
+                margin-bottom: 5px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
 
-            /* Inputs en inlines */
+            /* Inputs en inlines - ancho completo */
             .inline-group input[type="text"],
             .inline-group input[type="number"],
             .inline-group input[type="date"],
             .inline-group input[type="time"],
-            .inline-group select {
-                min-width: 100px;
-                font-size: 14px !important;
-                padding: 6px !important;
+            .inline-group select,
+            .inline-group textarea {
+                width: 100% !important;
+                font-size: 16px !important;
+                padding: 10px !important;
+                box-sizing: border-box;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+
+            /* Select con select2 */
+            .inline-group .select2-container {
+                width: 100% !important;
+            }
+
+            /* Campos readonly */
+            .inline-group .readonly {
+                background: #f5f5f5;
+                padding: 10px;
+                border-radius: 4px;
+                font-size: 15px;
+            }
+
+            /* Ocultar columna de orden (drag handle) */
+            .inline-group td.original {
+                display: none;
+            }
+
+            /* Campo DELETE al final de cada tarjeta */
+            .inline-group td:has(input[id*="DELETE"]) {
+                border-top: 1px solid #eee;
+                padding-top: 15px !important;
+                margin-top: 10px;
+            }
+
+            .inline-group td:has(input[id*="DELETE"])::before {
+                content: 'Eliminar';
+                color: #dc3545;
+            }
+
+            /* Checkbox de DELETE más grande */
+            .inline-group input[type="checkbox"][id*="DELETE"] {
+                width: 24px;
+                height: 24px;
             }
 
             /* Botones de agregar/eliminar más grandes */
@@ -117,11 +187,12 @@
             .delete-row,
             .inline-deletelink {
                 font-size: 14px !important;
-                padding: 10px 15px !important;
-                min-height: 44px;
+                padding: 12px 20px !important;
+                min-height: 48px;
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
+                border-radius: 6px;
             }
 
             /* Botón "Agregar otro" más visible */
@@ -130,12 +201,36 @@
             }
 
             .add-row a {
-                background: #417690 !important;
+                background: #28a745 !important;
                 color: white !important;
-                border-radius: 4px;
+                border: none;
                 text-decoration: none;
                 width: 100%;
                 text-align: center;
+                font-weight: 600;
+                box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+            }
+
+            .add-row a:hover {
+                background: #218838 !important;
+            }
+
+            /* Separador visual entre items */
+            .inline-group .dynamic-ventas_reservaservicio_set,
+            .inline-group .dynamic-ventas_reservaproducto_set,
+            .inline-group .dynamic-ventas_pago_set,
+            .inline-group .dynamic-ventas_giftcard_set {
+                margin-bottom: 20px;
+            }
+
+            /* Header de cada item con número */
+            .inline-group tbody tr h3 {
+                font-size: 16px;
+                font-weight: 700;
+                color: #417690;
+                margin-bottom: 15px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #e0e0e0;
             }
         }
 
@@ -289,16 +384,51 @@
 {% block footer %}
     {{ block.super }}
     <script>
-        // Script para detectar si los inlines tienen scroll
+        // Script para agregar data-labels a las celdas de los inlines
         document.addEventListener('DOMContentLoaded', function() {
             if (window.innerWidth <= 768) {
-                const inlineGroups = document.querySelectorAll('.inline-group');
+                // Para cada tabla inline
+                document.querySelectorAll('.inline-group table').forEach(function(table) {
+                    // Obtener los encabezados
+                    const headers = Array.from(table.querySelectorAll('thead th')).map(function(th) {
+                        return th.textContent.trim();
+                    });
 
-                inlineGroups.forEach(function(group) {
-                    const table = group.querySelector('table');
-                    if (table && table.scrollWidth <= group.clientWidth) {
-                        group.classList.add('no-scroll');
-                    }
+                    // Aplicar data-label a cada celda
+                    table.querySelectorAll('tbody tr').forEach(function(row) {
+                        Array.from(row.querySelectorAll('td')).forEach(function(cell, index) {
+                            if (headers[index]) {
+                                cell.setAttribute('data-label', headers[index]);
+                            }
+                        });
+                    });
+                });
+
+                // Observar cambios dinámicos (cuando se agregan nuevas filas)
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        mutation.addedNodes.forEach(function(node) {
+                            if (node.nodeType === 1 && node.tagName === 'TR') {
+                                const table = node.closest('table');
+                                if (table) {
+                                    const headers = Array.from(table.querySelectorAll('thead th')).map(function(th) {
+                                        return th.textContent.trim();
+                                    });
+
+                                    Array.from(node.querySelectorAll('td')).forEach(function(cell, index) {
+                                        if (headers[index]) {
+                                            cell.setAttribute('data-label', headers[index]);
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    });
+                });
+
+                // Observar cada tbody de inline
+                document.querySelectorAll('.inline-group tbody').forEach(function(tbody) {
+                    observer.observe(tbody, { childList: true, subtree: true });
                 });
             }
         });
