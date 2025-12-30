@@ -76,52 +76,52 @@ class Command(BaseCommand):
 
             with transaction.atomic():
                 for producto in productos_lote:
-                try:
-                    # Buscar el primer servicio de la reserva
-                    primer_servicio = producto.venta_reserva.reservaservicios.order_by('fecha_agendamiento').first()
+                    try:
+                        # Buscar el primer servicio de la reserva
+                        primer_servicio = producto.venta_reserva.reservaservicios.order_by('fecha_agendamiento').first()
 
-                    if primer_servicio:
-                        fecha_a_asignar = primer_servicio.fecha_agendamiento
+                        if primer_servicio:
+                            fecha_a_asignar = primer_servicio.fecha_agendamiento
 
-                        if dry_run:
-                            self.stdout.write(
-                                f'  [DRY RUN] Producto #{producto.id} ({producto.producto.nombre}) '
-                                f'en Reserva #{producto.venta_reserva.id} '
-                                f'-> fecha_entrega = {fecha_a_asignar}'
-                            )
+                            if dry_run:
+                                self.stdout.write(
+                                    f'  [DRY RUN] Producto #{producto.id} ({producto.producto.nombre}) '
+                                    f'en Reserva #{producto.venta_reserva.id} '
+                                    f'-> fecha_entrega = {fecha_a_asignar}'
+                                )
+                            else:
+                                producto.fecha_entrega = fecha_a_asignar
+                                producto.save()
+                                logger.info(
+                                    f'Producto {producto.id} actualizado con fecha_entrega={fecha_a_asignar}'
+                                )
+
+                            productos_actualizados += 1
                         else:
-                            producto.fecha_entrega = fecha_a_asignar
-                            producto.save()
-                            logger.info(
-                                f'Producto {producto.id} actualizado con fecha_entrega={fecha_a_asignar}'
-                            )
+                            # No hay servicios, usar fecha de la reserva como fallback
+                            fecha_a_asignar = producto.venta_reserva.fecha_reserva.date()
 
-                        productos_actualizados += 1
-                    else:
-                        # No hay servicios, usar fecha de la reserva como fallback
-                        fecha_a_asignar = producto.venta_reserva.fecha_reserva.date()
+                            if dry_run:
+                                self.stdout.write(
+                                    f'  [DRY RUN] ⚠️ Producto #{producto.id} ({producto.producto.nombre}) '
+                                    f'en Reserva #{producto.venta_reserva.id} (SIN SERVICIOS) '
+                                    f'-> fecha_entrega = {fecha_a_asignar} (fecha de reserva)'
+                                )
+                            else:
+                                producto.fecha_entrega = fecha_a_asignar
+                                producto.save()
+                                logger.warning(
+                                    f'Producto {producto.id} sin servicios, usando fecha_reserva={fecha_a_asignar}'
+                                )
 
-                        if dry_run:
-                            self.stdout.write(
-                                f'  [DRY RUN] ⚠️ Producto #{producto.id} ({producto.producto.nombre}) '
-                                f'en Reserva #{producto.venta_reserva.id} (SIN SERVICIOS) '
-                                f'-> fecha_entrega = {fecha_a_asignar} (fecha de reserva)'
-                            )
-                        else:
-                            producto.fecha_entrega = fecha_a_asignar
-                            producto.save()
-                            logger.warning(
-                                f'Producto {producto.id} sin servicios, usando fecha_reserva={fecha_a_asignar}'
-                            )
+                            productos_sin_servicios += 1
 
-                        productos_sin_servicios += 1
-
-                except Exception as e:
-                    logger.error(f'Error procesando producto {producto.id}: {str(e)}', exc_info=True)
-                    self.stdout.write(
-                        self.style.ERROR(f'  ❌ Error en Producto #{producto.id}: {str(e)}')
-                    )
-                    errores += 1
+                    except Exception as e:
+                        logger.error(f'Error procesando producto {producto.id}: {str(e)}', exc_info=True)
+                        self.stdout.write(
+                            self.style.ERROR(f'  ❌ Error en Producto #{producto.id}: {str(e)}')
+                        )
+                        errores += 1
 
                 # Si es dry-run, hacer rollback de este lote
                 if dry_run:
