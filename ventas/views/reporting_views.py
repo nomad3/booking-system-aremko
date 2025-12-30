@@ -169,6 +169,126 @@ def servicios_vendidos_view(request):
     return render(request, 'ventas/servicios_vendidos.html', context)
 
 
+@user_passes_test(es_administrador)
+def productos_vendidos_view(request):
+    """
+    Vista para mostrar productos vendidos asociados a servicios de un día específico.
+    Los productos se filtran según la fecha de agendamiento de los servicios en la reserva.
+    """
+    # Obtener la fecha actual con la zona horaria correcta
+    hoy = timezone.localdate()
+
+    # Obtener los parámetros del filtro, usando la fecha actual por defecto
+    fecha_str = request.GET.get('fecha', hoy.strftime('%Y-%m-%d'))
+    venta_reserva_id = request.GET.get('venta_reserva_id')
+
+    # Convertir la fecha del parámetro a objeto de fecha
+    try:
+        fecha_filtro = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+    except ValueError:
+        fecha_filtro = hoy
+
+    # Consultar todos los productos vendidos asociados a servicios del día
+    # Lógica: Buscar VentaReserva que tengan servicios agendados para la fecha filtrada
+    # y traer los productos asociados a esas reservas
+
+    # Primero, obtener las VentaReserva que tienen servicios en la fecha especificada
+    ventas_con_servicios_del_dia = VentaReserva.objects.filter(
+        reservaservicios__fecha_agendamiento=fecha_filtro
+    ).distinct().values_list('id', flat=True)
+
+    # Ahora obtener los productos de esas ventas
+    productos_vendidos = ReservaProducto.objects.select_related(
+        'venta_reserva__cliente', 'producto'
+    ).filter(
+        venta_reserva_id__in=ventas_con_servicios_del_dia
+    )
+
+    # Filtrar por ID de VentaReserva si está presente y es un número válido
+    if venta_reserva_id and venta_reserva_id.isdigit():
+        productos_vendidos = productos_vendidos.filter(venta_reserva__id=int(venta_reserva_id))
+
+    # Ordenar los productos vendidos por VentaReserva ID
+    productos_vendidos = productos_vendidos.order_by('venta_reserva__id', 'producto__nombre')
+
+    # Sumar el monto total de todos los productos vendidos
+    total_monto_vendido = sum(
+        (p.producto.precio_base * p.cantidad)
+        for p in productos_vendidos if p.producto
+    )
+
+    # Preparar los datos para la tabla
+    data = []
+    for producto_reserva in productos_vendidos:
+        # Skip if related product is missing
+        if not producto_reserva.producto:
+            continue
+
+        valor_unitario = producto_reserva.producto.precio_base
+        cantidad = producto_reserva.cantidad
+        valor_total = valor_unitario * cantidad
+
+        data.append({
+            'venta_reserva_id': producto_reserva.venta_reserva.id if producto_reserva.venta_reserva else 'N/A',
+            'cliente_nombre': producto_reserva.venta_reserva.cliente.nombre if producto_reserva.venta_reserva and producto_reserva.venta_reserva.cliente else 'N/A',
+            'producto_nombre': producto_reserva.producto.nombre,
+            'cantidad': cantidad,
+            'valor_unitario': valor_unitario,
+            'valor_total': valor_total,
+        })
+
+    # Pasar los datos a la plantilla
+    context = {
+        'productos': data,
+        'fecha': fecha_filtro.strftime('%Y-%m-%d'),
+        'venta_reserva_id': venta_reserva_id,
+        'total_monto_vendido': total_monto_vendido,
+        'total_productos': len(data),
+    }
+
+    # Verificar si se solicitó exportación
+    if request.GET.get('export') == 'excel':
+        response = HttpResponse(content_type='application/ms-excel')
+        response['Content-Disposition'] = 'attachment; filename="Productos_Vendidos_{}.xls"'.format(
+            datetime.now().strftime('%Y%m%d_%H%M%S')
+        )
+
+        wb = xlwt.Workbook(encoding='utf-8')
+        ws = wb.add_sheet('Productos Vendidos')
+
+        # Estilos
+        header_style = xlwt.easyxf('font: bold on; pattern: pattern solid, fore_colour gray25;')
+        money_style = xlwt.easyxf(num_format_str='#,##0')
+
+        # Headers
+        headers = [
+            'ID Venta/Reserva',
+            'Cliente',
+            'Producto',
+            'Cantidad',
+            'Valor Unitario',
+            'Valor Total'
+        ]
+
+        for col, header in enumerate(headers):
+            ws.write(0, col, header, header_style)
+            ws.col(col).width = 256 * 20  # Ancho aproximado de 20 caracteres
+
+        # Datos
+        for row, producto_data in enumerate(data, 1):
+            ws.write(row, 0, producto_data['venta_reserva_id'])
+            ws.write(row, 1, producto_data['cliente_nombre'])
+            ws.write(row, 2, producto_data['producto_nombre'])
+            ws.write(row, 3, producto_data['cantidad'])
+            ws.write(row, 4, producto_data['valor_unitario'], money_style)
+            ws.write(row, 5, producto_data['valor_total'], money_style)
+
+        wb.save(response)
+        return response
+
+    return render(request, 'ventas/productos_vendidos.html', context)
+
+
 @user_passes_test(es_administrador)  # Restringir el acceso a administradores
 def caja_diaria_view(request):
     # Obtener rango de fechas desde los parámetros GET

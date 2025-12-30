@@ -36,6 +36,7 @@ urlpatterns = [
     path('empresas/', public_views.empresas_view, name='empresas'),  # Landing page empresarial
     path('empresas/solicitar-cotizacion/', public_views.solicitar_cotizacion_empresa, name='solicitar_cotizacion_empresa'),  # Form submission endpoint
     path('servicios-vendidos/', reporting_views.servicios_vendidos_view, name='servicios_vendidos'),
+    path('productos-vendidos/', reporting_views.productos_vendidos_view, name='productos_vendidos'),
     path('caja-diaria/', reporting_views.caja_diaria_view, name='caja_diaria'),  # Nueva vista de caja diaria
     path('caja-diaria-recepcionistas/', reporting_views.caja_diaria_recepcionistas_view, name='caja_diaria_recepcionistas'), # Added path if needed
     path('auditoria-movimientos/', reporting_views.auditoria_movimientos_view, name='auditoria_movimientos'),  # Nueva vista de auditoría
