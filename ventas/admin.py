@@ -85,7 +85,7 @@ class ReservaServicioInline(admin.TabularInline):
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
     extra = 1
-    fields = ['producto', 'cantidad', 'mostrar_valor_unitario', 'mostrar_valor_total']
+    fields = ['producto', 'cantidad', 'fecha_entrega', 'mostrar_valor_unitario', 'mostrar_valor_total']
     readonly_fields = ['mostrar_valor_unitario', 'mostrar_valor_total']
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):

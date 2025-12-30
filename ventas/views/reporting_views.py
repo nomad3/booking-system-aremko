@@ -172,8 +172,10 @@ def servicios_vendidos_view(request):
 @user_passes_test(es_administrador)
 def productos_vendidos_view(request):
     """
-    Vista para mostrar productos vendidos asociados a servicios de un día específico.
-    Los productos se filtran según la fecha de agendamiento de los servicios en la reserva.
+    Vista para mostrar productos vendidos con fecha de entrega específica.
+
+    Usa el campo fecha_entrega de ReservaProducto para filtrar productos del día.
+    Si un producto no tiene fecha_entrega (históricos), usa la fecha del primer servicio.
     """
     # Obtener la fecha actual con la zona horaria correcta
     hoy = timezone.localdate()
@@ -188,28 +190,43 @@ def productos_vendidos_view(request):
     except ValueError:
         fecha_filtro = hoy
 
-    # Consultar todos los productos vendidos asociados a servicios del día
-    # Lógica: Buscar VentaReserva que tengan servicios agendados para la fecha filtrada
-    # y traer los productos asociados a esas reservas
+    # NUEVA LÓGICA: Filtrar productos por fecha_entrega
+    # Primero, obtener productos con fecha_entrega = fecha_filtro
+    productos_con_fecha = ReservaProducto.objects.select_related(
+        'venta_reserva__cliente', 'producto'
+    ).filter(
+        fecha_entrega=fecha_filtro
+    )
 
-    # Primero, obtener las VentaReserva que tienen servicios en la fecha especificada
+    # Para productos sin fecha_entrega (históricos), usar fallback:
+    # Buscar reservas con servicios en la fecha y productos sin fecha_entrega
     ventas_con_servicios_del_dia = VentaReserva.objects.filter(
         reservaservicios__fecha_agendamiento=fecha_filtro
     ).distinct().values_list('id', flat=True)
 
-    # Ahora obtener los productos de esas ventas
-    productos_vendidos = ReservaProducto.objects.select_related(
+    productos_sin_fecha = ReservaProducto.objects.select_related(
         'venta_reserva__cliente', 'producto'
     ).filter(
+        fecha_entrega__isnull=True,
         venta_reserva_id__in=ventas_con_servicios_del_dia
     )
 
+    # Combinar ambos querysets
+    from itertools import chain
+    productos_vendidos = list(chain(productos_con_fecha, productos_sin_fecha))
+
     # Filtrar por ID de VentaReserva si está presente y es un número válido
     if venta_reserva_id and venta_reserva_id.isdigit():
-        productos_vendidos = productos_vendidos.filter(venta_reserva__id=int(venta_reserva_id))
+        productos_vendidos = [
+            p for p in productos_vendidos
+            if p.venta_reserva and p.venta_reserva.id == int(venta_reserva_id)
+        ]
 
-    # Ordenar los productos vendidos por VentaReserva ID
-    productos_vendidos = productos_vendidos.order_by('venta_reserva__id', 'producto__nombre')
+    # Ordenar la lista de productos por VentaReserva ID y nombre de producto
+    productos_vendidos = sorted(
+        productos_vendidos,
+        key=lambda p: (p.venta_reserva.id if p.venta_reserva else 0, p.producto.nombre if p.producto else '')
+    )
 
     # Sumar el monto total de todos los productos vendidos
     total_monto_vendido = sum(

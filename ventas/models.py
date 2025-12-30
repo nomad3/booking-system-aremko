@@ -852,6 +852,12 @@ class ReservaProducto(models.Model):
     venta_reserva = models.ForeignKey(VentaReserva, on_delete=models.CASCADE, related_name='reservaproductos')
     producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
     cantidad = models.PositiveIntegerField()
+    fecha_entrega = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Entrega",
+        help_text="Fecha en que el producto fue/será entregado al cliente. Si está vacío, se asume la fecha del primer servicio de la reserva."
+    )
 
     def __str__(self):
         return f"{self.cantidad} x {self.producto.nombre} en Venta/Reserva #{self.venta_reserva.id}"
