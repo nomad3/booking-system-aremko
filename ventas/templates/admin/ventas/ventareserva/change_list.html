@@ -1,0 +1,377 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <style>
+        /* ===== ESTILOS RESPONSIVOS PARA LISTADO DE RESERVAS ===== */
+
+        /* Variables para breakpoints */
+        :root {
+            --mobile-breakpoint: 768px;
+        }
+
+        /* ===== OPTIMIZACIONES PARA MÓVIL ===== */
+
+        @media (max-width: 768px) {
+            /* Ocultar el header de la tabla */
+            #result_list thead {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+                visibility: hidden;
+            }
+
+            /* Hacer que cada fila sea una tarjeta */
+            #result_list tbody tr {
+                display: block;
+                background: white;
+                border: 2px solid #ddd;
+                border-radius: 8px;
+                padding: 15px;
+                margin-bottom: 15px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                position: relative;
+            }
+
+            /* Cada celda se muestra como bloque */
+            #result_list tbody td {
+                display: block;
+                border: none !important;
+                padding: 8px 0 !important;
+                text-align: left !important;
+                position: relative;
+                padding-left: 0 !important;
+            }
+
+            /* Agregar etiqueta antes de cada celda */
+            #result_list tbody td::before {
+                content: attr(data-label);
+                font-weight: 600;
+                font-size: 12px;
+                color: #666;
+                display: block;
+                margin-bottom: 4px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            /* Checkbox de selección - sin label */
+            #result_list tbody td.action-checkbox {
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                padding: 0 !important;
+            }
+
+            #result_list tbody td.action-checkbox::before {
+                content: none;
+            }
+
+            #result_list tbody td.action-checkbox input[type="checkbox"] {
+                width: 24px;
+                height: 24px;
+                margin: 0;
+            }
+
+            /* Primera celda (ID) más prominente */
+            #result_list tbody td:first-of-type:not(.action-checkbox) {
+                font-size: 18px;
+                font-weight: 700;
+                color: #417690;
+                padding-bottom: 12px !important;
+                margin-bottom: 8px;
+                border-bottom: 2px solid #e0e0e0;
+            }
+
+            #result_list tbody td:first-of-type:not(.action-checkbox)::before {
+                font-size: 13px;
+                color: #999;
+            }
+
+            /* Links de acción más grandes y táctiles */
+            #result_list tbody td a {
+                font-size: 14px;
+                padding: 8px 12px;
+                display: inline-block;
+                border-radius: 4px;
+                text-decoration: none;
+                margin-right: 8px;
+                margin-bottom: 4px;
+            }
+
+            /* Botones de generar resumen/tips más visibles */
+            #result_list tbody td a[href*="resumen"],
+            #result_list tbody td a[href*="tips"] {
+                background: #417690;
+                color: white !important;
+                font-weight: 600;
+                padding: 10px 15px;
+                margin-top: 4px;
+            }
+
+            #result_list tbody td a[href*="resumen"]:hover,
+            #result_list tbody td a[href*="tips"]:hover {
+                background: #2e5a6b;
+            }
+
+            /* Estados con colores */
+            #result_list tbody td:has(.badge),
+            #result_list tbody td > span {
+                font-weight: 600;
+            }
+
+            /* Valores monetarios más destacados */
+            #result_list tbody td:has(text()[contains(., '$')]),
+            #result_list tbody td[data-label*="Total"],
+            #result_list tbody td[data-label*="Pagado"],
+            #result_list tbody td[data-label*="Saldo"] {
+                font-size: 16px;
+                font-weight: 700;
+                color: #2a7a2a;
+            }
+
+            /* Ocultar columnas menos importantes en móvil (opcional) */
+            /* Puedes descomentar estas líneas si quieres ocultar algunos campos */
+            /*
+            #result_list tbody td[data-label="Total servicios"],
+            #result_list tbody td[data-label="Total productos"] {
+                display: none;
+            }
+            */
+
+            /* Acciones de la fila al final */
+            #result_list tbody td:last-child {
+                padding-top: 15px !important;
+                margin-top: 10px;
+                border-top: 1px solid #e0e0e0;
+            }
+
+            /* Hacer el container más ancho */
+            .results {
+                overflow-x: visible !important;
+            }
+
+            #result_list {
+                width: 100% !important;
+            }
+
+            /* Paginación más grande y táctil */
+            .pagination {
+                font-size: 16px;
+                padding: 15px 0;
+            }
+
+            .pagination a,
+            .pagination span {
+                padding: 10px 15px;
+                margin: 0 5px;
+                display: inline-block;
+                min-width: 44px;
+                min-height: 44px;
+                line-height: 24px;
+                text-align: center;
+            }
+
+            /* Filtros en móvil */
+            #changelist-filter {
+                width: 100% !important;
+                margin-left: 0 !important;
+                float: none !important;
+                padding: 15px;
+                border: none;
+                border-bottom: 2px solid #e0e0e0;
+            }
+
+            #changelist-filter h2 {
+                font-size: 18px;
+                padding: 10px 0;
+            }
+
+            #changelist-filter h3 {
+                font-size: 16px;
+                padding: 8px 0;
+            }
+
+            #changelist-filter li {
+                padding: 8px 0;
+            }
+
+            #changelist-filter a {
+                font-size: 15px;
+                padding: 8px 12px;
+                display: block;
+            }
+
+            /* Ajustar área de contenido */
+            #changelist {
+                display: flex;
+                flex-direction: column;
+            }
+
+            #changelist .results {
+                order: 2;
+                width: 100% !important;
+            }
+
+            #changelist-filter {
+                order: 1;
+            }
+
+            /* Barra de búsqueda más grande */
+            #changelist-search input[type="text"] {
+                font-size: 16px !important;
+                padding: 12px !important;
+                width: 100% !important;
+                box-sizing: border-box;
+            }
+
+            #changelist-search button,
+            #changelist-search input[type="submit"] {
+                font-size: 16px !important;
+                padding: 12px 20px !important;
+                min-height: 48px;
+            }
+
+            /* Botón "Agregar reserva" más grande */
+            .addlink {
+                font-size: 16px !important;
+                padding: 12px 20px !important;
+                min-height: 48px;
+                display: inline-block;
+                margin: 10px 0;
+            }
+
+            /* Acciones en el listado */
+            .actions {
+                padding: 15px 10px !important;
+            }
+
+            .actions select {
+                font-size: 16px !important;
+                padding: 10px !important;
+                min-height: 44px;
+            }
+
+            .actions button,
+            .actions input[type="submit"] {
+                font-size: 16px !important;
+                padding: 12px 20px !important;
+                min-height: 48px;
+            }
+
+            /* Ajustar breadcrumbs */
+            .breadcrumbs {
+                font-size: 12px;
+                padding: 8px 10px;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+
+            /* Contador de resultados */
+            .paginator {
+                font-size: 14px;
+                padding: 10px 0;
+            }
+        }
+
+        /* ===== OPTIMIZACIONES PARA TABLET ===== */
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+            /* En tablets, reducir el tamaño de fuente pero mantener tabla */
+            #result_list {
+                font-size: 13px;
+            }
+
+            #result_list th,
+            #result_list td {
+                padding: 8px 10px;
+            }
+
+            /* Hacer scroll horizontal suave */
+            .results {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+
+        /* ===== MODO LANDSCAPE EN MÓVIL ===== */
+
+        @media (max-width: 768px) and (orientation: landscape) {
+            /* Optimizar altura en landscape */
+            #result_list tbody tr {
+                padding: 10px;
+            }
+
+            #result_list tbody td {
+                padding: 5px 0 !important;
+            }
+
+            #result_list tbody td::before {
+                font-size: 11px;
+                margin-bottom: 2px;
+            }
+        }
+
+        /* ===== MEJORA DE ESTADOS VISUALES ===== */
+
+        @media (max-width: 768px) {
+            /* Estado de pago con colores */
+            #result_list tbody td[data-label*="Estado pago"] {
+                font-size: 15px;
+                font-weight: 700;
+                padding: 8px 0 !important;
+            }
+
+            /* Separador visual entre secciones de datos */
+            #result_list tbody td[data-label*="Cliente"]::after,
+            #result_list tbody td[data-label*="Servicios"]::after {
+                content: '';
+                display: block;
+                height: 1px;
+                background: #f0f0f0;
+                margin-top: 8px;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block footer %}
+    {{ block.super }}
+    <script>
+        // Script para agregar data-labels a las celdas de la tabla
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.innerWidth <= 768) {
+                // Obtener los encabezados de la tabla
+                const table = document.querySelector('#result_list');
+                if (table) {
+                    const headers = Array.from(table.querySelectorAll('thead th')).map(function(th) {
+                        return th.textContent.trim();
+                    });
+
+                    // Aplicar data-label a cada celda
+                    table.querySelectorAll('tbody tr').forEach(function(row) {
+                        Array.from(row.querySelectorAll('td')).forEach(function(cell, index) {
+                            if (headers[index]) {
+                                cell.setAttribute('data-label', headers[index]);
+                            }
+                        });
+                    });
+                }
+
+                // Log para debug
+                console.log('✅ Labels responsivos aplicados al listado de VentaReserva');
+            }
+        });
+
+        // Actualizar labels cuando cambia el tamaño de ventana
+        window.addEventListener('resize', function() {
+            const wasMobile = document.body.classList.contains('mobile-view');
+            const isMobile = window.innerWidth <= 768;
+
+            if (isMobile !== wasMobile) {
+                location.reload(); // Recargar para aplicar estilos correctos
+            }
+        });
+    </script>
+{% endblock %}

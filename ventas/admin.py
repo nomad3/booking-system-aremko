@@ -181,6 +181,7 @@ def registrar_movimiento(cliente, tipo_movimiento, descripcion, usuario):
 class VentaReservaAdmin(admin.ModelAdmin):
     form = VentaReservaAdminForm
     change_form_template = 'admin/ventas/ventareserva/change_form.html'
+    change_list_template = 'admin/ventas/ventareserva/change_list.html'
     list_per_page = 50
     autocomplete_fields = ['cliente']
     list_display = (
