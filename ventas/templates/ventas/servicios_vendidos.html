@@ -6,6 +6,172 @@
     <!-- Modern Airbnb-style CSS -->
     <link rel="stylesheet" href="{% static 'css/modern.css' %}">
     {# Font Awesome is loaded in admin/base_site.html #}
+
+    <!-- Responsive Mobile Styles -->
+    <style>
+        /* ===== ESTILOS RESPONSIVOS PARA SERVICIOS VENDIDOS ===== */
+
+        @media (max-width: 768px) {
+            /* Hacer formulario de filtros más compacto */
+            .row.g-3 {
+                margin: 0;
+            }
+
+            .col-md-6, .col-lg-3 {
+                padding: 5px !important;
+            }
+
+            .form-label {
+                font-size: 13px;
+                font-weight: 600;
+                margin-bottom: 4px;
+            }
+
+            .form-control, .form-select {
+                font-size: 16px !important; /* Evita zoom en iOS */
+                padding: 10px !important;
+            }
+
+            /* Botones más grandes */
+            .btn {
+                font-size: 16px !important;
+                padding: 12px 20px !important;
+                min-height: 48px;
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            /* Card de total monto */
+            .card-body.text-center strong {
+                font-size: 18px;
+                display: block;
+                padding: 10px;
+            }
+
+            /* ===== CONVERTIR TABLA A TARJETAS ===== */
+
+            /* Ocultar el encabezado de la tabla */
+            .table-responsive table thead {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+                visibility: hidden;
+            }
+
+            /* Hacer que la tabla no tenga scroll horizontal */
+            .table-responsive {
+                overflow-x: visible !important;
+            }
+
+            /* Convertir cada fila en una tarjeta */
+            .table-responsive table,
+            .table-responsive tbody,
+            .table-responsive tr,
+            .table-responsive td {
+                display: block;
+            }
+
+            .table-responsive tbody tr {
+                background: white;
+                border: 2px solid #ddd;
+                border-radius: 8px;
+                padding: 15px;
+                margin-bottom: 15px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+
+            /* Cada celda como bloque */
+            .table-responsive td {
+                border: none !important;
+                padding: 8px 0 !important;
+                text-align: left !important;
+                position: relative;
+            }
+
+            /* Agregar etiqueta antes de cada celda */
+            .table-responsive td::before {
+                content: attr(data-label);
+                font-weight: 600;
+                font-size: 12px;
+                color: #666;
+                display: block;
+                margin-bottom: 4px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            /* Primera celda (ID Venta) más prominente */
+            .table-responsive tbody tr td:first-child {
+                font-size: 18px;
+                font-weight: 700;
+                color: #417690;
+                padding-bottom: 12px !important;
+                margin-bottom: 8px;
+                border-bottom: 2px solid #e0e0e0;
+            }
+
+            .table-responsive tbody tr td:first-child::before {
+                font-size: 13px;
+                color: #999;
+            }
+
+            .table-responsive tbody tr td:first-child a {
+                color: #417690;
+                text-decoration: none;
+                font-weight: 700;
+            }
+
+            /* Valores monetarios destacados */
+            .table-responsive tbody tr td:nth-child(8) {
+                font-size: 16px;
+                font-weight: 700;
+                color: #2a7a2a;
+            }
+
+            /* Espaciado entre campos */
+            .table-responsive td + td {
+                margin-top: 4px;
+            }
+
+            /* Separadores visuales */
+            .table-responsive tbody tr td:nth-child(4)::after,
+            .table-responsive tbody tr td:nth-child(7)::after {
+                content: '';
+                display: block;
+                height: 1px;
+                background: #f0f0f0;
+                margin-top: 8px;
+            }
+        }
+
+        /* ===== TABLET (769px - 1024px) ===== */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .table {
+                font-size: 13px;
+            }
+
+            .table th,
+            .table td {
+                padding: 10px !important;
+            }
+        }
+
+        /* ===== MODO LANDSCAPE EN MÓVIL ===== */
+        @media (max-width: 768px) and (orientation: landscape) {
+            .table-responsive tbody tr {
+                padding: 10px;
+            }
+
+            .table-responsive td {
+                padding: 5px 0 !important;
+            }
+
+            .table-responsive td::before {
+                font-size: 11px;
+                margin-bottom: 2px;
+            }
+        }
+    </style>
 {% endblock %}
 
 {% block content %}
@@ -108,4 +274,33 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block footer %}
+    {{ block.super }}
+    <script>
+        // Script para agregar data-labels a las celdas de la tabla
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.innerWidth <= 768) {
+                const table = document.querySelector('.table-responsive table');
+                if (table) {
+                    // Obtener los encabezados de la tabla
+                    const headers = Array.from(table.querySelectorAll('thead th')).map(function(th) {
+                        return th.textContent.trim();
+                    });
+
+                    // Aplicar data-label a cada celda
+                    table.querySelectorAll('tbody tr').forEach(function(row) {
+                        Array.from(row.querySelectorAll('td')).forEach(function(cell, index) {
+                            if (headers[index]) {
+                                cell.setAttribute('data-label', headers[index]);
+                            }
+                        });
+                    });
+
+                    console.log('✅ Labels responsivos aplicados a Servicios Vendidos');
+                }
+            }
+        });
+    </script>
 {% endblock %}
