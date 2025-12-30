@@ -29,21 +29,24 @@ class Command(BaseCommand):
             action='store_true',
             help='Muestra qué se haría sin hacer cambios reales',
         )
+        parser.add_argument(
+            '--batch-size',
+            type=int,
+            default=1000,
+            help='Número de productos a procesar por lote (default: 1000)',
+        )
 
     def handle(self, *args, **options):
         dry_run = options.get('dry_run', False)
+        batch_size = options.get('batch_size', 1000)
 
         if dry_run:
             self.stdout.write(self.style.WARNING('🔍 Modo DRY RUN - No se harán cambios reales\n'))
         else:
-            self.stdout.write(self.style.SUCCESS('📅 Llenando fechas de entrega históricas...\n'))
+            self.stdout.write(self.style.SUCCESS(f'📅 Llenando fechas de entrega históricas en lotes de {batch_size}...\n'))
 
-        # Buscar productos sin fecha_entrega
-        productos_sin_fecha = ReservaProducto.objects.filter(fecha_entrega__isnull=True).select_related(
-            'venta_reserva'
-        )
-
-        total_productos = productos_sin_fecha.count()
+        # Contar productos sin fecha_entrega
+        total_productos = ReservaProducto.objects.filter(fecha_entrega__isnull=True).count()
         self.stdout.write(f'Total de productos sin fecha_entrega: {total_productos}\n')
 
         if total_productos == 0:
@@ -53,9 +56,26 @@ class Command(BaseCommand):
         productos_actualizados = 0
         productos_sin_servicios = 0
         errores = 0
+        batch_num = 0
 
-        with transaction.atomic():
-            for producto in productos_sin_fecha:
+        # Procesar en lotes
+        while True:
+            # Obtener siguiente lote de productos sin fecha
+            productos_sin_fecha = ReservaProducto.objects.filter(
+                fecha_entrega__isnull=True
+            ).select_related('venta_reserva')[:batch_size]
+
+            # Convertir a lista para poder iterar
+            productos_lote = list(productos_sin_fecha)
+
+            if not productos_lote:
+                break  # No hay más productos
+
+            batch_num += 1
+            self.stdout.write(f'\n📦 Procesando lote {batch_num} ({len(productos_lote)} productos)...')
+
+            with transaction.atomic():
+                for producto in productos_lote:
                 try:
                     # Buscar el primer servicio de la reserva
                     primer_servicio = producto.venta_reserva.reservaservicios.order_by('fecha_agendamiento').first()
@@ -103,9 +123,13 @@ class Command(BaseCommand):
                     )
                     errores += 1
 
-            # Si es dry-run, hacer rollback
-            if dry_run:
-                transaction.set_rollback(True)
+                # Si es dry-run, hacer rollback de este lote
+                if dry_run:
+                    transaction.set_rollback(True)
+
+            # Mostrar progreso del lote
+            self.stdout.write(f'   ✅ Lote {batch_num} completado ({len(productos_lote)} productos)')
+            self.stdout.write(f'   Progreso total: {productos_actualizados + productos_sin_servicios}/{total_productos}')
 
         # Resumen
         self.stdout.write('\n' + '=' * 60)
