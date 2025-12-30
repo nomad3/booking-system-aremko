@@ -191,7 +191,9 @@ def _generar_texto_resumen(reserva, config):
 
     # Datos de pago
     lineas.append(config.datos_transferencia)
-    lineas.append("")
-    lineas.append(f"{config.texto_link_pago} {config.link_pago_mercadopago}")
+
+    # NOTA: Link de Mercado Pago removido por solicitud del usuario (28-dic-2025)
+    # lineas.append("")
+    # lineas.append(f"{config.texto_link_pago} {config.link_pago_mercadopago}")
 
     return '\n'.join(lineas)
