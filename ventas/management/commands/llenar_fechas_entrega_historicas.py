@@ -60,10 +60,14 @@ class Command(BaseCommand):
 
         # Procesar en lotes
         while True:
-            # Obtener siguiente lote de productos sin fecha
+            # OPTIMIZACIÓN: Obtener lote con prefetch de servicios (evita N+1 queries)
             productos_sin_fecha = ReservaProducto.objects.filter(
                 fecha_entrega__isnull=True
-            ).select_related('venta_reserva')[:batch_size]
+            ).select_related(
+                'venta_reserva', 'producto'
+            ).prefetch_related(
+                'venta_reserva__reservaservicios'
+            )[:batch_size]
 
             # Convertir a lista para poder iterar
             productos_lote = list(productos_sin_fecha)
@@ -74,58 +78,53 @@ class Command(BaseCommand):
             batch_num += 1
             self.stdout.write(f'\n📦 Procesando lote {batch_num} ({len(productos_lote)} productos)...')
 
-            with transaction.atomic():
-                for producto in productos_lote:
-                    try:
-                        # Buscar el primer servicio de la reserva
-                        primer_servicio = producto.venta_reserva.reservaservicios.order_by('fecha_agendamiento').first()
+            # Lista para bulk_update
+            productos_a_actualizar = []
 
-                        if primer_servicio:
-                            fecha_a_asignar = primer_servicio.fecha_agendamiento
+            # PROCESAR EN MEMORIA (sin queries individuales)
+            for producto in productos_lote:
+                try:
+                    # Obtener servicios de la reserva (ya cargados con prefetch_related)
+                    servicios = list(producto.venta_reserva.reservaservicios.all())
 
-                            if dry_run:
-                                self.stdout.write(
-                                    f'  [DRY RUN] Producto #{producto.id} ({producto.producto.nombre}) '
-                                    f'en Reserva #{producto.venta_reserva.id} '
-                                    f'-> fecha_entrega = {fecha_a_asignar}'
-                                )
-                            else:
-                                producto.fecha_entrega = fecha_a_asignar
-                                producto.save()
-                                logger.info(
-                                    f'Producto {producto.id} actualizado con fecha_entrega={fecha_a_asignar}'
-                                )
+                    if servicios:
+                        # Encontrar el servicio con fecha más temprana
+                        primer_servicio = min(servicios, key=lambda s: s.fecha_agendamiento)
+                        fecha_a_asignar = primer_servicio.fecha_agendamiento
+                        productos_actualizados += 1
+                    else:
+                        # No hay servicios, usar fecha de la reserva como fallback
+                        fecha_a_asignar = producto.venta_reserva.fecha_reserva.date()
+                        productos_sin_servicios += 1
 
-                            productos_actualizados += 1
-                        else:
-                            # No hay servicios, usar fecha de la reserva como fallback
-                            fecha_a_asignar = producto.venta_reserva.fecha_reserva.date()
-
-                            if dry_run:
-                                self.stdout.write(
-                                    f'  [DRY RUN] ⚠️ Producto #{producto.id} ({producto.producto.nombre}) '
-                                    f'en Reserva #{producto.venta_reserva.id} (SIN SERVICIOS) '
-                                    f'-> fecha_entrega = {fecha_a_asignar} (fecha de reserva)'
-                                )
-                            else:
-                                producto.fecha_entrega = fecha_a_asignar
-                                producto.save()
-                                logger.warning(
-                                    f'Producto {producto.id} sin servicios, usando fecha_reserva={fecha_a_asignar}'
-                                )
-
-                            productos_sin_servicios += 1
-
-                    except Exception as e:
-                        logger.error(f'Error procesando producto {producto.id}: {str(e)}', exc_info=True)
+                    if dry_run:
+                        servicio_info = 'con servicio' if servicios else 'SIN SERVICIOS'
                         self.stdout.write(
-                            self.style.ERROR(f'  ❌ Error en Producto #{producto.id}: {str(e)}')
+                            f'  [DRY RUN] Producto #{producto.id} ({producto.producto.nombre}) '
+                            f'en Reserva #{producto.venta_reserva.id} ({servicio_info}) '
+                            f'-> fecha_entrega = {fecha_a_asignar}'
                         )
-                        errores += 1
+                    else:
+                        # Asignar fecha en memoria (no guardar todavía)
+                        producto.fecha_entrega = fecha_a_asignar
+                        productos_a_actualizar.append(producto)
 
-                # Si es dry-run, hacer rollback de este lote
-                if dry_run:
-                    transaction.set_rollback(True)
+                except Exception as e:
+                    logger.error(f'Error procesando producto {producto.id}: {str(e)}', exc_info=True)
+                    self.stdout.write(
+                        self.style.ERROR(f'  ❌ Error en Producto #{producto.id}: {str(e)}')
+                    )
+                    errores += 1
+
+            # OPTIMIZACIÓN: bulk_update en vez de save() individual
+            if not dry_run and productos_a_actualizar:
+                with transaction.atomic():
+                    ReservaProducto.objects.bulk_update(
+                        productos_a_actualizar,
+                        ['fecha_entrega'],
+                        batch_size=500
+                    )
+                    logger.info(f'Bulk update de {len(productos_a_actualizar)} productos completado')
 
             # Mostrar progreso del lote
             self.stdout.write(f'   ✅ Lote {batch_num} completado ({len(productos_lote)} productos)')
