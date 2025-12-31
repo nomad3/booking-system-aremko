@@ -84,6 +84,12 @@ class Command(BaseCommand):
             # PROCESAR EN MEMORIA (sin queries individuales)
             for producto in productos_lote:
                 try:
+                    # Validar que el producto tenga venta_reserva
+                    if not producto.venta_reserva:
+                        logger.warning(f'Producto {producto.id} sin venta_reserva, saltando')
+                        errores += 1
+                        continue
+
                     # Obtener servicios de la reserva (ya cargados con prefetch_related)
                     servicios = list(producto.venta_reserva.reservaservicios.all())
 
@@ -94,8 +100,18 @@ class Command(BaseCommand):
                         productos_actualizados += 1
                     else:
                         # No hay servicios, usar fecha de la reserva como fallback
-                        fecha_a_asignar = producto.venta_reserva.fecha_reserva.date()
-                        productos_sin_servicios += 1
+                        if producto.venta_reserva.fecha_reserva:
+                            fecha_a_asignar = producto.venta_reserva.fecha_reserva.date()
+                            productos_sin_servicios += 1
+                        else:
+                            # Fecha de reserva es NULL, usar fecha actual como último fallback
+                            from django.utils import timezone
+                            fecha_a_asignar = timezone.now().date()
+                            logger.warning(
+                                f'Producto {producto.id} en Reserva {producto.venta_reserva.id} '
+                                f'sin servicios ni fecha_reserva, usando fecha actual'
+                            )
+                            productos_sin_servicios += 1
 
                     if dry_run:
                         servicio_info = 'con servicio' if servicios else 'SIN SERVICIOS'
