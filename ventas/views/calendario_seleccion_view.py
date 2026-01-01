@@ -7,6 +7,7 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.db import transaction
 from datetime import datetime, date
 from ..models import (
@@ -25,88 +26,106 @@ def staff_required(view_func):
 
 
 @staff_required
+@xframe_options_sameorigin
 def calendario_seleccion_view(request):
     """
     Vista del calendario en modo selección para agregar servicios a una reserva.
     Muestra la matriz de disponibilidad y permite hacer click en slots disponibles.
     """
-    # Obtener ID de reserva si existe
-    reserva_id = request.GET.get('reserva_id', '')
-
-    # Obtener parámetros de la request
-    fecha_str = request.GET.get('fecha', date.today().strftime('%Y-%m-%d'))
-
-    # Obtener todas las categorías para el selector
-    categorias = CategoriaServicio.objects.all().order_by('nombre')
-
-    # Buscar la categoría "Tinas Calientes" para usarla como default
-    tinas_categoria = categorias.filter(nombre='Tinas Calientes').first()
-    if not tinas_categoria:
-        tinas_categoria = categorias.filter(nombre__icontains='tina').exclude(nombre__icontains='empresarial').first()
-    if not tinas_categoria:
-        tinas_categoria = categorias.filter(nombre__icontains='tina').first()
-
-    default_categoria_id = str(tinas_categoria.id) if tinas_categoria else '1'
-
-    # Obtener el ID de categoría del request o usar Tinas como default
-    categoria_id = request.GET.get('categoria', default_categoria_id)
-
     try:
-        fecha_seleccionada = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-    except ValueError:
-        fecha_seleccionada = date.today()
+        # Obtener ID de reserva si existe
+        reserva_id = request.GET.get('reserva_id', '')
 
-    # Obtener la categoría seleccionada
-    try:
-        categoria = CategoriaServicio.objects.get(id=categoria_id)
-    except CategoriaServicio.DoesNotExist:
-        categoria = tinas_categoria if tinas_categoria else categorias.first()
-        categoria_id = categoria.id if categoria else None
+        # Obtener parámetros de la request
+        fecha_str = request.GET.get('fecha', date.today().strftime('%Y-%m-%d'))
 
-    # Obtener servicios de la categoría que sean visibles en matriz
-    servicios = Servicio.objects.filter(
-        categoria=categoria,
-        activo=True,
-        visible_en_matriz=True
-    ).order_by('nombre')
+        # Obtener todas las categorías para el selector
+        categorias = CategoriaServicio.objects.all().order_by('nombre')
 
-    # Generar la matriz de disponibilidad
-    matriz_data = generar_matriz_disponibilidad(
-        fecha_seleccionada,
-        categoria,
-        servicios
-    )
+        # Buscar la categoría "Tinas Calientes" para usarla como default
+        tinas_categoria = categorias.filter(nombre='Tinas Calientes').first()
+        if not tinas_categoria:
+            tinas_categoria = categorias.filter(nombre__icontains='tina').exclude(nombre__icontains='empresarial').first()
+        if not tinas_categoria:
+            tinas_categoria = categorias.filter(nombre__icontains='tina').first()
 
-    # Crear una estructura de datos más simple para el template
-    matriz_simple = []
-    for slot in matriz_data['slots']:
-        fila = {'slot': slot, 'celdas': []}
-        for recurso in matriz_data['recursos']:
-            if slot in matriz_data['matriz'] and recurso in matriz_data['matriz'][slot]:
-                celda = matriz_data['matriz'][slot][recurso]
-            else:
-                celda = {'estado': 'disponible', 'cliente': None, 'personas': None}
-            fila['celdas'].append(celda)
-        matriz_simple.append(fila)
+        default_categoria_id = str(tinas_categoria.id) if tinas_categoria else '1'
 
-    # Contexto para el template
-    context = {
-        'fecha_seleccionada': fecha_seleccionada,
-        'fecha_str': fecha_seleccionada.strftime('%Y-%m-%d'),
-        'categoria_seleccionada': categoria,
-        'categoria_id': int(categoria_id) if categoria_id else None,
-        'categorias': categorias,
-        'matriz': matriz_data['matriz'],
-        'matriz_simple': matriz_simple,
-        'slots_horarios': matriz_data['slots'],
-        'recursos': matriz_data['recursos'],
-        'resumen': matriz_data['resumen'],
-        'reserva_id': reserva_id,
-        'modo_seleccion': True,  # Flag para indicar que estamos en modo selección
-    }
+        # Obtener el ID de categoría del request o usar Tinas como default
+        categoria_id = request.GET.get('categoria', default_categoria_id)
 
-    # Usar template específico para selección
-    return render(request, 'ventas/calendario_seleccion.html', context)
+        try:
+            fecha_seleccionada = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        except ValueError:
+            fecha_seleccionada = date.today()
+
+        # Obtener la categoría seleccionada
+        try:
+            categoria = CategoriaServicio.objects.get(id=categoria_id)
+        except CategoriaServicio.DoesNotExist:
+            categoria = tinas_categoria if tinas_categoria else categorias.first()
+            categoria_id = categoria.id if categoria else None
+
+        # Obtener servicios de la categoría que sean visibles en matriz
+        servicios = Servicio.objects.filter(
+            categoria=categoria,
+            activo=True,
+            visible_en_matriz=True
+        ).order_by('nombre')
+
+        # Generar la matriz de disponibilidad
+        matriz_data = generar_matriz_disponibilidad(
+            fecha_seleccionada,
+            categoria,
+            servicios
+        )
+
+        # Crear una estructura de datos más simple para el template
+        matriz_simple = []
+        for slot in matriz_data['slots']:
+            fila = {'slot': slot, 'celdas': []}
+            for recurso in matriz_data['recursos']:
+                if slot in matriz_data['matriz'] and recurso in matriz_data['matriz'][slot]:
+                    celda = matriz_data['matriz'][slot][recurso]
+                else:
+                    celda = {'estado': 'disponible', 'cliente': None, 'personas': None}
+                fila['celdas'].append(celda)
+            matriz_simple.append(fila)
+
+        # Contexto para el template
+        context = {
+            'fecha_seleccionada': fecha_seleccionada,
+            'fecha_str': fecha_seleccionada.strftime('%Y-%m-%d'),
+            'categoria_seleccionada': categoria,
+            'categoria_id': int(categoria_id) if categoria_id else None,
+            'categorias': categorias,
+            'matriz': matriz_data['matriz'],
+            'matriz_simple': matriz_simple,
+            'slots_horarios': matriz_data['slots'],
+            'recursos': matriz_data['recursos'],
+            'resumen': matriz_data['resumen'],
+            'reserva_id': reserva_id,
+            'modo_seleccion': True,  # Flag para indicar que estamos en modo selección
+        }
+
+        # Usar template específico para selección
+        return render(request, 'ventas/calendario_seleccion.html', context)
+
+    except Exception as e:
+        # En caso de error, mostrar página de error con detalles
+        from django.http import HttpResponse
+        import traceback
+        error_html = f"""
+        <html>
+        <head><title>Error en Calendario de Selección</title></head>
+        <body>
+        <h1>Error al cargar el calendario</h1>
+        <p><strong>Error:</strong> {str(e)}</p>
+        <pre>{traceback.format_exc()}</pre>
+        </body>
+        </html>
+        """
+        return HttpResponse(error_html, status=500)
 
 
 def obtener_personas_por_defecto(nombre_servicio):
