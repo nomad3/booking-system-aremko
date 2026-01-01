@@ -74,8 +74,8 @@ class ReservaServicioInline(admin.TabularInline):
     form = ReservaServicioInlineForm
     extra = 1
     autocomplete_fields = ['proveedor_asignado']
-    fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas', 'mostrar_valor_unitario', 'mostrar_valor_total', 'proveedor_asignado']
-    readonly_fields = ['mostrar_valor_unitario', 'mostrar_valor_total']
+    fields = ['servicio', 'fecha_agendamiento', 'hora_inicio', 'cantidad_personas', 'precio_unitario_venta', 'mostrar_valor_unitario', 'mostrar_valor_total', 'proveedor_asignado']
+    readonly_fields = ['mostrar_valor_unitario', 'mostrar_valor_total', 'precio_unitario_venta']
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "servicio":
@@ -85,8 +85,8 @@ class ReservaServicioInline(admin.TabularInline):
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
     extra = 1
-    fields = ['producto', 'cantidad', 'fecha_entrega', 'mostrar_valor_unitario', 'mostrar_valor_total']
-    readonly_fields = ['mostrar_valor_unitario', 'mostrar_valor_total']
+    fields = ['producto', 'cantidad', 'fecha_entrega', 'precio_unitario_venta', 'mostrar_valor_unitario', 'mostrar_valor_total']
+    readonly_fields = ['mostrar_valor_unitario', 'mostrar_valor_total', 'precio_unitario_venta']
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "producto":

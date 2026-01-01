@@ -472,6 +472,32 @@ def guardar_cantidad_anterior(sender, instance, **kwargs):
     else:
         instance._cantidad_anterior = 0
 
+@receiver(pre_save, sender=ReservaProducto)
+def congelar_precio_producto(sender, instance, **kwargs):
+    """
+    Congela el precio del producto al momento de agregarlo a la reserva.
+    Si es un nuevo producto (no tiene pk) y no tiene precio_unitario_venta,
+    copia el precio_base actual del producto.
+    """
+    # Solo congelar precio si es nuevo y no tiene precio ya asignado
+    if not instance.pk and not instance.precio_unitario_venta:
+        if instance.producto:
+            instance.precio_unitario_venta = instance.producto.precio_base
+            logger.debug(f"Precio congelado para ReservaProducto: ${instance.precio_unitario_venta}")
+
+@receiver(pre_save, sender=ReservaServicio)
+def congelar_precio_servicio(sender, instance, **kwargs):
+    """
+    Congela el precio del servicio al momento de agregarlo a la reserva.
+    Si es un nuevo servicio (no tiene pk) y no tiene precio_unitario_venta,
+    copia el precio_base actual del servicio.
+    """
+    # Solo congelar precio si es nuevo y no tiene precio ya asignado
+    if not instance.pk and not instance.precio_unitario_venta:
+        if instance.servicio:
+            instance.precio_unitario_venta = instance.servicio.precio_base
+            logger.debug(f"Precio congelado para ReservaServicio: ${instance.precio_unitario_venta}")
+
 @receiver(post_delete, sender=ReservaProducto) # Keep this signal for inventory updates
 def restaurar_inventario_al_eliminar_producto(sender, instance, **kwargs):
     try:

@@ -143,8 +143,16 @@ def _generar_texto_resumen(reserva, config):
 
     # Valor total con desglose
     total = reserva.total
-    total_servicios = sum(rs.servicio.precio_base * (rs.cantidad_personas or 1) for rs in servicios)
-    total_productos = sum(rp.producto.precio_base * rp.cantidad for rp in productos)
+
+    # Usar precios congelados si existen, sino usar precio_base actual
+    total_servicios = sum(
+        (rs.precio_unitario_venta if rs.precio_unitario_venta else rs.servicio.precio_base) * (rs.cantidad_personas or 1)
+        for rs in servicios
+    )
+    total_productos = sum(
+        (rp.precio_unitario_venta if rp.precio_unitario_venta else rp.producto.precio_base) * rp.cantidad
+        for rp in productos
+    )
     total_giftcards = sum(gc.monto_inicial for gc in giftcards)
 
     lineas.append(f"VALOR TOTAL: ${int(total):,}")

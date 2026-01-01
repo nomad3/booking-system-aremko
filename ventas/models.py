@@ -9,7 +9,7 @@ from django.db import transaction
 import random
 import string
 import re
-from django.db.models import Sum, F, DecimalField, FloatField # Added DecimalField, FloatField
+from django.db.models import Sum, F, DecimalField, FloatField, Coalesce # Added DecimalField, FloatField, Coalesce
 from solo.models import SingletonModel # Added import for django-solo
 
 class Proveedor(models.Model):
@@ -680,10 +680,25 @@ class VentaReserva(models.Model):
         return f"Venta/Reserva #{self.id} de {self.cliente}"
 
     def calcular_total(self):
-        total_productos = self.reservaproductos.aggregate(total=models.Sum(models.F('producto__precio_base') * models.F('cantidad')))['total'] or 0
-        total_servicios = self.reservaservicios.aggregate(total=models.Sum(models.F('servicio__precio_base') * models.F('cantidad_personas')))['total'] or 0
+        # OPTIMIZACIÓN: Usar precios congelados (precio_unitario_venta) si existen,
+        # sino usar precio actual del catálogo (precio_base) como fallback
+
+        # Para productos: usar precio_unitario_venta si existe, sino precio_base
+        total_productos = self.reservaproductos.aggregate(
+            total=models.Sum(
+                Coalesce(models.F('precio_unitario_venta'), models.F('producto__precio_base')) * models.F('cantidad')
+            )
+        )['total'] or 0
+
+        # Para servicios: usar precio_unitario_venta si existe, sino precio_base
+        total_servicios = self.reservaservicios.aggregate(
+            total=models.Sum(
+                Coalesce(models.F('precio_unitario_venta'), models.F('servicio__precio_base')) * models.F('cantidad_personas')
+            )
+        )['total'] or 0
+
         total_giftcards = self.giftcards.aggregate(total=models.Sum('monto_inicial'))['total'] or 0
-        total_pagos_descuentos = self.pagos.filter(metodo_pago='descuento').aggregate(total=models.Sum('monto'))['total'] or 0  # Considerar descuentos como pagos negativos
+        total_pagos_descuentos = self.pagos.filter(metodo_pago='descuento').aggregate(total=models.Sum('monto'))['total'] or 0
 
         self.total = total_productos + total_servicios + total_giftcards - total_pagos_descuentos
         self.save()
@@ -721,18 +736,20 @@ class VentaReserva(models.Model):
 
     @property
     def total_servicios(self):
+        # Usar precio congelado si existe, sino precio actual del catálogo
         total = self.reservaservicios.aggregate(
             total=models.Sum(
-                models.F('servicio__precio_base') * models.F('cantidad_personas')
+                Coalesce(models.F('precio_unitario_venta'), models.F('servicio__precio_base')) * models.F('cantidad_personas')
             )
         )['total'] or 0
         return total
 
     @property
     def total_productos(self):
+        # Usar precio congelado si existe, sino precio actual del catálogo
         total = self.reservaproductos.aggregate(
             total=models.Sum(
-                models.F('producto__precio_base') * models.F('cantidad')
+                Coalesce(models.F('precio_unitario_venta'), models.F('producto__precio_base')) * models.F('cantidad')
             )
         )['total'] or 0
         return total
@@ -858,19 +875,30 @@ class ReservaProducto(models.Model):
         verbose_name="Fecha de Entrega",
         help_text="Fecha en que el producto fue/será entregado al cliente. Si está vacío, se asume la fecha del primer servicio de la reserva."
     )
+    precio_unitario_venta = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Precio Unitario de Venta",
+        help_text="Precio del producto al momento de agregarlo a la reserva. Si está vacío, se usa el precio_base actual del producto."
+    )
 
     def __str__(self):
         return f"{self.cantidad} x {self.producto.nombre} en Venta/Reserva #{self.venta_reserva.id}"
 
     def mostrar_valor_unitario(self):
         """Muestra el valor unitario del producto formateado."""
-        valor = self.producto.precio_base
+        # Usar precio congelado si existe, sino usar precio actual del catálogo
+        valor = self.precio_unitario_venta if self.precio_unitario_venta else self.producto.precio_base
         return f"${valor:,.0f}".replace(',', '.')
     mostrar_valor_unitario.short_description = 'Valor Unitario'
 
     def mostrar_valor_total(self):
         """Muestra el valor total calculado formateado."""
-        valor = self.producto.precio_base * self.cantidad
+        # Usar precio congelado si existe, sino usar precio actual del catálogo
+        precio = self.precio_unitario_venta if self.precio_unitario_venta else self.producto.precio_base
+        valor = precio * self.cantidad
         return f"${valor:,.0f}".replace(',', '.')
     mostrar_valor_total.short_description = 'Valor Total'
 
@@ -889,6 +917,14 @@ class ReservaServicio(models.Model):
         blank=True,
         related_name='reservas_asignadas',
         help_text="Proveedor específico asignado para esta reserva (ej. masajista)."
+    )
+    precio_unitario_venta = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Precio Unitario de Venta",
+        help_text="Precio del servicio al momento de agregarlo a la reserva. Si está vacío, se usa el precio_base actual del servicio."
     )
 
     @property
@@ -916,13 +952,23 @@ class ReservaServicio(models.Model):
 
     def mostrar_valor_unitario(self):
         """Muestra el valor unitario del servicio formateado."""
-        valor = self.servicio.precio_base
+        # Usar precio congelado si existe, sino usar precio actual del catálogo
+        valor = self.precio_unitario_venta if self.precio_unitario_venta else self.servicio.precio_base
         return f"${valor:,.0f}".replace(',', '.')
     mostrar_valor_unitario.short_description = 'Valor Unitario'
 
     def mostrar_valor_total(self):
         """Muestra el valor total calculado formateado."""
-        valor = self.calcular_precio()
+        # Usar precio congelado si existe, sino calcular con precio actual
+        if self.precio_unitario_venta:
+            # Usar precio congelado
+            if self.servicio.tipo_servicio == 'cabana':
+                valor = self.precio_unitario_venta  # Precio fijo para cabañas
+            else:
+                valor = self.precio_unitario_venta * self.cantidad_personas
+        else:
+            # Fallback: calcular con precio actual del catálogo
+            valor = self.calcular_precio()
         return f"${valor:,.0f}".replace(',', '.')
     mostrar_valor_total.short_description = 'Valor Total'
 
