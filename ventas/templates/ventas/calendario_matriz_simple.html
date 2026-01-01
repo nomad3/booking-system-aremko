@@ -29,6 +29,15 @@
             border-radius: 4px;
             margin: 20px 0;
         }
+
+        /* ===== VISTA DESKTOP - TABLA ===== */
+        .vista-tabla {
+            display: block;
+        }
+        .vista-mobile {
+            display: none;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -62,6 +71,139 @@
             color: #999;
             font-style: italic;
         }
+
+        /* ===== VISTA MOBILE - TARJETAS ===== */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            /* Ocultar tabla en móvil */
+            .vista-tabla {
+                display: none;
+            }
+
+            /* Mostrar tarjetas en móvil */
+            .vista-mobile {
+                display: block;
+            }
+
+            /* Tarjeta de servicio */
+            .servicio-card {
+                background: white;
+                border: 2px solid #007bff;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                overflow: hidden;
+            }
+
+            .servicio-card-header {
+                background: #007bff;
+                color: white;
+                padding: 15px;
+                font-size: 18px;
+                font-weight: bold;
+            }
+
+            .servicio-card-body {
+                padding: 10px;
+            }
+
+            /* Slot individual */
+            .slot-item {
+                display: flex;
+                align-items: center;
+                padding: 12px;
+                margin: 8px 0;
+                border-radius: 6px;
+                border-left: 4px solid transparent;
+            }
+
+            .slot-hora {
+                font-weight: bold;
+                font-size: 16px;
+                min-width: 70px;
+                margin-right: 10px;
+            }
+
+            .slot-estado {
+                flex: 1;
+                font-size: 14px;
+            }
+
+            .slot-cliente {
+                font-size: 12px;
+                color: #666;
+                margin-top: 3px;
+            }
+
+            /* Estados de slots */
+            .slot-item.disponible {
+                background-color: #fff3cd;
+                border-left-color: #ffc107;
+            }
+
+            .slot-item.ocupado-pagado {
+                background-color: #d4edda;
+                border-left-color: #28a745;
+                color: #155724;
+            }
+
+            .slot-item.ocupado-no-pagado {
+                background-color: #f8d7da;
+                border-left-color: #dc3545;
+                color: #721c24;
+            }
+
+            .slot-item.no-aplica {
+                background-color: #f8f9fa;
+                border-left-color: #e0e0e0;
+                color: #999;
+            }
+
+            .info {
+                padding: 12px;
+            }
+
+            .info h3 {
+                font-size: 16px;
+                margin-top: 0;
+            }
+
+            .info ul {
+                font-size: 14px;
+            }
+
+            /* Formulario de filtros más compacto */
+            .info form {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .info form label {
+                font-weight: bold;
+                font-size: 14px;
+                margin-bottom: 5px;
+            }
+
+            .info form input[type="date"],
+            .info form select {
+                width: 100%;
+                padding: 10px;
+                font-size: 16px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -82,42 +224,89 @@
             </form>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Horario</th>
-                    {% for recurso in recursos %}
-                    <th>{{ recurso }}</th>
-                    {% endfor %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for fila in matriz_simple %}
-                <tr>
-                    <td><strong>{{ fila.slot }}</strong></td>
-                    {% for celda in fila.celdas %}
-                        {% if celda.estado == 'ocupado' %}
-                            {% if celda.estado_pago == 'pagado' %}
-                                <td class="ocupado-pagado" title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s) - PAGADO">
-                                    Ocupado<br>
-                                    <small>{{ celda.cliente|default:"" }}</small>
-                                </td>
+        <!-- VISTA DESKTOP: Tabla -->
+        <div class="vista-tabla">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Horario</th>
+                        {% for recurso in recursos %}
+                        <th>{{ recurso }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fila in matriz_simple %}
+                    <tr>
+                        <td><strong>{{ fila.slot }}</strong></td>
+                        {% for celda in fila.celdas %}
+                            {% if celda.estado == 'ocupado' %}
+                                {% if celda.estado_pago == 'pagado' %}
+                                    <td class="ocupado-pagado" title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s) - PAGADO">
+                                        Ocupado<br>
+                                        <small>{{ celda.cliente|default:"" }}</small>
+                                    </td>
+                                {% else %}
+                                    <td class="ocupado-no-pagado" title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s) - NO PAGADO ({{ celda.estado_pago|default:'pendiente' }})">
+                                        Ocupado<br>
+                                        <small>{{ celda.cliente|default:"" }}</small>
+                                    </td>
+                                {% endif %}
+                            {% elif celda.estado == 'no_aplica' %}
+                                <td class="no-aplica">-</td>
                             {% else %}
-                                <td class="ocupado-no-pagado" title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s) - NO PAGADO ({{ celda.estado_pago|default:'pendiente' }})">
-                                    Ocupado<br>
-                                    <small>{{ celda.cliente|default:"" }}</small>
-                                </td>
+                                <td class="disponible">Disponible</td>
                             {% endif %}
-                        {% elif celda.estado == 'no_aplica' %}
-                            <td class="no-aplica">-</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- VISTA MOBILE: Tarjetas por servicio -->
+        <div class="vista-mobile">
+            {% for servicio in servicios_con_horarios %}
+            <div class="servicio-card">
+                <div class="servicio-card-header">
+                    {{ servicio.nombre }}
+                </div>
+                <div class="servicio-card-body">
+                    {% for slot in servicio.slots %}
+                        {% if slot.estado == 'ocupado' %}
+                            {% if slot.estado_pago == 'pagado' %}
+                                <div class="slot-item ocupado-pagado">
+                                    <div class="slot-hora">{{ slot.hora }}</div>
+                                    <div class="slot-estado">
+                                        <strong>✓ Ocupado y Pagado</strong>
+                                        <div class="slot-cliente">{{ slot.cliente|default:"Cliente" }} - {{ slot.personas|default:"1" }} persona(s)</div>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="slot-item ocupado-no-pagado">
+                                    <div class="slot-hora">{{ slot.hora }}</div>
+                                    <div class="slot-estado">
+                                        <strong>⚠ Ocupado - No Pagado</strong>
+                                        <div class="slot-cliente">{{ slot.cliente|default:"Cliente" }} - {{ slot.personas|default:"1" }} persona(s)</div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% elif slot.estado == 'no_aplica' %}
+                            <div class="slot-item no-aplica">
+                                <div class="slot-hora">{{ slot.hora }}</div>
+                                <div class="slot-estado">No aplica</div>
+                            </div>
                         {% else %}
-                            <td class="disponible">Disponible</td>
+                            <div class="slot-item disponible">
+                                <div class="slot-hora">{{ slot.hora }}</div>
+                                <div class="slot-estado"><strong>Disponible</strong></div>
+                            </div>
                         {% endif %}
                     {% endfor %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
 
         <div class="info">
             <h3>Resumen de Ocupación</h3>
