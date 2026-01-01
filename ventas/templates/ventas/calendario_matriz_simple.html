@@ -47,9 +47,15 @@
             background-color: #d4edda;
             color: #155724;
         }
-        .ocupado {
+        .ocupado-pagado {
+            background-color: #d4edda;
+            color: #155724;
+            font-weight: bold;
+        }
+        .ocupado-no-pagado {
             background-color: #f8d7da;
             color: #721c24;
+            font-weight: bold;
         }
         .no-aplica {
             background-color: #e0e0e0;
@@ -91,10 +97,17 @@
                     <td><strong>{{ fila.slot }}</strong></td>
                     {% for celda in fila.celdas %}
                         {% if celda.estado == 'ocupado' %}
-                            <td class="ocupado" title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s)">
-                                Ocupado<br>
-                                <small>{{ celda.cliente|default:"" }}</small>
-                            </td>
+                            {% if celda.estado_pago == 'pagado' %}
+                                <td class="ocupado-pagado" title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s) - PAGADO">
+                                    Ocupado<br>
+                                    <small>{{ celda.cliente|default:"" }}</small>
+                                </td>
+                            {% else %}
+                                <td class="ocupado-no-pagado" title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s) - NO PAGADO ({{ celda.estado_pago|default:'pendiente' }})">
+                                    Ocupado<br>
+                                    <small>{{ celda.cliente|default:"" }}</small>
+                                </td>
+                            {% endif %}
                         {% elif celda.estado == 'no_aplica' %}
                             <td class="no-aplica">-</td>
                         {% else %}
@@ -113,6 +126,28 @@
                 <li>Ocupados: {{ resumen.ocupados }}</li>
                 <li>Disponibles: {{ resumen.disponibles }}</li>
                 <li>Porcentaje de ocupación: {{ resumen.porcentaje_ocupacion }}%</li>
+            </ul>
+        </div>
+
+        <div class="info">
+            <h3>Leyenda</h3>
+            <ul style="list-style: none; padding: 0;">
+                <li style="margin: 5px 0;">
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: #d4edda; border: 1px solid #c3e6cb; vertical-align: middle;"></span>
+                    <strong>Verde:</strong> Slot ocupado y pagado
+                </li>
+                <li style="margin: 5px 0;">
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: #f8d7da; border: 1px solid #f5c6cb; vertical-align: middle;"></span>
+                    <strong>Rojo:</strong> Slot ocupado pero NO pagado (pendiente/parcial)
+                </li>
+                <li style="margin: 5px 0;">
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: #d4edda; border: 1px solid #c3e6cb; vertical-align: middle;"></span>
+                    <strong>Verde claro:</strong> Slot disponible
+                </li>
+                <li style="margin: 5px 0;">
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: #e0e0e0; border: 1px solid #ccc; vertical-align: middle;"></span>
+                    <strong>Gris:</strong> Horario no aplica para este servicio
+                </li>
             </ul>
         </div>
 
