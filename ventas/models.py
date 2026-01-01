@@ -9,7 +9,8 @@ from django.db import transaction
 import random
 import string
 import re
-from django.db.models import Sum, F, DecimalField, FloatField, Coalesce # Added DecimalField, FloatField, Coalesce
+from django.db.models import Sum, F, DecimalField, FloatField # Added DecimalField, FloatField
+from django.db.models.functions import Coalesce # Coalesce es una función de DB
 from solo.models import SingletonModel # Added import for django-solo
 
 class Proveedor(models.Model):
