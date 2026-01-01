@@ -92,6 +92,27 @@ def calendario_seleccion_view(request):
                 fila['celdas'].append(celda)
             matriz_simple.append(fila)
 
+        # Crear estructura organizada por servicio (para vista mobile)
+        servicios_con_horarios = []
+        for recurso in matriz_data['recursos']:
+            servicio_data = {
+                'nombre': recurso,
+                'slots': []
+            }
+            for slot in matriz_data['slots']:
+                if slot in matriz_data['matriz'] and recurso in matriz_data['matriz'][slot]:
+                    slot_data = matriz_data['matriz'][slot][recurso].copy()
+                    slot_data['hora'] = slot
+                    servicio_data['slots'].append(slot_data)
+                else:
+                    servicio_data['slots'].append({
+                        'hora': slot,
+                        'estado': 'disponible',
+                        'cliente': None,
+                        'personas': None
+                    })
+            servicios_con_horarios.append(servicio_data)
+
         # Contexto para el template
         context = {
             'fecha_seleccionada': fecha_seleccionada,
@@ -101,6 +122,7 @@ def calendario_seleccion_view(request):
             'categorias': categorias,
             'matriz': matriz_data['matriz'],
             'matriz_simple': matriz_simple,
+            'servicios_con_horarios': servicios_con_horarios,  # Para vista mobile
             'slots_horarios': matriz_data['slots'],
             'recursos': matriz_data['recursos'],
             'resumen': matriz_data['resumen'],
