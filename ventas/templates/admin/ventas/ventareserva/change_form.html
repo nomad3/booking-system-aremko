@@ -379,11 +379,143 @@
             }
         }
     </style>
+        /* ===== ESTILOS PARA BOTÓN DE CALENDARIO ===== */
+        .calendario-button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 10px 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .calendario-button:hover {
+            background: #0056b3;
+            color: white;
+        }
+
+        /* Modal para calendario */
+        .calendario-modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+        }
+
+        .calendario-modal-content {
+            position: relative;
+            background-color: white;
+            margin: 2% auto;
+            width: 95%;
+            height: 90%;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .calendario-modal-close {
+            position: absolute;
+            right: 20px;
+            top: 15px;
+            color: white;
+            background: #dc3545;
+            border: none;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 10000;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .calendario-modal-close:hover {
+            background: #c82333;
+        }
+
+        .calendario-modal iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+{% endblock %}
+
+{% block content %}
+    {{ block.super }}
+
+    <!-- Botón para agregar servicio desde calendario -->
+    <div style="margin: 20px 0;">
+        <button type="button" class="calendario-button" onclick="abrirCalendarioModal()">
+            📅 Agregar servicio desde calendario
+        </button>
+    </div>
 {% endblock %}
 
 {% block footer %}
     {{ block.super }}
+
+    <!-- Modal para calendario -->
+    <div id="calendarioModal" class="calendario-modal">
+        <div class="calendario-modal-content">
+            <button class="calendario-modal-close" onclick="cerrarCalendarioModal()">&times;</button>
+            <iframe id="calendarioFrame" src=""></iframe>
+        </div>
+    </div>
+
     <script>
+        // Funciones para controlar el modal del calendario
+        function abrirCalendarioModal() {
+            const modal = document.getElementById('calendarioModal');
+            const iframe = document.getElementById('calendarioFrame');
+
+            // URL del calendario con parámetro para modo selección
+            const reservaId = '{{ original.pk|default:"" }}';
+            iframe.src = '/ventas/calendario-seleccion/' + (reservaId ? '?reserva_id=' + reservaId : '');
+
+            modal.style.display = 'block';
+        }
+
+        function cerrarCalendarioModal() {
+            const modal = document.getElementById('calendarioModal');
+            const iframe = document.getElementById('calendarioFrame');
+
+            modal.style.display = 'none';
+            iframe.src = '';
+        }
+
+        // Función llamada desde el iframe cuando se selecciona un servicio
+        function servicioAgregado(success, message) {
+            if (success) {
+                cerrarCalendarioModal();
+                // Recargar la página para mostrar el servicio agregado
+                window.location.reload();
+            } else {
+                alert('Error al agregar servicio: ' + message);
+            }
+        }
+
+        // Cerrar modal si se hace click fuera de él
+        window.onclick = function(event) {
+            const modal = document.getElementById('calendarioModal');
+            if (event.target == modal) {
+                cerrarCalendarioModal();
+            }
+        }
+
         // Script para agregar data-labels a las celdas de los inlines
         document.addEventListener('DOMContentLoaded', function() {
             if (window.innerWidth <= 768) {

@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, resumen_reserva_view, tips_reserva_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -52,6 +52,9 @@ urlpatterns = [
     # path('calendario-matriz/', calendario_matriz_view.calendario_matriz_view, name='calendario_matriz'),
     path('calendario-matriz/api/', calendario_matriz_view.calendario_matriz_api, name='calendario_matriz_api'),
     path('calendario-matriz/reservar/', calendario_matriz_view.calendario_matriz_reservar, name='calendario_matriz_reservar'),
+    # Calendario Selección - Para agregar servicios a reserva desde calendario
+    path('calendario-seleccion/', calendario_seleccion_view.calendario_seleccion_view, name='calendario_seleccion'),
+    path('api/agregar-servicio-reserva/', calendario_seleccion_view.agregar_servicio_a_reserva, name='agregar_servicio_reserva'),
     # Resumen de Reserva (Pre-Pago)
     path('resumen-reserva/<int:reserva_id>/', resumen_reserva_view.generar_resumen_prepago, name='generar_resumen_prepago'),
     # Tips de Reserva (Post-Pago)

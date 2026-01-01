@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seleccionar Servicio - Calendario</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+            margin: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        .info {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .info-mensaje {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border-left: 4px solid #17a2b8;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: center;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .disponible {
+            background-color: #fff3cd;
+            color: #856404;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .disponible:hover {
+            background-color: #ffc107;
+            transform: scale(1.02);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .ocupado-pagado {
+            background-color: #28a745;
+            color: white;
+            font-weight: bold;
+            cursor: not-allowed;
+        }
+        .ocupado-no-pagado {
+            background-color: #dc3545;
+            color: white;
+            font-weight: bold;
+            cursor: not-allowed;
+        }
+        .no-aplica {
+            background-color: #e0e0e0;
+            color: #999;
+            font-style: italic;
+        }
+        /* Spinner de carga */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        .loading.active {
+            display: block;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Filtros */
+        .filtros {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filtros label {
+            font-weight: 600;
+        }
+        .filtros input[type="date"],
+        .filtros select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📅 Seleccionar Servicio desde Calendario</h1>
+
+        <div class="info-mensaje">
+            <strong>Instrucciones:</strong> Haz click en un slot <strong>disponible (amarillo)</strong> para agregar ese servicio a la reserva.
+            La cantidad de personas y el precio se configurarán automáticamente según el tipo de servicio.
+        </div>
+
+        <div class="info">
+            <form method="get" action="" class="filtros">
+                <input type="hidden" name="reserva_id" value="{{ reserva_id }}">
+
+                <div>
+                    <label for="fecha">Fecha:</label>
+                    <input type="date" id="fecha" name="fecha" value="{{ fecha_str }}" onchange="this.form.submit()">
+                </div>
+
+                <div>
+                    <label for="categoria">Categoría:</label>
+                    <select id="categoria" name="categoria" onchange="this.form.submit()">
+                        {% for cat in categorias %}
+                        <option value="{{ cat.id }}" {% if cat.id == categoria_id %}selected{% endif %}>{{ cat.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Horario</th>
+                    {% for recurso in recursos %}
+                    <th>{{ recurso }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in matriz_simple %}
+                <tr>
+                    <td><strong>{{ fila.slot }}</strong></td>
+                    {% for celda in fila.celdas %}
+                        {% if celda.estado == 'ocupado' %}
+                            {% if celda.estado_pago == 'pagado' %}
+                                <td class="ocupado-pagado" title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s) - PAGADO">
+                                    Ocupado<br>
+                                    <small>{{ celda.cliente|default:"" }}</small>
+                                </td>
+                            {% else %}
+                                <td class="ocupado-no-pagado" title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s) - NO PAGADO ({{ celda.estado_pago|default:'pendiente' }})">
+                                    Ocupado<br>
+                                    <small>{{ celda.cliente|default:"" }}</small>
+                                </td>
+                            {% endif %}
+                        {% elif celda.estado == 'no_aplica' %}
+                            <td class="no-aplica">-</td>
+                        {% else %}
+                            <td class="disponible"
+                                data-servicio-index="{{ forloop.counter0 }}"
+                                data-fecha="{{ fecha_str }}"
+                                data-hora="{{ fila.slot }}"
+                                onclick="seleccionarServicioDesdeElemento(this)"
+                                title="Click para agregar servicio a las {{ fila.slot }}">
+                                Disponible<br>
+                                <small style="font-size: 11px;">Click para agregar</small>
+                            </td>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="info">
+            <h3>Leyenda</h3>
+            <ul style="list-style: none; padding: 0;">
+                <li style="margin: 5px 0;">
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: #fff3cd; border: 1px solid #ffeaa7; vertical-align: middle;"></span>
+                    <strong>Amarillo:</strong> Slot disponible (click para agregar)
+                </li>
+                <li style="margin: 5px 0;">
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: #28a745; border: 1px solid #1e7e34; vertical-align: middle;"></span>
+                    <strong>Verde:</strong> Slot ocupado y PAGADO
+                </li>
+                <li style="margin: 5px 0;">
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: #dc3545; border: 1px solid #c82333; vertical-align: middle;"></span>
+                    <strong>Rojo:</strong> Slot ocupado pero NO PAGADO
+                </li>
+                <li style="margin: 5px 0;">
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: #e0e0e0; border: 1px solid #ccc; vertical-align: middle;"></span>
+                    <strong>Gris:</strong> Horario no aplica para este servicio
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Indicador de carga -->
+    <div class="loading" id="loadingIndicator">
+        <div class="spinner"></div>
+        <p style="text-align: center; margin-top: 15px;">Agregando servicio...</p>
+    </div>
+
+    <script>
+        // Array de recursos para acceder por índice
+        const recursos = [
+            {% for recurso in recursos %}
+            "{{ recurso }}"{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        function seleccionarServicioDesdeElemento(elemento) {
+            const index = parseInt(elemento.getAttribute('data-servicio-index'));
+            const fecha = elemento.getAttribute('data-fecha');
+            const hora = elemento.getAttribute('data-hora');
+            const servicioNombre = recursos[index];
+
+            seleccionarServicio(servicioNombre, fecha, hora);
+        }
+
+        function seleccionarServicio(servicioNombre, fecha, hora) {
+            const reservaId = "{{ reserva_id }}";
+
+            // Verificar que hay una reserva
+            if (!reservaId) {
+                alert('Error: Debe crear la reserva primero antes de agregar servicios.\n\nPor favor:\n1. Cierre este calendario\n2. Complete los datos básicos de la reserva\n3. Guarde la reserva\n4. Luego vuelva a abrir el calendario para agregar servicios');
+                return;
+            }
+
+            // Mostrar confirmación
+            if (!confirm(`¿Agregar servicio "${servicioNombre}" el ${fecha} a las ${hora}?`)) {
+                return;
+            }
+
+            // Mostrar indicador de carga
+            document.getElementById('loadingIndicator').classList.add('active');
+
+            // Obtener el CSRF token
+            const csrfToken = getCookie('csrftoken');
+
+            // Enviar petición al servidor
+            fetch('/ventas/api/agregar-servicio-reserva/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    reserva_id: reservaId,
+                    servicio_nombre: servicioNombre,
+                    fecha: fecha,
+                    hora: hora
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Ocultar indicador de carga
+                document.getElementById('loadingIndicator').classList.remove('active');
+
+                if (data.success) {
+                    // Notificar al parent window
+                    if (window.parent && window.parent.servicioAgregado) {
+                        window.parent.servicioAgregado(true, data.mensaje);
+                    } else {
+                        alert('Servicio agregado correctamente');
+                        window.location.reload();
+                    }
+                } else {
+                    alert('Error al agregar servicio: ' + (data.error || 'Error desconocido'));
+                }
+            })
+            .catch(error => {
+                // Ocultar indicador de carga
+                document.getElementById('loadingIndicator').classList.remove('active');
+
+                alert('Error de conexión: ' + error.message);
+                console.error('Error:', error);
+            });
+        }
+
+        // Función para obtener el CSRF token de las cookies
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+</body>
+</html>
