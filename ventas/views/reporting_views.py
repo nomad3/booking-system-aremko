@@ -62,9 +62,9 @@ def servicios_vendidos_view(request):
     categorias = CategoriaServicio.objects.all()
 
     # Sumar el monto total de todos los servicios vendidos que se están mostrando
-    # Ensure related objects exist before calculation
+    # Usar precio congelado si existe, sino precio actual del catálogo
     total_monto_vendido = sum(
-        (s.servicio.precio_base * s.cantidad_personas)
+        ((s.precio_unitario_venta if s.precio_unitario_venta else s.servicio.precio_base) * s.cantidad_personas)
         for s in servicios_vendidos if s.servicio
     )
 
@@ -75,7 +75,9 @@ def servicios_vendidos_view(request):
         if not servicio.servicio:
             continue
 
-        total_monto = servicio.servicio.precio_base * servicio.cantidad_personas
+        # Usar precio congelado si existe, sino precio actual del catálogo
+        precio = servicio.precio_unitario_venta if servicio.precio_unitario_venta else servicio.servicio.precio_base
+        total_monto = precio * servicio.cantidad_personas
 
         # Use the date directly from the DateField
         fecha_display = servicio.fecha_agendamiento
@@ -101,7 +103,7 @@ def servicios_vendidos_view(request):
             'servicio_nombre': servicio.servicio.nombre,
             'fecha_agendamiento': fecha_display, # Use processed date
             'hora_agendamiento_str': hora_display_str, # Use formatted string for display/export
-            'monto': servicio.servicio.precio_base,
+            'monto': precio,  # Usar precio congelado
             'cantidad_personas': servicio.cantidad_personas,
             'total_monto': total_monto,
             'proveedor_asignado': servicio.proveedor_asignado.nombre if servicio.proveedor_asignado else 'N/A' # Add assigned provider name
@@ -229,8 +231,9 @@ def productos_vendidos_view(request):
     )
 
     # Sumar el monto total de todos los productos vendidos
+    # Usar precio congelado si existe, sino precio actual del catálogo
     total_monto_vendido = sum(
-        (p.producto.precio_base * p.cantidad)
+        ((p.precio_unitario_venta if p.precio_unitario_venta else p.producto.precio_base) * p.cantidad)
         for p in productos_vendidos if p.producto
     )
 
@@ -241,7 +244,8 @@ def productos_vendidos_view(request):
         if not producto_reserva.producto:
             continue
 
-        valor_unitario = producto_reserva.producto.precio_base
+        # Usar precio congelado si existe, sino precio actual del catálogo
+        valor_unitario = producto_reserva.precio_unitario_venta if producto_reserva.precio_unitario_venta else producto_reserva.producto.precio_base
         cantidad = producto_reserva.cantidad
         valor_total = valor_unitario * cantidad
 
