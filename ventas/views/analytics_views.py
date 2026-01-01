@@ -7,7 +7,7 @@ Proporciona dashboards con métricas de ventas, servicios y productos
 from django.shortcuts import render
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Sum, Count, Q, F, Value, CharField
-from django.db.models.functions import TruncMonth, TruncDate, ExtractWeekDay
+from django.db.models.functions import TruncMonth, TruncDate, ExtractWeekDay, Coalesce
 from django.utils import timezone
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -99,7 +99,7 @@ def dashboard_ventas(request):
             query_servicios_base
             .values('servicio__categoria__nombre')
             .annotate(
-                total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
+                total_ventas=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas')),
                 cantidad_servicios=Count('id')
             )
             .order_by('-total_ventas')
@@ -119,7 +119,7 @@ def dashboard_ventas(request):
             query_servicios_individual
             .values('servicio__nombre', 'servicio__categoria__nombre')
             .annotate(
-                total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
+                total_ventas=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas')),
                 cantidad=Count('id')
             )
             .order_by('-total_ventas')[:15]
@@ -134,7 +134,7 @@ def dashboard_ventas(request):
             .exclude(producto__isnull=True)
             .values('producto__nombre')
             .annotate(
-                total_ventas=Sum(F('cantidad') * F('producto__precio_base')),
+                total_ventas=Sum(F('cantidad') * Coalesce(F('precio_unitario_venta'), F('producto__precio_base'))),
                 cantidad_vendida=Sum('cantidad')
             )
             .order_by('-total_ventas')[:15]
@@ -153,7 +153,7 @@ def dashboard_ventas(request):
                 .annotate(dia_semana=ExtractWeekDay('venta_reserva__fecha_reserva'))
                 .values('dia_semana')
                 .annotate(
-                    total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
+                    total_ventas=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas')),
                     cantidad_reservas=Count('venta_reserva', distinct=True)
                 )
                 .order_by('dia_semana')
@@ -207,7 +207,7 @@ def dashboard_ventas(request):
                     .annotate(mes=TruncMonth('venta_reserva__fecha_reserva'))
                     .values('mes')
                     .annotate(
-                        total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
+                        total_ventas=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas')),
                         cantidad_reservas=Count('venta_reserva', distinct=True)
                     )
                     .order_by('mes')
@@ -284,7 +284,7 @@ def dashboard_ventas(request):
             query_total_servicios = query_total_servicios.filter(filtro_categoria)
 
         total_servicios_result = query_total_servicios.aggregate(
-            total=Sum(F('servicio__precio_base') * F('cantidad_personas'))
+            total=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas'))
         )
         total_servicios = float(total_servicios_result['total'] or 0)
 
@@ -292,7 +292,7 @@ def dashboard_ventas(request):
         total_productos_result = ReservaProducto.objects.filter(
             venta_reserva__in=VentaReserva.objects.filter(filtro_base)
         ).exclude(producto__isnull=True).aggregate(
-            total=Sum(F('cantidad') * F('producto__precio_base'))
+            total=Sum(F('cantidad') * Coalesce(F('precio_unitario_venta'), F('producto__precio_base')))
         )
         total_productos = float(total_productos_result['total'] or 0)
 
@@ -514,7 +514,7 @@ def dashboard_operativo(request):
             query_base
             .values('servicio__categoria__nombre')
             .annotate(
-                total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
+                total_ventas=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas')),
                 cantidad_servicios=Count('id')
             )
             .order_by('-total_ventas')
@@ -534,7 +534,7 @@ def dashboard_operativo(request):
             query_top_servicios
             .values('servicio__nombre', 'servicio__categoria__nombre')
             .annotate(
-                total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
+                total_ventas=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas')),
                 cantidad=Count('id')
             )
             .order_by('-total_ventas')[:15]
@@ -555,7 +555,7 @@ def dashboard_operativo(request):
             .annotate(dia_semana=ExtractWeekDay('fecha_agendamiento'))
             .values('dia_semana')
             .annotate(
-                total_servicios=Sum(F('servicio__precio_base') * F('cantidad_personas')),
+                total_servicios=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas')),
                 cantidad_servicios=Count('id')
             )
             .order_by('dia_semana')
@@ -598,7 +598,7 @@ def dashboard_operativo(request):
                 .annotate(mes=TruncMonth('fecha_agendamiento'))
                 .values('mes')
                 .annotate(
-                    total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
+                    total_ventas=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas')),
                     cantidad_servicios=Count('id')
                 )
                 .order_by('mes')
@@ -627,7 +627,7 @@ def dashboard_operativo(request):
         total_servicios_result = (
             query_total_servicios
             .aggregate(
-                total=Sum(F('servicio__precio_base') * F('cantidad_personas')),
+                total=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas')),
                 cantidad=Count('id'),
                 reservas_unicas=Count('venta_reserva', distinct=True)
             )
@@ -947,7 +947,7 @@ def exportar_estadisticas_csv(request):
         .exclude(servicio__isnull=True)
         .values('servicio__nombre', 'servicio__categoria__nombre')
         .annotate(
-            total_ventas=Sum(F('servicio__precio_base') * F('cantidad_personas')),
+            total_ventas=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas')),
             cantidad=Count('id')
         )
         .order_by('-total_ventas')
@@ -973,7 +973,7 @@ def exportar_estadisticas_csv(request):
         .exclude(producto__isnull=True)
         .values('producto__nombre')
         .annotate(
-            total_ventas=Sum(F('cantidad') * F('producto__precio_base')),
+            total_ventas=Sum(F('cantidad') * Coalesce(F('precio_unitario_venta'), F('producto__precio_base'))),
             cantidad_vendida=Sum('cantidad')
         )
         .order_by('-total_ventas')
