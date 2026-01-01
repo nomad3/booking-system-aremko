@@ -144,7 +144,7 @@ class VentaReservaViewSet(viewsets.ModelViewSet):
                     venta_reserva=venta_reserva,
                     producto=producto,
                     cantidad=cantidad,
-                    precio_unitario=producto.precio_base # Store price at time of reservation
+                    precio_unitario_venta=producto.precio_base # Store price at time of reservation
                 )
 
             # Procesar los servicios
@@ -178,7 +178,7 @@ class VentaReservaViewSet(viewsets.ModelViewSet):
                     fecha_agendamiento=fecha_agendamiento,
                     hora_inicio=hora_inicio,
                     cantidad_personas=cantidad_personas,
-                    precio_unitario=servicio.precio_base # Store price at time of reservation
+                    precio_unitario_venta=servicio.precio_base # Store price at time of reservation
                 )
 
             # Guardar la reserva y calcular el total
