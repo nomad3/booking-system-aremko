@@ -61,6 +61,11 @@
             color: white;
             font-weight: bold;
         }
+        .ocupado-parcial {
+            background-color: #e91e63;
+            color: white;
+            font-weight: bold;
+        }
         .ocupado-no-pagado {
             background-color: #dc3545;
             color: white;
@@ -157,6 +162,12 @@
                 color: #155724;
             }
 
+            .slot-item.ocupado-parcial {
+                background-color: #fce4ec;
+                border-left-color: #e91e63;
+                color: #880e4f;
+            }
+
             .slot-item.ocupado-no-pagado {
                 background-color: #f8d7da;
                 border-left-color: #dc3545;
@@ -246,8 +257,13 @@
                                         Ocupado<br>
                                         <small>{{ celda.cliente|default:"" }}</small>
                                     </td>
+                                {% elif celda.estado_pago == 'parcial' %}
+                                    <td class="ocupado-parcial" title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s) - PARCIALMENTE PAGADO">
+                                        Ocupado<br>
+                                        <small>{{ celda.cliente|default:"" }}</small>
+                                    </td>
                                 {% else %}
-                                    <td class="ocupado-no-pagado" title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s) - NO PAGADO ({{ celda.estado_pago|default:'pendiente' }})">
+                                    <td class="ocupado-no-pagado" title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s) - NO PAGADO">
                                         Ocupado<br>
                                         <small>{{ celda.cliente|default:"" }}</small>
                                     </td>
@@ -279,6 +295,14 @@
                                     <div class="slot-hora">{{ slot.hora }}</div>
                                     <div class="slot-estado">
                                         <strong>✓ Ocupado y Pagado</strong>
+                                        <div class="slot-cliente">{{ slot.cliente|default:"Cliente" }} - {{ slot.personas|default:"1" }} persona(s)</div>
+                                    </div>
+                                </div>
+                            {% elif slot.estado_pago == 'parcial' %}
+                                <div class="slot-item ocupado-parcial">
+                                    <div class="slot-hora">{{ slot.hora }}</div>
+                                    <div class="slot-estado">
+                                        <strong>◐ Ocupado - Pago Parcial</strong>
                                         <div class="slot-cliente">{{ slot.cliente|default:"Cliente" }} - {{ slot.personas|default:"1" }} persona(s)</div>
                                     </div>
                                 </div>
@@ -326,8 +350,12 @@
                     <strong>Verde:</strong> Slot ocupado y PAGADO
                 </li>
                 <li style="margin: 5px 0;">
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: #e91e63; border: 1px solid #c2185b; vertical-align: middle;"></span>
+                    <strong>Rosado:</strong> Slot ocupado con PAGO PARCIAL
+                </li>
+                <li style="margin: 5px 0;">
                     <span style="display: inline-block; width: 20px; height: 20px; background-color: #dc3545; border: 1px solid #c82333; vertical-align: middle;"></span>
-                    <strong>Rojo:</strong> Slot ocupado pero NO PAGADO (pendiente/parcial)
+                    <strong>Rojo:</strong> Slot ocupado pero NO PAGADO
                 </li>
                 <li style="margin: 5px 0;">
                     <span style="display: inline-block; width: 20px; height: 20px; background-color: #fff3cd; border: 1px solid #ffeaa7; vertical-align: middle;"></span>
