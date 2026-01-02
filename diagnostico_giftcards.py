@@ -1,198 +1,329 @@
 """
-Script de diagnóstico para identificar problemas con GiftCards
-Ejecutar: python3 manage.py shell < diagnostico_giftcards.py
+Script de diagnóstico para analizar el problema de GiftCards no descontando saldo
+al usarse como método de pago.
+
+PROBLEMA REPORTADO:
+- GiftCard se usó como pago por $150,000 en reserva 4388
+- El saldo de la GiftCard sigue siendo $150,000 cuando debería ser $0
+
+Este script analiza:
+1. Estado actual de la GiftCard problemática
+2. Pagos asociados a esa GiftCard
+3. Prueba de creación y uso de GiftCard de prueba
+4. Identificación de la causa del problema
+
+EJECUCIÓN:
+python3 manage.py shell < diagnostico_giftcards.py
 """
 
 import os
 import django
+import sys
 
-# Configurar Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aremko_project.settings')
+# Setup Django
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'booking_system.settings')
 django.setup()
 
-from ventas.models import GiftCardExperiencia
+from ventas.models import GiftCard, Pago, VentaReserva, Cliente
+from django.utils import timezone
+from datetime import timedelta
+from decimal import Decimal
 
-print("=" * 80)
-print("DIAGNÓSTICO DE GIFTCARDS - CONFIGURACIÓN")
-print("=" * 80)
 
-# Obtener todas las experiencias
-todas = GiftCardExperiencia.objects.all()
-activas = GiftCardExperiencia.objects.filter(activo=True)
-inactivas = GiftCardExperiencia.objects.filter(activo=False)
+def separador(titulo):
+    """Imprime un separador visual"""
+    print("\n" + "=" * 80)
+    print(f"  {titulo}")
+    print("=" * 80 + "\n")
 
-print(f"\n📊 RESUMEN GENERAL")
-print(f"   Total de experiencias: {todas.count()}")
-print(f"   ✅ Activas: {activas.count()}")
-print(f"   ❌ Inactivas: {inactivas.count()}")
 
-# Análisis de experiencias activas
-print(f"\n{'=' * 80}")
-print(f"✅ EXPERIENCIAS ACTIVAS (visibles en el wizard)")
-print(f"{'=' * 80}")
+def analizar_giftcard_problematica():
+    """Analiza la GiftCard que se reportó con problemas (reserva 4388)"""
+    separador("ANÁLISIS DE GIFTCARD PROBLEMÁTICA - RESERVA 4388")
 
-if activas.count() == 0:
-    print("\n⚠️  NO HAY EXPERIENCIAS ACTIVAS")
-    print("   Esto explica por qué no se pueden agregar giftcards al carrito.")
-    print("   Solución: Activar experiencias en el admin de Django.")
-else:
-    for exp in activas.order_by('categoria', 'orden'):
-        print(f"\n{exp.id}. {exp.nombre}")
-        print(f"   ID Experiencia: {exp.id_experiencia}")
-        print(f"   Categoría: {exp.get_categoria_display()}")
-        print(f"   Orden: {exp.orden}")
+    try:
+        reserva = VentaReserva.objects.get(id=4388)
+        print(f"✓ Reserva encontrada: #{reserva.id}")
+        print(f"  Cliente: {reserva.cliente.nombre}")
+        print(f"  Total reserva: ${reserva.total:,.0f}")
+        print(f"  Estado pago: {reserva.estado_pago}")
+        print()
 
-        # Verificar precio
-        if exp.monto_fijo:
-            print(f"   💰 Precio fijo: ${exp.monto_fijo:,}")
-        elif exp.montos_sugeridos:
-            print(f"   💰 Montos sugeridos: {exp.montos_sugeridos}")
+        # Buscar pagos de la reserva
+        pagos = reserva.pagos.all()
+        print(f"Pagos registrados: {pagos.count()}")
+
+        giftcard_encontrada = None
+        for pago in pagos:
+            print(f"\n  Pago ID: {pago.id}")
+            print(f"  - Método: {pago.metodo_pago}")
+            print(f"  - Monto: ${pago.monto:,.0f}")
+            print(f"  - Fecha: {pago.fecha_pago}")
+
+            if pago.metodo_pago == 'giftcard' and pago.giftcard:
+                print(f"  - GiftCard asociada: {pago.giftcard.codigo}")
+                print(f"    * Monto inicial: ${pago.giftcard.monto_inicial:,.0f}")
+                print(f"    * Monto disponible: ${pago.giftcard.monto_disponible:,.0f}")
+                print(f"    * Estado: {pago.giftcard.estado}")
+
+                diferencia = pago.giftcard.monto_inicial - pago.monto
+                if pago.giftcard.monto_disponible != diferencia:
+                    print(f"    * ⚠️ INCONSISTENCIA: Se pagó ${pago.monto:,.0f} pero el saldo es ${pago.giftcard.monto_disponible:,.0f}")
+                    print(f"    * ⚠️ Saldo esperado: ${diferencia:,.0f}")
+                else:
+                    print(f"    * ✓ Saldo correcto")
+
+                giftcard_encontrada = pago.giftcard
+
+        return giftcard_encontrada
+
+    except VentaReserva.DoesNotExist:
+        print("❌ ERROR: Reserva 4388 no encontrada")
+        return None
+    except Exception as e:
+        print(f"❌ ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def analizar_todos_pagos_giftcard(giftcard):
+    """Analiza todos los pagos realizados con una GiftCard específica"""
+    separador(f"ANÁLISIS DE TODOS LOS PAGOS CON GIFTCARD {giftcard.codigo}")
+
+    pagos = Pago.objects.filter(giftcard=giftcard).order_by('fecha_pago')
+
+    print(f"Total de pagos con esta GiftCard: {pagos.count()}\n")
+
+    monto_total_usado = Decimal('0')
+    for i, pago in enumerate(pagos, 1):
+        print(f"{i}. Pago ID: {pago.id}")
+        print(f"   Reserva: #{pago.venta_reserva.id}")
+        print(f"   Monto: ${pago.monto:,.0f}")
+        print(f"   Fecha: {pago.fecha_pago}")
+        monto_total_usado += pago.monto
+        print()
+
+    print(f"RESUMEN:")
+    print(f"  Monto inicial GiftCard: ${giftcard.monto_inicial:,.0f}")
+    print(f"  Total usado en pagos: ${monto_total_usado:,.0f}")
+    print(f"  Saldo actual en GiftCard: ${giftcard.monto_disponible:,.0f}")
+    print(f"  Saldo esperado: ${giftcard.monto_inicial - monto_total_usado:,.0f}")
+
+    diferencia = giftcard.monto_disponible - (giftcard.monto_inicial - monto_total_usado)
+    if diferencia != 0:
+        print(f"\n⚠️ INCONSISTENCIA DETECTADA: Diferencia de ${diferencia:,.0f}")
+        return True
+    else:
+        print(f"\n✓ GiftCard consistente")
+        return False
+
+
+def crear_giftcard_prueba_y_simular():
+    """Crea una GiftCard de prueba y simula el proceso completo"""
+    separador("PRUEBA: CREACIÓN Y USO DE GIFTCARD DE PRUEBA")
+
+    try:
+        # Buscar o crear cliente de prueba
+        cliente_prueba, created = Cliente.objects.get_or_create(
+            telefono='+56900000000',
+            defaults={
+                'nombre': 'Cliente Prueba GiftCard',
+                'email': 'prueba_giftcard@test.com'
+            }
+        )
+        print(f"Cliente de prueba: {cliente_prueba.nombre}")
+
+        # Crear GiftCard de prueba
+        giftcard_prueba = GiftCard.objects.create(
+            monto_inicial=50000,
+            fecha_vencimiento=timezone.now().date() + timedelta(days=365),
+            cliente_destinatario=cliente_prueba
+        )
+        print(f"\n✓ GiftCard creada: {giftcard_prueba.codigo}")
+        print(f"  Monto inicial: ${giftcard_prueba.monto_inicial:,.0f}")
+        print(f"  Monto disponible: ${giftcard_prueba.monto_disponible:,.0f}")
+        print(f"  Estado: {giftcard_prueba.estado}")
+
+        # Crear una reserva de prueba
+        reserva_prueba = VentaReserva.objects.create(
+            cliente=cliente_prueba,
+            total=50000
+        )
+        print(f"\n✓ Reserva de prueba creada: #{reserva_prueba.id}")
+
+        # Intentar crear un pago con la GiftCard
+        print(f"\n→ Intentando crear pago de $30,000 con GiftCard...")
+        pago_prueba = Pago(
+            venta_reserva=reserva_prueba,
+            monto=30000,
+            metodo_pago='giftcard',
+            giftcard=giftcard_prueba
+        )
+
+        # Guardar el pago (esto debería llamar al método save() que ejecuta usar())
+        pago_prueba.save()
+
+        print(f"✓ Pago creado exitosamente: ID {pago_prueba.id}")
+
+        # Refrescar la GiftCard desde la BD
+        giftcard_prueba.refresh_from_db()
+
+        print(f"\n📊 ESTADO POST-PAGO:")
+        print(f"  Monto disponible: ${giftcard_prueba.monto_disponible:,.0f}")
+        print(f"  Estado: {giftcard_prueba.estado}")
+        print(f"  Saldo esperado: $20,000")
+
+        funciona_correctamente = giftcard_prueba.monto_disponible == 20000
+
+        if funciona_correctamente:
+            print(f"\n✓ ¡EL MÉTODO SAVE() FUNCIONA CORRECTAMENTE!")
+            print(f"  La GiftCard descontó correctamente el monto usado.")
         else:
-            print(f"   ⚠️  SIN PRECIO CONFIGURADO (esto puede causar problemas)")
+            print(f"\n❌ ERROR: El saldo no se actualizó correctamente")
+            print(f"  Esperado: $20,000")
+            print(f"  Actual: ${giftcard_prueba.monto_disponible:,.0f}")
 
-        # Verificar imagen
-        if exp.imagen:
-            print(f"   🖼️  Imagen: {exp.imagen.url}")
-            # Verificar si el archivo existe
-            if exp.imagen.storage.exists(exp.imagen.name):
-                print(f"      ✅ Archivo existe")
-            else:
-                print(f"      ❌ ARCHIVO NO EXISTE (ruta rota)")
-        else:
-            print(f"   ⚠️  Sin imagen (se mostrará ícono por defecto)")
+        # Limpiar: eliminar datos de prueba
+        print(f"\n→ Limpiando datos de prueba...")
+        pago_prueba.delete()
+        reserva_prueba.delete()
+        giftcard_prueba.delete()
+        if created:
+            cliente_prueba.delete()
+        print(f"✓ Datos de prueba eliminados")
 
-        # Verificar descripciones
-        if not exp.descripcion:
-            print(f"   ⚠️  Sin descripción corta")
-        if not exp.descripcion_giftcard:
-            print(f"   ⚠️  Sin descripción para giftcard")
+        return funciona_correctamente
 
-# Análisis de experiencias inactivas
-if inactivas.count() > 0:
-    print(f"\n{'=' * 80}")
-    print(f"❌ EXPERIENCIAS INACTIVAS (NO visibles en el wizard)")
-    print(f"{'=' * 80}")
+    except Exception as e:
+        print(f"\n❌ ERROR en prueba: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
 
-    for exp in inactivas.order_by('categoria', 'nombre'):
-        print(f"\n{exp.id}. {exp.nombre}")
-        print(f"   ID Experiencia: {exp.id_experiencia}")
-        print(f"   Categoría: {exp.get_categoria_display()}")
-        if exp.monto_fijo:
-            print(f"   Precio: ${exp.monto_fijo:,}")
-        print(f"   💡 Para activar: Editar en admin y marcar como 'Activo'")
 
-# Problemas comunes
-print(f"\n{'=' * 80}")
-print(f"🔍 PROBLEMAS DETECTADOS")
-print(f"{'=' * 80}")
+def investigar_creacion_manual():
+    """Investiga si los pagos fueron creados manualmente saltando el save()"""
+    separador("INVESTIGACIÓN: ¿PAGOS CREADOS MANUALMENTE EN ADMIN?")
 
-problemas = []
+    print("Analizando formas en que los pagos podrían haberse creado sin ejecutar save():\n")
 
-# 1. No hay experiencias activas
-if activas.count() == 0:
-    problemas.append({
-        'tipo': 'CRÍTICO',
-        'mensaje': 'No hay experiencias activas',
-        'impacto': 'Los usuarios no pueden agregar giftcards al carrito',
-        'solucion': 'Activar al menos una experiencia en /admin/ventas/giftcardexperiencia/'
-    })
+    print("1. CREACIÓN DIRECTA EN ADMIN:")
+    print("   Si un pago se creó en el admin de Django, el método save() SÍ se ejecuta.")
+    print("   ✓ Esta NO sería la causa\n")
 
-# 2. Experiencias sin precio
-sin_precio = activas.filter(monto_fijo__isnull=True, montos_sugeridos__exact=[])
-if sin_precio.exists():
-    problemas.append({
-        'tipo': 'ALTO',
-        'mensaje': f'{sin_precio.count()} experiencias activas sin precio configurado',
-        'impacto': 'El usuario no sabrá cuánto pagar',
-        'solucion': 'Configurar monto_fijo o montos_sugeridos para cada experiencia'
-    })
-    for exp in sin_precio:
-        print(f"   - {exp.nombre} (ID: {exp.id_experiencia})")
+    print("2. BULK CREATE:")
+    print("   Si se usó Pago.objects.bulk_create(), el método save() NO se ejecuta.")
+    print("   ⚠️ Esta PODRÍA ser la causa\n")
 
-# 3. Experiencias sin imagen
-sin_imagen = activas.filter(imagen='')
-if sin_imagen.exists():
-    problemas.append({
-        'tipo': 'MEDIO',
-        'mensaje': f'{sin_imagen.count()} experiencias activas sin imagen',
-        'impacto': 'Se mostrará un ícono genérico en lugar de foto',
-        'solucion': 'Subir imágenes (800x600px recomendado) en el admin'
-    })
-    for exp in sin_imagen:
-        print(f"   - {exp.nombre} (ID: {exp.id_experiencia})")
+    print("3. UPDATE DIRECTO:")
+    print("   Si se usó Pago.objects.filter(...).update(), el método save() NO se ejecuta.")
+    print("   ⚠️ Esta PODRÍA ser la causa\n")
 
-# 4. Imágenes rotas
-imagenes_rotas = []
-for exp in activas:
-    if exp.imagen and not exp.imagen.storage.exists(exp.imagen.name):
-        imagenes_rotas.append(exp)
+    print("4. IMPORTACIÓN DE DATOS:")
+    print("   Si los datos se importaron desde otra fuente sin usar save().")
+    print("   ⚠️ Esta PODRÍA ser la causa\n")
 
-if imagenes_rotas:
-    problemas.append({
-        'tipo': 'ALTO',
-        'mensaje': f'{len(imagenes_rotas)} experiencias con imágenes rotas',
-        'impacto': 'Error 404 al cargar las imágenes',
-        'solucion': 'Volver a subir las imágenes o corregir las rutas'
-    })
-    for exp in imagenes_rotas:
-        print(f"   - {exp.nombre}: {exp.imagen.name}")
+    print("5. ADMIN INLINE SIN CONFIGURAR:")
+    print("   Si el inline de Pago en VentaReserva no ejecuta save() correctamente.")
+    print("   ⚠️ Esta PODRÍA ser la causa\n")
 
-# 5. Descripciones faltantes
-sin_descripcion = activas.filter(descripcion='') | activas.filter(descripcion_giftcard='')
-if sin_descripcion.exists():
-    problemas.append({
-        'tipo': 'BAJO',
-        'mensaje': f'{sin_descripcion.count()} experiencias sin descripciones completas',
-        'impacto': 'Información incompleta para el usuario',
-        'solucion': 'Completar descripcion y descripcion_giftcard'
-    })
 
-# Mostrar resumen de problemas
-if not problemas:
-    print("\n✅ No se detectaron problemas de configuración")
-else:
-    for i, problema in enumerate(problemas, 1):
-        print(f"\n{i}. [{problema['tipo']}] {problema['mensaje']}")
-        print(f"   Impacto: {problema['impacto']}")
-        print(f"   Solución: {problema['solucion']}")
+def generar_plan_correccion():
+    """Genera un plan de acción para corregir el problema"""
+    separador("PLAN DE CORRECCIÓN PROPUESTO")
 
-# Recomendaciones
-print(f"\n{'=' * 80}")
-print(f"💡 RECOMENDACIONES")
-print(f"{'=' * 80}")
-print("""
-1. Verificar el admin de Django:
-   URL: /admin/ventas/giftcardexperiencia/
+    print("""
+PASOS RECOMENDADOS:
 
-2. Para activar una experiencia:
-   - Entrar al admin
-   - Seleccionar la experiencia
-   - Marcar el checkbox "Activo"
-   - Guardar cambios
+1. AUDITORÍA COMPLETA:
+   ✓ Identificar todas las GiftCards con inconsistencias
+   ✓ Calcular el saldo correcto basado en pagos registrados
+   ✓ Generar reporte de diferencias
 
-3. Para crear una nueva experiencia:
-   - Ir a /admin/ventas/giftcardexperiencia/add/
-   - Completar todos los campos requeridos:
-     * id_experiencia (único, ej: 'tinas_calientes')
-     * categoria (tinas, masajes, faciales, packs, valor)
-     * nombre (nombre visible para el usuario)
-     * descripcion (descripción corta para el menú)
-     * descripcion_giftcard (descripción detallada para la giftcard)
-     * imagen (subir foto 800x600px)
-     * monto_fijo O montos_sugeridos (al menos uno)
-     * activo = True
-     * orden (número para ordenar la lista)
+2. CORRECCIÓN DE DATOS:
+   ✓ Script que recalcule el saldo de todas las GiftCards
+   ✓ Verificar cada pago con método 'giftcard'
+   ✓ Actualizar monto_disponible y estado correctamente
 
-4. Estructura recomendada de precios:
-   - Experiencias específicas (tinas, masajes): monto_fijo
-   - Tarjetas de valor libre: montos_sugeridos = [30000, 50000, 75000, 100000]
+3. PREVENCIÓN:
+   ✓ Asegurar que PagoInline en admin ejecute save()
+   ✓ Crear signal post_save para doble verificación
+   ✓ Agregar logging de cambios en GiftCard.usar()
+   ✓ Test automático para verificar descuento de saldo
 
-5. Testing:
-   - Después de configurar, visitar /giftcards/
-   - Verificar que se muestren todas las experiencias activas
-   - Intentar completar el wizard hasta agregar al carrito
-""")
+4. MONITOREO:
+   ✓ Dashboard de GiftCards con inconsistencias
+   ✓ Alerta automática si se detecta saldo incorrecto
+   ✓ Reporte diario de GiftCards activas
+    """)
 
-print(f"\n{'=' * 80}")
-print("FIN DEL DIAGNÓSTICO")
-print(f"{'=' * 80}\n")
+
+def main():
+    """Función principal que ejecuta todos los diagnósticos"""
+    print("\n" + "🔍" * 40)
+    print("  DIAGNÓSTICO DE GIFTCARDS - SISTEMA AREMKO")
+    print("🔍" * 40)
+
+    # 1. Analizar la GiftCard problemática
+    giftcard_problema = analizar_giftcard_problematica()
+
+    if giftcard_problema:
+        # 2. Analizar todos los pagos con esa GiftCard
+        tiene_inconsistencia = analizar_todos_pagos_giftcard(giftcard_problema)
+    else:
+        tiene_inconsistencia = False
+
+    # 3. Crear y probar GiftCard de prueba
+    prueba_exitosa = crear_giftcard_prueba_y_simular()
+
+    # 4. Investigar posibles causas
+    investigar_creacion_manual()
+
+    # 5. Generar plan de corrección
+    generar_plan_correccion()
+
+    # CONCLUSIÓN
+    separador("CONCLUSIÓN DEL DIAGNÓSTICO")
+
+    if prueba_exitosa and tiene_inconsistencia:
+        print("""
+✓ EL MÉTODO save() DEL MODELO PAGO FUNCIONA CORRECTAMENTE
+
+Conclusión:
+El problema NO es un bug en el código actual. La lógica de descuento
+funciona perfectamente cuando se usa el método save() normal.
+
+Causa probable:
+Los pagos problemáticos fueron creados de una forma que NO ejecutó
+el método save() del modelo (bulk_create, update directo, inline mal
+configurado, o importación).
+
+Recomendación INMEDIATA:
+1. Ejecutar script de corrección para recalcular saldos de GiftCards
+2. Revisar configuración de PagoInline en admin.py
+3. Agregar signal de validación post_save
+        """)
+    elif not prueba_exitosa:
+        print("""
+❌ EL MÉTODO save() NO FUNCIONÓ EN LA PRUEBA
+
+Conclusión:
+Hay un problema en el código actual que impide el descuento correcto.
+
+Siguiente paso:
+Revisar el método GiftCard.usar() y Pago.save() para identificar
+el problema específico.
+        """)
+    else:
+        print("""
+✓ TODO FUNCIONA CORRECTAMENTE
+
+No se detectaron inconsistencias en la GiftCard de la reserva 4388.
+Es posible que ya haya sido corregida manualmente.
+        """)
+
+
+if __name__ == "__main__":
+    main()
