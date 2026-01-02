@@ -216,7 +216,7 @@
                     <strong>Total Productos: {{ total_productos }}</strong>
                 </div>
                 <div class="col-md-6">
-                    <strong>Total Monto Vendido: ${{ total_monto_vendido|intcomma }}</strong>
+                    <strong>Total Monto Vendido: ${{ total_monto_vendido|floatformat:0|intcomma }}</strong>
                 </div>
             </div>
         </div>
@@ -251,8 +251,8 @@
                             <td class="px-4 py-3">{{ producto.cliente_nombre }}</td>
                             <td class="px-4 py-3">{{ producto.producto_nombre }}</td>
                             <td class="px-4 py-3 text-end">{{ producto.cantidad }}</td>
-                            <td class="px-4 py-3 text-end">${{ producto.valor_unitario|intcomma }}</td>
-                            <td class="px-4 py-3 text-end">${{ producto.valor_total|intcomma }}</td>
+                            <td class="px-4 py-3 text-end">${{ producto.valor_unitario|floatformat:0|intcomma }}</td>
+                            <td class="px-4 py-3 text-end">${{ producto.valor_total|floatformat:0|intcomma }}</td>
                         </tr>
                         {% empty %}
                         <tr>

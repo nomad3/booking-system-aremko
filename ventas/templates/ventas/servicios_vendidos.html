@@ -221,7 +221,7 @@
     <!-- Mostrar el monto total vendido -->
     <div class="card mb-4">
         <div class="card-body text-center">
-            <strong>Total Monto Vendido: ${{ total_monto_vendido|intcomma }}</strong> {# Use humanize #}
+            <strong>Total Monto Vendido: ${{ total_monto_vendido|floatformat:0|intcomma }}</strong> {# Use humanize #}
         </div>
     </div>
 
@@ -260,7 +260,7 @@
                 <td class="px-4 py-3">{{ servicio.fecha_agendamiento }}</td>
                 <td class="px-4 py-3">{{ servicio.hora_agendamiento_str }}</td> {# Use the formatted string #}
                 <td class="px-4 py-3 text-end">{{ servicio.cantidad_personas }}</td> {# Align right #}
-                <td class="px-4 py-3 text-end">${{ servicio.total_monto|intcomma }}</td> {# Use humanize #}
+                <td class="px-4 py-3 text-end">${{ servicio.total_monto|floatformat:0|intcomma }}</td> {# Use humanize #}
                 <td class="px-4 py-3">{{ servicio.proveedor_asignado }}</td> {# Display assigned provider #}
             </tr>
             {% empty %}
