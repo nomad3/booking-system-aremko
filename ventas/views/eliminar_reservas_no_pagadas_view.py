@@ -62,6 +62,9 @@ def eliminar_reservas_no_pagadas(request):
     # Preparar datos para el template
     reservas_data = []
     for reserva in reservas:
+        # Calcular días desde creación
+        dias_desde_creacion = (timezone.now() - reserva.fecha_reserva).days
+
         reservas_data.append({
             'id': reserva.id,
             'fecha_reserva': reserva.fecha_reserva,
@@ -69,7 +72,7 @@ def eliminar_reservas_no_pagadas(request):
             'cliente_nombre': reserva.cliente.nombre,
             'cliente_telefono': reserva.cliente.telefono,
             'total': reserva.total,
-            'dias_desde_creacion': (timezone.now().date() - reserva.fecha_reserva).days,
+            'dias_desde_creacion': dias_desde_creacion,
         })
 
     context = {
