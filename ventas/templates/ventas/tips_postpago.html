@@ -45,6 +45,8 @@
             border-radius: 4px;
             resize: vertical;
             line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
         .button-group {
             margin-top: 20px;
@@ -94,6 +96,51 @@
         }
         .success-message.show {
             display: block;
+        }
+
+        /* Estilos responsivos para móvil */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 15px;
+            }
+            h1 {
+                font-size: 20px;
+            }
+            textarea {
+                font-size: 13px;
+                padding: 10px;
+                min-height: 500px;
+            }
+            .button-group {
+                flex-direction: column;
+            }
+            button, .btn {
+                width: 100%;
+                font-size: 16px;
+                padding: 14px;
+            }
+            .info-box {
+                font-size: 14px;
+                padding: 12px;
+            }
+        }
+
+        /* Optimización para copiar y pegar en WhatsApp */
+        @media print {
+            .button-group, .info-box, h1 {
+                display: none;
+            }
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                padding: 0;
+            }
         }
     </style>
 </head>
@@ -165,6 +212,14 @@
         document.getElementById('textoTips').addEventListener('click', function() {
             this.select();
         });
+
+        // Prevenir scroll innecesario en mobile
+        if (window.innerWidth <= 768) {
+            document.getElementById('textoTips').addEventListener('focus', function() {
+                window.scrollTo(0, 0);
+                document.body.scrollTop = 0;
+            });
+        }
     </script>
 </body>
 </html>

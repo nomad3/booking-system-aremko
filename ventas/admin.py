@@ -189,7 +189,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         'estado_reserva', 'servicios_y_cantidades',
         'productos_y_cantidades', 'total_servicios',
         'total_productos', 'total', 'pagado', 'saldo_pendiente',
-        'generar_resumen_link', 'generar_tips_link'
+        'generar_cotizacion_link', 'generar_resumen_link', 'generar_tips_link'
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
@@ -329,6 +329,13 @@ class VentaReservaAdmin(admin.ModelAdmin):
         url = reverse('ventas:generar_tips_postpago', args=[obj.id])
         return format_html('<a class="button" href="{}" target="_blank">💡 Tips</a>', url)
     generar_tips_link.short_description = 'Tips'
+
+    def generar_cotizacion_link(self, obj):
+        from django.urls import reverse
+        from django.utils.html import format_html
+        url = reverse('ventas:generar_cotizacion', args=[obj.id])
+        return format_html('<a class="button" href="{}" target="_blank">💰 Cotización</a>', url)
+    generar_cotizacion_link.short_description = 'Cotización'
 
     class Media:
         css = {
