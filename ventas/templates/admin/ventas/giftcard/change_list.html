@@ -8,4 +8,17 @@
             🔍 Diagnóstico del Sistema
         </a>
     </li>
+    <li>
+        <a href="{% url 'ventas:revisar_inconsistencias_giftcards' %}" class="button" style="background-color: #f39c12; color: white; padding: 10px 15px; border-radius: 4px; text-decoration: none; font-weight: 500;">
+            ⚠️ Revisar Inconsistencias
+        </a>
+    </li>
+    <li>
+        <form method="post" action="{% url 'ventas:corregir_inconsistencias_giftcards' %}" style="display: inline;" onsubmit="return confirm('¿Estás seguro de que quieres corregir todas las inconsistencias encontradas? Esta acción actualizará los saldos de las GiftCards.');">
+            {% csrf_token %}
+            <button type="submit" class="button" style="background-color: #27ae60; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: 500;">
+                ✓ Corregir Inconsistencias
+            </button>
+        </form>
+    </li>
 {% endblock %}

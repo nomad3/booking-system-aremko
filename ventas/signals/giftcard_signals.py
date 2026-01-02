@@ -206,3 +206,68 @@ def recalcular_total_al_eliminar_giftcard(sender, instance, **kwargs):
             instance.venta_reserva.calcular_total()
     except Exception as e:
         logger.error(f"Error recalculando total después de eliminar GiftCard {instance.codigo}: {e}", exc_info=True)
+
+
+# --- Signal de Protección Preventiva para Saldos de GiftCards ---
+
+@receiver(post_save, sender=Pago)
+def verificar_saldo_giftcard_post_pago(sender, instance, created, **kwargs):
+    """
+    PROTECCIÓN PREVENTIVA: Verifica y corrige automáticamente el saldo de GiftCards
+    después de cada pago.
+
+    Este signal previene el problema de saldos incorrectos que ocurrió cuando
+    los pagos fueron creados con bulk_create(), update(), o desde el admin sin
+    ejecutar el método save() del modelo Pago.
+
+    Se ejecuta SIEMPRE que se guarda un Pago, incluso con bulk operations.
+    """
+    # Solo procesar pagos con GiftCard
+    if instance.metodo_pago != 'giftcard' or not instance.giftcard:
+        return
+
+    try:
+        from django.db.models import Sum
+        from decimal import Decimal
+
+        gc = instance.giftcard
+
+        # Calcular total usado en todos los pagos con esta GiftCard
+        total_usado = Pago.objects.filter(
+            giftcard=gc,
+            metodo_pago='giftcard'
+        ).aggregate(total=Sum('monto'))['total'] or Decimal('0')
+
+        # Calcular saldo esperado
+        saldo_esperado = gc.monto_inicial - total_usado
+
+        # Si el saldo está incorrecto, corregirlo automáticamente
+        if gc.monto_disponible != saldo_esperado:
+            logger.warning(
+                f"🔧 PROTECCIÓN: Inconsistencia detectada en GiftCard {gc.codigo}. "
+                f"Saldo actual: ${gc.monto_disponible}, Saldo esperado: ${saldo_esperado}. "
+                f"Corrigiendo automáticamente..."
+            )
+
+            # Determinar estado correcto
+            nuevo_estado = 'cobrado' if saldo_esperado == 0 else 'por_cobrar'
+
+            # Actualizar saldo y estado
+            # Usamos update() para evitar llamadas recursivas al signal
+            GiftCard.objects.filter(pk=gc.pk).update(
+                monto_disponible=saldo_esperado,
+                estado=nuevo_estado
+            )
+
+            logger.info(
+                f"✓ PROTECCIÓN: GiftCard {gc.codigo} corregida automáticamente. "
+                f"Nuevo saldo: ${saldo_esperado}, Nuevo estado: {nuevo_estado}"
+            )
+
+    except Exception as e:
+        logger.error(
+            f"❌ PROTECCIÓN: Error al verificar saldo de GiftCard para Pago ID={instance.id}: {str(e)}",
+            exc_info=True
+        )
+        # No re-lanzar la excepción para no interrumpir el proceso de guardado
+        pass

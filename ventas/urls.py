@@ -192,6 +192,8 @@ urlpatterns = [
     path('giftcard/<str:codigo>/download/', giftcard_views.giftcard_download_pdf, name='giftcard_download_pdf'),
     # Diagnóstico de GiftCards (solo staff)
     path('diagnostico/giftcards/', diagnostico_views.diagnostico_giftcards, name='diagnostico_giftcards'),
+    path('diagnostico/giftcards/revisar-inconsistencias/', diagnostico_views.revisar_inconsistencias_giftcards, name='revisar_inconsistencias_giftcards'),
+    path('diagnostico/giftcards/corregir-inconsistencias/', diagnostico_views.corregir_inconsistencias_giftcards, name='corregir_inconsistencias_giftcards'),
     path('diagnostico/test/', diagnostico_test.diagnostico_test, name='diagnostico_test'),
     path('diagnostico/simple/', diagnostico_simple.diagnostico_simple, name='diagnostico_simple'),
     # === END GIFTCARD WIZARD ===

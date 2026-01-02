@@ -5,13 +5,15 @@ Endpoint: /diagnostico/giftcards/
 """
 
 from django.http import JsonResponse, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views.decorators.http import require_http_methods
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db import connection
-from django.db.models import Count, Avg, Max, Min, Q
+from django.contrib import messages
+from django.db import connection, transaction
+from django.db.models import Count, Avg, Max, Min, Q, Sum
 from django.utils import timezone
 from datetime import timedelta
+from decimal import Decimal
 import time
 import json
 
@@ -295,3 +297,128 @@ def diagnostico_giftcards(request):
             'diagnostico': diagnostico,
             'diagnostico_json': json.dumps(diagnostico, indent=2)
         })
+
+
+@staff_member_required
+def revisar_inconsistencias_giftcards(request):
+    """
+    Vista para revisar inconsistencias en saldos de GiftCards.
+    Analiza todas las GiftCards que han sido usadas y compara el saldo
+    actual con el saldo esperado basado en los pagos registrados.
+    """
+    # Obtener todas las GiftCards que han sido usadas en pagos
+    giftcards_usadas = GiftCard.objects.filter(
+        pago__isnull=False
+    ).distinct().select_related(
+        'cliente_comprador',
+        'cliente_destinatario',
+        'venta_reserva'
+    )
+
+    inconsistencias = []
+    total_analizado = giftcards_usadas.count()
+
+    for gc in giftcards_usadas:
+        # Calcular total usado en pagos
+        total_usado = Pago.objects.filter(
+            giftcard=gc,
+            metodo_pago='giftcard'
+        ).aggregate(total=Sum('monto'))['total'] or Decimal('0')
+
+        # Calcular saldo esperado
+        saldo_esperado = gc.monto_inicial - total_usado
+        diferencia = gc.monto_disponible - saldo_esperado
+
+        # Si hay inconsistencia, agregarla a la lista
+        if diferencia != 0:
+            # Obtener los pagos para mostrar detalles
+            pagos = Pago.objects.filter(
+                giftcard=gc,
+                metodo_pago='giftcard'
+            ).select_related('venta_reserva').order_by('fecha_pago')
+
+            inconsistencias.append({
+                'giftcard': gc,
+                'total_usado': total_usado,
+                'saldo_actual': gc.monto_disponible,
+                'saldo_esperado': saldo_esperado,
+                'diferencia': diferencia,
+                'pagos': pagos,
+                'estado_actual': gc.estado,
+                'estado_esperado': 'cobrado' if saldo_esperado == 0 else 'por_cobrar'
+            })
+
+    context = {
+        'total_analizado': total_analizado,
+        'total_inconsistencias': len(inconsistencias),
+        'inconsistencias': inconsistencias,
+    }
+
+    return render(request, 'ventas/revisar_inconsistencias_giftcards.html', context)
+
+
+@staff_member_required
+def corregir_inconsistencias_giftcards(request):
+    """
+    Vista para corregir automáticamente las inconsistencias en saldos de GiftCards.
+    Solo acepta método POST por seguridad.
+    """
+    if request.method != 'POST':
+        messages.error(request, 'Método no permitido. Usa el botón de corrección.')
+        return redirect('admin:ventas_giftcard_changelist')
+
+    # Obtener todas las GiftCards con inconsistencias
+    giftcards_usadas = GiftCard.objects.filter(
+        pago__isnull=False
+    ).distinct()
+
+    correcciones_aplicadas = 0
+    errores = 0
+
+    for gc in giftcards_usadas:
+        try:
+            # Calcular total usado en pagos
+            total_usado = Pago.objects.filter(
+                giftcard=gc,
+                metodo_pago='giftcard'
+            ).aggregate(total=Sum('monto'))['total'] or Decimal('0')
+
+            # Calcular saldo esperado
+            saldo_esperado = gc.monto_inicial - total_usado
+
+            # Verificar si hay inconsistencia
+            if gc.monto_disponible != saldo_esperado:
+                # Determinar nuevo estado
+                nuevo_estado = 'cobrado' if saldo_esperado == 0 else 'por_cobrar'
+
+                # Aplicar corrección
+                with transaction.atomic():
+                    gc.monto_disponible = saldo_esperado
+                    gc.estado = nuevo_estado
+                    gc.save()
+
+                correcciones_aplicadas += 1
+
+        except Exception as e:
+            errores += 1
+            continue
+
+    # Mostrar mensaje de éxito
+    if correcciones_aplicadas > 0:
+        messages.success(
+            request,
+            f'✓ Se corrigieron {correcciones_aplicadas} GiftCard(s) exitosamente.'
+        )
+    else:
+        messages.info(
+            request,
+            '✓ No se encontraron inconsistencias. Todas las GiftCards están correctas.'
+        )
+
+    if errores > 0:
+        messages.warning(
+            request,
+            f'⚠ Se encontraron {errores} errores durante la corrección.'
+        )
+
+    return redirect('admin:ventas_giftcard_changelist')

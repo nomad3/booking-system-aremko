@@ -1,0 +1,326 @@
+{% extends "admin/base_site.html" %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Revisar Inconsistencias de GiftCards{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .stats-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #417690;
+    }
+
+    .stat-label {
+        color: #666;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .inconsistencia-card {
+        background: white;
+        border-left: 4px solid #e74c3c;
+        border-radius: 4px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .giftcard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .giftcard-codigo {
+        font-size: 1.3rem;
+        font-weight: bold;
+        color: #2c3e50;
+        font-family: monospace;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 3px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .badge-error {
+        background-color: #e74c3c;
+        color: white;
+    }
+
+    .badge-warning {
+        background-color: #f39c12;
+        color: white;
+    }
+
+    .badge-info {
+        background-color: #3498db;
+        color: white;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    .comparison-table {
+        width: 100%;
+        margin: 15px 0;
+    }
+
+    .comparison-table td {
+        padding: 10px;
+        vertical-align: top;
+    }
+
+    .comparison-table .label {
+        font-weight: bold;
+        color: #666;
+        width: 30%;
+    }
+
+    .comparison-table .value {
+        font-size: 1.1rem;
+    }
+
+    .value-incorrect {
+        color: #e74c3c;
+        font-weight: bold;
+    }
+
+    .value-correct {
+        color: #27ae60;
+        font-weight: bold;
+    }
+
+    .pagos-list {
+        background: #f8f9fa;
+        border-radius: 4px;
+        padding: 15px;
+        margin-top: 15px;
+    }
+
+    .pago-item {
+        padding: 8px 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .pago-item:last-child {
+        border-bottom: none;
+    }
+
+    .action-buttons {
+        margin: 30px 0;
+        text-align: center;
+    }
+
+    .btn {
+        display: inline-block;
+        padding: 12px 24px;
+        margin: 0 10px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s;
+    }
+
+    .btn-primary {
+        background: #417690;
+        color: white;
+    }
+
+    .btn-success {
+        background: #27ae60;
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #95a5a6;
+        color: white;
+    }
+
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .alert {
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+
+    .alert-success {
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+    }
+
+    .alert-info {
+        background: #d1ecf1;
+        border: 1px solid #bee5eb;
+        color: #0c5460;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding: 30px; max-width: 1400px; margin: 0 auto;">
+    <h1 style="margin-bottom: 30px; color: #2c3e50;">
+        ⚠️ Revisar Inconsistencias de GiftCards
+    </h1>
+
+    <!-- Estadísticas -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+        <div class="stats-card">
+            <div class="stat-number">{{ total_analizado }}</div>
+            <div class="stat-label">GiftCards Analizadas</div>
+        </div>
+        <div class="stats-card">
+            <div class="stat-number" style="color: {% if total_inconsistencias > 0 %}#e74c3c{% else %}#27ae60{% endif %};">
+                {{ total_inconsistencias }}
+            </div>
+            <div class="stat-label">Inconsistencias Encontradas</div>
+        </div>
+        <div class="stats-card">
+            <div class="stat-number" style="color: #27ae60;">
+                {{ total_analizado|add:"-"|add:total_inconsistencias }}
+            </div>
+            <div class="stat-label">GiftCards Correctas</div>
+        </div>
+    </div>
+
+    <!-- Alerta de estado -->
+    {% if total_inconsistencias == 0 %}
+    <div class="alert alert-success">
+        <strong>✓ Excelente!</strong> No se encontraron inconsistencias. Todas las GiftCards tienen saldos correctos.
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <strong>ℹ️ Atención:</strong> Se encontraron {{ total_inconsistencias }} GiftCard(s) con saldos incorrectos que requieren corrección.
+    </div>
+    {% endif %}
+
+    <!-- Listado de Inconsistencias -->
+    {% if inconsistencias %}
+    <h2 style="margin: 30px 0 20px; color: #2c3e50;">Detalles de Inconsistencias</h2>
+
+    {% for item in inconsistencias %}
+    <div class="inconsistencia-card">
+        <div class="giftcard-header">
+            <div>
+                <div class="giftcard-codigo">{{ item.giftcard.codigo }}</div>
+                <div style="color: #7f8c8d; margin-top: 5px;">
+                    {% if item.giftcard.cliente_destinatario %}
+                        Destinatario: {{ item.giftcard.cliente_destinatario.nombre }}
+                    {% endif %}
+                </div>
+            </div>
+            <div>
+                <span class="badge badge-error">Inconsistencia: ${{ item.diferencia|floatformat:0|intcomma }}</span>
+            </div>
+        </div>
+
+        <!-- Comparación de valores -->
+        <table class="comparison-table">
+            <tr>
+                <td class="label">Monto Inicial:</td>
+                <td class="value">${{ item.giftcard.monto_inicial|floatformat:0|intcomma }}</td>
+            </tr>
+            <tr>
+                <td class="label">Total Usado en Pagos:</td>
+                <td class="value">${{ item.total_usado|floatformat:0|intcomma }}</td>
+            </tr>
+            <tr>
+                <td class="label">Saldo Actual (INCORRECTO):</td>
+                <td class="value value-incorrect">${{ item.saldo_actual|floatformat:0|intcomma }}</td>
+            </tr>
+            <tr>
+                <td class="label">Saldo Esperado (CORRECTO):</td>
+                <td class="value value-correct">${{ item.saldo_esperado|floatformat:0|intcomma }}</td>
+            </tr>
+            <tr>
+                <td class="label">Diferencia:</td>
+                <td class="value value-incorrect">${{ item.diferencia|floatformat:0|intcomma }}</td>
+            </tr>
+            {% if item.estado_actual != item.estado_esperado %}
+            <tr>
+                <td class="label">Estado:</td>
+                <td class="value">
+                    <span class="badge badge-warning">{{ item.estado_actual }}</span>
+                    →
+                    <span class="badge badge-info">{{ item.estado_esperado }}</span>
+                </td>
+            </tr>
+            {% endif %}
+        </table>
+
+        <!-- Historial de Pagos -->
+        {% if item.pagos %}
+        <div class="pagos-list">
+            <strong>📝 Historial de Pagos con esta GiftCard:</strong>
+            {% for pago in item.pagos %}
+            <div class="pago-item">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>
+                        Pago #{{ pago.id }} - Reserva #{{ pago.venta_reserva.id }}
+                    </span>
+                    <span style="font-weight: bold;">
+                        ${{ pago.monto|floatformat:0|intcomma }}
+                    </span>
+                </div>
+                <div style="font-size: 0.85rem; color: #7f8c8d;">
+                    {{ pago.fecha_pago|date:"d/m/Y H:i" }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Botones de Acción -->
+    <div class="action-buttons">
+        <a href="{% url 'admin:ventas_giftcard_changelist' %}" class="btn btn-secondary">
+            ← Volver al Listado
+        </a>
+
+        {% if total_inconsistencias > 0 %}
+        <form method="post" action="{% url 'ventas:corregir_inconsistencias_giftcards' %}" style="display: inline;" onsubmit="return confirm('¿Estás seguro de corregir {{ total_inconsistencias }} GiftCard(s)? Esta acción actualizará sus saldos y estados.');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success">
+                ✓ Corregir Todas las Inconsistencias
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    <!-- Información Adicional -->
+    <div style="margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 4px; border-left: 4px solid #3498db;">
+        <h3 style="margin-top: 0; color: #2c3e50;">ℹ️ ¿Qué hace la corrección?</h3>
+        <ul style="line-height: 1.8;">
+            <li>Recalcula el saldo correcto basándose en los pagos registrados</li>
+            <li>Actualiza el campo <code>monto_disponible</code> al valor esperado</li>
+            <li>Cambia el <code>estado</code> a 'cobrado' si el saldo es $0, o 'por_cobrar' si tiene saldo restante</li>
+            <li>Ejecuta todo en una transacción atómica para garantizar consistencia</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
