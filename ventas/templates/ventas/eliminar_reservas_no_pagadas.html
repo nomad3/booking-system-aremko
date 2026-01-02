@@ -1,0 +1,397 @@
+{% extends "admin/base_site.html" %}
+{% load static humanize %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/modern.css' %}">
+    <style>
+        .page-header {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .page-header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .page-header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+        }
+        .stats-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .stats-box strong {
+            color: #856404;
+            font-size: 18px;
+        }
+        .instructions {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #0c5460;
+        }
+        .reservas-table {
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .reservas-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .reservas-table th {
+            background: #6c757d;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .reservas-table td {
+            padding: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .reservas-table tr:hover {
+            background: #f8f9fa;
+        }
+        .reservas-table tr:last-child td {
+            border-bottom: none;
+        }
+        .checkbox-cell {
+            width: 50px;
+            text-align: center;
+        }
+        .checkbox-cell input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .numero-reserva {
+            font-weight: 700;
+            color: #417690;
+            font-size: 16px;
+        }
+        .dias-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .dias-reciente {
+            background: #d4edda;
+            color: #155724;
+        }
+        .dias-medio {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .dias-antiguo {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .btn-eliminar {
+            background: #dc3545;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-eliminar:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+        }
+        .btn-eliminar:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-seleccionar-todo {
+            background: #17a2b8;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        .btn-seleccionar-todo:hover {
+            background: #138496;
+        }
+        .acciones-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .contador-seleccion {
+            font-size: 16px;
+            color: #495057;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 8px;
+        }
+        .empty-state i {
+            font-size: 64px;
+            color: #28a745;
+            margin-bottom: 20px;
+        }
+        .empty-state h2 {
+            color: #28a745;
+            margin-bottom: 10px;
+        }
+
+        /* Estilos responsivos para móvil */
+        @media (max-width: 768px) {
+            .page-header h1 {
+                font-size: 22px;
+            }
+            .reservas-table thead {
+                display: none;
+            }
+            .reservas-table tr {
+                display: block;
+                margin-bottom: 15px;
+                border: 2px solid #dee2e6;
+                border-radius: 8px;
+                background: white;
+            }
+            .reservas-table td {
+                display: block;
+                text-align: left !important;
+                padding: 10px 15px;
+                border-bottom: 1px solid #f0f0f0;
+            }
+            .reservas-table td:last-child {
+                border-bottom: none;
+            }
+            .reservas-table td::before {
+                content: attr(data-label);
+                font-weight: 600;
+                display: block;
+                margin-bottom: 5px;
+                color: #6c757d;
+                font-size: 12px;
+                text-transform: uppercase;
+            }
+            .checkbox-cell {
+                text-align: left !important;
+                width: 100%;
+            }
+            .acciones-container {
+                flex-direction: column;
+                gap: 15px;
+            }
+            .btn-eliminar {
+                width: 100%;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+{% include 'base_menu.html' %}
+
+<div class="modern-container mt-4">
+    <div class="page-header">
+        <h1>🗑️ Eliminar Reservas No Pagadas</h1>
+        <p>Gestión de reservas pendientes de pago de los últimos 30 días</p>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="stats-box">
+        <strong>📊 Total de reservas no pagadas: {{ total_reservas }}</strong>
+    </div>
+
+    <div class="instructions">
+        <h3>📋 Instrucciones</h3>
+        <ul style="margin: 0; padding-left: 20px;">
+            <li>Revisa las reservas sin pago de los últimos 30 días</li>
+            <li>Selecciona las reservas que deseas eliminar marcando los checkboxes</li>
+            <li>Click en "Eliminar Seleccionadas" para confirmar la eliminación</li>
+            <li><strong>⚠️ Advertencia:</strong> Esta acción es irreversible</li>
+        </ul>
+    </div>
+
+    {% if reservas %}
+        <form method="post" id="formEliminar" onsubmit="return confirmarEliminacion()">
+            {% csrf_token %}
+
+            <button type="button" class="btn-seleccionar-todo" onclick="toggleSeleccionarTodo()">
+                ✓ Seleccionar Todo / Deseleccionar
+            </button>
+
+            <div class="reservas-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="checkbox-cell">
+                                <input type="checkbox" id="selectAll" onchange="toggleSeleccionarTodo()">
+                            </th>
+                            <th>Nº Reserva</th>
+                            <th>Fecha Creación</th>
+                            <th>Fecha Check-in</th>
+                            <th>Cliente</th>
+                            <th>Teléfono</th>
+                            <th>Monto Total</th>
+                            <th>Días Desde Creación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for reserva in reservas %}
+                        <tr>
+                            <td class="checkbox-cell" data-label="Seleccionar">
+                                <input type="checkbox"
+                                       name="reservas_seleccionadas"
+                                       value="{{ reserva.id }}"
+                                       class="reserva-checkbox"
+                                       onchange="actualizarContador()">
+                            </td>
+                            <td data-label="Nº Reserva">
+                                <a href="{% url 'admin:ventas_ventareserva_change' reserva.id %}"
+                                   target="_blank"
+                                   class="numero-reserva">
+                                    #{{ reserva.id }}
+                                </a>
+                            </td>
+                            <td data-label="Fecha Creación">
+                                {{ reserva.fecha_reserva|date:"d/m/Y" }}
+                            </td>
+                            <td data-label="Fecha Check-in">
+                                {% if reserva.fecha_checkin %}
+                                    {{ reserva.fecha_checkin|date:"d/m/Y" }}
+                                {% else %}
+                                    <span style="color: #6c757d;">Sin servicios</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Cliente">{{ reserva.cliente_nombre }}</td>
+                            <td data-label="Teléfono">{{ reserva.cliente_telefono }}</td>
+                            <td data-label="Monto Total">
+                                <strong>${{ reserva.total|floatformat:0|intcomma }}</strong>
+                            </td>
+                            <td data-label="Días Desde Creación">
+                                {% if reserva.dias_desde_creacion <= 7 %}
+                                    <span class="dias-badge dias-reciente">{{ reserva.dias_desde_creacion }} días</span>
+                                {% elif reserva.dias_desde_creacion <= 15 %}
+                                    <span class="dias-badge dias-medio">{{ reserva.dias_desde_creacion }} días</span>
+                                {% else %}
+                                    <span class="dias-badge dias-antiguo">{{ reserva.dias_desde_creacion }} días</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="acciones-container">
+                <div class="contador-seleccion">
+                    <strong>Seleccionadas:</strong> <span id="contadorSeleccion">0</span> de {{ total_reservas }}
+                </div>
+                <button type="submit" class="btn-eliminar" id="btnEliminar" disabled>
+                    🗑️ Eliminar Seleccionadas
+                </button>
+            </div>
+        </form>
+    {% else %}
+        <div class="empty-state">
+            <i class="fas fa-check-circle"></i>
+            <h2>¡No hay reservas pendientes!</h2>
+            <p>No se encontraron reservas sin pago en los últimos 30 días.</p>
+            <a href="{% url 'admin:ventas_ventareserva_changelist' %}" class="btn btn-primary" style="margin-top: 20px;">
+                Ver Todas las Reservas
+            </a>
+        </div>
+    {% endif %}
+
+    <div style="margin-top: 30px; text-align: center;">
+        <a href="{% url 'admin:ventas_ventareserva_changelist' %}"
+           class="btn btn-secondary"
+           style="padding: 12px 24px; text-decoration: none; display: inline-block;">
+            ← Volver al Listado de Reservas
+        </a>
+    </div>
+</div>
+
+<script>
+    function toggleSeleccionarTodo() {
+        const checkboxes = document.querySelectorAll('.reserva-checkbox');
+        const selectAll = document.getElementById('selectAll');
+
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = selectAll.checked;
+        });
+
+        actualizarContador();
+    }
+
+    function actualizarContador() {
+        const checkboxes = document.querySelectorAll('.reserva-checkbox:checked');
+        const contador = document.getElementById('contadorSeleccion');
+        const btnEliminar = document.getElementById('btnEliminar');
+
+        contador.textContent = checkboxes.length;
+        btnEliminar.disabled = checkboxes.length === 0;
+
+        // Actualizar estado del checkbox "Seleccionar todo"
+        const totalCheckboxes = document.querySelectorAll('.reserva-checkbox').length;
+        const selectAll = document.getElementById('selectAll');
+        selectAll.checked = checkboxes.length === totalCheckboxes && totalCheckboxes > 0;
+    }
+
+    function confirmarEliminacion() {
+        const checkboxes = document.querySelectorAll('.reserva-checkbox:checked');
+        const cantidad = checkboxes.length;
+
+        if (cantidad === 0) {
+            alert('Por favor selecciona al menos una reserva para eliminar.');
+            return false;
+        }
+
+        const mensaje = cantidad === 1
+            ? '¿Estás seguro de eliminar 1 reserva?\n\n⚠️ Esta acción no se puede deshacer.'
+            : `¿Estás seguro de eliminar ${cantidad} reservas?\n\n⚠️ Esta acción no se puede deshacer.`;
+
+        return confirm(mensaje);
+    }
+
+    // Inicializar contador al cargar la página
+    document.addEventListener('DOMContentLoaded', function() {
+        actualizarContador();
+    });
+</script>
+{% endblock %}

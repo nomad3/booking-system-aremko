@@ -15,6 +15,7 @@ from . import calendario_seleccion_view
 from . import resumen_reserva_view
 from . import tips_reserva_view
 from . import cotizacion_reserva_view
+from . import eliminar_reservas_no_pagadas_view
 from . import pagos_masajistas_views
 from . import diagnostico_views
 from . import diagnostico_test
