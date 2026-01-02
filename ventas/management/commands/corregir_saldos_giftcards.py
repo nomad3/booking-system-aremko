@@ -13,6 +13,7 @@ python manage.py corregir_saldos_giftcards --codigo ZADH3G6D3MZT
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.db.models import Sum
 from decimal import Decimal
 from ventas.models import GiftCard, Pago
 
@@ -65,7 +66,7 @@ class Command(BaseCommand):
                     giftcard=gc,
                     metodo_pago='giftcard'
                 ).aggregate(
-                    total=Decimal('0')
+                    total=Sum('monto')
                 )['total'] or Decimal('0')
 
                 # Calcular saldo esperado

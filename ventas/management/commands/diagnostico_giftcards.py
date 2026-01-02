@@ -10,6 +10,7 @@ python manage.py diagnostico_giftcards --reserva 4388
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.db.models import Sum
 from datetime import timedelta
 from decimal import Decimal
 from ventas.models import GiftCard, Pago, VentaReserva, Cliente
@@ -170,7 +171,7 @@ class Command(BaseCommand):
             total_usado = Pago.objects.filter(
                 giftcard=gc,
                 metodo_pago='giftcard'
-            ).aggregate(total=Decimal('0'))['total'] or Decimal('0')
+            ).aggregate(total=Sum('monto'))['total'] or Decimal('0')
 
             saldo_esperado = gc.monto_inicial - total_usado
             diferencia = gc.monto_disponible - saldo_esperado
