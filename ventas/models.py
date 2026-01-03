@@ -244,7 +244,9 @@ class GiftCard(models.Model):
     def save(self, *args, **kwargs):
         if not self.codigo:
             self.codigo = self.generar_codigo_unico()
-        if not self.monto_disponible:
+        # FIXED: Verificar si es None específicamente, no si es falsy
+        # Esto permite guardar monto_disponible = 0 (GiftCard completamente usada)
+        if self.monto_disponible is None:
             self.monto_disponible = self.monto_inicial
         super().save(*args, **kwargs)
 
