@@ -143,11 +143,12 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
     """
 
     # Obtener todas las reservas del día para esta categoría (solo de servicios visibles en matriz)
+    # NOTA: Se muestran TODAS las reservas independientemente del estado de pago
+    # Los colores se asignan según el estado_pago en el template
     reservas = ReservaServicio.objects.filter(
         fecha_agendamiento=fecha,
         servicio__categoria=categoria,
-        servicio__visible_en_matriz=True,  # Solo considerar servicios visibles en matriz
-        venta_reserva__estado_pago__in=['pagado', 'parcial', 'pendiente']
+        servicio__visible_en_matriz=True  # Solo considerar servicios visibles en matriz
     ).select_related('servicio', 'venta_reserva', 'venta_reserva__cliente')
 
     # Usar los servicios visibles como recursos (columnas)
@@ -278,6 +279,7 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
                     primera_reserva = lista_reservas[0] if lista_reservas else None
                     if primera_reserva:
                         matriz[slot][recurso_nombre].update({
+                            'estado': 'ocupado',  # Marcar como ocupado si hay al menos una reserva
                             'reserva': primera_reserva,
                             'cliente': primera_reserva.venta_reserva.cliente.nombre if primera_reserva.venta_reserva.cliente else 'Sin cliente',
                             'personas': primera_reserva.cantidad_personas if primera_reserva.cantidad_personas else 1,
