@@ -192,13 +192,14 @@ def obtener_personas_por_defecto(nombre_servicio):
 @require_POST
 def agregar_servicio_a_reserva(request):
     """
-    API endpoint para agregar un servicio a una reserva existente o crear una nueva.
+    API endpoint para agregar uno o más servicios a una reserva existente.
 
     POST params:
     - reserva_id: ID de la reserva (opcional, si no existe se crea una nueva)
     - servicio_nombre: Nombre del servicio
     - fecha: Fecha del servicio (YYYY-MM-DD)
     - hora: Hora del servicio (HH:MM)
+    - cantidad: Cantidad de servicios a agregar (default: 1)
     """
     try:
         import json
@@ -208,12 +209,20 @@ def agregar_servicio_a_reserva(request):
         servicio_nombre = data.get('servicio_nombre')
         fecha_str = data.get('fecha')
         hora_str = data.get('hora')
+        cantidad = int(data.get('cantidad', 1))  # Default: 1 servicio
 
         # Validar datos requeridos
         if not servicio_nombre or not fecha_str or not hora_str:
             return JsonResponse({
                 'success': False,
                 'error': 'Faltan datos requeridos'
+            }, status=400)
+
+        # Validar cantidad
+        if cantidad < 1 or cantidad > 10:
+            return JsonResponse({
+                'success': False,
+                'error': 'La cantidad debe estar entre 1 y 10'
             }, status=400)
 
         # Buscar el servicio
@@ -254,28 +263,50 @@ def agregar_servicio_a_reserva(request):
         # Determinar cantidad de personas por defecto
         cantidad_personas = obtener_personas_por_defecto(servicio.nombre)
 
-        # Crear el servicio en la reserva con precio congelado
+        # Verificar capacidad disponible
+        from django.db.models import Count
+        reservas_existentes = ReservaServicio.objects.filter(
+            servicio=servicio,
+            fecha_agendamiento=fecha,
+            hora_inicio=hora_str
+        ).count()
+
+        espacios_disponibles = servicio.capacidad_maxima - reservas_existentes
+
+        if cantidad > espacios_disponibles:
+            return JsonResponse({
+                'success': False,
+                'error': f'Solo hay {espacios_disponibles} espacio(s) disponible(s) para este horario'
+            }, status=400)
+
+        # Crear los servicios en la reserva con precio congelado
+        reservas_creadas = []
         with transaction.atomic():
-            reserva_servicio = ReservaServicio.objects.create(
-                venta_reserva=venta_reserva,
-                servicio=servicio,
-                fecha_agendamiento=fecha,
-                hora_inicio=hora_str,
-                cantidad_personas=cantidad_personas,
-                precio_unitario_venta=servicio.precio_base  # Congelar el precio
-            )
+            for i in range(cantidad):
+                reserva_servicio = ReservaServicio.objects.create(
+                    venta_reserva=venta_reserva,
+                    servicio=servicio,
+                    fecha_agendamiento=fecha,
+                    hora_inicio=hora_str,
+                    cantidad_personas=cantidad_personas,
+                    precio_unitario_venta=servicio.precio_base  # Congelar el precio
+                )
+                reservas_creadas.append(reserva_servicio)
 
             # Recalcular el total de la reserva
             venta_reserva.calcular_total()
             venta_reserva.save()
 
+        subtotal_total = servicio.precio_base * cantidad_personas * cantidad
+        mensaje = f'{cantidad} servicio(s) "{servicio.nombre}" agregado(s) correctamente' if cantidad > 1 else f'Servicio "{servicio.nombre}" agregado correctamente'
+
         return JsonResponse({
             'success': True,
-            'mensaje': f'Servicio "{servicio.nombre}" agregado correctamente',
-            'reserva_servicio_id': reserva_servicio.id,
+            'mensaje': mensaje,
+            'reservas_creadas': len(reservas_creadas),
             'cantidad_personas': cantidad_personas,
             'precio_unitario': str(servicio.precio_base),
-            'subtotal': str(servicio.precio_base * cantidad_personas)
+            'subtotal': str(subtotal_total)
         })
 
     except json.JSONDecodeError:

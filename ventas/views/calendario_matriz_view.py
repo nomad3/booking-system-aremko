@@ -199,61 +199,93 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         else:
             slots = sorted(list(slots_set))
 
+    # Crear mapa de servicios para acceder a capacidad_maxima
+    servicios_map = {s.nombre: s for s in servicios}
+
+    # Contar reservas por slot y servicio
+    from collections import defaultdict
+    contador_reservas = defaultdict(lambda: defaultdict(int))
+
+    for reserva in reservas:
+        hora_str = reserva.hora_inicio if reserva.hora_inicio else None
+        if hora_str and ':' in hora_str:
+            partes = hora_str.split(':')
+            if len(partes) >= 2:
+                hora = int(partes[0])
+                minuto = int(partes[1])
+                hora_normalizada = f"{hora:02d}:{minuto:02d}"
+                recurso_nombre = reserva.servicio.nombre
+                contador_reservas[hora_normalizada][recurso_nombre] += 1
+
     # Inicializar matriz
     matriz = {}
     for slot in slots:
         matriz[slot] = {}
         for recurso in recursos:
+            # Obtener el servicio para acceder a capacidad_maxima
+            servicio = servicios_map.get(recurso)
+            capacidad_max = servicio.capacidad_maxima if servicio else 1
+            reservas_count = contador_reservas[slot][recurso]
+
             # Para tinas, verificar si el slot corresponde a este recurso
             if categoria and 'tina' in categoria.nombre.lower() and 'slots_por_servicio' in locals():
                 # Verificar si este slot es válido para este recurso
                 if recurso in slots_por_servicio and slot in slots_por_servicio[recurso]:
-                    estado = 'disponible'
+                    # Verificar si aún hay capacidad disponible
+                    if reservas_count < capacidad_max:
+                        estado = 'disponible'
+                    else:
+                        estado = 'ocupado'
                 else:
                     estado = 'no_aplica'  # Este slot no existe para esta tina
             else:
-                estado = 'disponible'
+                # Verificar si aún hay capacidad disponible
+                if reservas_count < capacidad_max:
+                    estado = 'disponible'
+                else:
+                    estado = 'ocupado'
 
             matriz[slot][recurso] = {
                 'estado': estado,
+                'capacidad_maxima': capacidad_max,
+                'reservas_existentes': reservas_count,
+                'servicio_nombre': recurso,
                 'reserva': None,
                 'cliente': None
             }
 
-    # Marcar las reservas existentes en la matriz
+    # Marcar las reservas existentes en la matriz (para mostrar detalles)
+    # Agrupar reservas por slot y servicio
+    reservas_por_slot = defaultdict(lambda: defaultdict(list))
     for reserva in reservas:
         hora_str = reserva.hora_inicio if reserva.hora_inicio else None
+        if hora_str and ':' in hora_str:
+            partes = hora_str.split(':')
+            if len(partes) >= 2:
+                hora = int(partes[0])
+                minuto = int(partes[1])
+                hora_normalizada = f"{hora:02d}:{minuto:02d}"
+                recurso_nombre = reserva.servicio.nombre
+                reservas_por_slot[hora_normalizada][recurso_nombre].append(reserva)
 
-        # Buscar el slot correspondiente
-        slot_encontrado = None
-        if hora_str:
-            # Normalizar el formato de hora (asegurar formato HH:MM)
-            if ':' in hora_str:
-                partes = hora_str.split(':')
-                if len(partes) >= 2:
-                    hora = int(partes[0])
-                    minuto = int(partes[1])
-                    hora_normalizada = f"{hora:02d}:{minuto:02d}"
-
-                    # Buscar coincidencia exacta con la hora normalizada
-                    if hora_normalizada in slots:
-                        slot_encontrado = hora_normalizada
-
-        if slot_encontrado and slot_encontrado in matriz:
-            # Usar el nombre del servicio de la reserva como recurso
-            recurso_nombre = reserva.servicio.nombre
-
-            # Verificar si el recurso existe en la matriz
-            if recurso_nombre in matriz[slot_encontrado]:
-                matriz[slot_encontrado][recurso_nombre] = {
-                    'estado': 'ocupado',
-                    'reserva': reserva,
-                    'cliente': reserva.venta_reserva.cliente.nombre if reserva.venta_reserva.cliente else 'Sin cliente',
-                    'servicio': reserva.servicio.nombre,
-                    'personas': reserva.cantidad_personas if reserva.cantidad_personas else 1,
-                    'reserva_id': reserva.venta_reserva.id,
-                    'estado_pago': reserva.venta_reserva.estado_pago
-                }
+    # Actualizar matriz con detalles de reservas
+    for slot, servicios_reservas in reservas_por_slot.items():
+        if slot in matriz:
+            for recurso_nombre, lista_reservas in servicios_reservas.items():
+                if recurso_nombre in matriz[slot]:
+                    # Mantener capacidad_maxima y reservas_existentes ya calculados
+                    # Agregar información de la primera reserva para mostrar
+                    primera_reserva = lista_reservas[0] if lista_reservas else None
+                    if primera_reserva:
+                        matriz[slot][recurso_nombre].update({
+                            'reserva': primera_reserva,
+                            'cliente': primera_reserva.venta_reserva.cliente.nombre if primera_reserva.venta_reserva.cliente else 'Sin cliente',
+                            'personas': primera_reserva.cantidad_personas if primera_reserva.cantidad_personas else 1,
+                            'reserva_id': primera_reserva.venta_reserva.id,
+                            'estado_pago': primera_reserva.venta_reserva.estado_pago,
+                            'servicio': primera_reserva.servicio.nombre,
+                            'todas_reservas': lista_reservas  # Guardar todas las reservas para referencia
+                        })
 
     # Calcular resumen de ocupación (excluyendo slots que no aplican)
     slots_validos = sum(

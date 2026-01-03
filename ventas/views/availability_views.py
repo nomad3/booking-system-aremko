@@ -48,17 +48,29 @@ def get_available_hours(request):
              return JsonResponse({'success': True, 'horas_disponibles': []})
 
         # --- Get existing reservations for this service on this date ---
-        reservas = ReservaServicio.objects.filter(
+        from django.db.models import Count
+        reservas_por_hora = ReservaServicio.objects.filter(
             servicio=servicio,
             fecha_agendamiento=fecha_obj
-        ).values_list('hora_inicio', flat=True)
-        # Ensure booked slots are strings for comparison, handle potential None values from DB
-        booked_slots = set(str(h) for h in reservas if h is not None)
-        print(f"[get_available_hours] Booked slots for {fecha_obj}: {booked_slots}") # Debug booked slots
+        ).values('hora_inicio').annotate(cantidad=Count('id'))
 
-        # --- Filter available slots by removing booked ones ---
-        # Ensure slots from config are also strings for comparison
-        horas_disponibles = [str(hora) for hora in available_slots_for_day if str(hora) not in booked_slots]
+        # Crear diccionario de slots ocupados con su cantidad
+        slots_ocupacion = {str(r['hora_inicio']): r['cantidad'] for r in reservas_por_hora}
+        print(f"[get_available_hours] Slots ocupation for {fecha_obj}: {slots_ocupacion}") # Debug slots occupation
+
+        # Obtener capacidad máxima del servicio
+        capacidad_maxima = getattr(servicio, 'capacidad_maxima', 1)
+        print(f"[get_available_hours] Servicio {servicio.nombre} capacidad_maxima: {capacidad_maxima}") # Debug capacity
+
+        # --- Filter available slots considering capacity ---
+        # Un slot está disponible si tiene menos reservas que la capacidad máxima
+        horas_disponibles = []
+        for hora in available_slots_for_day:
+            hora_str = str(hora)
+            reservas_existentes = slots_ocupacion.get(hora_str, 0)
+            if reservas_existentes < capacidad_maxima:
+                horas_disponibles.append(hora_str)
+
         print(f"[get_available_hours] Filtered available hours: {horas_disponibles}") # Debug filtered list
 
         # --- Sort the final list ---

@@ -119,6 +119,95 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Modal de selección de cantidad */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+        .modal-content h2 {
+            color: #333;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .modal-content p {
+            color: #666;
+            margin: 10px 0;
+            line-height: 1.5;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 25px;
+            flex-wrap: wrap;
+        }
+        .modal-button {
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 140px;
+            font-weight: bold;
+        }
+        .modal-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .modal-button.primary {
+            background: #007bff;
+            color: white;
+        }
+        .modal-button.primary:hover {
+            background: #0056b3;
+        }
+        .modal-button.secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .modal-button.secondary:hover {
+            background: #5a6268;
+        }
+        .modal-button.cancel {
+            background: #f8f9fa;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+        .modal-button.cancel:hover {
+            background: #e9ecef;
+        }
+        .capacidad-info {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 15px 0;
+            border-left: 4px solid #2196f3;
+        }
+        .capacidad-info strong {
+            color: #1976d2;
+        }
         /* Filtros */
         .filtros {
             display: flex;
@@ -366,12 +455,18 @@
                             {% else %}
                                 <td class="disponible"
                                     data-servicio-index="{{ forloop.counter0 }}"
+                                    data-servicio-nombre="{{ celda.servicio_nombre }}"
+                                    data-capacidad-maxima="{{ celda.capacidad_maxima }}"
+                                    data-reservas-existentes="{{ celda.reservas_existentes }}"
                                     data-fecha="{{ fecha_str }}"
                                     data-hora="{{ fila.slot }}"
                                     onclick="seleccionarServicioDesdeElemento(this)"
-                                    title="Click para agregar servicio a las {{ fila.slot }}">
-                                    Disponible<br>
-                                    <small style="font-size: 11px;">Click para agregar</small>
+                                    title="Click para agregar servicio a las {{ fila.slot }} - Capacidad: {{ celda.reservas_existentes }}/{{ celda.capacidad_maxima }}">
+                                    Disponible
+                                    {% if celda.capacidad_maxima > 1 and celda.reservas_existentes > 0 %}
+                                        <span style="font-size: 10px; display: block;">({{ celda.reservas_existentes }}/{{ celda.capacidad_maxima }})</span>
+                                    {% endif %}
+                                    <small style="font-size: 11px; display: block;">Click para agregar</small>
                                 </td>
                             {% endif %}
                         {% endfor %}
@@ -469,6 +564,30 @@
         <p style="text-align: center; margin-top: 15px;">Agregando servicio...</p>
     </div>
 
+    <!-- Modal para seleccionar cantidad de masajes -->
+    <div class="modal-overlay" id="cantidadModal">
+        <div class="modal-content">
+            <h2 id="modalTitulo">¿Cuántos masajes deseas agregar?</h2>
+            <p id="modalMensaje">Este servicio permite reservar múltiples masajes simultáneos.</p>
+            <div class="capacidad-info" id="modalCapacidad">
+                <strong>Disponibilidad:</strong> <span id="espaciosDisponibles"></span>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-button primary" id="btnCantidad1" onclick="confirmarCantidad(1)">
+                    1 Masaje
+                </button>
+                <button class="modal-button secondary" id="btnCantidad2" onclick="confirmarCantidad(2)">
+                    2 Masajes
+                </button>
+            </div>
+            <div style="margin-top: 20px;">
+                <button class="modal-button cancel" onclick="cerrarModal()">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Array de recursos para acceder por índice
         const recursos = [
@@ -477,16 +596,81 @@
             {% endfor %}
         ];
 
+        // Variables globales para el modal
+        let modalData = {
+            servicioNombre: null,
+            fecha: null,
+            hora: null,
+            capacidadMaxima: 1,
+            reservasExistentes: 0
+        };
+
         function seleccionarServicioDesdeElemento(elemento) {
-            const index = parseInt(elemento.getAttribute('data-servicio-index'));
+            const servicioNombre = elemento.getAttribute('data-servicio-nombre');
+            const capacidadMaxima = parseInt(elemento.getAttribute('data-capacidad-maxima') || '1');
+            const reservasExistentes = parseInt(elemento.getAttribute('data-reservas-existentes') || '0');
             const fecha = elemento.getAttribute('data-fecha');
             const hora = elemento.getAttribute('data-hora');
-            const servicioNombre = recursos[index];
 
-            seleccionarServicio(servicioNombre, fecha, hora);
+            // Guardar datos para uso posterior
+            modalData = {
+                servicioNombre,
+                fecha,
+                hora,
+                capacidadMaxima,
+                reservasExistentes
+            };
+
+            // Verificar si es un masaje de relajación o descontracturante con capacidad múltiple
+            const esMasajeMultiple = (
+                servicioNombre.toLowerCase().includes('relajación') ||
+                servicioNombre.toLowerCase().includes('relajacion') ||
+                servicioNombre.toLowerCase().includes('descontracturante')
+            ) && capacidadMaxima > 1;
+
+            if (esMasajeMultiple) {
+                // Mostrar modal para seleccionar cantidad
+                mostrarModal();
+            } else {
+                // Agregar directamente con cantidad 1
+                seleccionarServicio(servicioNombre, fecha, hora, 1);
+            }
         }
 
-        function seleccionarServicio(servicioNombre, fecha, hora) {
+        function mostrarModal() {
+            const espaciosDisponibles = modalData.capacidadMaxima - modalData.reservasExistentes;
+
+            // Actualizar contenido del modal
+            document.getElementById('modalTitulo').textContent = `¿Cuántos masajes deseas agregar?`;
+            document.getElementById('modalMensaje').textContent = `Este servicio permite reservar hasta ${modalData.capacidadMaxima} masajes simultáneos.`;
+            document.getElementById('espaciosDisponibles').textContent = `${espaciosDisponibles} de ${modalData.capacidadMaxima} espacios disponibles`;
+
+            // Habilitar/deshabilitar botones según disponibilidad
+            const btn2Masajes = document.getElementById('btnCantidad2');
+            if (espaciosDisponibles >= 2) {
+                btn2Masajes.disabled = false;
+                btn2Masajes.style.opacity = '1';
+                btn2Masajes.style.cursor = 'pointer';
+            } else {
+                btn2Masajes.disabled = true;
+                btn2Masajes.style.opacity = '0.5';
+                btn2Masajes.style.cursor = 'not-allowed';
+            }
+
+            // Mostrar modal
+            document.getElementById('cantidadModal').classList.add('active');
+        }
+
+        function cerrarModal() {
+            document.getElementById('cantidadModal').classList.remove('active');
+        }
+
+        function confirmarCantidad(cantidad) {
+            cerrarModal();
+            seleccionarServicio(modalData.servicioNombre, modalData.fecha, modalData.hora, cantidad);
+        }
+
+        function seleccionarServicio(servicioNombre, fecha, hora, cantidad = 1) {
             const reservaId = "{{ reserva_id }}";
 
             // Verificar que hay una reserva
@@ -496,7 +680,11 @@
             }
 
             // Mostrar confirmación
-            if (!confirm(`¿Agregar servicio "${servicioNombre}" el ${fecha} a las ${hora}?`)) {
+            const mensajeConfirmacion = cantidad > 1
+                ? `¿Agregar ${cantidad} masajes de "${servicioNombre}" el ${fecha} a las ${hora}?`
+                : `¿Agregar servicio "${servicioNombre}" el ${fecha} a las ${hora}?`;
+
+            if (!confirm(mensajeConfirmacion)) {
                 return;
             }
 
@@ -517,7 +705,8 @@
                     reserva_id: reservaId,
                     servicio_nombre: servicioNombre,
                     fecha: fecha,
-                    hora: hora
+                    hora: hora,
+                    cantidad: cantidad
                 })
             })
             .then(response => response.json())
