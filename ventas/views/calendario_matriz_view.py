@@ -274,12 +274,24 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         if slot in matriz:
             for recurso_nombre, lista_reservas in servicios_reservas.items():
                 if recurso_nombre in matriz[slot]:
-                    # Mantener capacidad_maxima y reservas_existentes ya calculados
+                    # Obtener info actual de la celda
+                    celda_actual = matriz[slot][recurso_nombre]
+                    capacidad_max = celda_actual.get('capacidad_maxima', 1)
+                    reservas_count = len(lista_reservas)
+
+                    # Determinar estado real basado en capacidad
+                    # Solo marcar como 'ocupado' si está COMPLETAMENTE lleno
+                    if reservas_count >= capacidad_max:
+                        nuevo_estado = 'ocupado'
+                    else:
+                        # Aún hay espacio, mantener como 'disponible'
+                        nuevo_estado = celda_actual.get('estado', 'disponible')
+
                     # Agregar información de la primera reserva para mostrar
                     primera_reserva = lista_reservas[0] if lista_reservas else None
                     if primera_reserva:
                         matriz[slot][recurso_nombre].update({
-                            'estado': 'ocupado',  # Marcar como ocupado si hay al menos una reserva
+                            'estado': nuevo_estado,
                             'reserva': primera_reserva,
                             'cliente': primera_reserva.venta_reserva.cliente.nombre if primera_reserva.venta_reserva.cliente else 'Sin cliente',
                             'personas': primera_reserva.cantidad_personas if primera_reserva.cantidad_personas else 1,

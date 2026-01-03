@@ -453,7 +453,19 @@
                             {% elif celda.estado == 'no_aplica' %}
                                 <td class="no-aplica">-</td>
                             {% else %}
-                                <td class="disponible"
+                                {# Estado disponible - puede tener reservas parciales #}
+                                {% if celda.cliente %}
+                                    {# Hay reservas pero aún queda capacidad #}
+                                    {% if celda.estado_pago == 'pagado' %}
+                                        <td class="disponible"
+                                            style="border-left: 4px solid #28a745;"
+                                    {% elif celda.estado_pago == 'parcial' %}
+                                        <td class="disponible"
+                                            style="border-left: 4px solid #17a2b8;"
+                                    {% else %}
+                                        <td class="disponible"
+                                            style="border-left: 4px solid #dc3545;"
+                                    {% endif %}
                                     data-servicio-index="{{ forloop.counter0 }}"
                                     data-servicio-nombre="{{ celda.servicio_nombre }}"
                                     data-capacidad-maxima="{{ celda.capacidad_maxima }}"
@@ -461,13 +473,26 @@
                                     data-fecha="{{ fecha_str }}"
                                     data-hora="{{ fila.slot }}"
                                     onclick="seleccionarServicioDesdeElemento(this)"
-                                    title="Click para agregar servicio a las {{ fila.slot }} - Capacidad: {{ celda.reservas_existentes }}/{{ celda.capacidad_maxima }}">
-                                    Disponible
-                                    {% if celda.capacidad_maxima > 1 and celda.reservas_existentes > 0 %}
-                                        <span style="font-size: 10px; display: block;">({{ celda.reservas_existentes }}/{{ celda.capacidad_maxima }})</span>
-                                    {% endif %}
-                                    <small style="font-size: 11px; display: block;">Click para agregar</small>
-                                </td>
+                                    title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s) - Aún quedan espacios">
+                                        Disponible ({{ celda.reservas_existentes }}/{{ celda.capacidad_maxima }})<br>
+                                        <small style="font-size: 10px;">{{ celda.cliente|default:"" }}</small><br>
+                                        <small style="font-size: 11px;">Click para agregar</small>
+                                    </td>
+                                {% else %}
+                                    {# Completamente disponible #}
+                                    <td class="disponible"
+                                        data-servicio-index="{{ forloop.counter0 }}"
+                                        data-servicio-nombre="{{ celda.servicio_nombre }}"
+                                        data-capacidad-maxima="{{ celda.capacidad_maxima }}"
+                                        data-reservas-existentes="{{ celda.reservas_existentes }}"
+                                        data-fecha="{{ fecha_str }}"
+                                        data-hora="{{ fila.slot }}"
+                                        onclick="seleccionarServicioDesdeElemento(this)"
+                                        title="Click para agregar servicio a las {{ fila.slot }}">
+                                        Disponible
+                                        <small style="font-size: 11px; display: block;">Click para agregar</small>
+                                    </td>
+                                {% endif %}
                             {% endif %}
                         {% endfor %}
                     </tr>
