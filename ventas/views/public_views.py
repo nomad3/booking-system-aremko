@@ -8,6 +8,10 @@ def homepage_view(request):
     Vista que renderiza la página de inicio pública de Aremko.cl
     Muestra los servicios disponibles y permite realizar reservas.
     """
+    # DEBUG: Temporalmente redirigir a /tinas/ para restaurar el sitio
+    from django.shortcuts import redirect
+    return redirect('/tinas/')
+
     # Obtener servicios activos Y publicados en la web
     servicios = Servicio.objects.filter(activo=True, publicado_web=True).select_related('categoria')
     categorias = CategoriaServicio.objects.all()
