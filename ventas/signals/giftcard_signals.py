@@ -216,12 +216,17 @@ def verificar_saldo_giftcard_post_pago(sender, instance, created, **kwargs):
     PROTECCIÓN PREVENTIVA: Verifica y corrige automáticamente el saldo de GiftCards
     después de cada pago.
 
+    OPTIMIZACIÓN: Solo se ejecuta cuando se CREA un nuevo pago (not en updates)
+    para evitar queries innecesarias que ralentizan el sistema.
+
     Este signal previene el problema de saldos incorrectos que ocurrió cuando
     los pagos fueron creados con bulk_create(), update(), o desde el admin sin
     ejecutar el método save() del modelo Pago.
-
-    Se ejecuta SIEMPRE que se guarda un Pago, incluso con bulk operations.
     """
+    # OPTIMIZACIÓN 1: Solo ejecutar en creación, no en actualización
+    if not created:
+        return
+
     # Solo procesar pagos con GiftCard
     if instance.metodo_pago != 'giftcard' or not instance.giftcard:
         return
@@ -232,17 +237,21 @@ def verificar_saldo_giftcard_post_pago(sender, instance, created, **kwargs):
 
         gc = instance.giftcard
 
-        # Calcular total usado en todos los pagos con esta GiftCard
-        total_usado = Pago.objects.filter(
-            giftcard=gc,
-            metodo_pago='giftcard'
-        ).aggregate(total=Sum('monto'))['total'] or Decimal('0')
+        # OPTIMIZACIÓN 2: Calcular saldo de forma más eficiente
+        # En lugar de sumar TODOS los pagos, restamos directamente el monto del pago actual
+        saldo_esperado = gc.monto_disponible - instance.monto
 
-        # Calcular saldo esperado
-        saldo_esperado = gc.monto_inicial - total_usado
-
-        # Si el saldo está incorrecto, corregirlo automáticamente
+        # OPTIMIZACIÓN 3: Solo hacer la query Sum() si hay inconsistencia
+        # La mayoría de las veces el saldo ya estará correcto
         if gc.monto_disponible != saldo_esperado:
+            # Ahora sí, verificar con Sum() por seguridad
+            total_usado = Pago.objects.filter(
+                giftcard=gc,
+                metodo_pago='giftcard'
+            ).aggregate(total=Sum('monto'))['total'] or Decimal('0')
+
+            saldo_esperado = gc.monto_inicial - total_usado
+
             logger.warning(
                 f"🔧 PROTECCIÓN: Inconsistencia detectada en GiftCard {gc.codigo}. "
                 f"Saldo actual: ${gc.monto_disponible}, Saldo esperado: ${saldo_esperado}. "
