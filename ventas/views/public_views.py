@@ -8,13 +8,48 @@ def homepage_view(request):
     Vista que renderiza la página de inicio pública de Aremko.cl
     Muestra los servicios disponibles y permite realizar reservas.
     """
-    # DEBUG: Temporalmente redirigir a /tinas/ para restaurar el sitio
-    from django.shortcuts import redirect
-    return redirect('/tinas/')
+    # DEBUG: Probar paso a paso
+    from django.http import HttpResponse
+    import traceback
 
-    # Obtener servicios activos Y publicados en la web
-    servicios = Servicio.objects.filter(activo=True, publicado_web=True).select_related('categoria')
-    categorias = CategoriaServicio.objects.all()
+    try:
+        # Test 1: Básico
+        test_html = "<h1>Test 1: Vista funciona</h1>"
+
+        # Test 2: Query servicios
+        servicios = Servicio.objects.filter(activo=True, publicado_web=True).select_related('categoria')
+        test_html += f"<p>Test 2: {servicios.count()} servicios encontrados</p>"
+
+        # Test 3: Query categorías
+        categorias = CategoriaServicio.objects.all()
+        test_html += f"<p>Test 3: {categorias.count()} categorías encontradas</p>"
+
+        # Test 4: HomepageConfig
+        config = HomepageConfig.get_solo()
+        test_html += f"<p>Test 4: HomepageConfig existe: {config is not None}</p>"
+        test_html += f"<p>Hero title: {config.hero_title if config else 'N/A'}</p>"
+
+        # Test 5: Template render
+        from django.shortcuts import render
+        context = {
+            'servicios': servicios,
+            'categorias': categorias,
+            'cart': {'servicios': [], 'total': 0},
+            'canonical_url': request.build_absolute_uri(request.path),
+        }
+        test_html += "<p>Test 5: Context creado OK</p>"
+
+        # Intentar renderizar template
+        return render(request, 'ventas/homepage.html', context)
+
+    except Exception as e:
+        error_html = f"""
+        <h1>ERROR EN HOMEPAGE</h1>
+        <h2>Error: {str(e)}</h2>
+        <h3>Tipo: {type(e).__name__}</h3>
+        <pre>{traceback.format_exc()}</pre>
+        """
+        return HttpResponse(error_html, status=500)
 
     # Obtener carrito de compras de la sesión o crear uno nuevo
     cart = request.session.get('cart', {'servicios': [], 'total': 0})
