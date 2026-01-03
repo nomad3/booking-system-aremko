@@ -660,7 +660,7 @@ def sync_newsletter_subscriber(sender, instance, created, **kwargs):
     """
     # Lazy import to avoid circular imports
     try:
-        from .models import NewsletterSubscriber
+        from ..models import NewsletterSubscriber
     except Exception as e:
         logger.error(f"Unable to import NewsletterSubscriber: {e}")
         return
