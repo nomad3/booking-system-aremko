@@ -200,7 +200,7 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         else:
             slots = sorted(list(slots_set))
 
-    # Crear mapa de servicios para acceder a capacidad_maxima
+    # Crear mapa de servicios para acceder a max_servicios_simultaneos
     servicios_map = {s.nombre: s for s in servicios}
 
     # Contar reservas por slot y servicio
@@ -223,9 +223,9 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
     for slot in slots:
         matriz[slot] = {}
         for recurso in recursos:
-            # Obtener el servicio para acceder a capacidad_maxima
+            # Obtener el servicio para acceder a max_servicios_simultaneos
             servicio = servicios_map.get(recurso)
-            capacidad_max = servicio.capacidad_maxima if servicio else 1
+            capacidad_max = servicio.max_servicios_simultaneos if servicio else 1
             reservas_count = contador_reservas[slot][recurso]
 
             # Para tinas, verificar si el slot corresponde a este recurso
@@ -248,7 +248,7 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
 
             matriz[slot][recurso] = {
                 'estado': estado,
-                'capacidad_maxima': capacidad_max,
+                'max_servicios_simultaneos': capacidad_max,
                 'reservas_existentes': reservas_count,
                 'servicio_nombre': recurso,
                 'reserva': None,
@@ -276,7 +276,7 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
                 if recurso_nombre in matriz[slot]:
                     # Obtener info actual de la celda
                     celda_actual = matriz[slot][recurso_nombre]
-                    capacidad_max = celda_actual.get('capacidad_maxima', 1)
+                    capacidad_max = celda_actual.get('max_servicios_simultaneos', 1)
                     reservas_count = len(lista_reservas)
 
                     # Determinar estado real basado en capacidad

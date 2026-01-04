@@ -263,7 +263,7 @@ def agregar_servicio_a_reserva(request):
         # Determinar cantidad de personas por defecto
         cantidad_personas = obtener_personas_por_defecto(servicio.nombre)
 
-        # Verificar capacidad disponible
+        # Verificar capacidad disponible (cantidad de servicios simultáneos)
         from django.db.models import Count
         reservas_existentes = ReservaServicio.objects.filter(
             servicio=servicio,
@@ -271,7 +271,7 @@ def agregar_servicio_a_reserva(request):
             hora_inicio=hora_str
         ).count()
 
-        espacios_disponibles = servicio.capacidad_maxima - reservas_existentes
+        espacios_disponibles = servicio.max_servicios_simultaneos - reservas_existentes
 
         if cantidad > espacios_disponibles:
             return JsonResponse({

@@ -58,17 +58,17 @@ def get_available_hours(request):
         slots_ocupacion = {str(r['hora_inicio']): r['cantidad'] for r in reservas_por_hora}
         print(f"[get_available_hours] Slots ocupation for {fecha_obj}: {slots_ocupacion}") # Debug slots occupation
 
-        # Obtener capacidad máxima del servicio
-        capacidad_maxima = getattr(servicio, 'capacidad_maxima', 1)
-        print(f"[get_available_hours] Servicio {servicio.nombre} capacidad_maxima: {capacidad_maxima}") # Debug capacity
+        # Obtener capacidad de servicios simultáneos del servicio
+        max_simultaneos = getattr(servicio, 'max_servicios_simultaneos', 1)
+        print(f"[get_available_hours] Servicio {servicio.nombre} max_servicios_simultaneos: {max_simultaneos}") # Debug capacity
 
         # --- Filter available slots considering capacity ---
-        # Un slot está disponible si tiene menos reservas que la capacidad máxima
+        # Un slot está disponible si tiene menos reservas que el máximo de servicios simultáneos
         horas_disponibles = []
         for hora in available_slots_for_day:
             hora_str = str(hora)
             reservas_existentes = slots_ocupacion.get(hora_str, 0)
-            if reservas_existentes < capacidad_maxima:
+            if reservas_existentes < max_simultaneos:
                 horas_disponibles.append(hora_str)
 
         print(f"[get_available_hours] Filtered available hours: {horas_disponibles}") # Debug filtered list

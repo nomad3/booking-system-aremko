@@ -468,13 +468,13 @@
                                     {% endif %}
                                     data-servicio-index="{{ forloop.counter0 }}"
                                     data-servicio-nombre="{{ celda.servicio_nombre }}"
-                                    data-capacidad-maxima="{{ celda.capacidad_maxima }}"
+                                    data-max-servicios-simultaneos="{{ celda.max_servicios_simultaneos }}"
                                     data-reservas-existentes="{{ celda.reservas_existentes }}"
                                     data-fecha="{{ fecha_str }}"
                                     data-hora="{{ fila.slot }}"
                                     onclick="seleccionarServicioDesdeElemento(this)"
                                     title="{{ celda.cliente|default:'Cliente' }} - {{ celda.personas|default:'1' }} persona(s) - Aún quedan espacios">
-                                        Disponible ({{ celda.reservas_existentes }}/{{ celda.capacidad_maxima }})<br>
+                                        Disponible ({{ celda.reservas_existentes }}/{{ celda.max_servicios_simultaneos }})<br>
                                         <small style="font-size: 10px;">{{ celda.cliente|default:"" }}</small><br>
                                         <small style="font-size: 11px;">Click para agregar</small>
                                     </td>
@@ -483,7 +483,7 @@
                                     <td class="disponible"
                                         data-servicio-index="{{ forloop.counter0 }}"
                                         data-servicio-nombre="{{ celda.servicio_nombre }}"
-                                        data-capacidad-maxima="{{ celda.capacidad_maxima }}"
+                                        data-max-servicios-simultaneos="{{ celda.max_servicios_simultaneos }}"
                                         data-reservas-existentes="{{ celda.reservas_existentes }}"
                                         data-fecha="{{ fecha_str }}"
                                         data-hora="{{ fila.slot }}"
@@ -626,13 +626,13 @@
             servicioNombre: null,
             fecha: null,
             hora: null,
-            capacidadMaxima: 1,
+            maxServiciosSimultaneos: 1,
             reservasExistentes: 0
         };
 
         function seleccionarServicioDesdeElemento(elemento) {
             const servicioNombre = elemento.getAttribute('data-servicio-nombre');
-            const capacidadMaxima = parseInt(elemento.getAttribute('data-capacidad-maxima') || '1');
+            const maxServiciosSimultaneos = parseInt(elemento.getAttribute('data-max-servicios-simultaneos') || '1');
             const reservasExistentes = parseInt(elemento.getAttribute('data-reservas-existentes') || '0');
             const fecha = elemento.getAttribute('data-fecha');
             const hora = elemento.getAttribute('data-hora');
@@ -642,7 +642,7 @@
                 servicioNombre,
                 fecha,
                 hora,
-                capacidadMaxima,
+                maxServiciosSimultaneos,
                 reservasExistentes
             };
 
@@ -651,7 +651,7 @@
                 servicioNombre.toLowerCase().includes('relajación') ||
                 servicioNombre.toLowerCase().includes('relajacion') ||
                 servicioNombre.toLowerCase().includes('descontracturante')
-            ) && capacidadMaxima > 1;
+            ) && maxServiciosSimultaneos > 1;
 
             if (esMasajeMultiple) {
                 // Mostrar modal para seleccionar cantidad
@@ -663,12 +663,12 @@
         }
 
         function mostrarModal() {
-            const espaciosDisponibles = modalData.capacidadMaxima - modalData.reservasExistentes;
+            const espaciosDisponibles = modalData.maxServiciosSimultaneos - modalData.reservasExistentes;
 
             // Actualizar contenido del modal
             document.getElementById('modalTitulo').textContent = `¿Cuántos masajes deseas agregar?`;
-            document.getElementById('modalMensaje').textContent = `Este servicio permite reservar hasta ${modalData.capacidadMaxima} masajes simultáneos.`;
-            document.getElementById('espaciosDisponibles').textContent = `${espaciosDisponibles} de ${modalData.capacidadMaxima} espacios disponibles`;
+            document.getElementById('modalMensaje').textContent = `Este servicio permite reservar hasta ${modalData.maxServiciosSimultaneos} masajes simultáneos.`;
+            document.getElementById('espaciosDisponibles').textContent = `${espaciosDisponibles} de ${modalData.maxServiciosSimultaneos} espacios disponibles`;
 
             // Habilitar/deshabilitar botones según disponibilidad
             const btn2Masajes = document.getElementById('btnCantidad2');
