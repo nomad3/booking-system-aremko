@@ -225,6 +225,8 @@ urlpatterns = [
     path('cron/triggers-reactivation/', cron_views.cron_triggers_reactivation, name='cron_triggers_reactivation'),
     # Emails Programados
     path('cron/enviar-emails-programados/', cron_views.cron_enviar_emails_programados, name='cron_enviar_emails_programados'),
+    # Campañas de Email
+    path('cron/enviar-campanas-email/', cron_views.cron_enviar_campanas_email, name='cron_enviar_campanas_email'),
     # Campañas Específicas
     path('cron/enviar-campana-giftcard/', cron_views.cron_enviar_campana_giftcard, name='cron_enviar_campana_giftcard'),
     # Control de Gestión - Tareas Automáticas

@@ -1,5 +1,5 @@
 """
-Vistas para endpoints de cron jobs de premios
+Vistas para endpoints de cron jobs de premios y campañas
 Permiten ejecutar comandos Django via HTTP desde cron-job.org
 """
 from django.http import JsonResponse
@@ -9,6 +9,7 @@ from django.views.decorators.http import require_http_methods
 from io import StringIO
 import os
 import logging
+import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,77 @@ def cron_enviar_premios_aprobados(request):
             "ok": False,
             "error": str(e),
             "command": "enviar_premios_aprobados"
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_enviar_campanas_email(request):
+    """
+    Endpoint para procesar campañas de email desde cron externo
+
+    GET o POST: /ventas/cron/enviar-campanas-email/?token=xxx
+
+    Qué hace:
+    - Busca campañas con estado='ready' o 'sending'
+    - Procesa lotes de emails respetando configuración
+    - Se ejecuta en background para evitar timeouts
+    - Continúa desde donde quedó si se interrumpió
+
+    Frecuencia recomendada: Cada 5 minutos
+
+    Ventajas de ejecutar via cron:
+    - Si el proceso background muere, el cron lo reinicia
+    - Permite procesar campañas grandes sin timeouts
+    - Los recipients 'pending' se procesan en cada ejecución
+    """
+    # Validar token de seguridad
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            logger.warning("❌ Intento de acceso a cron campañas con token inválido")
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+
+    try:
+        # Contar campañas pendientes antes de ejecutar
+        from ventas.models import EmailCampaign
+        campanas_pendientes = EmailCampaign.objects.filter(status__in=['ready', 'sending'])
+        count = campanas_pendientes.count()
+
+        if count == 0:
+            logger.info("ℹ️ No hay campañas pendientes para procesar")
+            return JsonResponse({
+                "ok": True,
+                "message": "No hay campañas pendientes",
+                "campaigns_count": 0
+            })
+
+        # Ejecutar comando en BACKGROUND
+        # Esto permite que el endpoint retorne rápido mientras el envío continúa
+        subprocess.Popen(
+            ['python', 'manage.py', 'enviar_campana_email', '--auto'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
+
+        logger.info(f"✅ Cron enviar_campanas_email iniciado. {count} campaña(s) en cola")
+
+        return JsonResponse({
+            "ok": True,
+            "message": f"Procesamiento de {count} campaña(s) iniciado en background",
+            "command": "enviar_campana_email --auto",
+            "campaigns_count": count,
+            "note": "El envío continúa en segundo plano"
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Error en cron enviar_campanas_email: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False,
+            "error": str(e),
+            "command": "enviar_campana_email --auto"
         }, status=500)
 
 
