@@ -1612,6 +1612,7 @@ class EmailCampaignAdmin(admin.ModelAdmin):
     list_display = (
         'name',
         'status',
+        'progreso_visual',
         'total_recipients',
         'emails_sent',
         'created_at'
@@ -1646,6 +1647,39 @@ class EmailCampaignAdmin(admin.ModelAdmin):
     )
 
     actions = ['reanudar_campanas_seleccionadas']
+
+    def progreso_visual(self, obj):
+        """Muestra una barra de progreso visual con los números"""
+        from django.utils.html import format_html
+
+        if obj.total_recipients == 0:
+            porcentaje = 0
+        else:
+            porcentaje = int((obj.emails_sent / obj.total_recipients) * 100)
+
+        # Color basado en el estado
+        if obj.status == 'completed':
+            color = '#28a745'  # Verde
+        elif obj.status == 'sending':
+            color = '#17a2b8'  # Azul
+        elif obj.status == 'paused':
+            color = '#ffc107'  # Amarillo
+        else:
+            color = '#6c757d'  # Gris
+
+        return format_html(
+            '<div style="width:150px">'
+            '<div style="background-color:#e9ecef; border-radius:3px; height:20px; position:relative;">'
+            '<div style="background-color:{}; width:{}%; height:100%; border-radius:3px;"></div>'
+            '<span style="position:absolute; width:100%; text-align:center; line-height:20px; font-size:11px; font-weight:bold;">'
+            '{}/{} ({}%)'
+            '</span>'
+            '</div>'
+            '</div>',
+            color, porcentaje, obj.emails_sent, obj.total_recipients, porcentaje
+        )
+
+    progreso_visual.short_description = 'Progreso'
 
     def reanudar_campanas_seleccionadas(self, request, queryset):
         """
@@ -1711,27 +1745,40 @@ class EmailCampaignAdmin(admin.ModelAdmin):
     def reanudar_todas_las_campanas(self, request):
         """
         Vista personalizada para reanudar TODAS las campañas pendientes.
-        Ejecuta el comando con --auto.
+        Ejecuta el comando con --auto en BACKGROUND para evitar timeout.
         """
         from django.shortcuts import redirect
         from django.contrib import messages
-        from django.core.management import call_command
-        from io import StringIO
+        import subprocess
         import logging
 
         logger = logging.getLogger(__name__)
 
         try:
-            output = StringIO()
-            # Ejecutar comando en modo automático (procesa todas las campañas ready/sending)
-            call_command('enviar_campana_email', '--auto', stdout=output)
+            # Contar campañas que se van a procesar
+            from ventas.models import EmailCampaign
+            campanas_pendientes = EmailCampaign.objects.filter(status__in=['ready', 'sending'])
+            count = campanas_pendientes.count()
 
-            result = output.getvalue()
+            if count == 0:
+                messages.warning(request, '⚠️ No hay campañas pendientes para reanudar.')
+                return redirect('..')
+
+            # Ejecutar comando en BACKGROUND usando subprocess
+            # Esto evita bloquear el worker de Gunicorn
+            subprocess.Popen(
+                ['python', 'manage.py', 'enviar_campana_email', '--auto'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True  # Desacoplar del proceso padre
+            )
+
             messages.success(
                 request,
-                '✅ Proceso de reanudación iniciado. Todas las campañas pendientes o en proceso serán procesadas automáticamente.'
+                f'✅ Proceso iniciado en segundo plano. Se procesarán {count} campaña(s). '
+                f'Los emails se enviarán automáticamente respetando los intervalos configurados.'
             )
-            logger.info(f'Usuario {request.user.username} ejecutó reanudar_todas_las_campanas. Output: {result}')
+            logger.info(f'Usuario {request.user.username} inició reanudación de {count} campañas en background')
 
         except Exception as e:
             logger.error(f'Error ejecutando reanudar_todas_las_campanas: {e}')
