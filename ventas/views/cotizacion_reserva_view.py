@@ -188,7 +188,9 @@ def _generar_texto_cotizacion(reserva):
         lineas.append("")
 
     # Despedida
-    lineas.append("Esta cotización tiene una validez de 7 días.")
+    lineas.append("⏰ Esta cotización tiene validez hasta las 22:00 horas de hoy.")
+    lineas.append("")
+    lineas.append("⚠️ IMPORTANTE: Al no estar pagada la reserva, los servicios pueden ser agendados por otra persona a través de la web de Aremko.")
     lineas.append("")
     lineas.append("Para confirmar tu reserva, contáctanos por WhatsApp o email.")
     lineas.append("")
