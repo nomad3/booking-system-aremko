@@ -295,8 +295,12 @@ def registrar_pago(request, masajista_id):
         )
         return redirect('ventas:dashboard_pagos_masajistas')
 
-    # GET - Mostrar formulario
-    servicios_pendientes = masajista.get_servicios_pendientes_pago()
+    # GET - Mostrar formulario con optimizaciones para evitar N+1 queries
+    servicios_pendientes = masajista.get_servicios_pendientes_pago().select_related(
+        'servicio',
+        'venta_reserva',
+        'venta_reserva__cliente'
+    )
 
     # Agregar montos calculados a cada servicio
     servicios_con_montos = []

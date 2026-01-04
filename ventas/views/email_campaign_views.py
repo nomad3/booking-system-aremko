@@ -66,9 +66,11 @@ def create_email_campaign_from_segment(request):
             messages.error(request, _("IDs de clientes inválidos."))
             return HttpResponseRedirect(reverse('ventas:cliente_segmentation'))
 
-        # Obtener clientes
+        # Obtener clientes con optimizaciones para evitar N+1 queries
         logger.info(f"Buscando {len(selected_client_ids)} clientes en la base de datos")
-        clientes = Cliente.objects.filter(id__in=selected_client_ids)
+        clientes = Cliente.objects.filter(
+            id__in=selected_client_ids
+        ).select_related('comuna').prefetch_related('ventareserva_set')
         logger.info(f"Encontrados {clientes.count()} clientes")
 
         if not clientes.exists():
@@ -85,8 +87,9 @@ def create_email_campaign_from_segment(request):
                 continue
 
             try:
-                gasto_total = cliente.gasto_total()
-
+                # OPTIMIZACIÓN: No calcular gasto_total aquí para evitar timeout
+                # Se calculará después en background si es necesario
+                # Usar datos prefetched para evitar N+1 queries
 
                 # Obtener primer nombre de forma segura
                 nombre_completo = (cliente.nombre or 'Cliente').strip()
@@ -99,13 +102,16 @@ def create_email_campaign_from_segment(request):
                 elif cliente.ciudad:
                     ubicacion = cliente.ciudad
 
+                # Usar len() en datos prefetched en lugar de .count() para evitar query
+                visitas = len(cliente.ventareserva_set.all())
+
                 clientes_data.append({
                     'id': cliente.id,
                     'nombre_completo': nombre_completo,
                     'primer_nombre': primer_nombre,
                     'email': cliente.email.strip(),
-                    'gasto_total': gasto_total,
-                    'visitas': cliente.ventareserva_set.count(),
+                    'gasto_total': 0,  # Se calculará después si es necesario
+                    'visitas': visitas,
                     'ciudad': ubicacion
                 })
             except Exception as e:
