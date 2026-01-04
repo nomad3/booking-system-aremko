@@ -1684,10 +1684,9 @@ class EmailCampaignAdmin(admin.ModelAdmin):
     def reanudar_campanas_seleccionadas(self, request, queryset):
         """
         Acción del admin para reanudar campañas seleccionadas.
-        Ejecuta el comando enviar_campana_email para cada campaña.
+        Ejecuta el comando enviar_campana_email en BACKGROUND para cada campaña.
         """
-        from django.core.management import call_command
-        from io import StringIO
+        import subprocess
         import logging
 
         logger = logging.getLogger(__name__)
@@ -1706,28 +1705,28 @@ class EmailCampaignAdmin(admin.ModelAdmin):
 
         for campana in campanas_validas:
             try:
-                output = StringIO()
-                # Ejecutar comando para esta campaña específica
-                call_command(
-                    'enviar_campana_email',
-                    f'--campaign-id={campana.id}',
-                    '--batch-size=5',
-                    stdout=output
+                # Ejecutar comando en BACKGROUND usando subprocess
+                # Esto evita bloquear el worker de Gunicorn con time.sleep()
+                subprocess.Popen(
+                    ['python', 'manage.py', 'enviar_campana_email', f'--campaign-id={campana.id}', '--batch-size=5'],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True  # Desacoplar del proceso padre
                 )
                 campanas_procesadas += 1
-                logger.info(f'Campaña {campana.name} (ID: {campana.id}) reanudada por {request.user.username}')
+                logger.info(f'Campaña {campana.name} (ID: {campana.id}) iniciada en background por {request.user.username}')
             except Exception as e:
-                logger.error(f'Error reanudando campaña {campana.name}: {e}')
+                logger.error(f'Error iniciando campaña {campana.name}: {e}')
                 self.message_user(
                     request,
-                    f'❌ Error al reanudar "{campana.name}": {str(e)}',
+                    f'❌ Error al iniciar "{campana.name}": {str(e)}',
                     level='error'
                 )
 
         if campanas_procesadas > 0:
             self.message_user(
                 request,
-                f'✅ {campanas_procesadas} campaña(s) reanudada(s) exitosamente. El envío continuará automáticamente.',
+                f'✅ {campanas_procesadas} campaña(s) iniciada(s) en segundo plano. El envío continuará automáticamente.',
                 level='success'
             )
 
