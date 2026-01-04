@@ -268,7 +268,7 @@
                 <div class="service-details">
                     <div class="service-header">
                         <span class="service-date">
-                            {{ item.servicio.fecha_agendamiento|date:"d/m/Y" }} - {{ item.servicio.hora_inicio|time:"H:i" }}
+                            {{ item.servicio.fecha_agendamiento|date:"d/m/Y" }} - {{ item.servicio.hora_inicio }}
                         </span>
                         <span class="service-amount">
                             Neto: ${{ item.monto_neto|floatformat:0|intcomma }}
@@ -281,7 +281,7 @@
                     <div class="service-info">
                         Precio: ${{ item.precio_servicio|floatformat:0|intcomma }} →
                         Masajista ({{ masajista.porcentaje_comision }}%): ${{ item.monto_masajista|floatformat:0|intcomma }} →
-                        Retención: -${{ item.monto_masajista|mul:0.145|floatformat:0|intcomma }}
+                        Retención: -${{ item.monto_retencion|floatformat:0|intcomma }}
                     </div>
                 </div>
             </div>
@@ -363,7 +363,7 @@ const serviciosData = {
     {% for item in servicios %}
     '{{ item.servicio.id }}': {
         monto_bruto: {{ item.monto_masajista|stringformat:"f" }},
-        monto_retencion: {{ item.monto_masajista|mul:0.145|stringformat:"f" }},
+        monto_retencion: {{ item.monto_retencion|stringformat:"f" }},
         monto_neto: {{ item.monto_neto|stringformat:"f" }}
     },
     {% endfor %}

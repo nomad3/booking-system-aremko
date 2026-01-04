@@ -317,6 +317,7 @@ def registrar_pago(request, masajista_id):
             'servicio': servicio,
             'precio_servicio': precio_servicio,
             'monto_masajista': monto_masajista,
+            'monto_retencion': monto_retencion,
             'monto_neto': monto_neto,
         })
 
