@@ -10,8 +10,8 @@
             <h1 class="h2 mb-0">Campañas de Email</h1>
             <p class="text-muted">Gestiona tus comunicaciones masivas</p>
         </div>
-        <div class="d-flex gap-2">
-            <form method="POST" action="{% url 'ventas:resume_all_campaigns' %}" style="display: inline;">
+        <div>
+            <form method="POST" action="{% url 'ventas:resume_all_campaigns' %}" style="display: inline; margin-right: 10px;">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-success" onclick="return confirm('¿Deseas reanudar todas las campañas pendientes o en proceso?')">
                     <i class="fas fa-play"></i> Reanudar Campañas
