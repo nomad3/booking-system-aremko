@@ -1643,6 +1643,60 @@ class EmailCampaignAdmin(admin.ModelAdmin):
         })
     )
 
+    actions = ['reanudar_campanas_seleccionadas']
+
+    def reanudar_campanas_seleccionadas(self, request, queryset):
+        """
+        Acción del admin para reanudar campañas seleccionadas.
+        Ejecuta el comando enviar_campana_email para cada campaña.
+        """
+        from django.core.management import call_command
+        from io import StringIO
+        import logging
+
+        logger = logging.getLogger(__name__)
+        campanas_procesadas = 0
+
+        # Filtrar solo campañas que se pueden reanudar (ready o sending)
+        campanas_validas = queryset.filter(status__in=['ready', 'sending'])
+
+        if not campanas_validas.exists():
+            self.message_user(
+                request,
+                "⚠️ Ninguna de las campañas seleccionadas está en estado 'Lista' o 'Enviando'.",
+                level='warning'
+            )
+            return
+
+        for campana in campanas_validas:
+            try:
+                output = StringIO()
+                # Ejecutar comando para esta campaña específica
+                call_command(
+                    'enviar_campana_email',
+                    f'--campaign-id={campana.id}',
+                    '--batch-size=5',
+                    stdout=output
+                )
+                campanas_procesadas += 1
+                logger.info(f'Campaña {campana.name} (ID: {campana.id}) reanudada por {request.user.username}')
+            except Exception as e:
+                logger.error(f'Error reanudando campaña {campana.name}: {e}')
+                self.message_user(
+                    request,
+                    f'❌ Error al reanudar "{campana.name}": {str(e)}',
+                    level='error'
+                )
+
+        if campanas_procesadas > 0:
+            self.message_user(
+                request,
+                f'✅ {campanas_procesadas} campaña(s) reanudada(s) exitosamente. El envío continuará automáticamente.',
+                level='success'
+            )
+
+    reanudar_campanas_seleccionadas.short_description = "▶️ Reanudar campañas seleccionadas"
+
 
 @admin.register(EmailRecipient)
 class EmailRecipientAdmin(admin.ModelAdmin):
