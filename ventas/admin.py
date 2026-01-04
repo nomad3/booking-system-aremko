@@ -1606,7 +1606,9 @@ class CampaignEmailTemplateAdmin(admin.ModelAdmin):
 @admin.register(EmailCampaign)
 class EmailCampaignAdmin(admin.ModelAdmin):
     """Admin para gestionar campañas de email"""
-    
+
+    change_list_template = 'admin/ventas/emailcampaign/change_list.html'
+
     list_display = (
         'name',
         'status',
@@ -1614,7 +1616,7 @@ class EmailCampaignAdmin(admin.ModelAdmin):
         'emails_sent',
         'created_at'
     )
-    
+
     list_filter = ('status', 'ai_variation_enabled', 'created_at')
     search_fields = ('name', 'description')
     
@@ -1696,6 +1698,46 @@ class EmailCampaignAdmin(admin.ModelAdmin):
             )
 
     reanudar_campanas_seleccionadas.short_description = "▶️ Reanudar campañas seleccionadas"
+
+    def get_urls(self):
+        """Agregar URL personalizada para el botón de reanudar todas"""
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path('reanudar-todas/', self.admin_site.admin_view(self.reanudar_todas_las_campanas), name='emailcampaign_reanudar_todas'),
+        ]
+        return custom_urls + urls
+
+    def reanudar_todas_las_campanas(self, request):
+        """
+        Vista personalizada para reanudar TODAS las campañas pendientes.
+        Ejecuta el comando con --auto.
+        """
+        from django.shortcuts import redirect
+        from django.contrib import messages
+        from django.core.management import call_command
+        from io import StringIO
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            output = StringIO()
+            # Ejecutar comando en modo automático (procesa todas las campañas ready/sending)
+            call_command('enviar_campana_email', '--auto', stdout=output)
+
+            result = output.getvalue()
+            messages.success(
+                request,
+                '✅ Proceso de reanudación iniciado. Todas las campañas pendientes o en proceso serán procesadas automáticamente.'
+            )
+            logger.info(f'Usuario {request.user.username} ejecutó reanudar_todas_las_campanas. Output: {result}')
+
+        except Exception as e:
+            logger.error(f'Error ejecutando reanudar_todas_las_campanas: {e}')
+            messages.error(request, f'❌ Error al reanudar campañas: {str(e)}')
+
+        return redirect('..')
 
 
 @admin.register(EmailRecipient)

@@ -1,0 +1,17 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static %}
+
+{% block object-tools-items %}
+    {# Botón personalizado para reanudar TODAS las campañas #}
+    <li>
+        <a href="{% url 'admin:emailcampaign_reanudar_todas' %}"
+           class="btn btn-success"
+           style="background-color: #28a745; color: white; padding: 10px 15px; border-radius: 4px; text-decoration: none; display: inline-block; font-weight: bold;"
+           onclick="return confirm('¿Deseas reanudar TODAS las campañas pendientes o en proceso? Esto ejecutará el envío automático.');">
+            🔄 REANUDAR TODAS LAS CAMPAÑAS
+        </a>
+    </li>
+
+    {# Botón original de "Añadir" #}
+    {{ block.super }}
+{% endblock %}
