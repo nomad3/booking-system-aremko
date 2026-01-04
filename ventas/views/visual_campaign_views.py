@@ -335,12 +335,47 @@ def visual_campaign_pause(request, pk):
 def visual_campaign_delete(request, pk):
     """Elimina una campaña"""
     campaign = get_object_or_404(EmailCampaignTemplate, pk=pk)
-    
+
     if campaign.status in ['draft', 'completed', 'cancelled']:
         name = campaign.name
         campaign.delete()
         messages.success(request, f'Campaña "{name}" eliminada.')
     else:
         messages.error(request, 'No se puede eliminar una campaña activa.')
-    
+
     return redirect('visual_campaign_dashboard')
+
+
+@login_required
+@user_passes_test(is_staff_user)
+@require_POST
+def resume_all_campaigns(request):
+    """
+    Ejecuta el comando enviar_campana_email --auto para reanudar campañas.
+    Este comando busca campañas con status 'ready' o 'sending' y las procesa.
+    """
+    try:
+        from django.core.management import call_command
+        from io import StringIO
+
+        # Capturar la salida del comando
+        output = StringIO()
+
+        # Ejecutar el comando en segundo plano
+        call_command('enviar_campana_email', '--auto', stdout=output)
+
+        # Obtener el resultado
+        result = output.getvalue()
+
+        messages.success(
+            request,
+            '✅ Proceso de reanudación de campañas iniciado. '
+            'Las campañas pendientes o en proceso serán procesadas automáticamente.'
+        )
+        logger.info(f'Usuario {request.user.username} ejecutó resume_all_campaigns. Output: {result}')
+
+    except Exception as e:
+        logger.error(f'Error ejecutando resume_all_campaigns: {e}')
+        messages.error(request, f'Error al reanudar campañas: {str(e)}')
+
+    return redirect('ventas:visual_campaign_dashboard')

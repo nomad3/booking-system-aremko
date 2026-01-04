@@ -170,6 +170,7 @@ urlpatterns = [
     path('crm/campanias/<int:pk>/estadisticas/', visual_campaign_views.visual_campaign_stats, name='visual_campaign_stats'),
     path('crm/campanias/<int:pk>/pausar/', visual_campaign_views.visual_campaign_pause, name='visual_campaign_pause'),
     path('crm/campanias/<int:pk>/eliminar/', visual_campaign_views.visual_campaign_delete, name='visual_campaign_delete'),
+    path('crm/campanias/reanudar-todas/', visual_campaign_views.resume_all_campaigns, name='resume_all_campaigns'),
 
     # === BULK EMAIL SENDER WITH AI ===
     path('crm/bulk-email-sender/', crm_views.bulk_email_sender_view, name='bulk_email_sender'),
