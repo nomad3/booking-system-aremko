@@ -51,7 +51,7 @@ def _generar_texto_cotizacion(reserva):
     lineas.append(f"Cotización Nº {reserva.id}")
     lineas.append(f"Cliente: {reserva.cliente.nombre}")
     lineas.append("")
-    lineas.append("━" * 50)
+    lineas.append("━" * 25)
     lineas.append("")
 
     # Obtener servicios, productos y giftcards
@@ -97,7 +97,7 @@ def _generar_texto_cotizacion(reserva):
 
             lineas.append("")
 
-        lineas.append("━" * 50)
+        lineas.append("━" * 25)
         lineas.append("")
 
     # Productos
@@ -121,7 +121,7 @@ def _generar_texto_cotizacion(reserva):
             lineas.append(f"  Subtotal: ${int(subtotal):,}")
             lineas.append("")
 
-        lineas.append("━" * 50)
+        lineas.append("━" * 25)
         lineas.append("")
 
     # Gift Cards
@@ -139,7 +139,7 @@ def _generar_texto_cotizacion(reserva):
             lineas.append(f"• Gift Card ${int(giftcard.monto_inicial):,}{destinatario}")
             lineas.append("")
 
-        lineas.append("━" * 50)
+        lineas.append("━" * 25)
         lineas.append("")
 
     # Valor total con desglose
@@ -175,7 +175,7 @@ def _generar_texto_cotizacion(reserva):
 
     lineas.append(f"VALOR TOTAL: ${int(total):,}")
     lineas.append("")
-    lineas.append("━" * 50)
+    lineas.append("━" * 25)
     lineas.append("")
 
     # Notas adicionales
@@ -184,7 +184,7 @@ def _generar_texto_cotizacion(reserva):
         lineas.append("")
         lineas.append(reserva.comentarios)
         lineas.append("")
-        lineas.append("━" * 50)
+        lineas.append("━" * 25)
         lineas.append("")
 
     # Despedida
@@ -192,7 +192,7 @@ def _generar_texto_cotizacion(reserva):
     lineas.append("")
     lineas.append("⚠️ IMPORTANTE: Al no estar pagada la reserva, los servicios pueden ser agendados por otra persona a través de la web de Aremko.")
     lineas.append("")
-    lineas.append("Para confirmar tu reserva, contáctanos por WhatsApp o email.")
+    lineas.append("Para confirmar la reserva debes pagarla mediante transferencia bancaria. Los datos los puedes obtener por WhatsApp.")
     lineas.append("")
     lineas.append("¡Esperamos verte pronto en Aremko! 🌿✨")
 
