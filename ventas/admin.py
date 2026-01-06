@@ -1710,6 +1710,43 @@ class EmailCampaignAdmin(admin.ModelAdmin):
     ver_preview.short_description = 'Vista Previa'
     ver_preview.allow_tags = True
 
+    def status(self, obj):
+        """Muestra el estado con validación de consistencia"""
+        from django.utils.html import format_html
+
+        # Validar consistencia del estado
+        if obj.status == 'completed':
+            # Una campaña "completada" debe tener TODOS sus emails enviados
+            if obj.total_recipients > 0 and obj.emails_sent < obj.total_recipients:
+                # INCONSISTENCIA: Marcada como completada pero faltan emails
+                return format_html(
+                    '<span style="background: #ff4444; color: white; padding: 3px 8px; '
+                    'border-radius: 3px; font-weight: bold;">'
+                    '⚠️ COMPLETADA (ERROR)</span><br>'
+                    '<small style="color: #666;">Solo {}/{} enviados</small>',
+                    obj.emails_sent, obj.total_recipients
+                )
+
+        # Estado normal
+        status_colors = {
+            'draft': '#6c757d',
+            'ready': '#007bff',
+            'sending': '#17a2b8',
+            'paused': '#ffc107',
+            'completed': '#28a745',
+            'cancelled': '#dc3545',
+        }
+        color = status_colors.get(obj.status, '#6c757d')
+
+        return format_html(
+            '<span style="background: {}; color: white; padding: 3px 8px; '
+            'border-radius: 3px; font-weight: bold;">{}</span>',
+            color, obj.get_status_display()
+        )
+
+    status.short_description = 'Estado'
+    status.allow_tags = True
+
     def reanudar_campanas_seleccionadas(self, request, queryset):
         """
         Acción del admin para reanudar campañas seleccionadas.

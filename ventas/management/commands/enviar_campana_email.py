@@ -190,16 +190,42 @@ class Command(BaseCommand):
         
         # Actualizar estado final de la campaña
         if not dry_run:
+            # Verificar recipients pendientes
             remaining = EmailRecipient.objects.filter(
                 campaign=campaign,
                 send_enabled=True,
                 status='pending'
             ).count()
-            
-            if remaining == 0:
+
+            # Verificar total de destinatarios habilitados
+            total_enabled = EmailRecipient.objects.filter(
+                campaign=campaign,
+                send_enabled=True
+            ).count()
+
+            # Verificar emails exitosamente enviados
+            successfully_sent = EmailRecipient.objects.filter(
+                campaign=campaign,
+                send_enabled=True,
+                status__in=['sent', 'delivered', 'opened', 'clicked']
+            ).count()
+
+            # Solo marcar como completada si TODOS los habilitados fueron enviados exitosamente
+            if remaining == 0 and successfully_sent == total_enabled:
                 campaign.status = 'completed'
                 campaign.save()
-                self.stdout.write(self.style.SUCCESS(f'✅ Campaña {campaign.name} completada'))
+                self.stdout.write(self.style.SUCCESS(
+                    f'✅ Campaña {campaign.name} completada: {successfully_sent}/{total_enabled} emails enviados'
+                ))
+            elif remaining == 0 and successfully_sent < total_enabled:
+                # Hay algunos que fallaron - marcar como pausada para revisión
+                campaign.status = 'paused'
+                campaign.save()
+                failed_count = total_enabled - successfully_sent
+                self.stdout.write(self.style.WARNING(
+                    f'⚠️ Campaña {campaign.name} pausada: {failed_count} emails fallaron. '
+                    f'Enviados exitosamente: {successfully_sent}/{total_enabled}'
+                ))
             else:
                 self.stdout.write(f'📊 Quedan {remaining} destinatarios pendientes')
         
