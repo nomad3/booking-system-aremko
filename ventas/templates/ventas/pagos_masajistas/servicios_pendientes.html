@@ -151,11 +151,34 @@
 </style>
 
 <div class="container">
-    <h1>Servicios Pendientes de Pago {% if masajista %}- {{ masajista.nombre }}{% endif %}</h1>
+    <h1>
+        {% if estado_pago_proveedor == 'todos' %}
+            Todos los Servicios
+        {% elif estado_pago_proveedor == 'pagados' %}
+            Servicios Pagados
+        {% else %}
+            Servicios Pendientes de Pago
+        {% endif %}
+        {% if masajista %} - {{ masajista.nombre }}{% endif %}
+    </h1>
 
     <!-- Filtros -->
     <div class="filters-section">
         <form method="get" class="filter-form">
+            <div class="form-group">
+                <label>Estado de Pago</label>
+                <select name="estado_pago_proveedor">
+                    <option value="todos" {% if estado_pago_proveedor == 'todos' %}selected{% endif %}>
+                        Todos los Servicios
+                    </option>
+                    <option value="pendientes" {% if estado_pago_proveedor == 'pendientes' %}selected{% endif %}>
+                        Solo Pendientes de Pago
+                    </option>
+                    <option value="pagados" {% if estado_pago_proveedor == 'pagados' %}selected{% endif %}>
+                        Solo Pagados
+                    </option>
+                </select>
+            </div>
             {% if not masajista %}
             <div class="form-group">
                 <label>Masajista</label>
@@ -221,6 +244,7 @@
                     <th>Cliente</th>
                     <th>Servicio</th>
                     {% if not masajista %}<th>Masajista</th>{% endif %}
+                    {% if estado_pago_proveedor == 'todos' %}<th>Estado Pago</th>{% endif %}
                     <th class="text-right">Precio</th>
                     <th class="text-center">%</th>
                     <th class="text-right">Monto Masajista</th>
@@ -238,6 +262,15 @@
                     {% if not masajista %}
                     <td>{{ item.servicio.proveedor_asignado.nombre }}</td>
                     {% endif %}
+                    {% if estado_pago_proveedor == 'todos' %}
+                    <td>
+                        {% if item.servicio.pagado_a_proveedor %}
+                            <span style="color: #28a745; font-weight: bold;">✓ Pagado</span>
+                        {% else %}
+                            <span style="color: #dc3545; font-weight: bold;">⏳ Pendiente</span>
+                        {% endif %}
+                    </td>
+                    {% endif %}
                     <td class="text-right">${{ item.precio_servicio|floatformat:0|intcomma }}</td>
                     <td class="text-center">{{ item.porcentaje_comision }}%</td>
                     <td class="text-right">${{ item.monto_masajista|floatformat:0|intcomma }}</td>
@@ -246,7 +279,7 @@
                 </tr>
                 {% endfor %}
                 <tr class="totals-row">
-                    <td colspan="{% if masajista %}5{% else %}6{% endif %}">TOTALES</td>
+                    <td colspan="{% if masajista and estado_pago_proveedor == 'todos' %}6{% elif masajista %}5{% elif estado_pago_proveedor == 'todos' %}7{% else %}6{% endif %}">TOTALES</td>
                     <td class="text-right">${{ total_bruto|floatformat:0|intcomma }}</td>
                     <td></td>
                     <td class="text-right">${{ total_masajista|floatformat:0|intcomma }}</td>

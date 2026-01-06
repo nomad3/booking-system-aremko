@@ -220,11 +220,11 @@
             <a href="{% url 'ventas:registrar_pago' masajista_seleccionado.id %}" class="btn">
                 Registrar Pago para {{ masajista_seleccionado.nombre }}
             </a>
-            <a href="{% url 'ventas:servicios_pendientes_masajista' masajista_seleccionado.id %}" class="btn btn-secondary">
+            <a href="{% url 'ventas:servicios_pendientes_masajista' masajista_seleccionado.id %}?estado_pago_proveedor=todos" class="btn btn-secondary">
                 Ver Todos los Servicios de {{ masajista_seleccionado.nombre }}
             </a>
             {% else %}
-            <a href="{% url 'ventas:listar_servicios_pendientes' %}" class="btn">
+            <a href="{% url 'ventas:listar_servicios_pendientes' %}?estado_pago_proveedor=pendientes" class="btn">
                 Ver Todos los Servicios Pendientes
             </a>
             {% endif %}

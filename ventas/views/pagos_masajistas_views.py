@@ -137,20 +137,27 @@ def dashboard_pagos_masajistas(request):
 @staff_required
 def listar_servicios_pendientes(request, masajista_id=None):
     """
-    Lista los servicios pendientes de pago, filtrados por masajista si se especifica.
+    Lista los servicios de masajistas, con filtros por estado de pago, masajista y fechas.
     """
     # Filtros
     masajista = None
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin = request.GET.get('fecha_fin')
+    estado_pago_proveedor = request.GET.get('estado_pago_proveedor', 'pendientes')
 
-    # Base query
+    # Base query - servicios de masajistas con reservas pagadas por el cliente
     servicios = ReservaServicio.objects.filter(
         venta_reserva__estado_pago='pagado',
-        pagado_a_proveedor=False,
         proveedor_asignado__isnull=False,
         proveedor_asignado__es_masajista=True
     )
+
+    # Filtrar por estado de pago al proveedor
+    if estado_pago_proveedor == 'pendientes':
+        servicios = servicios.filter(pagado_a_proveedor=False)
+    elif estado_pago_proveedor == 'pagados':
+        servicios = servicios.filter(pagado_a_proveedor=True)
+    # Si es 'todos', no filtramos por pagado_a_proveedor
 
     # Filtrar por masajista
     if masajista_id:
@@ -209,6 +216,7 @@ def listar_servicios_pendientes(request, masajista_id=None):
         'masajistas': masajistas,
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
+        'estado_pago_proveedor': estado_pago_proveedor,
         'total_bruto': total_bruto,
         'total_masajista': total_masajista,
         'total_retencion': total_retencion,
