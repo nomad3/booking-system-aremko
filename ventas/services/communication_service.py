@@ -192,11 +192,25 @@ class CommunicationService:
                 pagado_bruto = 0.0
             saldo_bruto = max(total_bruto - pagado_bruto, 0.0)
 
+            # Verificar si hay un pago con giftcard
+            # Si es destinatario de giftcard, NO mostrar datos bancarios
+            tiene_pago_giftcard = False
+            try:
+                tiene_pago_giftcard = booking.pagos.filter(metodo_pago='giftcard').exists()
+            except Exception:
+                pass
+
             def format_clp(value: float) -> str:
                 try:
                     return ("$" + f"{value:,.0f}").replace(",", ".")
                 except Exception:
                     return f"${int(value)}"
+
+            # monto_pagado_cero determina si se muestran los datos bancarios
+            # Solo mostrar datos bancarios si:
+            # 1. No hay nada pagado Y
+            # 2. NO hay pago con giftcard (destinatario de regalo no debe ver datos bancarios)
+            mostrar_datos_bancarios = (pagado_bruto <= 0.0) and (not tiene_pago_giftcard)
 
             context = {
                 'nombre': cliente.nombre,
@@ -211,7 +225,7 @@ class CommunicationService:
                 'total_monto': format_clp(total_bruto),
                 'pagado_monto': format_clp(pagado_bruto),
                 'saldo_monto': format_clp(saldo_bruto),
-                'monto_pagado_cero': pagado_bruto <= 0.0,
+                'monto_pagado_cero': mostrar_datos_bancarios,
             }
             
             # Renderizar email HTML
@@ -306,11 +320,23 @@ class CommunicationService:
             total = float(getattr(booking, 'total', 0) or 0)
             pagado = float(getattr(booking, 'pagado', 0) or 0)
             saldo = max(total - pagado, 0.0)
+
+            # Verificar si hay un pago con giftcard
+            # Si es destinatario de giftcard, NO mostrar datos bancarios
+            tiene_pago_giftcard = False
+            try:
+                tiene_pago_giftcard = booking.pagos.filter(metodo_pago='giftcard').exists()
+            except Exception:
+                pass
+
             def format_clp(v: float) -> str:
                 try:
                     return ("$" + f"{v:,.0f}").replace(",", ".")
                 except Exception:
                     return f"${int(v)}"
+
+            # Solo mostrar datos bancarios si no hay pago Y no hay giftcard
+            mostrar_datos_bancarios = (pagado <= 0.0) and (not tiene_pago_giftcard)
 
             context = {
                 'nombre': cliente.nombre,
@@ -325,7 +351,7 @@ class CommunicationService:
                 'total_monto': format_clp(total),
                 'pagado_monto': format_clp(pagado),
                 'saldo_monto': format_clp(saldo),
-                'monto_pagado_cero': pagado <= 0.0,
+                'monto_pagado_cero': mostrar_datos_bancarios,
             }
 
             html_content = render_to_string('emails/booking_reminder_email.html', context)
