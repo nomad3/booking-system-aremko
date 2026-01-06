@@ -285,7 +285,7 @@
                 {% for detalle in detalles %}
                 <tr>
                     <td>{{ detalle.reserva_servicio.fecha_agendamiento|date:"d/m/Y" }}</td>
-                    <td>{{ detalle.reserva_servicio.hora_inicio|time:"H:i" }}</td>
+                    <td>{{ detalle.reserva_servicio.hora_inicio }}</td>
                     <td>{{ detalle.reserva_servicio.venta_reserva.cliente.nombre }}</td>
                     <td>{{ detalle.reserva_servicio.servicio.nombre }}</td>
                     <td class="text-right">${{ detalle.monto_servicio|floatformat:0|intcomma }}</td>
