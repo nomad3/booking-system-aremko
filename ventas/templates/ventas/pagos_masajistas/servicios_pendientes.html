@@ -239,6 +239,8 @@
         <table>
             <thead>
                 <tr>
+                    <th>ID Servicio</th>
+                    <th>N° Reserva</th>
                     <th>Fecha</th>
                     <th>Hora</th>
                     <th>Cliente</th>
@@ -255,6 +257,8 @@
             <tbody>
                 {% for item in servicios %}
                 <tr>
+                    <td><strong>#{{ item.servicio.id }}</strong></td>
+                    <td><strong>#{{ item.servicio.venta_reserva.id }}</strong></td>
                     <td>{{ item.servicio.fecha_agendamiento|date:"d/m/Y" }}</td>
                     <td>{{ item.servicio.hora_inicio }}</td>
                     <td>{{ item.servicio.venta_reserva.cliente.nombre }}</td>
@@ -279,7 +283,7 @@
                 </tr>
                 {% endfor %}
                 <tr class="totals-row">
-                    <td colspan="{% if masajista and estado_pago_proveedor == 'todos' %}6{% elif masajista %}5{% elif estado_pago_proveedor == 'todos' %}7{% else %}6{% endif %}">TOTALES</td>
+                    <td colspan="{% if masajista and estado_pago_proveedor == 'todos' %}8{% elif masajista %}7{% elif estado_pago_proveedor == 'todos' %}9{% else %}8{% endif %}">TOTALES</td>
                     <td class="text-right">${{ total_bruto|floatformat:0|intcomma }}</td>
                     <td></td>
                     <td class="text-right">${{ total_masajista|floatformat:0|intcomma }}</td>
