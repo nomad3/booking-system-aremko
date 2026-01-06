@@ -1,0 +1,187 @@
+{% extends 'admin/base_site.html' %}
+
+{% block title %}Vista Previa - {{ campaign.name }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Inicio</a>
+    › <a href="{% url 'admin:ventas_emailcampaign_changelist' %}">Campañas de Email</a>
+    › Vista Previa: {{ campaign.name }}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+    .preview-container {
+        max-width: 800px;
+        margin: 20px auto;
+        padding: 20px;
+    }
+    .preview-header {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .preview-header h1 {
+        margin: 0 0 10px 0;
+        color: #333;
+    }
+    .preview-info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+    .info-item {
+        display: flex;
+        flex-direction: column;
+    }
+    .info-label {
+        color: #666;
+        font-size: 0.9em;
+        margin-bottom: 3px;
+    }
+    .info-value {
+        font-weight: 600;
+        color: #333;
+    }
+    .email-preview {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .email-subject {
+        background: #f8f9fa;
+        padding: 15px;
+        border-left: 4px solid #417690;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    .email-subject strong {
+        color: #666;
+        font-size: 0.9em;
+        display: block;
+        margin-bottom: 5px;
+    }
+    .email-subject-text {
+        font-size: 1.2em;
+        color: #333;
+        font-weight: 600;
+    }
+    .email-body {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        padding: 30px;
+        min-height: 200px;
+        border-radius: 4px;
+    }
+    .context-info {
+        background: #fffbea;
+        border: 1px solid #ffd700;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    .context-info h3 {
+        margin: 0 0 10px 0;
+        color: #856404;
+        font-size: 1em;
+    }
+    .context-info pre {
+        background: white;
+        padding: 10px;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-size: 0.9em;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    .btn {
+        padding: 10px 20px;
+        text-decoration: none;
+        border-radius: 4px;
+        display: inline-block;
+        font-weight: 500;
+        transition: all 0.3s;
+    }
+    .btn-secondary {
+        background: transparent;
+        color: #000;
+        border: 1px solid #ddd;
+    }
+    .btn-secondary:hover {
+        background: #f8f9fa;
+        border-color: #000;
+    }
+</style>
+
+<div class="preview-container">
+    <!-- Encabezado -->
+    <div class="preview-header">
+        <h1>Vista Previa del Email</h1>
+        <h2>{{ campaign.name }}</h2>
+
+        <div class="preview-info">
+            <div class="info-item">
+                <span class="info-label">Estado</span>
+                <span class="info-value">{{ campaign.get_status_display }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Total Destinatarios</span>
+                <span class="info-value">{{ campaign.total_recipients }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Emails Enviados</span>
+                <span class="info-value">{{ campaign.emails_sent }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Creado por</span>
+                <span class="info-value">{{ campaign.created_by.get_full_name|default:campaign.created_by.username }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información del contexto -->
+    <div class="context-info">
+        <h3>Datos de ejemplo usados para renderizar:</h3>
+        <pre>{% for key, value in context_email.items %}{{ key }}: {{ value }}
+{% endfor %}</pre>
+        <p style="margin: 10px 0 0 0; font-size: 0.9em; color: #666;">
+            Las variables disponibles en el template son: {{ context_email.keys|join:", " }}
+        </p>
+    </div>
+
+    <!-- Preview del Email -->
+    <div class="email-preview">
+        <h3>Email Renderizado</h3>
+
+        <!-- Asunto -->
+        <div class="email-subject">
+            <strong>ASUNTO:</strong>
+            <div class="email-subject-text">{{ subject_rendered }}</div>
+        </div>
+
+        <!-- Cuerpo -->
+        <div class="email-body">
+            {{ body_rendered|safe }}
+        </div>
+    </div>
+
+    <!-- Botones de acción -->
+    <div class="action-buttons">
+        <a href="{% url 'admin:ventas_emailcampaign_change' campaign.id %}" class="btn btn-secondary">
+            Editar Campaña
+        </a>
+        <a href="{% url 'admin:ventas_emailcampaign_changelist' %}" class="btn btn-secondary">
+            Volver al Listado
+        </a>
+    </div>
+</div>
+{% endblock %}

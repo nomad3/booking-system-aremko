@@ -1615,6 +1615,7 @@ class EmailCampaignAdmin(admin.ModelAdmin):
         'progreso_visual',
         'total_recipients',
         'emails_sent',
+        'ver_preview',
         'created_at'
     )
 
@@ -1680,6 +1681,34 @@ class EmailCampaignAdmin(admin.ModelAdmin):
         )
 
     progreso_visual.short_description = 'Progreso'
+
+    def ver_preview(self, obj):
+        """Botón para ver la preview del email"""
+        from django.utils.html import format_html
+        from django.urls import reverse
+
+        url = reverse('ventas:email_campaign_preview', args=[obj.id])
+        return format_html(
+            '<a href="{}" target="_blank" style="'
+            'display: inline-block; '
+            'padding: 5px 12px; '
+            'background: #417690; '
+            'color: white; '
+            'text-decoration: none; '
+            'border-radius: 4px; '
+            'font-size: 12px; '
+            'font-weight: 500; '
+            'transition: background 0.3s;'
+            '" '
+            'onmouseover="this.style.background=\'#205067\'" '
+            'onmouseout="this.style.background=\'#417690\'">'
+            '👁️ Ver Email'
+            '</a>',
+            url
+        )
+
+    ver_preview.short_description = 'Vista Previa'
+    ver_preview.allow_tags = True
 
     def reanudar_campanas_seleccionadas(self, request, queryset):
         """

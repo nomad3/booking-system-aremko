@@ -405,3 +405,57 @@ def send_email_campaign(request, campaign_id):
         'message': f'Campaña "{campaign.name}" iniciada. Los emails se enviarán en lotes.',
         'campaign_id': campaign.id
     })
+
+
+@login_required
+@user_passes_test(es_administrador)
+def email_campaign_preview(request, campaign_id):
+    """
+    Vista para mostrar una preview del email de una campaña.
+    Renderiza el template con datos de ejemplo para visualización.
+    """
+    try:
+        campaign = EmailCampaign.objects.get(id=campaign_id)
+    except EmailCampaign.DoesNotExist:
+        messages.error(request, f'Campaña con ID {campaign_id} no encontrada')
+        return redirect('admin:ventas_emailcampaign_changelist')
+
+    # Obtener un cliente de ejemplo para renderizar las variables
+    recipient_ejemplo = EmailRecipient.objects.filter(campaign=campaign).first()
+
+    if recipient_ejemplo:
+        # Usar datos reales del primer destinatario
+        context_email = {
+            'nombre': recipient_ejemplo.cliente_nombre,
+            'email': recipient_ejemplo.email,
+            'ciudad': getattr(recipient_ejemplo.cliente, 'ciudad', 'N/A') if recipient_ejemplo.cliente else 'N/A',
+        }
+    else:
+        # Usar datos de ejemplo
+        context_email = {
+            'nombre': 'Cliente Ejemplo',
+            'email': 'ejemplo@email.com',
+            'ciudad': 'Puerto Varas',
+        }
+
+    # Renderizar el subject y body con las variables
+    from django.template import Context, Template
+
+    try:
+        subject_template = Template(campaign.email_subject_template)
+        body_template = Template(campaign.email_body_template)
+
+        subject_rendered = subject_template.render(Context(context_email))
+        body_rendered = body_template.render(Context(context_email))
+    except Exception as e:
+        subject_rendered = campaign.email_subject_template
+        body_rendered = f"<p>Error al renderizar el template: {str(e)}</p><hr><pre>{campaign.email_body_template}</pre>"
+
+    context = {
+        'campaign': campaign,
+        'subject_rendered': subject_rendered,
+        'body_rendered': body_rendered,
+        'context_email': context_email,
+    }
+
+    return render(request, 'ventas/email_campaign_preview_display.html', context)
