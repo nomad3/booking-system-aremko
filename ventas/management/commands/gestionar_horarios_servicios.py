@@ -148,9 +148,33 @@ class Command(BaseCommand):
             for servicio in servicios:
                 if servicio.slots_disponibles and len(servicio.slots_disponibles) > 0:
                     # Tiene horarios configurados
-                    slots_str = ', '.join(servicio.slots_disponibles)
                     self.stdout.write(f"  ✅ {servicio.nombre}")
-                    self.stdout.write(f"     Horarios: {slots_str}")
+
+                    # Verificar si es formato por día de semana (dict) o formato simple (list)
+                    if isinstance(servicio.slots_disponibles, dict):
+                        # Formato por día de semana
+                        self.stdout.write(f"     Horarios por día:")
+                        dias_orden = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+                        nombres_dias = {
+                            'monday': 'Lunes',
+                            'tuesday': 'Martes',
+                            'wednesday': 'Miércoles',
+                            'thursday': 'Jueves',
+                            'friday': 'Viernes',
+                            'saturday': 'Sábado',
+                            'sunday': 'Domingo'
+                        }
+                        for dia_en in dias_orden:
+                            if dia_en in servicio.slots_disponibles:
+                                slots_dia = servicio.slots_disponibles[dia_en]
+                                slots_str = ', '.join(slots_dia) if slots_dia else 'Sin horarios'
+                                self.stdout.write(f"       • {nombres_dias[dia_en]}: {slots_str}")
+                    elif isinstance(servicio.slots_disponibles, list):
+                        # Formato simple (mismos horarios todos los días)
+                        slots_str = ', '.join(servicio.slots_disponibles)
+                        self.stdout.write(f"     Horarios (todos los días): {slots_str}")
+                    else:
+                        self.stdout.write(self.style.WARNING(f"     Formato desconocido: {type(servicio.slots_disponibles)}"))
                 else:
                     # NO tiene horarios configurados
                     self.stdout.write(f"  ⚠️  {servicio.nombre}")

@@ -130,6 +130,57 @@ def calendario_matriz_view(request):
     return render(request, 'ventas/calendario_matriz_simple.html', context)
 
 
+def extraer_slots_para_fecha(slots_disponibles, fecha):
+    """
+    Extrae los slots disponibles para una fecha específica.
+
+    Soporta dos formatos:
+    1. Diccionario por día de semana: {"monday": ["12:00", "14:30"], "friday": ["12:00", "22:00"]}
+    2. Lista simple: ["12:00", "14:30", "17:00"]
+
+    Args:
+        slots_disponibles: JSONField del servicio (puede ser dict o list)
+        fecha: date object de la fecha seleccionada
+
+    Returns:
+        Lista de slots para ese día, o None si no hay configurados
+    """
+    if not slots_disponibles:
+        return None
+
+    # Si es un diccionario (formato por día de semana)
+    if isinstance(slots_disponibles, dict):
+        # Obtener el día de la semana en inglés (lowercase)
+        # weekday() retorna 0=Monday, 1=Tuesday, ... 6=Sunday
+        dias_semana = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        dia_nombre = dias_semana[fecha.weekday()]
+
+        # Buscar slots para ese día
+        slots_del_dia = slots_disponibles.get(dia_nombre, [])
+
+        if slots_del_dia and len(slots_del_dia) > 0:
+            return slots_del_dia
+        else:
+            return None
+
+    # Si es una lista (formato simple - mismos horarios todos los días)
+    elif isinstance(slots_disponibles, list):
+        # Filtrar días de la semana que puedan estar en la lista por error
+        slots_validos = [
+            slot for slot in slots_disponibles
+            if isinstance(slot, str) and slot.lower() not in [
+                'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+                'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'
+            ]
+        ]
+        if slots_validos:
+            return slots_validos
+        else:
+            return None
+
+    return None
+
+
 def generar_matriz_disponibilidad(fecha, categoria, servicios):
     """
     Genera la matriz de disponibilidad para una fecha y categoría.
@@ -158,7 +209,7 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
     slots_por_servicio = {}  # Diccionario de slots por servicio
 
     if categoria and 'tina' in categoria.nombre.lower():
-        # HORARIOS DINÁMICOS: Usar slots_disponibles de cada servicio
+        # HORARIOS DINÁMICOS: Usar slots_disponibles de cada servicio (soporta horarios por día)
         # Fallback a valores por defecto si no están configurados
 
         # Valores por defecto (fallback)
@@ -170,18 +221,13 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         # Crear diccionario de slots por servicio
         slots_set = set()
         for servicio in servicios:
-            # PRIORIDAD 1: Usar slots_disponibles si están configurados en el servicio
-            if servicio.slots_disponibles and len(servicio.slots_disponibles) > 0:
-                # Filtrar slots válidos (no días de la semana)
-                slots_validos = [
-                    slot for slot in servicio.slots_disponibles
-                    if slot.lower() not in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-                                           'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
-                ]
-                if slots_validos:
-                    slots_por_servicio[servicio.nombre] = slots_validos
-                    slots_set.update(slots_validos)
-                    continue
+            # PRIORIDAD 1: Usar slots_disponibles configurados (soporta dict por día o list simple)
+            slots_del_servicio = extraer_slots_para_fecha(servicio.slots_disponibles, fecha)
+
+            if slots_del_servicio:
+                slots_por_servicio[servicio.nombre] = slots_del_servicio
+                slots_set.update(slots_del_servicio)
+                continue
 
             # PRIORIDAD 2: Fallback a valores por defecto basados en el nombre
             nombre_lower = servicio.nombre.lower()
@@ -196,18 +242,14 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         slots = sorted(list(slots_set))
 
     elif categoria and 'cabaña' in categoria.nombre.lower():
-        # HORARIOS DINÁMICOS para cabañas
+        # HORARIOS DINÁMICOS para cabañas (soporta horarios por día)
         slots_set = set()
         for servicio in servicios:
-            if servicio.slots_disponibles and len(servicio.slots_disponibles) > 0:
-                slots_validos = [
-                    slot for slot in servicio.slots_disponibles
-                    if slot.lower() not in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-                                           'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
-                ]
-                if slots_validos:
-                    slots_por_servicio[servicio.nombre] = slots_validos
-                    slots_set.update(slots_validos)
+            slots_del_servicio = extraer_slots_para_fecha(servicio.slots_disponibles, fecha)
+
+            if slots_del_servicio:
+                slots_por_servicio[servicio.nombre] = slots_del_servicio
+                slots_set.update(slots_del_servicio)
 
         if slots_set:
             slots = sorted(list(slots_set))
@@ -216,18 +258,14 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
             slots = ["16:00"]
 
     elif categoria and 'masaje' in categoria.nombre.lower():
-        # HORARIOS DINÁMICOS para masajes
+        # HORARIOS DINÁMICOS para masajes (soporta horarios por día)
         slots_set = set()
         for servicio in servicios:
-            if servicio.slots_disponibles and len(servicio.slots_disponibles) > 0:
-                slots_validos = [
-                    slot for slot in servicio.slots_disponibles
-                    if slot.lower() not in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-                                           'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
-                ]
-                if slots_validos:
-                    slots_por_servicio[servicio.nombre] = slots_validos
-                    slots_set.update(slots_validos)
+            slots_del_servicio = extraer_slots_para_fecha(servicio.slots_disponibles, fecha)
+
+            if slots_del_servicio:
+                slots_por_servicio[servicio.nombre] = slots_del_servicio
+                slots_set.update(slots_del_servicio)
 
         if slots_set:
             slots = sorted(list(slots_set))
@@ -236,15 +274,14 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
             slots = ["10:30", "11:45", "13:00", "14:15", "15:30", "16:45", "18:00", "19:15", "20:30", "21:45"]
 
     else:
-        # Para otras categorías, intentar obtener slots de los servicios
+        # Para otras categorías (soporta horarios por día)
         slots_set = set()
         for servicio in servicios:
-            if servicio.slots_disponibles:
-                for slot in servicio.slots_disponibles:
-                    # Verificar que no sean días de la semana (bug de datos)
-                    if slot.lower() not in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-                                           'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']:
-                        slots_set.add(slot)
+            slots_del_servicio = extraer_slots_para_fecha(servicio.slots_disponibles, fecha)
+
+            if slots_del_servicio:
+                slots_por_servicio[servicio.nombre] = slots_del_servicio
+                slots_set.update(slots_del_servicio)
 
         if not slots_set:
             # Para otros servicios por defecto
