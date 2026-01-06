@@ -155,34 +155,86 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
     recursos = [s.nombre for s in servicios]
 
     # Configurar slots según el tipo de categoría
-    slots_por_servicio = {}  # Inicializar vacío por defecto
+    slots_por_servicio = {}  # Diccionario de slots por servicio
 
     if categoria and 'tina' in categoria.nombre.lower():
-        # Definir los horarios específicos para tinas
+        # HORARIOS DINÁMICOS: Usar slots_disponibles de cada servicio
+        # Fallback a valores por defecto si no están configurados
+
+        # Valores por defecto (fallback)
         # Tinas SIN hidromasaje: Hornopiren, Tronador, Calbuco, Osorno
-        slots_sin_hidromasaje = ["12:00", "14:30", "17:00", "19:30", "22:00"]
+        slots_sin_hidromasaje_default = ["12:00", "14:30", "17:00", "19:30", "22:00"]
         # Tinas CON hidromasaje: Puntiagudo, Llaima, Villarrica, Puyehue
-        slots_con_hidromasaje = ["14:00", "16:30", "19:00", "21:30"]
+        slots_con_hidromasaje_default = ["14:00", "16:30", "19:00", "21:30"]
 
         # Crear diccionario de slots por servicio
+        slots_set = set()
         for servicio in servicios:
-            nombre_lower = servicio.nombre.lower()
-            # Verificar si es tina con hidromasaje
-            if 'hidromasaje' in nombre_lower or 'puntiagudo' in nombre_lower or 'llaima' in nombre_lower or 'villarrica' in nombre_lower or 'puyehue' in nombre_lower:
-                slots_por_servicio[servicio.nombre] = slots_con_hidromasaje
-            else:
-                # Es tina sin hidromasaje
-                slots_por_servicio[servicio.nombre] = slots_sin_hidromasaje
+            # PRIORIDAD 1: Usar slots_disponibles si están configurados en el servicio
+            if servicio.slots_disponibles and len(servicio.slots_disponibles) > 0:
+                # Filtrar slots válidos (no días de la semana)
+                slots_validos = [
+                    slot for slot in servicio.slots_disponibles
+                    if slot.lower() not in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+                                           'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+                ]
+                if slots_validos:
+                    slots_por_servicio[servicio.nombre] = slots_validos
+                    slots_set.update(slots_validos)
+                    continue
 
-        # Para la matriz, usar todos los slots posibles (para las filas)
-        slots_set = set(slots_sin_hidromasaje + slots_con_hidromasaje)
+            # PRIORIDAD 2: Fallback a valores por defecto basados en el nombre
+            nombre_lower = servicio.nombre.lower()
+            if 'hidromasaje' in nombre_lower or 'puntiagudo' in nombre_lower or 'llaima' in nombre_lower or 'villarrica' in nombre_lower or 'puyehue' in nombre_lower:
+                slots_por_servicio[servicio.nombre] = slots_con_hidromasaje_default
+                slots_set.update(slots_con_hidromasaje_default)
+            else:
+                slots_por_servicio[servicio.nombre] = slots_sin_hidromasaje_default
+                slots_set.update(slots_sin_hidromasaje_default)
+
+        # Para la matriz, usar todos los slots recopilados
         slots = sorted(list(slots_set))
+
     elif categoria and 'cabaña' in categoria.nombre.lower():
-        # Para cabañas, solo mostrar el horario de check-in
-        slots = ["16:00"]
+        # HORARIOS DINÁMICOS para cabañas
+        slots_set = set()
+        for servicio in servicios:
+            if servicio.slots_disponibles and len(servicio.slots_disponibles) > 0:
+                slots_validos = [
+                    slot for slot in servicio.slots_disponibles
+                    if slot.lower() not in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+                                           'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+                ]
+                if slots_validos:
+                    slots_por_servicio[servicio.nombre] = slots_validos
+                    slots_set.update(slots_validos)
+
+        if slots_set:
+            slots = sorted(list(slots_set))
+        else:
+            # Fallback: horario por defecto de check-in
+            slots = ["16:00"]
+
     elif categoria and 'masaje' in categoria.nombre.lower():
-        # Para masajes, horarios específicos cada 1 hora 15 minutos
-        slots = ["10:30", "11:45", "13:00", "14:15", "15:30", "16:45", "18:00", "19:15", "20:30", "21:45"]
+        # HORARIOS DINÁMICOS para masajes
+        slots_set = set()
+        for servicio in servicios:
+            if servicio.slots_disponibles and len(servicio.slots_disponibles) > 0:
+                slots_validos = [
+                    slot for slot in servicio.slots_disponibles
+                    if slot.lower() not in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+                                           'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+                ]
+                if slots_validos:
+                    slots_por_servicio[servicio.nombre] = slots_validos
+                    slots_set.update(slots_validos)
+
+        if slots_set:
+            slots = sorted(list(slots_set))
+        else:
+            # Fallback: horarios por defecto cada 1 hora 15 minutos
+            slots = ["10:30", "11:45", "13:00", "14:15", "15:30", "16:45", "18:00", "19:15", "20:30", "21:45"]
+
     else:
         # Para otras categorías, intentar obtener slots de los servicios
         slots_set = set()
