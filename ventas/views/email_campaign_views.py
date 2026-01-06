@@ -426,9 +426,9 @@ def email_campaign_preview(request, campaign_id):
     if recipient_ejemplo:
         # Usar datos reales del primer destinatario
         context_email = {
-            'nombre': recipient_ejemplo.cliente_nombre,
+            'nombre': recipient_ejemplo.name,
             'email': recipient_ejemplo.email,
-            'ciudad': getattr(recipient_ejemplo.cliente, 'ciudad', 'N/A') if recipient_ejemplo.cliente else 'N/A',
+            'ciudad': getattr(recipient_ejemplo.client, 'ciudad', 'N/A') if recipient_ejemplo.client else 'N/A',
         }
     else:
         # Usar datos de ejemplo
