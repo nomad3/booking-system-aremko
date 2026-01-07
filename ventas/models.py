@@ -699,9 +699,20 @@ class VentaReserva(models.Model):
         )['total'] or 0
 
         # Para servicios: usar precio_unitario_venta si existe, sino precio_base
+        # IMPORTANTE: Las cabañas tienen precio fijo (no se multiplican por cantidad_personas)
+        # Otros servicios (tinas, masajes) sí se multiplican por cantidad_personas
+        from django.db.models import Case, When, Value, IntegerField
+
         total_servicios = self.reservaservicios.aggregate(
             total=models.Sum(
-                Coalesce(models.F('precio_unitario_venta'), models.F('servicio__precio_base')) * models.F('cantidad_personas')
+                Coalesce(models.F('precio_unitario_venta'), models.F('servicio__precio_base')) *
+                Case(
+                    # Si es cabaña, multiplicar por 1 (precio fijo)
+                    When(servicio__tipo_servicio='cabana', then=Value(1)),
+                    # Si no es cabaña, multiplicar por cantidad_personas
+                    default=models.F('cantidad_personas'),
+                    output_field=IntegerField()
+                )
             )
         )['total'] or 0
 
@@ -745,9 +756,19 @@ class VentaReserva(models.Model):
     @property
     def total_servicios(self):
         # Usar precio congelado si existe, sino precio actual del catálogo
+        # IMPORTANTE: Las cabañas tienen precio fijo (no se multiplican por cantidad_personas)
+        from django.db.models import Case, When, Value, IntegerField
+
         total = self.reservaservicios.aggregate(
             total=models.Sum(
-                Coalesce(models.F('precio_unitario_venta'), models.F('servicio__precio_base')) * models.F('cantidad_personas')
+                Coalesce(models.F('precio_unitario_venta'), models.F('servicio__precio_base')) *
+                Case(
+                    # Si es cabaña, multiplicar por 1 (precio fijo)
+                    When(servicio__tipo_servicio='cabana', then=Value(1)),
+                    # Si no es cabaña, multiplicar por cantidad_personas
+                    default=models.F('cantidad_personas'),
+                    output_field=IntegerField()
+                )
             )
         )['total'] or 0
         return total
@@ -916,7 +937,11 @@ class ReservaServicio(models.Model):
     fecha_agendamiento = models.DateField()
     hora_inicio = models.CharField(max_length=5)
     # Default to 1, but enforce max 2 for cabins during booking if needed
-    cantidad_personas = models.PositiveIntegerField(default=1)
+    cantidad_personas = models.PositiveIntegerField(
+        default=1,
+        verbose_name='Cantidad',
+        help_text='Para cabañas: cantidad de cabañas (siempre 1). Para tinas: cantidad de personas.'
+    )
     # Add field to link specific provider for this instance (e.g., masseuse)
     proveedor_asignado = models.ForeignKey(
         Proveedor,
