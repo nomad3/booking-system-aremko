@@ -341,6 +341,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         css = {
             'all': ('admin/css/custom.css',)
         }
+        js = ('admin/js/autocomplete_config.js',)
 
 @admin.register(Proveedor)
 class ProveedorAdmin(admin.ModelAdmin):
@@ -481,6 +482,19 @@ class ClienteAdmin(admin.ModelAdmin):
     search_fields = ('nombre', 'telefono', 'email')
     list_display = ('nombre', 'telefono', 'email')
     actions = ['exportar_a_excel']
+
+    def get_search_results(self, request, queryset, search_term):
+        """
+        Optimiza búsqueda de clientes limitando resultados para autocomplete.
+        Reduce payload y mejora rendimiento.
+        """
+        queryset, use_distinct = super().get_search_results(
+            request, queryset, search_term
+        )
+        # Limitar resultados a 50 para autocomplete
+        if 'autocomplete' in request.path:
+            queryset = queryset[:50]
+        return queryset, use_distinct
 
     def exportar_a_excel(self, request, queryset):
         response = HttpResponse(content_type='application/ms-excel')

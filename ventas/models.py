@@ -550,8 +550,8 @@ class Comuna(models.Model):
 
 
 class Cliente(models.Model):
-    nombre = models.CharField(max_length=100)
-    email = models.EmailField(blank=True, null=True) # Allow blank email if phone is primary
+    nombre = models.CharField(max_length=100, db_index=True)
+    email = models.EmailField(blank=True, null=True, db_index=True) # Allow blank email if phone is primary
     telefono = models.CharField(max_length=20, unique=True, help_text="Número de teléfono único (formato internacional preferido)") # Add unique=True
     documento_identidad = models.CharField(max_length=100, null=True, blank=True, verbose_name="ID/DNI/Passport/RUT")
     pais = models.CharField(max_length=100, null=True, blank=True)
