@@ -531,6 +531,7 @@ class ServicioAdmin(admin.ModelAdmin):
     list_editable = ('publicado_web', 'visible_en_matriz')
     search_fields = ('nombre', 'descripcion_web')
     filter_horizontal = ('proveedores',)  # Para manejar ManyToMany de proveedores
+    readonly_fields = ('imagen_preview',)
 
     fieldsets = (
         ('Información Básica', {
@@ -550,10 +551,27 @@ class ServicioAdmin(admin.ModelAdmin):
             'description': 'Control de visibilidad del servicio en diferentes partes del sistema'
         }),
         ('Información Web', {
-            'fields': ('imagen', 'descripcion_web'),
-            'classes': ('collapse',)
+            'fields': ('imagen_preview', 'imagen', 'descripcion_web'),
+            'description': 'Contenido e imágenes para la página web pública'
         })
     )
+
+    def imagen_preview(self, obj):
+        """Vista previa de la imagen del servicio"""
+        if not obj or not obj.imagen:
+            return format_html('<p style="color: #999;">No hay imagen cargada</p>')
+        try:
+            return format_html(
+                '<div style="margin-top: 10px;">'
+                '<img src="{}" style="max-width: 600px; max-height: 400px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px; padding: 5px;" />'
+                '<p style="color: #666; font-size: 12px; margin-top: 5px;">URL: {}</p>'
+                '</div>',
+                obj.imagen.url,
+                obj.imagen.url
+            )
+        except Exception:
+            return format_html('<p style="color: #999;">No se puede generar vista previa</p>')
+    imagen_preview.short_description = 'Vista previa actual'
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
