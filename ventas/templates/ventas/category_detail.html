@@ -153,6 +153,18 @@
 }
 </script>
 {% endif %}
+
+<!-- Google Ads: Evento de conversión para página de Masajes -->
+{% if categoria_actual.id == 2 %}
+<script>
+    // Evento de page_view para rastrear visitas a la página de masajes
+    gtag('event', 'page_view', {
+        'send_to': 'AW-1767221019',
+        'page_title': '{{ categoria_actual.nombre }}',
+        'page_location': '{{ canonical_url }}'
+    });
+</script>
+{% endif %}
 {% endblock %}
 
 {% block extra_style %}
