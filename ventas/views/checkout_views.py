@@ -347,6 +347,9 @@ def complete_checkout(request):
                     )
 
                     # Create ReservaServicio for each service in cart
+                    # Detectar si hay masajes para Google Ads tracking
+                    tiene_masaje = False
+
                     for servicio_item in cart['servicios']: # Renamed variable
                         # Get the service ID
                         servicio_id = servicio_item.get('id')
@@ -356,6 +359,11 @@ def complete_checkout(request):
                             continue
 
                         servicio_obj = Servicio.objects.get(id=servicio_id)
+
+                        # Verificar si es un masaje (categoria_id == 2)
+                        if servicio_obj.categoria_id == 2:
+                            tiene_masaje = True
+
                         fecha = datetime.strptime(servicio_item['fecha'], '%Y-%m-%d').date()
 
                         # Create the reservation without pre_save validation
@@ -525,7 +533,9 @@ def complete_checkout(request):
                         'message': 'Reserva creada exitosamente',
                         'reserva_id': venta.id,
                         'metodo_pago': metodo_pago,
-                        'redirect_url': detail_url # Add the redirect URL
+                        'redirect_url': detail_url, # Add the redirect URL
+                        'tiene_masaje': tiene_masaje, # Para Google Ads tracking
+                        'total_reserva': float(cart['total']) # Para Google Ads conversion value
                     }
 
                     return JsonResponse(response_data)
