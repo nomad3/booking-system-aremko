@@ -210,6 +210,113 @@
             background: #f8f9fa;
         }
 
+        /* Comparativa YoY */
+        .comparativa-yoy {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .comparativa-yoy h3 {
+            margin: 0 0 20px 0;
+            color: #333;
+            font-size: 1.4rem;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .yoy-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .yoy-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .yoy-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .yoy-card.crecimiento {
+            border-left-color: #10b981;
+        }
+
+        .yoy-card.decrecimiento {
+            border-left-color: #ef4444;
+        }
+
+        .yoy-categoria {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .yoy-years {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .yoy-year-data {
+            flex: 1;
+        }
+
+        .yoy-year-label {
+            font-size: 0.85rem;
+            color: #666;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .yoy-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .yoy-cantidad {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 3px;
+        }
+
+        .yoy-cambio {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .yoy-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        .yoy-badge.positivo {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .yoy-badge.negativo {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .chart-grid {
@@ -222,6 +329,10 @@
 
             .filter-group {
                 width: 100%;
+            }
+
+            .yoy-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -348,6 +459,42 @@
                 <div class="subtitle">Promedio por reserva</div>
             </div>
         </div>
+
+        <!-- Comparativa Año vs Año -->
+        {% if comparativa_yoy %}
+        <div class="comparativa-yoy">
+            <h3>📊 Comparativa Año vs Año por Categoría</h3>
+            <div class="yoy-grid">
+                {% for item in comparativa_yoy %}
+                <div class="yoy-card {% if item.crecimiento %}crecimiento{% else %}decrecimiento{% endif %}">
+                    <div class="yoy-categoria">{{ item.categoria }}</div>
+
+                    <div class="yoy-years">
+                        <div class="yoy-year-data">
+                            <div class="yoy-year-label">{{ item.year_anterior }}</div>
+                            <div class="yoy-value">${{ item.total_anterior|floatformat:0|intcomma }}</div>
+                            <div class="yoy-cantidad">{{ item.cantidad_anterior }} servicio{{ item.cantidad_anterior|pluralize }}</div>
+                        </div>
+
+                        <div class="yoy-year-data">
+                            <div class="yoy-year-label">{{ item.year_actual }}</div>
+                            <div class="yoy-value">${{ item.total_actual|floatformat:0|intcomma }}</div>
+                            <div class="yoy-cantidad">{{ item.cantidad_actual }} servicio{{ item.cantidad_actual|pluralize }}</div>
+                        </div>
+                    </div>
+
+                    <div class="yoy-cambio">
+                        <span style="color: #666; font-size: 0.9rem;">Cambio:</span>
+                        <span class="yoy-badge {% if item.cambio_total_pct >= 0 %}positivo{% else %}negativo{% endif %}">
+                            {% if item.cambio_total_pct >= 0 %}↗{% else %}↘{% endif %}
+                            {{ item.cambio_total_pct|floatformat:1 }}%
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Gráficos -->
         <div class="chart-grid">

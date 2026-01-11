@@ -653,6 +653,141 @@ def dashboard_operativo(request):
         )
 
         # ====================================================================
+        # 1.5 COMPARATIVA AÑO vs AÑO (Year over Year) - Dashboard Operativo
+        # ====================================================================
+        comparativa_yoy = []
+        # Solo mostrar comparativa si el año anterior es 2025 o posterior
+        if year >= 2026:
+            try:
+                from datetime import datetime, timedelta
+
+                # Calcular el mismo período pero del año anterior
+                year_anterior = year - 1
+
+                # Filtro base para año anterior (sin filtro de estado_pago, igual que dashboard operativo)
+                ventas_validas_anterior = VentaReserva.objects.filter(
+                    Q(estado_reserva__in=['checkin', 'checkout', 'pendiente', 'confirmada'])
+                )
+
+                # Filtros de fecha para la comparativa
+                filtro_servicios_anterior = Q()
+                filtro_servicios_actual_comparativa = Q()
+
+                if start_date and end_date:
+                    # Rango personalizado: comparar el mismo rango del año anterior
+                    start_anterior = (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=365)).strftime('%Y-%m-%d')
+                    end_anterior = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=365)).strftime('%Y-%m-%d')
+                    filtro_servicios_anterior = Q(fecha_agendamiento__gte=start_anterior, fecha_agendamiento__lte=end_anterior)
+                    filtro_servicios_actual_comparativa = Q(fecha_agendamiento__gte=start_date, fecha_agendamiento__lte=end_date)
+                elif month:
+                    # Mismo mes del año anterior
+                    filtro_servicios_anterior = Q(fecha_agendamiento__year=year_anterior, fecha_agendamiento__month=int(month))
+                    filtro_servicios_actual_comparativa = Q(fecha_agendamiento__year=year, fecha_agendamiento__month=int(month))
+                else:
+                    # Sin filtros: comparar desde inicio de año hasta HOY en ambos años
+                    hoy = timezone.now().date()
+
+                    if year == current_year:
+                        # Si estamos viendo el año actual, comparar desde inicio de año hasta hoy
+                        inicio_actual = datetime(year, 1, 1).date()
+                        inicio_anterior = datetime(year_anterior, 1, 1).date()
+
+                        # Calcular el mismo día del año pero en el año anterior
+                        dia_del_año = (hoy - inicio_actual).days
+                        fin_anterior = inicio_anterior + timedelta(days=dia_del_año)
+
+                        filtro_servicios_anterior = Q(fecha_agendamiento__gte=inicio_anterior, fecha_agendamiento__lte=fin_anterior)
+                        filtro_servicios_actual_comparativa = Q(fecha_agendamiento__gte=inicio_actual, fecha_agendamiento__lte=hoy)
+                    else:
+                        # Si estamos viendo un año pasado, comparar todo el año
+                        filtro_servicios_anterior = Q(fecha_agendamiento__year=year_anterior)
+                        filtro_servicios_actual_comparativa = Q(fecha_agendamiento__year=year)
+
+                # Obtener servicios del año actual con el filtro correcto
+                query_servicios_actual_yoy = ReservaServicio.objects.filter(
+                    venta_reserva__in=ventas_validas
+                ).filter(filtro_servicios_actual_comparativa).exclude(servicio__isnull=True)
+
+                if filtro_categoria:
+                    query_servicios_actual_yoy = query_servicios_actual_yoy.filter(filtro_categoria)
+
+                servicios_año_actual = (
+                    query_servicios_actual_yoy
+                    .values('servicio__categoria__nombre')
+                    .annotate(
+                        total_ventas=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas')),
+                        cantidad_servicios=Count('id')
+                    )
+                )
+
+                # Obtener servicios del año anterior
+                query_servicios_anterior_yoy = ReservaServicio.objects.filter(
+                    venta_reserva__in=ventas_validas_anterior
+                ).filter(filtro_servicios_anterior).exclude(servicio__isnull=True)
+
+                if filtro_categoria:
+                    query_servicios_anterior_yoy = query_servicios_anterior_yoy.filter(filtro_categoria)
+
+                servicios_año_anterior = (
+                    query_servicios_anterior_yoy
+                    .values('servicio__categoria__nombre')
+                    .annotate(
+                        total_ventas=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas')),
+                        cantidad_servicios=Count('id')
+                    )
+                )
+
+                # Crear diccionario del año anterior
+                servicios_anterior_dict = {
+                    item['servicio__categoria__nombre']: {
+                        'total': float(item['total_ventas'] or 0),
+                        'cantidad': item['cantidad_servicios']
+                    }
+                    for item in servicios_año_anterior
+                }
+
+                # Generar comparativa
+                for item_actual in servicios_año_actual:
+                    categoria = item_actual['servicio__categoria__nombre'] or 'Sin categoría'
+                    total_actual = float(item_actual['total_ventas'] or 0)
+                    cantidad_actual = item_actual['cantidad_servicios']
+
+                    # Buscar datos del año anterior
+                    datos_anterior = servicios_anterior_dict.get(categoria, {'total': 0, 'cantidad': 0})
+                    total_anterior = datos_anterior['total']
+                    cantidad_anterior = datos_anterior['cantidad']
+
+                    # Calcular cambios porcentuales
+                    cambio_total_pct = 0
+                    cambio_cantidad_pct = 0
+
+                    if total_anterior > 0:
+                        cambio_total_pct = ((total_actual - total_anterior) / total_anterior) * 100
+                    elif total_actual > 0:
+                        cambio_total_pct = 100  # Creció desde 0
+
+                    if cantidad_anterior > 0:
+                        cambio_cantidad_pct = ((cantidad_actual - cantidad_anterior) / cantidad_anterior) * 100
+                    elif cantidad_actual > 0:
+                        cambio_cantidad_pct = 100  # Creció desde 0
+
+                    comparativa_yoy.append({
+                        'categoria': categoria,
+                        'year_actual': year,
+                        'total_actual': total_actual,
+                        'cantidad_actual': cantidad_actual,
+                        'year_anterior': year_anterior,
+                        'total_anterior': total_anterior,
+                        'cantidad_anterior': cantidad_anterior,
+                        'cambio_total_pct': cambio_total_pct,
+                        'cambio_cantidad_pct': cambio_cantidad_pct,
+                        'crecimiento': cambio_total_pct > 0
+                    })
+            except Exception as e:
+                logger.error(f"Error calculando comparativa YoY operativo: {e}")
+                comparativa_yoy = []
+
+        # ====================================================================
         # 2. TOP SERVICIOS (fecha cuando se prestan)
         # ====================================================================
         query_top_servicios = ReservaServicio.objects.filter(
@@ -820,6 +955,9 @@ def dashboard_operativo(request):
 
             # Resumen
             'resumen': resumen,
+
+            # Comparativa YoY
+            'comparativa_yoy': comparativa_yoy,
 
             # Filtros
             'year': int(year),
