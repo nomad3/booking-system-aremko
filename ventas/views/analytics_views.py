@@ -113,22 +113,61 @@ def dashboard_ventas(request):
         # (es decir, estamos viendo 2026 en adelante)
         if year >= 2026:
             try:
+                from datetime import datetime, timedelta
+
                 # Calcular el mismo período pero del año anterior
                 year_anterior = year - 1
                 filtro_year_anterior = Q(estado_reserva__in=['checkin', 'checkout', 'pendiente']) & Q(estado_pago='pagado')
+                filtro_year_actual_comparativa = Q(estado_reserva__in=['checkin', 'checkout', 'pendiente']) & Q(estado_pago='pagado')
 
                 if start_date and end_date:
-                    # Restar un año a las fechas
-                    from datetime import datetime, timedelta
+                    # Rango personalizado: comparar el mismo rango del año anterior
                     start_anterior = (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=365)).strftime('%Y-%m-%d')
                     end_anterior = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=365)).strftime('%Y-%m-%d')
                     filtro_year_anterior &= Q(fecha_reserva__gte=start_anterior, fecha_reserva__lte=end_anterior)
+                    filtro_year_actual_comparativa &= Q(fecha_reserva__gte=start_date, fecha_reserva__lte=end_date)
                 elif month:
                     # Mismo mes del año anterior
                     filtro_year_anterior &= Q(fecha_reserva__year=year_anterior, fecha_reserva__month=int(month))
+                    filtro_year_actual_comparativa &= Q(fecha_reserva__year=year, fecha_reserva__month=int(month))
                 else:
-                    # Todo el año anterior
-                    filtro_year_anterior &= Q(fecha_reserva__year=year_anterior)
+                    # Sin filtros: comparar desde inicio de año hasta HOY en ambos años
+                    # Esto asegura que si estamos al 11 de enero de 2026, comparamos:
+                    # 1-11 enero 2025 vs 1-11 enero 2026
+                    hoy = timezone.now().date()
+
+                    if year == current_year:
+                        # Si estamos viendo el año actual, comparar desde inicio de año hasta hoy
+                        inicio_actual = datetime(year, 1, 1).date()
+                        inicio_anterior = datetime(year_anterior, 1, 1).date()
+
+                        # Calcular el mismo día del año pero en el año anterior
+                        dia_del_año = (hoy - inicio_actual).days
+                        fin_anterior = inicio_anterior + timedelta(days=dia_del_año)
+
+                        filtro_year_anterior &= Q(fecha_reserva__gte=inicio_anterior, fecha_reserva__lte=fin_anterior)
+                        filtro_year_actual_comparativa &= Q(fecha_reserva__gte=inicio_actual, fecha_reserva__lte=hoy)
+                    else:
+                        # Si estamos viendo un año pasado, comparar todo el año
+                        filtro_year_anterior &= Q(fecha_reserva__year=year_anterior)
+                        filtro_year_actual_comparativa &= Q(fecha_reserva__year=year)
+
+                # Obtener ventas del año actual con el filtro correcto (mismo período que se compara)
+                query_servicios_actual = ReservaServicio.objects.filter(
+                    venta_reserva__in=VentaReserva.objects.filter(filtro_year_actual_comparativa)
+                ).exclude(servicio__isnull=True)
+
+                if filtro_categoria:
+                    query_servicios_actual = query_servicios_actual.filter(filtro_categoria)
+
+                ventas_año_actual = (
+                    query_servicios_actual
+                    .values('servicio__categoria__nombre')
+                    .annotate(
+                        total_ventas=Sum(Coalesce(F('precio_unitario_venta'), F('servicio__precio_base')) * F('cantidad_personas')),
+                        cantidad_servicios=Count('id')
+                    )
+                )
 
                 # Obtener ventas del año anterior por categoría
                 query_servicios_anterior = ReservaServicio.objects.filter(
@@ -147,7 +186,7 @@ def dashboard_ventas(request):
                     )
                 )
 
-                # Crear diccionario para comparación rápida
+                # Crear diccionario para comparación rápida del año anterior
                 ventas_anterior_dict = {
                     item['servicio__categoria__nombre']: {
                         'total': float(item['total_ventas'] or 0),
@@ -156,8 +195,8 @@ def dashboard_ventas(request):
                     for item in ventas_año_anterior
                 }
 
-                # Generar comparativa
-                for item_actual in ventas_por_familia:
+                # Generar comparativa usando los datos del año actual con el filtro correcto
+                for item_actual in ventas_año_actual:
                     categoria = item_actual['servicio__categoria__nombre'] or 'Sin categoría'
                     total_actual = float(item_actual['total_ventas'] or 0)
                     cantidad_actual = item_actual['cantidad_servicios']
