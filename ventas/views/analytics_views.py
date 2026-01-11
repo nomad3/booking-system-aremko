@@ -109,8 +109,9 @@ def dashboard_ventas(request):
         # 1.5 COMPARATIVA AÑO vs AÑO (Year over Year)
         # ====================================================================
         comparativa_yoy = []
-        # Solo mostrar comparativa si estamos viendo el año 2025 o posterior
-        if year >= 2025:
+        # Solo mostrar comparativa si el año anterior es 2025 o posterior
+        # (es decir, estamos viendo 2026 en adelante)
+        if year >= 2026:
             try:
                 # Calcular el mismo período pero del año anterior
                 year_anterior = year - 1
