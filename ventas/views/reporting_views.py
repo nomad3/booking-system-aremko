@@ -101,6 +101,7 @@ def servicios_vendidos_view(request):
             'cliente_nombre': servicio.venta_reserva.cliente.nombre if servicio.venta_reserva and servicio.venta_reserva.cliente else 'N/A',
             'categoria_servicio': servicio.servicio.categoria.nombre if servicio.servicio.categoria else 'N/A',
             'servicio_nombre': servicio.servicio.nombre,
+            'estado_reserva': servicio.venta_reserva.estado_reserva if servicio.venta_reserva else 'N/A',  # Add estado de reserva
             'fecha_agendamiento': fecha_display, # Use processed date
             'hora_agendamiento_str': hora_display_str, # Use formatted string for display/export
             'monto': precio,  # Usar precio congelado
@@ -142,6 +143,7 @@ def servicios_vendidos_view(request):
             'Cliente',
             'Categoría del Servicio',
             'Servicio',
+            'Estado',
             'Fecha de Agendamiento',
             'Hora de Agendamiento',
             'Cantidad de Personas',
@@ -159,11 +161,12 @@ def servicios_vendidos_view(request):
             ws.write(row, 1, servicio_data['cliente_nombre'])
             ws.write(row, 2, servicio_data['categoria_servicio'])
             ws.write(row, 3, servicio_data['servicio_nombre'])
-            ws.write(row, 4, servicio_data['fecha_agendamiento'], date_style) # Use date object
-            ws.write(row, 5, servicio_data['hora_agendamiento_str']) # Use string for Excel time
-            ws.write(row, 6, servicio_data['cantidad_personas'])
-            ws.write(row, 7, servicio_data['total_monto'], money_style)
-            ws.write(row, 8, servicio_data['proveedor_asignado']) # Add provider data to Excel
+            ws.write(row, 4, servicio_data['estado_reserva'])  # Add estado
+            ws.write(row, 5, servicio_data['fecha_agendamiento'], date_style) # Use date object
+            ws.write(row, 6, servicio_data['hora_agendamiento_str']) # Use string for Excel time
+            ws.write(row, 7, servicio_data['cantidad_personas'])
+            ws.write(row, 8, servicio_data['total_monto'], money_style)
+            ws.write(row, 9, servicio_data['proveedor_asignado']) # Add provider data to Excel
 
         wb.save(response)
         return response

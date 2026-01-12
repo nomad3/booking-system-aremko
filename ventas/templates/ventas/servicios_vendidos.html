@@ -122,7 +122,7 @@
             }
 
             /* Valores monetarios destacados */
-            .table-responsive tbody tr td:nth-child(8) {
+            .table-responsive tbody tr td:nth-child(9) {
                 font-size: 16px;
                 font-weight: 700;
                 color: #2a7a2a;
@@ -134,8 +134,8 @@
             }
 
             /* Separadores visuales */
-            .table-responsive tbody tr td:nth-child(4)::after,
-            .table-responsive tbody tr td:nth-child(7)::after {
+            .table-responsive tbody tr td:nth-child(5)::after,
+            .table-responsive tbody tr td:nth-child(8)::after {
                 content: '';
                 display: block;
                 height: 1px;
@@ -239,6 +239,7 @@
                 <th class="px-4 py-3">Cliente</th>
                 <th class="px-4 py-3">Categoría</th>
                 <th class="px-4 py-3">Servicio</th>
+                <th class="px-4 py-3">Estado</th>
                 <th class="px-4 py-3">Fecha</th>
                 <th class="px-4 py-3">Hora</th>
                 <th class="px-4 py-3 text-end">Personas</th> {# Align right #}
@@ -257,6 +258,7 @@
                 <td class="px-4 py-3">{{ servicio.cliente_nombre }}</td>
                 <td class="px-4 py-3">{{ servicio.categoria_servicio }}</td>
                 <td class="px-4 py-3">{{ servicio.servicio_nombre }}</td>
+                <td class="px-4 py-3">{{ servicio.estado_reserva }}</td>
                 <td class="px-4 py-3">{{ servicio.fecha_agendamiento }}</td>
                 <td class="px-4 py-3">{{ servicio.hora_agendamiento_str }}</td> {# Use the formatted string #}
                 <td class="px-4 py-3 text-end">{{ servicio.cantidad_personas }}</td> {# Align right #}
@@ -265,7 +267,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="9" class="text-center py-4">No se encontraron servicios vendidos.</td> {# Updated colspan to 9 #}
+                <td colspan="10" class="text-center py-4">No se encontraron servicios vendidos.</td> {# Updated colspan to 10 #}
             </tr>
             {% endfor %}
         </tbody>
