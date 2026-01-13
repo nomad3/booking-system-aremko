@@ -278,16 +278,20 @@ class Command(BaseCommand):
             return True
         
         try:
+            # Agregar footer con link de unsubscribe
+            from ventas.utils.email_footer import get_email_footer_html
+            final_body_with_footer = final_body + get_email_footer_html(recipient.email)
+
             # Crear email con contenido final
             msg = EmailMultiAlternatives(
                 subject=final_subject,
-                body=final_body,  # Fallback text
+                body=final_body,  # Fallback text sin HTML
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[recipient.email]
             )
-            
-            # Agregar contenido HTML
-            msg.attach_alternative(final_body, "text/html")
+
+            # Agregar contenido HTML con footer de unsubscribe
+            msg.attach_alternative(final_body_with_footer, "text/html")
             
             # Enviar
             result = msg.send()
