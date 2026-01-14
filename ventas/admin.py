@@ -2824,6 +2824,16 @@ class ServicioSlotBloqueoAdmin(admin.ModelAdmin):
         models.TextField: {'widget': forms.Textarea(attrs={'rows': 3})}
     }
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Personalizar el queryset del campo servicio"""
+        if db_field.name == "servicio":
+            # Solo mostrar servicios activos y visibles en web, ordenados alfabéticamente
+            kwargs["queryset"] = Servicio.objects.filter(
+                activo=True,
+                visible_en_web=True
+            ).order_by('nombre')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
     def save_model(self, request, obj, form, change):
         """Guardar el usuario que crea el bloqueo"""
         if not change:  # Si es nuevo
