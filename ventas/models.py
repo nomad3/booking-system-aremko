@@ -4261,12 +4261,16 @@ class ServicioBloqueo(models.Model):
     )
 
     class Meta:
+        app_label = 'ventas'
         verbose_name = 'Bloqueo de Servicio'
         verbose_name_plural = 'Bloqueos de Servicios'
         ordering = ['-fecha_inicio']
         indexes = [
             models.Index(fields=['servicio', 'fecha_inicio', 'fecha_fin']),
             models.Index(fields=['activo']),
+        ]
+        permissions = [
+            ('can_manage_bloqueos', 'Puede gestionar bloqueos de servicios'),
         ]
 
     def __str__(self):
