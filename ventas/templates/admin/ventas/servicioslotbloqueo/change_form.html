@@ -1,0 +1,89 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<script>
+(function($) {
+    $(document).ready(function() {
+        var $servicio = $('#id_servicio');
+        var $fecha = $('#id_fecha');
+        var $horaSlot = $('#id_hora_slot');
+
+        // Convertir input text a select dropdown
+        if ($horaSlot.is('input[type="text"]')) {
+            var currentValue = $horaSlot.val();
+            var $select = $('<select id="id_hora_slot" name="hora_slot" class="vTextField" style="width:100%; padding:8px;"></select>');
+            $select.append('<option value="">Seleccione servicio y fecha primero...</option>');
+            if (currentValue) {
+                $select.append('<option value="' + currentValue + '" selected>' + currentValue + '</option>');
+            }
+            $horaSlot.replaceWith($select);
+            $horaSlot = $select;
+        }
+
+        function cargarSlotsDisponibles() {
+            var servicioId = $servicio.val();
+            var fecha = $fecha.val();
+
+            if (!servicioId || !fecha) {
+                $horaSlot.html('<option value="">Seleccione servicio y fecha primero...</option>');
+                $horaSlot.prop('disabled', true);
+                return;
+            }
+
+            $horaSlot.html('<option value="">Cargando horarios...</option>');
+            $horaSlot.prop('disabled', true);
+
+            $.ajax({
+                url: '/ventas/get-slots-disponibles-para-bloquear/',
+                data: {
+                    servicio_id: servicioId,
+                    fecha: fecha
+                },
+                success: function(response) {
+                    $horaSlot.html('');
+
+                    if (response.success && response.slots_disponibles && response.slots_disponibles.length > 0) {
+                        $horaSlot.append('<option value="">-- Seleccione un horario --</option>');
+                        $.each(response.slots_disponibles, function(i, slot) {
+                            $horaSlot.append('<option value="' + slot + '">' + slot + '</option>');
+                        });
+                        $horaSlot.prop('disabled', false);
+                    } else {
+                        var mensaje = response.mensaje || 'No hay horarios disponibles para bloquear';
+                        $horaSlot.append('<option value="">' + mensaje + '</option>');
+                        $horaSlot.prop('disabled', true);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error cargando slots:', error);
+                    $horaSlot.html('<option value="">Error cargando horarios. Intente nuevamente.</option>');
+                    $horaSlot.prop('disabled', true);
+                }
+            });
+        }
+
+        // Eventos para cargar slots cuando cambian servicio o fecha
+        $servicio.on('change', cargarSlotsDisponibles);
+        $fecha.on('change', cargarSlotsDisponibles);
+
+        // Cargar slots al inicio si ya hay valores seleccionados
+        if ($servicio.val() && $fecha.val()) {
+            cargarSlotsDisponibles();
+        }
+    });
+})(django.jQuery);
+</script>
+
+<style>
+#id_hora_slot {
+    max-width: 300px;
+}
+.form-row.field-hora_slot .help {
+    font-style: italic;
+    color: #666;
+    margin-top: 5px;
+}
+</style>
+{% endblock %}
