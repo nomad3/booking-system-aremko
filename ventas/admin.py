@@ -2586,36 +2586,57 @@ class ServicioBloqueoAdmin(admin.ModelAdmin):
         'dias_bloqueados',
         'ver_reservas_conflicto'
     )
-    fieldsets = (
-        ('Información del Bloqueo', {
-            'fields': (
-                'servicio',
-                ('fecha_inicio', 'fecha_fin'),
-                'dias_bloqueados',
-                'motivo',
-                'activo'
-            )
-        }),
-        ('Detalles', {
-            'fields': ('notas',),
-            'classes': ('collapse',)
-        }),
-        ('Validación', {
-            'fields': ('ver_reservas_conflicto',),
-            'classes': ('collapse',),
-            'description': 'Verificación de conflictos con reservas existentes'
-        }),
-        ('Metadatos', {
-            'fields': (
-                'creado_por',
-                'creado_en'
-            ),
-            'classes': ('collapse',)
-        })
-    )
+
     date_hierarchy = 'fecha_inicio'
     ordering = ('-fecha_inicio',)
     actions = ['activar_bloqueos', 'desactivar_bloqueos', 'duplicar_bloqueo']
+
+    def get_fieldsets(self, request, obj=None):
+        """Ajusta fieldsets según si es creación (add) o edición (change)"""
+        if obj:  # Editando objeto existente
+            return (
+                ('Información del Bloqueo', {
+                    'fields': (
+                        'servicio',
+                        ('fecha_inicio', 'fecha_fin'),
+                        'dias_bloqueados',
+                        'motivo',
+                        'activo'
+                    )
+                }),
+                ('Detalles', {
+                    'fields': ('notas',),
+                    'classes': ('collapse',)
+                }),
+                ('Validación', {
+                    'fields': ('ver_reservas_conflicto',),
+                    'classes': ('collapse',),
+                    'description': 'Verificación de conflictos con reservas existentes'
+                }),
+                ('Metadatos', {
+                    'fields': (
+                        'creado_por',
+                        'creado_en'
+                    ),
+                    'classes': ('collapse',)
+                })
+            )
+        else:  # Creando nuevo objeto
+            return (
+                ('Información del Bloqueo', {
+                    'fields': (
+                        'servicio',
+                        ('fecha_inicio', 'fecha_fin'),
+                        'motivo',
+                        'activo'
+                    ),
+                    'description': 'El sistema validará automáticamente que no haya reservas en este rango al guardar.'
+                }),
+                ('Detalles', {
+                    'fields': ('notas',),
+                    'classes': ('collapse',)
+                })
+            )
 
     # Widgets personalizados
     formfield_overrides = {
@@ -2646,36 +2667,44 @@ class ServicioBloqueoAdmin(admin.ModelAdmin):
 
     def ver_reservas_conflicto(self, obj):
         """Muestra si hay reservas en el rango de fechas"""
-        if not obj.pk:
+        # Verificar que el objeto existe y tiene los datos necesarios
+        if not obj or not obj.pk:
             return "Guarda primero para verificar conflictos"
 
+        if not obj.servicio or not obj.fecha_inicio or not obj.fecha_fin:
+            return "Complete los datos del formulario"
+
         from ventas.models import ReservaServicio
-        reservas = ReservaServicio.objects.filter(
-            servicio=obj.servicio,
-            fecha_agendamiento__gte=obj.fecha_inicio,
-            fecha_agendamiento__lte=obj.fecha_fin
-        ).exclude(
-            venta_reserva__estado_reserva='cancelada'
-        ).select_related('venta_reserva', 'venta_reserva__cliente')
+        try:
+            reservas = ReservaServicio.objects.filter(
+                servicio=obj.servicio,
+                fecha_agendamiento__gte=obj.fecha_inicio,
+                fecha_agendamiento__lte=obj.fecha_fin
+            ).exclude(
+                venta_reserva__estado_reserva='cancelada'
+            ).select_related('venta_reserva', 'venta_reserva__cliente')
 
-        if not reservas.exists():
-            return format_html('<span style="color: green;">✓ Sin conflictos - No hay reservas en este rango</span>')
+            if not reservas.exists():
+                return format_html('<span style="color: green;">✓ Sin conflictos - No hay reservas en este rango</span>')
 
-        # Hay conflictos
-        html = '<div style="padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107;">'
-        html += f'<strong style="color: #856404;">⚠ {reservas.count()} reservas encontradas:</strong><ul style="margin: 10px 0;">'
+            # Hay conflictos
+            html = '<div style="padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107;">'
+            html += f'<strong style="color: #856404;">⚠ {reservas.count()} reservas encontradas:</strong><ul style="margin: 10px 0;">'
 
-        for reserva in reservas[:10]:  # Mostrar máximo 10
-            cliente = reserva.venta_reserva.cliente.nombre if reserva.venta_reserva.cliente else 'Sin cliente'
-            estado = reserva.venta_reserva.get_estado_pago_display()
-            fecha = reserva.fecha_agendamiento.strftime('%d/%m/%Y')
-            html += f'<li>{fecha} - {cliente} ({estado})</li>'
+            for reserva in reservas[:10]:  # Mostrar máximo 10
+                cliente = reserva.venta_reserva.cliente.nombre if reserva.venta_reserva.cliente else 'Sin cliente'
+                estado = reserva.venta_reserva.get_estado_pago_display()
+                fecha = reserva.fecha_agendamiento.strftime('%d/%m/%Y')
+                html += f'<li>{fecha} - {cliente} ({estado})</li>'
 
-        if reservas.count() > 10:
-            html += f'<li><em>...y {reservas.count() - 10} reservas más</em></li>'
+            if reservas.count() > 10:
+                html += f'<li><em>...y {reservas.count() - 10} reservas más</em></li>'
 
-        html += '</ul></div>'
-        return format_html(html)
+            html += '</ul></div>'
+            return format_html(html)
+
+        except Exception as e:
+            return format_html('<span style="color: red;">Error verificando conflictos: {}</span>', str(e))
     ver_reservas_conflicto.short_description = 'Reservas en el Rango'
 
     # Acciones personalizadas
