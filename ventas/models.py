@@ -4357,3 +4357,169 @@ class ServicioBloqueo(models.Model):
             fecha_fin__gte=fecha,
             activo=True
         ).exists()
+
+
+# ============================================================================
+# MODELO: ServicioSlotBloqueo - Bloqueo de slots específicos
+# ============================================================================
+
+class ServicioSlotBloqueo(models.Model):
+    """
+    Bloquea UN slot específico (horario) de un servicio en una fecha determinada.
+
+    A diferencia de ServicioBloqueo (que bloquea días completos), este modelo
+    bloquea un único horario, similar a crear una reserva pero sin cliente.
+
+    Casos de uso:
+    - Mantenimiento rápido (1-2 horas)
+    - Limpieza profunda entre clientes
+    - Setup o preparación especial
+    - Time block para operaciones internas
+
+    Características:
+    - Solo 1 fecha (no rangos)
+    - Solo 1 slot/horario
+    - Solo se puede bloquear si el slot está disponible (sin reservas)
+    - Si el día está bloqueado completamente, no se puede crear bloqueo de slot
+    """
+    servicio = models.ForeignKey(
+        Servicio,
+        on_delete=models.CASCADE,
+        related_name='bloqueos_slot',
+        verbose_name='Servicio'
+    )
+    fecha = models.DateField(
+        verbose_name='Fecha',
+        help_text='Fecha específica del bloqueo'
+    )
+    hora_slot = models.CharField(
+        max_length=10,
+        verbose_name='Horario',
+        help_text='Horario a bloquear (ej: 14:30)'
+    )
+    motivo = models.CharField(
+        max_length=255,
+        verbose_name='Motivo del Bloqueo',
+        help_text='Ej: Limpieza, Mantenimiento, Setup'
+    )
+    creado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Creado Por'
+    )
+    creado_en = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de Creación'
+    )
+    activo = models.BooleanField(
+        default=True,
+        verbose_name='Activo',
+        help_text='Desmarcar para desbloquear sin eliminar el registro'
+    )
+    notas = models.TextField(
+        blank=True,
+        verbose_name='Notas Adicionales',
+        help_text='Información adicional sobre el bloqueo'
+    )
+
+    class Meta:
+        app_label = 'ventas'
+        verbose_name = 'Bloqueo de Slot'
+        verbose_name_plural = 'Bloqueos de Slots'
+        ordering = ['-fecha', '-hora_slot']
+        indexes = [
+            models.Index(fields=['servicio', 'fecha', 'hora_slot']),
+            models.Index(fields=['activo']),
+            models.Index(fields=['fecha']),
+        ]
+        # Prevenir duplicados: un servicio no puede tener el mismo slot bloqueado dos veces
+        unique_together = [['servicio', 'fecha', 'hora_slot', 'activo']]
+
+    def __str__(self):
+        return f"{self.servicio.nombre} - {self.fecha.strftime('%d/%m/%Y')} a las {self.hora_slot}"
+
+    def clean(self):
+        """Validaciones del modelo"""
+        from django.core.exceptions import ValidationError
+
+        # Validar que el slot no esté ya bloqueado por día completo
+        if ServicioBloqueo.servicio_bloqueado_en_fecha(self.servicio_id, self.fecha):
+            raise ValidationError({
+                'fecha': 'Este servicio está bloqueado por día completo en esta fecha. No se pueden bloquear slots individuales.'
+            })
+
+        # Validar que el slot exista en la configuración del servicio
+        from ventas.views.calendario_matriz_view import extraer_slots_para_fecha
+        slots_disponibles_config = extraer_slots_para_fecha(
+            self.servicio.slots_disponibles,
+            self.fecha
+        )
+
+        if slots_disponibles_config and self.hora_slot not in slots_disponibles_config:
+            raise ValidationError({
+                'hora_slot': f'El horario {self.hora_slot} no existe para este servicio. Horarios válidos: {", ".join(slots_disponibles_config)}'
+            })
+
+        # Validar que no haya reservas en este slot
+        reservas_existentes = ReservaServicio.objects.filter(
+            servicio=self.servicio,
+            fecha_agendamiento=self.fecha,
+            hora_inicio=self.hora_slot
+        ).exclude(
+            venta_reserva__estado_reserva='cancelada'
+        )
+
+        if reservas_existentes.exists():
+            reserva = reservas_existentes.first()
+            cliente = reserva.venta_reserva.cliente.nombre if reserva.venta_reserva.cliente else 'Sin cliente'
+            raise ValidationError({
+                'hora_slot': f'Este slot ya tiene una reserva de {cliente}. No se puede bloquear.'
+            })
+
+        # Si estamos editando, permitir guardar el mismo slot (no es duplicado)
+        if self.pk:
+            # Es una edición, verificar cambios
+            original = ServicioSlotBloqueo.objects.get(pk=self.pk)
+            # Si no cambió nada relevante, permitir guardar
+            if (original.servicio_id == self.servicio_id and
+                original.fecha == self.fecha and
+                original.hora_slot == self.hora_slot):
+                return  # No hay cambios en los campos únicos
+
+        # Validar que no exista otro bloqueo activo para este mismo slot
+        bloqueos_duplicados = ServicioSlotBloqueo.objects.filter(
+            servicio=self.servicio,
+            fecha=self.fecha,
+            hora_slot=self.hora_slot,
+            activo=True
+        )
+
+        if self.pk:
+            bloqueos_duplicados = bloqueos_duplicados.exclude(pk=self.pk)
+
+        if bloqueos_duplicados.exists():
+            raise ValidationError({
+                'hora_slot': f'Ya existe un bloqueo activo para {self.servicio.nombre} el {self.fecha.strftime("%d/%m/%Y")} a las {self.hora_slot}'
+            })
+
+    @classmethod
+    def slot_bloqueado(cls, servicio_id, fecha, hora_slot):
+        """
+        Método de clase para verificar si un slot específico está bloqueado.
+
+        Args:
+            servicio_id: ID del servicio
+            fecha: Fecha a verificar (date object)
+            hora_slot: Horario a verificar (string, ej: "14:30")
+
+        Returns:
+            bool: True si está bloqueado, False si está disponible
+        """
+        return cls.objects.filter(
+            servicio_id=servicio_id,
+            fecha=fecha,
+            hora_slot=hora_slot,
+            activo=True
+        ).exists()
