@@ -4203,3 +4203,153 @@ Nota: Indicaciones de la autoridad sanitaria""",
 
     def __str__(self):
         return "Configuración de Tips Post-Pago"
+
+
+# --- Sistema de Bloqueo de Servicios por Fecha ---
+
+class ServicioBloqueo(models.Model):
+    """
+    Modelo para bloquear servicios en rangos de fechas específicos.
+    Útil para mantenimiento, reparaciones, o cerrar servicios temporalmente.
+
+    Ejemplos de uso:
+    - Cerrar Cabaña Torre del 15-20 enero por mantenimiento
+    - Cerrar Tina Hornopiren el 5 de febrero por reparación
+    - Bloquear Masaje de Piedras Calientes una semana completa
+
+    IMPORTANTE: Solo se puede bloquear si NO hay reservas existentes en el rango.
+    """
+    servicio = models.ForeignKey(
+        Servicio,
+        on_delete=models.CASCADE,
+        related_name='bloqueos',
+        verbose_name='Servicio'
+    )
+    fecha_inicio = models.DateField(
+        verbose_name='Fecha Inicio',
+        help_text='Primer día del bloqueo (inclusive)'
+    )
+    fecha_fin = models.DateField(
+        verbose_name='Fecha Fin',
+        help_text='Último día del bloqueo (inclusive)'
+    )
+    motivo = models.CharField(
+        max_length=255,
+        verbose_name='Motivo del Bloqueo',
+        help_text='Ej: Mantenimiento, Reparación, Fuera de temporada'
+    )
+    creado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Creado Por'
+    )
+    creado_en = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de Creación'
+    )
+    activo = models.BooleanField(
+        default=True,
+        verbose_name='Activo',
+        help_text='Desmarcar para desactivar el bloqueo sin eliminarlo'
+    )
+    notas = models.TextField(
+        blank=True,
+        verbose_name='Notas Adicionales',
+        help_text='Información adicional sobre el bloqueo'
+    )
+
+    class Meta:
+        verbose_name = 'Bloqueo de Servicio'
+        verbose_name_plural = 'Bloqueos de Servicios'
+        ordering = ['-fecha_inicio']
+        indexes = [
+            models.Index(fields=['servicio', 'fecha_inicio', 'fecha_fin']),
+            models.Index(fields=['activo']),
+        ]
+
+    def __str__(self):
+        if self.fecha_inicio == self.fecha_fin:
+            return f"{self.servicio.nombre} - {self.fecha_inicio.strftime('%d/%m/%Y')}"
+        return f"{self.servicio.nombre} - {self.fecha_inicio.strftime('%d/%m/%Y')} al {self.fecha_fin.strftime('%d/%m/%Y')}"
+
+    def clean(self):
+        """Validaciones del modelo"""
+        from django.core.exceptions import ValidationError
+
+        # Validar que fecha_fin >= fecha_inicio
+        if self.fecha_fin < self.fecha_inicio:
+            raise ValidationError({
+                'fecha_fin': 'La fecha fin no puede ser anterior a la fecha inicio.'
+            })
+
+        # Validar que no haya reservas en el rango (solo si es un bloqueo nuevo o se cambió el rango)
+        if self.pk:
+            # Es una edición - verificar si cambió el rango de fechas
+            original = ServicioBloqueo.objects.get(pk=self.pk)
+            if (original.fecha_inicio != self.fecha_inicio or
+                original.fecha_fin != self.fecha_fin or
+                original.servicio_id != self.servicio_id):
+                self._validar_sin_reservas()
+        else:
+            # Es un bloqueo nuevo
+            self._validar_sin_reservas()
+
+    def _validar_sin_reservas(self):
+        """Verifica que no existan reservas en el rango de fechas"""
+        from django.core.exceptions import ValidationError
+
+        # Buscar reservas del servicio en el rango de fechas
+        reservas_conflicto = ReservaServicio.objects.filter(
+            servicio=self.servicio,
+            fecha_agendamiento__gte=self.fecha_inicio,
+            fecha_agendamiento__lte=self.fecha_fin
+        ).exclude(
+            venta_reserva__estado_reserva='cancelada'
+        )
+
+        if reservas_conflicto.exists():
+            # Contar reservas por fecha
+            fechas_con_reservas = reservas_conflicto.values_list('fecha_agendamiento', flat=True).distinct()
+            fechas_str = ', '.join([f.strftime('%d/%m/%Y') for f in sorted(fechas_con_reservas)[:5]])
+
+            if len(fechas_con_reservas) > 5:
+                fechas_str += f' y {len(fechas_con_reservas) - 5} fechas más'
+
+            raise ValidationError({
+                'fecha_inicio': f'No se puede bloquear: existen {reservas_conflicto.count()} reservas en las fechas: {fechas_str}'
+            })
+
+    def save(self, *args, **kwargs):
+        """Ejecutar validaciones antes de guardar"""
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def get_dias_bloqueados(self):
+        """Retorna la cantidad de días bloqueados"""
+        return (self.fecha_fin - self.fecha_inicio).days + 1
+
+    def contiene_fecha(self, fecha):
+        """Verifica si una fecha específica está dentro del bloqueo"""
+        return self.activo and self.fecha_inicio <= fecha <= self.fecha_fin
+
+    @classmethod
+    def servicio_bloqueado_en_fecha(cls, servicio_id, fecha):
+        """
+        Método de clase para verificar si un servicio está bloqueado en una fecha.
+        Útil para validaciones rápidas.
+
+        Args:
+            servicio_id: ID del servicio
+            fecha: Fecha a verificar (date object)
+
+        Returns:
+            bool: True si está bloqueado, False si está disponible
+        """
+        return cls.objects.filter(
+            servicio_id=servicio_id,
+            fecha_inicio__lte=fecha,
+            fecha_fin__gte=fecha,
+            activo=True
+        ).exists()

@@ -28,6 +28,8 @@ from .models import (
     CommunicationLog, CommunicationLimit, ClientPreferences, SMSTemplate,
     # Corporate Services
     CotizacionEmpresa,
+    # Service Blocking
+    ServicioBloqueo,
     # Newsletter
     NewsletterSubscriber,
     # SEO
@@ -2549,4 +2551,172 @@ class PagoMasajistaAdmin(admin.ModelAdmin):
         return response
 
     exportar_a_excel.short_description = "Exportar pagos seleccionados a Excel"
+
+
+# ============================================================================
+# ADMIN: Sistema de Bloqueo de Servicios
+# ============================================================================
+
+@admin.register(ServicioBloqueo)
+class ServicioBloqueoAdmin(admin.ModelAdmin):
+    list_display = (
+        'servicio',
+        'fecha_inicio',
+        'fecha_fin',
+        'dias_bloqueados',
+        'motivo_corto',
+        'activo',
+        'creado_por',
+        'creado_en'
+    )
+    list_filter = (
+        'activo',
+        'servicio__categoria',
+        'servicio',
+        'creado_en'
+    )
+    search_fields = (
+        'servicio__nombre',
+        'motivo',
+        'notas'
+    )
+    readonly_fields = (
+        'creado_por',
+        'creado_en',
+        'dias_bloqueados',
+        'ver_reservas_conflicto'
+    )
+    fieldsets = (
+        ('Información del Bloqueo', {
+            'fields': (
+                'servicio',
+                ('fecha_inicio', 'fecha_fin'),
+                'dias_bloqueados',
+                'motivo',
+                'activo'
+            )
+        }),
+        ('Detalles', {
+            'fields': ('notas',),
+            'classes': ('collapse',)
+        }),
+        ('Validación', {
+            'fields': ('ver_reservas_conflicto',),
+            'classes': ('collapse',),
+            'description': 'Verificación de conflictos con reservas existentes'
+        }),
+        ('Metadatos', {
+            'fields': (
+                'creado_por',
+                'creado_en'
+            ),
+            'classes': ('collapse',)
+        })
+    )
+    date_hierarchy = 'fecha_inicio'
+    ordering = ('-fecha_inicio',)
+    actions = ['activar_bloqueos', 'desactivar_bloqueos', 'duplicar_bloqueo']
+
+    # Widgets personalizados
+    formfield_overrides = {
+        models.DateField: {'widget': DateInput(attrs={'type': 'date'})},
+        models.TextField: {'widget': forms.Textarea(attrs={'rows': 3})}
+    }
+
+    def save_model(self, request, obj, form, change):
+        """Guardar el usuario que crea el bloqueo"""
+        if not change:  # Si es nuevo
+            obj.creado_por = request.user
+        super().save_model(request, obj, form, change)
+
+    def dias_bloqueados(self, obj):
+        """Muestra cantidad de días bloqueados"""
+        dias = obj.get_dias_bloqueados()
+        if dias == 1:
+            return "1 día"
+        return f"{dias} días"
+    dias_bloqueados.short_description = 'Duración'
+
+    def motivo_corto(self, obj):
+        """Muestra el motivo truncado"""
+        if len(obj.motivo) > 50:
+            return obj.motivo[:50] + '...'
+        return obj.motivo
+    motivo_corto.short_description = 'Motivo'
+
+    def ver_reservas_conflicto(self, obj):
+        """Muestra si hay reservas en el rango de fechas"""
+        if not obj.pk:
+            return "Guarda primero para verificar conflictos"
+
+        from ventas.models import ReservaServicio
+        reservas = ReservaServicio.objects.filter(
+            servicio=obj.servicio,
+            fecha_agendamiento__gte=obj.fecha_inicio,
+            fecha_agendamiento__lte=obj.fecha_fin
+        ).exclude(
+            venta_reserva__estado_reserva='cancelada'
+        ).select_related('venta_reserva', 'venta_reserva__cliente')
+
+        if not reservas.exists():
+            return format_html('<span style="color: green;">✓ Sin conflictos - No hay reservas en este rango</span>')
+
+        # Hay conflictos
+        html = '<div style="padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107;">'
+        html += f'<strong style="color: #856404;">⚠ {reservas.count()} reservas encontradas:</strong><ul style="margin: 10px 0;">'
+
+        for reserva in reservas[:10]:  # Mostrar máximo 10
+            cliente = reserva.venta_reserva.cliente.nombre if reserva.venta_reserva.cliente else 'Sin cliente'
+            estado = reserva.venta_reserva.get_estado_pago_display()
+            fecha = reserva.fecha_agendamiento.strftime('%d/%m/%Y')
+            html += f'<li>{fecha} - {cliente} ({estado})</li>'
+
+        if reservas.count() > 10:
+            html += f'<li><em>...y {reservas.count() - 10} reservas más</em></li>'
+
+        html += '</ul></div>'
+        return format_html(html)
+    ver_reservas_conflicto.short_description = 'Reservas en el Rango'
+
+    # Acciones personalizadas
+    def activar_bloqueos(self, request, queryset):
+        """Activa bloqueos seleccionados"""
+        updated = queryset.update(activo=True)
+        self.message_user(request, f'{updated} bloqueo(s) activado(s)')
+    activar_bloqueos.short_description = "Activar bloqueos seleccionados"
+
+    def desactivar_bloqueos(self, request, queryset):
+        """Desactiva bloqueos seleccionados"""
+        updated = queryset.update(activo=False)
+        self.message_user(request, f'{updated} bloqueo(s) desactivado(s)')
+    desactivar_bloqueos.short_description = "Desactivar bloqueos seleccionados"
+
+    def duplicar_bloqueo(self, request, queryset):
+        """Duplica bloqueos seleccionados para facilitar crear bloqu eos similares"""
+        duplicados = 0
+        for bloqueo in queryset:
+            bloqueo.pk = None
+            bloqueo.creado_por = request.user
+            bloqueo.creado_en = timezone.now()
+            # Adelantar las fechas 7 días para el duplicado
+            bloqueo.fecha_inicio = bloqueo.fecha_inicio + timedelta(days=7)
+            bloqueo.fecha_fin = bloqueo.fecha_fin + timedelta(days=7)
+            try:
+                bloqueo.save()
+                duplicados += 1
+            except Exception as e:
+                self.message_user(request, f'Error duplicando bloqueo: {e}', level=messages.ERROR)
+
+        if duplicados:
+            self.message_user(request, f'{duplicados} bloqueo(s) duplicado(s) (fechas adelantadas 7 días)')
+    duplicar_bloqueo.short_description = "Duplicar bloqueos seleccionados (+7 días)"
+
+    class Media:
+        css = {
+            'all': ('admin/css/forms.css',)
+        }
+        js = (
+            'admin/js/vendor/jquery/jquery.min.js',
+            'admin/js/jquery.init.js',
+        )
 
