@@ -2,11 +2,15 @@ import traceback
 from datetime import datetime
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from ..models import Servicio, ReservaServicio # Relative imports
+from ..models import Servicio, ReservaServicio, ServicioBloqueo # Relative imports
 
 # Helper function to check slot availability (used internally or by other views)
 def is_slot_available(servicio, fecha, hora):
     """Checks if a specific service slot (date and time) is available."""
+    # CRITICAL: Check if the service is blocked on this date
+    if ServicioBloqueo.servicio_bloqueado_en_fecha(servicio.id, fecha):
+        return False
+
     # Check if there are any existing reservations for this service, date and time
     existing_reservas = ReservaServicio.objects.filter(
         servicio=servicio,
@@ -30,6 +34,12 @@ def get_available_hours(request):
         servicio = get_object_or_404(Servicio, id=servicio_id)
         fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
         print(f"[get_available_hours] Date requested: {fecha_obj}") # Debug date
+
+        # CRITICAL: Check if service is blocked on this date
+        if ServicioBloqueo.servicio_bloqueado_en_fecha(servicio_id, fecha_obj):
+            print(f"[get_available_hours] Service {servicio_id} is BLOCKED on {fecha_obj}")
+            return JsonResponse({'success': True, 'horas_disponibles': [], 'bloqueado': True})
+
         day_name = fecha_obj.strftime('%A').lower() # Get day name in English lowercase (e.g., 'monday')
         print(f"[get_available_hours] Day name calculated: {day_name}") # Debug day name
 

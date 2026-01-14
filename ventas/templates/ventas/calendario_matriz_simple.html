@@ -76,6 +76,11 @@
             color: #999;
             font-style: italic;
         }
+        .bloqueado {
+            background-color: #9b59b6;
+            color: white;
+            font-weight: bold;
+        }
 
         /* ===== VISTA MOBILE - TARJETAS ===== */
         @media (max-width: 768px) {
@@ -180,6 +185,12 @@
                 color: #999;
             }
 
+            .slot-item.bloqueado {
+                background-color: #e8d6f0;
+                border-left-color: #9b59b6;
+                color: #6c2d8a;
+            }
+
             .info {
                 padding: 12px;
             }
@@ -268,6 +279,11 @@
                                         <small>{{ celda.cliente|default:"" }}</small>
                                     </td>
                                 {% endif %}
+                            {% elif celda.estado == 'bloqueado' %}
+                                <td class="bloqueado" title="Bloqueado: {{ celda.motivo_bloqueo|default:'Mantenimiento' }} ({{ celda.fecha_inicio_bloqueo }} al {{ celda.fecha_fin_bloqueo }})">
+                                    🚫 Fuera de servicio<br>
+                                    <small>{{ celda.motivo_bloqueo|default:"Bloqueado" }}</small>
+                                </td>
                             {% elif celda.estado == 'no_aplica' %}
                                 <td class="no-aplica">-</td>
                             {% else %}
@@ -315,6 +331,14 @@
                                     </div>
                                 </div>
                             {% endif %}
+                        {% elif slot.estado == 'bloqueado' %}
+                            <div class="slot-item bloqueado">
+                                <div class="slot-hora">{{ slot.hora }}</div>
+                                <div class="slot-estado">
+                                    <strong>🚫 Fuera de servicio</strong>
+                                    <div class="slot-cliente">{{ slot.motivo_bloqueo|default:"Bloqueado" }}</div>
+                                </div>
+                            </div>
                         {% elif slot.estado == 'no_aplica' %}
                             <div class="slot-item no-aplica">
                                 <div class="slot-hora">{{ slot.hora }}</div>
@@ -364,6 +388,10 @@
                 <li style="margin: 5px 0;">
                     <span style="display: inline-block; width: 20px; height: 20px; background-color: #e0e0e0; border: 1px solid #ccc; vertical-align: middle;"></span>
                     <strong>Gris:</strong> Horario no aplica para este servicio
+                </li>
+                <li style="margin: 5px 0;">
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: #9b59b6; border: 1px solid #8e44ad; vertical-align: middle;"></span>
+                    <strong>Morado:</strong> Servicio bloqueado (fuera de servicio por mantenimiento o reparación)
                 </li>
             </ul>
         </div>

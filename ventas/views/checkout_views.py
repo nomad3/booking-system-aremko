@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models.signals import pre_save # Import pre_save signal
 from django.contrib import messages
-from ..models import Servicio, Cliente, VentaReserva, ReservaServicio, Pago, Region, Comuna # Relative imports
+from ..models import Servicio, Cliente, VentaReserva, ReservaServicio, Pago, Region, Comuna, ServicioBloqueo # Relative imports
 # Import the specific signal receiver to disconnect/reconnect
 from ..signals import validar_disponibilidad_admin
 from ..services.cliente_service import ClienteService
@@ -64,6 +64,18 @@ def add_to_cart(request):
 
         try:
             servicio = Servicio.objects.get(id=servicio_id)
+
+            # --- CRITICAL: Check if service is blocked on this date ---
+            try:
+                fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
+                if ServicioBloqueo.servicio_bloqueado_en_fecha(servicio_id, fecha_obj):
+                    messages.error(request, f"El servicio '{servicio.nombre}' no está disponible en la fecha seleccionada (fuera de servicio).")
+                    referer_url = request.META.get('HTTP_REFERER', reverse('ventas:homepage'))
+                    return redirect(referer_url)
+            except ValueError:
+                messages.error(request, "Fecha inválida.")
+                referer_url = request.META.get('HTTP_REFERER', reverse('ventas:homepage'))
+                return redirect(referer_url)
 
             # --- Capacity Validation ---
             # Ensure minimum capacity is met
@@ -267,6 +279,11 @@ def complete_checkout(request):
                 servicio_obj = Servicio.objects.get(id=servicio_id)
                 fecha = datetime.strptime(servicio_item['fecha'], '%Y-%m-%d').date()
                 hora = servicio_item['hora']
+
+                # CRITICAL: Check if service is blocked on this date
+                if ServicioBloqueo.servicio_bloqueado_en_fecha(servicio_id, fecha):
+                    unavailable_slots.append(f"{servicio_obj.nombre} no está disponible en {fecha.strftime('%d/%m/%Y')} (fuera de servicio)")
+                    continue
 
                 # Check if the slot is still available
                 existing_reservas = ReservaServicio.objects.filter(

@@ -14,7 +14,8 @@ from ..models import (
     Servicio,
     CategoriaServicio,
     ReservaServicio,
-    VentaReserva
+    VentaReserva,
+    ServicioBloqueo
 )
 import json
 
@@ -389,6 +390,37 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
                             'servicio': primera_reserva.servicio.nombre,
                             'todas_reservas': lista_reservas  # Guardar todas las reservas para referencia
                         })
+
+    # Marcar servicios bloqueados en la matriz
+    # Obtener todos los bloqueos activos que afectan esta fecha
+    bloqueos = ServicioBloqueo.objects.filter(
+        fecha_inicio__lte=fecha,
+        fecha_fin__gte=fecha,
+        activo=True,
+        servicio__categoria=categoria,
+        servicio__visible_en_matriz=True
+    ).select_related('servicio')
+
+    # Aplicar bloqueos a la matriz
+    for bloqueo in bloqueos:
+        recurso_nombre = bloqueo.servicio.nombre
+
+        # Solo bloquear si el recurso está en la matriz
+        if recurso_nombre in recursos:
+            # Bloquear TODOS los slots para este servicio
+            for slot in slots:
+                if slot in matriz and recurso_nombre in matriz[slot]:
+                    # Marcar como bloqueado, sobrescribiendo cualquier estado previo
+                    matriz[slot][recurso_nombre].update({
+                        'estado': 'bloqueado',
+                        'bloqueo': bloqueo,
+                        'motivo_bloqueo': bloqueo.motivo,
+                        'fecha_inicio_bloqueo': bloqueo.fecha_inicio,
+                        'fecha_fin_bloqueo': bloqueo.fecha_fin,
+                        'cliente': None,  # Limpiar datos de reserva si había
+                        'reserva': None,
+                        'personas': None
+                    })
 
     # Calcular resumen de ocupación (excluyendo slots que no aplican)
     slots_validos = sum(
