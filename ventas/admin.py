@@ -2766,6 +2766,30 @@ class ServicioSlotBloqueoAdmin(admin.ModelAdmin):
         'creado_por',
         'creado_en'
     )
+
+    def changelist_view(self, request, extra_context=None):
+        """Override to add diagnostic info"""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("ServicioSlotBloqueoAdmin: changelist_view called")
+        return super().changelist_view(request, extra_context)
+
+    def add_view(self, request, form_url='', extra_context=None):
+        """Override to add diagnostic info"""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("ServicioSlotBloqueoAdmin: add_view called")
+        logger.info(f"Template path: {self.change_form_template}")
+
+        try:
+            result = super().add_view(request, form_url, extra_context)
+            logger.info("ServicioSlotBloqueoAdmin: add_view successful")
+            return result
+        except Exception as e:
+            logger.error(f"ServicioSlotBloqueoAdmin: add_view ERROR: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            raise
     list_filter = (
         'activo',
         'servicio__categoria',
