@@ -133,3 +133,94 @@ def check_slot_availability(request):
         print(f"Error checking slot availability: {e}")
         traceback.print_exc()
         return JsonResponse({'available': False, 'error': 'Error interno del servidor'}, status=500)
+
+def get_slots_disponibles_para_bloquear(request):
+    """
+    API endpoint para obtener slots disponibles para bloquear.
+
+    Retorna solo los slots que:
+    - NO tienen reservas
+    - NO están bloqueados por día completo
+    - NO están bloqueados por slot individual
+
+    Usado por el admin de ServicioSlotBloqueo para mostrar solo slots bloqueables.
+    """
+    servicio_id = request.GET.get('servicio_id')
+    fecha_str = request.GET.get('fecha')
+
+    if not servicio_id or not fecha_str:
+        return JsonResponse({'success': False, 'error': 'Faltan parámetros'}, status=400)
+
+    try:
+        servicio = get_object_or_404(Servicio, id=servicio_id)
+        fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+
+        # 1. Verificar si el día está bloqueado completamente
+        if ServicioBloqueo.servicio_bloqueado_en_fecha(servicio_id, fecha_obj):
+            return JsonResponse({
+                'success': True,
+                'slots_disponibles': [],
+                'mensaje': 'Este servicio está bloqueado por día completo en esta fecha'
+            })
+
+        # 2. Obtener slots configurados para este servicio en esta fecha
+        from ventas.views.calendario_matriz_view import extraer_slots_para_fecha
+        slots_configurados = extraer_slots_para_fecha(servicio.slots_disponibles, fecha_obj)
+
+        if not slots_configurados:
+            return JsonResponse({
+                'success': True,
+                'slots_disponibles': [],
+                'mensaje': 'Este servicio no tiene horarios configurados para este día'
+            })
+
+        # 3. Obtener reservas existentes
+        from django.db.models import Count
+        reservas_por_hora = ReservaServicio.objects.filter(
+            servicio=servicio,
+            fecha_agendamiento=fecha_obj
+        ).exclude(
+            venta_reserva__estado_reserva='cancelada'
+        ).values('hora_inicio').annotate(cantidad=Count('id'))
+
+        slots_ocupados = {r['hora_inicio']: r['cantidad'] for r in reservas_por_hora}
+
+        # 4. Obtener bloqueos de slot existentes
+        from ventas.models import ServicioSlotBloqueo
+        bloqueos_slot = ServicioSlotBloqueo.objects.filter(
+            servicio=servicio,
+            fecha=fecha_obj,
+            activo=True
+        ).values_list('hora_slot', flat=True)
+
+        slots_bloqueados_set = set(bloqueos_slot)
+
+        # 5. Filtrar slots disponibles
+        max_simultaneos = getattr(servicio, 'max_servicios_simultaneos', 1)
+        slots_disponibles = []
+
+        for hora in slots_configurados:
+            hora_str = str(hora)
+
+            # Verificar si está bloqueado individualmente
+            if hora_str in slots_bloqueados_set:
+                continue
+
+            # Verificar si tiene capacidad disponible
+            reservas_existentes = slots_ocupados.get(hora_str, 0)
+            if reservas_existentes < max_simultaneos:
+                slots_disponibles.append(hora_str)
+
+        return JsonResponse({
+            'success': True,
+            'slots_disponibles': sorted(slots_disponibles)
+        })
+
+    except Servicio.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Servicio no encontrado'}, status=404)
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': f'Error de formato: {str(e)}'}, status=400)
+    except Exception as e:
+        print(f"Error en get_slots_disponibles_para_bloquear: {str(e)}")
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'}, status=500)

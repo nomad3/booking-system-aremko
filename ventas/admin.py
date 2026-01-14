@@ -30,6 +30,7 @@ from .models import (
     CotizacionEmpresa,
     # Service Blocking
     ServicioBloqueo,
+    ServicioSlotBloqueo,
     # Newsletter
     NewsletterSubscriber,
     # SEO
@@ -2748,4 +2749,196 @@ class ServicioBloqueoAdmin(admin.ModelAdmin):
             'admin/js/vendor/jquery/jquery.min.js',
             'admin/js/jquery.init.js',
         )
+
+
+# ============================================================================
+# ADMIN: Sistema de Bloqueo de Slots Específicos
+# ============================================================================
+
+@admin.register(ServicioSlotBloqueo)
+class ServicioSlotBloqueoAdmin(admin.ModelAdmin):
+    list_display = (
+        'servicio',
+        'fecha',
+        'hora_slot',
+        'motivo_corto',
+        'activo',
+        'creado_por',
+        'creado_en'
+    )
+    list_filter = (
+        'activo',
+        'servicio__categoria',
+        'servicio',
+        'fecha'
+    )
+    search_fields = (
+        'servicio__nombre',
+        'motivo',
+        'notas',
+        'hora_slot'
+    )
+    readonly_fields = (
+        'creado_por',
+        'creado_en'
+    )
+
+    date_hierarchy = 'fecha'
+    ordering = ('-fecha', '-hora_slot')
+    actions = ['activar_bloqueos_slot', 'desactivar_bloqueos_slot']
+
+    fieldsets = (
+        ('Selección de Servicio y Fecha', {
+            'fields': (
+                'servicio',
+                'fecha',
+            ),
+            'description': 'Seleccione el servicio y la fecha. Los horarios disponibles se cargarán automáticamente.'
+        }),
+        ('Horario a Bloquear', {
+            'fields': ('hora_slot',),
+            'description': 'Solo aparecerán horarios SIN reservas y SIN bloqueos previos.'
+        }),
+        ('Información del Bloqueo', {
+            'fields': (
+                'motivo',
+                'activo'
+            )
+        }),
+        ('Detalles', {
+            'fields': ('notas',),
+            'classes': ('collapse',)
+        }),
+        ('Metadatos', {
+            'fields': (
+                'creado_por',
+                'creado_en'
+            ),
+            'classes': ('collapse',)
+        })
+    )
+
+    # Widgets personalizados
+    formfield_overrides = {
+        models.DateField: {'widget': DateInput(attrs={'type': 'date'})},
+        models.TextField: {'widget': forms.Textarea(attrs={'rows': 3})}
+    }
+
+    def save_model(self, request, obj, form, change):
+        """Guardar el usuario que crea el bloqueo"""
+        if not change:  # Si es nuevo
+            obj.creado_por = request.user
+        super().save_model(request, obj, form, change)
+
+    def motivo_corto(self, obj):
+        """Muestra el motivo truncado"""
+        if len(obj.motivo) > 40:
+            return obj.motivo[:40] + '...'
+        return obj.motivo
+    motivo_corto.short_description = 'Motivo'
+
+    # Acciones personalizadas
+    def activar_bloqueos_slot(self, request, queryset):
+        """Activa bloqueos de slot seleccionados"""
+        updated = queryset.update(activo=True)
+        self.message_user(request, f'{updated} bloqueo(s) de slot activado(s)')
+    activar_bloqueos_slot.short_description = "Activar bloqueos de slot seleccionados"
+
+    def desactivar_bloqueos_slot(self, request, queryset):
+        """Desactiva bloqueos de slot seleccionados"""
+        updated = queryset.update(activo=False)
+        self.message_user(request, f'{updated} bloqueo(s) de slot desactivado(s)')
+    desactivar_bloqueos_slot.short_description = "Desactivar bloqueos de slot seleccionados"
+
+    class Media:
+        css = {
+            'all': ('admin/css/forms.css',)
+        }
+        js = (
+            'admin/js/vendor/jquery/jquery.min.js',
+            'admin/js/jquery.init.js',
+        )
+
+    def render_change_form(self, request, context, *args, **kwargs):
+        """Inyectar JavaScript para cargar slots dinámicamente"""
+        context['adminform'].form.fields['hora_slot'].widget.attrs.update({
+            'id': 'id_hora_slot',
+        })
+
+        # JavaScript inline para AJAX
+        extra_context = {
+            'slot_bloqueo_js': """
+            <script>
+            (function($) {
+                $(document).ready(function() {
+                    var $servicio = $('#id_servicio');
+                    var $fecha = $('#id_fecha');
+                    var $horaSlot = $('#id_hora_slot');
+                    var $horaSlotContainer = $horaSlot.closest('.form-row');
+
+                    // Convertir select a dropdown
+                    if (!$horaSlot.parent().find('select').length) {
+                        var $select = $('<select id="id_hora_slot" name="hora_slot" class="admin-autocomplete" style="width:100%; padding:8px;"></select>');
+                        $select.append('<option value="">Seleccione servicio y fecha primero...</option>');
+                        $horaSlot.replaceWith($select);
+                        $horaSlot = $select;
+                    }
+
+                    function cargarSlotsDisponibles() {
+                        var servicioId = $servicio.val();
+                        var fecha = $fecha.val();
+
+                        if (!servicioId || !fecha) {
+                            $horaSlot.html('<option value="">Seleccione servicio y fecha primero...</option>');
+                            $horaSlot.prop('disabled', true);
+                            return;
+                        }
+
+                        $horaSlot.html('<option value="">Cargando horarios...</option>');
+                        $horaSlot.prop('disabled', true);
+
+                        $.ajax({
+                            url: '/ventas/get-slots-disponibles-para-bloquear/',
+                            data: {
+                                servicio_id: servicioId,
+                                fecha: fecha
+                            },
+                            success: function(response) {
+                                $horaSlot.html('');
+
+                                if (response.success && response.slots_disponibles.length > 0) {
+                                    $horaSlot.append('<option value="">-- Seleccione un horario --</option>');
+                                    $.each(response.slots_disponibles, function(i, slot) {
+                                        $horaSlot.append('<option value="' + slot + '">' + slot + '</option>');
+                                    });
+                                    $horaSlot.prop('disabled', false);
+                                } else {
+                                    var mensaje = response.mensaje || 'No hay horarios disponibles para bloquear';
+                                    $horaSlot.append('<option value="">' + mensaje + '</option>');
+                                    $horaSlot.prop('disabled', true);
+                                }
+                            },
+                            error: function() {
+                                $horaSlot.html('<option value="">Error cargando horarios</option>');
+                                $horaSlot.prop('disabled', true);
+                            }
+                        });
+                    }
+
+                    // Eventos
+                    $servicio.on('change', cargarSlotsDisponibles);
+                    $fecha.on('change', cargarSlotsDisponibles);
+
+                    // Cargar al inicio si hay valores
+                    if ($servicio.val() && $fecha.val()) {
+                        cargarSlotsDisponibles();
+                    }
+                });
+            })(django.jQuery);
+            </script>
+            """
+        }
+
+        context.update(extra_context)
+        return super().render_change_form(request, context, *args, **kwargs)
 
