@@ -7,8 +7,14 @@ from ..models import Servicio, ReservaServicio, ServicioBloqueo # Relative impor
 # Helper function to check slot availability (used internally or by other views)
 def is_slot_available(servicio, fecha, hora):
     """Checks if a specific service slot (date and time) is available."""
-    # CRITICAL: Check if the service is blocked on this date
+    from ventas.models import ServicioSlotBloqueo
+
+    # CRITICAL 1: Check if the service is blocked by DAY (día completo)
     if ServicioBloqueo.servicio_bloqueado_en_fecha(servicio.id, fecha):
+        return False
+
+    # CRITICAL 2: Check if the specific SLOT is blocked (bloqueo de slot individual)
+    if ServicioSlotBloqueo.slot_bloqueado(servicio.id, fecha, hora):
         return False
 
     # Check if there are any existing reservations for this service, date and time
@@ -72,11 +78,30 @@ def get_available_hours(request):
         max_simultaneos = getattr(servicio, 'max_servicios_simultaneos', 1)
         print(f"[get_available_hours] Servicio {servicio.nombre} max_servicios_simultaneos: {max_simultaneos}") # Debug capacity
 
-        # --- Filter available slots considering capacity ---
-        # Un slot está disponible si tiene menos reservas que el máximo de servicios simultáneos
+        # --- Get blocked slots (bloqueos de slot individuales) ---
+        from ventas.models import ServicioSlotBloqueo
+        bloqueos_slot = ServicioSlotBloqueo.objects.filter(
+            servicio=servicio,
+            fecha=fecha_obj,
+            activo=True
+        ).values_list('hora_slot', flat=True)
+        slots_bloqueados_set = set(bloqueos_slot)
+        print(f"[get_available_hours] Blocked slots: {slots_bloqueados_set}") # Debug blocked slots
+
+        # --- Filter available slots considering capacity AND slot blocks ---
+        # Un slot está disponible si:
+        # 1. Tiene menos reservas que el máximo de servicios simultáneos
+        # 2. NO está bloqueado individualmente
         horas_disponibles = []
         for hora in available_slots_for_day:
             hora_str = str(hora)
+
+            # Verificar si está bloqueado
+            if hora_str in slots_bloqueados_set:
+                print(f"[get_available_hours] Slot {hora_str} is BLOCKED - skipping")
+                continue
+
+            # Verificar capacidad
             reservas_existentes = slots_ocupacion.get(hora_str, 0)
             if reservas_existentes < max_simultaneos:
                 horas_disponibles.append(hora_str)

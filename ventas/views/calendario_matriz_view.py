@@ -15,7 +15,8 @@ from ..models import (
     CategoriaServicio,
     ReservaServicio,
     VentaReserva,
-    ServicioBloqueo
+    ServicioBloqueo,
+    ServicioSlotBloqueo
 )
 import json
 
@@ -391,7 +392,7 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
                             'todas_reservas': lista_reservas  # Guardar todas las reservas para referencia
                         })
 
-    # Marcar servicios bloqueados en la matriz
+    # Marcar servicios bloqueados en la matriz (bloqueos de DÍA COMPLETO)
     # Obtener todos los bloqueos activos que afectan esta fecha
     bloqueos = ServicioBloqueo.objects.filter(
         fecha_inicio__lte=fecha,
@@ -401,7 +402,7 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         servicio__visible_en_matriz=True
     ).select_related('servicio')
 
-    # Aplicar bloqueos a la matriz
+    # Aplicar bloqueos de día completo a la matriz
     for bloqueo in bloqueos:
         recurso_nombre = bloqueo.servicio.nombre
 
@@ -417,6 +418,38 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
                         'motivo_bloqueo': bloqueo.motivo,
                         'fecha_inicio_bloqueo': bloqueo.fecha_inicio,
                         'fecha_fin_bloqueo': bloqueo.fecha_fin,
+                        'tipo_bloqueo': 'dia_completo',  # Identificar como bloqueo de día
+                        'cliente': None,  # Limpiar datos de reserva si había
+                        'reserva': None,
+                        'personas': None
+                    })
+
+    # Marcar bloqueos de SLOTS ESPECÍFICOS (solo horarios puntuales, no días completos)
+    # Obtener todos los bloqueos de slot para esta fecha
+    bloqueos_slot = ServicioSlotBloqueo.objects.filter(
+        fecha=fecha,
+        activo=True,
+        servicio__categoria=categoria,
+        servicio__visible_en_matriz=True
+    ).select_related('servicio')
+
+    # Aplicar bloqueos de slot específico a la matriz
+    for bloqueo_slot in bloqueos_slot:
+        recurso_nombre = bloqueo_slot.servicio.nombre
+        hora_slot = bloqueo_slot.hora_slot
+
+        # Solo bloquear si el recurso está en la matriz Y el slot existe
+        if recurso_nombre in recursos and hora_slot in matriz:
+            if recurso_nombre in matriz[hora_slot]:
+                # Verificar que no haya un bloqueo de día completo (que tiene prioridad)
+                if matriz[hora_slot][recurso_nombre].get('tipo_bloqueo') != 'dia_completo':
+                    # Marcar SOLO este slot específico como bloqueado
+                    matriz[hora_slot][recurso_nombre].update({
+                        'estado': 'bloqueado',
+                        'bloqueo_slot': bloqueo_slot,
+                        'motivo_bloqueo': bloqueo_slot.motivo,
+                        'tipo_bloqueo': 'slot_individual',  # Identificar como bloqueo de slot
+                        'notas_bloqueo': bloqueo_slot.notas if bloqueo_slot.notas else None,
                         'cliente': None,  # Limpiar datos de reserva si había
                         'reserva': None,
                         'personas': None
