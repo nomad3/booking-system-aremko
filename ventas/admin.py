@@ -2761,6 +2761,15 @@ class ServicioSlotBloqueoAdmin(admin.ModelAdmin):
     list_filter = ('activo', 'fecha')
     fields = ('servicio', 'fecha', 'hora_slot', 'motivo', 'activo', 'notas')
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Filtrar servicios: solo visibles en web, ordenados alfabéticamente"""
+        if db_field.name == "servicio":
+            kwargs["queryset"] = Servicio.objects.filter(
+                activo=True,
+                visible_en_web=True
+            ).order_by('nombre')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
     def save_model(self, request, obj, form, change):
         """Guardar el usuario que crea el bloqueo"""
         if not change:
