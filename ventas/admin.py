@@ -2755,8 +2755,23 @@ class ServicioBloqueoAdmin(admin.ModelAdmin):
 # ADMIN: Sistema de Bloqueo de Slots Específicos
 # ============================================================================
 
+class ServicioSlotBloqueoForm(forms.ModelForm):
+    """Formulario personalizado para ServicioSlotBloqueo"""
+    class Meta:
+        model = ServicioSlotBloqueo
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filtrar servicios: solo activos, ordenados alfabéticamente
+        self.fields['servicio'].queryset = Servicio.objects.filter(
+            activo=True
+        ).order_by('nombre')
+
+
 @admin.register(ServicioSlotBloqueo)
 class ServicioSlotBloqueoAdmin(admin.ModelAdmin):
+    form = ServicioSlotBloqueoForm
     list_display = ('servicio', 'fecha', 'hora_slot', 'motivo', 'activo')
     list_filter = ('activo', 'fecha')
     fields = ('servicio', 'fecha', 'hora_slot', 'motivo', 'activo', 'notas')
