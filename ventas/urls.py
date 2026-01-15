@@ -125,8 +125,6 @@ urlpatterns = [
     path('get-available-hours/', availability_views.get_available_hours, name='get_available_hours'),
     path('check-availability/', availability_views.check_slot_availability, name='check_slot_availability'), # Added URL
     path('get-slots-disponibles-para-bloquear/', availability_views.get_slots_disponibles_para_bloquear, name='get_slots_disponibles_para_bloquear'), # AJAX para admin bloqueo de slots
-    # Diagnostic URL (temporal)
-    path('diagnostic/slot-template/', lambda r: __import__('ventas.views.slot_diagnostic', fromlist=['diagnostic_slot_template']).diagnostic_slot_template(r), name='diagnostic_slot_template'),
     path('add-to-cart/', checkout_views.add_to_cart, name='add_to_cart'),
     path('remove-from-cart/', checkout_views.remove_from_cart, name='remove_from_cart'),
     path('cart/', checkout_views.cart_view, name='cart'), # Added cart view URL
