@@ -2893,5 +2893,3 @@ class ServicioSlotBloqueoAdmin(admin.ModelAdmin):
             'admin/js/jquery.init.js',
         )
 
-    change_form_template = 'admin/ventas/servicioslotbloqueo/change_form.html'
-
