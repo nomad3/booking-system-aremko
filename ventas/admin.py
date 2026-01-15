@@ -2787,42 +2787,7 @@ class ServicioSlotBloqueoAdmin(admin.ModelAdmin):
     ordering = ('-fecha', '-hora_slot')
     actions = ['activar_bloqueos_slot', 'desactivar_bloqueos_slot']
 
-    fieldsets = (
-        ('Selección de Servicio y Fecha', {
-            'fields': (
-                'servicio',
-                'fecha',
-            ),
-            'description': 'Seleccione el servicio y la fecha. Los horarios disponibles se cargarán automáticamente.'
-        }),
-        ('Horario a Bloquear', {
-            'fields': ('hora_slot',),
-            'description': 'Solo aparecerán horarios SIN reservas y SIN bloqueos previos.'
-        }),
-        ('Información del Bloqueo', {
-            'fields': (
-                'motivo',
-                'activo'
-            )
-        }),
-        ('Detalles', {
-            'fields': ('notas',),
-            'classes': ('collapse',)
-        }),
-        ('Metadatos', {
-            'fields': (
-                'creado_por',
-                'creado_en'
-            ),
-            'classes': ('collapse',)
-        })
-    )
-
-    # Widgets personalizados
-    formfield_overrides = {
-        models.DateField: {'widget': DateInput(attrs={'type': 'date'})},
-        models.TextField: {'widget': forms.Textarea(attrs={'rows': 3})}
-    }
+    fields = ('servicio', 'fecha', 'hora_slot', 'motivo', 'activo', 'notas')
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """Personalizar el queryset del campo servicio"""
