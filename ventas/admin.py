@@ -2757,80 +2757,13 @@ class ServicioBloqueoAdmin(admin.ModelAdmin):
 
 @admin.register(ServicioSlotBloqueo)
 class ServicioSlotBloqueoAdmin(admin.ModelAdmin):
-    list_display = (
-        'servicio',
-        'fecha',
-        'hora_slot',
-        'motivo_corto',
-        'activo',
-        'creado_por',
-        'creado_en'
-    )
-    list_filter = (
-        'activo',
-        'servicio__categoria',
-        'servicio',
-        'fecha'
-    )
-    search_fields = (
-        'servicio__nombre',
-        'motivo',
-        'notas',
-        'hora_slot'
-    )
-    readonly_fields = (
-        'creado_por',
-        'creado_en'
-    )
-
-    date_hierarchy = 'fecha'
-    ordering = ('-fecha', '-hora_slot')
-    actions = ['activar_bloqueos_slot', 'desactivar_bloqueos_slot']
-
+    list_display = ('servicio', 'fecha', 'hora_slot', 'motivo', 'activo')
+    list_filter = ('activo', 'fecha')
     fields = ('servicio', 'fecha', 'hora_slot', 'motivo', 'activo', 'notas')
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """Personalizar el queryset del campo servicio"""
-        if db_field.name == "servicio":
-            # Solo mostrar servicios activos y visibles en web, ordenados alfabéticamente
-            kwargs["queryset"] = Servicio.objects.filter(
-                activo=True,
-                visible_en_web=True
-            ).order_by('nombre')
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
         """Guardar el usuario que crea el bloqueo"""
-        if not change:  # Si es nuevo
+        if not change:
             obj.creado_por = request.user
         super().save_model(request, obj, form, change)
-
-    def motivo_corto(self, obj):
-        """Muestra el motivo truncado"""
-        if len(obj.motivo) > 40:
-            return obj.motivo[:40] + '...'
-        return obj.motivo
-    motivo_corto.short_description = 'Motivo'
-
-    # Acciones personalizadas
-    def activar_bloqueos_slot(self, request, queryset):
-        """Activa bloqueos de slot seleccionados"""
-        updated = queryset.update(activo=True)
-        self.message_user(request, f'{updated} bloqueo(s) de slot activado(s)')
-    activar_bloqueos_slot.short_description = "Activar bloqueos de slot seleccionados"
-
-    def desactivar_bloqueos_slot(self, request, queryset):
-        """Desactiva bloqueos de slot seleccionados"""
-        updated = queryset.update(activo=False)
-        self.message_user(request, f'{updated} bloqueo(s) de slot desactivado(s)')
-    desactivar_bloqueos_slot.short_description = "Desactivar bloqueos de slot seleccionados"
-
-    class Media:
-        css = {
-            'all': ('admin/css/forms.css',)
-        }
-        js = (
-            'admin/js/vendor/jquery/jquery.min.js',
-            'admin/js/jquery.init.js',
-        )
 
