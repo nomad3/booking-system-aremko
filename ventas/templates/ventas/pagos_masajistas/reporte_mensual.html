@@ -251,43 +251,13 @@
                 <!-- Fila de totales -->
                 <tr class="total-row">
                     <td>TOTALES</td>
-                    {% for mes in meses %}
+                    {% for total in totales_mes %}
                     <td style="text-align: center;">
-                        {% with total_mes_cobrado=0 total_mes_comision=0 %}
-                        {% for fila in datos_reporte %}
-                            {% with mes_index=forloop.counter0 %}
-                            {% if fila.meses|length > mes_index %}
-                                {% with mes_data=fila.meses|slice:mes_index|first %}
-                                {% endwith %}
-                            {% endif %}
-                            {% endwith %}
-                        {% endfor %}
-                        {% endwith %}
-                        <div class="cell-cobrado">
-                            ${% widthratio 1 1 0 as suma %}
-                            {% for fila in datos_reporte %}
-                                {% for m in fila.meses %}
-                                    {% if m.mes == mes.mes and m.anio == mes.anio %}
-                                        {% widthratio m.total_cobrado 1 1 as valor %}
-                                        {% widthratio suma 1 1 as suma_anterior %}
-                                        {% widthratio suma_anterior|add:valor 1 1 as suma %}
-                                    {% endif %}
-                                {% endfor %}
-                            {% endfor %}
-                            {{ suma|floatformat:0|intcomma }}
-                        </div>
+                        <div class="cell-cobrado">${{ total.total_cobrado|floatformat:0|intcomma }}</div>
                     </td>
                     {% endfor %}
                     <td style="background: #c8e6c9; text-align: center;">
-                        <div class="cell-cobrado">
-                            {% widthratio 1 1 0 as gran_total %}
-                            {% for fila in datos_reporte %}
-                                {% widthratio fila.total_cobrado 1 1 as valor %}
-                                {% widthratio gran_total 1 1 as total_anterior %}
-                                {% widthratio total_anterior|add:valor 1 1 as gran_total %}
-                            {% endfor %}
-                            ${{ gran_total|floatformat:0|intcomma }}
-                        </div>
+                        <div class="cell-cobrado">${{ gran_total_cobrado|floatformat:0|intcomma }}</div>
                     </td>
                 </tr>
             </tbody>

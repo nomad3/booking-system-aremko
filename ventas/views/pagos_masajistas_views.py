@@ -590,9 +590,30 @@ def reporte_mensual_masajistas(request):
 
         datos_reporte.append(fila)
 
+    # Calcular totales por mes
+    totales_mes = []
+    for i, mes in enumerate(meses):
+        total_mes_cobrado = Decimal('0')
+        total_mes_comision = Decimal('0')
+        for fila in datos_reporte:
+            if i < len(fila['meses']):
+                total_mes_cobrado += fila['meses'][i]['total_cobrado']
+                total_mes_comision += fila['meses'][i]['total_comision']
+        totales_mes.append({
+            'total_cobrado': total_mes_cobrado,
+            'total_comision': total_mes_comision
+        })
+
+    # Calcular gran total
+    gran_total_cobrado = sum(fila['total_cobrado'] for fila in datos_reporte)
+    gran_total_comision = sum(fila['total_comision'] for fila in datos_reporte)
+
     context = {
         'datos_reporte': datos_reporte,
         'meses': meses,
+        'totales_mes': totales_mes,
+        'gran_total_cobrado': gran_total_cobrado,
+        'gran_total_comision': gran_total_comision,
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
         'hoy': hoy
