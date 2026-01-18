@@ -497,3 +497,175 @@ def exportar_liquidacion(request, pago_id):
     wb.save(response)
 
     return response
+
+
+@staff_required
+def reporte_mensual_masajistas(request):
+    """
+    Reporte de pagos a masajistas - últimos 6 meses
+    Muestra resumen mensual con posibilidad de ver detalle
+    """
+    from dateutil.relativedelta import relativedelta
+
+    # Obtener fecha actual
+    hoy = timezone.now().date()
+
+    # Calcular rango de últimos 6 meses
+    fecha_fin = hoy.replace(day=1)  # Primer día del mes actual
+    fecha_inicio = fecha_fin - relativedelta(months=5)  # 6 meses atrás (incluyendo actual)
+
+    # Generar lista de meses para las columnas
+    meses = []
+    mes_actual = fecha_inicio
+    while mes_actual <= fecha_fin:
+        meses.append({
+            'fecha': mes_actual,
+            'nombre': mes_actual.strftime('%b %Y'),  # "Ene 2026"
+            'mes': mes_actual.month,
+            'anio': mes_actual.year
+        })
+        mes_actual += relativedelta(months=1)
+
+    # Obtener todas las masajistas activas
+    masajistas = Proveedor.objects.filter(
+        es_masajista=True,
+        activo=True
+    ).order_by('nombre')
+
+    # Construir datos del reporte
+    datos_reporte = []
+
+    for masajista in masajistas:
+        fila = {
+            'masajista_id': masajista.id,
+            'masajista_nombre': masajista.nombre,
+            'porcentaje_comision': masajista.porcentaje_comision,
+            'meses': [],
+            'total_cobrado': Decimal('0'),
+            'total_comision': Decimal('0')
+        }
+
+        for mes in meses:
+            # Calcular fecha inicio y fin del mes
+            primer_dia = mes['fecha']
+            if mes['fecha'].month == 12:
+                ultimo_dia = mes['fecha'].replace(year=mes['fecha'].year + 1, month=1, day=1) - timedelta(days=1)
+            else:
+                ultimo_dia = mes['fecha'].replace(month=mes['fecha'].month + 1, day=1) - timedelta(days=1)
+
+            # Obtener reservas de este masajista en este mes, solo pagadas
+            reservas = ReservaServicio.objects.filter(
+                proveedor_asignado=masajista,
+                fecha_agendamiento__gte=primer_dia,
+                fecha_agendamiento__lte=ultimo_dia,
+                venta_reserva__estado_pago='pagado'
+            ).select_related('servicio', 'venta_reserva', 'venta_reserva__cliente')
+
+            # Calcular totales del mes
+            total_mes_cobrado = Decimal('0')
+            total_mes_comision = Decimal('0')
+            cantidad_servicios = reservas.count()
+
+            for reserva in reservas:
+                # Total cobrado = precio del servicio * cantidad de personas
+                monto_cobrado = Decimal(str(reserva.servicio.precio_base)) * reserva.cantidad_personas
+
+                # Comisión = monto cobrado * (porcentaje / 100) SIN descontar impuestos
+                comision = monto_cobrado * (Decimal(str(masajista.porcentaje_comision)) / 100)
+
+                total_mes_cobrado += monto_cobrado
+                total_mes_comision += comision
+
+            fila['meses'].append({
+                'mes': mes['mes'],
+                'anio': mes['anio'],
+                'nombre': mes['nombre'],
+                'total_cobrado': total_mes_cobrado,
+                'total_comision': total_mes_comision,
+                'cantidad_servicios': cantidad_servicios
+            })
+
+            fila['total_cobrado'] += total_mes_cobrado
+            fila['total_comision'] += total_mes_comision
+
+        datos_reporte.append(fila)
+
+    context = {
+        'datos_reporte': datos_reporte,
+        'meses': meses,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'hoy': hoy
+    }
+
+    return render(request, 'ventas/pagos_masajistas/reporte_mensual.html', context)
+
+
+@staff_required
+def detalle_mes_masajista(request):
+    """
+    API endpoint para obtener el detalle de servicios de una masajista en un mes específico
+    """
+    masajista_id = request.GET.get('masajista_id')
+    mes = request.GET.get('mes')
+    anio = request.GET.get('anio')
+
+    if not all([masajista_id, mes, anio]):
+        return JsonResponse({'error': 'Faltan parámetros'}, status=400)
+
+    try:
+        masajista = Proveedor.objects.get(id=masajista_id, es_masajista=True)
+
+        # Calcular rango del mes
+        primer_dia = datetime(int(anio), int(mes), 1).date()
+        if int(mes) == 12:
+            ultimo_dia = datetime(int(anio) + 1, 1, 1).date() - timedelta(days=1)
+        else:
+            ultimo_dia = datetime(int(anio), int(mes) + 1, 1).date() - timedelta(days=1)
+
+        # Obtener reservas del mes, solo pagadas
+        reservas = ReservaServicio.objects.filter(
+            proveedor_asignado=masajista,
+            fecha_agendamiento__gte=primer_dia,
+            fecha_agendamiento__lte=ultimo_dia,
+            venta_reserva__estado_pago='pagado'
+        ).select_related(
+            'servicio',
+            'venta_reserva',
+            'venta_reserva__cliente'
+        ).order_by('fecha_agendamiento', 'hora_inicio')
+
+        # Construir lista de servicios
+        servicios = []
+        for reserva in reservas:
+            monto_cobrado = Decimal(str(reserva.servicio.precio_base)) * reserva.cantidad_personas
+            comision = monto_cobrado * (Decimal(str(masajista.porcentaje_comision)) / 100)
+
+            servicios.append({
+                'fecha': reserva.fecha_agendamiento.strftime('%d/%m/%Y'),
+                'hora': reserva.hora_inicio,
+                'cliente': reserva.venta_reserva.cliente.nombre if reserva.venta_reserva.cliente else 'Sin cliente',
+                'servicio': reserva.servicio.nombre,
+                'cantidad_personas': reserva.cantidad_personas,
+                'monto_cobrado': float(monto_cobrado),
+                'comision': float(comision),
+                'reserva_id': reserva.venta_reserva.id
+            })
+
+        return JsonResponse({
+            'success': True,
+            'masajista': masajista.nombre,
+            'porcentaje_comision': float(masajista.porcentaje_comision),
+            'mes': primer_dia.strftime('%B %Y'),
+            'servicios': servicios,
+            'total_servicios': len(servicios),
+            'total_cobrado': float(sum(Decimal(str(s['monto_cobrado'])) for s in servicios)),
+            'total_comision': float(sum(Decimal(str(s['comision'])) for s in servicios))
+        })
+
+    except Proveedor.DoesNotExist:
+        return JsonResponse({'error': 'Masajista no encontrada'}, status=404)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': str(e)}, status=500)

@@ -1,0 +1,392 @@
+{% extends 'admin/base_site.html' %}
+{% load humanize %}
+
+{% block title %}Reporte Mensual de Masajistas{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Inicio</a>
+    › <a href="{% url 'ventas:dashboard_pagos_masajistas' %}">Pagos a Masajistas</a>
+    › Reporte Mensual
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+    .reporte-container {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    .reporte-header {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+    .btn {
+        display: inline-block;
+        padding: 10px 20px;
+        background: transparent;
+        color: #000;
+        border: 1px solid #ddd;
+        text-decoration: none;
+        border-radius: 4px;
+        transition: all 0.3s;
+        font-weight: 500;
+    }
+    .btn:hover {
+        background: #f8f9fa;
+        border-color: #000;
+    }
+    .table-container {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        overflow-x: auto;
+    }
+    .reporte-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 800px;
+    }
+    .reporte-table th {
+        background: #f8f9fa;
+        padding: 12px;
+        text-align: left;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    .reporte-table th.mes-header {
+        text-align: center;
+        min-width: 140px;
+    }
+    .reporte-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .reporte-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+    .cell-data {
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 4px;
+        transition: all 0.2s;
+        min-height: 50px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    .cell-data:hover {
+        background: #e3f2fd;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .cell-empty {
+        color: #999;
+        text-align: center;
+        font-style: italic;
+    }
+    .cell-cobrado {
+        font-size: 0.9em;
+        font-weight: bold;
+        color: #2e7d32;
+    }
+    .cell-comision {
+        font-size: 0.85em;
+        color: #1976d2;
+    }
+    .cell-count {
+        font-size: 0.75em;
+        color: #666;
+        margin-top: 4px;
+    }
+    .masajista-nombre {
+        font-weight: 500;
+    }
+    .masajista-comision {
+        font-size: 0.85em;
+        color: #666;
+    }
+    .total-row {
+        background: #f0f0f0;
+        font-weight: bold;
+    }
+    .total-row td {
+        border-top: 2px solid #333;
+        padding: 12px;
+    }
+
+    /* Modal para detalle */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0,0,0,0.4);
+    }
+    .modal-content {
+        background-color: #fefefe;
+        margin: 5% auto;
+        padding: 0;
+        border: 1px solid #888;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 900px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .modal-header {
+        padding: 20px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        border-radius: 8px 8px 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .modal-body {
+        padding: 20px;
+        max-height: 500px;
+        overflow-y: auto;
+    }
+    .close {
+        color: #aaa;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+    .close:hover,
+    .close:focus {
+        color: #000;
+    }
+    .detalle-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .detalle-table th {
+        background: #f8f9fa;
+        padding: 10px;
+        text-align: left;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .detalle-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .detalle-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+    }
+</style>
+
+<div class="reporte-container">
+    <div class="reporte-header">
+        <h1>Reporte Mensual de Masajistas</h1>
+        <p style="color: #666; margin: 10px 0;">Últimos 6 meses - Total cobrado al cliente y comisión a masajista (sin descuento de impuestos)</p>
+        <div style="margin-top: 15px;">
+            <a href="{% url 'ventas:dashboard_pagos_masajistas' %}" class="btn">← Volver al Dashboard</a>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table class="reporte-table">
+            <thead>
+                <tr>
+                    <th style="min-width: 200px;">Masajista</th>
+                    {% for mes in meses %}
+                    <th class="mes-header">{{ mes.nombre }}</th>
+                    {% endfor %}
+                    <th class="mes-header" style="background: #e8f5e9;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in datos_reporte %}
+                <tr>
+                    <td>
+                        <div class="masajista-nombre">{{ fila.masajista_nombre }}</div>
+                        <div class="masajista-comision">Comisión: {{ fila.porcentaje_comision }}%</div>
+                    </td>
+                    {% for mes_data in fila.meses %}
+                    <td>
+                        {% if mes_data.cantidad_servicios > 0 %}
+                        <div class="cell-data"
+                             onclick="mostrarDetalle({{ fila.masajista_id }}, {{ mes_data.mes }}, {{ mes_data.anio }}, '{{ fila.masajista_nombre }}', '{{ mes_data.nombre }}')">
+                            <div class="cell-cobrado">${{ mes_data.total_cobrado|floatformat:0|intcomma }}</div>
+                            <div class="cell-comision">Com: ${{ mes_data.total_comision|floatformat:0|intcomma }}</div>
+                            <div class="cell-count">{{ mes_data.cantidad_servicios }} servicio{{ mes_data.cantidad_servicios|pluralize }}</div>
+                        </div>
+                        {% else %}
+                        <div class="cell-empty">-</div>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                    <td style="background: #e8f5e9;">
+                        {% if fila.total_cobrado > 0 %}
+                        <div style="text-align: center;">
+                            <div class="cell-cobrado">${{ fila.total_cobrado|floatformat:0|intcomma }}</div>
+                            <div class="cell-comision">Com: ${{ fila.total_comision|floatformat:0|intcomma }}</div>
+                        </div>
+                        {% else %}
+                        <div class="cell-empty">-</div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+
+                <!-- Fila de totales -->
+                <tr class="total-row">
+                    <td>TOTALES</td>
+                    {% for mes in meses %}
+                    <td style="text-align: center;">
+                        {% with total_mes_cobrado=0 total_mes_comision=0 %}
+                        {% for fila in datos_reporte %}
+                            {% with mes_index=forloop.counter0 %}
+                            {% if fila.meses|length > mes_index %}
+                                {% with mes_data=fila.meses|slice:mes_index|first %}
+                                {% endwith %}
+                            {% endif %}
+                            {% endwith %}
+                        {% endfor %}
+                        {% endwith %}
+                        <div class="cell-cobrado">
+                            ${% widthratio 1 1 0 as suma %}
+                            {% for fila in datos_reporte %}
+                                {% for m in fila.meses %}
+                                    {% if m.mes == mes.mes and m.anio == mes.anio %}
+                                        {% widthratio m.total_cobrado 1 1 as valor %}
+                                        {% widthratio suma 1 1 as suma_anterior %}
+                                        {% widthratio suma_anterior|add:valor 1 1 as suma %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endfor %}
+                            {{ suma|floatformat:0|intcomma }}
+                        </div>
+                    </td>
+                    {% endfor %}
+                    <td style="background: #c8e6c9; text-align: center;">
+                        <div class="cell-cobrado">
+                            {% widthratio 1 1 0 as gran_total %}
+                            {% for fila in datos_reporte %}
+                                {% widthratio fila.total_cobrado 1 1 as valor %}
+                                {% widthratio gran_total 1 1 as total_anterior %}
+                                {% widthratio total_anterior|add:valor 1 1 as gran_total %}
+                            {% endfor %}
+                            ${{ gran_total|floatformat:0|intcomma }}
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal para detalle -->
+<div id="detalleModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">Detalle de Servicios</h2>
+            <span class="close" onclick="cerrarModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="modalBody">
+            <div class="loading">Cargando...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+function mostrarDetalle(masajistaId, mes, anio, masajistaNombre, mesNombre) {
+    const modal = document.getElementById('detalleModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+
+    modalTitle.textContent = `Detalle - ${masajistaNombre} - ${mesNombre}`;
+    modalBody.innerHTML = '<div class="loading">Cargando...</div>';
+    modal.style.display = 'block';
+
+    // Realizar petición AJAX
+    fetch(`{% url 'ventas:detalle_mes_masajista' %}?masajista_id=${masajistaId}&mes=${mes}&anio=${anio}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                modalBody.innerHTML = `<p style="color: red;">${data.error}</p>`;
+                return;
+            }
+
+            let html = '<table class="detalle-table">';
+            html += '<thead><tr>';
+            html += '<th>Fecha</th>';
+            html += '<th>Hora</th>';
+            html += '<th>Cliente</th>';
+            html += '<th>Servicio</th>';
+            html += '<th style="text-align: right;">Cobrado</th>';
+            html += '<th style="text-align: right;">Comisión</th>';
+            html += '</tr></thead>';
+            html += '<tbody>';
+
+            let totalCobrado = 0;
+            let totalComision = 0;
+
+            data.servicios.forEach(servicio => {
+                html += '<tr>';
+                html += `<td>${servicio.fecha}</td>`;
+                html += `<td>${servicio.hora}</td>`;
+                html += `<td>${servicio.cliente}</td>`;
+                html += `<td>${servicio.servicio}</td>`;
+                html += `<td style="text-align: right;">$${Number(servicio.monto_cobrado).toLocaleString('es-CL', {maximumFractionDigits: 0})}</td>`;
+                html += `<td style="text-align: right;">$${Number(servicio.comision).toLocaleString('es-CL', {maximumFractionDigits: 0})}</td>`;
+                html += '</tr>';
+
+                totalCobrado += parseFloat(servicio.monto_cobrado);
+                totalComision += parseFloat(servicio.comision);
+            });
+
+            html += '<tr class="total-row">';
+            html += '<td colspan="4">TOTAL</td>';
+            html += `<td style="text-align: right;">$${totalCobrado.toLocaleString('es-CL', {maximumFractionDigits: 0})}</td>`;
+            html += `<td style="text-align: right;">$${totalComision.toLocaleString('es-CL', {maximumFractionDigits: 0})}</td>`;
+            html += '</tr>';
+
+            html += '</tbody></table>';
+
+            modalBody.innerHTML = html;
+        })
+        .catch(error => {
+            modalBody.innerHTML = `<p style="color: red;">Error al cargar los datos: ${error}</p>`;
+        });
+}
+
+function cerrarModal() {
+    document.getElementById('detalleModal').style.display = 'none';
+}
+
+// Cerrar modal si se hace clic fuera de él
+window.onclick = function(event) {
+    const modal = document.getElementById('detalleModal');
+    if (event.target == modal) {
+        cerrarModal();
+    }
+}
+
+// Cerrar modal con la tecla Escape
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        cerrarModal();
+    }
+});
+</script>
+{% endblock %}

@@ -249,6 +249,8 @@ urlpatterns = [
     path('pagos-masajistas/historial/', pagos_masajistas_views.historial_pagos, name='historial_pagos'),
     path('pagos-masajistas/detalle/<int:pago_id>/', pagos_masajistas_views.detalle_pago, name='detalle_pago'),
     path('pagos-masajistas/exportar/<int:pago_id>/', pagos_masajistas_views.exportar_liquidacion, name='exportar_liquidacion'),
+    path('pagos-masajistas/reporte-mensual/', pagos_masajistas_views.reporte_mensual_masajistas, name='reporte_mensual_masajistas'),
+    path('pagos-masajistas/reporte-mensual/detalle/', pagos_masajistas_views.detalle_mes_masajista, name='detalle_mes_masajista'),
     # === END SISTEMA DE PAGOS A MASAJISTAS ===
 
     # API Router (Keep this last if possible, or ensure specific paths come first)
