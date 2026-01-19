@@ -10,6 +10,7 @@ from django.db.models import Q, Sum, Count
 from django.utils import timezone
 from datetime import datetime, timedelta
 from decimal import Decimal
+from dateutil.relativedelta import relativedelta
 import json
 
 from ..models import (
@@ -505,8 +506,6 @@ def reporte_mensual_masajistas(request):
     Reporte de pagos a masajistas - últimos 6 meses
     Muestra resumen mensual con posibilidad de ver detalle
     """
-    from dateutil.relativedelta import relativedelta
-
     # Obtener fecha actual
     hoy = timezone.now().date()
 
