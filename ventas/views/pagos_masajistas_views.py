@@ -566,14 +566,22 @@ def reporte_mensual_masajistas(request):
             cantidad_servicios = reservas.count()
 
             for reserva in reservas:
+                # Validar que la reserva tenga servicio
+                if not reserva.servicio:
+                    continue
+
                 # Total cobrado = precio del servicio * cantidad de personas
-                monto_cobrado = Decimal(str(reserva.servicio.precio_base)) * reserva.cantidad_personas
+                try:
+                    monto_cobrado = Decimal(str(reserva.servicio.precio_base)) * reserva.cantidad_personas
 
-                # Comisión = monto cobrado * (porcentaje / 100) SIN descontar impuestos
-                comision = monto_cobrado * (Decimal(str(masajista.porcentaje_comision)) / 100)
+                    # Comisión = monto cobrado * (porcentaje / 100) SIN descontar impuestos
+                    comision = monto_cobrado * (Decimal(str(masajista.porcentaje_comision)) / 100)
 
-                total_mes_cobrado += monto_cobrado
-                total_mes_comision += comision
+                    total_mes_cobrado += monto_cobrado
+                    total_mes_comision += comision
+                except (AttributeError, TypeError, ValueError) as e:
+                    # Si hay algún error con el precio, saltamos esta reserva
+                    continue
 
             fila['meses'].append({
                 'mes': mes['mes'],
@@ -658,19 +666,27 @@ def detalle_mes_masajista(request):
         # Construir lista de servicios
         servicios = []
         for reserva in reservas:
-            monto_cobrado = Decimal(str(reserva.servicio.precio_base)) * reserva.cantidad_personas
-            comision = monto_cobrado * (Decimal(str(masajista.porcentaje_comision)) / 100)
+            # Validar que la reserva tenga servicio
+            if not reserva.servicio:
+                continue
 
-            servicios.append({
-                'fecha': reserva.fecha_agendamiento.strftime('%d/%m/%Y'),
-                'hora': reserva.hora_inicio,
-                'cliente': reserva.venta_reserva.cliente.nombre if reserva.venta_reserva.cliente else 'Sin cliente',
-                'servicio': reserva.servicio.nombre,
-                'cantidad_personas': reserva.cantidad_personas,
-                'monto_cobrado': float(monto_cobrado),
-                'comision': float(comision),
-                'reserva_id': reserva.venta_reserva.id
-            })
+            try:
+                monto_cobrado = Decimal(str(reserva.servicio.precio_base)) * reserva.cantidad_personas
+                comision = monto_cobrado * (Decimal(str(masajista.porcentaje_comision)) / 100)
+
+                servicios.append({
+                    'fecha': reserva.fecha_agendamiento.strftime('%d/%m/%Y'),
+                    'hora': reserva.hora_inicio,
+                    'cliente': reserva.venta_reserva.cliente.nombre if reserva.venta_reserva.cliente else 'Sin cliente',
+                    'servicio': reserva.servicio.nombre,
+                    'cantidad_personas': reserva.cantidad_personas,
+                    'monto_cobrado': float(monto_cobrado),
+                    'comision': float(comision),
+                    'reserva_id': reserva.venta_reserva.id
+                })
+            except (AttributeError, TypeError, ValueError):
+                # Si hay algún error con el precio, saltamos esta reserva
+                continue
 
         return JsonResponse({
             'success': True,
