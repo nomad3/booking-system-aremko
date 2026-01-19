@@ -525,10 +525,9 @@ def reporte_mensual_masajistas(request):
         })
         mes_actual += relativedelta(months=1)
 
-    # Obtener todas las masajistas activas
+    # Obtener todas las masajistas
     masajistas = Proveedor.objects.filter(
-        es_masajista=True,
-        activo=True
+        es_masajista=True
     ).order_by('nombre')
 
     # Construir datos del reporte

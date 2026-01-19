@@ -49,10 +49,9 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f'✓ OK - {len(meses)} meses generados\n'))
 
             # Test 5: Obtener masajistas
-            self.stdout.write('Test 5: Obtener masajistas activas... ')
+            self.stdout.write('Test 5: Obtener masajistas... ')
             masajistas = Proveedor.objects.filter(
-                es_masajista=True,
-                activo=True
+                es_masajista=True
             ).order_by('nombre')
             self.stdout.write(self.style.SUCCESS(f'✓ OK - {masajistas.count()} masajistas encontradas\n'))
 
