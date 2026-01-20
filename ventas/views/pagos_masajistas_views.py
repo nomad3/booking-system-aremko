@@ -66,12 +66,22 @@ def dashboard_pagos_masajistas(request):
         ultimo_dia = calendar.monthrange(hoy.year, hoy.month)[1]
         fecha_fin = hoy.replace(day=ultimo_dia).strftime('%Y-%m-%d')
 
+    # Obtener filtro de estado de pago del cliente
+    estado_pago_cliente = request.GET.get('estado_pago_cliente', 'pagado')  # Default: solo pagado
+
     # Construir query de servicios pendientes con filtros
     servicios_pendientes = ReservaServicio.objects.filter(
-        venta_reserva__estado_pago='pagado',
         pagado_a_proveedor=False,
         proveedor_asignado__es_masajista=True
     )
+
+    # Filtrar por estado de pago del cliente
+    if estado_pago_cliente == 'pagado':
+        servicios_pendientes = servicios_pendientes.filter(venta_reserva__estado_pago='pagado')
+    elif estado_pago_cliente == 'parcial':
+        servicios_pendientes = servicios_pendientes.filter(venta_reserva__estado_pago='parcial')
+    elif estado_pago_cliente == 'ambos':
+        servicios_pendientes = servicios_pendientes.filter(venta_reserva__estado_pago__in=['pagado', 'parcial'])
 
     # Aplicar filtro de masajista si está seleccionado
     if masajista_seleccionado:
@@ -125,6 +135,7 @@ def dashboard_pagos_masajistas(request):
         'masajista_id': masajista_id,
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
+        'estado_pago_cliente': estado_pago_cliente,
         'servicios': servicios_con_montos,
         'servicios_pendientes_count': len(servicios_con_montos),
         'total_bruto_comisiones': total_bruto_comisiones,  # Total bruto para Boleta de Honorarios
@@ -145,13 +156,21 @@ def listar_servicios_pendientes(request, masajista_id=None):
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin = request.GET.get('fecha_fin')
     estado_pago_proveedor = request.GET.get('estado_pago_proveedor', 'pendientes')
+    estado_pago_cliente = request.GET.get('estado_pago_cliente', 'pagado')  # Default: solo pagado
 
-    # Base query - servicios de masajistas con reservas pagadas por el cliente
+    # Base query - servicios de masajistas
     servicios = ReservaServicio.objects.filter(
-        venta_reserva__estado_pago='pagado',
         proveedor_asignado__isnull=False,
         proveedor_asignado__es_masajista=True
     )
+
+    # Filtrar por estado de pago del cliente
+    if estado_pago_cliente == 'pagado':
+        servicios = servicios.filter(venta_reserva__estado_pago='pagado')
+    elif estado_pago_cliente == 'parcial':
+        servicios = servicios.filter(venta_reserva__estado_pago='parcial')
+    elif estado_pago_cliente == 'ambos':
+        servicios = servicios.filter(venta_reserva__estado_pago__in=['pagado', 'parcial'])
 
     # Filtrar por estado de pago al proveedor
     if estado_pago_proveedor == 'pendientes':
@@ -218,6 +237,7 @@ def listar_servicios_pendientes(request, masajista_id=None):
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
         'estado_pago_proveedor': estado_pago_proveedor,
+        'estado_pago_cliente': estado_pago_cliente,
         'total_bruto': total_bruto,
         'total_masajista': total_masajista,
         'total_retencion': total_retencion,
@@ -506,6 +526,9 @@ def reporte_mensual_masajistas(request):
     Reporte de pagos a masajistas - últimos 6 meses
     Muestra resumen mensual con posibilidad de ver detalle
     """
+    # Obtener filtro de estado de pago del cliente
+    estado_pago_cliente = request.GET.get('estado_pago_cliente', 'pagado')  # Default: solo pagado
+
     # Obtener fecha actual
     hoy = timezone.now().date()
 
@@ -551,13 +574,22 @@ def reporte_mensual_masajistas(request):
             else:
                 ultimo_dia = mes['fecha'].replace(month=mes['fecha'].month + 1, day=1) - timedelta(days=1)
 
-            # Obtener reservas de este masajista en este mes, solo pagadas
+            # Obtener reservas de este masajista en este mes
             reservas = ReservaServicio.objects.filter(
                 proveedor_asignado=masajista,
                 fecha_agendamiento__gte=primer_dia,
-                fecha_agendamiento__lte=ultimo_dia,
-                venta_reserva__estado_pago='pagado'
-            ).select_related('servicio', 'venta_reserva', 'venta_reserva__cliente')
+                fecha_agendamiento__lte=ultimo_dia
+            )
+
+            # Filtrar por estado de pago del cliente
+            if estado_pago_cliente == 'pagado':
+                reservas = reservas.filter(venta_reserva__estado_pago='pagado')
+            elif estado_pago_cliente == 'parcial':
+                reservas = reservas.filter(venta_reserva__estado_pago='parcial')
+            elif estado_pago_cliente == 'ambos':
+                reservas = reservas.filter(venta_reserva__estado_pago__in=['pagado', 'parcial'])
+
+            reservas = reservas.select_related('servicio', 'venta_reserva', 'venta_reserva__cliente')
 
             # Calcular totales del mes
             total_mes_cobrado = Decimal('0')
@@ -620,6 +652,7 @@ def reporte_mensual_masajistas(request):
         'totales_mes': totales_mes,
         'gran_total_cobrado': gran_total_cobrado,
         'gran_total_comision': gran_total_comision,
+        'estado_pago_cliente': estado_pago_cliente,
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
         'hoy': hoy
@@ -636,6 +669,7 @@ def detalle_mes_masajista(request):
     masajista_id = request.GET.get('masajista_id')
     mes = request.GET.get('mes')
     anio = request.GET.get('anio')
+    estado_pago_cliente = request.GET.get('estado_pago_cliente', 'pagado')  # Default: solo pagado
 
     if not all([masajista_id, mes, anio]):
         return JsonResponse({'error': 'Faltan parámetros'}, status=400)
@@ -650,13 +684,22 @@ def detalle_mes_masajista(request):
         else:
             ultimo_dia = datetime(int(anio), int(mes) + 1, 1).date() - timedelta(days=1)
 
-        # Obtener reservas del mes, solo pagadas
+        # Obtener reservas del mes
         reservas = ReservaServicio.objects.filter(
             proveedor_asignado=masajista,
             fecha_agendamiento__gte=primer_dia,
-            fecha_agendamiento__lte=ultimo_dia,
-            venta_reserva__estado_pago='pagado'
-        ).select_related(
+            fecha_agendamiento__lte=ultimo_dia
+        )
+
+        # Filtrar por estado de pago del cliente
+        if estado_pago_cliente == 'pagado':
+            reservas = reservas.filter(venta_reserva__estado_pago='pagado')
+        elif estado_pago_cliente == 'parcial':
+            reservas = reservas.filter(venta_reserva__estado_pago='parcial')
+        elif estado_pago_cliente == 'ambos':
+            reservas = reservas.filter(venta_reserva__estado_pago__in=['pagado', 'parcial'])
+
+        reservas = reservas.select_related(
             'servicio',
             'venta_reserva',
             'venta_reserva__cliente'

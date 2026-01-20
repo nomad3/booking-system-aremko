@@ -175,6 +175,14 @@
                 <input type="date" name="fecha_fin" value="{{ fecha_fin }}"
                        style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
             </div>
+            <div style="display: flex; flex-direction: column;">
+                <label style="margin-bottom: 5px; color: #666; font-size: 0.9em;">Estado Pago Cliente</label>
+                <select name="estado_pago_cliente" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; min-width: 150px;">
+                    <option value="pagado" {% if estado_pago_cliente == 'pagado' %}selected{% endif %}>Solo Pagado</option>
+                    <option value="parcial" {% if estado_pago_cliente == 'parcial' %}selected{% endif %}>Solo Parcial</option>
+                    <option value="ambos" {% if estado_pago_cliente == 'ambos' %}selected{% endif %}>Pagado + Parcial</option>
+                </select>
+            </div>
             <button type="submit" class="btn">Aplicar Filtros</button>
             <a href="{% url 'ventas:dashboard_pagos_masajistas' %}" class="btn btn-secondary">Limpiar</a>
         </form>

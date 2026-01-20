@@ -200,6 +200,14 @@
                 <label>Fecha Fin</label>
                 <input type="date" name="fecha_fin" value="{{ fecha_fin }}">
             </div>
+            <div class="form-group">
+                <label>Estado Pago Cliente</label>
+                <select name="estado_pago_cliente">
+                    <option value="pagado" {% if estado_pago_cliente == 'pagado' %}selected{% endif %}>Solo Pagado</option>
+                    <option value="parcial" {% if estado_pago_cliente == 'parcial' %}selected{% endif %}>Solo Parcial</option>
+                    <option value="ambos" {% if estado_pago_cliente == 'ambos' %}selected{% endif %}>Pagado + Parcial</option>
+                </select>
+            </div>
             <button type="submit" class="btn">Filtrar</button>
             <a href="{% if masajista %}{% url 'ventas:servicios_pendientes_masajista' masajista.id %}{% else %}{% url 'ventas:listar_servicios_pendientes' %}{% endif %}" class="btn btn-secondary">
                 Limpiar

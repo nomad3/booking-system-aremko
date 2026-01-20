@@ -198,6 +198,18 @@
     <div class="reporte-header">
         <h1>Reporte Mensual de Masajistas</h1>
         <p style="color: #666; margin: 10px 0;">Últimos 6 meses - Total cobrado al cliente y comisión a masajista (sin descuento de impuestos)</p>
+
+        <form method="get" style="margin: 15px 0; display: flex; gap: 10px; align-items: center;">
+            <label style="color: #666; font-size: 0.9em;">Estado Pago Cliente:</label>
+            <select name="estado_pago_cliente" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                <option value="pagado" {% if estado_pago_cliente == 'pagado' %}selected{% endif %}>Solo Pagado</option>
+                <option value="parcial" {% if estado_pago_cliente == 'parcial' %}selected{% endif %}>Solo Parcial</option>
+                <option value="ambos" {% if estado_pago_cliente == 'ambos' %}selected{% endif %}>Pagado + Parcial</option>
+            </select>
+            <button type="submit" class="btn">Aplicar</button>
+            <a href="{% url 'ventas:reporte_mensual_masajistas' %}" class="btn">Limpiar</a>
+        </form>
+
         <div style="margin-top: 15px;">
             <a href="{% url 'ventas:dashboard_pagos_masajistas' %}" class="btn">← Volver al Dashboard</a>
         </div>
@@ -289,7 +301,8 @@ function mostrarDetalle(masajistaId, mes, anio, masajistaNombre, mesNombre) {
     modal.style.display = 'block';
 
     // Realizar petición AJAX
-    fetch(`{% url 'ventas:detalle_mes_masajista' %}?masajista_id=${masajistaId}&mes=${mes}&anio=${anio}`)
+    const estado_pago_cliente = '{{ estado_pago_cliente }}';
+    fetch(`{% url 'ventas:detalle_mes_masajista' %}?masajista_id=${masajistaId}&mes=${mes}&anio=${anio}&estado_pago_cliente=${estado_pago_cliente}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
