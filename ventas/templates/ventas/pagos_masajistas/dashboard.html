@@ -254,6 +254,7 @@
             <table style="width: 100%; border-collapse: collapse;">
                 <thead>
                     <tr style="background: #f8f9fa;">
+                        <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">N° Reserva</th>
                         <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Fecha</th>
                         <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Hora</th>
                         <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Cliente</th>
@@ -266,6 +267,7 @@
                 <tbody>
                     {% for item in servicios %}
                     <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 10px;"><strong>#{{ item.servicio.venta_reserva.id }}</strong></td>
                         <td style="padding: 10px;">{{ item.servicio.fecha_agendamiento|date:"d/m/Y" }}</td>
                         <td style="padding: 10px;">{{ item.servicio.hora_inicio }}</td>
                         <td style="padding: 10px;">{{ item.servicio.venta_reserva.cliente.nombre }}</td>
@@ -276,7 +278,7 @@
                     </tr>
                     {% endfor %}
                     <tr style="font-weight: bold; background: #f0f0f0;">
-                        <td colspan="5" style="padding: 10px; border-top: 2px solid #333;">TOTAL BRUTO (Boleta de Honorarios)</td>
+                        <td colspan="6" style="padding: 10px; border-top: 2px solid #333;">TOTAL BRUTO (Boleta de Honorarios)</td>
                         <td style="padding: 10px; text-align: right; border-top: 2px solid #333;">${{ total_bruto_comisiones|floatformat:0|intcomma }}</td>
                         <td style="padding: 10px; text-align: right; border-top: 2px solid #333;"></td>
                     </tr>
