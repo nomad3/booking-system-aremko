@@ -28,7 +28,9 @@ class Command(BaseCommand):
                 self.stdout.write(f'  Estado Reserva: {venta_reserva.estado_reserva}')
                 self.stdout.write(f'  Estado Pago: {venta_reserva.estado_pago}')
                 self.stdout.write(f'  Fecha Creación: {venta_reserva.fecha_creacion}')
-                self.stdout.write(f'  Total: ${venta_reserva.total_venta}')
+                self.stdout.write(f'  Total: ${venta_reserva.total}')
+                self.stdout.write(f'  Pagado: ${venta_reserva.pagado}')
+                self.stdout.write(f'  Saldo Pendiente: ${venta_reserva.saldo_pendiente}')
 
                 # Buscar servicios asociados
                 servicios = ReservaServicio.objects.filter(venta_reserva=venta_reserva)
