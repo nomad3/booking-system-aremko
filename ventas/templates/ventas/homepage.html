@@ -380,48 +380,6 @@
         /* White background */
     }
 
-    .gallery-section {
-        background-color: #f8f9fa;
-        /* Light gray background */
-    }
-
-    /* Base styles for all gallery images */
-    .gallery-section .row>div img {
-        /* Target images inside direct children divs of the row */
-        transition: transform 0.3s ease;
-        width: 100%;
-        /* Make image fill the column width */
-        object-fit: cover;
-        /* Cover the area, maintain aspect ratio, crop if needed */
-        object-position: center;
-        /* Center the image within the frame */
-        display: block;
-        /* Ensure image behaves like a block element */
-    }
-
-    /* Style for the first image (vertical) */
-    .gallery-section .row>div:first-child img {
-        height: 350px;
-        /* Taller height for vertical */
-    }
-
-    /* Style for the second (middle) image (horizontal) */
-    .gallery-section .row>div:nth-child(2) img {
-        height: 250px;
-        /* Shorter height for horizontal */
-    }
-
-    /* Style for the third (last) image (vertical) */
-    .gallery-section .row>div:last-child img {
-        height: 350px;
-        /* Taller height for vertical */
-    }
-
-    /* Keep the hover effect */
-    .gallery-section .row>div img:hover {
-        transform: scale(1.05);
-    }
-
     .cta-section {
         /* background-color: var(--primary-color); /* Already set via class */
         /* color: white; /* Already set via class */
@@ -668,48 +626,6 @@
                     <h4 class="feature-title">Reserva Tu Bienestar</h4>
                     <p>Asegura tu momento de paz. Reserva tu experiencia Aremko fácilmente en línea.</p>
                 </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Gallery Section -->
-<section class="gallery-section py-5 bg-light">
-    <div class="container">
-        <h2 class="section-title mb-5">Nuestros Espacios</h2>
-        <div class="row">
-            <div class="col-md-4 mb-4">
-                {# Use gallery_image_1_url context variable #}
-                {% if gallery_image_1_url %}
-                <img src="{{ gallery_image_1_url }}" class="img-fluid rounded shadow-sm"
-                    alt="Espacio de masajes Aremko">
-                {% else %}
-                {# Fallback image 1 #}
-                <img src="https://images.unsplash.com/photo-1600334129128-689c9abc74fa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80"
-                    class="img-fluid rounded shadow-sm" alt="Espacio de masajes Aremko">
-                {% endif %}
-            </div>
-            <div class="col-md-4 mb-4">
-                {# Use gallery_image_2_url context variable #}
-                {% if gallery_image_2_url %}
-                <img src="{{ gallery_image_2_url }}" class="img-fluid rounded shadow-sm"
-                    alt="Tina Caliente Privada Aremko">
-                {% else %}
-                {# Fallback image 2 #}
-                <img src="https://images.unsplash.com/photo-1584592487903-6d47417a141f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80"
-                    class="img-fluid rounded shadow-sm" alt="Tina Caliente Privada">
-                {% endif %}
-            </div>
-            <div class="col-md-4 mb-4">
-                {# Use gallery_image_3_url context variable #}
-                {% if gallery_image_3_url %}
-                <img src="{{ gallery_image_3_url }}" class="img-fluid rounded shadow-sm"
-                    alt="Habitación Acogedora Aremko">
-                {% else %}
-                {# Fallback image 3 #}
-                <img src="https://images.unsplash.com/photo-1560185893-a55ec67692d9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80"
-                    class="img-fluid rounded shadow-sm" alt="Habitación Acogedora">
-                {% endif %}
             </div>
         </div>
     </div>
