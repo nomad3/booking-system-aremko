@@ -155,17 +155,41 @@ def _generar_texto_resumen(reserva, config):
     )
     total_giftcards = sum(gc.monto_inicial for gc in giftcards)
 
-    lineas.append(f"VALOR TOTAL: ${int(total):,}")
+    # Obtener descuentos aplicados
+    descuentos = reserva.pagos.filter(metodo_pago='descuento')
+    total_descuentos = sum(d.monto for d in descuentos)
+    tiene_descuentos = total_descuentos > 0
 
-    # Mostrar desglose solo si hay más de un tipo de item
-    items_count = sum([1 if servicios else 0, 1 if productos else 0, 1 if giftcards else 0])
-    if items_count > 1:
-        if servicios:
-            lineas.append(f"  - Servicios: ${int(total_servicios):,}")
-        if productos:
-            lineas.append(f"  - Productos: ${int(total_productos):,}")
-        if giftcards:
-            lineas.append(f"  - Gift Cards: ${int(total_giftcards):,}")
+    # Si hay descuentos, mostrar el desglose completo
+    if tiene_descuentos:
+        subtotal_sin_descuento = total_servicios + total_productos + total_giftcards
+
+        lineas.append(f"Valor Normal: ${int(subtotal_sin_descuento):,}")
+        lineas.append(f"Descuento: -${int(total_descuentos):,}")
+        lineas.append(f"VALOR CON DESCUENTO: ${int(total):,}")
+        lineas.append("")
+
+        # Mostrar desglose solo si hay más de un tipo de item
+        items_count = sum([1 if servicios else 0, 1 if productos else 0, 1 if giftcards else 0])
+        if items_count > 1:
+            if servicios:
+                lineas.append(f"  - Servicios: ${int(total_servicios):,}")
+            if productos:
+                lineas.append(f"  - Productos: ${int(total_productos):,}")
+            if giftcards:
+                lineas.append(f"  - Gift Cards: ${int(total_giftcards):,}")
+    else:
+        # Sin descuentos, formato original
+        lineas.append(f"VALOR TOTAL: ${int(total):,}")
+
+        items_count = sum([1 if servicios else 0, 1 if productos else 0, 1 if giftcards else 0])
+        if items_count > 1:
+            if servicios:
+                lineas.append(f"  - Servicios: ${int(total_servicios):,}")
+            if productos:
+                lineas.append(f"  - Productos: ${int(total_productos):,}")
+            if giftcards:
+                lineas.append(f"  - Gift Cards: ${int(total_giftcards):,}")
 
     lineas.append("")
     lineas.append("")

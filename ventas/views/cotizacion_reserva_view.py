@@ -158,10 +158,15 @@ def _generar_texto_cotizacion(reserva):
     )
     total_giftcards = sum(gc.monto_inicial for gc in giftcards)
 
+    # Obtener descuentos aplicados
+    descuentos = reserva.pagos.filter(metodo_pago='descuento')
+    total_descuentos = sum(d.monto for d in descuentos)
+    tiene_descuentos = total_descuentos > 0
+
     lineas.append("💰 RESUMEN DE VALORES")
     lineas.append("")
 
-    # Mostrar desglose
+    # Mostrar desglose por tipo
     items_count = sum([1 if servicios else 0, 1 if productos else 0, 1 if giftcards else 0])
 
     if items_count > 1:
@@ -173,7 +178,14 @@ def _generar_texto_cotizacion(reserva):
             lineas.append(f"Gift Cards: ${int(total_giftcards):,}")
         lineas.append("")
 
-    lineas.append(f"VALOR TOTAL: ${int(total):,}")
+    # Si hay descuentos, mostrar el desglose
+    if tiene_descuentos:
+        subtotal_sin_descuento = total_servicios + total_productos + total_giftcards
+        lineas.append(f"Valor Normal: ${int(subtotal_sin_descuento):,}")
+        lineas.append(f"Descuento: -${int(total_descuentos):,}")
+        lineas.append(f"Valor con descuento: ${int(total):,}")
+    else:
+        lineas.append(f"VALOR TOTAL: ${int(total):,}")
     lineas.append("")
     lineas.append("━" * 12)
     lineas.append("")
