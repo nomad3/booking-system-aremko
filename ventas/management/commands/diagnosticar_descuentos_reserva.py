@@ -163,8 +163,7 @@ class Command(BaseCommand):
                 venta_reserva=reserva,
                 metodo_pago='descuento',
                 monto=total_descuento_disponible,
-                fecha_pago=timezone.now(),
-                comprobante_pago=f"Pack descuento aplicado automáticamente: {', '.join([p['pack'].nombre for p in packs_aplicables])}"
+                fecha_pago=timezone.now()
             )
 
             self.stdout.write(self.style.SUCCESS(
