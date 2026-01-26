@@ -76,16 +76,35 @@ class Command(BaseCommand):
 
         self.stdout.write(f"\nTOTAL SERVICIOS: ${total_servicios:,.0f}\n")
 
-        # Verificar descuentos ya aplicados
-        descuentos_existentes = reserva.pagos.filter(metodo_pago='descuento')
-        total_descuentos_existentes = sum(d.monto for d in descuentos_existentes)
+        # Verificar descuentos ya aplicados (como ReservaServicio)
+        descuentos_existentes = reserva.reservaservicios.filter(
+            servicio__precio_base=-1,
+            servicio__nombre__icontains='descuento'
+        )
+        total_descuentos_existentes = sum(
+            abs((rs.precio_unitario_venta or rs.servicio.precio_base) * (rs.cantidad_personas or 1))
+            for rs in descuentos_existentes
+        )
+
+        # También verificar descuentos antiguos aplicados como Pago (método obsoleto)
+        descuentos_pago_obsoletos = reserva.pagos.filter(metodo_pago='descuento')
+        total_descuentos_pago = sum(d.monto for d in descuentos_pago_obsoletos)
+
+        if descuentos_pago_obsoletos.exists():
+            self.stdout.write(self.style.WARNING(
+                f"⚠️ Tiene descuentos aplicados con método OBSOLETO (como Pago): ${total_descuentos_pago:,.0f}"
+            ))
+            for desc in descuentos_pago_obsoletos:
+                self.stdout.write(f"  - ${desc.monto:,.0f} ({desc.fecha_pago})")
+            self.stdout.write("   Estos descuentos serán eliminados automáticamente al aplicar el nuevo descuento.\n")
 
         if total_descuentos_existentes > 0:
             self.stdout.write(self.style.WARNING(
-                f"⚠️ Ya tiene descuentos aplicados: ${total_descuentos_existentes:,.0f}"
+                f"⚠️ Ya tiene descuentos aplicados correctamente: ${total_descuentos_existentes:,.0f}"
             ))
             for desc in descuentos_existentes:
-                self.stdout.write(f"  - ${desc.monto:,.0f} ({desc.fecha_pago})")
+                monto = abs((desc.precio_unitario_venta or desc.servicio.precio_base) * (desc.cantidad_personas or 1))
+                self.stdout.write(f"  - ${monto:,.0f} ({desc.servicio.nombre} - {desc.fecha_agendamiento})")
             self.stdout.write("")
 
         # Convertir reserva a formato de carrito para verificar packs
@@ -149,32 +168,67 @@ class Command(BaseCommand):
         if aplicar_descuento:
             if total_descuentos_existentes > 0:
                 self.stdout.write(self.style.WARNING(
-                    "⚠️ No se aplicó el descuento porque ya tiene descuentos registrados."
+                    "⚠️ No se aplicó el descuento porque ya tiene descuentos correctos registrados."
                 ))
                 self.stdout.write("   Elimínelos primero si desea aplicar el nuevo descuento.\n")
                 return
 
             self.stdout.write(self.style.SUCCESS("🚀 APLICANDO DESCUENTO..."))
 
-            # Crear registro de Pago con el descuento
-            from django.utils import timezone
+            # Limpiar descuentos obsoletos (método Pago) si existen
+            if descuentos_pago_obsoletos.exists():
+                cantidad_eliminados = descuentos_pago_obsoletos.count()
+                descuentos_pago_obsoletos.delete()
+                self.stdout.write(self.style.WARNING(
+                    f"   🧹 Eliminados {cantidad_eliminados} descuentos obsoletos (método Pago)"
+                ))
 
-            pago_descuento = Pago.objects.create(
-                venta_reserva=reserva,
-                metodo_pago='descuento',
-                monto=total_descuento_disponible,
-                fecha_pago=timezone.now()
-            )
+            # Buscar servicio especial de descuento
+            try:
+                from ventas.models import ReservaServicio
 
-            self.stdout.write(self.style.SUCCESS(
-                f"✅ Descuento de ${total_descuento_disponible:,.0f} aplicado correctamente"
-            ))
+                servicio_descuento = Servicio.objects.get(
+                    nombre__icontains='descuento',
+                    precio_base=-1
+                )
 
-            # Recalcular total de la reserva
-            reserva.calcular_total()
-            reserva.save()
+                self.stdout.write(f"   Usando servicio: {servicio_descuento.nombre}")
 
-            self.stdout.write(f"✅ Total de reserva actualizado: ${reserva.total:,.0f}\n")
+                # Usar fecha del primer servicio del carrito
+                fecha_descuento = servicios_reserva[0].fecha_agendamiento
+
+                # Crear ReservaServicio con el descuento
+                # cantidad_personas = monto_descuento para que -1 × cantidad = -descuento
+                reserva_descuento = ReservaServicio.objects.create(
+                    venta_reserva=reserva,
+                    servicio=servicio_descuento,
+                    fecha_agendamiento=fecha_descuento,
+                    hora_inicio='00:00',  # Hora especial para descuentos automáticos
+                    cantidad_personas=int(total_descuento_disponible)
+                )
+
+                self.stdout.write(self.style.SUCCESS(
+                    f"✅ Descuento de ${total_descuento_disponible:,.0f} aplicado como servicio"
+                ))
+                self.stdout.write(f"   Fecha: {fecha_descuento.strftime('%d/%m/%Y')} - Hora: 00:00")
+
+                # Recalcular total de la reserva
+                reserva.calcular_total()
+                reserva.save()
+
+                self.stdout.write(f"✅ Total de reserva actualizado: ${reserva.total:,.0f}\n")
+
+            except Servicio.DoesNotExist:
+                self.stdout.write(self.style.ERROR(
+                    "❌ ERROR: No se encontró el servicio de descuento.\n"
+                    "   Debe existir un servicio con:\n"
+                    "   - Nombre que contenga 'descuento'\n"
+                    "   - Precio base = -1\n"
+                ))
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(
+                    f"❌ ERROR al aplicar descuento: {e}\n"
+                ))
 
         else:
             self.stdout.write(self.style.WARNING(

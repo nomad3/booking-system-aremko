@@ -158,9 +158,15 @@ def _generar_texto_cotizacion(reserva):
     )
     total_giftcards = sum(gc.monto_inicial for gc in giftcards)
 
-    # Obtener descuentos aplicados
-    descuentos = reserva.pagos.filter(metodo_pago='descuento')
-    total_descuentos = sum(d.monto for d in descuentos)
+    # Obtener descuentos aplicados (como ReservaServicio con precio_base=-1)
+    descuentos_servicios = reserva.reservaservicios.filter(
+        servicio__precio_base=-1,
+        servicio__nombre__icontains='descuento'
+    )
+    total_descuentos = sum(
+        abs((rs.precio_unitario_venta or rs.servicio.precio_base) * (rs.cantidad_personas or 1))
+        for rs in descuentos_servicios
+    )
     tiene_descuentos = total_descuentos > 0
 
     lineas.append("💰 RESUMEN DE VALORES")
