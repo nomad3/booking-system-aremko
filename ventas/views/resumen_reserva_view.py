@@ -145,9 +145,11 @@ def _generar_texto_resumen(reserva, config):
     total = reserva.total
 
     # Usar precios congelados si existen, sino usar precio_base actual
+    # IMPORTANTE: Excluir servicios de descuento del cálculo
     total_servicios = sum(
         (rs.precio_unitario_venta if rs.precio_unitario_venta else rs.servicio.precio_base) * (rs.cantidad_personas or 1)
         for rs in servicios
+        if not (rs.servicio.precio_base == -1 and 'descuento' in rs.servicio.nombre.lower())
     )
     total_productos = sum(
         (rp.precio_unitario_venta if rp.precio_unitario_venta else rp.producto.precio_base) * rp.cantidad
