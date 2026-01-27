@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, cotizacion_reserva_view, eliminar_reservas_no_pagadas_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, cotizacion_reserva_view, eliminar_reservas_no_pagadas_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple, inventario_view
 )
 from . import api # Keep api module import as is
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
@@ -37,6 +37,9 @@ urlpatterns = [
     path('empresas/solicitar-cotizacion/', public_views.solicitar_cotizacion_empresa, name='solicitar_cotizacion_empresa'),  # Form submission endpoint
     path('servicios-vendidos/', reporting_views.servicios_vendidos_view, name='servicios_vendidos'),
     path('productos-vendidos/', reporting_views.productos_vendidos_view, name='productos_vendidos'),
+    # Gestión de Inventario
+    path('inventario/', inventario_view.gestion_inventario, name='gestion_inventario'),
+    path('inventario/ajustar/<int:producto_id>/', inventario_view.ajustar_inventario, name='ajustar_inventario'),
     path('caja-diaria/', reporting_views.caja_diaria_view, name='caja_diaria'),  # Nueva vista de caja diaria
     path('caja-diaria-recepcionistas/', reporting_views.caja_diaria_recepcionistas_view, name='caja_diaria_recepcionistas'), # Added path if needed
     path('auditoria-movimientos/', reporting_views.auditoria_movimientos_view, name='auditoria_movimientos'),  # Nueva vista de auditoría

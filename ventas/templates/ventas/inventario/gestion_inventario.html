@@ -1,0 +1,455 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Gestión de Inventario{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .inventario-container {
+        padding: 20px;
+        background: #f5f5f5;
+        min-height: 100vh;
+    }
+
+    .inventario-header {
+        background: white;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .inventario-title {
+        font-size: 24px;
+        color: #333;
+        margin: 0 0 10px 0;
+    }
+
+    .inventario-info {
+        display: flex;
+        gap: 30px;
+        color: #666;
+        margin-top: 15px;
+        flex-wrap: wrap;
+    }
+
+    .info-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .info-label {
+        font-weight: 600;
+    }
+
+    .inventario-filters {
+        background: white;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: flex;
+        gap: 20px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .filter-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .filter-label {
+        font-weight: 500;
+        color: #555;
+    }
+
+    .filter-select {
+        padding: 6px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background: white;
+        min-width: 150px;
+    }
+
+    .btn-filtrar {
+        background: #2196F3;
+        color: white;
+        padding: 6px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+    }
+
+    .btn-filtrar:hover {
+        background: #1976D2;
+    }
+
+    .btn-limpiar {
+        background: #f0f0f0;
+        color: #666;
+        padding: 6px 20px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-limpiar:hover {
+        background: #e0e0e0;
+    }
+
+    .inventario-table {
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .inventario-table table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .inventario-table th {
+        background: #f8f8f8;
+        padding: 12px 15px;
+        text-align: left;
+        font-weight: 600;
+        color: #555;
+        border-bottom: 2px solid #e0e0e0;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .inventario-table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .inventario-table tr:hover {
+        background: #f9f9f9;
+    }
+
+    .inventario-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    /* Columnas de stock */
+    .stock-actual {
+        font-weight: 600;
+        color: #2196F3;
+    }
+
+    .stock-ayer {
+        font-weight: 600;
+        color: #4CAF50;
+    }
+
+    .stock-diferencia {
+        font-weight: 600;
+    }
+
+    .stock-diferencia.positivo {
+        color: #FF9800;
+    }
+
+    .stock-diferencia.cero {
+        color: #999;
+    }
+
+    /* Estado de stock */
+    .stock-bajo {
+        color: #f44336;
+        font-weight: 600;
+    }
+
+    .stock-warning {
+        color: #FF9800;
+        font-weight: 600;
+    }
+
+    .stock-ok {
+        color: #4CAF50;
+    }
+
+    /* Botones de acción */
+    .btn-ajustar {
+        background: #FF9800;
+        color: white;
+        padding: 4px 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        text-decoration: none;
+    }
+
+    .btn-ajustar:hover {
+        background: #F57C00;
+    }
+
+    .btn-volver {
+        display: inline-block;
+        margin: 20px 0;
+        background: #666;
+        color: white;
+        padding: 10px 20px;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+
+    .btn-volver:hover {
+        background: #555;
+    }
+
+    .explicacion-box {
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+
+    .explicacion-title {
+        color: #856404;
+        font-weight: 600;
+        margin-bottom: 10px;
+        font-size: 16px;
+    }
+
+    .explicacion-text {
+        color: #856404;
+        line-height: 1.6;
+    }
+
+    .columna-header {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .columna-titulo {
+        font-weight: 600;
+    }
+
+    .columna-fecha {
+        font-size: 11px;
+        color: #888;
+        font-weight: normal;
+    }
+
+    .categoria-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        background: #e3f2fd;
+        color: #1976D2;
+        border-radius: 12px;
+        font-size: 12px;
+    }
+
+    .btn-exportar {
+        background: #4CAF50;
+        color: white;
+        padding: 8px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+        float: right;
+    }
+
+    .btn-exportar:hover {
+        background: #45a049;
+    }
+
+    @media print {
+        .inventario-filters, .btn-volver, .btn-ajustar, .btn-exportar {
+            display: none;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="inventario-container">
+    <div class="inventario-header">
+        <h1 class="inventario-title">📦 Gestión de Inventario</h1>
+
+        <div class="inventario-info">
+            <div class="info-item">
+                <span class="info-label">📅 Fecha:</span>
+                <span>{{ fecha_actual }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">🕐 Hora:</span>
+                <span>{{ hora_actual }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">📊 Total productos:</span>
+                <span>{{ total_productos }}</span>
+            </div>
+        </div>
+
+        <button class="btn-exportar" onclick="window.print()">
+            📥 Imprimir/Exportar
+        </button>
+    </div>
+
+    <div class="explicacion-box">
+        <div class="explicacion-title">ℹ️ Información importante sobre el inventario</div>
+        <div class="explicacion-text">
+            <strong>Stock Sistema:</strong> Es el inventario actual en el sistema (productos ya descontados).<br>
+            <strong>Stock Cierre Ayer:</strong> Es el inventario sin contar las ventas con entrega hoy.
+            Este valor debería coincidir con su inventario físico si hace el conteo por la mañana,
+            ya que los productos vendidos para entregar hoy aún no han sido entregados físicamente.<br>
+            <strong>Vendidos Hoy:</strong> Cantidad de productos con fecha de entrega = hoy.
+        </div>
+    </div>
+
+    <div class="inventario-filters">
+        <form method="get" style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+            <div class="filter-group">
+                <label class="filter-label">Categoría:</label>
+                <select name="categoria" class="filter-select">
+                    <option value="">Todas las categorías</option>
+                    {% for cat in categorias %}
+                    <option value="{{ cat }}" {% if cat == categoria_seleccionada %}selected{% endif %}>
+                        {{ cat }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn-filtrar">Filtrar</button>
+            <a href="{% url 'ventas:gestion_inventario' %}" class="btn-limpiar">Limpiar filtros</a>
+        </form>
+    </div>
+
+    <div class="inventario-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th>Proveedor</th>
+                    <th>
+                        <div class="columna-header">
+                            <span class="columna-titulo">Stock Sistema</span>
+                            <span class="columna-fecha">(Actual)</span>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="columna-header">
+                            <span class="columna-titulo">Stock Cierre Ayer</span>
+                            <span class="columna-fecha">({{ fecha_ayer }})</span>
+                        </div>
+                    </th>
+                    <th>Vendidos Hoy</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in inventario_data %}
+                <tr>
+                    <td>
+                        <strong>{{ item.producto.nombre }}</strong>
+                    </td>
+                    <td>
+                        <span class="categoria-badge">{{ item.categoria }}</span>
+                    </td>
+                    <td>{{ item.proveedor }}</td>
+                    <td>
+                        <span class="stock-actual {% if item.stock_actual == 0 %}stock-bajo{% elif item.stock_actual < 5 %}stock-warning{% else %}stock-ok{% endif %}">
+                            {{ item.stock_actual }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="stock-ayer">{{ item.stock_cierre_ayer }}</span>
+                    </td>
+                    <td>
+                        <span class="stock-diferencia {% if item.productos_vendidos_hoy > 0 %}positivo{% else %}cero{% endif %}">
+                            {{ item.productos_vendidos_hoy }}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn-ajustar" onclick="ajustarInventario({{ item.producto.id }}, '{{ item.producto.nombre }}', {{ item.stock_actual }})">
+                            Ajustar
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 40px; color: #999;">
+                        No hay productos disponibles
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <a href="/admin/ventas/" class="btn-volver">← Volver al menú</a>
+</div>
+
+<!-- Modal para ajustar inventario -->
+<div id="ajustarModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 8px; width: 400px; max-width: 90%;">
+        <h2 style="margin: 0 0 20px 0;">Ajustar Inventario</h2>
+        <form method="post" id="ajustarForm">
+            {% csrf_token %}
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Producto:</label>
+                <span id="productoNombre" style="color: #666;"></span>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Stock actual:</label>
+                <span id="stockActual" style="color: #2196F3; font-size: 18px; font-weight: bold;"></span>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="nuevo_stock" style="display: block; margin-bottom: 5px; font-weight: 600;">Nuevo stock:</label>
+                <input type="number" name="nuevo_stock" id="nuevo_stock" min="0" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label for="motivo" style="display: block; margin-bottom: 5px; font-weight: 600;">Motivo del ajuste:</label>
+                <textarea name="motivo" id="motivo" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; height: 60px;"></textarea>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" onclick="cerrarModal()" style="padding: 8px 20px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                    Cancelar
+                </button>
+                <button type="submit" style="padding: 8px 20px; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    Guardar ajuste
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function ajustarInventario(productoId, productoNombre, stockActual) {
+    document.getElementById('productoNombre').textContent = productoNombre;
+    document.getElementById('stockActual').textContent = stockActual;
+    document.getElementById('nuevo_stock').value = stockActual;
+    document.getElementById('ajustarForm').action = '/admin/ventas/inventario/ajustar/' + productoId + '/';
+    document.getElementById('ajustarModal').style.display = 'block';
+}
+
+function cerrarModal() {
+    document.getElementById('ajustarModal').style.display = 'none';
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('ajustarModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        cerrarModal();
+    }
+});
+</script>
+
+{% endblock %}
