@@ -43,6 +43,9 @@ class VentaReservaAdminForm(forms.ModelForm):
                     self.fields['fecha_reserva'].initial = self.instance.fecha_reserva.date()
                 else:
                     self.fields['fecha_reserva'].initial = self.instance.fecha_reserva
+            else:
+                # Para nuevas reservas, usar la fecha actual
+                self.fields['fecha_reserva'].initial = timezone.now().date()
 
 class ReservaProductoForm(forms.ModelForm):
     class Meta:
