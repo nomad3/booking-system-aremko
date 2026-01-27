@@ -94,6 +94,20 @@
             </div>
         </div>
 
+        {# Gestión de Inventario Card (Custom View) #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-warehouse card-icon text-info"></i>
+                    <h5 class="card-title">Gestión de Inventario</h5>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'ventas:gestion_inventario' %}" class="btn btn-sm btn-modern btn-info">Ver Inventario</a>
+                        {# Este módulo compara stock actual vs cierre de ayer #}
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 {% endblock %}
