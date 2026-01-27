@@ -295,6 +295,16 @@
                 <span class="info-label">📊 Total productos:</span>
                 <span>{{ total_productos }}</span>
             </div>
+            <div class="info-item">
+                <span class="info-label">👤 Usuario:</span>
+                <span>{{ usuario_actual }}
+                {% if puede_ajustar %}
+                    <span style="color: #4CAF50; font-weight: 600;">(Puede ajustar)</span>
+                {% else %}
+                    <span style="color: #FF9800;">(Solo lectura)</span>
+                {% endif %}
+                </span>
+            </div>
         </div>
 
         <div style="float: right; display: flex; gap: 10px;">
@@ -367,7 +377,9 @@
                         </div>
                     </th>
                     <th>Vendidos Hoy</th>
+                    {% if puede_ajustar %}
                     <th>Acciones</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -400,15 +412,17 @@
                             </div>
                         {% endif %}
                     </td>
+                    {% if puede_ajustar %}
                     <td>
                         <button class="btn-ajustar" onclick="ajustarInventario({{ item.producto.id }}, '{{ item.producto.nombre }}', {{ item.stock_actual }})">
                             Ajustar
                         </button>
                     </td>
+                    {% endif %}
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 40px; color: #999;">
+                    <td colspan="{% if puede_ajustar %}7{% else %}6{% endif %}" style="text-align: center; padding: 40px; color: #999;">
                         No hay productos disponibles
                     </td>
                 </tr>
@@ -420,6 +434,7 @@
     <a href="/admin/ventas/" class="btn-volver">← Volver al menú</a>
 </div>
 
+{% if puede_ajustar %}
 <!-- Modal para ajustar inventario -->
 <div id="ajustarModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 8px; width: 400px; max-width: 90%;">
@@ -474,5 +489,6 @@ document.getElementById('ajustarModal').addEventListener('click', function(e) {
     }
 });
 </script>
+{% endif %}
 
 {% endblock %}

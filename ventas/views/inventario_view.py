@@ -112,6 +112,10 @@ def gestion_inventario(request):
     categorias = list(set([item['categoria'] for item in inventario_data]))
     categorias.sort()
 
+    # Verificar si el usuario puede ajustar inventario
+    usuarios_permitidos = ['alda', 'jorge', 'admin']
+    puede_ajustar = request.user.username.lower() in usuarios_permitidos or request.user.is_superuser
+
     context = {
         'inventario_data': inventario_data,
         'fecha_actual': hoy.strftime('%d/%m/%Y'),
@@ -120,7 +124,9 @@ def gestion_inventario(request):
         'categorias': categorias,
         'categoria_seleccionada': categoria_filtro,
         'total_productos': len(inventario_data),
-        'debug_mode': debug_mode
+        'debug_mode': debug_mode,
+        'puede_ajustar': puede_ajustar,
+        'usuario_actual': request.user.username
     }
 
     return render(request, 'ventas/inventario/gestion_inventario.html', context)
@@ -130,9 +136,17 @@ def ajustar_inventario(request, producto_id):
     """
     Vista para ajustar manualmente el inventario de un producto.
     Esta función permite corregir discrepancias entre inventario físico y del sistema.
+    Solo permitida para usuarios específicos: alda, jorge, admin.
     """
     from django.shortcuts import get_object_or_404, redirect
     from django.contrib import messages
+    from django.http import HttpResponseForbidden
+
+    # Verificar permisos específicos
+    usuarios_permitidos = ['alda', 'jorge', 'admin']
+    if not (request.user.username.lower() in usuarios_permitidos or request.user.is_superuser):
+        messages.error(request, 'No tienes permisos para ajustar inventario.')
+        return HttpResponseForbidden('No tienes permisos para realizar esta acción.')
 
     if request.method == 'POST':
         producto = get_object_or_404(Producto, id=producto_id)
