@@ -46,18 +46,29 @@ def fix_image_urls(model_class, image_field='imagen'):
 
                 # Extraer solo el path relativo
                 # Formato esperado: servicios/nombre_archivo
-                if 'cloudinary.com' in image.name and 'dtuncr1pi/' in image.name:
-                    # Extraer la parte después del cloud name
-                    parts = image.name.split('dtuncr1pi/')
-                    if len(parts) > 1:
-                        new_name = parts[1]
-                        image.name = new_name
-                        obj.save(update_fields=[image_field])
-                        print(f"   Después: {new_name}")
-                        print(f"   ✅ Corregido")
-                        fixed += 1
+                if 'cloudinary.com' in image.name:
+                    # Soportar ambos cloud names: dfuncr1pj (actual) y dtuncr1pi (viejo)
+                    for cloud_name in ['dfuncr1pj', 'dtuncr1pi']:
+                        if f'{cloud_name}/' in image.name:
+                            # Extraer la parte después del cloud name
+                            # Buscar la ÚLTIMA ocurrencia para casos de URLs duplicadas
+                            parts = image.name.split(f'{cloud_name}/')
+                            if len(parts) > 1:
+                                new_name = parts[-1]  # Tomar la última parte
+                                # Limpiar posibles duplicados adicionales
+                                new_name = new_name.replace('https:/res.cloudinary.com/', '').replace('https://res.cloudinary.com/', '')
+                                image.name = new_name
+                                obj.save(update_fields=[image_field])
+                                print(f"   Después: {new_name}")
+                                print(f"   ✅ Corregido")
+                                fixed += 1
+                                break
+                            else:
+                                print(f"   ⚠️ No se pudo extraer el path")
+                                skipped += 1
+                                break
                     else:
-                        print(f"   ⚠️ No se pudo extraer el path")
+                        print(f"   ⚠️ Formato de URL no reconocido (cloud name no encontrado)")
                         skipped += 1
                 else:
                     print(f"   ⚠️ Formato de URL no reconocido")
@@ -126,10 +137,11 @@ else:
             print(f"  imagen.name: {s14.imagen.name}")
             print(f"  imagen.url: {s14.imagen.url}")
 
-            if not s14.imagen.url.startswith('https://res.cloudinary.com/dtuncr1pi/https:'):
-                print(f"  ✅ URL correcta")
+            # Verificar que la URL no esté duplicada
+            if 'https:/res.cloudinary.com' in s14.imagen.url or 'https://res.cloudinary.com' in s14.imagen.url.replace('https://res.cloudinary.com/', '', 1):
+                print(f"  ❌ Todavía tiene problema (URL duplicada)")
             else:
-                print(f"  ❌ Todavía tiene problema")
+                print(f"  ✅ URL correcta")
         except:
             pass
 

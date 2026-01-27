@@ -178,9 +178,10 @@ if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
         'SECURE': True,  # Usar HTTPS
     }
 
-    # IMPORTANTE: MEDIA_URL debe configurarse explícitamente
-    # django-cloudinary-storage NO lo configura automáticamente
-    MEDIA_URL = f'https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/'
+    # NOTA: NO configurar MEDIA_URL cuando se usa django-cloudinary-storage
+    # El backend ya devuelve URLs completas (https://res.cloudinary.com/...)
+    # Si se configura MEDIA_URL, las URLs se duplican incorrectamente
+    # MEDIA_URL = f'https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/'  # COMENTADO
 
     logger.info(f"✅ Cloudinary configurado para media: cloud_name={CLOUDINARY_CLOUD_NAME}")
 
