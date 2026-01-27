@@ -27,6 +27,9 @@ def gestion_inventario(request):
     # Obtener todos los productos activos
     productos = Producto.objects.all().select_related('categoria', 'proveedor').order_by('nombre')
 
+    # Modo debug (opcional)
+    debug_mode = request.GET.get('debug', '').lower() == 'true'
+
     # Preparar datos de inventario
     inventario_data = []
 
@@ -34,14 +37,34 @@ def gestion_inventario(request):
         # Stock actual del sistema
         stock_actual = producto.cantidad_disponible
 
-        # Calcular productos vendidos hoy (con fecha_entrega = hoy)
-        productos_vendidos_hoy = ReservaProducto.objects.filter(
+        # Calcular productos vendidos hoy (con fecha_entrega = hoy o NULL con primer servicio = hoy)
+        from django.db.models import Min
+
+        # Caso 1: fecha_entrega explícita = hoy
+        vendidos_con_fecha_explicita = ReservaProducto.objects.filter(
             producto=producto,
             fecha_entrega=hoy,
-            venta_reserva__estado_reserva__in=['confirmada', 'en_proceso']
+        ).exclude(
+            venta_reserva__estado_reserva='cancelada'
         ).aggregate(
             total=Sum('cantidad')
         )['total'] or 0
+
+        # Caso 2: fecha_entrega NULL y primer servicio de la reserva = hoy
+        vendidos_con_fecha_null = ReservaProducto.objects.filter(
+            producto=producto,
+            fecha_entrega__isnull=True,
+        ).exclude(
+            venta_reserva__estado_reserva='cancelada'
+        ).annotate(
+            primer_servicio=Min('venta_reserva__reservaservicios__fecha_agendamiento')
+        ).filter(
+            primer_servicio=hoy
+        ).aggregate(
+            total=Sum('cantidad')
+        )['total'] or 0
+
+        productos_vendidos_hoy = vendidos_con_fecha_explicita + vendidos_con_fecha_null
 
         # Stock al cierre de ayer (stock actual + productos vendidos hoy)
         # Este es el stock que deberían tener físicamente si no se han entregado los productos de hoy
@@ -50,6 +73,25 @@ def gestion_inventario(request):
         # Calcular diferencia
         diferencia = stock_cierre_ayer - stock_actual
 
+        # Info adicional de debug
+        debug_info = None
+        if debug_mode and productos_vendidos_hoy > 0:
+            # Obtener detalles de las ventas de hoy
+            reservas_hoy = ReservaProducto.objects.filter(
+                producto=producto
+            ).filter(
+                Q(fecha_entrega=hoy) |
+                (Q(fecha_entrega__isnull=True) & Q(venta_reserva__reservaservicios__fecha_agendamiento=hoy))
+            ).exclude(
+                venta_reserva__estado_reserva='cancelada'
+            ).distinct().values(
+                'venta_reserva__id',
+                'cantidad',
+                'fecha_entrega',
+                'venta_reserva__estado_reserva'
+            )
+            debug_info = list(reservas_hoy)
+
         inventario_data.append({
             'producto': producto,
             'stock_actual': stock_actual,
@@ -57,7 +99,8 @@ def gestion_inventario(request):
             'productos_vendidos_hoy': productos_vendidos_hoy,
             'diferencia': diferencia,
             'categoria': producto.categoria.nombre if producto.categoria else 'Sin categoría',
-            'proveedor': producto.proveedor.nombre if producto.proveedor else 'Sin proveedor'
+            'proveedor': producto.proveedor.nombre if producto.proveedor else 'Sin proveedor',
+            'debug_info': debug_info
         })
 
     # Filtrar por categoría si se especifica
@@ -76,7 +119,8 @@ def gestion_inventario(request):
         'hora_actual': timezone.now().strftime('%H:%M'),
         'categorias': categorias,
         'categoria_seleccionada': categoria_filtro,
-        'total_productos': len(inventario_data)
+        'total_productos': len(inventario_data),
+        'debug_mode': debug_mode
     }
 
     return render(request, 'ventas/inventario/gestion_inventario.html', context)

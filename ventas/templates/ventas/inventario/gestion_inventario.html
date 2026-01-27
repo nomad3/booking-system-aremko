@@ -297,9 +297,22 @@
             </div>
         </div>
 
-        <button class="btn-exportar" onclick="window.print()">
-            📥 Imprimir/Exportar
-        </button>
+        <div style="float: right; display: flex; gap: 10px;">
+            {% if not debug_mode %}
+            <a href="?debug=true{% if categoria_seleccionada %}&categoria={{ categoria_seleccionada }}{% endif %}"
+               class="btn-exportar" style="background: #9C27B0;">
+                🐛 Modo Debug
+            </a>
+            {% else %}
+            <a href="?{% if categoria_seleccionada %}categoria={{ categoria_seleccionada }}{% endif %}"
+               class="btn-exportar" style="background: #666;">
+                ❌ Salir Debug
+            </a>
+            {% endif %}
+            <button class="btn-exportar" onclick="window.print()">
+                📥 Imprimir/Exportar
+            </button>
+        </div>
     </div>
 
     <div class="explicacion-box">
@@ -309,7 +322,10 @@
             <strong>Stock Cierre Ayer:</strong> Es el inventario sin contar las ventas con entrega hoy.
             Este valor debería coincidir con su inventario físico si hace el conteo por la mañana,
             ya que los productos vendidos para entregar hoy aún no han sido entregados físicamente.<br>
-            <strong>Vendidos Hoy:</strong> Cantidad de productos con fecha de entrega = hoy.
+            <strong>Vendidos Hoy:</strong> Cantidad de productos con fecha de entrega = hoy o sin fecha (usa fecha del primer servicio).
+            {% if debug_mode %}
+            <br><strong style="color: #9C27B0;">🐛 MODO DEBUG ACTIVO - Se muestran detalles de reservas</strong>
+            {% endif %}
         </div>
     </div>
 
@@ -376,6 +392,13 @@
                         <span class="stock-diferencia {% if item.productos_vendidos_hoy > 0 %}positivo{% else %}cero{% endif %}">
                             {{ item.productos_vendidos_hoy }}
                         </span>
+                        {% if debug_mode and item.debug_info %}
+                            <div style="font-size: 10px; color: #666; margin-top: 4px;">
+                                {% for reserva in item.debug_info %}
+                                    <div>Reserva #{{ reserva.venta_reserva__id }} ({{ reserva.cantidad }} und)</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </td>
                     <td>
                         <button class="btn-ajustar" onclick="ajustarInventario({{ item.producto.id }}, '{{ item.producto.nombre }}', {{ item.stock_actual }})">
