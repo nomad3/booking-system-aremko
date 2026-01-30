@@ -431,7 +431,7 @@
         </table>
     </div>
 
-    <a href="/admin/ventas/" class="btn-volver">← Volver al menú</a>
+    <a href="/admin/" class="btn-volver">← Volver al menú</a>
 </div>
 
 {% if puede_ajustar %}
@@ -474,7 +474,7 @@ function ajustarInventario(productoId, productoNombre, stockActual) {
     document.getElementById('productoNombre').textContent = productoNombre;
     document.getElementById('stockActual').textContent = stockActual;
     document.getElementById('nuevo_stock').value = stockActual;
-    document.getElementById('ajustarForm').action = '/admin/ventas/inventario/ajustar/' + productoId + '/';
+    document.getElementById('ajustarForm').action = '/ventas/inventario/ajustar/' + productoId + '/';
     document.getElementById('ajustarModal').style.display = 'block';
 }
 
