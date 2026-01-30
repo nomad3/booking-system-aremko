@@ -20,8 +20,9 @@ def gestion_inventario(request):
     Vista principal de gestión de inventario.
     Muestra el stock actual y el stock al cierre del día anterior.
     """
-    # Obtener fecha actual y fecha de ayer
-    hoy = timezone.now().date()
+    # Obtener fecha actual y fecha de ayer en zona horaria local
+    ahora_local = timezone.localtime(timezone.now())
+    hoy = ahora_local.date()
     ayer = hoy - timedelta(days=1)
 
     # Obtener todos los productos activos
@@ -120,7 +121,7 @@ def gestion_inventario(request):
         'inventario_data': inventario_data,
         'fecha_actual': hoy.strftime('%d/%m/%Y'),
         'fecha_ayer': ayer.strftime('%d/%m/%Y'),
-        'hora_actual': timezone.now().strftime('%H:%M'),
+        'hora_actual': timezone.localtime(timezone.now()).strftime('%H:%M'),
         'categorias': categorias,
         'categoria_seleccionada': categoria_filtro,
         'total_productos': len(inventario_data),

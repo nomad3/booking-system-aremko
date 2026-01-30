@@ -23,8 +23,8 @@ def agenda_operativa(request):
     Muestra todos los servicios y productos pendientes desde la hora actual,
     organizados cronológicamente.
     """
-    # Obtener fecha y hora actuales
-    ahora = timezone.now()
+    # Obtener fecha y hora actuales en zona horaria local
+    ahora = timezone.localtime(timezone.now())
     hoy = ahora.date()
     hora_actual = ahora.time()
 
