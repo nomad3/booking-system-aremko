@@ -15,6 +15,8 @@ from .models import (
     Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto,
     Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio,
     MovimientoCliente, Compra, DetalleCompra, GiftCard, GiftCardExperiencia, PackDescuento,
+    # Massage Management Models
+    MasajistaEspecialidad, HorarioMasajista, SalaServicio,
     # CRM Models
     Lead, Company, Contact, Activity, Campaign, Deal, CampaignInteraction,
     HomepageConfig, HomepageSettings,
@@ -529,9 +531,9 @@ class ClienteAdmin(admin.ModelAdmin):
     exportar_a_excel.short_description = "Exportar clientes seleccionados a Excel"
 
 class ServicioAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'precio_base', 'duracion', 'categoria', 'publicado_web', 'visible_en_matriz')
-    list_filter = ('categoria', 'tipo_servicio', 'activo', 'publicado_web', 'visible_en_matriz')
-    list_editable = ('publicado_web', 'visible_en_matriz')
+    list_display = ('nombre', 'precio_base', 'duracion', 'categoria', 'publicado_web', 'permite_reserva_web', 'visible_en_matriz')
+    list_filter = ('categoria', 'tipo_servicio', 'activo', 'publicado_web', 'permite_reserva_web', 'visible_en_matriz')
+    list_editable = ('publicado_web', 'permite_reserva_web', 'visible_en_matriz')
     search_fields = ('nombre', 'descripcion_web')
     filter_horizontal = ('proveedores',)  # Para manejar ManyToMany de proveedores
     readonly_fields = ('imagen_preview',)
@@ -550,8 +552,8 @@ class ServicioAdmin(admin.ModelAdmin):
             'fields': ('proveedores',)
         }),
         ('Visibilidad', {
-            'fields': ('activo', 'publicado_web', 'visible_en_matriz'),
-            'description': 'Control de visibilidad del servicio en diferentes partes del sistema'
+            'fields': ('activo', 'publicado_web', 'permite_reserva_web', 'visible_en_matriz'),
+            'description': 'Control de visibilidad del servicio en diferentes partes del sistema. Si permite_reserva_web está desmarcado, se mostrará opción de WhatsApp.'
         }),
         ('Información Web', {
             'fields': ('imagen_preview', 'imagen', 'descripcion_web'),
@@ -2781,4 +2783,70 @@ class ServicioSlotBloqueoAdmin(admin.ModelAdmin):
         if not change:
             obj.creado_por = request.user
         super().save_model(request, obj, form, change)
+
+
+# ============================================
+# ADMIN PARA GESTIÓN DE MASAJISTAS
+# ============================================
+
+@admin.register(MasajistaEspecialidad)
+class MasajistaEspecialidadAdmin(admin.ModelAdmin):
+    list_display = ('masajista', 'servicio', 'nivel_experiencia', 'activo')
+    list_filter = ('activo', 'nivel_experiencia', 'masajista')
+    search_fields = ('masajista__nombre', 'servicio__nombre')
+    ordering = ('masajista__nombre', 'servicio__nombre')
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "masajista":
+            kwargs["queryset"] = Proveedor.objects.filter(es_masajista=True).order_by('nombre')
+        elif db_field.name == "servicio":
+            kwargs["queryset"] = Servicio.objects.filter(tipo_servicio='masaje').order_by('nombre')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+@admin.register(HorarioMasajista)
+class HorarioMasajistaAdmin(admin.ModelAdmin):
+    list_display = ('masajista', 'dia_semana', 'hora_inicio', 'hora_fin', 'disponible')
+    list_filter = ('disponible', 'dia_semana', 'masajista')
+    search_fields = ('masajista__nombre',)
+    ordering = ('masajista__nombre', 'dia_semana')
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "masajista":
+            kwargs["queryset"] = Proveedor.objects.filter(es_masajista=True).order_by('nombre')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+class HorarioMasajistaInline(admin.TabularInline):
+    model = HorarioMasajista
+    extra = 0
+    fields = ('dia_semana', 'hora_inicio', 'hora_fin', 'disponible')
+    ordering = ('dia_semana',)
+
+
+class MasajistaEspecialidadInline(admin.TabularInline):
+    model = MasajistaEspecialidad
+    extra = 0
+    fields = ('servicio', 'nivel_experiencia', 'activo')
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "servicio":
+            kwargs["queryset"] = Servicio.objects.filter(tipo_servicio='masaje').order_by('nombre')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+@admin.register(SalaServicio)
+class SalaServicioAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'numero_camillas', 'permite_grupos_mixtos', 'activa')
+    list_filter = ('activa', 'permite_grupos_mixtos')
+    search_fields = ('nombre', 'descripcion')
+    ordering = ('nombre',)
+    fieldsets = (
+        ('Información General', {
+            'fields': ('nombre', 'numero_camillas', 'activa')
+        }),
+        ('Configuración', {
+            'fields': ('permite_grupos_mixtos', 'descripcion')
+        }),
+    )
 

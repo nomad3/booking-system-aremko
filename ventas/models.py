@@ -439,6 +439,11 @@ class Servicio(models.Model):
         default=True,
         help_text="Marcar si este servicio debe ser visible y reservable en la página web pública."
     )
+    permite_reserva_web = models.BooleanField(
+        default=True,
+        verbose_name="Permite Reserva Web Directa",
+        help_text="Si está marcado, permite reserva directa por web. Si no, requiere contacto por WhatsApp."
+    )
     visible_en_matriz = models.BooleanField(
         default=True,
         verbose_name="Visible en Calendario Matriz",
@@ -480,6 +485,142 @@ class Servicio(models.Model):
 
     def horario_valido(self, hora_propuesta):
         return hora_propuesta in self.slots_disponibles
+
+
+# ============================================
+# MODELS DE GESTIÓN DE MASAJISTAS
+# ============================================
+
+class MasajistaEspecialidad(models.Model):
+    """
+    Define qué tipos de masajes puede realizar cada masajista.
+    Permite control granular de especialidades por profesional.
+    """
+    masajista = models.ForeignKey(
+        Proveedor,
+        on_delete=models.CASCADE,
+        limit_choices_to={'es_masajista': True},
+        related_name='especialidades',
+        verbose_name='Masajista'
+    )
+    servicio = models.ForeignKey(
+        Servicio,
+        on_delete=models.CASCADE,
+        limit_choices_to={'tipo_servicio': 'masaje'},
+        related_name='especialistas',
+        verbose_name='Tipo de Masaje'
+    )
+    nivel_experiencia = models.CharField(
+        max_length=20,
+        choices=[
+            ('basico', 'Básico'),
+            ('intermedio', 'Intermedio'),
+            ('avanzado', 'Avanzado'),
+            ('experto', 'Experto'),
+        ],
+        default='intermedio',
+        help_text='Nivel de experiencia del masajista en este tipo de masaje'
+    )
+    activo = models.BooleanField(
+        default=True,
+        help_text='Si el masajista está actualmente ofreciendo este servicio'
+    )
+
+    class Meta:
+        unique_together = ['masajista', 'servicio']
+        verbose_name = 'Especialidad de Masajista'
+        verbose_name_plural = 'Especialidades de Masajistas'
+        ordering = ['masajista__nombre', 'servicio__nombre']
+
+    def __str__(self):
+        return f"{self.masajista.nombre} - {self.servicio.nombre}"
+
+
+class HorarioMasajista(models.Model):
+    """
+    Define la disponibilidad semanal de cada masajista.
+    Permite configurar horarios diferentes por día de la semana.
+    """
+    DIAS_SEMANA = [
+        (0, 'Lunes'),
+        (1, 'Martes'),
+        (2, 'Miércoles'),
+        (3, 'Jueves'),
+        (4, 'Viernes'),
+        (5, 'Sábado'),
+        (6, 'Domingo'),
+    ]
+
+    masajista = models.ForeignKey(
+        Proveedor,
+        on_delete=models.CASCADE,
+        limit_choices_to={'es_masajista': True},
+        related_name='horarios',
+        verbose_name='Masajista'
+    )
+    dia_semana = models.IntegerField(
+        choices=DIAS_SEMANA,
+        verbose_name='Día de la Semana'
+    )
+    hora_inicio = models.TimeField(
+        verbose_name='Hora de Inicio',
+        help_text='Hora de inicio del turno'
+    )
+    hora_fin = models.TimeField(
+        verbose_name='Hora de Fin',
+        help_text='Hora de fin del turno'
+    )
+    disponible = models.BooleanField(
+        default=True,
+        help_text='Si el masajista está disponible este día'
+    )
+
+    class Meta:
+        unique_together = ['masajista', 'dia_semana']
+        verbose_name = 'Horario de Masajista'
+        verbose_name_plural = 'Horarios de Masajistas'
+        ordering = ['masajista__nombre', 'dia_semana']
+
+    def __str__(self):
+        return f"{self.masajista.nombre} - {self.get_dia_semana_display()}"
+
+
+class SalaServicio(models.Model):
+    """
+    Define las salas disponibles para servicios (principalmente masajes).
+    Cada sala puede tener múltiples camillas.
+    """
+    nombre = models.CharField(
+        max_length=50,
+        verbose_name='Nombre de la Sala',
+        help_text='Ej: Sala 1, Sala Relax, etc.'
+    )
+    numero_camillas = models.PositiveIntegerField(
+        default=2,
+        verbose_name='Número de Camillas',
+        help_text='Cantidad de camillas disponibles en esta sala'
+    )
+    permite_grupos_mixtos = models.BooleanField(
+        default=False,
+        verbose_name='Permite Grupos Mixtos',
+        help_text='Si permite que personas no relacionadas compartan la sala'
+    )
+    activa = models.BooleanField(
+        default=True,
+        help_text='Si la sala está disponible para uso'
+    )
+    descripcion = models.TextField(
+        blank=True,
+        help_text='Descripción adicional de la sala'
+    )
+
+    class Meta:
+        verbose_name = 'Sala de Servicio'
+        verbose_name_plural = 'Salas de Servicio'
+        ordering = ['nombre']
+
+    def __str__(self):
+        return f"{self.nombre} ({self.numero_camillas} camillas)"
 
 
 # ============================================
