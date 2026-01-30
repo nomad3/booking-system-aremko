@@ -471,13 +471,35 @@ html {
                             <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
                         {% endif %}
                         <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p>
+                        {% if servicio.permite_reserva_web %}
+                        {# Botón de reserva directa por web #}
                         <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                 data-servicio-id="{{ servicio.id }}"
                                 data-servicio-nombre="{{ servicio.nombre|escapejs }}"
                                 data-servicio-precio="{{ servicio.precio_base }}"
                                 data-servicio-tipo="{{ servicio.tipo_servicio }}">
-                            <i class="fas fa-calendar-plus me-2"></i>Reservar Ahora
+                            <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                         </button>
+                        {% else %}
+                        {# Botones para reserva por WhatsApp cuando es complejo #}
+                        <div class="d-grid gap-2">
+                            <a href="https://wa.me/56976668080?text=Hola%2C%20quiero%20reservar%20{{ servicio.nombre|urlencode }}"
+                               class="btn btn-success w-100" target="_blank">
+                                <i class="fab fa-whatsapp me-2"></i>Reservar por WhatsApp
+                            </a>
+                            <button class="btn btn-outline-primary w-100 js-open-booking-modal"
+                                data-servicio-id="{{ servicio.id }}"
+                                data-servicio-nombre="{{ servicio.nombre|escapejs }}"
+                                data-servicio-precio="{{ servicio.precio_base }}"
+                                data-servicio-tipo="{{ servicio.tipo_servicio }}"
+                                data-readonly="true">
+                                <i class="fas fa-calendar me-2"></i>Ver disponibilidad
+                            </button>
+                            <small class="text-muted text-center mt-1">
+                                <i class="fas fa-info-circle"></i> Este servicio requiere coordinación especial
+                            </small>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -870,6 +892,7 @@ html {
                 currentServicioNombre = this.dataset.servicioNombre;
                 currentServicioPrecio = parseFloat(this.dataset.servicioPrecio);
                 currentServicioTipo = this.dataset.servicioTipo || 'otro';
+                const isReadonly = this.dataset.readonly === 'true'; // Check if in readonly mode
 
                 document.getElementById('servicioId').value = currentServicioId;
                 document.getElementById('servicioNombre').value = currentServicioNombre;
@@ -891,6 +914,55 @@ html {
                     if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'block';
                     cantidadPersonasSelect.style.display = 'block';
                     document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio);
+                }
+
+                // Handle readonly mode
+                const addToCartBtn = document.getElementById('addToCartBtn');
+                const modalTitle = document.getElementById('bookingModalLabel');
+                const modalFooter = document.querySelector('#bookingModal .modal-footer');
+
+                if (isReadonly) {
+                    // Change modal title for readonly mode
+                    if (modalTitle) {
+                        modalTitle.textContent = 'Ver Disponibilidad - ' + currentServicioNombre;
+                    }
+
+                    // Hide or modify the Add to Cart button
+                    if (addToCartBtn) {
+                        addToCartBtn.style.display = 'none';
+                    }
+
+                    // Add WhatsApp message in footer
+                    const existingMsg = document.getElementById('readonlyMessage');
+                    if (!existingMsg && modalFooter) {
+                        const readonlyMsg = document.createElement('div');
+                        readonlyMsg.id = 'readonlyMessage';
+                        readonlyMsg.className = 'alert alert-info mb-0 me-auto';
+                        readonlyMsg.innerHTML = `
+                            <i class="fas fa-info-circle me-2"></i>
+                            Para reservar este servicio, por favor contáctanos por
+                            <a href="https://wa.me/56976668080?text=Hola%2C%20quiero%20reservar%20${encodeURIComponent(currentServicioNombre)}"
+                               class="alert-link" target="_blank">
+                                <i class="fab fa-whatsapp"></i> WhatsApp
+                            </a>
+                        `;
+                        modalFooter.insertBefore(readonlyMsg, modalFooter.firstChild);
+                    }
+                } else {
+                    // Normal mode - restore everything
+                    if (modalTitle) {
+                        modalTitle.textContent = 'Reservar Servicio';
+                    }
+
+                    if (addToCartBtn) {
+                        addToCartBtn.style.display = '';
+                    }
+
+                    // Remove readonly message if exists
+                    const existingMsg = document.getElementById('readonlyMessage');
+                    if (existingMsg) {
+                        existingMsg.remove();
+                    }
                 }
 
                 const bookingModalEl = document.getElementById('bookingModal');
