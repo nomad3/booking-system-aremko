@@ -6,7 +6,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ventas', '0060_newslettersubscriber_created_at_and_more'),
+        ('ventas', '0077_add_cliente_search_indexes'),
     ]
 
     operations = [
