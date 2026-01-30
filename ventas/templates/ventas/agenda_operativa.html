@@ -261,6 +261,23 @@
         font-weight: 600;
     }
 
+    .reserva-badge-link {
+        text-decoration: none;
+        transition: transform 0.2s;
+        display: inline-block;
+    }
+
+    .reserva-badge-link:hover .reserva-badge {
+        background: #2196F3;
+        color: white;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .reserva-badge-link:hover {
+        transform: translateY(-1px);
+    }
+
     .header-buttons {
         display: flex;
         gap: 10px;
@@ -281,6 +298,19 @@
             page-break-inside: avoid;
             box-shadow: none;
             border: 1px solid #ddd;
+        }
+
+        /* Remover estilos de enlace en impresión */
+        .reserva-badge-link {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .reserva-badge-link:hover .reserva-badge {
+            background: #e0e0e0;
+            color: #666;
+            transform: none;
+            box-shadow: none;
         }
     }
 </style>
@@ -392,7 +422,12 @@
                     </div>
                     <div class="detalle-item">
                         <span>📋</span>
-                        <span class="reserva-badge">Reserva #{{ item.reserva_id }}</span>
+                        <a href="/admin/ventas/ventareserva/{{ item.reserva_id }}/change/"
+                           target="_blank"
+                           class="reserva-badge-link"
+                           title="Editar reserva #{{ item.reserva_id }}">
+                            <span class="reserva-badge">Reserva #{{ item.reserva_id }}</span>
+                        </a>
                     </div>
                     <div class="detalle-item">
                         <span>👥</span>
