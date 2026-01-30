@@ -1,0 +1,407 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Agenda Operativa del Día{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .agenda-container {
+        padding: 20px;
+        background: #f5f5f5;
+        min-height: 100vh;
+    }
+
+    .agenda-header {
+        background: white;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .agenda-title {
+        font-size: 24px;
+        color: #333;
+        margin: 0 0 10px 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .agenda-info {
+        display: flex;
+        gap: 30px;
+        color: #666;
+        margin-top: 15px;
+        flex-wrap: wrap;
+    }
+
+    .info-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .info-label {
+        font-weight: 600;
+    }
+
+    .hora-block {
+        background: white;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .hora-header {
+        padding: 12px 20px;
+        font-size: 18px;
+        font-weight: 600;
+        border-bottom: 2px solid #e0e0e0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .hora-header.urgente {
+        background: #ffebee;
+        color: #c62828;
+        border-bottom-color: #ef5350;
+    }
+
+    .hora-header.normal {
+        background: #f8f8f8;
+        color: #333;
+    }
+
+    .servicio-item {
+        padding: 15px 20px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .servicio-item:last-child {
+        border-bottom: none;
+    }
+
+    .servicio-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 8px;
+    }
+
+    .servicio-tipo {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .tipo-tina {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+
+    .tipo-masaje {
+        background: #f3e5f5;
+        color: #7b1fa2;
+    }
+
+    .tipo-cabana {
+        background: #e8f5e9;
+        color: #388e3c;
+    }
+
+    .tipo-otro {
+        background: #fff3e0;
+        color: #f57c00;
+    }
+
+    .servicio-nombre {
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .servicio-detalles {
+        color: #666;
+        margin-left: 0;
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .detalle-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .productos-section {
+        margin-top: 12px;
+        padding: 10px 15px;
+        background: #f9f9f9;
+        border-left: 3px solid #ff9800;
+        border-radius: 4px;
+    }
+
+    .productos-title {
+        font-weight: 600;
+        color: #f57c00;
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+
+    .producto-item {
+        color: #666;
+        margin-left: 20px;
+        padding: 3px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .producto-cantidad {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .btn-actualizar {
+        background: #2196F3;
+        color: white;
+        padding: 10px 25px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-actualizar:hover {
+        background: #1976D2;
+    }
+
+    .btn-imprimir {
+        background: #4CAF50;
+        color: white;
+        padding: 10px 25px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-imprimir:hover {
+        background: #45a049;
+    }
+
+    .btn-volver {
+        display: inline-block;
+        margin: 20px 0;
+        background: #666;
+        color: white;
+        padding: 10px 20px;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+
+    .btn-volver:hover {
+        background: #555;
+    }
+
+    .sin-tareas {
+        background: white;
+        padding: 60px;
+        text-align: center;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .sin-tareas-icon {
+        font-size: 48px;
+        margin-bottom: 20px;
+    }
+
+    .sin-tareas-mensaje {
+        font-size: 18px;
+        color: #666;
+    }
+
+    .urgente-badge {
+        background: #f44336;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.6; }
+        100% { opacity: 1; }
+    }
+
+    .reserva-badge {
+        background: #e0e0e0;
+        color: #666;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .header-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    @media print {
+        .header-buttons, .btn-volver {
+            display: none;
+        }
+
+        .agenda-container {
+            background: white;
+            padding: 0;
+        }
+
+        .hora-block {
+            page-break-inside: avoid;
+            box-shadow: none;
+            border: 1px solid #ddd;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="agenda-container">
+    <div class="agenda-header">
+        <h1 class="agenda-title">
+            📋 Agenda Operativa del Día
+        </h1>
+
+        <div class="agenda-info">
+            <div class="info-item">
+                <span class="info-label">📅 Fecha:</span>
+                <span>{{ fecha_actual }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">🕐 Generado a las:</span>
+                <span>{{ hora_generacion }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">⏰ Desde:</span>
+                <span>{{ hora_actual }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">📊 Servicios pendientes:</span>
+                <span>{{ total_servicios }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">📦 Productos a entregar:</span>
+                <span>{{ total_productos }}</span>
+            </div>
+        </div>
+
+        <div class="header-buttons">
+            <button class="btn-actualizar" onclick="location.reload()">
+                🔄 Actualizar
+            </button>
+            <button class="btn-imprimir" onclick="window.print()">
+                🖨️ Imprimir
+            </button>
+        </div>
+    </div>
+
+    {% if tiene_tareas %}
+        {% for bloque_hora in agenda %}
+        <div class="hora-block">
+            <div class="hora-header {% if bloque_hora.es_urgente %}urgente{% else %}normal{% endif %}">
+                <span>{{ bloque_hora.hora }} hrs</span>
+                {% if bloque_hora.es_urgente %}
+                <span class="urgente-badge">PRÓXIMO</span>
+                {% endif %}
+            </div>
+
+            {% for item in bloque_hora.items %}
+            <div class="servicio-item">
+                <div class="servicio-header">
+                    {% if item.servicio.servicio.tipo_servicio == 'tina' %}
+                        <span class="servicio-tipo tipo-tina">Tina</span>
+                    {% elif item.servicio.servicio.tipo_servicio == 'masaje' %}
+                        <span class="servicio-tipo tipo-masaje">Masaje</span>
+                    {% elif item.servicio.servicio.tipo_servicio == 'cabana' %}
+                        <span class="servicio-tipo tipo-cabana">Cabaña</span>
+                    {% else %}
+                        <span class="servicio-tipo tipo-otro">Servicio</span>
+                    {% endif %}
+
+                    <span class="servicio-nombre">{{ item.nombre }}</span>
+                </div>
+
+                <div class="servicio-detalles">
+                    <div class="detalle-item">
+                        <span>👤</span>
+                        <span><strong>{{ item.cliente }}</strong></span>
+                    </div>
+                    <div class="detalle-item">
+                        <span>📋</span>
+                        <span class="reserva-badge">Reserva #{{ item.reserva_id }}</span>
+                    </div>
+                    <div class="detalle-item">
+                        <span>👥</span>
+                        <span>{{ item.cantidad_personas }} persona{% if item.cantidad_personas > 1 %}s{% endif %}</span>
+                    </div>
+                </div>
+
+                {% if item.productos %}
+                <div class="productos-section">
+                    <div class="productos-title">📦 Productos a entregar con este servicio:</div>
+                    {% for producto in item.productos %}
+                    <div class="producto-item">
+                        <span>•</span>
+                        <span class="producto-cantidad">{{ producto.cantidad }}x</span>
+                        <span>{{ producto.producto.nombre }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="sin-tareas">
+            <div class="sin-tareas-icon">✅</div>
+            <div class="sin-tareas-mensaje">
+                No hay servicios pendientes para el resto del día
+            </div>
+        </div>
+    {% endif %}
+
+    <a href="/admin/" class="btn-volver">← Volver al menú</a>
+</div>
+
+<script>
+// Auto-actualizar cada 5 minutos
+setTimeout(function() {
+    if (confirm('Han pasado 5 minutos. ¿Desea actualizar la agenda?')) {
+        location.reload();
+    }
+}, 300000);
+</script>
+
+{% endblock %}
