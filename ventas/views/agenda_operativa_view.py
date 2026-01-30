@@ -36,10 +36,14 @@ def agenda_operativa(request):
         except:
             pass  # Usar hora actual si hay error
 
+    # Modo debug para ver todos los servicios del día
+    debug_mode = request.GET.get('debug', '').lower() == 'true'
+    if debug_mode:
+        hora_actual = time(0, 0)  # Mostrar desde las 00:00 en modo debug
+
     # Obtener todos los servicios del día desde la hora actual
     servicios = ReservaServicio.objects.filter(
-        fecha_agendamiento=hoy,
-        venta_reserva__estado_reserva__in=['confirmada', 'en_proceso']
+        fecha_agendamiento=hoy
     ).exclude(
         venta_reserva__estado_reserva='cancelada'
     ).select_related(
@@ -129,6 +133,41 @@ def agenda_operativa(request):
         for item in agenda_ordenada[0]['items']:
             item['es_proximo'] = True
 
+    # En modo debug, agregar información adicional
+    debug_info = None
+    if debug_mode:
+        # Contar todos los servicios antes de filtrar
+        todos_servicios = ReservaServicio.objects.filter(
+            fecha_agendamiento=hoy
+        ).count()
+
+        # Servicios por estado
+        servicios_por_estado = {}
+        for servicio in ReservaServicio.objects.filter(fecha_agendamiento=hoy).select_related('venta_reserva'):
+            estado = servicio.venta_reserva.estado_reserva if servicio.venta_reserva else 'sin_reserva'
+            servicios_por_estado[estado] = servicios_por_estado.get(estado, 0) + 1
+
+        # Mostrar algunos servicios de ejemplo
+        primeros_servicios = []
+        for servicio in ReservaServicio.objects.filter(fecha_agendamiento=hoy)[:5]:
+            primeros_servicios.append({
+                'id': servicio.id,
+                'servicio': servicio.servicio.nombre if servicio.servicio else 'Sin servicio',
+                'hora': servicio.hora_inicio,
+                'cliente': servicio.venta_reserva.cliente.nombre if servicio.venta_reserva and servicio.venta_reserva.cliente else 'Sin cliente',
+                'estado': servicio.venta_reserva.estado_reserva if servicio.venta_reserva else 'Sin reserva'
+            })
+
+        debug_info = {
+            'total_servicios_hoy': todos_servicios,
+            'servicios_filtrados': len(servicios),
+            'servicios_pendientes': len(servicios_pendientes),
+            'servicios_por_estado': servicios_por_estado,
+            'primeros_servicios': primeros_servicios,
+            'hora_actual_str': hora_actual.strftime('%H:%M'),
+            'fecha_hoy': hoy.strftime('%Y-%m-%d')
+        }
+
     context = {
         'agenda': agenda_ordenada,
         'fecha_actual': hoy.strftime('%d/%m/%Y'),
@@ -136,7 +175,9 @@ def agenda_operativa(request):
         'hora_generacion': ahora.strftime('%H:%M'),
         'total_servicios': total_servicios,
         'total_productos': total_productos,
-        'tiene_tareas': len(agenda_ordenada) > 0
+        'tiene_tareas': len(agenda_ordenada) > 0,
+        'debug_mode': debug_mode,
+        'debug_info': debug_info
     }
 
     return render(request, 'ventas/agenda_operativa.html', context)

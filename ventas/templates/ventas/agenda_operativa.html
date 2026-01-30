@@ -323,8 +323,41 @@
             <button class="btn-imprimir" onclick="window.print()">
                 🖨️ Imprimir
             </button>
+            {% if not debug_mode %}
+            <a href="?debug=true" class="btn-actualizar" style="background: #9C27B0;">
+                🐛 Modo Debug
+            </a>
+            {% else %}
+            <a href="{% url 'ventas:agenda_operativa' %}" class="btn-actualizar" style="background: #666;">
+                ❌ Salir Debug
+            </a>
+            {% endif %}
         </div>
     </div>
+
+    {% if debug_mode and debug_info %}
+    <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+        <h3 style="color: #856404; margin: 0 0 10px 0;">🐛 Información de Debug</h3>
+        <div style="color: #856404; line-height: 1.6;">
+            <strong>Fecha consultada:</strong> {{ debug_info.fecha_hoy }}<br>
+            <strong>Hora actual en filtro:</strong> {{ debug_info.hora_actual_str }}<br>
+            <strong>Total servicios hoy:</strong> {{ debug_info.total_servicios_hoy }}<br>
+            <strong>Servicios después de filtros básicos:</strong> {{ debug_info.servicios_filtrados }}<br>
+            <strong>Servicios pendientes (desde {{ hora_actual }}):</strong> {{ debug_info.servicios_pendientes }}<br>
+            <strong>Servicios por estado:</strong><br>
+            {% for estado, cantidad in debug_info.servicios_por_estado.items %}
+                &nbsp;&nbsp;• {{ estado|default:"sin estado" }}: {{ cantidad }}<br>
+            {% endfor %}
+
+            {% if debug_info.primeros_servicios %}
+            <strong>Primeros servicios de hoy:</strong><br>
+            {% for srv in debug_info.primeros_servicios %}
+                &nbsp;&nbsp;• ID: {{ srv.id }} - {{ srv.servicio }} - {{ srv.hora }} - Cliente: {{ srv.cliente }} - Estado: {{ srv.estado }}<br>
+            {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 
     {% if tiene_tareas %}
         {% for bloque_hora in agenda %}
