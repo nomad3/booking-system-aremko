@@ -56,13 +56,31 @@ def agenda_operativa(request):
         'venta_reserva__cliente'
     ).order_by('hora_inicio')
 
-    # Filtrar servicios desde la hora actual en adelante
+    # Filtrar servicios desde la hora actual en adelante Y servicios en curso
     servicios_pendientes = []
     for servicio in servicios:
         try:
             servicio_hora = datetime.strptime(servicio.hora_inicio, '%H:%M').time()
-            if servicio_hora >= hora_actual:
-                servicios_pendientes.append(servicio)
+
+            # Calcular hora de fin basado en la duración del servicio
+            if servicio.servicio and servicio.servicio.duracion:
+                hora_inicio_dt = datetime.combine(hoy, servicio_hora)
+                hora_fin_dt = hora_inicio_dt + timedelta(minutes=servicio.servicio.duracion)
+                hora_fin = hora_fin_dt.time()
+
+                # Incluir si:
+                # 1. El servicio aún no ha comenzado (futuro)
+                # 2. El servicio está en curso (ya comenzó pero no ha terminado)
+                if servicio_hora >= hora_actual or (servicio_hora < hora_actual and hora_fin > hora_actual):
+                    # Marcar si está en curso
+                    servicio.en_curso = (servicio_hora < hora_actual and hora_fin > hora_actual)
+                    servicio.hora_fin = hora_fin.strftime('%H:%M')
+                    servicios_pendientes.append(servicio)
+            else:
+                # Si no hay duración, usar lógica anterior (solo futuros)
+                if servicio_hora >= hora_actual:
+                    servicio.en_curso = False
+                    servicios_pendientes.append(servicio)
         except:
             continue
 
@@ -108,7 +126,10 @@ def agenda_operativa(request):
                 'reserva_id': servicio.venta_reserva.id,
                 'cantidad_personas': servicio.cantidad_personas or 1,
                 'productos': productos_a_entregar,
-                'es_proximo': False  # Se marcará después
+                'es_proximo': False,  # Se marcará después
+                'en_curso': getattr(servicio, 'en_curso', False),  # Si está en ejecución
+                'hora_fin': getattr(servicio, 'hora_fin', None),  # Hora de finalización
+                'duracion': servicio.servicio.duracion if servicio.servicio else None  # Duración en minutos
             })
 
     # Convertir a lista ordenada y marcar servicios urgentes
@@ -131,6 +152,12 @@ def agenda_operativa(request):
         len(item['productos'])
         for h in agenda_ordenada
         for item in h['items']
+    )
+    # Contar servicios en curso
+    servicios_en_curso = sum(
+        1 for h in agenda_ordenada
+        for item in h['items']
+        if item.get('en_curso', False)
     )
 
     # Identificar próximos servicios (próxima hora)
@@ -180,6 +207,7 @@ def agenda_operativa(request):
             'total_servicios_hoy': todos_servicios,
             'servicios_filtrados': len(servicios),
             'servicios_pendientes': len(servicios_pendientes),
+            'servicios_en_curso': servicios_en_curso,
             'servicios_por_estado': servicios_por_estado,
             'primeros_servicios': primeros_servicios,
             'hora_actual_str': hora_actual.strftime('%H:%M'),
@@ -192,6 +220,7 @@ def agenda_operativa(request):
         'hora_actual': hora_actual.strftime('%H:%M'),
         'hora_generacion': ahora.strftime('%H:%M'),
         'total_servicios': total_servicios,
+        'servicios_en_curso': servicios_en_curso,
         'total_productos': total_productos,
         'tiene_tareas': len(agenda_ordenada) > 0,
         'debug_mode': debug_mode,
