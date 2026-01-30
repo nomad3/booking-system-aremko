@@ -43,11 +43,14 @@ def agenda_operativa(request):
 
     # Obtener todos los servicios del día desde la hora actual
     # Primero filtrar servicios que tienen venta_reserva asociada
+    # Excluir servicios de descuento que no son servicios reales
     servicios = ReservaServicio.objects.filter(
         fecha_agendamiento=hoy,
         venta_reserva__isnull=False  # Asegurar que hay venta_reserva
     ).exclude(
         venta_reserva__estado_reserva='cancelada'
+    ).exclude(
+        servicio__nombre__icontains='descuento'  # Excluir servicios de descuento
     ).select_related(
         'servicio',
         'venta_reserva__cliente'
@@ -139,27 +142,39 @@ def agenda_operativa(request):
     # En modo debug, agregar información adicional
     debug_info = None
     if debug_mode:
-        # Contar todos los servicios antes de filtrar
+        # Contar todos los servicios antes de filtrar (excluyendo descuentos)
         todos_servicios = ReservaServicio.objects.filter(
             fecha_agendamiento=hoy
+        ).exclude(
+            servicio__nombre__icontains='descuento'
         ).count()
 
-        # Servicios por estado
+        # Servicios por estado (excluyendo descuentos)
         servicios_por_estado = {}
-        for servicio in ReservaServicio.objects.filter(fecha_agendamiento=hoy).select_related('venta_reserva'):
-            estado = servicio.venta_reserva.estado_reserva if servicio.venta_reserva else 'sin_reserva'
-            servicios_por_estado[estado] = servicios_por_estado.get(estado, 0) + 1
+        for servicio in ReservaServicio.objects.filter(
+            fecha_agendamiento=hoy
+        ).exclude(
+            servicio__nombre__icontains='descuento'
+        ).select_related('venta_reserva', 'servicio'):
+            if servicio.servicio:  # Verificar que el servicio existe
+                estado = servicio.venta_reserva.estado_reserva if servicio.venta_reserva else 'sin_reserva'
+                servicios_por_estado[estado] = servicios_por_estado.get(estado, 0) + 1
 
-        # Mostrar algunos servicios de ejemplo
+        # Mostrar algunos servicios de ejemplo (excluyendo descuentos)
         primeros_servicios = []
-        for servicio in ReservaServicio.objects.filter(fecha_agendamiento=hoy)[:5]:
-            primeros_servicios.append({
-                'id': servicio.id,
-                'servicio': servicio.servicio.nombre if servicio.servicio else 'Sin servicio',
-                'hora': servicio.hora_inicio,
-                'cliente': servicio.venta_reserva.cliente.nombre if servicio.venta_reserva and servicio.venta_reserva.cliente else 'Sin cliente',
-                'estado': servicio.venta_reserva.estado_reserva if servicio.venta_reserva else 'Sin reserva'
-            })
+        for servicio in ReservaServicio.objects.filter(
+            fecha_agendamiento=hoy
+        ).exclude(
+            servicio__nombre__icontains='descuento'
+        ).select_related('servicio', 'venta_reserva__cliente')[:5]:
+            if servicio.servicio:  # Verificar que el servicio existe
+                primeros_servicios.append({
+                    'id': servicio.id,
+                    'servicio': servicio.servicio.nombre,
+                    'hora': servicio.hora_inicio,
+                    'cliente': servicio.venta_reserva.cliente.nombre if servicio.venta_reserva and servicio.venta_reserva.cliente else 'Sin cliente',
+                    'estado': servicio.venta_reserva.estado_reserva if servicio.venta_reserva else 'Sin reserva'
+                })
 
         debug_info = {
             'total_servicios_hoy': todos_servicios,
