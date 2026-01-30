@@ -42,8 +42,10 @@ def agenda_operativa(request):
         hora_actual = time(0, 0)  # Mostrar desde las 00:00 en modo debug
 
     # Obtener todos los servicios del día desde la hora actual
+    # Primero filtrar servicios que tienen venta_reserva asociada
     servicios = ReservaServicio.objects.filter(
-        fecha_agendamiento=hoy
+        fecha_agendamiento=hoy,
+        venta_reserva__isnull=False  # Asegurar que hay venta_reserva
     ).exclude(
         venta_reserva__estado_reserva='cancelada'
     ).select_related(
@@ -93,17 +95,18 @@ def agenda_operativa(request):
             if entregar_con_este_servicio:
                 productos_a_entregar.append(producto)
 
-        # Agregar a la agenda
-        agenda_por_hora[hora_key].append({
-            'servicio': servicio,
-            'tipo': 'servicio',
-            'nombre': servicio.servicio.nombre,
-            'cliente': servicio.venta_reserva.cliente.nombre,
-            'reserva_id': servicio.venta_reserva.id,
-            'cantidad_personas': servicio.cantidad_personas or 1,
-            'productos': productos_a_entregar,
-            'es_proximo': False  # Se marcará después
-        })
+        # Agregar a la agenda (con verificaciones de seguridad)
+        if servicio.servicio and servicio.venta_reserva and servicio.venta_reserva.cliente:
+            agenda_por_hora[hora_key].append({
+                'servicio': servicio,
+                'tipo': 'servicio',
+                'nombre': servicio.servicio.nombre,
+                'cliente': servicio.venta_reserva.cliente.nombre,
+                'reserva_id': servicio.venta_reserva.id,
+                'cantidad_personas': servicio.cantidad_personas or 1,
+                'productos': productos_a_entregar,
+                'es_proximo': False  # Se marcará después
+            })
 
     # Convertir a lista ordenada y marcar servicios urgentes
     agenda_ordenada = []
