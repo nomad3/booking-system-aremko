@@ -60,12 +60,16 @@ def agenda_operativa(request):
     servicios_pendientes = []
     for servicio in servicios:
         try:
+            # Validar que hora_inicio existe y tiene formato correcto
+            if not servicio.hora_inicio:
+                continue
+
             servicio_hora = datetime.strptime(servicio.hora_inicio, '%H:%M').time()
 
             # Calcular hora de fin basado en la duración del servicio
-            if servicio.servicio and servicio.servicio.duracion:
+            if servicio.servicio and hasattr(servicio.servicio, 'duracion') and servicio.servicio.duracion:
                 hora_inicio_dt = datetime.combine(hoy, servicio_hora)
-                hora_fin_dt = hora_inicio_dt + timedelta(minutes=servicio.servicio.duracion)
+                hora_fin_dt = hora_inicio_dt + timedelta(minutes=int(servicio.servicio.duracion))
                 hora_fin = hora_fin_dt.time()
 
                 # Incluir si:
@@ -80,8 +84,10 @@ def agenda_operativa(request):
                 # Si no hay duración, usar lógica anterior (solo futuros)
                 if servicio_hora >= hora_actual:
                     servicio.en_curso = False
+                    servicio.hora_fin = None
                     servicios_pendientes.append(servicio)
-        except:
+        except Exception as e:
+            # Log del error pero continuar con otros servicios
             continue
 
     # Organizar por hora
@@ -101,13 +107,20 @@ def agenda_operativa(request):
             # Excluir productos de descuento (precio negativo o nombre con "descuento")
             if producto.producto:
                 # Verificar si es un descuento por nombre o precio negativo
-                es_descuento = (
-                    'descuento' in producto.producto.nombre.lower() or
-                    producto.producto.precio < 0
-                )
+                try:
+                    nombre_producto = producto.producto.nombre or ""
+                    precio_producto = producto.producto.precio or 0
 
-                if es_descuento:
-                    continue  # Saltar productos de descuento
+                    es_descuento = (
+                        'descuento' in nombre_producto.lower() or
+                        precio_producto < 0
+                    )
+
+                    if es_descuento:
+                        continue  # Saltar productos de descuento
+                except Exception:
+                    # Si hay cualquier error, asumimos que no es descuento
+                    pass
 
             entregar_con_este_servicio = False
 
@@ -158,18 +171,18 @@ def agenda_operativa(request):
         })
 
     # Calcular estadísticas
-    total_servicios = sum(len(h['items']) for h in agenda_ordenada)
+    total_servicios = sum(len(h['items']) for h in agenda_ordenada) if agenda_ordenada else 0
     total_productos = sum(
-        len(item['productos'])
+        len(item.get('productos', []))
         for h in agenda_ordenada
-        for item in h['items']
-    )
+        for item in h.get('items', [])
+    ) if agenda_ordenada else 0
     # Contar servicios en curso
     servicios_en_curso = sum(
         1 for h in agenda_ordenada
-        for item in h['items']
+        for item in h.get('items', [])
         if item.get('en_curso', False)
-    )
+    ) if agenda_ordenada else 0
 
     # Identificar próximos servicios (próxima hora)
     if agenda_ordenada:
