@@ -104,24 +104,7 @@ def agenda_operativa(request):
         # Determinar si los productos se entregan con este servicio
         productos_a_entregar = []
         for producto in productos:
-            # Excluir productos de descuento (precio negativo o nombre con "descuento")
-            if producto.producto:
-                # Verificar si es un descuento por nombre o precio negativo
-                try:
-                    nombre_producto = producto.producto.nombre or ""
-                    precio_producto = producto.producto.precio or 0
-
-                    es_descuento = (
-                        'descuento' in nombre_producto.lower() or
-                        precio_producto < 0
-                    )
-
-                    if es_descuento:
-                        continue  # Saltar productos de descuento
-                except Exception:
-                    # Si hay cualquier error, asumimos que no es descuento
-                    pass
-
+            # Primero verificar si el producto tiene entrega programada para hoy o es el primer servicio
             entregar_con_este_servicio = False
 
             if producto.fecha_entrega == hoy:
@@ -137,8 +120,33 @@ def agenda_operativa(request):
                 if primer_servicio and primer_servicio.id == servicio.id:
                     entregar_con_este_servicio = True
 
-            if entregar_con_este_servicio:
-                productos_a_entregar.append(producto)
+            # Solo agregar si se debe entregar Y no es un descuento
+            if entregar_con_este_servicio and producto.producto:
+                # Verificar si es un descuento por nombre o precio
+                try:
+                    nombre_producto = str(producto.producto.nombre or "").strip()
+                    precio_producto = float(producto.producto.precio or 0)
+
+                    # Más exhaustivo: verificar múltiples condiciones de descuento
+                    es_descuento = any([
+                        'descuento' in nombre_producto.lower(),
+                        'discount' in nombre_producto.lower(),
+                        'dto' in nombre_producto.lower(),
+                        precio_producto < 0,
+                        nombre_producto.startswith('-'),
+                        # Específicamente para casos como "Descuento -500"
+                        nombre_producto.lower().startswith('descuento -'),
+                        nombre_producto.lower().startswith('descuento-'),
+                    ])
+
+                    if not es_descuento:
+                        productos_a_entregar.append(producto)
+                except Exception as e:
+                    # Si hay error al verificar, mejor no incluir el producto
+                    pass
+            elif entregar_con_este_servicio and not producto.producto:
+                # Si no hay producto asociado, no incluir
+                pass
 
         # Agregar a la agenda (con verificaciones de seguridad)
         if servicio.servicio and servicio.venta_reserva and servicio.venta_reserva.cliente:
@@ -227,6 +235,25 @@ def agenda_operativa(request):
                     'estado': servicio.venta_reserva.estado_reserva if servicio.venta_reserva else 'Sin reserva'
                 })
 
+        # Contar productos filtrados como descuento
+        productos_descuento_filtrados = []
+        total_productos_filtrados = 0
+        for venta in VentaReserva.objects.filter(fecha_venta=hoy):
+            for prod in ReservaProducto.objects.filter(venta_reserva=venta).select_related('producto'):
+                if prod.producto:
+                    try:
+                        nombre = str(prod.producto.nombre or "").strip()
+                        precio = float(prod.producto.precio or 0)
+                        if 'descuento' in nombre.lower() or precio < 0:
+                            total_productos_filtrados += 1
+                            if len(productos_descuento_filtrados) < 5:  # Solo mostrar primeros 5
+                                productos_descuento_filtrados.append({
+                                    'nombre': nombre,
+                                    'precio': precio
+                                })
+                    except:
+                        pass
+
         debug_info = {
             'total_servicios_hoy': todos_servicios,
             'servicios_filtrados': len(servicios),
@@ -234,6 +261,8 @@ def agenda_operativa(request):
             'servicios_en_curso': servicios_en_curso,
             'servicios_por_estado': servicios_por_estado,
             'primeros_servicios': primeros_servicios,
+            'productos_descuento_filtrados': productos_descuento_filtrados,
+            'total_productos_descuento': total_productos_filtrados,
             'hora_actual_str': hora_actual.strftime('%H:%M'),
             'fecha_hoy': hoy.strftime('%Y-%m-%d')
         }

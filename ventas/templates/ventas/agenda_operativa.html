@@ -423,6 +423,14 @@
                 &nbsp;&nbsp;• ID: {{ srv.id }} - {{ srv.servicio }} - {{ srv.hora }} - Cliente: {{ srv.cliente }} - Estado: {{ srv.estado }}<br>
             {% endfor %}
             {% endif %}
+
+            {% if debug_info.productos_descuento_filtrados %}
+            <br><strong>🚫 Productos de descuento filtrados (no se muestran):</strong><br>
+            <span style="color: #d32f2f;">Total filtrados: {{ debug_info.total_productos_descuento }}</span><br>
+            {% for prod in debug_info.productos_descuento_filtrados %}
+                &nbsp;&nbsp;• <span style="text-decoration: line-through;">{{ prod.nombre }} (Precio: ${{ prod.precio|floatformat:0|intcomma }})</span><br>
+            {% endfor %}
+            {% endif %}
         </div>
     </div>
     {% endif %}
