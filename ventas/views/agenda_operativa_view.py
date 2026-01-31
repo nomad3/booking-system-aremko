@@ -90,7 +90,7 @@ def agenda_operativa(request):
     for servicio in servicios_pendientes:
         hora_key = servicio.hora_inicio
 
-        # Obtener productos asociados a esta reserva
+        # Obtener productos asociados a esta reserva (excluyendo descuentos)
         productos = ReservaProducto.objects.filter(
             venta_reserva=servicio.venta_reserva
         ).select_related('producto')
@@ -98,6 +98,17 @@ def agenda_operativa(request):
         # Determinar si los productos se entregan con este servicio
         productos_a_entregar = []
         for producto in productos:
+            # Excluir productos de descuento (precio negativo o nombre con "descuento")
+            if producto.producto:
+                # Verificar si es un descuento por nombre o precio negativo
+                es_descuento = (
+                    'descuento' in producto.producto.nombre.lower() or
+                    producto.producto.precio < 0
+                )
+
+                if es_descuento:
+                    continue  # Saltar productos de descuento
+
             entregar_con_este_servicio = False
 
             if producto.fecha_entrega == hoy:
