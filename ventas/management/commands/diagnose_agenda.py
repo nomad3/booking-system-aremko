@@ -100,7 +100,7 @@ class Command(BaseCommand):
                             continue
 
                         nombre = str(producto.producto.nombre or "").strip()
-                        precio = float(producto.producto.precio or 0)
+                        precio = float(producto.producto.precio_base or 0)
 
                         es_descuento = any([
                             'descuento' in nombre.lower(),
@@ -154,7 +154,7 @@ class Command(BaseCommand):
                 for prod in productos:
                     if prod.producto:
                         nombre = prod.producto.nombre
-                        precio = prod.producto.precio
+                        precio = prod.producto.precio_base
                         es_descuento = any([
                             'descuento' in nombre.lower(),
                             precio < 0

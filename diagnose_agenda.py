@@ -116,7 +116,7 @@ def diagnose_agenda():
                 continue
 
             nombre = str(producto.producto.nombre or "").strip()
-            precio = float(producto.producto.precio or 0)
+            precio = float(producto.producto.precio_base or 0)
 
             # Verificar si es descuento
             es_descuento = any([
@@ -153,7 +153,7 @@ def diagnose_agenda():
 
             try:
                 nombre_producto = str(producto.producto.nombre or "").strip()
-                precio_producto = float(producto.producto.precio or 0)
+                precio_producto = float(producto.producto.precio_base or 0)
 
                 es_descuento = any([
                     'descuento' in nombre_producto.lower(),
@@ -200,7 +200,7 @@ def diagnose_agenda():
             for prod in productos:
                 if prod.producto:
                     nombre = prod.producto.nombre
-                    es_descuento = 'descuento' in nombre.lower() or prod.producto.precio < 0
+                    es_descuento = 'descuento' in nombre.lower() or prod.producto.precio_base < 0
                     marca = "🚫 DESCUENTO" if es_descuento else "✅ NORMAL"
                     print(f"  {marca}: {prod.cantidad}x {nombre}")
 

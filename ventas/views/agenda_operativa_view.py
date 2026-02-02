@@ -112,7 +112,7 @@ def agenda_operativa(request):
             # Verificar si es un descuento
             try:
                 nombre_producto = str(producto.producto.nombre or "").strip()
-                precio_producto = float(producto.producto.precio or 0)
+                precio_producto = float(producto.producto.precio_base or 0)
 
                 es_descuento = any([
                     'descuento' in nombre_producto.lower(),
@@ -224,7 +224,7 @@ def agenda_operativa(request):
                 if prod.producto:
                     try:
                         nombre = str(prod.producto.nombre or "").strip()
-                        precio = float(prod.producto.precio or 0)
+                        precio = float(prod.producto.precio_base or 0)
                         if 'descuento' in nombre.lower() or precio < 0:
                             total_productos_filtrados += 1
                             if len(productos_descuento_filtrados) < 5:  # Solo mostrar primeros 5
