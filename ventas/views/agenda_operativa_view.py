@@ -141,6 +141,13 @@ def agenda_operativa(request):
 
         # Agregar a la agenda (con verificaciones de seguridad)
         if servicio.servicio and servicio.venta_reserva and servicio.venta_reserva.cliente:
+            # Obtener estado de pago y montos
+            venta = servicio.venta_reserva
+            estado_pago = venta.estado_pago
+            total = venta.total
+            pagado = venta.pagado
+            saldo_pendiente = venta.saldo_pendiente
+
             agenda_por_hora[hora_key].append({
                 'servicio': servicio,
                 'tipo': 'servicio',
@@ -152,7 +159,11 @@ def agenda_operativa(request):
                 'es_proximo': False,  # Se marcará después
                 'en_curso': getattr(servicio, 'en_curso', False),  # Si está en ejecución
                 'hora_fin': getattr(servicio, 'hora_fin', None),  # Hora de finalización
-                'duracion': servicio.servicio.duracion if servicio.servicio else None  # Duración en minutos
+                'duracion': servicio.servicio.duracion if servicio.servicio else None,  # Duración en minutos
+                'estado_pago': estado_pago,
+                'total': total,
+                'pagado': pagado,
+                'saldo_pendiente': saldo_pendiente
             })
 
     # Convertir a lista ordenada y marcar servicios urgentes
@@ -183,6 +194,25 @@ def agenda_operativa(request):
         1 for h in agenda_ordenada
         for item in h.get('items', [])
         if item.get('en_curso', False)
+    ) if agenda_ordenada else 0
+
+    # Contar servicios por estado de pago
+    servicios_pagados = sum(
+        1 for h in agenda_ordenada
+        for item in h.get('items', [])
+        if item.get('estado_pago') == 'pagado'
+    ) if agenda_ordenada else 0
+
+    servicios_parcial = sum(
+        1 for h in agenda_ordenada
+        for item in h.get('items', [])
+        if item.get('estado_pago') == 'parcial'
+    ) if agenda_ordenada else 0
+
+    servicios_pendientes_pago = sum(
+        1 for h in agenda_ordenada
+        for item in h.get('items', [])
+        if item.get('estado_pago') == 'pendiente'
     ) if agenda_ordenada else 0
 
     # Identificar próximos servicios (próxima hora)
@@ -268,6 +298,9 @@ def agenda_operativa(request):
         'total_servicios': total_servicios,
         'servicios_en_curso': servicios_en_curso,
         'total_productos': total_productos,
+        'servicios_pagados': servicios_pagados,
+        'servicios_parcial': servicios_parcial,
+        'servicios_pendientes_pago': servicios_pendientes_pago,
         'tiene_tareas': len(agenda_ordenada) > 0,
         'debug_mode': debug_mode,
         'debug_info': debug_info

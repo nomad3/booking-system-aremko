@@ -296,6 +296,46 @@
         margin-left: 10px;
     }
 
+    /* Estilos para estado de pago */
+    .estado-pago-badge {
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-left: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .estado-pago-pagado {
+        background: #4CAF50;
+        color: white;
+    }
+
+    .estado-pago-parcial {
+        background: #FF9800;
+        color: white;
+    }
+
+    .estado-pago-pendiente {
+        background: #f44336;
+        color: white;
+        animation: pulse-red 2s infinite;
+    }
+
+    @keyframes pulse-red {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+    }
+
+    .pago-info {
+        font-size: 11px;
+        color: #666;
+        margin-left: 5px;
+    }
+
     @keyframes pulse-green {
         0% { opacity: 1; background: #4CAF50; }
         50% { opacity: 0.8; background: #66BB6A; }
@@ -305,6 +345,21 @@
     .servicio-item.en-curso {
         background: linear-gradient(to right, #e8f5e9 0%, white 100%);
         border-left: 4px solid #4CAF50;
+    }
+
+    /* Indicador visual de estado de pago en el borde */
+    .servicio-item.pago-pagado {
+        border-left: 5px solid #4CAF50;
+    }
+
+    .servicio-item.pago-parcial {
+        border-left: 5px solid #FF9800;
+        background: linear-gradient(to right, #fff8e1 0%, white 100%);
+    }
+
+    .servicio-item.pago-pendiente {
+        border-left: 5px solid #f44336;
+        background: linear-gradient(to right, #ffebee 0%, white 100%);
     }
 
     .hora-fin {
@@ -381,6 +436,34 @@
             </div>
         </div>
 
+        <!-- Resumen de pagos -->
+        <div class="agenda-info" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0e0e0;">
+            <div class="info-item">
+                <span class="info-label">💰 Estado de Pagos:</span>
+            </div>
+            {% if servicios_pagados > 0 %}
+            <div class="info-item">
+                <span style="background: #4CAF50; color: white; padding: 2px 8px; border-radius: 4px; font-weight: 600;">
+                    ✓ Pagados: {{ servicios_pagados }}
+                </span>
+            </div>
+            {% endif %}
+            {% if servicios_parcial > 0 %}
+            <div class="info-item">
+                <span style="background: #FF9800; color: white; padding: 2px 8px; border-radius: 4px; font-weight: 600;">
+                    ⚠️ Parcial: {{ servicios_parcial }}
+                </span>
+            </div>
+            {% endif %}
+            {% if servicios_pendientes_pago > 0 %}
+            <div class="info-item">
+                <span style="background: #f44336; color: white; padding: 2px 8px; border-radius: 4px; font-weight: 600;">
+                    ❗ Pendientes: {{ servicios_pendientes_pago }}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+
         <div class="header-buttons">
             <button class="btn-actualizar" onclick="location.reload()">
                 🔄 Actualizar
@@ -446,7 +529,7 @@
             </div>
 
             {% for item in bloque_hora.items %}
-            <div class="servicio-item {% if item.en_curso %}en-curso{% endif %}">
+            <div class="servicio-item {% if item.en_curso %}en-curso{% endif %} pago-{{ item.estado_pago }}">
                 <div class="servicio-header">
                     {% if item.servicio.servicio.tipo_servicio == 'tina' %}
                         <span class="servicio-tipo tipo-tina">Tina</span>
@@ -486,6 +569,23 @@
                     <div class="detalle-item">
                         <span>👥</span>
                         <span>{{ item.cantidad_personas }} persona{% if item.cantidad_personas > 1 %}s{% endif %}</span>
+                    </div>
+                    <div class="detalle-item">
+                        {% if item.estado_pago == 'pagado' %}
+                            <span class="estado-pago-badge estado-pago-pagado">
+                                ✓ PAGADO
+                            </span>
+                        {% elif item.estado_pago == 'parcial' %}
+                            <span class="estado-pago-badge estado-pago-parcial">
+                                ⚠️ PAGO PARCIAL
+                                <span class="pago-info">${{ item.pagado|floatformat:0|intcomma }} de ${{ item.total|floatformat:0|intcomma }}</span>
+                            </span>
+                        {% else %}
+                            <span class="estado-pago-badge estado-pago-pendiente">
+                                ❗ PENDIENTE
+                                <span class="pago-info">${{ item.total|floatformat:0|intcomma }}</span>
+                            </span>
+                        {% endif %}
                     </div>
                 </div>
 
