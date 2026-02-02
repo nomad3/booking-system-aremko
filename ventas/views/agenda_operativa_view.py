@@ -96,38 +96,48 @@ def agenda_operativa(request):
     for servicio in servicios_pendientes:
         hora_key = servicio.hora_inicio
 
-        # LÓGICA SUPER SIMPLIFICADA:
-        # Obtener TODOS los productos de la reserva que NO sean descuentos
-        productos = ReservaProducto.objects.filter(
-            venta_reserva=servicio.venta_reserva
-        ).select_related('producto')
-
+        # Determinar si este es el primer servicio del día de esta reserva
         productos_a_entregar = []
 
-        for producto in productos:
-            # Verificar si el producto existe
-            if not producto.producto:
-                continue
+        # Buscar el primer servicio del día de esta reserva (excluyendo descuentos)
+        primer_servicio_del_dia = ReservaServicio.objects.filter(
+            venta_reserva=servicio.venta_reserva,
+            fecha_agendamiento=hoy
+        ).exclude(
+            servicio__nombre__icontains='descuento'
+        ).order_by('hora_inicio').first()
 
-            # Verificar si es un descuento
-            try:
-                nombre_producto = str(producto.producto.nombre or "").strip()
-                precio_producto = float(producto.producto.precio_base or 0)
+        # Solo procesar productos si este es el primer servicio del día
+        if primer_servicio_del_dia and primer_servicio_del_dia.id == servicio.id:
+            # Obtener productos de la reserva que NO sean descuentos
+            productos = ReservaProducto.objects.filter(
+                venta_reserva=servicio.venta_reserva
+            ).select_related('producto')
 
-                es_descuento = any([
-                    'descuento' in nombre_producto.lower(),
-                    'discount' in nombre_producto.lower(),
-                    'dto' in nombre_producto.lower(),
-                    precio_producto < 0,
-                    nombre_producto.startswith('-'),
-                ])
+            for producto in productos:
+                # Verificar si el producto existe
+                if not producto.producto:
+                    continue
 
-                # Si NO es descuento, añadirlo a la lista para mostrar
-                if not es_descuento:
-                    productos_a_entregar.append(producto)
-            except Exception:
-                # En caso de error, no incluir el producto
-                continue
+                # Verificar si es un descuento
+                try:
+                    nombre_producto = str(producto.producto.nombre or "").strip()
+                    precio_producto = float(producto.producto.precio_base or 0)
+
+                    es_descuento = any([
+                        'descuento' in nombre_producto.lower(),
+                        'discount' in nombre_producto.lower(),
+                        'dto' in nombre_producto.lower(),
+                        precio_producto < 0,
+                        nombre_producto.startswith('-'),
+                    ])
+
+                    # Si NO es descuento, añadirlo a la lista para mostrar
+                    if not es_descuento:
+                        productos_a_entregar.append(producto)
+                except Exception:
+                    # En caso de error, no incluir el producto
+                    continue
 
         # Agregar a la agenda (con verificaciones de seguridad)
         if servicio.servicio and servicio.venta_reserva and servicio.venta_reserva.cliente:
