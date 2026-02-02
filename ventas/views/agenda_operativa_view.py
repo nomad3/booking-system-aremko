@@ -171,10 +171,12 @@ def agenda_operativa(request):
 
     # Calcular estadísticas
     total_servicios = sum(len(h['items']) for h in agenda_ordenada) if agenda_ordenada else 0
+    # Sumar las CANTIDADES de productos, no solo contar los ítems
     total_productos = sum(
-        len(item.get('productos', []))
+        producto.cantidad
         for h in agenda_ordenada
         for item in h.get('items', [])
+        for producto in item.get('productos', [])
     ) if agenda_ordenada else 0
     # Contar servicios en curso
     servicios_en_curso = sum(
