@@ -96,76 +96,42 @@ def agenda_operativa(request):
     for servicio in servicios_pendientes:
         hora_key = servicio.hora_inicio
 
-        # Obtener productos asociados a esta reserva (excluyendo descuentos)
+        # LÓGICA SUPER SIMPLIFICADA:
+        # Obtener TODOS los productos de la reserva que NO sean descuentos
         productos = ReservaProducto.objects.filter(
             venta_reserva=servicio.venta_reserva
         ).select_related('producto')
 
-        # Determinar si los productos se entregan con este servicio
         productos_a_entregar = []
-        productos_debug = [] if debug_mode else None
 
         for producto in productos:
-            # Debug: registrar todos los productos procesados
-            if debug_mode and producto.producto:
-                productos_debug.append({
-                    'nombre': producto.producto.nombre,
-                    'fecha_entrega': producto.fecha_entrega,
-                    'cantidad': producto.cantidad,
-                    'precio': producto.producto.precio
-                })
-
             # Verificar si el producto existe
             if not producto.producto:
                 continue
 
-            # Verificar si es un descuento PRIMERO
+            # Verificar si es un descuento
             try:
                 nombre_producto = str(producto.producto.nombre or "").strip()
                 precio_producto = float(producto.producto.precio or 0)
 
-                # Más exhaustivo: verificar múltiples condiciones de descuento
                 es_descuento = any([
                     'descuento' in nombre_producto.lower(),
                     'discount' in nombre_producto.lower(),
                     'dto' in nombre_producto.lower(),
                     precio_producto < 0,
                     nombre_producto.startswith('-'),
-                    # Específicamente para casos como "Descuento -500"
-                    nombre_producto.lower().startswith('descuento -'),
-                    nombre_producto.lower().startswith('descuento-'),
                 ])
 
-                if es_descuento:
-                    continue  # Saltar productos de descuento
+                # Si NO es descuento, añadirlo a la lista para mostrar
+                if not es_descuento:
+                    productos_a_entregar.append(producto)
             except Exception:
-                continue  # Si hay error, saltar este producto
-
-            # LÓGICA MEJORADA:
-            # Mostrar productos con CADA servicio de la reserva (no solo el primero)
-            # para que el personal siempre vea qué productos están asociados
-            entregar_con_este_servicio = False
-
-            # Si el producto tiene fecha de entrega específica
-            if producto.fecha_entrega:
-                fecha_entrega_date = producto.fecha_entrega
-                if hasattr(producto.fecha_entrega, 'date'):
-                    fecha_entrega_date = producto.fecha_entrega.date()
-
-                # Mostrar si la fecha de entrega es hoy
-                if fecha_entrega_date == hoy:
-                    entregar_con_este_servicio = True
-            else:
-                # Si NO tiene fecha de entrega, mostrar con TODOS los servicios del día
-                # Esto asegura que productos como cafés aparezcan con cada servicio
-                entregar_con_este_servicio = True
-
-            if entregar_con_este_servicio:
-                productos_a_entregar.append(producto)
+                # En caso de error, no incluir el producto
+                continue
 
         # Agregar a la agenda (con verificaciones de seguridad)
         if servicio.servicio and servicio.venta_reserva and servicio.venta_reserva.cliente:
-            item_agenda = {
+            agenda_por_hora[hora_key].append({
                 'servicio': servicio,
                 'tipo': 'servicio',
                 'nombre': servicio.servicio.nombre,
@@ -177,18 +143,7 @@ def agenda_operativa(request):
                 'en_curso': getattr(servicio, 'en_curso', False),  # Si está en ejecución
                 'hora_fin': getattr(servicio, 'hora_fin', None),  # Hora de finalización
                 'duracion': servicio.servicio.duracion if servicio.servicio else None  # Duración en minutos
-            }
-
-            # Debug específico para reserva #4718
-            if debug_mode and servicio.venta_reserva.id == 4718:
-                item_agenda['debug_productos'] = productos_debug
-                item_agenda['debug_info'] = {
-                    'total_productos_reserva': len(productos_debug) if productos_debug else 0,
-                    'productos_a_entregar': len(productos_a_entregar),
-                    'fecha_hoy': str(hoy)
-                }
-
-            agenda_por_hora[hora_key].append(item_agenda)
+            })
 
     # Convertir a lista ordenada y marcar servicios urgentes
     agenda_ordenada = []

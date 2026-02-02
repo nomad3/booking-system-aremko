@@ -501,23 +501,6 @@
                     {% endfor %}
                 </div>
                 {% endif %}
-
-                {% if debug_mode and item.reserva_id == 4718 and item.debug_productos %}
-                <div style="background: #ffecb3; border: 1px solid #ff9800; padding: 10px; margin-top: 10px; border-radius: 4px;">
-                    <strong style="color: #e65100;">🐛 Debug Reserva #4718:</strong><br>
-                    <span style="color: #e65100;">Total productos en reserva: {{ item.debug_info.total_productos_reserva }}</span><br>
-                    <span style="color: #e65100;">Productos a entregar: {{ item.debug_info.productos_a_entregar }}</span><br>
-                    <span style="color: #e65100;">Fecha hoy: {{ item.debug_info.fecha_hoy }}</span><br>
-                    <strong style="color: #e65100;">Todos los productos:</strong><br>
-                    {% for prod in item.debug_productos %}
-                    <span style="color: #e65100; margin-left: 10px;">
-                        • {{ prod.cantidad }}x {{ prod.nombre }} -
-                        Entrega: {{ prod.fecha_entrega|default:"Sin fecha" }} -
-                        Precio: ${{ prod.precio|floatformat:0|intcomma }}
-                    </span><br>
-                    {% endfor %}
-                </div>
-                {% endif %}
             </div>
             {% endfor %}
         </div>
