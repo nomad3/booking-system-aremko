@@ -141,30 +141,24 @@ def agenda_operativa(request):
             except Exception:
                 continue  # Si hay error, saltar este producto
 
-            # Ahora verificar si el producto se debe entregar con este servicio
+            # LÓGICA MEJORADA:
+            # Mostrar productos con CADA servicio de la reserva (no solo el primero)
+            # para que el personal siempre vea qué productos están asociados
             entregar_con_este_servicio = False
 
-            # Comparar fechas correctamente (date vs datetime)
+            # Si el producto tiene fecha de entrega específica
             if producto.fecha_entrega:
-                # Si fecha_entrega es datetime, convertir a date para comparar
                 fecha_entrega_date = producto.fecha_entrega
                 if hasattr(producto.fecha_entrega, 'date'):
                     fecha_entrega_date = producto.fecha_entrega.date()
 
+                # Mostrar si la fecha de entrega es hoy
                 if fecha_entrega_date == hoy:
-                    # Si tiene fecha de entrega explícita de hoy, se entrega
                     entregar_con_este_servicio = True
             else:
-                # Si no tiene fecha de entrega, verificar si este es el primer servicio del día
-                primer_servicio = ReservaServicio.objects.filter(
-                    venta_reserva=servicio.venta_reserva,
-                    fecha_agendamiento=hoy
-                ).exclude(
-                    servicio__nombre__icontains='descuento'
-                ).order_by('hora_inicio').first()
-
-                if primer_servicio and primer_servicio.id == servicio.id:
-                    entregar_con_este_servicio = True
+                # Si NO tiene fecha de entrega, mostrar con TODOS los servicios del día
+                # Esto asegura que productos como cafés aparezcan con cada servicio
+                entregar_con_este_servicio = True
 
             if entregar_con_este_servicio:
                 productos_a_entregar.append(producto)
