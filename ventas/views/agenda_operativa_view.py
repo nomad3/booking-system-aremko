@@ -96,19 +96,48 @@ def agenda_operativa(request):
     for servicio in servicios_pendientes:
         hora_key = servicio.hora_inicio
 
-        # Determinar si este es el primer servicio del día de esta reserva
+        # Lógica inteligente para determinar dónde mostrar los productos
         productos_a_entregar = []
 
-        # Buscar el primer servicio del día de esta reserva (excluyendo descuentos)
-        primer_servicio_del_dia = ReservaServicio.objects.filter(
+        # Obtener todos los servicios del día de esta reserva
+        servicios_del_dia = ReservaServicio.objects.filter(
             venta_reserva=servicio.venta_reserva,
             fecha_agendamiento=hoy
         ).exclude(
             servicio__nombre__icontains='descuento'
-        ).order_by('hora_inicio').first()
+        ).select_related('servicio').order_by('hora_inicio')
 
-        # Solo procesar productos si este es el primer servicio del día
-        if primer_servicio_del_dia and primer_servicio_del_dia.id == servicio.id:
+        # Identificar qué tipos de servicios hay en la reserva
+        tiene_tina = any(s.servicio and s.servicio.tipo_servicio == 'tina' for s in servicios_del_dia)
+        tiene_cabana = any(s.servicio and s.servicio.tipo_servicio == 'cabana' for s in servicios_del_dia)
+        tiene_masaje = any(s.servicio and s.servicio.tipo_servicio == 'masaje' for s in servicios_del_dia)
+
+        mostrar_productos_aqui = False
+
+        # Determinar si este servicio debe mostrar los productos
+        if tiene_tina:
+            # Si hay tinas, mostrar productos con el primer servicio de tina
+            primer_servicio_tina = servicios_del_dia.filter(servicio__tipo_servicio='tina').first()
+            if primer_servicio_tina and primer_servicio_tina.id == servicio.id:
+                mostrar_productos_aqui = True
+        elif tiene_cabana:
+            # Si no hay tinas pero hay cabañas, mostrar con la primera cabaña
+            primer_servicio_cabana = servicios_del_dia.filter(servicio__tipo_servicio='cabana').first()
+            if primer_servicio_cabana and primer_servicio_cabana.id == servicio.id:
+                mostrar_productos_aqui = True
+        elif tiene_masaje:
+            # Solo si únicamente hay masajes, mostrar con el primer masaje
+            primer_servicio_masaje = servicios_del_dia.filter(servicio__tipo_servicio='masaje').first()
+            if primer_servicio_masaje and primer_servicio_masaje.id == servicio.id:
+                mostrar_productos_aqui = True
+        else:
+            # Para otros tipos de servicio, mostrar con el primero
+            primer_servicio = servicios_del_dia.first()
+            if primer_servicio and primer_servicio.id == servicio.id:
+                mostrar_productos_aqui = True
+
+        # Solo procesar productos si este servicio debe mostrarlos
+        if mostrar_productos_aqui:
             # Obtener productos de la reserva que NO sean descuentos
             productos = ReservaProducto.objects.filter(
                 venta_reserva=servicio.venta_reserva
