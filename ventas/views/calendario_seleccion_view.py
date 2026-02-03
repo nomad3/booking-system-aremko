@@ -167,15 +167,31 @@ def obtener_personas_por_defecto(nombre_servicio):
     if 'cabaña' in nombre_lower or 'cabana' in nombre_lower:
         return 1
 
-    # Masajes: 1 persona
+    # IMPORTANTE: Verificar hidromasajes ANTES que masajes normales
+    # Hidromasaje es un tipo de tina, no un masaje
+    if 'hidromasaje' in nombre_lower:
+        # Tinas específicas con 4 personas
+        if 'osorno' in nombre_lower or 'calbuco' in nombre_lower:
+            return 4
+
+        # Tinas específicas con 2 personas
+        # Incluye: Puyehue, Llaima, Puntiagudo, Villarrica, Hornopiren, Tronador
+        tinas_2_personas = ['hornopiren', 'tronador', 'puntiagudo', 'llaima', 'villarrica', 'puyehue']
+        if any(nombre in nombre_lower for nombre in tinas_2_personas):
+            return 2
+
+        # Otros hidromasajes por defecto
+        return 2
+
+    # Masajes normales (NO hidromasajes): 1 persona
     if 'masaje' in nombre_lower:
         return 1
 
-    # Tinas específicas con 4 personas
+    # Tinas específicas con 4 personas (sin hidromasaje en el nombre)
     if 'osorno' in nombre_lower or 'calbuco' in nombre_lower:
         return 4
 
-    # Tinas específicas con 2 personas
+    # Tinas específicas con 2 personas (sin hidromasaje en el nombre)
     tinas_2_personas = ['hornopiren', 'tronador', 'puntiagudo', 'llaima', 'villarrica', 'puyehue']
     if any(nombre in nombre_lower for nombre in tinas_2_personas):
         return 2
