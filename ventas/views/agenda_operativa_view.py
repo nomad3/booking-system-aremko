@@ -93,9 +93,9 @@ def agenda_operativa(request):
     # Buscar desayunos del día siguiente para preparar hoy
     manana = hoy + timedelta(days=1)
 
-    # Solo buscar desayunos si la hora actual es antes de las 19:00
+    # Solo buscar desayunos si la hora actual es antes de las 19:10
     desayunos_manana = []
-    if hora_actual <= time(19, 0):
+    if hora_actual <= time(19, 10):
         desayunos_manana = ReservaServicio.objects.filter(
             fecha_agendamiento=manana,
             servicio__nombre__icontains='desayuno',
@@ -226,8 +226,8 @@ def agenda_operativa(request):
                     'estado_pago': desayuno.venta_reserva.estado_pago
                 })
 
-        # Agregar bloque de preparación de desayunos a las 19:00
-        agenda_por_hora['19:00'].append({
+        # Agregar bloque de preparación de desayunos a las 19:10
+        agenda_por_hora['19:10'].append({
             'tipo': 'preparacion_desayuno',
             'nombre': f'Preparación de Desayunos - {len(desayunos_info)} servicio(s) para mañana',
             'cliente': 'Múltiples clientes',
@@ -236,8 +236,8 @@ def agenda_operativa(request):
             'desayunos_detalle': desayunos_info,
             'es_proximo': False,
             'en_curso': False,
-            'hora_fin': '22:00',
-            'duracion': 180,  # 3 horas
+            'hora_fin': '23:00',
+            'duracion': 230,  # 3 horas 50 minutos
             'estado_pago': 'preparacion',  # Estado especial
             'total': 0,
             'pagado': 0,
