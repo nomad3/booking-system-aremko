@@ -156,8 +156,12 @@ def agenda_operativa(request):
         # Solo procesar productos si este servicio debe mostrarlos
         if mostrar_productos_aqui:
             # Obtener productos de la reserva que NO sean descuentos
+            # y que no hayan sido entregados en días anteriores
             productos = ReservaProducto.objects.filter(
                 venta_reserva=servicio.venta_reserva
+            ).filter(
+                # Incluir solo productos con fecha_entrega de hoy o sin fecha_entrega (NULL)
+                Q(fecha_entrega__isnull=True) | Q(fecha_entrega=hoy)
             ).select_related('producto')
 
             for producto in productos:
