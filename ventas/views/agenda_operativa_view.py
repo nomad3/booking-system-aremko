@@ -241,7 +241,8 @@ def agenda_operativa(request):
                 'estado_pago': estado_pago,
                 'total': total,
                 'pagado': pagado,
-                'saldo_pendiente': saldo_pendiente
+                'saldo_pendiente': saldo_pendiente,
+                'estado_reserva': servicio.venta_reserva.estado_reserva  # Agregar estado de la reserva
             })
 
     # Agregar desayunos del día siguiente si los hay

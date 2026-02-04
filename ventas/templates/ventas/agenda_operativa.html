@@ -377,6 +377,32 @@
         margin-left: 10px;
     }
 
+    /* Estilos para estado de reserva */
+    .estado-reserva-badge {
+        padding: 3px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .estado-reserva-pendiente {
+        background: #FF9800;
+        color: white;
+    }
+
+    .estado-reserva-checkin {
+        background: #2196F3;
+        color: white;
+    }
+
+    .estado-reserva-checkout {
+        background: #9E9E9E;
+        color: white;
+    }
+
     @media print {
         .header-buttons, .btn-volver {
             display: none;
@@ -619,6 +645,28 @@
                             <span>👥</span>
                             <span>{{ item.cantidad_personas }} persona{% if item.cantidad_personas > 1 %}s{% endif %}</span>
                         </div>
+                        {% if item.estado_reserva %}
+                        <div class="detalle-item">
+                            <span>🏠</span>
+                            {% if item.estado_reserva == 'pendiente' %}
+                                <span style="background: #FF9800; color: white; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                                    Pendiente
+                                </span>
+                            {% elif item.estado_reserva == 'checkin' %}
+                                <span style="background: #2196F3; color: white; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                                    Check-in
+                                </span>
+                            {% elif item.estado_reserva == 'checkout' %}
+                                <span style="background: #9E9E9E; color: white; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                                    Check-out
+                                </span>
+                            {% else %}
+                                <span style="background: #e0e0e0; color: #666; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                                    {{ item.estado_reserva }}
+                                </span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
                     {% endif %}
                     <div class="detalle-item">
                         {% if item.tipo == 'preparacion_desayuno' %}
