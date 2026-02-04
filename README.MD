@@ -1,11 +1,11 @@
-# Aremko Booking & CRM System
+# 🏔️ Aremko Booking System
 
-[![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Django Version](https://img.shields.io/badge/django-4.2-green.svg)](https://www.djangoproject.com/)
-[![Docker](https://img.shields.io/badge/docker-✓-blue.svg)](https://www.docker.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-1.0-blue.svg)](https://github.com/nomad3/booking-system-aremko)
+[![Python](https://img.shields.io/badge/python-3.11+-brightgreen.svg)](https://www.python.org/)
+[![Django](https://img.shields.io/badge/django-4.2+-green.svg)](https://www.djangoproject.com/)
+[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
-Sistema integral para la gestión de reservas de servicios y productos, complementado con funcionalidades de CRM para la gestión de clientes y campañas de marketing.
+Sistema integral de reservas y gestión para **Aremko Spa Puerto Varas**, un spa boutique que combina servicios de masajes, tinas calientes (tinajas) y alojamiento en cabañas con vistas espectaculares al lago y volcanes de la región de Los Lagos, Chile.
 
 ## Tabla de Contenidos
 - [Introducción](#introducción)
