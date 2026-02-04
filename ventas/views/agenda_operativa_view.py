@@ -93,9 +93,9 @@ def agenda_operativa(request):
     # Buscar desayunos del día siguiente para preparar hoy
     manana = hoy + timedelta(days=1)
 
-    # Solo buscar desayunos si la hora actual es antes de las 19:10
+    # Solo buscar desayunos si la hora actual es antes de las 23:00
     desayunos_manana = []
-    if hora_actual <= time(19, 10):
+    if hora_actual <= time(23, 0):
         desayunos_manana = ReservaServicio.objects.filter(
             fecha_agendamiento=manana,
             servicio__nombre__icontains='desayuno',
@@ -226,23 +226,35 @@ def agenda_operativa(request):
                     'estado_pago': desayuno.venta_reserva.estado_pago
                 })
 
-        # Agregar bloque de preparación de desayunos a las 19:10
-        agenda_por_hora['19:10'].append({
-            'tipo': 'preparacion_desayuno',
-            'nombre': f'Preparación de Desayunos - {len(desayunos_info)} servicio(s) para mañana',
-            'cliente': 'Múltiples clientes',
-            'es_preparacion': True,
-            'cantidad_desayunos': len(desayunos_info),
-            'desayunos_detalle': desayunos_info,
-            'es_proximo': False,
-            'en_curso': False,
-            'hora_fin': '23:00',
-            'duracion': 230,  # 3 horas 50 minutos
-            'estado_pago': 'preparacion',  # Estado especial
-            'total': 0,
-            'pagado': 0,
-            'saldo_pendiente': 0
-        })
+        # Agregar bloque de preparación de desayunos a las 17:10
+        # Pero solo si aún no ha pasado la hora de fin (23:00)
+        hora_inicio_prep = time(17, 10)
+        hora_fin_prep = time(23, 0)
+
+        # Determinar si está en curso
+        en_curso_prep = hora_inicio_prep <= hora_actual <= hora_fin_prep
+
+        # Solo agregar si es futuro o está en curso
+        if hora_actual <= hora_fin_prep:
+            # Si ya pasó la hora de inicio, agregarlo en la hora actual para que aparezca
+            hora_key_prep = '17:10' if hora_actual < hora_inicio_prep else hora_actual.strftime('%H:%M')
+
+            agenda_por_hora['17:10'].append({
+                'tipo': 'preparacion_desayuno',
+                'nombre': f'Preparación de Desayunos - {len(desayunos_info)} servicio(s) para mañana',
+                'cliente': 'Múltiples clientes',
+                'es_preparacion': True,
+                'cantidad_desayunos': len(desayunos_info),
+                'desayunos_detalle': desayunos_info,
+                'es_proximo': False,
+                'en_curso': en_curso_prep,
+                'hora_fin': '23:00',
+                'duracion': 350,  # 5 horas 50 minutos
+                'estado_pago': 'preparacion',  # Estado especial
+                'total': 0,
+                'pagado': 0,
+                'saldo_pendiente': 0
+            })
 
     # Convertir a lista ordenada y marcar servicios urgentes
     agenda_ordenada = []
