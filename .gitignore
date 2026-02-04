@@ -21,3 +21,7 @@ nueva_configuracion_render.txt
 render_migration_guide.md
 aremko-e51ae-0912defb776b.json
 temp_images_empresas/
+
+# Archivos pendientes de implementación
+control_gestion/migrations/0059_add_periodic_task_frequencies.py
+ventas/management/commands/create_tramos_migration.py
