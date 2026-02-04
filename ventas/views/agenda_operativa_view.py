@@ -90,6 +90,23 @@ def agenda_operativa(request):
             # Log del error pero continuar con otros servicios
             continue
 
+    # Buscar desayunos del día siguiente para preparar hoy
+    manana = hoy + timedelta(days=1)
+
+    # Solo buscar desayunos si la hora actual es antes de las 19:00
+    desayunos_manana = []
+    if hora_actual <= time(19, 0):
+        desayunos_manana = ReservaServicio.objects.filter(
+            fecha_agendamiento=manana,
+            servicio__nombre__icontains='desayuno',
+            venta_reserva__isnull=False
+        ).exclude(
+            venta_reserva__estado_reserva='cancelada'
+        ).select_related(
+            'servicio',
+            'venta_reserva__cliente'
+        ).order_by('hora_inicio')
+
     # Organizar por hora
     agenda_por_hora = defaultdict(list)
 
@@ -194,6 +211,38 @@ def agenda_operativa(request):
                 'pagado': pagado,
                 'saldo_pendiente': saldo_pendiente
             })
+
+    # Agregar desayunos del día siguiente si los hay
+    if desayunos_manana:
+        # Agrupar desayunos por preparación
+        desayunos_info = []
+        for desayuno in desayunos_manana:
+            if desayuno.servicio and desayuno.venta_reserva and desayuno.venta_reserva.cliente:
+                desayunos_info.append({
+                    'cliente': desayuno.venta_reserva.cliente.nombre,
+                    'hora_servicio': desayuno.hora_inicio,
+                    'cantidad_personas': desayuno.cantidad_personas or 1,
+                    'reserva_id': desayuno.venta_reserva.id,
+                    'estado_pago': desayuno.venta_reserva.estado_pago
+                })
+
+        # Agregar bloque de preparación de desayunos a las 19:00
+        agenda_por_hora['19:00'].append({
+            'tipo': 'preparacion_desayuno',
+            'nombre': f'Preparación de Desayunos - {len(desayunos_info)} servicio(s) para mañana',
+            'cliente': 'Múltiples clientes',
+            'es_preparacion': True,
+            'cantidad_desayunos': len(desayunos_info),
+            'desayunos_detalle': desayunos_info,
+            'es_proximo': False,
+            'en_curso': False,
+            'hora_fin': '22:00',
+            'duracion': 180,  # 3 horas
+            'estado_pago': 'preparacion',  # Estado especial
+            'total': 0,
+            'pagado': 0,
+            'saldo_pendiente': 0
+        })
 
     # Convertir a lista ordenada y marcar servicios urgentes
     agenda_ordenada = []

@@ -362,6 +362,15 @@
         background: linear-gradient(to right, #ffebee 0%, white 100%);
     }
 
+    .servicio-item.preparacion-desayuno {
+        border-left: 5px solid #FFA726;
+        background: linear-gradient(to right, #FFF3E0 0%, white 100%);
+    }
+
+    .servicio-item.preparacion-desayuno .servicio-header {
+        background: #FFE0B2;
+    }
+
     .hora-fin {
         color: #666;
         font-size: 12px;
@@ -529,9 +538,11 @@
             </div>
 
             {% for item in bloque_hora.items %}
-            <div class="servicio-item {% if item.en_curso %}en-curso{% endif %} pago-{{ item.estado_pago }}">
+            <div class="servicio-item {% if item.en_curso %}en-curso{% endif %} {% if item.tipo == 'preparacion_desayuno' %}preparacion-desayuno{% else %}pago-{{ item.estado_pago }}{% endif %}">
                 <div class="servicio-header">
-                    {% if item.servicio.servicio.tipo_servicio == 'tina' %}
+                    {% if item.tipo == 'preparacion_desayuno' %}
+                        <span class="servicio-tipo" style="background: #FFA726;">🍳 Preparación</span>
+                    {% elif item.servicio.servicio.tipo_servicio == 'tina' %}
                         <span class="servicio-tipo tipo-tina">Tina</span>
                     {% elif item.servicio.servicio.tipo_servicio == 'masaje' %}
                         <span class="servicio-tipo tipo-masaje">Masaje</span>
@@ -553,25 +564,68 @@
                 </div>
 
                 <div class="servicio-detalles">
+                    {% if item.tipo == 'preparacion_desayuno' %}
+                        <div class="detalle-item">
+                            <span>⏰</span>
+                            <span><strong>Horario de preparación: 19:00 - 22:00 hrs</strong></span>
+                        </div>
+                        <div class="detalle-item">
+                            <span>📊</span>
+                            <span>Total de desayunos a preparar: <strong>{{ item.cantidad_desayunos }}</strong></span>
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; font-weight: 600; color: #1976d2;">
+                                📋 Ver detalle de desayunos para mañana
+                            </summary>
+                            <div style="margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+                                {% for desayuno in item.desayunos_detalle %}
+                                <div style="margin-bottom: 8px; padding: 8px; background: white; border-radius: 4px; border-left: 3px solid #FFA726;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <div>
+                                            <strong>{{ desayuno.cliente }}</strong> -
+                                            {{ desayuno.cantidad_personas }} persona{% if desayuno.cantidad_personas > 1 %}s{% endif %}<br>
+                                            <small style="color: #666;">Servicio a las {{ desayuno.hora_servicio }} hrs</small>
+                                        </div>
+                                        <div>
+                                            <a href="/admin/ventas/ventareserva/{{ desayuno.reserva_id }}/change/"
+                                               target="_blank"
+                                               style="color: #1976d2; text-decoration: none;">
+                                                Reserva #{{ desayuno.reserva_id }}
+                                            </a>
+                                            {% if desayuno.estado_pago == 'pagado' %}
+                                            <span style="color: #4CAF50; font-size: 12px;">✓</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </details>
+                    {% else %}
+                        <div class="detalle-item">
+                            <span>👤</span>
+                            <span><strong>{{ item.cliente }}</strong></span>
+                        </div>
+                        <div class="detalle-item">
+                            <span>📋</span>
+                            <a href="/admin/ventas/ventareserva/{{ item.reserva_id }}/change/"
+                               target="_blank"
+                               class="reserva-badge-link"
+                               title="Editar reserva #{{ item.reserva_id }}">
+                                <span class="reserva-badge">Reserva #{{ item.reserva_id }}</span>
+                            </a>
+                        </div>
+                        <div class="detalle-item">
+                            <span>👥</span>
+                            <span>{{ item.cantidad_personas }} persona{% if item.cantidad_personas > 1 %}s{% endif %}</span>
+                        </div>
+                    {% endif %}
                     <div class="detalle-item">
-                        <span>👤</span>
-                        <span><strong>{{ item.cliente }}</strong></span>
-                    </div>
-                    <div class="detalle-item">
-                        <span>📋</span>
-                        <a href="/admin/ventas/ventareserva/{{ item.reserva_id }}/change/"
-                           target="_blank"
-                           class="reserva-badge-link"
-                           title="Editar reserva #{{ item.reserva_id }}">
-                            <span class="reserva-badge">Reserva #{{ item.reserva_id }}</span>
-                        </a>
-                    </div>
-                    <div class="detalle-item">
-                        <span>👥</span>
-                        <span>{{ item.cantidad_personas }} persona{% if item.cantidad_personas > 1 %}s{% endif %}</span>
-                    </div>
-                    <div class="detalle-item">
-                        {% if item.estado_pago == 'pagado' %}
+                        {% if item.tipo == 'preparacion_desayuno' %}
+                            <span class="estado-pago-badge" style="background: #FFA726;">
+                                🍳 PREPARACIÓN
+                            </span>
+                        {% elif item.estado_pago == 'pagado' %}
                             <span class="estado-pago-badge estado-pago-pagado">
                                 ✓ PAGADO
                             </span>
