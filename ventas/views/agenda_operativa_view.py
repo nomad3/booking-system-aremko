@@ -155,6 +155,14 @@ def agenda_operativa(request):
 
         # Solo procesar productos si este servicio debe mostrarlos
         if mostrar_productos_aqui:
+            # Verificar si la reserva tiene un servicio de desayuno hoy
+            tiene_desayuno_hoy = servicios_del_dia.filter(
+                servicio__nombre__icontains='desayuno'
+            ).exists()
+
+            # Determinar si el servicio actual es de desayuno
+            es_servicio_desayuno = servicio.servicio and 'desayuno' in servicio.servicio.nombre.lower()
+
             # Obtener productos de la reserva que NO sean descuentos
             # y que no hayan sido entregados en días anteriores
             productos = ReservaProducto.objects.filter(
@@ -182,8 +190,28 @@ def agenda_operativa(request):
                         nombre_producto.startswith('-'),
                     ])
 
-                    # Si NO es descuento, añadirlo a la lista para mostrar
+                    # Si NO es descuento, verificar si debe mostrarse
                     if not es_descuento:
+                        # Si es un producto de desayuno (café, etc.)
+                        es_producto_desayuno = any([
+                            'cafe' in nombre_producto.lower(),
+                            'café' in nombre_producto.lower(),
+                            'desayuno' in nombre_producto.lower(),
+                            'marley' in nombre_producto.lower(),  # Café Marley
+                            'jugo' in nombre_producto.lower(),
+                            'leche' in nombre_producto.lower(),
+                            'pan' in nombre_producto.lower(),
+                            'mantequilla' in nombre_producto.lower(),
+                            'mermelada' in nombre_producto.lower()
+                        ])
+
+                        # Lógica especial para productos de desayuno
+                        if es_producto_desayuno and tiene_desayuno_hoy and not es_servicio_desayuno:
+                            # Si hay desayuno hoy y el servicio actual NO es desayuno,
+                            # NO mostrar productos de desayuno (ya se entregaron en la mañana)
+                            continue
+
+                        # Si pasó todos los filtros, agregar el producto
                         productos_a_entregar.append(producto)
                 except Exception:
                     # En caso de error, no incluir el producto
