@@ -52,6 +52,13 @@ admin.site.site_header = _("Sistema de Gestión de Ventas")
 admin.site.site_title = _("Panel de Administración")
 admin.site.index_title = _("Bienvenido al Panel de Control")
 
+# Importar parches de optimización para Cliente
+try:
+    from .admin_patches import ClienteAdminOptimizado
+    # Los parches se aplican automáticamente al importar
+except ImportError:
+    pass  # Si no existen los parches, continuar normal
+
 # Formulario personalizado para elegir los slots de horas según el servicio
 class ReservaServicioInlineForm(forms.ModelForm):
     class Meta:
