@@ -52,12 +52,8 @@ admin.site.site_header = _("Sistema de Gestión de Ventas")
 admin.site.site_title = _("Panel de Administración")
 admin.site.index_title = _("Bienvenido al Panel de Control")
 
-# Importar parches de optimización para Cliente
-try:
-    from .admin_patches import ClienteAdminOptimizado
-    # Los parches se aplican automáticamente al importar
-except ImportError:
-    pass  # Si no existen los parches, continuar normal
+# Importar formulario optimizado para Cliente
+from .forms import ClienteAdminForm
 
 # Formulario personalizado para elegir los slots de horas según el servicio
 class ReservaServicioInlineForm(forms.ModelForm):
@@ -490,10 +486,25 @@ class ProductoAdmin(admin.ModelAdmin):
         return format_html('<span style="color: #999;">Sin imagen</span>')
     vista_previa_imagen.short_description = 'Imagen' 
 
+@admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
+    """ClienteAdmin con autocomplete funcional y optimizaciones"""
+    form = ClienteAdminForm
     search_fields = ('nombre', 'telefono', 'email')
     list_display = ('nombre', 'telefono', 'email')
+    list_filter = ('created_at',)
+    list_per_page = 50
     actions = ['exportar_a_excel']
+
+    # Organización de campos en el formulario
+    fieldsets = (
+        ('Información Personal', {
+            'fields': ('nombre', 'email', 'telefono_completo', 'codigo_pais_otro', 'documento_identidad')
+        }),
+        ('Ubicación', {
+            'fields': ('pais', 'ciudad', 'region', 'comuna'),
+        }),
+    )
 
     def get_search_results(self, request, queryset, search_term):
         """
@@ -503,9 +514,9 @@ class ClienteAdmin(admin.ModelAdmin):
         queryset, use_distinct = super().get_search_results(
             request, queryset, search_term
         )
-        # Limitar resultados a 50 para autocomplete
+        # Limitar resultados a 20 para autocomplete
         if 'autocomplete' in request.path:
-            queryset = queryset[:50]
+            queryset = queryset[:20]
         return queryset, use_distinct
 
     def exportar_a_excel(self, request, queryset):
@@ -609,7 +620,7 @@ class PagoAdmin(admin.ModelAdmin):
 admin.site.register(CategoriaProducto, CategoriaProductoAdmin)
 admin.site.register(Producto, ProductoAdmin)
 admin.site.register(VentaReserva, VentaReservaAdmin)
-# admin.site.register(Cliente, ClienteAdmin)  # Commented out - using optimized version from admin_patches.py
+# Cliente ya está registrado con @admin.register(Cliente) decorador arriba
 admin.site.register(Servicio, ServicioAdmin)
 @admin.register(CategoriaServicio)
 class CategoriaServicioAdmin(admin.ModelAdmin):

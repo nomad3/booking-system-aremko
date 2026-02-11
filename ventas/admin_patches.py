@@ -12,13 +12,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Desregistrar el admin actual
-try:
-    admin.site.unregister(Cliente)
-except admin.sites.NotRegistered:
-    pass
+# NOTA: ClienteAdmin ahora está definido directamente en admin.py
+# Este archivo mantiene los monkey patches para optimización del modelo
 
-@admin.register(Cliente)
+# NO registramos ClienteAdminOptimizado aquí para evitar conflictos
+# El admin está en admin.py con decorador @admin.register(Cliente)
+
 class ClienteAdminOptimizado(admin.ModelAdmin):
     """
     ClienteAdmin con optimizaciones de rendimiento
