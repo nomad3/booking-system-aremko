@@ -105,15 +105,6 @@ class ClienteAdminOptimizado(admin.ModelAdmin):
 
         # Limitar resultados en autocomplete
         if 'autocomplete' in request.path:
-            # Priorizar coincidencias exactas
-            if search_term:
-                exact_matches = queryset.filter(
-                    Q(telefono__exact=search_term) |
-                    Q(email__iexact=search_term)
-                )
-                if exact_matches.exists():
-                    return exact_matches[:10], False
-
             queryset = queryset[:20]
 
         return queryset, use_distinct
