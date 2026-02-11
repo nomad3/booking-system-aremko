@@ -1,6 +1,8 @@
 from django import forms
 from django.forms import BaseInlineFormSet
-from ..models import ReservaProducto, Pago, Campaign, VentaReserva
+from django.contrib import admin
+from django.contrib.admin.widgets import RelatedFieldWidgetWrapper
+from ..models import ReservaProducto, Pago, Campaign, VentaReserva, Cliente
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import datetime, time
@@ -50,6 +52,17 @@ class VentaReservaAdminForm(forms.ModelForm):
 
         # No cargar todos los clientes aquí - Django lo maneja automáticamente
         # El widget ya tiene las opciones correctas del ModelChoiceField
+
+        # Agregar widget con botones para el campo cliente
+        if 'cliente' in self.fields:
+            self.fields['cliente'].widget = RelatedFieldWidgetWrapper(
+                self.fields['cliente'].widget,
+                VentaReserva._meta.get_field('cliente').remote_field,
+                admin.site,
+                can_add_related=True,
+                can_change_related=True,
+                can_delete_related=False
+            )
 
 class ReservaProductoForm(forms.ModelForm):
     class Meta:
