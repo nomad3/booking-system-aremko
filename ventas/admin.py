@@ -609,7 +609,7 @@ class PagoAdmin(admin.ModelAdmin):
 admin.site.register(CategoriaProducto, CategoriaProductoAdmin)
 admin.site.register(Producto, ProductoAdmin)
 admin.site.register(VentaReserva, VentaReservaAdmin)
-admin.site.register(Cliente, ClienteAdmin)
+# admin.site.register(Cliente, ClienteAdmin)  # Commented out - using optimized version from admin_patches.py
 admin.site.register(Servicio, ServicioAdmin)
 @admin.register(CategoriaServicio)
 class CategoriaServicioAdmin(admin.ModelAdmin):
