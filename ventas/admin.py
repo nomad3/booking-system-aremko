@@ -52,8 +52,8 @@ admin.site.site_header = _("Sistema de Gestión de Ventas")
 admin.site.site_title = _("Panel de Administración")
 admin.site.index_title = _("Bienvenido al Panel de Control")
 
-# Importar formulario optimizado para Cliente
-from .forms import ClienteAdminForm
+# ClienteAdminForm está en forms.py (no en forms/ paquete)
+# Por ahora usamos formulario por defecto para evitar conflictos de importación
 
 # Formulario personalizado para elegir los slots de horas según el servicio
 class ReservaServicioInlineForm(forms.ModelForm):
@@ -489,7 +489,6 @@ class ProductoAdmin(admin.ModelAdmin):
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
     """ClienteAdmin con autocomplete funcional y optimizaciones"""
-    form = ClienteAdminForm
     search_fields = ('nombre', 'telefono', 'email')
     list_display = ('nombre', 'telefono', 'email')
     list_filter = ('created_at',)
@@ -499,7 +498,7 @@ class ClienteAdmin(admin.ModelAdmin):
     # Organización de campos en el formulario
     fieldsets = (
         ('Información Personal', {
-            'fields': ('nombre', 'email', 'telefono_completo', 'codigo_pais_otro', 'documento_identidad')
+            'fields': ('nombre', 'email', 'telefono', 'documento_identidad')
         }),
         ('Ubicación', {
             'fields': ('pais', 'ciudad', 'region', 'comuna'),
