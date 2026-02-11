@@ -1,0 +1,20 @@
+Para reiniciar el gateway con Kimi, ejecuta estos comandos en tu terminal de Hostinger:
+
+1. Primero, detén el gateway actual:
+   pkill -f "openclaw-gateway"
+
+2. Verifica que se detuvo:
+   ps aux | grep openclaw
+
+3. Reinicia el gateway:
+   openclaw gateway
+
+4. Una vez que veas que está corriendo, presiona Ctrl+A y luego D para desconectar de screen
+
+5. Verifica el estado:
+   openclaw status
+
+Si el gateway no se detiene con pkill, usa:
+   kill -9 51418
+
+Luego continúa con el paso 3.
