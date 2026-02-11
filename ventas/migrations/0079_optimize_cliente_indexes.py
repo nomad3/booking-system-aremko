@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
     """
 
     dependencies = [
-        ('ventas', '0077_add_cliente_search_indexes'),
+        ('ventas', '0078_add_massage_reservation_models'),
     ]
 
     operations = [

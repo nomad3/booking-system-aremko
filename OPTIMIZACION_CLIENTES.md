@@ -31,7 +31,7 @@ El sistema experimentaba lentitud y errores 500 al crear/editar clientes debido 
 
 ### 1. Aplicar la migración de índices:
 ```bash
-python manage.py migrate ventas 0078
+python manage.py migrate ventas 0079
 ```
 
 ### 2. Configurar caché en settings.py:
