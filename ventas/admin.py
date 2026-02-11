@@ -195,7 +195,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
     change_form_template = 'admin/ventas/ventareserva/change_form.html'
     change_list_template = 'admin/ventas/ventareserva/change_list.html'
     list_per_page = 50
-    autocomplete_fields = ['cliente']
+    # Removido autocomplete_fields para usar widget personalizado
     list_display = (
         'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago',
         'estado_reserva', 'servicios_y_cantidades',

@@ -1,11 +1,44 @@
 from django import forms
 from django.forms import BaseInlineFormSet
-from ..models import ReservaProducto, Pago, Campaign, VentaReserva
+from django.urls import reverse
+from django.utils.html import format_html
+from django.contrib.admin.widgets import RelatedFieldWidgetWrapper
+from ..models import ReservaProducto, Pago, Campaign, VentaReserva, Cliente
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import datetime, time
 from decimal import Decimal
 from collections import defaultdict
+
+class ClienteSelectWidget(forms.Select):
+    """Widget personalizado para el campo Cliente con botones de editar/crear"""
+
+    def render(self, name, value, attrs=None, renderer=None):
+        html = super().render(name, value, attrs, renderer)
+
+        # Agregar botones de editar y crear
+        buttons_html = '''
+        <div style="margin-top: 5px;">
+            <a href="{}" class="related-widget-wrapper-link change-related" id="change_id_cliente"
+               data-href-template="/admin/ventas/cliente/__fk__/change/?_to_field=id&_popup=1"
+               title="Cambiar cliente seleccionado" style="margin-right: 10px;">
+                <img src="/static/admin/img/icon-changelink.svg" alt="Cambiar">
+            </a>
+            <a href="{}" class="related-widget-wrapper-link add-related" id="add_id_cliente"
+               title="Añadir otro cliente">
+                <img src="/static/admin/img/icon-addlink.svg" alt="Añadir">
+            </a>
+        </div>
+        '''
+
+        add_url = reverse('admin:ventas_cliente_add') + '?_to_field=id&_popup=1'
+
+        return format_html(
+            '<div class="related-widget-wrapper" data-model-ref="cliente">{}{}</div>',
+            html,
+            format_html(buttons_html, '#', add_url)
+        )
+
 
 class VentaReservaAdminForm(forms.ModelForm):
     """Formulario personalizado para VentaReserva que solo muestra fecha (sin hora)."""
@@ -18,6 +51,7 @@ class VentaReservaAdminForm(forms.ModelForm):
                 attrs={'type': 'date'},
                 format='%Y-%m-%d'
             ),
+            'cliente': ClienteSelectWidget(),
         }
 
     def __init__(self, *args, **kwargs):
@@ -46,6 +80,12 @@ class VentaReservaAdminForm(forms.ModelForm):
             else:
                 # Para nuevas reservas, usar la fecha actual
                 self.fields['fecha_reserva'].initial = timezone.now().date()
+
+        # Configurar el widget del campo cliente con todos los clientes
+        if 'cliente' in self.fields:
+            self.fields['cliente'].widget.choices = [('', '---------')] + [
+                (c.id, f"{c.nombre} - {c.telefono}") for c in Cliente.objects.all().order_by('nombre')
+            ]
 
 class ReservaProductoForm(forms.ModelForm):
     class Meta:

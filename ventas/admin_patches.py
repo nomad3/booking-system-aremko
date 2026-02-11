@@ -158,6 +158,31 @@ class ClienteAdminOptimizado(admin.ModelAdmin):
 
         return super().changelist_view(request, extra_context)
 
+    def response_add(self, request, obj, post_url_continue=None):
+        """Maneja la respuesta después de agregar un cliente desde un popup"""
+        if "_popup" in request.POST:
+            from django.http import HttpResponse
+            return HttpResponse(
+                '<script>opener.dismissAddRelatedObjectPopup(window, "%s", "%s");</script>' % (
+                    obj.pk,
+                    obj.nombre + ' - ' + obj.telefono
+                )
+            )
+        return super().response_add(request, obj, post_url_continue)
+
+    def response_change(self, request, obj):
+        """Maneja la respuesta después de cambiar un cliente desde un popup"""
+        if "_popup" in request.POST:
+            from django.http import HttpResponse
+            return HttpResponse(
+                '<script>opener.dismissChangeRelatedObjectPopup(window, "%s", "%s", "%s");</script>' % (
+                    obj.pk,
+                    obj.nombre + ' - ' + obj.telefono,
+                    obj.pk
+                )
+            )
+        return super().response_change(request, obj)
+
 
 # Monkey patch para optimizar el save del modelo
 original_cliente_save = Cliente.save

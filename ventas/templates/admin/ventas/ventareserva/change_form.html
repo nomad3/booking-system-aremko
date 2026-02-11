@@ -517,6 +517,90 @@
             }
         }
 
+        // JavaScript para manejar los popups de cliente
+        function dismissAddRelatedObjectPopup(win, newId, newRepr) {
+            const name = win.name;
+            const elem = document.getElementById(name);
+            if (elem) {
+                if (elem.tagName === 'SELECT') {
+                    // Agregar la nueva opción al select
+                    const o = new Option(newRepr, newId);
+                    o.selected = true;
+                    elem.options.add(o);
+
+                    // Trigger change event
+                    const event = new Event('change', { bubbles: true });
+                    elem.dispatchEvent(event);
+                }
+            }
+            win.close();
+        }
+
+        function dismissChangeRelatedObjectPopup(win, objId, newRepr, newId) {
+            const name = win.name.replace(/^edit_/, '');
+            const elem = document.getElementById(name);
+            if (elem) {
+                if (elem.tagName === 'SELECT') {
+                    // Actualizar la opción en el select
+                    const opts = elem.options;
+                    for (let i = 0; i < opts.length; i++) {
+                        if (opts[i].value == objId) {
+                            opts[i].textContent = newRepr;
+                            if (newId && newId != objId) {
+                                opts[i].value = newId;
+                            }
+                            break;
+                        }
+                    }
+
+                    // Trigger change event
+                    const event = new Event('change', { bubbles: true });
+                    elem.dispatchEvent(event);
+                }
+            }
+            win.close();
+        }
+
+        // Script para manejar los links de editar cliente
+        document.addEventListener('DOMContentLoaded', function() {
+            // Función para actualizar el link de editar cuando cambia la selección
+            function updateChangeLink() {
+                const select = document.getElementById('id_cliente');
+                const changeLink = document.getElementById('change_id_cliente');
+
+                if (select && changeLink) {
+                    const selectedValue = select.value;
+                    if (selectedValue) {
+                        const template = changeLink.getAttribute('data-href-template');
+                        changeLink.href = template.replace('__fk__', selectedValue);
+                        changeLink.style.display = '';
+                    } else {
+                        changeLink.style.display = 'none';
+                    }
+                }
+            }
+
+            // Actualizar al cargar y cuando cambie la selección
+            updateChangeLink();
+            const clienteSelect = document.getElementById('id_cliente');
+            if (clienteSelect) {
+                clienteSelect.addEventListener('change', updateChangeLink);
+            }
+
+            // Manejar clicks en los botones de agregar/editar
+            document.querySelectorAll('.related-widget-wrapper-link').forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    if (this.href && this.href !== '#') {
+                        e.preventDefault();
+                        const name = this.id.replace(/^(change|add|delete)_/, '');
+                        const windowOptions = 'height=600,width=1000,resizable=yes,scrollbars=yes';
+                        const win = window.open(this.href, name, windowOptions);
+                        win.focus();
+                    }
+                });
+            });
+        });
+
         // Script para agregar data-labels a las celdas de los inlines
         document.addEventListener('DOMContentLoaded', function() {
             if (window.innerWidth <= 768) {
