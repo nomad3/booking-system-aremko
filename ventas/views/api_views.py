@@ -27,6 +27,7 @@ from ..models import Campaign, Contact, Activity, CampaignInteraction # Import C
 from .. import communication_utils # Import communication utils
 from django.conf import settings # To get placeholder API key
 from django.utils.dateparse import parse_datetime # For parsing timestamp if provided
+from django.views.decorators.csrf import csrf_exempt
 
 class ProveedorViewSet(viewsets.ModelViewSet):
     queryset = Proveedor.objects.all()
@@ -620,3 +621,36 @@ class ComunaViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(region_id=region_id)
         
         return queryset
+
+
+
+@require_GET
+def comunas_por_region(request):
+    """
+    Vista para obtener las comunas de una región específica.
+    Usado en el formulario de Cliente para cargar dinámicamente las comunas.
+    """
+    region_id = request.GET.get("region")
+
+    if not region_id:
+        return JsonResponse({"error": "Region ID es requerido"}, status=400)
+
+    try:
+        # Obtener las comunas de la región especificada
+        comunas = Comuna.objects.filter(region_id=region_id).order_by("nombre")
+
+        # Serializar los datos
+        comunas_data = [{
+            "id": comuna.id,
+            "nombre": comuna.nombre
+        } for comuna in comunas]
+
+        return JsonResponse({
+            "comunas": comunas_data,
+            "total": len(comunas_data)
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            "error": f"Error al obtener comunas: {str(e)}"
+        }, status=500)

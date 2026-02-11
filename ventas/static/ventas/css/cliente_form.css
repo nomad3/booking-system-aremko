@@ -1,0 +1,78 @@
+/**
+ * Estilos para el formulario de Cliente
+ */
+
+/* Widget de teléfono con código de país */
+.field-telefono_completo {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.field-telefono_completo .country-code-select {
+    width: 200px;
+    margin-right: 10px;
+}
+
+.field-telefono_completo .phone-number-input {
+    flex: 1;
+    min-width: 200px;
+}
+
+.field-telefono_completo .codigo-pais-otro {
+    width: 100px;
+    margin-left: 10px;
+}
+
+/* Ayuda visual para campos condicionales */
+.field-region.hidden,
+.field-comuna.hidden,
+.field-pais.hidden,
+.field-ciudad.hidden {
+    display: none !important;
+}
+
+/* Mensajes de ayuda */
+.help-text {
+    display: block;
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+}
+
+.help-text.error {
+    color: #ba2121;
+    font-weight: bold;
+}
+
+/* Mejorar la presentación en el admin */
+.form-row.field-telefono_completo {
+    overflow: visible;
+}
+
+/* Agrupar visualmente campos relacionados */
+fieldset.location-fields {
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+}
+
+fieldset.location-fields legend {
+    font-weight: bold;
+    padding: 0 10px;
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+    .field-telefono_completo {
+        flex-direction: column;
+    }
+
+    .field-telefono_completo .country-code-select,
+    .field-telefono_completo .phone-number-input {
+        width: 100%;
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
+}

@@ -7,6 +7,7 @@ from django.db import transaction
 from django.core.cache import cache
 from django.db.models import Count, Sum, Q, Prefetch
 from .models import Cliente
+from .forms import ClienteAdminForm
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ class ClienteAdminOptimizado(admin.ModelAdmin):
     """
     ClienteAdmin con optimizaciones de rendimiento
     """
+    form = ClienteAdminForm
     search_fields = ('nombre', 'telefono', 'email')
     list_display = ('nombre', 'telefono', 'email', 'mostrar_visitas', 'mostrar_gasto')
     list_filter = ('created_at',)
@@ -33,6 +35,21 @@ class ClienteAdminOptimizado(admin.ModelAdmin):
 
     # Campos de solo lectura para cálculos costosos
     readonly_fields = ('numero_visitas', 'gasto_total')
+
+    # Organización de campos en el formulario
+    fieldsets = (
+        ('Información Personal', {
+            'fields': ('nombre', 'email', 'telefono_completo', 'codigo_pais_otro', 'documento_identidad')
+        }),
+        ('Ubicación', {
+            'fields': ('pais', 'ciudad', 'region', 'comuna'),
+            'classes': ('location-fields',),
+        }),
+        ('Estadísticas', {
+            'fields': ('numero_visitas', 'gasto_total'),
+            'classes': ('collapse',),
+        }),
+    )
 
     def get_queryset(self, request):
         """Optimiza queries con anotaciones"""

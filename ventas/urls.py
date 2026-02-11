@@ -158,6 +158,9 @@ urlpatterns = [
     path('api/activities/log/', api_views.log_external_activity, name='log_external_activity'), # Logs outgoing activities
     path('api/interactions/log/', api_views.log_campaign_interaction, name='log_campaign_interaction'), # Logs incoming interactions
     # --- End Remarketing URLs ---
+
+    # API para obtener comunas por región
+    path('api/comunas-por-region/', api_views.comunas_por_region, name='comunas_por_region'),
     
     # === ADVANCED EMAIL CAMPAIGN SYSTEM ===
     path('admin/campaigns/', campaign_views.campaign_list_view, name='campaign_list'),
