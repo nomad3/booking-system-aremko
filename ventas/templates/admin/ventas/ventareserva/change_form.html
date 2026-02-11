@@ -621,7 +621,7 @@
 
                 // Crear botón de búsqueda
                 const lookupLink = document.createElement('a');
-                lookupLink.href = '/admin/ventas/cliente/?_to_field=id&_popup=1';
+                lookupLink.href = '{% url "admin:ventas_cliente_changelist" %}?_to_field=id&_popup=1';
                 lookupLink.className = 'related-lookup';
                 lookupLink.id = 'lookup_id_cliente';
                 lookupLink.title = 'Buscar cliente';
@@ -637,7 +637,7 @@
 
                 // Crear botón de agregar
                 const addLink = document.createElement('a');
-                addLink.href = '/admin/ventas/cliente/add/?_to_field=id&_popup=1';
+                addLink.href = '{% url "admin:ventas_cliente_add" %}?_to_field=id&_popup=1';
                 addLink.className = 'add-related';
                 addLink.id = 'add_id_cliente';
                 addLink.title = 'Añadir cliente';
@@ -662,7 +662,7 @@
                     e.preventDefault();
                     const clienteId = clienteField.value;
                     if (clienteId) {
-                        const href = '/admin/ventas/cliente/' + clienteId + '/change/?_to_field=id&_popup=1';
+                        const href = '{% url "admin:ventas_cliente_change" 0 %}'.replace('0', clienteId) + '?_to_field=id&_popup=1';
                         const win = window.open(href, 'id_cliente', 'height=600,width=1000,resizable=yes,scrollbars=yes');
                         win.focus();
                     }
