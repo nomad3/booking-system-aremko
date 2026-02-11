@@ -1,6 +1,11 @@
 {% extends "admin/change_form.html" %}
 {% load static %}
 
+{% block extrahead %}
+    {{ block.super }}
+    <script src="{% static 'admin/js/admin/RelatedObjectLookups.js' %}"></script>
+{% endblock %}
+
 {% block extrastyle %}
     {{ block.super }}
     <style>
@@ -600,6 +605,98 @@
                 });
             });
         });
+
+        // Añadir botones de raw_id_fields si no existen
+        document.addEventListener('DOMContentLoaded', function() {
+            // Buscar el campo cliente
+            const clienteField = document.getElementById('id_cliente');
+            if (clienteField && !document.querySelector('.related-lookup')) {
+                // Crear contenedor para los botones
+                const wrapper = document.createElement('span');
+                wrapper.className = 'related-widget-wrapper';
+
+                // Insertar el wrapper después del input
+                clienteField.parentNode.insertBefore(wrapper, clienteField);
+                wrapper.appendChild(clienteField);
+
+                // Crear botón de búsqueda
+                const lookupLink = document.createElement('a');
+                lookupLink.href = '/admin/ventas/cliente/?_to_field=id&_popup=1';
+                lookupLink.className = 'related-lookup';
+                lookupLink.id = 'lookup_id_cliente';
+                lookupLink.title = 'Buscar cliente';
+                lookupLink.innerHTML = '<img src="/static/admin/img/search.svg" alt="Buscar">';
+                lookupLink.onclick = function(e) {
+                    e.preventDefault();
+                    const name = 'id_cliente';
+                    const href = this.href;
+                    const win = window.open(href, name, 'height=500,width=800,resizable=yes,scrollbars=yes');
+                    win.focus();
+                    return false;
+                };
+
+                // Crear botón de agregar
+                const addLink = document.createElement('a');
+                addLink.href = '/admin/ventas/cliente/add/?_to_field=id&_popup=1';
+                addLink.className = 'add-related';
+                addLink.id = 'add_id_cliente';
+                addLink.title = 'Añadir cliente';
+                addLink.innerHTML = '<img src="/static/admin/img/icon-addlink.svg" alt="Añadir">';
+                addLink.onclick = function(e) {
+                    e.preventDefault();
+                    const name = 'id_cliente';
+                    const href = this.href;
+                    const win = window.open(href, name, 'height=600,width=1000,resizable=yes,scrollbars=yes');
+                    win.focus();
+                    return false;
+                };
+
+                // Crear botón de editar
+                const changeLink = document.createElement('a');
+                changeLink.href = '#';
+                changeLink.className = 'change-related';
+                changeLink.id = 'change_id_cliente';
+                changeLink.title = 'Cambiar cliente';
+                changeLink.innerHTML = '<img src="/static/admin/img/icon-changelink.svg" alt="Cambiar">';
+                changeLink.onclick = function(e) {
+                    e.preventDefault();
+                    const clienteId = clienteField.value;
+                    if (clienteId) {
+                        const href = '/admin/ventas/cliente/' + clienteId + '/change/?_to_field=id&_popup=1';
+                        const win = window.open(href, 'id_cliente', 'height=600,width=1000,resizable=yes,scrollbars=yes');
+                        win.focus();
+                    }
+                    return false;
+                };
+
+                // Añadir los botones
+                wrapper.appendChild(lookupLink);
+                wrapper.appendChild(addLink);
+                wrapper.appendChild(changeLink);
+
+                // Mostrar/ocultar botón de editar según haya valor
+                function updateChangeLink() {
+                    changeLink.style.display = clienteField.value ? '' : 'none';
+                }
+
+                updateChangeLink();
+                clienteField.addEventListener('input', updateChangeLink);
+                clienteField.addEventListener('change', updateChangeLink);
+            }
+        });
+
+        // Funciones para manejar las respuestas de los popups
+        function dismissRelatedLookupPopup(win, chosenId) {
+            const name = win.name;
+            const elem = document.getElementById(name);
+            if (elem) {
+                elem.value = chosenId;
+                elem.focus();
+                const event = new Event('change', { bubbles: true });
+                elem.dispatchEvent(event);
+            }
+            win.close();
+        }
 
         // Script para agregar data-labels a las celdas de los inlines
         document.addEventListener('DOMContentLoaded', function() {
