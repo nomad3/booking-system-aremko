@@ -9,7 +9,7 @@ import sys
 import django
 
 # Setup Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bookings.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aremko_project.settings')
 django.setup()
 
 from django.contrib.admin.sites import site
