@@ -208,21 +208,47 @@ class DetalleComandaInline(admin.TabularInline):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
-class ComandaInline(admin.StackedInline):
-    """Inline para mostrar/crear comandas en una VentaReserva"""
+class ComandaInline(admin.TabularInline):
+    """
+    Inline para mostrar comandas existentes en una VentaReserva.
+    Para agregar productos, usar el botón "Agregar Comanda con Productos".
+    """
     model = Comanda
     extra = 0
     can_delete = False
-    readonly_fields = ('fecha_solicitud', 'hora_solicitud', 'tiempo_espera_display',
-                       'usuario_solicita', 'usuario_procesa', 'fecha_inicio_proceso', 'fecha_entrega')
-    fields = (
-        ('estado', 'tiempo_espera_display'),
-        'fecha_entrega_objetivo',
-        'notas_generales',
-        ('fecha_solicitud', 'hora_solicitud'),
-        ('usuario_solicita', 'usuario_procesa'),
-        ('fecha_inicio_proceso', 'fecha_entrega'),
-    )
+    fields = ('id', 'estado_badge', 'total_productos', 'fecha_entrega_objetivo',
+              'tiempo_espera_display', 'editar_comanda_link')
+    readonly_fields = ('id', 'estado_badge', 'total_productos', 'tiempo_espera_display',
+                       'editar_comanda_link')
+
+    def estado_badge(self, obj):
+        """Muestra el estado con colores"""
+        if not obj or not obj.pk:
+            return '-'
+        colores = {
+            'pendiente': '#ff9800',
+            'procesando': '#2196f3',
+            'entregada': '#4caf50',
+            'cancelada': '#f44336'
+        }
+        return format_html(
+            '<span style="background:{}; color:white; padding:3px 10px; border-radius:10px; '
+            'font-weight:600; font-size:11px;">{}</span>',
+            colores.get(obj.estado, '#999'),
+            obj.get_estado_display()
+        )
+    estado_badge.short_description = 'Estado'
+
+    def total_productos(self, obj):
+        """Muestra total de productos"""
+        if obj and obj.pk:
+            count = obj.detalles.count()
+            return format_html(
+                '<span style="font-weight:600;">{} producto{}</span>',
+                count, 's' if count != 1 else ''
+            )
+        return '-'
+    total_productos.short_description = 'Productos'
 
     def tiempo_espera_display(self, obj):
         """Muestra el tiempo de espera con colores"""
@@ -235,30 +261,34 @@ class ComandaInline(admin.StackedInline):
             else:
                 color = 'red'
             return format_html(
-                '<span style="color:{}; font-weight:600; font-size:14px;">{} min</span>',
+                '<span style="color:{}; font-weight:600;">{} min</span>',
                 color, minutos
             )
         return '-'
-    tiempo_espera_display.short_description = 'Tiempo Espera'
+    tiempo_espera_display.short_description = 'Espera'
+
+    def editar_comanda_link(self, obj):
+        """Link para editar la comanda con productos"""
+        if obj and obj.pk:
+            url = reverse('admin:ventas_comanda_change', args=[obj.pk])
+            return format_html(
+                '<a href="{}?_popup=1" class="related-widget-wrapper-link change-related" '
+                'onclick="return showRelatedObjectPopup(this);" '
+                'style="background:#4caf50; color:white; padding:5px 12px; border-radius:4px; '
+                'text-decoration:none; font-weight:600; font-size:11px; display:inline-block;">'
+                '✏️ Editar / Ver Productos</a>',
+                url
+            )
+        return '-'
+    editar_comanda_link.short_description = 'Acciones'
 
     def has_add_permission(self, request, obj=None):
-        # Solo permitir agregar comandas si la reserva ya existe
-        return obj is not None and obj.pk is not None
+        # Desactivar el "Add another" del inline, usaremos botón personalizado
+        return False
 
-    def get_formset(self, request, obj=None, **kwargs):
-        formset = super().get_formset(request, obj, **kwargs)
-        # Guardar request para usarlo en save_formset
-        formset.request = request
-        return formset
-
-    def save_formset(self, request, form, formset, change):
-        """Guarda el formset y asigna el usuario que solicita"""
-        instances = formset.save(commit=False)
-        for instance in instances:
-            if not instance.pk:  # Nueva comanda
-                instance.usuario_solicita = request.user
-            instance.save()
-        formset.save_m2m()
+    class Media:
+        js = ('admin/js/vendor/jquery/jquery.js', 'admin/js/jquery.init.js',
+              'admin/js/admin/RelatedObjectLookups.js')
 
 
 class VentaReservaAdmin(admin.ModelAdmin):
@@ -280,7 +310,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
         'productos_y_cantidades', 'servicios_y_cantidades',
-        'total_productos', 'total_servicios'
+        'total_productos', 'total_servicios', 'agregar_comanda_button'
     )
     fieldsets = (
         (None, {
@@ -297,6 +327,11 @@ class VentaReservaAdmin(admin.ModelAdmin):
         }),
         ('Detalles', {
             'fields': ('comentarios',)
+        }),
+        ('Gestión de Comandas', {
+            'fields': ('agregar_comanda_button',),
+            'classes': ('collapse',),
+            'description': 'Las comandas existentes se muestran más abajo en la sección "COMANDAS".'
         }),
     )
     def changelist_view(self, request, extra_context=None):
@@ -412,6 +447,32 @@ class VentaReservaAdmin(admin.ModelAdmin):
         url = reverse('ventas:generar_tips_postpago', args=[obj.id])
         return format_html('<a class="button" href="{}" target="_blank">💡 Tips</a>', url)
     generar_tips_link.short_description = 'Tips'
+
+    def agregar_comanda_button(self, obj):
+        """Botón para agregar nueva comanda con productos"""
+        from django.urls import reverse
+        from django.utils.html import format_html
+        if obj and obj.pk:
+            url = reverse('admin:ventas_comanda_add')
+            return format_html(
+                '<a href="{}?venta_reserva={}&_popup=1" '
+                'class="related-widget-wrapper-link add-related" '
+                'onclick="return showRelatedObjectPopup(this);" '
+                'style="background:#4caf50; color:white; padding:10px 20px; border-radius:6px; '
+                'text-decoration:none; font-weight:600; font-size:13px; display:inline-block; '
+                'margin:10px 0;">'
+                '➕ Agregar Comanda con Productos'
+                '</a>'
+                '<p style="color:#666; font-size:12px; margin:5px 0 0 0;">'
+                'Se abrirá una ventana donde podrás agregar la comanda y sus productos. '
+                'Al guardar, se actualizará automáticamente esta reserva.'
+                '</p>',
+                url, obj.pk
+            )
+        return format_html(
+            '<p style="color:#999;">Guarda la reserva primero para poder agregar comandas.</p>'
+        )
+    agregar_comanda_button.short_description = 'Comandas'
 
     def generar_cotizacion_link(self, obj):
         from django.urls import reverse
@@ -3050,11 +3111,49 @@ class ComandaAdmin(admin.ModelAdmin):
         return format_html('<span style="color:#999;">⚡ Inmediato</span>')
     entrega_objetivo_display.short_description = 'Entrega Objetivo'
 
+    def get_form(self, request, obj=None, **kwargs):
+        """Pre-poblar venta_reserva si viene desde el popup"""
+        form = super().get_form(request, obj, **kwargs)
+        if 'venta_reserva' in request.GET and not obj:
+            # Pre-seleccionar la venta_reserva
+            venta_reserva_id = request.GET.get('venta_reserva')
+            if venta_reserva_id:
+                form.base_fields['venta_reserva'].initial = venta_reserva_id
+        return form
+
     def save_model(self, request, obj, form, change):
         """Asigna usuario que solicita si es nueva comanda"""
         if not change:  # Nueva comanda
             obj.usuario_solicita = request.user
         super().save_model(request, obj, form, change)
+
+    def response_add(self, request, obj, post_url_continue=None):
+        """Cerrar popup después de guardar si viene desde popup"""
+        if '_popup' in request.GET or '_popup' in request.POST:
+            from django.http import HttpResponse
+            return HttpResponse(
+                '<script type="text/javascript">'
+                'if (window.opener && !window.opener.closed) {'
+                '    window.opener.location.reload();'
+                '}'
+                'window.close();'
+                '</script>'
+            )
+        return super().response_add(request, obj, post_url_continue)
+
+    def response_change(self, request, obj):
+        """Cerrar popup después de editar si viene desde popup"""
+        if '_popup' in request.GET or '_popup' in request.POST:
+            from django.http import HttpResponse
+            return HttpResponse(
+                '<script type="text/javascript">'
+                'if (window.opener && !window.opener.closed) {'
+                '    window.opener.location.reload();'
+                '}'
+                'window.close();'
+                '</script>'
+            )
+        return super().response_change(request, obj)
 
     def has_delete_permission(self, request, obj=None):
         """Solo permitir eliminar comandas pendientes o canceladas"""
