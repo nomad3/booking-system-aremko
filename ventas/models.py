@@ -4598,6 +4598,190 @@ class ServicioSlotBloqueo(models.Model):
             self.fecha
         )
 
+
+# ============================================================================
+# SISTEMA DE COMANDAS
+# ============================================================================
+
+class Comanda(models.Model):
+    """
+    Comanda de productos para una reserva.
+    Similar a una orden de restaurante - permite al personal tomar pedidos
+    que aparecen en tiempo real en la cocina/bar.
+    """
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('procesando', 'En Proceso'),
+        ('entregada', 'Entregada'),
+        ('cancelada', 'Cancelada'),
+    ]
+
+    # Relaciones
+    venta_reserva = models.ForeignKey(
+        VentaReserva,
+        on_delete=models.CASCADE,
+        related_name='comandas',
+        verbose_name='Reserva'
+    )
+
+    # Información temporal
+    fecha_solicitud = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha y Hora de Solicitud'
+    )
+    hora_solicitud = models.TimeField(
+        auto_now_add=True,
+        verbose_name='Hora de Solicitud',
+        help_text='Hora específica para ordenamiento rápido'
+    )
+
+    # Estado y gestión
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default='pendiente',
+        verbose_name='Estado',
+        db_index=True
+    )
+
+    # Notas generales de la comanda
+    notas_generales = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Notas Generales',
+        help_text='Indicaciones especiales para toda la comanda'
+    )
+
+    # Auditoría
+    usuario_solicita = models.ForeignKey(
+        'auth.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='comandas_solicitadas',
+        verbose_name='Usuario que Solicita'
+    )
+
+    usuario_procesa = models.ForeignKey(
+        'auth.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='comandas_procesadas',
+        verbose_name='Usuario que Procesa'
+    )
+
+    fecha_inicio_proceso = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Inicio de Proceso'
+    )
+
+    fecha_entrega = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha de Entrega'
+    )
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Comanda'
+        verbose_name_plural = 'Comandas'
+        ordering = ['-fecha_solicitud']
+        indexes = [
+            models.Index(fields=['estado', '-fecha_solicitud'], name='comanda_estado_fecha_idx'),
+            models.Index(fields=['venta_reserva', 'estado'], name='comanda_reserva_estado_idx'),
+        ]
+
+    def __str__(self):
+        cliente_nombre = self.venta_reserva.cliente.nombre if self.venta_reserva and self.venta_reserva.cliente else "Sin cliente"
+        return f"Comanda #{self.id} - {cliente_nombre} - {self.get_estado_display()}"
+
+    def tiempo_espera(self):
+        """Calcula el tiempo de espera en minutos"""
+        from django.utils import timezone
+        if self.estado == 'entregada' and self.fecha_entrega:
+            delta = self.fecha_entrega - self.fecha_solicitud
+        elif self.estado == 'procesando' and self.fecha_inicio_proceso:
+            delta = timezone.now() - self.fecha_solicitud
+        else:
+            delta = timezone.now() - self.fecha_solicitud
+        return int(delta.total_seconds() / 60)
+
+    def marcar_procesando(self, usuario):
+        """Marca la comanda como en proceso"""
+        from django.utils import timezone
+        self.estado = 'procesando'
+        self.usuario_procesa = usuario
+        self.fecha_inicio_proceso = timezone.now()
+        self.save()
+
+    def marcar_entregada(self):
+        """Marca la comanda como entregada"""
+        from django.utils import timezone
+        self.estado = 'entregada'
+        self.fecha_entrega = timezone.now()
+        self.save()
+
+
+class DetalleComanda(models.Model):
+    """
+    Detalle de productos en una comanda.
+    Permite especificaciones individuales por producto (sabor, temperatura, etc.)
+    """
+    comanda = models.ForeignKey(
+        Comanda,
+        on_delete=models.CASCADE,
+        related_name='detalles',
+        verbose_name='Comanda'
+    )
+
+    producto = models.ForeignKey(
+        Producto,
+        on_delete=models.PROTECT,
+        verbose_name='Producto'
+    )
+
+    cantidad = models.PositiveIntegerField(
+        default=1,
+        verbose_name='Cantidad'
+    )
+
+    # Especificaciones del producto
+    especificaciones = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Especificaciones',
+        help_text='Ej: Sabor frutilla, sin azúcar, con endulzante, bien frío, etc.'
+    )
+
+    # Precio al momento de la comanda (snapshot)
+    precio_unitario = models.DecimalField(
+        max_digits=10,
+        decimal_places=0,
+        verbose_name='Precio Unitario'
+    )
+
+    class Meta:
+        verbose_name = 'Detalle de Comanda'
+        verbose_name_plural = 'Detalles de Comanda'
+        ordering = ['id']
+
+    def __str__(self):
+        return f"{self.cantidad}x {self.producto.nombre}"
+
+    def subtotal(self):
+        """Calcula el subtotal de este item"""
+        return self.cantidad * self.precio_unitario
+
+    def save(self, *args, **kwargs):
+        # Capturar precio actual del producto si no está definido
+        if not self.precio_unitario:
+            self.precio_unitario = self.producto.precio_base
+        super().save(*args, **kwargs)
+
         if slots_disponibles_config and self.hora_slot not in slots_disponibles_config:
             raise ValidationError({
                 'hora_slot': f'El horario {self.hora_slot} no existe para este servicio. Horarios válidos: {", ".join(slots_disponibles_config)}'

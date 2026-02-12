@@ -42,7 +42,9 @@ from .models import (
     # Tips Post-Pago
     ConfiguracionTips,
     # Sistema de Pagos a Masajistas
-    PagoMasajista, DetalleServicioPago
+    PagoMasajista, DetalleServicioPago,
+    # Sistema de Comandas
+    Comanda, DetalleComanda
 )
 from django.http import HttpResponse
 import xlwt
@@ -186,6 +188,78 @@ def registrar_movimiento(cliente, tipo_movimiento, descripcion, usuario):
         usuario=usuario
     )
 
+
+# ============================================================================
+# SISTEMA DE COMANDAS - Inlines
+# ============================================================================
+
+class DetalleComandaInline(admin.TabularInline):
+    """Inline para agregar productos a una comanda"""
+    model = DetalleComanda
+    extra = 1
+    fields = ['producto', 'cantidad', 'especificaciones', 'precio_unitario']
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "producto":
+            # Ordenar productos alfabéticamente y solo mostrar activos
+            kwargs["queryset"] = Producto.objects.filter(
+                cantidad_disponible__gt=0
+            ).order_by('nombre')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+class ComandaInline(admin.StackedInline):
+    """Inline para mostrar/crear comandas en una VentaReserva"""
+    model = Comanda
+    extra = 0
+    can_delete = False
+    readonly_fields = ('fecha_solicitud', 'hora_solicitud', 'tiempo_espera_display',
+                       'usuario_solicita', 'usuario_procesa', 'fecha_inicio_proceso', 'fecha_entrega')
+    fields = (
+        ('estado', 'tiempo_espera_display'),
+        'notas_generales',
+        ('fecha_solicitud', 'hora_solicitud'),
+        ('usuario_solicita', 'usuario_procesa'),
+        ('fecha_inicio_proceso', 'fecha_entrega'),
+    )
+
+    def tiempo_espera_display(self, obj):
+        """Muestra el tiempo de espera con colores"""
+        if obj and obj.pk:
+            minutos = obj.tiempo_espera()
+            if minutos < 10:
+                color = 'green'
+            elif minutos < 20:
+                color = 'orange'
+            else:
+                color = 'red'
+            return format_html(
+                '<span style="color:{}; font-weight:600; font-size:14px;">{} min</span>',
+                color, minutos
+            )
+        return '-'
+    tiempo_espera_display.short_description = 'Tiempo Espera'
+
+    def has_add_permission(self, request, obj=None):
+        # Solo permitir agregar comandas si la reserva ya existe
+        return obj is not None and obj.pk is not None
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        # Guardar request para usarlo en save_formset
+        formset.request = request
+        return formset
+
+    def save_formset(self, request, form, formset, change):
+        """Guarda el formset y asigna el usuario que solicita"""
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if not instance.pk:  # Nueva comanda
+                instance.usuario_solicita = request.user
+            instance.save()
+        formset.save_m2m()
+
+
 class VentaReservaAdmin(admin.ModelAdmin):
     form = VentaReservaAdminForm
     change_form_template = 'admin/ventas/ventareserva/change_form.html'
@@ -201,7 +275,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
-    inlines = [ReservaServicioInline, ReservaProductoInline, GiftCardInline, PagoInline]
+    inlines = [ReservaServicioInline, ReservaProductoInline, GiftCardInline, PagoInline, ComandaInline]
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
         'productos_y_cantidades', 'servicios_y_cantidades',
@@ -2866,4 +2940,97 @@ class SalaServicioAdmin(admin.ModelAdmin):
             'fields': ('permite_grupos_mixtos', 'descripcion')
         }),
     )
+
+
+# ============================================================================
+# SISTEMA DE COMANDAS - Admin Principal
+# ============================================================================
+
+@admin.register(Comanda)
+class ComandaAdmin(admin.ModelAdmin):
+    """Admin para gestión de comandas"""
+    list_display = (
+        'id', 'hora_solicitud', 'cliente_nombre', 'estado_badge',
+        'total_items', 'tiempo_espera_display', 'usuario_procesa'
+    )
+    list_filter = ('estado', 'fecha_solicitud', 'usuario_procesa')
+    search_fields = ('id', 'venta_reserva__cliente__nombre', 'notas_generales')
+    readonly_fields = ('fecha_solicitud', 'hora_solicitud', 'fecha_inicio_proceso',
+                       'fecha_entrega', 'tiempo_espera_display', 'created_at', 'updated_at')
+    inlines = [DetalleComandaInline]
+    date_hierarchy = 'fecha_solicitud'
+    list_per_page = 50
+
+    fieldsets = (
+        ('Información de la Comanda', {
+            'fields': ('venta_reserva', 'estado', 'notas_generales')
+        }),
+        ('Gestión', {
+            'fields': (
+                'usuario_solicita', 'usuario_procesa',
+                'fecha_solicitud', 'hora_solicitud',
+                'fecha_inicio_proceso', 'fecha_entrega',
+                'tiempo_espera_display'
+            )
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def cliente_nombre(self, obj):
+        """Muestra el nombre del cliente"""
+        if obj.venta_reserva and obj.venta_reserva.cliente:
+            return obj.venta_reserva.cliente.nombre
+        return '-'
+    cliente_nombre.short_description = 'Cliente'
+
+    def estado_badge(self, obj):
+        """Muestra el estado con colores"""
+        colores = {
+            'pendiente': '#ff9800',
+            'procesando': '#2196f3',
+            'entregada': '#4caf50',
+            'cancelada': '#f44336'
+        }
+        return format_html(
+            '<span style="background:{}; color:white; padding:4px 12px; border-radius:12px; '
+            'font-weight:600; font-size:11px;">{}</span>',
+            colores.get(obj.estado, '#999'),
+            obj.get_estado_display()
+        )
+    estado_badge.short_description = 'Estado'
+
+    def total_items(self, obj):
+        """Cuenta total de items en la comanda"""
+        return obj.detalles.count()
+    total_items.short_description = 'Items'
+
+    def tiempo_espera_display(self, obj):
+        """Muestra tiempo de espera con colores"""
+        minutos = obj.tiempo_espera()
+        if minutos < 10:
+            color = 'green'
+        elif minutos < 20:
+            color = 'orange'
+        else:
+            color = 'red'
+        return format_html(
+            '<span style="color:{}; font-weight:600;">{} min</span>',
+            color, minutos
+        )
+    tiempo_espera_display.short_description = 'Tiempo Espera'
+
+    def save_model(self, request, obj, form, change):
+        """Asigna usuario que solicita si es nueva comanda"""
+        if not change:  # Nueva comanda
+            obj.usuario_solicita = request.user
+        super().save_model(request, obj, form, change)
+
+    def has_delete_permission(self, request, obj=None):
+        """Solo permitir eliminar comandas pendientes o canceladas"""
+        if obj:
+            return obj.estado in ['pendiente', 'cancelada']
+        return True
 
