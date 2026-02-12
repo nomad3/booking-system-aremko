@@ -4682,6 +4682,14 @@ class Comanda(models.Model):
         verbose_name='Fecha de Entrega'
     )
 
+    fecha_entrega_objetivo = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha/Hora Entrega Objetivo',
+        help_text='Para cuándo se necesita este pedido. Si es vacío, es para ahora (inmediato).',
+        db_index=True
+    )
+
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -4724,6 +4732,37 @@ class Comanda(models.Model):
         self.estado = 'entregada'
         self.fecha_entrega = timezone.now()
         self.save()
+
+    def save(self, *args, **kwargs):
+        """
+        Guarda la comanda y auto-crea ReservaProducto para integración con facturación.
+
+        La comanda es para seguimiento operativo (cocina/bar), mientras que
+        ReservaProducto es para contabilidad y cobro. Este método mantiene ambos
+        sistemas sincronizados automáticamente.
+        """
+        # Guardar la comanda primero
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+
+        # Auto-crear ReservaProducto por cada DetalleComanda (solo si es nueva comanda)
+        if is_new:
+            from django.utils import timezone
+            for detalle in self.detalles.all():
+                # Determinar fecha de entrega para ReservaProducto
+                fecha_entrega_reserva = self.fecha_entrega_objetivo.date() if self.fecha_entrega_objetivo else timezone.now().date()
+
+                # Crear o actualizar ReservaProducto
+                ReservaProducto.objects.get_or_create(
+                    venta_reserva=self.venta_reserva,
+                    producto=detalle.producto,
+                    defaults={
+                        'cantidad': detalle.cantidad,
+                        'precio_unitario_venta': detalle.precio_unitario,
+                        'fecha_entrega': fecha_entrega_reserva,
+                        'notas': f'Comanda #{self.id}' + (f' - {detalle.especificaciones}' if detalle.especificaciones else '')
+                    }
+                )
 
 
 class DetalleComanda(models.Model):

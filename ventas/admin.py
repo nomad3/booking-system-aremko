@@ -217,6 +217,7 @@ class ComandaInline(admin.StackedInline):
                        'usuario_solicita', 'usuario_procesa', 'fecha_inicio_proceso', 'fecha_entrega')
     fields = (
         ('estado', 'tiempo_espera_display'),
+        'fecha_entrega_objetivo',
         'notas_generales',
         ('fecha_solicitud', 'hora_solicitud'),
         ('usuario_solicita', 'usuario_procesa'),
@@ -2951,9 +2952,9 @@ class ComandaAdmin(admin.ModelAdmin):
     """Admin para gestión de comandas"""
     list_display = (
         'id', 'hora_solicitud', 'cliente_nombre', 'estado_badge',
-        'total_items', 'tiempo_espera_display', 'usuario_procesa'
+        'entrega_objetivo_display', 'total_items', 'tiempo_espera_display', 'usuario_procesa'
     )
-    list_filter = ('estado', 'fecha_solicitud', 'usuario_procesa')
+    list_filter = ('estado', 'fecha_solicitud', 'fecha_entrega_objetivo', 'usuario_procesa')
     search_fields = ('id', 'venta_reserva__cliente__nombre', 'notas_generales')
     readonly_fields = ('fecha_solicitud', 'hora_solicitud', 'fecha_inicio_proceso',
                        'fecha_entrega', 'tiempo_espera_display', 'created_at', 'updated_at')
@@ -2963,7 +2964,8 @@ class ComandaAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Información de la Comanda', {
-            'fields': ('venta_reserva', 'estado', 'notas_generales')
+            'fields': ('venta_reserva', 'estado', 'fecha_entrega_objetivo', 'notas_generales'),
+            'description': 'Fecha/hora objetivo: deja vacío para entrega inmediata, o programa para más tarde.'
         }),
         ('Gestión', {
             'fields': (
@@ -3021,6 +3023,32 @@ class ComandaAdmin(admin.ModelAdmin):
             color, minutos
         )
     tiempo_espera_display.short_description = 'Tiempo Espera'
+
+    def entrega_objetivo_display(self, obj):
+        """Muestra fecha/hora objetivo de entrega"""
+        if obj.fecha_entrega_objetivo:
+            from django.utils import timezone
+            ahora = timezone.now()
+            if obj.fecha_entrega_objetivo < ahora:
+                # Retrasada
+                return format_html(
+                    '<span style="color:#f44336; font-weight:600;">🔴 {}</span>',
+                    obj.fecha_entrega_objetivo.strftime('%d/%m %H:%M')
+                )
+            elif obj.fecha_entrega_objetivo <= ahora + timezone.timedelta(hours=2):
+                # Próxima (menos de 2 horas)
+                return format_html(
+                    '<span style="color:#ff9800; font-weight:600;">🟠 {}</span>',
+                    obj.fecha_entrega_objetivo.strftime('%d/%m %H:%M')
+                )
+            else:
+                # Programada (más de 2 horas)
+                return format_html(
+                    '<span style="color:#4caf50; font-weight:600;">🟢 {}</span>',
+                    obj.fecha_entrega_objetivo.strftime('%d/%m %H:%M')
+                )
+        return format_html('<span style="color:#999;">⚡ Inmediato</span>')
+    entrega_objetivo_display.short_description = 'Entrega Objetivo'
 
     def save_model(self, request, obj, form, change):
         """Asigna usuario que solicita si es nueva comanda"""
