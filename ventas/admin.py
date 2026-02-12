@@ -242,7 +242,8 @@ class ComandaInline(admin.TabularInline):
     def total_productos(self, obj):
         """Muestra total de productos"""
         if obj and obj.pk:
-            count = obj.detalles.count()
+            # Usar len() en lugar de count() porque detalles ya está precargado
+            count = len(obj.detalles.all()) if hasattr(obj, '_prefetched_objects_cache') and 'detalles' in obj._prefetched_objects_cache else obj.detalles.count()
             return format_html(
                 '<span style="font-weight:600;">{} producto{}</span>',
                 count, 's' if count != 1 else ''
@@ -282,6 +283,14 @@ class ComandaInline(admin.TabularInline):
             )
         return '-'
     editar_comanda_link.short_description = 'Acciones'
+
+    def get_queryset(self, request):
+        """Optimizar queries del inline"""
+        qs = super().get_queryset(request)
+        return qs.select_related(
+            'usuario_solicita',
+            'usuario_procesa'
+        ).prefetch_related('detalles')
 
     def has_add_permission(self, request, obj=None):
         # Desactivar el "Add another" del inline, usaremos botón personalizado
@@ -332,7 +341,18 @@ class VentaReservaAdmin(admin.ModelAdmin):
     )
     def changelist_view(self, request, extra_context=None):
         return super().changelist_view(request, extra_context=extra_context)
-    
+
+    def get_queryset(self, request):
+        """Optimizar queries para VentaReserva con comandas"""
+        qs = super().get_queryset(request)
+        return qs.select_related('cliente').prefetch_related(
+            'comandas',
+            'comandas__detalles',
+            'comandas__detalles__producto',
+            'comandas__usuario_solicita',
+            'comandas__usuario_procesa'
+        )
+
     # Guardar cambios con registro de movimiento
     def save_model(self, request, obj, form, change):
         # Si fecha_reserva solo tiene fecha (sin hora), agregar hora actual
@@ -3037,6 +3057,16 @@ class ComandaAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+    def get_queryset(self, request):
+        """Optimizar queries con select_related y prefetch_related"""
+        qs = super().get_queryset(request)
+        return qs.select_related(
+            'venta_reserva',
+            'venta_reserva__cliente',
+            'usuario_solicita',
+            'usuario_procesa'
+        ).prefetch_related('detalles', 'detalles__producto')
 
     def cliente_nombre(self, obj):
         """Muestra el nombre del cliente"""
