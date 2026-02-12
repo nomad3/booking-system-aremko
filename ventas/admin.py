@@ -330,7 +330,6 @@ class VentaReservaAdmin(admin.ModelAdmin):
         }),
         ('Gestión de Comandas', {
             'fields': ('agregar_comanda_button',),
-            'classes': ('collapse',),
             'description': 'Las comandas existentes se muestran más abajo en la sección "COMANDAS".'
         }),
     )
