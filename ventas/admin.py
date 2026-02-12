@@ -272,10 +272,11 @@ class ComandaInline(admin.TabularInline):
         if obj and obj.pk:
             url = reverse('admin:ventas_comanda_change', args=[obj.pk])
             return format_html(
-                '<a href="{}?_popup=1" class="related-widget-wrapper-link change-related" '
-                'onclick="return showRelatedObjectPopup(this);" '
+                '<a href="javascript:void(0);" '
+                'onclick="window.open(\'{0}?_popup=1\', \'_blank\', '
+                '\'width=1000,height=800,scrollbars=yes,resizable=yes\'); return false;" '
                 'style="background:#4caf50; color:white; padding:5px 12px; border-radius:4px; '
-                'text-decoration:none; font-weight:600; font-size:11px; display:inline-block;">'
+                'text-decoration:none; font-weight:600; font-size:11px; display:inline-block; cursor:pointer;">'
                 '✏️ Editar / Ver Productos</a>',
                 url
             )
@@ -285,10 +286,6 @@ class ComandaInline(admin.TabularInline):
     def has_add_permission(self, request, obj=None):
         # Desactivar el "Add another" del inline, usaremos botón personalizado
         return False
-
-    class Media:
-        js = ('admin/js/vendor/jquery/jquery.js', 'admin/js/jquery.init.js',
-              'admin/js/admin/RelatedObjectLookups.js')
 
 
 class VentaReservaAdmin(admin.ModelAdmin):
@@ -454,12 +451,12 @@ class VentaReservaAdmin(admin.ModelAdmin):
         if obj and obj.pk:
             url = reverse('admin:ventas_comanda_add')
             return format_html(
-                '<a href="{}?venta_reserva={}&_popup=1" '
-                'class="related-widget-wrapper-link add-related" '
-                'onclick="return showRelatedObjectPopup(this);" '
+                '<a href="javascript:void(0);" '
+                'onclick="window.open(\'{0}?venta_reserva={1}&_popup=1\', \'_blank\', '
+                '\'width=1000,height=800,scrollbars=yes,resizable=yes\'); return false;" '
                 'style="background:#4caf50; color:white; padding:10px 20px; border-radius:6px; '
                 'text-decoration:none; font-weight:600; font-size:13px; display:inline-block; '
-                'margin:10px 0;">'
+                'margin:10px 0; cursor:pointer;">'
                 '➕ Agregar Comanda con Productos'
                 '</a>'
                 '<p style="color:#666; font-size:12px; margin:5px 0 0 0;">'
