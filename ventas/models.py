@@ -4598,6 +4598,26 @@ class ServicioSlotBloqueo(models.Model):
             self.fecha
         )
 
+    @staticmethod
+    def slot_bloqueado(servicio_id, fecha, hora):
+        """
+        Verifica si un slot específico está bloqueado.
+
+        Args:
+            servicio_id: ID del servicio
+            fecha: Fecha del slot (date object)
+            hora: Hora del slot (string, ej: '14:00')
+
+        Returns:
+            True si el slot está bloqueado, False si está disponible
+        """
+        return ServicioSlotBloqueo.objects.filter(
+            servicio_id=servicio_id,
+            fecha=fecha,
+            hora_slot=hora,
+            activo=True
+        ).exists()
+
 
 # ============================================================================
 # SISTEMA DE COMANDAS
