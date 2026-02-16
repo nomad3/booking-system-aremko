@@ -3125,6 +3125,8 @@ class ComandaAdmin(admin.ModelAdmin):
 
     def tiempo_espera_display(self, obj):
         """Muestra tiempo de espera con colores"""
+        if not obj or not obj.pk:
+            return '-'
         minutos = obj.tiempo_espera()
         if minutos < 10:
             color = 'green'
@@ -3140,6 +3142,8 @@ class ComandaAdmin(admin.ModelAdmin):
 
     def entrega_objetivo_display(self, obj):
         """Muestra fecha/hora objetivo de entrega"""
+        if not obj or not obj.pk:
+            return '-'
         if obj.fecha_entrega_objetivo:
             from django.utils import timezone
             ahora = timezone.now()
