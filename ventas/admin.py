@@ -238,14 +238,7 @@ class DetalleComandaInline(admin.TabularInline):
     model = DetalleComanda
     extra = 1
     fields = ['producto', 'cantidad', 'especificaciones', 'precio_unitario']
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "producto":
-            # Ordenar productos alfabéticamente y solo mostrar activos
-            kwargs["queryset"] = Producto.objects.filter(
-                cantidad_disponible__gt=0
-            ).order_by('nombre')
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    autocomplete_fields = ['producto']  # Usar autocomplete en lugar de dropdown para evitar timeout
 
 
 class ComandaInline(admin.TabularInline):
