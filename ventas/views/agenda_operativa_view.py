@@ -163,11 +163,12 @@ def agenda_operativa(request):
             continue
 
     # Buscar desayunos del día siguiente para preparar hoy
+    # NO buscar desayunos si es filtro de pagos pendientes (no es relevante)
     manana = hoy + timedelta(days=1)
 
-    # Solo buscar desayunos si la hora actual es antes de las 23:00
+    # Solo buscar desayunos si la hora actual es antes de las 23:00 Y no es filtro de pagos pendientes
     desayunos_manana = []
-    if hora_actual <= time(23, 0):
+    if hora_actual <= time(23, 0) and filtro_vista != 'pendientes_pago':
         desayunos_manana = ReservaServicio.objects.filter(
             fecha_agendamiento=manana,
             servicio__nombre__icontains='desayuno',
@@ -183,6 +184,7 @@ def agenda_operativa(request):
     if filtro_vista == 'pendientes_pago':
         # Para pagos pendientes, organizar primero por fecha, luego por hora
         agenda_por_fecha = defaultdict(lambda: defaultdict(list))
+        agenda_por_hora = defaultdict(list)  # Definir también por si se necesita para desayunos
     else:
         agenda_por_hora = defaultdict(list)
 
