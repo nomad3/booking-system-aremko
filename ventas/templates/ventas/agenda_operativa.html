@@ -486,6 +486,37 @@
         border: 2px solid #ef5350;
     }
 
+    .fecha-section-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px 30px;
+        margin: 30px 0 20px 0;
+        border-radius: 12px;
+        font-size: 24px;
+        font-weight: 700;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        text-align: center;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .fecha-section-header.ayer {
+        background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+    }
+
+    .fecha-section-header.hoy {
+        background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+    }
+
+    .hora-block.de-ayer {
+        border-left: 5px solid #FF9800;
+        background: #fff8f0;
+    }
+
+    .hora-block.de-hoy {
+        border-left: 5px solid #2196F3;
+    }
+
     @media print {
         .header-buttons, .btn-volver, .filter-group {
             display: none;
@@ -670,7 +701,16 @@
 
     {% if tiene_tareas %}
         {% for bloque_hora in agenda %}
-        <div class="hora-block">
+
+        {# Si es un header de sección de fecha, mostrar banner grande #}
+        {% if bloque_hora.tipo_seccion == 'header_fecha' %}
+        <div class="fecha-section-header {% if bloque_hora.es_ayer %}ayer{% elif bloque_hora.es_hoy %}hoy{% endif %}">
+            {{ bloque_hora.fecha_texto }}
+        </div>
+
+        {% else %}
+        {# Bloque normal de hora #}
+        <div class="hora-block {% if bloque_hora.es_de_ayer %}de-ayer{% elif bloque_hora.es_de_hoy %}de-hoy{% endif %}">
             <div class="hora-header {% if bloque_hora.es_urgente %}urgente{% else %}normal{% endif %}">
                 <span>{{ bloque_hora.hora }} hrs</span>
                 {% if bloque_hora.es_urgente %}
@@ -835,6 +875,9 @@
             </div>
             {% endfor %}
         </div>
+        {% endif %}
+        {# Fin del bloque if tipo_seccion #}
+
         {% endfor %}
     {% else %}
         <div class="sin-tareas">

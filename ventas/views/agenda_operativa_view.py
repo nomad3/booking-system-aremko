@@ -179,8 +179,12 @@ def agenda_operativa(request):
             'venta_reserva__cliente'
         ).order_by('hora_inicio')
 
-    # Organizar por hora
-    agenda_por_hora = defaultdict(list)
+    # Organizar por hora (y opcionalmente por fecha si es filtro de pagos pendientes)
+    if filtro_vista == 'pendientes_pago':
+        # Para pagos pendientes, organizar primero por fecha, luego por hora
+        agenda_por_fecha = defaultdict(lambda: defaultdict(list))
+    else:
+        agenda_por_hora = defaultdict(list)
 
     for servicio in servicios_pendientes:
         hora_key = servicio.hora_inicio
@@ -302,7 +306,7 @@ def agenda_operativa(request):
             fecha_servicio = servicio.fecha_agendamiento
             es_de_ayer = (fecha_servicio < hoy)
 
-            agenda_por_hora[hora_key].append({
+            item_data = {
                 'servicio': servicio,
                 'tipo': 'servicio',
                 'nombre': servicio.servicio.nombre,
@@ -322,7 +326,16 @@ def agenda_operativa(request):
                 'pagado': pagado,
                 'saldo_pendiente': saldo_pendiente,
                 'estado_reserva': servicio.venta_reserva.estado_reserva  # Agregar estado de la reserva
-            })
+            }
+
+            # Agregar a la estructura correspondiente según el filtro
+            if filtro_vista == 'pendientes_pago':
+                # Agrupar por fecha y luego por hora
+                fecha_key = fecha_servicio.strftime('%Y-%m-%d')
+                agenda_por_fecha[fecha_key][hora_key].append(item_data)
+            else:
+                # Agrupar solo por hora
+                agenda_por_hora[hora_key].append(item_data)
 
     # Agregar desayunos del día siguiente si los hay
     if desayunos_manana:
@@ -372,15 +385,63 @@ def agenda_operativa(request):
     agenda_ordenada = []
     hora_limite_urgente = (ahora + timedelta(minutes=30)).time()
 
-    for hora in sorted(agenda_por_hora.keys()):
-        hora_obj = datetime.strptime(hora, '%H:%M').time()
-        es_urgente = hora_obj <= hora_limite_urgente
+    if filtro_vista == 'pendientes_pago':
+        # Para pagos pendientes, organizar por fecha y hora con secciones claras
+        ayer = hoy - timedelta(days=1)
 
-        agenda_ordenada.append({
-            'hora': hora,
-            'es_urgente': es_urgente,
-            'items': agenda_por_hora[hora]
-        })
+        # Procesar primero servicios de AYER (si existen)
+        ayer_key = ayer.strftime('%Y-%m-%d')
+        if ayer_key in agenda_por_fecha:
+            # Agregar header de sección para AYER
+            agenda_ordenada.append({
+                'tipo_seccion': 'header_fecha',
+                'fecha': ayer,
+                'fecha_texto': f"📅 AYER - {ayer.strftime('%A %d de %B, %Y')}",
+                'es_ayer': True
+            })
+
+            # Agregar horas de ayer ordenadas
+            for hora in sorted(agenda_por_fecha[ayer_key].keys()):
+                hora_obj = datetime.strptime(hora, '%H:%M').time()
+                agenda_ordenada.append({
+                    'hora': hora,
+                    'es_urgente': False,  # Servicios de ayer no son urgentes
+                    'es_de_ayer': True,
+                    'items': agenda_por_fecha[ayer_key][hora]
+                })
+
+        # Procesar servicios de HOY (si existen)
+        hoy_key = hoy.strftime('%Y-%m-%d')
+        if hoy_key in agenda_por_fecha:
+            # Agregar header de sección para HOY
+            agenda_ordenada.append({
+                'tipo_seccion': 'header_fecha',
+                'fecha': hoy,
+                'fecha_texto': f"📅 HOY - {hoy.strftime('%A %d de %B, %Y')}",
+                'es_hoy': True
+            })
+
+            # Agregar horas de hoy ordenadas
+            for hora in sorted(agenda_por_fecha[hoy_key].keys()):
+                hora_obj = datetime.strptime(hora, '%H:%M').time()
+                es_urgente = hora_obj <= hora_limite_urgente
+                agenda_ordenada.append({
+                    'hora': hora,
+                    'es_urgente': es_urgente,
+                    'es_de_hoy': True,
+                    'items': agenda_por_fecha[hoy_key][hora]
+                })
+    else:
+        # Lógica normal: organizar solo por hora
+        for hora in sorted(agenda_por_hora.keys()):
+            hora_obj = datetime.strptime(hora, '%H:%M').time()
+            es_urgente = hora_obj <= hora_limite_urgente
+
+            agenda_ordenada.append({
+                'hora': hora,
+                'es_urgente': es_urgente,
+                'items': agenda_por_hora[hora]
+            })
 
     # Calcular estadísticas
     total_servicios = sum(len(h['items']) for h in agenda_ordenada) if agenda_ordenada else 0
