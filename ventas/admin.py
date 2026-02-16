@@ -3061,6 +3061,7 @@ class ComandaAdmin(admin.ModelAdmin):
     search_fields = ('id', 'venta_reserva__cliente__nombre', 'notas_generales')
     readonly_fields = ('fecha_solicitud', 'hora_solicitud', 'fecha_inicio_proceso',
                        'fecha_entrega', 'tiempo_espera_display', 'created_at', 'updated_at')
+    autocomplete_fields = ['venta_reserva']  # Usar autocomplete para evitar timeout al cargar todas las reservas
     inlines = []  # Temporalmente desactivado - timeout al cargar productos. Agregar productos después de crear comanda.
     date_hierarchy = 'fecha_solicitud'
     list_per_page = 50
