@@ -92,6 +92,20 @@ class ReservaServicioInline(admin.TabularInline):
             kwargs["queryset"] = Servicio.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        """Ajustar el tamaño de los campos del formulario para evitar scroll horizontal"""
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+
+        # Ajustar anchos de campos específicos
+        if db_field.name == 'hora_inicio':
+            formfield.widget.attrs['style'] = 'width: 100px;'
+        elif db_field.name == 'fecha_agendamiento':
+            formfield.widget.attrs['style'] = 'width: 150px;'
+        elif db_field.name == 'cantidad_personas':
+            formfield.widget.attrs['style'] = 'width: 80px;'
+
+        return formfield
+
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
     extra = 1
@@ -103,6 +117,18 @@ class ReservaProductoInline(admin.TabularInline):
             kwargs["queryset"] = Producto.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        """Ajustar el tamaño de los campos del formulario"""
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+
+        # Ajustar anchos de campos específicos
+        if db_field.name == 'cantidad':
+            formfield.widget.attrs['style'] = 'width: 80px;'
+        elif db_field.name == 'fecha_entrega':
+            formfield.widget.attrs['style'] = 'width: 150px;'
+
+        return formfield
+
 class PagoInline(admin.TabularInline):
     model = Pago
     form = PagoInlineForm
@@ -110,6 +136,20 @@ class PagoInline(admin.TabularInline):
     extra = 1
     fields = ['fecha_pago', 'monto', 'metodo_pago', 'giftcard']
     autocomplete_fields = ['giftcard']
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        """Ajustar el tamaño de los campos del formulario"""
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+
+        # Ajustar anchos de campos específicos
+        if db_field.name == 'fecha_pago':
+            formfield.widget.attrs['style'] = 'width: 150px;'
+        elif db_field.name == 'monto':
+            formfield.widget.attrs['style'] = 'width: 120px;'
+        elif db_field.name == 'metodo_pago':
+            formfield.widget.attrs['style'] = 'width: 150px;'
+
+        return formfield
 
     def save_model(self, request, obj, form, change):
         if not change:  # If this is a new instance

@@ -10,4 +10,102 @@
 .column-fecha_reserva_corta {
     width: 100px !important;  /* Ajusta este valor según necesites */
     white-space: nowrap;
-} 
+}
+
+/* ====================================================================
+   OPTIMIZACIÓN DE FORMULARIOS DE EDICIÓN DE RESERVA
+   Evita scroll horizontal haciendo los campos más compactos
+   ==================================================================== */
+
+/* Hacer tablas inline más compactas */
+.change-form .inline-group {
+    overflow-x: auto;
+    margin-bottom: 20px;
+}
+
+/* Reducir padding de celdas en tablas inline */
+.inline-group table tbody td,
+.inline-group table tbody th {
+    padding: 8px 5px;
+    font-size: 13px;
+}
+
+/* Columnas de valores unitarios y totales - solo números */
+.field-mostrar_valor_unitario,
+.field-mostrar_valor_total {
+    width: 100px !important;
+    text-align: right;
+}
+
+/* Campos de cantidad - muy pequeños */
+.field-cantidad_personas input,
+.field-cantidad input {
+    width: 80px !important;
+    text-align: center;
+}
+
+/* Campos de hora - formato HH:MM */
+.field-hora_inicio input {
+    width: 100px !important;
+}
+
+/* Campos de fecha - formato DD/MM/YYYY */
+.field-fecha_agendamiento input,
+.field-fecha_entrega input,
+.field-fecha_pago input {
+    width: 150px !important;
+}
+
+/* Campo de monto - montos de pago */
+.field-monto input {
+    width: 120px !important;
+    text-align: right;
+}
+
+/* Campos de select pequeños - método de pago, etc */
+.field-metodo_pago select {
+    width: 150px !important;
+}
+
+/* Hacer readonly fields más compactos */
+.inline-group .readonly {
+    font-size: 13px;
+    padding: 5px;
+    white-space: nowrap;
+}
+
+/* Ajustar el ancho del formulario principal para que no sea demasiado ancho */
+#content-main {
+    max-width: 100%;
+}
+
+/* Hacer que los selects de servicio y producto no sean tan anchos */
+.field-servicio .select2-container,
+.field-producto .select2-container {
+    max-width: 300px !important;
+}
+
+/* Campos de autocomplete - proveedor, giftcard */
+.field-proveedor_asignado .select2-container,
+.field-giftcard .select2-container {
+    max-width: 250px !important;
+}
+
+/* Responsive: en pantallas pequeñas, permitir scroll horizontal pero con indicador */
+@media (max-width: 1400px) {
+    .inline-group {
+        overflow-x: auto;
+        box-shadow: inset -10px 0 10px -10px rgba(0,0,0,0.1);
+    }
+}
+
+/* Mejorar la visualización de acciones en inline */
+.inline-group .inline-deletelink {
+    white-space: nowrap;
+}
+
+/* Hacer que los botones de eliminar sean más compactos */
+.inline-deletelink {
+    font-size: 12px;
+    padding: 3px 8px;
+}
