@@ -238,7 +238,16 @@ class DetalleComandaInline(admin.TabularInline):
     model = DetalleComanda
     extra = 0  # No mostrar filas vacías al inicio - evita timeout. Usuario debe hacer clic en "Agregar otro"
     fields = ['producto', 'cantidad', 'especificaciones', 'precio_unitario']
+    readonly_fields = ['precio_unitario']  # Se auto-llena desde producto.precio_base en save()
     autocomplete_fields = ['producto']  # Usar autocomplete en lugar de dropdown para evitar timeout
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        """Limitar tamaño del campo especificaciones"""
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name == 'especificaciones':
+            formfield.widget.attrs['style'] = 'width: 300px;'
+            formfield.widget.attrs['maxlength'] = 100
+        return formfield
 
 
 class ComandaInline(admin.TabularInline):
@@ -3168,20 +3177,28 @@ class ComandaAdmin(admin.ModelAdmin):
         return format_html('<span style="color:#999;">⚡ Inmediato</span>')
     entrega_objetivo_display.short_description = 'Entrega Objetivo'
 
-    # TEMPORALMENTE COMENTADO - No funciona con autocomplete_fields
-    # def get_form(self, request, obj=None, **kwargs):
-    #     """Pre-poblar venta_reserva si viene desde el popup"""
-    #     form = super().get_form(request, obj, **kwargs)
-    #     if 'venta_reserva' in request.GET and not obj:
-    #         # Pre-seleccionar la venta_reserva
-    #         venta_reserva_id = request.GET.get('venta_reserva')
-    #         if venta_reserva_id:
-    #             form.base_fields['venta_reserva'].initial = venta_reserva_id
-    #     return form
+    def get_form(self, request, obj=None, **kwargs):
+        """Pre-poblar usuarios por defecto"""
+        form = super().get_form(request, obj, **kwargs)
+        if not obj:  # Solo para nuevas comandas
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            # Buscar usuarios por defecto
+            try:
+                deborah = User.objects.get(username='deborah')
+                form.base_fields['usuario_solicita'].initial = deborah.id
+            except User.DoesNotExist:
+                pass
+            try:
+                ernesto = User.objects.get(username='ernesto')
+                form.base_fields['usuario_procesa'].initial = ernesto.id
+            except User.DoesNotExist:
+                pass
+        return form
 
     def save_model(self, request, obj, form, change):
-        """Asigna usuario que solicita si es nueva comanda"""
-        if not change:  # Nueva comanda
+        """Asigna usuario que solicita si es nueva comanda y no está seteado"""
+        if not change and not obj.usuario_solicita:  # Nueva comanda sin usuario
             obj.usuario_solicita = request.user
         super().save_model(request, obj, form, change)
 
