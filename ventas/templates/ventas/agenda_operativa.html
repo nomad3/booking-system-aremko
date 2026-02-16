@@ -459,6 +459,33 @@
         margin-left: 10px;
     }
 
+    .badge-ayer {
+        background: #FF9800;
+        color: white;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-left: 10px;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
+    .saldo-destacado {
+        background: #ffebee;
+        color: #c62828;
+        padding: 5px 12px;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 15px;
+        border: 2px solid #ef5350;
+    }
+
     @media print {
         .header-buttons, .btn-volver, .filter-group {
             display: none;
@@ -509,8 +536,10 @@
             </div>
             <div class="info-item">
                 <span class="info-label">🔍 Vista:</span>
-                <span style="padding: 2px 8px; border-radius: 4px; font-weight: 600; {% if filtro_vista == 'todos' %}background: #2196F3; color: white;{% elif filtro_vista == 'pasados' %}background: #FF9800; color: white;{% else %}background: #4CAF50; color: white;{% endif %}">
-                    {% if filtro_vista == 'todos' %}
+                <span style="padding: 2px 8px; border-radius: 4px; font-weight: 600; {% if filtro_vista == 'pendientes_pago' %}background: #f44336; color: white;{% elif filtro_vista == 'todos' %}background: #2196F3; color: white;{% elif filtro_vista == 'pasados' %}background: #FF9800; color: white;{% else %}background: #4CAF50; color: white;{% endif %}">
+                    {% if filtro_vista == 'pendientes_pago' %}
+                        💳 Solo Pagos Pendientes/Parciales
+                    {% elif filtro_vista == 'todos' %}
                         📅 Todos del Día
                     {% elif filtro_vista == 'pasados' %}
                         ⏪ Anteriores a {{ hora_actual }}
@@ -577,6 +606,11 @@
                 <a href="?filtro=pasados{% if debug_mode %}&debug=true{% endif %}"
                    class="btn-filter {% if filtro_vista == 'pasados' %}active{% endif %}">
                     ⏪ Anteriores
+                </a>
+                <a href="?filtro=pendientes_pago{% if debug_mode %}&debug=true{% endif %}"
+                   class="btn-filter {% if filtro_vista == 'pendientes_pago' %}active{% endif %}"
+                   style="{% if filtro_vista == 'pendientes_pago' %}background: #f44336;{% else %}background: #ffebee; color: #c62828;{% endif %}">
+                    💳 Pagos Pendientes
                 </a>
             </div>
 
@@ -660,6 +694,10 @@
                     {% endif %}
 
                     <span class="servicio-nombre">{{ item.nombre }}</span>
+
+                    {% if item.es_de_ayer %}
+                        <span class="badge-ayer">📅 AYER {{ item.fecha_servicio }}</span>
+                    {% endif %}
 
                     {% if item.en_curso %}
                         <span class="en-curso-badge">EN CURSO</span>
@@ -772,6 +810,14 @@
                             </span>
                         {% endif %}
                     </div>
+                    {% if filtro_vista == 'pendientes_pago' and item.saldo_pendiente > 0 %}
+                    <div class="detalle-item">
+                        <span>💰</span>
+                        <span class="saldo-destacado">
+                            SALDO: ${{ item.saldo_pendiente|floatformat:0|intcomma }}
+                        </span>
+                    </div>
+                    {% endif %}
                 </div>
 
                 {% if item.productos %}

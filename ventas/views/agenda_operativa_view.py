@@ -41,9 +41,9 @@ def agenda_operativa(request):
     if debug_mode:
         hora_actual = time(0, 0)  # Mostrar desde las 00:00 en modo debug
 
-    # Filtro de vista: actual (desde hora actual), todos (todo el día), pasados (anteriores a hora actual)
+    # Filtro de vista: actual (desde hora actual), todos (todo el día), pasados (anteriores a hora actual), pendientes_pago
     filtro_vista = request.GET.get('filtro', 'actual')
-    if filtro_vista not in ['actual', 'todos', 'pasados']:
+    if filtro_vista not in ['actual', 'todos', 'pasados', 'pendientes_pago']:
         filtro_vista = 'actual'  # Default seguro
 
     # Aplicar filtro
@@ -56,12 +56,24 @@ def agenda_operativa(request):
     elif filtro_vista == 'pasados':
         hora_filtro_inicio = time(0, 0)
         hora_filtro_fin = hora_actual  # Hasta la hora actual
+    elif filtro_vista == 'pendientes_pago':
+        hora_filtro_inicio = time(0, 0)  # Todo el día
+        hora_filtro_fin = time(23, 59)
 
-    # Obtener todos los servicios del día desde la hora actual
+    # Determinar rango de fechas según filtro
+    if filtro_vista == 'pendientes_pago':
+        # Incluir día actual y día anterior (para cabañas con alojamiento)
+        ayer = hoy - timedelta(days=1)
+        fecha_filtro = Q(fecha_agendamiento=hoy) | Q(fecha_agendamiento=ayer)
+    else:
+        # Solo día actual
+        fecha_filtro = Q(fecha_agendamiento=hoy)
+
+    # Obtener servicios según filtro de fecha
     # Primero filtrar servicios que tienen venta_reserva asociada
     # Excluir servicios de descuento que no son servicios reales
     servicios = ReservaServicio.objects.filter(
-        fecha_agendamiento=hoy,
+        fecha_filtro,
         venta_reserva__isnull=False  # Asegurar que hay venta_reserva
     ).exclude(
         venta_reserva__estado_reserva='cancelada'
@@ -70,7 +82,7 @@ def agenda_operativa(request):
     ).select_related(
         'servicio',
         'venta_reserva__cliente'
-    ).order_by('hora_inicio')
+    ).order_by('fecha_agendamiento', 'hora_inicio')
 
     # Filtrar servicios según el filtro seleccionado
     servicios_pendientes = []
@@ -80,46 +92,71 @@ def agenda_operativa(request):
             if not servicio.hora_inicio:
                 continue
 
+            # Para filtro de pendientes_pago, verificar estado de pago primero
+            if filtro_vista == 'pendientes_pago':
+                estado_pago = servicio.venta_reserva.estado_pago if servicio.venta_reserva else None
+                if estado_pago not in ['pendiente', 'parcial']:
+                    continue  # Saltar servicios pagados o sin estado
+
+            # Determinar fecha del servicio para cálculos de hora
+            fecha_servicio = servicio.fecha_agendamiento
             servicio_hora = datetime.strptime(servicio.hora_inicio, '%H:%M').time()
 
             # Calcular hora de fin basado en la duración del servicio
             if servicio.servicio and hasattr(servicio.servicio, 'duracion') and servicio.servicio.duracion:
-                hora_inicio_dt = datetime.combine(hoy, servicio_hora)
+                hora_inicio_dt = datetime.combine(fecha_servicio, servicio_hora)
                 hora_fin_dt = hora_inicio_dt + timedelta(minutes=int(servicio.servicio.duracion))
                 hora_fin = hora_fin_dt.time()
 
-                # Marcar si está en curso o ya pasó
-                en_curso = (servicio_hora < hora_actual and hora_fin > hora_actual)
-                es_pasado = (hora_fin <= hora_actual)
+                # Marcar si está en curso o ya pasó (solo relevante para día actual)
+                if fecha_servicio == hoy:
+                    en_curso = (servicio_hora < hora_actual and hora_fin > hora_actual)
+                    es_pasado = (hora_fin <= hora_actual)
+                else:
+                    # Servicios de ayer siempre son pasados
+                    en_curso = False
+                    es_pasado = True
+
                 servicio.en_curso = en_curso
                 servicio.es_pasado = es_pasado
                 servicio.hora_fin = hora_fin.strftime('%H:%M')
 
                 # Aplicar filtro según vista seleccionada
-                if filtro_vista == 'todos':
+                if filtro_vista == 'pendientes_pago':
+                    # Ya filtrado por estado_pago arriba, incluir todos
+                    servicios_pendientes.append(servicio)
+                elif filtro_vista == 'todos':
                     # Mostrar todos los servicios del día
                     servicios_pendientes.append(servicio)
                 elif filtro_vista == 'pasados':
                     # Mostrar solo servicios que ya terminaron
-                    if hora_fin <= hora_actual:
+                    if fecha_servicio == hoy and hora_fin <= hora_actual:
+                        servicios_pendientes.append(servicio)
+                    elif fecha_servicio < hoy:
                         servicios_pendientes.append(servicio)
                 else:  # filtro_vista == 'actual'
                     # Mostrar servicios futuros o en curso (comportamiento original)
-                    if servicio_hora >= hora_actual or en_curso:
+                    if fecha_servicio == hoy and (servicio_hora >= hora_actual or en_curso):
                         servicios_pendientes.append(servicio)
             else:
                 # Si no hay duración, usar lógica simplificada
-                servicio.en_curso = False
-                servicio.es_pasado = (servicio_hora < hora_actual)
+                if fecha_servicio == hoy:
+                    servicio.en_curso = False
+                    servicio.es_pasado = (servicio_hora < hora_actual)
+                else:
+                    servicio.en_curso = False
+                    servicio.es_pasado = True
                 servicio.hora_fin = None
 
-                if filtro_vista == 'todos':
+                if filtro_vista == 'pendientes_pago':
+                    servicios_pendientes.append(servicio)
+                elif filtro_vista == 'todos':
                     servicios_pendientes.append(servicio)
                 elif filtro_vista == 'pasados':
-                    if servicio_hora < hora_actual:
+                    if fecha_servicio < hoy or (fecha_servicio == hoy and servicio_hora < hora_actual):
                         servicios_pendientes.append(servicio)
                 else:  # filtro_vista == 'actual'
-                    if servicio_hora >= hora_actual:
+                    if fecha_servicio == hoy and servicio_hora >= hora_actual:
                         servicios_pendientes.append(servicio)
         except Exception as e:
             # Log del error pero continuar con otros servicios
@@ -261,6 +298,10 @@ def agenda_operativa(request):
             pagado = venta.pagado
             saldo_pendiente = venta.saldo_pendiente
 
+            # Verificar si el servicio es de ayer
+            fecha_servicio = servicio.fecha_agendamiento
+            es_de_ayer = (fecha_servicio < hoy)
+
             agenda_por_hora[hora_key].append({
                 'servicio': servicio,
                 'tipo': 'servicio',
@@ -272,6 +313,8 @@ def agenda_operativa(request):
                 'es_proximo': False,  # Se marcará después
                 'en_curso': getattr(servicio, 'en_curso', False),  # Si está en ejecución
                 'es_pasado': getattr(servicio, 'es_pasado', False),  # Si ya terminó
+                'es_de_ayer': es_de_ayer,  # Si es del día anterior
+                'fecha_servicio': fecha_servicio.strftime('%d/%m/%Y'),  # Fecha formateada
                 'hora_fin': getattr(servicio, 'hora_fin', None),  # Hora de finalización
                 'duracion': servicio.servicio.duracion if servicio.servicio else None,  # Duración en minutos
                 'estado_pago': estado_pago,
