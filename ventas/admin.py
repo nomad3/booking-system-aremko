@@ -236,7 +236,7 @@ def registrar_movimiento(cliente, tipo_movimiento, descripcion, usuario):
 class DetalleComandaInline(admin.TabularInline):
     """Inline para agregar productos a una comanda"""
     model = DetalleComanda
-    extra = 1
+    extra = 0  # No mostrar filas vacías al inicio - evita timeout. Usuario debe hacer clic en "Agregar otro"
     fields = ['producto', 'cantidad', 'especificaciones', 'precio_unitario']
     autocomplete_fields = ['producto']  # Usar autocomplete en lugar de dropdown para evitar timeout
 
@@ -3062,7 +3062,7 @@ class ComandaAdmin(admin.ModelAdmin):
     readonly_fields = ('fecha_solicitud', 'hora_solicitud', 'fecha_inicio_proceso',
                        'fecha_entrega', 'tiempo_espera_display', 'created_at', 'updated_at')
     autocomplete_fields = ['venta_reserva']  # Usar autocomplete para evitar timeout al cargar todas las reservas
-    inlines = []  # Temporalmente desactivado - timeout al cargar productos. Agregar productos después de crear comanda.
+    inlines = [DetalleComandaInline]
     date_hierarchy = 'fecha_solicitud'
     list_per_page = 50
 
