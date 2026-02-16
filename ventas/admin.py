@@ -3219,6 +3219,3 @@ class ComandaAdmin(admin.ModelAdmin):
         if obj:
             return obj.estado in ['pendiente', 'cancelada']
         return True
-
-# Registrar ComandaAdmin después de su definición
-admin.site.register(Comanda, ComandaAdmin)
