@@ -804,7 +804,6 @@ class PagoAdmin(admin.ModelAdmin):
 admin.site.register(CategoriaProducto, CategoriaProductoAdmin)
 admin.site.register(Producto, ProductoAdmin)
 admin.site.register(VentaReserva, VentaReservaAdmin)
-admin.site.register(Comanda, ComandaAdmin)
 # Cliente ya está registrado con @admin.register(Cliente) decorador arriba
 admin.site.register(Servicio, ServicioAdmin)
 @admin.register(CategoriaServicio)
@@ -3221,3 +3220,5 @@ class ComandaAdmin(admin.ModelAdmin):
             return obj.estado in ['pendiente', 'cancelada']
         return True
 
+# Registrar ComandaAdmin después de su definición
+admin.site.register(Comanda, ComandaAdmin)
