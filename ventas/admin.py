@@ -3185,21 +3185,32 @@ class ComandaAdmin(admin.ModelAdmin):
             User = get_user_model()
             # Buscar usuarios por defecto
             try:
-                deborah = User.objects.get(username='deborah')
+                deborah = User.objects.get(username='Deborah')
                 form.base_fields['usuario_solicita'].initial = deborah.id
             except User.DoesNotExist:
                 pass
             try:
-                ernesto = User.objects.get(username='ernesto')
+                ernesto = User.objects.get(username='Ernesto')
                 form.base_fields['usuario_procesa'].initial = ernesto.id
             except User.DoesNotExist:
                 pass
         return form
 
     def save_model(self, request, obj, form, change):
-        """Asigna usuario que solicita si es nueva comanda y no está seteado"""
-        if not change and not obj.usuario_solicita:  # Nueva comanda sin usuario
-            obj.usuario_solicita = request.user
+        """Asigna valores por defecto si es nueva comanda"""
+        if not change:  # Nueva comanda
+            # Asignar usuario_solicita si está vacío
+            if not obj.usuario_solicita:
+                obj.usuario_solicita = request.user
+            # Asignar venta_reserva desde GET si viene del popup y está vacío
+            if not obj.venta_reserva and 'venta_reserva' in request.GET:
+                venta_reserva_id = request.GET.get('venta_reserva')
+                if venta_reserva_id:
+                    from .models import VentaReserva
+                    try:
+                        obj.venta_reserva = VentaReserva.objects.get(pk=venta_reserva_id)
+                    except VentaReserva.DoesNotExist:
+                        pass
         super().save_model(request, obj, form, change)
 
     def response_add(self, request, obj, post_url_continue=None):
