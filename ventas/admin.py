@@ -3164,15 +3164,16 @@ class ComandaAdmin(admin.ModelAdmin):
         return format_html('<span style="color:#999;">⚡ Inmediato</span>')
     entrega_objetivo_display.short_description = 'Entrega Objetivo'
 
-    def get_form(self, request, obj=None, **kwargs):
-        """Pre-poblar venta_reserva si viene desde el popup"""
-        form = super().get_form(request, obj, **kwargs)
-        if 'venta_reserva' in request.GET and not obj:
-            # Pre-seleccionar la venta_reserva
-            venta_reserva_id = request.GET.get('venta_reserva')
-            if venta_reserva_id:
-                form.base_fields['venta_reserva'].initial = venta_reserva_id
-        return form
+    # TEMPORALMENTE COMENTADO - No funciona con autocomplete_fields
+    # def get_form(self, request, obj=None, **kwargs):
+    #     """Pre-poblar venta_reserva si viene desde el popup"""
+    #     form = super().get_form(request, obj, **kwargs)
+    #     if 'venta_reserva' in request.GET and not obj:
+    #         # Pre-seleccionar la venta_reserva
+    #         venta_reserva_id = request.GET.get('venta_reserva')
+    #         if venta_reserva_id:
+    #             form.base_fields['venta_reserva'].initial = venta_reserva_id
+    #     return form
 
     def save_model(self, request, obj, form, change):
         """Asigna usuario que solicita si es nueva comanda"""
