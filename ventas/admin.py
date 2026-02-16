@@ -246,7 +246,7 @@ class DetalleComandaInline(admin.TabularInline):
         formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
         if db_field.name == 'especificaciones':
             formfield.widget.attrs['style'] = 'width: 300px;'
-            formfield.widget.attrs['maxlength'] = 100
+            formfield.widget.attrs['maxlength'] = 30
         return formfield
 
 
@@ -3077,7 +3077,7 @@ class ComandaAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Información de la Comanda', {
-            'fields': ('venta_reserva', 'estado', 'fecha_entrega_objetivo', 'notas_generales'),
+            'fields': ('venta_reserva', 'estado', 'fecha_entrega_objetivo'),
             'description': 'Fecha/hora objetivo: deja vacío para entrega inmediata, o programa para más tarde.'
         }),
         ('Gestión', {
@@ -3211,7 +3211,53 @@ class ComandaAdmin(admin.ModelAdmin):
                         obj.venta_reserva = VentaReserva.objects.get(pk=venta_reserva_id)
                     except VentaReserva.DoesNotExist:
                         pass
+        # Marcar que esta comanda fue creada/modificada desde admin
+        # para que save_formset sepa si debe crear ReservaProducto
+        obj._from_admin = True
+        obj._is_new_from_admin = not change
         super().save_model(request, obj, form, change)
+
+    def save_formset(self, request, form, formset, change):
+        """Guardar el formset y crear ReservaProducto para nuevas comandas"""
+        instances = formset.save(commit=False)
+
+        # Guardar las instancias del formset (DetalleComanda)
+        for instance in instances:
+            instance.save()
+
+        # Eliminar instancias marcadas para borrar
+        for obj in formset.deleted_objects:
+            obj.delete()
+
+        formset.save_m2m()
+
+        # Si es una nueva comanda creada desde admin, crear ReservaProducto
+        comanda = form.instance
+        if hasattr(comanda, '_is_new_from_admin') and comanda._is_new_from_admin and comanda.venta_reserva:
+            from django.utils import timezone
+            from .models import ReservaProducto
+
+            for detalle in comanda.detalles.all():
+                # Determinar fecha de entrega para ReservaProducto
+                fecha_entrega_reserva = (
+                    comanda.fecha_entrega_objetivo.date()
+                    if comanda.fecha_entrega_objetivo
+                    else timezone.now().date()
+                )
+
+                # Crear o actualizar ReservaProducto
+                ReservaProducto.objects.get_or_create(
+                    venta_reserva=comanda.venta_reserva,
+                    producto=detalle.producto,
+                    defaults={
+                        'cantidad': detalle.cantidad,
+                        'precio_unitario_venta': detalle.precio_unitario,
+                        'fecha_entrega': fecha_entrega_reserva,
+                        'notas': f'Comanda #{comanda.id}' + (
+                            f' - {detalle.especificaciones}' if detalle.especificaciones else ''
+                        )
+                    }
+                )
 
     def response_add(self, request, obj, post_url_continue=None):
         """Cerrar popup después de guardar si viene desde popup"""

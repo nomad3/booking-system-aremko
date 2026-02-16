@@ -4760,13 +4760,18 @@ class Comanda(models.Model):
         La comanda es para seguimiento operativo (cocina/bar), mientras que
         ReservaProducto es para contabilidad y cobro. Este método mantiene ambos
         sistemas sincronizados automáticamente.
+
+        NOTA: Cuando se crea desde el admin, la creación de ReservaProducto se hace
+        en save_formset() después de guardar los detalles. Este método solo se usa
+        para creación programática (API, scripts, etc.)
         """
         # Guardar la comanda primero
         is_new = self.pk is None
         super().save(*args, **kwargs)
 
         # Auto-crear ReservaProducto por cada DetalleComanda (solo si es nueva comanda)
-        if is_new:
+        # y NO viene del admin (el admin usa save_formset para esto)
+        if is_new and not getattr(self, '_from_admin', False):
             from django.utils import timezone
             for detalle in self.detalles.all():
                 # Determinar fecha de entrega para ReservaProducto
