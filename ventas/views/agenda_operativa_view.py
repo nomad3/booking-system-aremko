@@ -391,14 +391,24 @@ def agenda_operativa(request):
         # Para pagos pendientes, organizar por fecha y hora con secciones claras
         ayer = hoy - timedelta(days=1)
 
+        # Mapas para nombres en español (sin depender de locale)
+        dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+        meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
         # Procesar primero servicios de AYER (si existen)
         ayer_key = ayer.strftime('%Y-%m-%d')
         if ayer_key in agenda_por_fecha:
+            # Formatear fecha en español
+            dia_semana_ayer = dias_semana[ayer.weekday()]
+            mes_ayer = meses[ayer.month - 1]
+            fecha_texto_ayer = f"📅 AYER - {dia_semana_ayer} {ayer.day} de {mes_ayer}, {ayer.year}"
+
             # Agregar header de sección para AYER
             agenda_ordenada.append({
                 'tipo_seccion': 'header_fecha',
                 'fecha': ayer,
-                'fecha_texto': f"📅 AYER - {ayer.strftime('%A %d de %B, %Y')}",
+                'fecha_texto': fecha_texto_ayer,
                 'es_ayer': True
             })
 
@@ -415,11 +425,16 @@ def agenda_operativa(request):
         # Procesar servicios de HOY (si existen)
         hoy_key = hoy.strftime('%Y-%m-%d')
         if hoy_key in agenda_por_fecha:
+            # Formatear fecha en español
+            dia_semana_hoy = dias_semana[hoy.weekday()]
+            mes_hoy = meses[hoy.month - 1]
+            fecha_texto_hoy = f"📅 HOY - {dia_semana_hoy} {hoy.day} de {mes_hoy}, {hoy.year}"
+
             # Agregar header de sección para HOY
             agenda_ordenada.append({
                 'tipo_seccion': 'header_fecha',
                 'fecha': hoy,
-                'fecha_texto': f"📅 HOY - {hoy.strftime('%A %d de %B, %Y')}",
+                'fecha_texto': fecha_texto_hoy,
                 'es_hoy': True
             })
 
@@ -445,45 +460,47 @@ def agenda_operativa(request):
                 'items': agenda_por_hora[hora]
             })
 
-    # Calcular estadísticas
-    total_servicios = sum(len(h['items']) for h in agenda_ordenada) if agenda_ordenada else 0
+    # Calcular estadísticas (filtrar headers de sección que no tienen items)
+    bloques_con_items = [h for h in agenda_ordenada if 'items' in h]
+
+    total_servicios = sum(len(h['items']) for h in bloques_con_items) if bloques_con_items else 0
     # Sumar las CANTIDADES de productos, no solo contar los ítems
     total_productos = sum(
         producto.cantidad
-        for h in agenda_ordenada
+        for h in bloques_con_items
         for item in h.get('items', [])
         for producto in item.get('productos', [])
-    ) if agenda_ordenada else 0
+    ) if bloques_con_items else 0
     # Contar servicios en curso
     servicios_en_curso = sum(
-        1 for h in agenda_ordenada
+        1 for h in bloques_con_items
         for item in h.get('items', [])
         if item.get('en_curso', False)
-    ) if agenda_ordenada else 0
+    ) if bloques_con_items else 0
 
     # Contar servicios por estado de pago
     servicios_pagados = sum(
-        1 for h in agenda_ordenada
+        1 for h in bloques_con_items
         for item in h.get('items', [])
         if item.get('estado_pago') == 'pagado'
-    ) if agenda_ordenada else 0
+    ) if bloques_con_items else 0
 
     servicios_parcial = sum(
-        1 for h in agenda_ordenada
+        1 for h in bloques_con_items
         for item in h.get('items', [])
         if item.get('estado_pago') == 'parcial'
-    ) if agenda_ordenada else 0
+    ) if bloques_con_items else 0
 
     servicios_pendientes_pago = sum(
-        1 for h in agenda_ordenada
+        1 for h in bloques_con_items
         for item in h.get('items', [])
         if item.get('estado_pago') == 'pendiente'
-    ) if agenda_ordenada else 0
+    ) if bloques_con_items else 0
 
-    # Identificar próximos servicios (próxima hora)
-    if agenda_ordenada:
-        primera_hora = agenda_ordenada[0]['hora']
-        for item in agenda_ordenada[0]['items']:
+    # Identificar próximos servicios (próxima hora) - solo en bloques con items
+    if bloques_con_items:
+        # Marcar items de la primera hora como próximos
+        for item in bloques_con_items[0]['items']:
             item['es_proximo'] = True
 
     # En modo debug, agregar información adicional
