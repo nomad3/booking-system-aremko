@@ -41,6 +41,22 @@ def agenda_operativa(request):
     if debug_mode:
         hora_actual = time(0, 0)  # Mostrar desde las 00:00 en modo debug
 
+    # Filtro de vista: actual (desde hora actual), todos (todo el día), pasados (anteriores a hora actual)
+    filtro_vista = request.GET.get('filtro', 'actual')
+    if filtro_vista not in ['actual', 'todos', 'pasados']:
+        filtro_vista = 'actual'  # Default seguro
+
+    # Aplicar filtro
+    hora_filtro_inicio = hora_actual
+    hora_filtro_fin = time(23, 59)
+
+    if filtro_vista == 'todos':
+        hora_filtro_inicio = time(0, 0)  # Desde las 00:00
+        hora_filtro_fin = time(23, 59)
+    elif filtro_vista == 'pasados':
+        hora_filtro_inicio = time(0, 0)
+        hora_filtro_fin = hora_actual  # Hasta la hora actual
+
     # Obtener todos los servicios del día desde la hora actual
     # Primero filtrar servicios que tienen venta_reserva asociada
     # Excluir servicios de descuento que no son servicios reales
@@ -56,7 +72,7 @@ def agenda_operativa(request):
         'venta_reserva__cliente'
     ).order_by('hora_inicio')
 
-    # Filtrar servicios desde la hora actual en adelante Y servicios en curso
+    # Filtrar servicios según el filtro seleccionado
     servicios_pendientes = []
     for servicio in servicios:
         try:
@@ -72,20 +88,39 @@ def agenda_operativa(request):
                 hora_fin_dt = hora_inicio_dt + timedelta(minutes=int(servicio.servicio.duracion))
                 hora_fin = hora_fin_dt.time()
 
-                # Incluir si:
-                # 1. El servicio aún no ha comenzado (futuro)
-                # 2. El servicio está en curso (ya comenzó pero no ha terminado)
-                if servicio_hora >= hora_actual or (servicio_hora < hora_actual and hora_fin > hora_actual):
-                    # Marcar si está en curso
-                    servicio.en_curso = (servicio_hora < hora_actual and hora_fin > hora_actual)
-                    servicio.hora_fin = hora_fin.strftime('%H:%M')
+                # Marcar si está en curso o ya pasó
+                en_curso = (servicio_hora < hora_actual and hora_fin > hora_actual)
+                es_pasado = (hora_fin <= hora_actual)
+                servicio.en_curso = en_curso
+                servicio.es_pasado = es_pasado
+                servicio.hora_fin = hora_fin.strftime('%H:%M')
+
+                # Aplicar filtro según vista seleccionada
+                if filtro_vista == 'todos':
+                    # Mostrar todos los servicios del día
                     servicios_pendientes.append(servicio)
+                elif filtro_vista == 'pasados':
+                    # Mostrar solo servicios que ya terminaron
+                    if hora_fin <= hora_actual:
+                        servicios_pendientes.append(servicio)
+                else:  # filtro_vista == 'actual'
+                    # Mostrar servicios futuros o en curso (comportamiento original)
+                    if servicio_hora >= hora_actual or en_curso:
+                        servicios_pendientes.append(servicio)
             else:
-                # Si no hay duración, usar lógica anterior (solo futuros)
-                if servicio_hora >= hora_actual:
-                    servicio.en_curso = False
-                    servicio.hora_fin = None
+                # Si no hay duración, usar lógica simplificada
+                servicio.en_curso = False
+                servicio.es_pasado = (servicio_hora < hora_actual)
+                servicio.hora_fin = None
+
+                if filtro_vista == 'todos':
                     servicios_pendientes.append(servicio)
+                elif filtro_vista == 'pasados':
+                    if servicio_hora < hora_actual:
+                        servicios_pendientes.append(servicio)
+                else:  # filtro_vista == 'actual'
+                    if servicio_hora >= hora_actual:
+                        servicios_pendientes.append(servicio)
         except Exception as e:
             # Log del error pero continuar con otros servicios
             continue
@@ -236,6 +271,7 @@ def agenda_operativa(request):
                 'productos': productos_a_entregar,
                 'es_proximo': False,  # Se marcará después
                 'en_curso': getattr(servicio, 'en_curso', False),  # Si está en ejecución
+                'es_pasado': getattr(servicio, 'es_pasado', False),  # Si ya terminó
                 'hora_fin': getattr(servicio, 'hora_fin', None),  # Hora de finalización
                 'duracion': servicio.servicio.duracion if servicio.servicio else None,  # Duración en minutos
                 'estado_pago': estado_pago,
@@ -426,7 +462,8 @@ def agenda_operativa(request):
         'servicios_pendientes_pago': servicios_pendientes_pago,
         'tiene_tareas': len(agenda_ordenada) > 0,
         'debug_mode': debug_mode,
-        'debug_info': debug_info
+        'debug_info': debug_info,
+        'filtro_vista': filtro_vista  # Pasar filtro activo al template
     }
 
     return render(request, 'ventas/agenda_operativa.html', context)

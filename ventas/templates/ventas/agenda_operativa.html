@@ -282,6 +282,46 @@
         display: flex;
         gap: 10px;
         margin-top: 15px;
+        flex-wrap: wrap;
+    }
+
+    .filter-group {
+        display: flex;
+        gap: 5px;
+        border: 2px solid #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+        background: #f5f5f5;
+    }
+
+    .btn-filter {
+        background: #f5f5f5;
+        color: #666;
+        padding: 10px 20px;
+        border: none;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+        border-right: 1px solid #e0e0e0;
+    }
+
+    .btn-filter:last-child {
+        border-right: none;
+    }
+
+    .btn-filter:hover {
+        background: #e0e0e0;
+    }
+
+    .btn-filter.active {
+        background: #2196F3;
+        color: white;
+        font-weight: 600;
     }
 
     /* Estilos para servicios en curso */
@@ -403,8 +443,24 @@
         color: white;
     }
 
+    .servicio-item.pasado {
+        opacity: 0.7;
+        background: #fafafa;
+    }
+
+    .badge-pasado {
+        background: #757575;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-left: 10px;
+    }
+
     @media print {
-        .header-buttons, .btn-volver {
+        .header-buttons, .btn-volver, .filter-group {
             display: none;
         }
 
@@ -452,8 +508,16 @@
                 <span>{{ hora_generacion }}</span>
             </div>
             <div class="info-item">
-                <span class="info-label">⏰ Desde:</span>
-                <span>{{ hora_actual }}</span>
+                <span class="info-label">🔍 Vista:</span>
+                <span style="padding: 2px 8px; border-radius: 4px; font-weight: 600; {% if filtro_vista == 'todos' %}background: #2196F3; color: white;{% elif filtro_vista == 'pasados' %}background: #FF9800; color: white;{% else %}background: #4CAF50; color: white;{% endif %}">
+                    {% if filtro_vista == 'todos' %}
+                        📅 Todos del Día
+                    {% elif filtro_vista == 'pasados' %}
+                        ⏪ Anteriores a {{ hora_actual }}
+                    {% else %}
+                        ⏩ Desde {{ hora_actual }}
+                    {% endif %}
+                </span>
             </div>
             <div class="info-item">
                 <span class="info-label">📊 Total servicios:</span>
@@ -500,6 +564,23 @@
         </div>
 
         <div class="header-buttons">
+            <!-- Filtros de Vista -->
+            <div class="filter-group">
+                <a href="?filtro=actual{% if debug_mode %}&debug=true{% endif %}"
+                   class="btn-filter {% if filtro_vista == 'actual' %}active{% endif %}">
+                    ⏩ Desde Hora Actual
+                </a>
+                <a href="?filtro=todos{% if debug_mode %}&debug=true{% endif %}"
+                   class="btn-filter {% if filtro_vista == 'todos' %}active{% endif %}">
+                    📅 Todos del Día
+                </a>
+                <a href="?filtro=pasados{% if debug_mode %}&debug=true{% endif %}"
+                   class="btn-filter {% if filtro_vista == 'pasados' %}active{% endif %}">
+                    ⏪ Anteriores
+                </a>
+            </div>
+
+            <!-- Botones de Acción -->
             <button class="btn-actualizar" onclick="location.reload()">
                 🔄 Actualizar
             </button>
@@ -507,11 +588,11 @@
                 🖨️ Imprimir
             </button>
             {% if not debug_mode %}
-            <a href="?debug=true" class="btn-actualizar" style="background: #9C27B0;">
+            <a href="?filtro={{ filtro_vista }}&debug=true" class="btn-actualizar" style="background: #9C27B0;">
                 🐛 Modo Debug
             </a>
             {% else %}
-            <a href="{% url 'ventas:agenda_operativa' %}" class="btn-actualizar" style="background: #666;">
+            <a href="?filtro={{ filtro_vista }}" class="btn-actualizar" style="background: #666;">
                 ❌ Salir Debug
             </a>
             {% endif %}
@@ -564,7 +645,7 @@
             </div>
 
             {% for item in bloque_hora.items %}
-            <div class="servicio-item {% if item.en_curso %}en-curso{% endif %} {% if item.tipo == 'preparacion_desayuno' %}preparacion-desayuno{% else %}pago-{{ item.estado_pago }}{% endif %}">
+            <div class="servicio-item {% if item.es_pasado %}pasado{% endif %} {% if item.en_curso %}en-curso{% endif %} {% if item.tipo == 'preparacion_desayuno' %}preparacion-desayuno{% else %}pago-{{ item.estado_pago }}{% endif %}">
                 <div class="servicio-header">
                     {% if item.tipo == 'preparacion_desayuno' %}
                         <span class="servicio-tipo" style="background: #FFA726;">🍳 Preparación</span>
@@ -582,6 +663,8 @@
 
                     {% if item.en_curso %}
                         <span class="en-curso-badge">EN CURSO</span>
+                    {% elif item.es_pasado %}
+                        <span class="badge-pasado">✓ COMPLETADO</span>
                     {% endif %}
 
                     {% if item.hora_fin %}
