@@ -3235,42 +3235,42 @@ class ComandaAdmin(admin.ModelAdmin):
         try:
             instances = formset.save(commit=False)
 
-        # Guardar las instancias del formset (DetalleComanda)
-        for instance in instances:
-            instance.save()
+            # Guardar las instancias del formset (DetalleComanda)
+            for instance in instances:
+                instance.save()
 
-        # Eliminar instancias marcadas para borrar
-        for obj in formset.deleted_objects:
-            obj.delete()
+            # Eliminar instancias marcadas para borrar
+            for obj in formset.deleted_objects:
+                obj.delete()
 
-        formset.save_m2m()
+            formset.save_m2m()
 
-        # Si es una nueva comanda creada desde admin, crear ReservaProducto
-        comanda = form.instance
-        if hasattr(comanda, '_is_new_from_admin') and comanda._is_new_from_admin and comanda.venta_reserva:
-            from django.utils import timezone
-            from .models import ReservaProducto
+            # Si es una nueva comanda creada desde admin, crear ReservaProducto
+            comanda = form.instance
+            if hasattr(comanda, '_is_new_from_admin') and comanda._is_new_from_admin and comanda.venta_reserva:
+                from django.utils import timezone
+                from .models import ReservaProducto
 
-            for detalle in comanda.detalles.all():
-                # Determinar fecha de entrega para ReservaProducto
-                if comanda.fecha_entrega_objetivo:
-                    fecha_entrega_reserva = comanda.fecha_entrega_objetivo.date()
-                else:
-                    fecha_entrega_reserva = timezone.now().date()
+                for detalle in comanda.detalles.all():
+                    # Determinar fecha de entrega para ReservaProducto
+                    if comanda.fecha_entrega_objetivo:
+                        fecha_entrega_reserva = comanda.fecha_entrega_objetivo.date()
+                    else:
+                        fecha_entrega_reserva = timezone.now().date()
 
-                # Crear o actualizar ReservaProducto
-                ReservaProducto.objects.get_or_create(
-                    venta_reserva=comanda.venta_reserva,
-                    producto=detalle.producto,
-                    defaults={
-                        'cantidad': detalle.cantidad,
-                        'precio_unitario_venta': detalle.precio_unitario,
-                        'fecha_entrega': fecha_entrega_reserva,
-                        'notas': f'Comanda #{comanda.id}' + (
-                            f' - {detalle.especificaciones}' if detalle.especificaciones else ''
-                        )
-                    }
-                )
+                    # Crear o actualizar ReservaProducto
+                    ReservaProducto.objects.get_or_create(
+                        venta_reserva=comanda.venta_reserva,
+                        producto=detalle.producto,
+                        defaults={
+                            'cantidad': detalle.cantidad,
+                            'precio_unitario_venta': detalle.precio_unitario,
+                            'fecha_entrega': fecha_entrega_reserva,
+                            'notas': f'Comanda #{comanda.id}' + (
+                                f' - {detalle.especificaciones}' if detalle.especificaciones else ''
+                            )
+                        }
+                    )
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
