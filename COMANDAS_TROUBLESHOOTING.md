@@ -577,4 +577,60 @@ readonly_fields = (...) # sin created_at ni updated_at
 
 ---
 
+### 12. FieldError: Campo 'notas' Inexistente en ReservaProducto (RESUELTO ✅)
+
+**Síntoma:**
+- Error 500 al guardar comandas desde el admin
+- Logs mostraban: `django.core.exceptions.FieldError: Invalid field name(s) for model ReservaProducto: 'notas'.`
+
+**Causa Raíz:**
+- El modelo `ReservaProducto` NO tiene un campo llamado 'notas'
+- Tanto en `save_formset` de ComandaAdmin como en `save()` de Comanda, se intentaba crear ReservaProducto con este campo inexistente
+
+**Diagnóstico:**
+- El error aparecía como Error 400/403 en los tests pero era Error 500 en producción
+- El problema real solo se reveló en los logs de Render
+
+**Solución:**
+- Eliminar el campo 'notas' del diccionario `defaults` al crear ReservaProducto
+- El modelo ReservaProducto solo tiene: venta_reserva, producto, cantidad, fecha_entrega, precio_unitario_venta
+
+**Código Corregido:**
+```python
+# ANTES (con error)
+ReservaProducto.objects.get_or_create(
+    venta_reserva=comanda.venta_reserva,
+    producto=detalle.producto,
+    defaults={
+        'cantidad': detalle.cantidad,
+        'precio_unitario_venta': detalle.precio_unitario,
+        'fecha_entrega': fecha_entrega_reserva,
+        'notas': f'Comanda #{comanda.id}' + (...)  # ❌ Campo inexistente
+    }
+)
+
+# DESPUÉS (correcto)
+ReservaProducto.objects.get_or_create(
+    venta_reserva=comanda.venta_reserva,
+    producto=detalle.producto,
+    defaults={
+        'cantidad': detalle.cantidad,
+        'precio_unitario_venta': detalle.precio_unitario,
+        'fecha_entrega': fecha_entrega_reserva
+        # Sin campo 'notas' ✅
+    }
+)
+```
+
+**Resultado:**
+- ✅ Error 500 resuelto definitivamente
+- ✅ Comandas se crean correctamente desde el popup
+- ✅ ReservaProducto se crea automáticamente al guardar comandas
+
+**Archivos Modificados:**
+- `ventas/admin.py` - Líneas 3269-3272 (eliminar campo 'notas')
+- `ventas/models.py` - Líneas 4772 (eliminar campo 'notas' en Comanda.save())
+
+---
+
 **Fin del Documento**

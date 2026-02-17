@@ -4768,8 +4768,7 @@ class Comanda(models.Model):
                     defaults={
                         'cantidad': detalle.cantidad,
                         'precio_unitario_venta': detalle.precio_unitario,
-                        'fecha_entrega': fecha_entrega_reserva,
-                        'notas': f'Comanda #{self.id}' + (f' - {detalle.especificaciones}' if detalle.especificaciones else '')
+                        'fecha_entrega': fecha_entrega_reserva
                     }
                 )
 
