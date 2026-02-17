@@ -13,7 +13,7 @@ print("1. VentaReserva disponibles:")
 vrs = VentaReserva.objects.all()[:5]
 if vrs:
     for vr in vrs:
-        print(f"   - ID={vr.id}, Cliente={vr.cliente}, Estado={vr.estado}")
+        print(f"   - ID={vr.id}, Cliente={vr.cliente}, Estado Reserva={vr.estado_reserva}, Estado Pago={vr.estado_pago}")
 else:
     print("   ❌ No hay VentaReserva")
 

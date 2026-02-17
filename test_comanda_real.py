@@ -10,7 +10,7 @@ print("=== TEST CREAR COMANDA ===\n")
 
 try:
     # Buscar una VentaReserva existente
-    vr = VentaReserva.objects.filter(estado='confirmado').first()
+    vr = VentaReserva.objects.filter(estado_reserva='confirmado').first()
     if not vr:
         vr = VentaReserva.objects.first()
 
