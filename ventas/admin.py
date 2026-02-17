@@ -3083,9 +3083,6 @@ class ComandaAdmin(admin.ModelAdmin):
         ('Gestión', {
             'fields': (
                 'usuario_solicita', 'usuario_procesa',
-                'fecha_solicitud', 'hora_solicitud',
-                'fecha_inicio_proceso', 'fecha_entrega',
-                'tiempo_espera_display'
             )
         }),
         ('Metadata', {
@@ -3195,6 +3192,40 @@ class ComandaAdmin(admin.ModelAdmin):
             except User.DoesNotExist:
                 pass
         return form
+
+    def get_fieldsets(self, request, obj=None):
+        """Personalizar fieldsets según si es creación o edición"""
+        if obj:  # Editando una comanda existente
+            return (
+                ('Información de la Comanda', {
+                    'fields': ('venta_reserva', 'estado', 'fecha_entrega_objetivo'),
+                    'description': 'Fecha/hora objetivo: deja vacío para entrega inmediata, o programa para más tarde.'
+                }),
+                ('Gestión', {
+                    'fields': (
+                        'usuario_solicita', 'usuario_procesa',
+                        'fecha_solicitud', 'hora_solicitud',
+                        'fecha_inicio_proceso', 'fecha_entrega',
+                        'tiempo_espera_display'
+                    )
+                }),
+                ('Timestamps', {
+                    'fields': ('created_at', 'updated_at'),
+                    'classes': ('collapse',),
+                }),
+            )
+        else:  # Creando nueva comanda
+            return (
+                ('Información de la Comanda', {
+                    'fields': ('venta_reserva', 'estado', 'fecha_entrega_objetivo'),
+                    'description': 'Fecha/hora objetivo: deja vacío para entrega inmediata, o programa para más tarde.'
+                }),
+                ('Gestión', {
+                    'fields': (
+                        'usuario_solicita', 'usuario_procesa',
+                    )
+                }),
+            )
 
     def save_model(self, request, obj, form, change):
         """Asigna valores por defecto si es nueva comanda"""
