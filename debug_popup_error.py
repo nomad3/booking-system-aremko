@@ -29,15 +29,11 @@ try:
     # Simular request POST desde popup
     post_data = {
         'venta_reserva': '4971',
-        'mesa_numero': '1',
-        'descripcion': 'Test desde popup',
+        'notas_generales': 'Test desde popup',
         'estado': 'pendiente',
         'usuario_solicita': '1',  # Admin user
         'usuario_procesa': '1',   # Admin user
-        # Campos de fecha y hora
-        'fecha_solicitud_0': '2024-02-16',
-        'fecha_solicitud_1': '10:00:00',
-        'hora_solicitud': '10:00:00',
+        # No incluir campos auto_now/auto_now_add
         # Popup flag
         '_popup': '1',
         '_save': 'Guardar',

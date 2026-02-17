@@ -3195,10 +3195,6 @@ class ComandaAdmin(admin.ModelAdmin):
                         'tiempo_espera_display'
                     )
                 }),
-                ('Timestamps', {
-                    'fields': ('created_at', 'updated_at'),
-                    'classes': ('collapse',),
-                }),
             )
         else:  # Creando nueva comanda
             return (

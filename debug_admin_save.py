@@ -45,15 +45,11 @@ try:
     # Datos mínimos para crear una comanda
     form_data = {
         'venta_reserva': '4971',
-        'mesa_numero': '1',
-        'descripcion': 'Comanda de prueba',
+        'notas_generales': 'Comanda de prueba',
         'estado': 'pendiente',
         'usuario_solicita': str(request.user.id),
         'usuario_procesa': str(request.user.id),
-        # No incluir campos auto_now/auto_now_add
-        'fecha_solicitud_0': datetime.now().strftime('%Y-%m-%d'),  # Fecha
-        'fecha_solicitud_1': datetime.now().strftime('%H:%M:%S'),  # Hora
-        'hora_solicitud': datetime.now().strftime('%H:%M:%S'),
+        # No incluir campos auto_now/auto_now_add (se generan automáticamente)
         # Formset vacío para los detalles
         'detalles-TOTAL_FORMS': '0',
         'detalles-INITIAL_FORMS': '0',

@@ -14,8 +14,7 @@ try:
     # Crear comanda mínima
     c = Comanda.objects.create(
         venta_reserva=vr,
-        mesa_numero=1,
-        descripcion='Test directo',
+        notas_generales='Test directo',
         estado='pendiente',
         usuario_solicita=user,
         usuario_procesa=user

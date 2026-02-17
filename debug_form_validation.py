@@ -90,8 +90,7 @@ try:
     print("\n6. Probando validación con datos mínimos...")
     test_data = {
         'venta_reserva': '4971',
-        'mesa_numero': '1',
-        'descripcion': 'Test',
+        'notas_generales': 'Test',
         'estado': 'pendiente',
         'usuario_solicita': str(request.user.id),
         'usuario_procesa': str(request.user.id),
