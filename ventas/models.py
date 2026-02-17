@@ -4499,24 +4499,6 @@ class ServicioBloqueo(models.Model):
             activo=True
         ).exists()
 
-
-# ============================================================================
-# MODELO: ServicioSlotBloqueo - Bloqueo de slots específicos
-# ============================================================================
-
-class ServicioSlotBloqueo(models.Model):
-    """
-    Bloquea UN slot específico (horario) de un servicio en una fecha determinada.
-
-    A diferencia de ServicioBloqueo (que bloquea días completos), este modelo
-    bloquea un único horario, similar a crear una reserva pero sin cliente.
-
-    Casos de uso:
-    - Mantenimiento rápido (1-2 horas)
-    - Limpieza profunda entre clientes
-    - Setup o preparación especial
-    - Time block para operaciones internas
-
     Características:
     - Solo 1 fecha (no rangos)
     - Solo 1 slot/horario
@@ -4846,27 +4828,33 @@ class DetalleComanda(models.Model):
             self.precio_unitario = self.producto.precio_base
         super().save(*args, **kwargs)
 
-        if slots_disponibles_config and self.hora_slot not in slots_disponibles_config:
-            raise ValidationError({
-                'hora_slot': f'El horario {self.hora_slot} no existe para este servicio. Horarios válidos: {", ".join(slots_disponibles_config)}'
-            })
 
-        # Validar que no haya reservas en este slot
-        reservas_existentes = ReservaServicio.objects.filter(
-            servicio=self.servicio,
-            fecha_agendamiento=self.fecha,
-            hora_inicio=self.hora_slot
-        ).exclude(
-            venta_reserva__estado_reserva='cancelada'
-        )
+# ============================================================================
+# MODELO: ServicioSlotBloqueo - Bloqueo de slots específicos
+# ============================================================================
 
-        if reservas_existentes.exists():
-            reserva = reservas_existentes.first()
-            cliente = reserva.venta_reserva.cliente.nombre if reserva.venta_reserva.cliente else 'Sin cliente'
-            raise ValidationError({
-                'hora_slot': f'Este slot ya tiene una reserva de {cliente}. No se puede bloquear.'
-            })
+class ServicioSlotBloqueo(models.Model):
+    """
+    Bloquea UN slot específico (horario) de un servicio en una fecha determinada.
+    """
+    servicio = models.ForeignKey('Servicio', on_delete=models.CASCADE, related_name='slots_bloqueados')
+    fecha = models.DateField()
+    hora_slot = models.CharField(max_length=5)
+    motivo = models.CharField(max_length=200)
+    activo = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        verbose_name = 'Slot Bloqueado'
+        verbose_name_plural = 'Slots Bloqueados'
+        unique_together = ['servicio', 'fecha', 'hora_slot']
+        ordering = ['fecha', 'hora_slot']
+
+    def __str__(self):
+        return f"{self.servicio.nombre} - {self.fecha} {self.hora_slot} - {self.motivo}"
+
+    def save(self, *args, **kwargs):
         # Si estamos editando, permitir guardar el mismo slot (no es duplicado)
         if self.pk:
             # Es una edición, verificar cambios
