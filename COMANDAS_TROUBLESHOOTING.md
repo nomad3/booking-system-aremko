@@ -633,4 +633,62 @@ ReservaProducto.objects.get_or_create(
 
 ---
 
+### 13. Error "column ventas_serviciobloqueo.fecha does not exist" (RESUELTO ✅)
+
+**Síntoma:**
+- Después de resolver problemas de comandas, el calendario dejó de funcionar
+- Error: `column ventas_serviciobloqueo.fecha does not exist`
+- Ocurría al intentar abrir el calendario desde el admin
+
+**Causa Raíz:**
+- La tabla ventas_serviciobloqueo tenía columnas 'fecha_inicio' y 'fecha_fin'
+- El código del calendario buscaba una columna llamada 'fecha'
+
+**Solución:**
+- Agregar columna 'fecha' copiando datos de 'fecha_inicio':
+
+```sql
+ALTER TABLE ventas_serviciobloqueo ADD COLUMN fecha DATE;
+UPDATE ventas_serviciobloqueo SET fecha = fecha_inicio;
+```
+
+**Resultado:**
+- ✅ Error de columna 'fecha' resuelto
+- ❌ Apareció nuevo error con columna 'hora_slot'
+
+---
+
+### 14. Error "column ventas_serviciobloqueo.hora_slot does not exist" (EN PROGRESO ⏳)
+
+**Síntoma:**
+- Después de agregar columna 'fecha', nuevo error apareció
+- Error: `column ventas_serviciobloqueo.hora_slot does not exist`
+- El calendario sigue sin funcionar
+
+**Causa Raíz:**
+- El modelo ServicioBloqueo parece tener campos mezclados de dos modelos diferentes:
+  - ServicioBloqueo (debería tener: fecha_inicio, fecha_fin)
+  - ServicioSlotBloqueo (debería tener: fecha, hora_slot)
+- El código del calendario está usando ServicioBloqueo como si fuera ServicioSlotBloqueo
+
+**Diagnóstico:**
+- calendario_matriz_view.py está buscando 'hora_slot' en ServicioBloqueo.objects
+- El campo 'hora_slot' solo debería existir en ServicioSlotBloqueo
+
+**Solución Temporal Propuesta:**
+- Script fix_calendar_model_issue.py creado para agregar columna hora_slot
+- Esto permitirá que el calendario funcione temporalmente
+
+**Solución Definitiva Pendiente:**
+- El código necesita ser actualizado para usar los modelos correctos
+- ServicioBloqueo para bloqueos de fechas completas
+- ServicioSlotBloqueo para bloqueos de slots específicos
+
+**Script Disponible:**
+```bash
+python fix_calendar_model_issue.py
+```
+
+---
+
 **Fin del Documento**
