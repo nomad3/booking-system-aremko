@@ -233,6 +233,39 @@ fieldsets = (
 
 ### 8. Error 500 al Guardar la Comanda (RESUELTO ✅)
 
+### 9. NameError: 'slots_disponibles_config' is not defined (RESUELTO ✅)
+
+**Síntoma:**
+- Error 500 persistía después de todas las correcciones anteriores
+- En los logs: `NameError: name 'slots_disponibles_config' is not defined`
+- Error ocurría en `DetalleComanda.save()` línea 4849
+
+**Causa Raíz:**
+- Código de `ServicioSlotBloqueo` estaba mezclado dentro del método `save()` de `DetalleComanda`
+- Este código validaba slots de servicios pero no pertenecía a DetalleComanda
+
+**Solución:**
+```python
+# En ventas/models.py - DetalleComanda.save()
+def save(self, *args, **kwargs):
+    # Capturar precio actual del producto si no está definido
+    if not self.precio_unitario:
+        self.precio_unitario = self.producto.precio_base
+    super().save(*args, **kwargs)
+    # ← Método termina aquí, sin código adicional
+```
+
+**Resultado:**
+- ✅ Error NameError resuelto
+- ✅ Comandas ahora se pueden guardar correctamente
+
+**Archivos Modificados:**
+- `ventas/models.py` - Líneas 4843-4847
+
+---
+
+### 8. Error 500 al Guardar la Comanda (Problema Original)
+
 **Síntoma:**
 - Formulario se cargaba correctamente
 - Usuarios pre-seleccionados correctamente
@@ -347,6 +380,7 @@ def save(self, *args, **kwargs):
 5. Campo especificaciones limitado a 30 caracteres
 6. Campo Notas Generales oculto
 7. Lógica de save_formset implementada para evitar Error 500
+8. **Error NameError en DetalleComanda.save() CORREGIDO**
 
 ### ⏳ Pendiente de Verificar:
 1. **Probar el guardado en producción** - Confirmar que Error 500 está resuelto
