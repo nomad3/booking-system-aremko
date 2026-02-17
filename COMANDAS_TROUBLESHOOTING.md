@@ -380,7 +380,9 @@ def save(self, *args, **kwargs):
 5. Campo especificaciones limitado a 30 caracteres
 6. Campo Notas Generales oculto
 7. Lógica de save_formset implementada para evitar Error 500
-8. **Error NameError en DetalleComanda.save() CORREGIDO**
+8. Error NameError en DetalleComanda.save() CORREGIDO
+9. Error de sintaxis en models.py CORREGIDO
+10. **Error 500 por campos display en fieldsets CORREGIDO**
 
 ### ⏳ Pendiente de Verificar:
 1. **Probar el guardado en producción** - Confirmar que Error 500 está resuelto
@@ -492,6 +494,53 @@ Posibles errores que podrían aparecer:
 2. `precio_unitario` es NULL → verificar DetalleComanda.save()
 3. `usuario_solicita` es NULL → verificar get_form() initial values
 4. Problema con ReservaProducto.get_or_create() → verificar que venta_reserva existe
+
+---
+
+### 10. Error 500 al Crear Comanda - Campos Display en Fieldsets (RESUELTO ✅)
+
+**Síntoma:**
+- Error 500 persistía después de todas las correcciones anteriores
+- Ocurría al hacer clic en "GUARDAR" en el formulario de nueva comanda
+
+**Causa Raíz:**
+- Los métodos `tiempo_espera_display` estaban incluidos en los `fieldsets`
+- Estos métodos solo funcionan cuando el objeto ya existe (tienen pk)
+- Al crear una nueva comanda, Django intentaba renderizar estos campos con obj=None
+
+**Código Problemático:**
+```python
+fieldsets = (
+    ('Gestión', {
+        'fields': (
+            'usuario_solicita', 'usuario_procesa',
+            'fecha_solicitud', 'hora_solicitud',
+            'fecha_inicio_proceso', 'fecha_entrega',
+            'tiempo_espera_display'  # ← Este campo causaba el error
+        )
+    }),
+)
+```
+
+**Solución:**
+1. Remover campos display del fieldset base
+2. Agregar método `get_fieldsets()` para mostrar campos solo al editar:
+
+```python
+def get_fieldsets(self, request, obj=None):
+    """Personalizar fieldsets según si es creación o edición"""
+    if obj:  # Editando una comanda existente
+        # Incluir todos los campos incluyendo tiempo_espera_display
+    else:  # Creando nueva comanda
+        # Solo campos básicos, sin campos display
+```
+
+**Resultado:**
+- ✅ Formulario de creación funciona sin Error 500
+- ✅ Formulario de edición muestra todos los campos
+
+**Archivos Modificados:**
+- `ventas/admin.py` - Método get_fieldsets agregado
 
 ---
 
