@@ -3069,27 +3069,13 @@ class ComandaAdmin(admin.ModelAdmin):
     list_filter = ('estado', 'fecha_solicitud', 'fecha_entrega_objetivo', 'usuario_procesa')
     search_fields = ('id', 'venta_reserva__cliente__nombre', 'notas_generales')
     readonly_fields = ('fecha_solicitud', 'hora_solicitud', 'fecha_inicio_proceso',
-                       'fecha_entrega', 'tiempo_espera_display', 'created_at', 'updated_at')
+                       'fecha_entrega', 'tiempo_espera_display')
     autocomplete_fields = ['venta_reserva']  # Usar autocomplete para evitar timeout al cargar todas las reservas
     inlines = [DetalleComandaInline]
     date_hierarchy = 'fecha_solicitud'
     list_per_page = 50
 
-    fieldsets = (
-        ('Información de la Comanda', {
-            'fields': ('venta_reserva', 'estado', 'fecha_entrega_objetivo'),
-            'description': 'Fecha/hora objetivo: deja vacío para entrega inmediata, o programa para más tarde.'
-        }),
-        ('Gestión', {
-            'fields': (
-                'usuario_solicita', 'usuario_procesa',
-            )
-        }),
-        ('Metadata', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
+    # fieldsets se define dinámicamente en get_fieldsets()
 
     def get_queryset(self, request):
         """Optimizar queries con select_related y prefetch_related"""
