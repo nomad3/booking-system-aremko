@@ -544,4 +544,37 @@ def get_fieldsets(self, request, obj=None):
 
 ---
 
+### 11. Error 500 - Campos Auto en Fieldsets y Readonly (RESUELTO ✅)
+
+**Síntoma:**
+- Error 500 persistía incluso después de las correcciones anteriores
+
+**Causa Raíz:**
+1. El atributo `fieldsets` estático todavía existía y Django lo usaba en lugar de `get_fieldsets()`
+2. Los campos `created_at` y `updated_at` estaban en `readonly_fields`
+3. Estos campos son `auto_now_add=True` y `auto_now=True`, no existen al crear objetos nuevos
+
+**Solución:**
+1. Comentar el `fieldsets` estático para forzar uso de `get_fieldsets()`
+2. Remover `created_at` y `updated_at` de `readonly_fields`
+
+```python
+# ANTES (problemático)
+fieldsets = ( ... )  # Django usaba esto en lugar de get_fieldsets
+readonly_fields = (..., 'created_at', 'updated_at')
+
+# DESPUÉS (correcto)
+# fieldsets se define dinámicamente en get_fieldsets()
+readonly_fields = (...) # sin created_at ni updated_at
+```
+
+**Resultado:**
+- ✅ Error 500 completamente resuelto
+- ✅ Comandas se pueden crear desde el admin
+
+**Archivos Modificados:**
+- `ventas/admin.py` - Líneas 3078-3092 y 3071-3072
+
+---
+
 **Fin del Documento**
