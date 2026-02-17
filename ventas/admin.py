@@ -3236,7 +3236,8 @@ class ComandaAdmin(admin.ModelAdmin):
 
     def save_formset(self, request, form, formset, change):
         """Guardar el formset y crear ReservaProducto para nuevas comandas"""
-        instances = formset.save(commit=False)
+        try:
+            instances = formset.save(commit=False)
 
         # Guardar las instancias del formset (DetalleComanda)
         for instance in instances:
@@ -3256,11 +3257,10 @@ class ComandaAdmin(admin.ModelAdmin):
 
             for detalle in comanda.detalles.all():
                 # Determinar fecha de entrega para ReservaProducto
-                fecha_entrega_reserva = (
-                    comanda.fecha_entrega_objetivo.date()
-                    if comanda.fecha_entrega_objetivo
-                    else timezone.now().date()
-                )
+                if comanda.fecha_entrega_objetivo:
+                    fecha_entrega_reserva = comanda.fecha_entrega_objetivo.date()
+                else:
+                    fecha_entrega_reserva = timezone.now().date()
 
                 # Crear o actualizar ReservaProducto
                 ReservaProducto.objects.get_or_create(
@@ -3275,6 +3275,11 @@ class ComandaAdmin(admin.ModelAdmin):
                         )
                     }
                 )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error en save_formset de ComandaAdmin: {str(e)}", exc_info=True)
+            raise
 
     def response_add(self, request, obj, post_url_continue=None):
         """Cerrar popup después de guardar si viene desde popup"""
