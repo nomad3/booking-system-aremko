@@ -4499,6 +4499,8 @@ class ServicioBloqueo(models.Model):
             activo=True
         ).exists()
 
+
+    """
     Características:
     - Solo 1 fecha (no rangos)
     - Solo 1 slot/horario
