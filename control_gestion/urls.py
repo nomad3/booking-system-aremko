@@ -4,6 +4,7 @@ URLs para Control de Gestión
 
 from django.urls import path
 from . import views, views_templates
+from .views import comandas_view
 
 app_name = "control_gestion"
 
@@ -42,5 +43,12 @@ urlpatterns = [
     path("cron/vaciado-tinas/", views.cron_vaciado_tinas, name="cron_vaciado"),
     path("cron/daily-opening/", views.cron_daily_opening, name="cron_opening"),
     path("cron/daily-reports/", views.cron_daily_reports, name="cron_reports"),
+
+    # Gestión de Comandas para Cafetería
+    path("comandas/", comandas_view.lista_comandas, name="lista_comandas"),
+    path("comandas/<int:comanda_id>/", comandas_view.detalle_comanda, name="detalle_comanda"),
+    path("comandas/<int:comanda_id>/estado/", comandas_view.cambiar_estado_comanda, name="cambiar_estado_comanda"),
+    path("comandas/cocina/", comandas_view.comandas_cocina, name="comandas_cocina"),
+    path("comandas/<int:comanda_id>/imprimir/", comandas_view.imprimir_comanda, name="imprimir_comanda"),
 ]
 

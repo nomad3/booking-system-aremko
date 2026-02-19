@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comandas - Vista Cocina</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            padding: 10px;
+        }
+
+        .header {
+            background: #333;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+            border-radius: 10px;
+        }
+
+        .comandas-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .comanda {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: 3px solid transparent;
+        }
+
+        .comanda.pendiente {
+            border-color: #ff9800;
+        }
+
+        .comanda.procesando {
+            border-color: #2196f3;
+            background: #e3f2fd;
+        }
+
+        .comanda-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+
+        .comanda-numero {
+            color: #333;
+        }
+
+        .tiempo {
+            background: #ff5252;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        .cliente {
+            font-size: 1.2rem;
+            color: #555;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+
+        .productos {
+            margin: 15px 0;
+        }
+
+        .producto {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 2px solid #eee;
+            font-size: 1.1rem;
+        }
+
+        .producto:last-child {
+            border-bottom: none;
+        }
+
+        .cantidad {
+            background: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            margin-right: 15px;
+            font-weight: bold;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .producto-nombre {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .especificaciones {
+            font-size: 0.9rem;
+            color: #666;
+            margin-left: 70px;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        .urgente {
+            background: #ff5252;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .notas {
+            background: #fff9c4;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #f9a825;
+        }
+
+        .estado {
+            text-align: center;
+            padding: 10px;
+            background: #ff9800;
+            color: white;
+            border-radius: 5px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 15px;
+        }
+
+        .estado.procesando {
+            background: #2196f3;
+        }
+
+        @media (max-width: 768px) {
+            .comandas-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Auto refresh indicator */
+        .refresh-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #333;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🍽️ COMANDAS COCINA - {{ ahora|date:"d/m/Y H:i" }}</h1>
+    </div>
+
+    <div class="comandas-container">
+        {% for comanda in comandas %}
+        <div class="comanda {{ comanda.estado }}">
+            <div class="comanda-header">
+                <span class="comanda-numero">
+                    #{{ comanda.id }}
+                    {% if comanda.es_urgente %}
+                        <span class="urgente">URGENTE</span>
+                    {% endif %}
+                </span>
+                <span class="tiempo">
+                    {{ comanda.tiempo_espera }} min
+                </span>
+            </div>
+
+            <div class="cliente">
+                👤 {{ comanda.venta_reserva.cliente.nombre }}
+                <br>
+                <small>📍 {{ comanda.lugar_entrega|default:"Cafetería" }}</small>
+            </div>
+
+            {% if comanda.notas_generales %}
+            <div class="notas">
+                📝 {{ comanda.notas_generales }}
+            </div>
+            {% endif %}
+
+            <div class="productos">
+                {% for detalle in comanda.detalles.all %}
+                <div class="producto">
+                    <span class="cantidad">{{ detalle.cantidad }}</span>
+                    <span class="producto-nombre">{{ detalle.producto.nombre }}</span>
+                </div>
+                {% if detalle.especificaciones %}
+                    <div class="especificaciones">
+                        → {{ detalle.especificaciones }}
+                    </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="estado {{ comanda.estado }}">
+                {% if comanda.estado == 'pendiente' %}
+                    ⏳ PENDIENTE
+                {% elif comanda.estado == 'procesando' %}
+                    👨‍🍳 PREPARANDO
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div style="grid-column: 1/-1; text-align: center; padding: 50px;">
+            <h2>✅ No hay comandas pendientes</h2>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="refresh-indicator">
+        ↻ Auto-actualización cada 15 seg
+    </div>
+
+    <script>
+        // Auto-recargar cada 15 segundos
+        setInterval(() => {
+            location.reload();
+        }, 15000);
+    </script>
+</body>
+</html>

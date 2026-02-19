@@ -1,0 +1,172 @@
+{% extends "control_gestion/base_control.html" %}
+{% load static %}
+
+{% block title %}Comanda #{{ comanda.id }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>Detalle de Comanda #{{ comanda.id }}</h1>
+        <a href="{% url 'control_gestion:lista_comandas' %}" class="btn btn-secondary">← Volver al listado</a>
+    </div>
+
+    <div class="comanda-detalle">
+        <div class="info-section">
+            <h3>Información General</h3>
+            <table class="table">
+                <tr>
+                    <th>Estado:</th>
+                    <td>
+                        <span class="estado-badge estado-{{ comanda.estado }}">
+                            {{ comanda.get_estado_display }}
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Cliente:</th>
+                    <td>{{ comanda.venta_reserva.cliente.nombre }}</td>
+                </tr>
+                <tr>
+                    <th>Reserva:</th>
+                    <td>#{{ comanda.venta_reserva.id }}</td>
+                </tr>
+                <tr>
+                    <th>Fecha/Hora Solicitud:</th>
+                    <td>{{ comanda.fecha_solicitud|date:"d/m/Y H:i" }}</td>
+                </tr>
+                <tr>
+                    <th>Solicitado por:</th>
+                    <td>{{ comanda.usuario_solicita.username|default:"Sistema" }}</td>
+                </tr>
+                {% if comanda.usuario_procesa %}
+                <tr>
+                    <th>Procesado por:</th>
+                    <td>{{ comanda.usuario_procesa.username }}</td>
+                </tr>
+                {% endif %}
+                {% if comanda.fecha_entrega %}
+                <tr>
+                    <th>Fecha Entrega:</th>
+                    <td>{{ comanda.fecha_entrega|date:"d/m/Y H:i" }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <th>Lugar de Entrega:</th>
+                    <td>{{ comanda.lugar_entrega|default:"Cafetería" }}</td>
+                </tr>
+                {% if comanda.notas_generales %}
+                <tr>
+                    <th>Notas:</th>
+                    <td>{{ comanda.notas_generales }}</td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+
+        <div class="productos-section">
+            <h3>Productos</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Cantidad</th>
+                        <th>Producto</th>
+                        <th>Precio Unit.</th>
+                        <th>Subtotal</th>
+                        <th>Especificaciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for detalle in comanda.detalles.all %}
+                    <tr>
+                        <td>{{ detalle.cantidad }}</td>
+                        <td>{{ detalle.producto.nombre }}</td>
+                        <td>${{ detalle.precio_unitario|floatformat:0 }}</td>
+                        <td>${{ detalle.subtotal|floatformat:0 }}</td>
+                        <td>{{ detalle.especificaciones|default:"-" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="3">Total:</th>
+                        <th>${{ comanda.total_precio|default:"0"|floatformat:0 }}</th>
+                        <th></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="actions">
+            {% if puede_procesar %}
+            <form method="post" action="{% url 'control_gestion:cambiar_estado_comanda' comanda.id %}" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="estado" value="procesando">
+                <button type="submit" class="btn btn-primary">Comenzar a Preparar</button>
+            </form>
+            {% endif %}
+
+            {% if puede_entregar %}
+            <form method="post" action="{% url 'control_gestion:cambiar_estado_comanda' comanda.id %}" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="estado" value="entregada">
+                <button type="submit" class="btn btn-success">Marcar como Entregada</button>
+            </form>
+            {% endif %}
+
+            <a href="{% url 'control_gestion:imprimir_comanda' comanda.id %}"
+               class="btn btn-info" target="_blank">
+                Imprimir
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.comanda-detalle {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    margin-top: 20px;
+}
+
+.info-section, .productos-section {
+    margin-bottom: 30px;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table th {
+    background: #f5f5f5;
+    padding: 10px;
+    text-align: left;
+}
+
+.table td {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.estado-badge {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.estado-pendiente { background: #fff3e0; color: #e65100; }
+.estado-procesando { background: #e3f2fd; color: #1565c0; }
+.estado-entregada { background: #e8f5e9; color: #2e7d32; }
+
+.actions {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.actions .btn {
+    margin: 0 5px;
+}
+</style>
+{% endblock %}

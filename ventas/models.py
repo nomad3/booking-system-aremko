@@ -4737,6 +4737,41 @@ class Comanda(models.Model):
         self.fecha_entrega = timezone.now()
         self.save()
 
+    @property
+    def total_items(self):
+        """Retorna el total de items en la comanda"""
+        return self.detalles.count()
+
+    @property
+    def total_precio(self):
+        """Calcula el precio total de la comanda"""
+        total = sum(
+            detalle.cantidad * detalle.precio_unitario
+            for detalle in self.detalles.all()
+        )
+        return total
+
+    @property
+    def lugar_entrega(self):
+        """Retorna el lugar de entrega basado en el servicio de la reserva"""
+        # Por ahora retornar valores por defecto
+        # TODO: Implementar lógica basada en servicios
+        servicios = self.venta_reserva.reservaservicios.all()
+        for servicio in servicios:
+            nombre = servicio.servicio.nombre.lower()
+            if 'tina' in nombre:
+                return 'Tinas'
+            elif 'cabaña' in nombre:
+                return 'Cabaña'
+            elif 'masaje' in nombre:
+                return 'Sala de Masajes'
+        return 'Cafetería'
+
+    @property
+    def es_urgente(self):
+        """Determina si la comanda es urgente (más de 15 minutos esperando)"""
+        return self.tiempo_espera() > 15 and self.estado == 'pendiente'
+
     def save(self, *args, **kwargs):
         """
         Guarda la comanda y auto-crea ReservaProducto para integración con facturación.

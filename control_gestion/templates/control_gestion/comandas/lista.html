@@ -1,0 +1,419 @@
+{% extends "control_gestion/base_control.html" %}
+{% load static %}
+
+{% block title %}Gestión de Comandas - Cafetería{% endblock %}
+
+{% block extra_css %}
+<style>
+    .comandas-container {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .stats-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+
+    .stat-card h3 {
+        font-size: 2rem;
+        margin: 10px 0;
+    }
+
+    .stat-card.pendientes { border-left: 5px solid #ff9800; }
+    .stat-card.procesando { border-left: 5px solid #2196f3; }
+    .stat-card.entregadas { border-left: 5px solid #4caf50; }
+
+    .filtros {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .comandas-grid {
+        display: grid;
+        gap: 20px;
+    }
+
+    .comanda-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+
+    .comanda-card:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+
+    .comanda-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .comanda-numero {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .comanda-tiempo {
+        font-size: 0.9rem;
+        color: #666;
+    }
+
+    .estado-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+
+    .estado-pendiente { background: #fff3e0; color: #e65100; }
+    .estado-procesando { background: #e3f2fd; color: #1565c0; }
+    .estado-entregada { background: #e8f5e9; color: #2e7d32; }
+    .estado-cancelada { background: #ffebee; color: #c62828; }
+
+    .comanda-cliente {
+        margin-bottom: 10px;
+    }
+
+    .cliente-nombre {
+        font-weight: 600;
+        color: #333;
+        font-size: 1.1rem;
+    }
+
+    .productos-lista {
+        margin: 15px 0;
+        padding: 15px;
+        background: #f5f5f5;
+        border-radius: 8px;
+    }
+
+    .producto-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .producto-item:last-child {
+        border-bottom: none;
+    }
+
+    .producto-nombre {
+        flex: 1;
+        font-weight: 500;
+    }
+
+    .producto-cantidad {
+        background: #333;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        margin-right: 10px;
+    }
+
+    .producto-especificaciones {
+        font-size: 0.85rem;
+        color: #666;
+        font-style: italic;
+        margin-left: 20px;
+    }
+
+    .comanda-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+    }
+
+    .boton-estado {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .boton-procesar {
+        background: #2196f3;
+        color: white;
+    }
+
+    .boton-procesar:hover {
+        background: #1976d2;
+    }
+
+    .boton-entregar {
+        background: #4caf50;
+        color: white;
+    }
+
+    .boton-entregar:hover {
+        background: #388e3c;
+    }
+
+    .boton-cancelar {
+        background: #f44336;
+        color: white;
+    }
+
+    .urgente-badge {
+        background: #ff5252;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        margin-left: 10px;
+        animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+    }
+
+    .notas-comanda {
+        background: #fffde7;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+        font-size: 0.9rem;
+        border-left: 3px solid #fbc02d;
+    }
+
+    @media (max-width: 768px) {
+        .comandas-container {
+            padding: 10px;
+        }
+
+        .comanda-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .comanda-footer {
+            flex-direction: column;
+            gap: 10px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="comandas-container">
+    <div class="page-header">
+        <h1>📋 Gestión de Comandas - Cafetería</h1>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="stats-cards">
+        <div class="stat-card pendientes">
+            <p>Pendientes</p>
+            <h3>{{ stats.pendientes }}</h3>
+        </div>
+        <div class="stat-card procesando">
+            <p>En Proceso</p>
+            <h3>{{ stats.procesando }}</h3>
+        </div>
+        <div class="stat-card entregadas">
+            <p>Entregadas Hoy</p>
+            <h3>{{ stats.entregadas }}</h3>
+        </div>
+        <div class="stat-card">
+            <p>Total Hoy</p>
+            <h3>{{ stats.total_hoy }}</h3>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filtros">
+        <form method="get" class="form-inline">
+            <div class="form-row">
+                <div class="col-md-4">
+                    <label for="fecha">Fecha:</label>
+                    <input type="date" name="fecha" id="fecha"
+                           value="{{ fecha_filtro }}"
+                           class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <label for="estado">Estado:</label>
+                    <select name="estado" id="estado" class="form-control">
+                        <option value="">Pendientes y En Proceso</option>
+                        {% for value, label in estados %}
+                            <option value="{{ value }}" {% if estado_filtro == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary">Filtrar</button>
+                    <a href="{% url 'control_gestion:lista_comandas' %}" class="btn btn-secondary">Limpiar</a>
+                    <a href="{% url 'control_gestion:comandas_cocina' %}" class="btn btn-info" target="_blank">
+                        Vista Cocina
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Lista de Comandas -->
+    <div class="comandas-grid">
+        {% for comanda in comandas %}
+        <div class="comanda-card" id="comanda-{{ comanda.id }}">
+            <div class="comanda-header">
+                <div>
+                    <span class="comanda-numero">
+                        Comanda #{{ comanda.id }}
+                        {% if comanda.es_urgente %}
+                            <span class="urgente-badge">URGENTE</span>
+                        {% endif %}
+                    </span>
+                    <span class="comanda-tiempo">
+                        {{ comanda.fecha_solicitud|date:"H:i" }} -
+                        Hace {{ comanda.tiempo_espera }} min
+                    </span>
+                </div>
+                <span class="estado-badge estado-{{ comanda.estado }}">
+                    {{ comanda.get_estado_display }}
+                </span>
+            </div>
+
+            <div class="comanda-cliente">
+                <div class="cliente-nombre">
+                    👤 {{ comanda.venta_reserva.cliente.nombre }}
+                </div>
+                <small>
+                    📍 Entrega: {{ comanda.lugar_entrega|default:"Cafetería" }}
+                </small>
+            </div>
+
+            {% if comanda.notas_generales %}
+            <div class="notas-comanda">
+                📝 {{ comanda.notas_generales }}
+            </div>
+            {% endif %}
+
+            <div class="productos-lista">
+                {% for detalle in comanda.detalles.all %}
+                <div class="producto-item">
+                    <span class="producto-nombre">
+                        <span class="producto-cantidad">{{ detalle.cantidad }}x</span>
+                        {{ detalle.producto.nombre }}
+                    </span>
+                </div>
+                {% if detalle.especificaciones %}
+                    <div class="producto-especificaciones">
+                        → {{ detalle.especificaciones }}
+                    </div>
+                {% endif %}
+                {% empty %}
+                <p>Sin productos</p>
+                {% endfor %}
+            </div>
+
+            <div class="comanda-footer">
+                <div>
+                    <small>
+                        Solicitó: {{ comanda.usuario_solicita.username|default:"Sistema" }}
+                        {% if comanda.usuario_procesa %}
+                            | Procesa: {{ comanda.usuario_procesa.username }}
+                        {% endif %}
+                    </small>
+                </div>
+                <div>
+                    {% if comanda.estado == 'pendiente' %}
+                        <button class="boton-estado boton-procesar"
+                                onclick="cambiarEstado({{ comanda.id }}, 'procesando')">
+                            Comenzar a Preparar
+                        </button>
+                    {% elif comanda.estado == 'procesando' %}
+                        <button class="boton-estado boton-entregar"
+                                onclick="cambiarEstado({{ comanda.id }}, 'entregada')">
+                            Marcar como Entregada
+                        </button>
+                    {% endif %}
+
+                    <a href="{% url 'control_gestion:detalle_comanda' comanda.id %}"
+                       class="btn btn-sm btn-outline-secondary">
+                        Ver Detalle
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="alert alert-info">
+            No hay comandas para mostrar con los filtros seleccionados.
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+// Cambiar estado de comanda
+function cambiarEstado(comandaId, nuevoEstado) {
+    if (!confirm('¿Cambiar el estado de la comanda?')) {
+        return;
+    }
+
+    fetch(`{% url 'control_gestion:cambiar_estado_comanda' 0 %}`.replace('0', comandaId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': '{{ csrf_token }}',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: `estado=${nuevoEstado}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Recargar la página para actualizar el listado
+            location.reload();
+        } else {
+            alert('Error al cambiar el estado');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al procesar la solicitud');
+    });
+}
+
+// Auto-recargar cada 30 segundos
+setInterval(() => {
+    if (!document.hidden) {
+        location.reload();
+    }
+}, 30000);
+</script>
+{% endblock %}
