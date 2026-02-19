@@ -14,9 +14,10 @@ from datetime import datetime, timedelta
 def lista_comandas(request):
     """Vista principal del listado de comandas para cafetería"""
 
-    # Filtros
-    estado_filtro = request.GET.get('estado', '')
-    fecha_filtro = request.GET.get('fecha', timezone.now().date().isoformat())
+    try:
+        # Filtros
+        estado_filtro = request.GET.get('estado', '')
+        fecha_filtro = request.GET.get('fecha', timezone.now().date().isoformat())
 
     # Query base
     comandas = Comanda.objects.select_related(
@@ -74,7 +75,33 @@ def lista_comandas(request):
         ]
     }
 
-    return render(request, 'control_gestion/comandas/lista.html', context)
+        return render(request, 'control_gestion/comandas/lista.html', context)
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error en lista_comandas: {str(e)}", exc_info=True)
+
+        # Renderizar una página de error simple
+        context = {
+            'comandas': [],
+            'estado_filtro': '',
+            'fecha_filtro': timezone.now().date().isoformat(),
+            'stats': {
+                'pendientes': 0,
+                'procesando': 0,
+                'entregadas': 0,
+                'total_hoy': 0
+            },
+            'estados': [
+                ('pendiente', 'Pendiente'),
+                ('procesando', 'En Proceso'),
+                ('entregada', 'Entregada'),
+                ('cancelada', 'Cancelada')
+            ],
+            'error_message': f"Error al cargar comandas: {str(e)}"
+        }
+        return render(request, 'control_gestion/comandas/lista.html', context)
 
 
 @login_required

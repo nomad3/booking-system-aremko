@@ -234,6 +234,12 @@
         <h1>📋 Gestión de Comandas - Cafetería</h1>
     </div>
 
+    {% if error_message %}
+    <div class="alert alert-danger">
+        <strong>Error:</strong> {{ error_message }}
+    </div>
+    {% endif %}
+
     <!-- Estadísticas -->
     <div class="stats-cards">
         <div class="stat-card pendientes">

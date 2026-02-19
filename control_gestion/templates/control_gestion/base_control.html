@@ -105,7 +105,7 @@
     <nav>
         <div class="container">
             <a href="{% url 'control_gestion:mi_dia' %}" {% if request.resolver_match.url_name == 'mi_dia' %}class="active"{% endif %}>📅 Mi Día</a>
-            <a href="{% url 'control_gestion:lista_comandas' %}" {% if 'comanda' in request.resolver_match.url_name %}class="active"{% endif %}>📋 Comandas</a>
+            <a href="{% url 'control_gestion:lista_comandas' %}" {% if request.resolver_match.url_name and 'comanda' in request.resolver_match.url_name %}class="active"{% endif %}>📋 Comandas</a>
             <a href="{% url 'control_gestion:equipo_snapshot' %}" {% if request.resolver_match.url_name == 'equipo_snapshot' %}class="active"{% endif %}>👥 Equipo</a>
             <a href="{% url 'control_gestion:indicadores' %}" {% if request.resolver_match.url_name == 'indicadores' %}class="active"{% endif %}>📊 Indicadores</a>
             <a href="/admin/control_gestion/task/">⚙️ Admin</a>
