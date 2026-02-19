@@ -19,61 +19,61 @@ def lista_comandas(request):
         estado_filtro = request.GET.get('estado', '')
         fecha_filtro = request.GET.get('fecha', timezone.now().date().isoformat())
 
-    # Query base
-    comandas = Comanda.objects.select_related(
-        'venta_reserva__cliente',
-        'usuario_solicita',
-        'usuario_procesa'
-    ).prefetch_related(
-        'detalles__producto'
-    )
+        # Query base
+        comandas = Comanda.objects.select_related(
+            'venta_reserva__cliente',
+            'usuario_solicita',
+            'usuario_procesa'
+        ).prefetch_related(
+            'detalles__producto'
+        )
 
-    # Aplicar filtros
-    if estado_filtro:
-        comandas = comandas.filter(estado=estado_filtro)
-    else:
-        # Por defecto mostrar pendientes y en proceso
-        comandas = comandas.filter(estado__in=['pendiente', 'procesando'])
+        # Aplicar filtros
+        if estado_filtro:
+            comandas = comandas.filter(estado=estado_filtro)
+        else:
+            # Por defecto mostrar pendientes y en proceso
+            comandas = comandas.filter(estado__in=['pendiente', 'procesando'])
 
-    if fecha_filtro:
-        fecha = datetime.strptime(fecha_filtro, '%Y-%m-%d').date()
-        comandas = comandas.filter(fecha_solicitud__date=fecha)
+        if fecha_filtro:
+            fecha = datetime.strptime(fecha_filtro, '%Y-%m-%d').date()
+            comandas = comandas.filter(fecha_solicitud__date=fecha)
 
-    # Ordenar por prioridad: urgentes primero, luego por hora
-    comandas = comandas.order_by('-es_urgente', 'fecha_solicitud')
+        # Ordenar por prioridad: urgentes primero, luego por hora
+        comandas = comandas.order_by('-es_urgente', 'fecha_solicitud')
 
-    # Estadísticas del día
-    hoy = timezone.now().date()
-    stats = {
-        'pendientes': Comanda.objects.filter(
-            estado='pendiente',
-            fecha_solicitud__date=hoy
-        ).count(),
-        'procesando': Comanda.objects.filter(
-            estado='procesando',
-            fecha_solicitud__date=hoy
-        ).count(),
-        'entregadas': Comanda.objects.filter(
-            estado='entregada',
-            fecha_solicitud__date=hoy
-        ).count(),
-        'total_hoy': Comanda.objects.filter(
-            fecha_solicitud__date=hoy
-        ).count()
-    }
+        # Estadísticas del día
+        hoy = timezone.now().date()
+        stats = {
+            'pendientes': Comanda.objects.filter(
+                estado='pendiente',
+                fecha_solicitud__date=hoy
+            ).count(),
+            'procesando': Comanda.objects.filter(
+                estado='procesando',
+                fecha_solicitud__date=hoy
+            ).count(),
+            'entregadas': Comanda.objects.filter(
+                estado='entregada',
+                fecha_solicitud__date=hoy
+            ).count(),
+            'total_hoy': Comanda.objects.filter(
+                fecha_solicitud__date=hoy
+            ).count()
+        }
 
-    context = {
-        'comandas': comandas,
-        'estado_filtro': estado_filtro,
-        'fecha_filtro': fecha_filtro,
-        'stats': stats,
-        'estados': [
-            ('pendiente', 'Pendiente'),
-            ('procesando', 'En Proceso'),
-            ('entregada', 'Entregada'),
-            ('cancelada', 'Cancelada')
-        ]
-    }
+        context = {
+            'comandas': comandas,
+            'estado_filtro': estado_filtro,
+            'fecha_filtro': fecha_filtro,
+            'stats': stats,
+            'estados': [
+                ('pendiente', 'Pendiente'),
+                ('procesando', 'En Proceso'),
+                ('entregada', 'Entregada'),
+                ('cancelada', 'Cancelada')
+            ]
+        }
 
         return render(request, 'control_gestion/comandas/lista.html', context)
 
