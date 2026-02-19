@@ -107,7 +107,7 @@ try:
         print(f"Usando reserva ID: {reserva.id} - Cliente: {reserva.cliente}")
 
         # Buscar productos para la comanda
-        productos = Producto.objects.filter(disponible=True)[:3]
+        productos = Producto.objects.filter(publicado_web=True)[:3]
         if not productos:
             productos = Producto.objects.all()[:3]
 

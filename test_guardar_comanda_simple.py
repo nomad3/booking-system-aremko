@@ -21,7 +21,7 @@ try:
     print("1. Obteniendo datos...")
     reserva = VentaReserva.objects.first()
     usuario = User.objects.filter(username__in=['Deborah', 'Ernesto']).first() or User.objects.first()
-    producto = Producto.objects.filter(disponible=True).first() or Producto.objects.first()
+    producto = Producto.objects.filter(publicado_web=True).first() or Producto.objects.first()
 
     if not all([reserva, usuario, producto]):
         print("ERROR: Faltan datos básicos")

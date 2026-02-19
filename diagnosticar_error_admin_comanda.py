@@ -99,7 +99,7 @@ if reserva:
                 print("\nCreando detalles (simulando formset)...")
 
                 # Obtener productos
-                productos = Producto.objects.filter(disponible=True)[:2]
+                productos = Producto.objects.filter(publicado_web=True)[:2]
                 if not productos:
                     productos = Producto.objects.all()[:2]
 
