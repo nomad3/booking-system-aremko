@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Comanda #{{ comanda.id }}</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 0;
+            padding: 20px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px dashed #000;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .info {
+            margin-bottom: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .productos {
+            border-top: 1px dashed #000;
+            border-bottom: 1px dashed #000;
+            padding: 10px 0;
+            margin: 20px 0;
+        }
+
+        .producto {
+            margin-bottom: 10px;
+        }
+
+        .cantidad {
+            display: inline-block;
+            width: 30px;
+            font-weight: bold;
+        }
+
+        .especificaciones {
+            margin-left: 35px;
+            font-style: italic;
+            font-size: 12px;
+        }
+
+        .notas {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 20px 0;
+            border: 1px dashed #000;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+                padding: 10px;
+            }
+
+            .notas {
+                background: none;
+            }
+        }
+    </style>
+</head>
+<body onload="window.print()">
+    <div class="header">
+        <h1>COMANDA #{{ comanda.id }}</h1>
+        <p>{{ fecha_impresion|date:"d/m/Y H:i" }}</p>
+    </div>
+
+    <div class="info">
+        <div class="info-row">
+            <span>Cliente:</span>
+            <strong>{{ comanda.venta_reserva.cliente.nombre }}</strong>
+        </div>
+        <div class="info-row">
+            <span>Hora pedido:</span>
+            <strong>{{ comanda.fecha_solicitud|date:"H:i" }}</strong>
+        </div>
+        <div class="info-row">
+            <span>Entregar en:</span>
+            <strong>{{ comanda.lugar_entrega|default:"Cafetería" }}</strong>
+        </div>
+        {% if comanda.fecha_entrega_objetivo %}
+        <div class="info-row">
+            <span>Hora objetivo:</span>
+            <strong>{{ comanda.fecha_entrega_objetivo|date:"H:i" }}</strong>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if comanda.notas_generales %}
+    <div class="notas">
+        <strong>NOTAS:</strong><br>
+        {{ comanda.notas_generales }}
+    </div>
+    {% endif %}
+
+    <div class="productos">
+        <strong>PRODUCTOS:</strong><br><br>
+        {% for detalle in comanda.detalles.all %}
+        <div class="producto">
+            <span class="cantidad">{{ detalle.cantidad }}x</span>
+            <strong>{{ detalle.producto.nombre }}</strong>
+            {% if detalle.especificaciones %}
+                <div class="especificaciones">
+                    → {{ detalle.especificaciones }}
+                </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="info">
+        <div class="info-row">
+            <span>Tomó pedido:</span>
+            <strong>{{ comanda.usuario_solicita.username|default:"Sistema" }}</strong>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>- - - - - - - - - - - - - - - - - - - -</p>
+        <p>Aremko Spa - Sistema de Comandas</p>
+    </div>
+</body>
+</html>
