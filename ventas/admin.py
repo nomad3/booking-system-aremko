@@ -349,7 +349,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
-    inlines = [ReservaServicioInline, ReservaProductoInline, GiftCardInline, PagoInline, ComandaInline]
+    inlines = [ReservaServicioInline, ReservaProductoInline, GiftCardInline, PagoInline]  # , ComandaInline] # TEMPORAL - deshabilitado por error
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
         'productos_y_cantidades', 'servicios_y_cantidades',
