@@ -258,10 +258,8 @@ class ComandaInline(admin.TabularInline):
     model = Comanda
     extra = 0
     can_delete = False
-    fields = ('id', 'estado_badge', 'total_productos', 'fecha_entrega_objetivo',
-              'tiempo_espera_display', 'editar_comanda_link')
-    readonly_fields = ('id', 'estado_badge', 'total_productos', 'tiempo_espera_display',
-                       'editar_comanda_link')
+    fields = ('id', 'estado', 'fecha_solicitud')
+    readonly_fields = ('id', 'estado', 'fecha_solicitud')
 
     def estado_badge(self, obj):
         """Muestra el estado con colores"""
