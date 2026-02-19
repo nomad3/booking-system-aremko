@@ -4845,6 +4845,7 @@ class ServicioSlotBloqueo(models.Model):
     activo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    notas = models.TextField(blank=True, null=True, verbose_name='Notas', help_text='Notas adicionales sobre el bloqueo')
 
     class Meta:
         verbose_name = 'Slot Bloqueado'
