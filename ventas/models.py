@@ -4737,25 +4737,48 @@ class Comanda(models.Model):
         self.fecha_entrega = timezone.now()
         self.save()
 
-    # TEMPORAL: Propiedades comentadas por causar error en admin
-    # @property
-    # def total_items(self):
-    #     """Retorna el total de items en la comanda"""
-    #     return self.detalles.count()
+    @property
+    def es_editable(self):
+        """La comanda solo es editable si está pendiente"""
+        return self.estado == 'pendiente'
 
-    # @property
-    # def total_precio(self):
-    #     """Calcula el precio total de la comanda"""
-    #     total = sum(
-    #         detalle.cantidad * detalle.precio_unitario
-    #         for detalle in self.detalles.all()
-    #     )
-    #     return total
+    @property
+    def puede_agregar_productos(self):
+        """Solo se pueden agregar productos en estado pendiente"""
+        return self.estado == 'pendiente'
 
-    # @property
-    # def lugar_entrega(self):
-    #     """Retorna el lugar de entrega basado en el servicio de la reserva"""
-    #     # Por ahora retornar valores por defecto
+    @property
+    def total_items(self):
+        """Retorna el total de items en la comanda"""
+        try:
+            return self.detalles.aggregate(total=models.Sum('cantidad'))['total'] or 0
+        except:
+            return 0
+
+    @property
+    def total_precio(self):
+        """Calcula el precio total de la comanda"""
+        try:
+            from decimal import Decimal
+            total = self.detalles.aggregate(
+                total=models.Sum(models.F('cantidad') * models.F('precio_unitario'))
+            )['total']
+            return total or Decimal('0')
+        except:
+            return Decimal('0')
+
+    @property
+    def lugar_entrega(self):
+        """Retorna el lugar de entrega basado en el servicio de la reserva"""
+        try:
+            if self.venta_reserva and self.venta_reserva.reserva_servicios.exists():
+                # Si tiene servicios, usar la sala del primer servicio
+                primer_servicio = self.venta_reserva.reserva_servicios.first()
+                if primer_servicio and hasattr(primer_servicio, 'sala'):
+                    return f"Sala: {primer_servicio.sala}"
+            return "Cafetería"
+        except:
+            return "Cafetería"
     #     # TODO: Implementar lógica basada en servicios
     #     servicios = self.venta_reserva.reservaservicios.all()
     #     for servicio in servicios:
@@ -4773,22 +4796,18 @@ class Comanda(models.Model):
     #     """Determina si la comanda es urgente (más de 15 minutos esperando)"""
     #     return self.tiempo_espera() > 15 and self.estado == 'pendiente'
 
-    # Versiones simples temporales
-    @property
-    def total_items(self):
-        return 0
-
-    @property
-    def total_precio(self):
-        return 0
-
-    @property
-    def lugar_entrega(self):
-        return 'Cafetería'
-
     @property
     def es_urgente(self):
-        return False
+        """Determina si la comanda es urgente (más de 15 minutos esperando)"""
+        try:
+            return self.tiempo_espera() > 15 and self.estado == 'pendiente'
+        except:
+            return False
+
+    @property
+    def notas(self):
+        """Alias para notas_generales para compatibilidad"""
+        return self.notas_generales or ""
 
     def save(self, *args, **kwargs):
         """

@@ -258,8 +258,27 @@ class ComandaInline(admin.TabularInline):
     model = Comanda
     extra = 0
     can_delete = False
-    fields = ('id', 'estado', 'fecha_solicitud')
-    readonly_fields = ('id', 'estado', 'fecha_solicitud')
+    fields = ('ver_comanda', 'estado_badge', 'fecha_solicitud', 'total_items', 'total_precio', 'es_editable')
+    readonly_fields = ('ver_comanda', 'estado_badge', 'fecha_solicitud', 'total_items', 'total_precio', 'es_editable')
+
+    def ver_comanda(self, obj):
+        """Link para ver/editar la comanda"""
+        if not obj or not obj.pk:
+            return '-'
+        from django.urls import reverse
+        url = reverse('admin:ventas_comanda_change', args=[obj.pk])
+        return format_html('<a href="{}" target="_blank">Comanda #{}</a>', url, obj.pk)
+    ver_comanda.short_description = 'Comanda'
+
+    def es_editable(self, obj):
+        """Muestra si la comanda es editable"""
+        if not obj or not obj.pk:
+            return '-'
+        if obj.es_editable:
+            return format_html('<span style="color:green;">✓ Editable</span>')
+        else:
+            return format_html('<span style="color:red;">🔒 Bloqueada</span>')
+    es_editable.short_description = 'Estado'
 
     def estado_badge(self, obj):
         """Muestra el estado con colores"""
@@ -349,7 +368,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
-    inlines = [ReservaServicioInline, ReservaProductoInline, GiftCardInline, PagoInline]  # , ComandaInline] # TEMPORAL - deshabilitado por error
+    inlines = [ReservaServicioInline, ReservaProductoInline, GiftCardInline, PagoInline, ComandaInline]
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
         'productos_y_cantidades', 'servicios_y_cantidades',
@@ -3158,6 +3177,22 @@ class ComandaAdmin(admin.ModelAdmin):
         return format_html('<span style="color:#999;">⚡ Inmediato</span>')
     entrega_objetivo_display.short_description = 'Entrega Objetivo'
 
+    def has_change_permission(self, request, obj=None):
+        """Solo permitir edición si la comanda está pendiente"""
+        if obj and obj.estado != 'pendiente':
+            # Para comandas procesando/entregadas, solo permitir vista
+            return request.user.has_perm('ventas.view_comanda')
+        return super().has_change_permission(request, obj)
+
+    def get_readonly_fields(self, request, obj=None):
+        """Hacer todos los campos readonly si la comanda no está pendiente"""
+        readonly = list(self.readonly_fields)
+        if obj and obj.estado != 'pendiente':
+            # Si no está pendiente, todos los campos son readonly
+            readonly.extend(['venta_reserva', 'estado', 'fecha_entrega_objetivo',
+                           'usuario_solicita', 'usuario_procesa', 'notas_generales'])
+        return readonly
+
     def get_form(self, request, obj=None, **kwargs):
         """Pre-poblar usuarios por defecto"""
         form = super().get_form(request, obj, **kwargs)
@@ -3231,11 +3266,52 @@ class ComandaAdmin(admin.ModelAdmin):
 
     def save_formset(self, request, form, formset, change):
         """Guardar el formset y crear ReservaProducto para nuevas comandas"""
+        from django.contrib import messages
+
+        # Validar que la comanda sea editable
+        comanda = form.instance
+        if change and comanda.estado != 'pendiente':
+            messages.error(request,
+                f"❌ No se puede modificar una comanda en estado {comanda.get_estado_display()}"
+            )
+            return
+
         try:
             instances = formset.save(commit=False)
 
-            # Guardar las instancias del formset (DetalleComanda)
+            # Validar stock ANTES de guardar
+            errores_stock = []
+            instancias_validas = []
+
             for instance in instances:
+                if hasattr(instance, 'producto') and instance.producto:
+                    if instance.producto.cantidad_disponible < instance.cantidad:
+                        errores_stock.append(
+                            f"{instance.producto.nombre}: necesita {instance.cantidad}, "
+                            f"disponible {instance.producto.cantidad_disponible}"
+                        )
+                    else:
+                        instancias_validas.append(instance)
+                else:
+                    instancias_validas.append(instance)
+
+            # Mostrar advertencias de stock
+            if errores_stock:
+                messages.warning(request, "⚠️ Productos sin stock suficiente:")
+                for error in errores_stock:
+                    messages.warning(request, f"• {error}")
+
+                if instancias_validas:
+                    messages.info(request,
+                        f"✓ Se agregaron {len(instancias_validas)} productos con stock disponible"
+                    )
+                else:
+                    messages.error(request,
+                        "❌ Ningún producto tiene stock suficiente. La comanda no se puede procesar."
+                    )
+
+            # Guardar solo las instancias válidas
+            for instance in instancias_validas:
                 instance.save()
 
             # Eliminar instancias marcadas para borrar
