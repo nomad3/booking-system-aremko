@@ -256,11 +256,14 @@ VENTAS_FROM_EMAIL = os.getenv('VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
 # Email Backend - usar console para desarrollo si no hay credenciales
 # Email Backend - SendGrid (Anymail)
 if os.getenv('SENDGRID_API_KEY'):
-    EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
-    ANYMAIL = {
-        "SENDGRID_API_KEY": os.getenv('SENDGRID_API_KEY'),
-    }
-    logger.info("✅ Usando SendGrid para envío de correos")
+    # Usar SMTP directo de SendGrid en lugar de anymail
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = 'smtp.sendgrid.net'
+    EMAIL_PORT = 587
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = 'apikey'  # Literal 'apikey', no cambiar
+    EMAIL_HOST_PASSWORD = os.getenv('SENDGRID_API_KEY')
+    logger.info("✅ Usando SendGrid SMTP directo")
 elif not os.getenv('EMAIL_HOST_USER') or not os.getenv('EMAIL_HOST_PASSWORD'):
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
     logger.warning("⚠️ SENDGRID_API_KEY ni SMTP configurados - usando console backend")
@@ -269,6 +272,7 @@ else:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     logger.info("ℹ️ Usando SMTP clásico (Gmail) como fallback")
 
+# Configuración SMTP de respaldo (si no se usa SendGrid)
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
