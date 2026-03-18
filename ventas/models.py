@@ -4569,6 +4569,10 @@ class ServicioBloqueo(models.Model):
         """Validaciones del modelo"""
         from django.core.exceptions import ValidationError
 
+        # Verificar que tenemos los campos necesarios antes de validar
+        if not hasattr(self, 'fecha') or self.fecha is None:
+            return  # No validar si no hay fecha
+
         # Validar que el slot no esté ya bloqueado por día completo
         if ServicioBloqueo.servicio_bloqueado_en_fecha(self.servicio_id, self.fecha):
             raise ValidationError({
