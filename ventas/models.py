@@ -4922,7 +4922,9 @@ class ServicioSlotBloqueo(models.Model):
             if (original.servicio_id == self.servicio_id and
                 original.fecha == self.fecha and
                 original.hora_slot == self.hora_slot):
-                return  # No hay cambios en los campos únicos
+                # Aún así, guardar por si cambió el motivo o activo
+                super().save(*args, **kwargs)
+                return
 
         # Validar que no exista otro bloqueo activo para este mismo slot
         bloqueos_duplicados = ServicioSlotBloqueo.objects.filter(
@@ -4939,6 +4941,9 @@ class ServicioSlotBloqueo(models.Model):
             raise ValidationError({
                 'hora_slot': f'Ya existe un bloqueo activo para {self.servicio.nombre} el {self.fecha.strftime("%d/%m/%Y")} a las {self.hora_slot}'
             })
+
+        # IMPORTANTE: Guardar el objeto después de todas las validaciones
+        super().save(*args, **kwargs)
 
     @classmethod
     def slot_bloqueado(cls, servicio_id, fecha, hora_slot):
