@@ -1,0 +1,111 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extrahead %}
+<style>
+    .form-bloqueo {
+        max-width: 600px;
+        margin: 20px 0;
+    }
+    .form-bloqueo .form-group {
+        margin-bottom: 15px;
+    }
+    .form-bloqueo label {
+        font-weight: bold;
+        display: block;
+        margin-bottom: 5px;
+    }
+    .form-bloqueo .form-control {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    .alert-info {
+        background-color: #e3f2fd;
+        border: 1px solid #90caf9;
+        color: #0d47a1;
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    .btn-group {
+        margin-top: 20px;
+    }
+    .btn {
+        padding: 10px 20px;
+        margin-right: 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+    }
+    .btn-primary {
+        background-color: #417690;
+        color: white;
+    }
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Inicio</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_label|capfirst }}</a>
+    &rsaquo; <a href="{% url 'admin:ventas_serviciobloqueo_changelist' %}">Bloqueos de Slots</a>
+    &rsaquo; Crear Bloqueo (Alternativo)
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+
+<div class="alert-info">
+    <strong>ℹ️ Formulario Alternativo:</strong>
+    Use este formulario para crear bloqueos de servicio sin errores.
+    Permite bloquear un servicio completo por un rango de fechas.
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+<form method="post" class="form-bloqueo">
+    {% csrf_token %}
+
+    {% for field in form %}
+    <div class="form-group">
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.help_text %}
+            <small class="help-text">{{ field.help_text }}</small>
+        {% endif %}
+        {% if field.errors %}
+            <div class="error-text" style="color: red;">
+                {{ field.errors }}
+            </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="btn-group">
+        <button type="submit" class="btn btn-primary">
+            ✅ Crear Bloqueo
+        </button>
+        <a href="{% url 'admin:ventas_serviciobloqueo_changelist' %}" class="btn btn-secondary">
+            Cancelar
+        </a>
+    </div>
+</form>
+
+{% endblock %}
