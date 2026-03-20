@@ -1,0 +1,20 @@
+.alternative-add-button {
+    background-color: #28a745 !important;
+    color: white !important;
+    padding: 10px 15px;
+    margin-left: 10px;
+    border-radius: 4px;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.alternative-add-button:hover {
+    background-color: #218838 !important;
+    color: white !important;
+}
+
+.alternative-add-info {
+    margin-left: 10px;
+    color: #666;
+    font-size: 0.9em;
+}

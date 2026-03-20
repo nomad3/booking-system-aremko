@@ -3408,3 +3408,41 @@ class ComandaAdmin(admin.ModelAdmin):
         if obj:
             return obj.estado in ['pendiente', 'cancelada']
         return True
+
+
+# ============================================================================
+# FORMULARIO ALTERNATIVO PARA SERVICIOBLOQUEO (Fix Error 500)
+# ============================================================================
+
+from ventas.admin_bloqueo_alternativo import crear_bloqueo_servicio_view, get_admin_urls
+from django.urls import path
+
+class ServicioBloqueoAdminMejorado(ServicioBloqueoAdmin):
+    """Admin mejorado con formulario alternativo sin error 500"""
+    
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context.update({
+            'title': 'Bloqueos de Servicios',
+            'has_add_permission': self.has_add_permission(request),
+            'alternative_add_url': '/admin/ventas/serviciobloqueo/crear-alternativo/',
+        })
+        return super().changelist_view(request, extra_context=extra_context)
+    
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('crear-alternativo/',
+                 self.admin_site.admin_view(crear_bloqueo_servicio_view),
+                 name='ventas_serviciobloqueo_crear_alternativo'),
+        ]
+        return custom_urls + urls
+
+    class Media:
+        css = {
+            'all': ('admin/css/bloqueo_alternativo.css',)
+        }
+
+# Re-registrar con el admin mejorado
+admin.site.unregister(ServicioBloqueo)
+admin.site.register(ServicioBloqueo, ServicioBloqueoAdminMejorado)
