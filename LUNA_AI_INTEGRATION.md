@@ -144,10 +144,43 @@ Remember: You're representing Aremko Spa, so always be professional, helpful, an
 - Verify the API key matches exactly
 - Check the header name is "X-API-Key"
 
-### Issue: No Data Returned
-- Check if services exist in the database
-- Verify categories are named correctly (Tinajas, Masajes, Cabañas)
-- Ensure services are marked as active and published
+### Issue: No Data Returned / Empty Availability
+**This is the most common issue!**
+
+#### Problem: Services show no availability when slots exist
+**Root Cause**: The `slots_disponibles` field stores days in Spanish (lunes, martes, etc.) but the code expects English day names (monday, tuesday, etc.)
+
+**How to Diagnose**:
+```bash
+# Run in Render shell
+python scripts/diagnostics/check_slots_issue.py
+```
+
+**How to Fix**:
+```bash
+# Run in Render shell to convert Spanish days to English
+python scripts/fix_slots_language.py
+```
+
+**Prevention**: Always configure slots using English day names:
+```json
+{
+  "monday": ["09:00", "11:00", "14:00", "17:00"],
+  "tuesday": ["09:00", "11:00", "14:00", "17:00"],
+  "wednesday": ["09:00", "11:00", "14:00", "17:00"],
+  "thursday": ["09:00", "11:00", "14:00", "17:00"],
+  "friday": ["09:00", "11:00", "14:00", "17:00", "19:00"],
+  "saturday": ["09:00", "11:00", "14:00", "17:00", "19:00"],
+  "sunday": ["09:00", "11:00", "14:00", "17:00"]
+}
+```
+
+#### Other causes for no availability:
+- Services not marked as `activo=True` and `publicado_web=True`
+- Service is blocked on that date (check ServicioBloqueo)
+- Individual slots are blocked (check ServicioSlotBloqueo)
+- All slots are already booked (check ReservaServicio)
+- Category names don't match (should be "Tinajas", "Masajes", "Cabañas")
 
 ## Support
 
