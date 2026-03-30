@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     # Aplicaciones propias
     'ventas',
     'control_gestion',  # Módulo de Control de Gestión
+    'api',  # API para Luna AI Assistant
 
     # Aplicaciones de terceros
     'rest_framework',
@@ -330,3 +331,7 @@ LOGGING = {
         },
     },
 }
+
+# API Configuration for Luna AI Assistant
+import secrets
+LUNA_API_KEY = os.getenv('LUNA_API_KEY', secrets.token_urlsafe(32))
