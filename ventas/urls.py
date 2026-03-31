@@ -210,11 +210,11 @@ urlpatterns = [
 
     # === LUNA AI API (WhatsApp Agent) ===
     # Endpoints para que Luna pueda crear reservas y consultar información
-    path('api/luna/test', luna_api_views.test_connection, name='luna_test'),
-    path('api/luna/health', luna_api_views.health_check, name='luna_health'),
-    path('api/luna/regiones', luna_api_views.listar_regiones, name='luna_regiones'),
-    path('api/luna/reservas/validar', luna_api_views.validar_disponibilidad, name='luna_validar_disponibilidad'),
-    path('api/luna/reservas/create', luna_api_views.crear_reserva, name='luna_crear_reserva'),
+    path('api/luna/test/', luna_api_views.test_connection, name='luna_test'),
+    path('api/luna/health/', luna_api_views.health_check, name='luna_health'),
+    path('api/luna/regiones/', luna_api_views.listar_regiones, name='luna_regiones'),
+    path('api/luna/reservas/validar/', luna_api_views.validar_disponibilidad, name='luna_validar_disponibilidad'),
+    path('api/luna/reservas/create/', luna_api_views.crear_reserva, name='luna_crear_reserva'),
     # === END LUNA AI API ===
 
     # === PREMIOS Y FIDELIZACIÓN ===

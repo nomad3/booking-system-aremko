@@ -23,7 +23,7 @@ print("TEST 1: Health Check (público)")
 print("-"*60)
 
 try:
-    url = f"{base_url}/api/luna/health"
+    url = f"{base_url}/api/luna/health/"
     print(f"URL: {url}")
 
     response = urllib.request.urlopen(url, timeout=10)
@@ -43,7 +43,7 @@ print("TEST 2: Test Connection (con API Key)")
 print("-"*60)
 
 try:
-    url = f"{base_url}/api/luna/test"
+    url = f"{base_url}/api/luna/test/"
     print(f"URL: {url}")
     print(f"Header: X-Luna-API-Key: {api_key[:20]}...")
 
@@ -114,7 +114,7 @@ print("TEST 4: Listar Regiones y Comunas")
 print("-"*60)
 
 try:
-    url = f"{base_url}/api/luna/regiones"
+    url = f"{base_url}/api/luna/regiones/"
     print(f"URL: {url}")
 
     req = urllib.request.Request(url)
@@ -159,7 +159,7 @@ print("TEST 5: Validar Disponibilidad (placeholder - Fase 2)")
 print("-"*60)
 
 try:
-    url = f"{base_url}/api/luna/reservas/validar"
+    url = f"{base_url}/api/luna/reservas/validar/"
     print(f"URL: {url}")
 
     body = json.dumps({
@@ -198,7 +198,7 @@ print("TEST 6: Crear Reserva (placeholder - Fase 3)")
 print("-"*60)
 
 try:
-    url = f"{base_url}/api/luna/reservas/create"
+    url = f"{base_url}/api/luna/reservas/create/"
     print(f"URL: {url}")
 
     body = json.dumps({
