@@ -38,9 +38,9 @@ try:
             "nombre": "Juan Pérez Test Luna",
             "email": "juan.test.luna@example.com",
             "telefono": "+56987654321",
-            "documento_identidad": "12345678-9",
-            "region_id": 1,
-            "comuna_id": 10
+            "documento_identidad": "11111111-1",  # RUT válido de prueba
+            "region_id": 10,  # Región de Los Lagos
+            "comuna_id": 101  # Puerto Varas (pertenece a Región 10)
         },
         "servicios": [
             {
