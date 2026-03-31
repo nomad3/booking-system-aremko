@@ -668,17 +668,311 @@ def crear_reserva(request):
         }
     }
     """
+    try:
+        # Extraer datos del request
+        idempotency_key = request.data.get('idempotency_key')
+        cliente_data = request.data.get('cliente', {})
+        servicios_data = request.data.get('servicios', [])
+        metodo_pago = request.data.get('metodo_pago', 'pendiente')
+        notas = request.data.get('notas', '')
 
-    # Por ahora, endpoint básico que responde OK
-    # TODO: Implementar creación completa en Fase 3
+        # Validar campos requeridos
+        if not idempotency_key:
+            return Response({
+                'success': False,
+                'error': 'validation_error',
+                'mensaje': 'idempotency_key es requerido'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-    logger.info(f'[Luna API] Solicitud de creación de reserva recibida')
+        if not cliente_data:
+            return Response({
+                'success': False,
+                'error': 'validation_error',
+                'mensaje': 'Datos de cliente son requeridos'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response({
-        'success': True,
-        'mensaje': 'Endpoint en desarrollo - Fase 3',
-        'nota': 'La autenticación funciona correctamente'
-    })
+        if not servicios_data:
+            return Response({
+                'success': False,
+                'error': 'validation_error',
+                'mensaje': 'Debe incluir al menos un servicio'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verificar idempotencia (evitar duplicados)
+        cache_key = f'luna_reserva_{idempotency_key}'
+        cached_reserva = cache.get(cache_key)
+
+        if cached_reserva:
+            logger.info(f'[Luna API] Reserva duplicada detectada: {idempotency_key}')
+            return Response({
+                'success': True,
+                'reserva': cached_reserva,
+                'duplicada': True,
+                'mensaje': 'Reserva ya fue creada previamente'
+            })
+
+        # Validar datos del cliente
+        es_valido, errores = validar_datos_cliente(cliente_data)
+        if not es_valido:
+            return Response({
+                'success': False,
+                'error': 'validation_error',
+                'errores': errores,
+                'mensaje': 'Datos de cliente inválidos'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validar disponibilidad de servicios (reutilizar lógica de validar_disponibilidad)
+        # Crear request interno para validación
+        validacion_response = validar_disponibilidad_interna(servicios_data)
+
+        if not validacion_response['success']:
+            return Response({
+                'success': False,
+                'error': 'availability_error',
+                'errores': validacion_response.get('errores', []),
+                'mensaje': 'Uno o más servicios no están disponibles'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Iniciar transacción atómica
+        with transaction.atomic():
+            # 1. Buscar o crear cliente
+            telefono_normalizado = validar_telefono_chileno(cliente_data.get('telefono', ''))[2]
+
+            cliente, created = Cliente.objects.get_or_create(
+                telefono=telefono_normalizado,
+                defaults={
+                    'nombre': cliente_data.get('nombre', ''),
+                    'email': cliente_data.get('email', ''),
+                    'documento_identidad': cliente_data.get('documento_identidad', ''),
+                    'region_id': cliente_data.get('region_id'),
+                    'comuna_id': cliente_data.get('comuna_id'),
+                }
+            )
+
+            # Actualizar datos si el cliente ya existía
+            if not created:
+                cliente.nombre = cliente_data.get('nombre', cliente.nombre)
+                cliente.email = cliente_data.get('email', cliente.email) or cliente.email
+                if cliente_data.get('documento_identidad'):
+                    cliente.documento_identidad = cliente_data.get('documento_identidad')
+                if cliente_data.get('region_id'):
+                    cliente.region_id = cliente_data.get('region_id')
+                if cliente_data.get('comuna_id'):
+                    cliente.comuna_id = cliente_data.get('comuna_id')
+                cliente.save()
+
+            logger.info(f'[Luna API] Cliente {"creado" if created else "actualizado"}: {cliente.nombre} ({cliente.telefono})')
+
+            # 2. Crear VentaReserva
+            venta_reserva = VentaReserva.objects.create(
+                cliente=cliente,
+                estado_pago=metodo_pago,
+                comentarios=f"[Luna WhatsApp] {notas}" if notas else "[Luna WhatsApp]",
+                total=0  # Se calculará después
+            )
+
+            logger.info(f'[Luna API] VentaReserva creada: ID {venta_reserva.id}')
+
+            # 3. Crear ReservaServicio para cada servicio
+            servicios_creados = []
+            total_estimado = 0
+
+            for servicio_data in servicios_data:
+                servicio = Servicio.objects.get(id=servicio_data['servicio_id'])
+
+                fecha = datetime.strptime(servicio_data['fecha'], '%Y-%m-%d').date()
+                hora = servicio_data['hora']
+                cantidad_personas = servicio_data['cantidad_personas']
+
+                # Calcular precio
+                if servicio.tipo_servicio == 'cabana':
+                    precio_unitario = servicio.precio_base
+                else:
+                    precio_unitario = servicio.precio_base
+
+                reserva_servicio = ReservaServicio.objects.create(
+                    venta_reserva=venta_reserva,
+                    servicio=servicio,
+                    fecha_agendamiento=fecha,
+                    hora_inicio=hora,
+                    cantidad_personas=cantidad_personas,
+                    precio_unitario_venta=precio_unitario
+                )
+
+                # Calcular subtotal
+                subtotal = reserva_servicio.calcular_precio()
+                total_estimado += subtotal
+
+                servicios_creados.append({
+                    'id': reserva_servicio.id,
+                    'servicio_id': servicio.id,
+                    'servicio_nombre': servicio.nombre,
+                    'fecha': servicio_data['fecha'],
+                    'hora': hora,
+                    'cantidad_personas': cantidad_personas,
+                    'precio_unitario': float(precio_unitario),
+                    'subtotal': float(subtotal)
+                })
+
+            # 4. Aplicar descuentos
+            cart_items = []
+            for servicio_data in servicios_data:
+                servicio = Servicio.objects.get(id=servicio_data['servicio_id'])
+                cart_items.append({
+                    'id': servicio.id,
+                    'nombre': servicio.nombre,
+                    'precio': float(servicio.precio_base),
+                    'fecha': servicio_data['fecha'],
+                    'hora': servicio_data['hora'],
+                    'cantidad_personas': servicio_data['cantidad_personas'],
+                    'tipo_servicio': servicio.tipo_servicio,
+                    'subtotal': float(servicio.precio_base * servicio_data['cantidad_personas'])
+                })
+
+            packs_aplicables = PackDescuentoService.detectar_packs_aplicables(cart_items)
+            total_descuentos = sum(pack_info['descuento'] for pack_info in packs_aplicables)
+
+            # 5. Actualizar total de VentaReserva
+            venta_reserva.total = total_estimado - total_descuentos
+            venta_reserva.saldo_pendiente = venta_reserva.total - venta_reserva.pagado
+            venta_reserva.save()
+
+            logger.info(f'[Luna API] Reserva completada: Total ${venta_reserva.total} (descuentos: ${total_descuentos})')
+
+            # 6. Preparar respuesta
+            reserva_data = {
+                'id': venta_reserva.id,
+                'numero': f'RES-{venta_reserva.id}',
+                'cliente': {
+                    'id': cliente.id,
+                    'nombre': cliente.nombre,
+                    'email': cliente.email,
+                    'telefono': cliente.telefono,
+                    'documento_identidad': cliente.documento_identidad
+                },
+                'servicios': servicios_creados,
+                'total': float(venta_reserva.total),
+                'pagado': float(venta_reserva.pagado),
+                'saldo_pendiente': float(venta_reserva.saldo_pendiente),
+                'estado_pago': venta_reserva.estado_pago,
+                'descuentos_aplicados': [
+                    {
+                        'pack_nombre': pack_info['pack'].nombre,
+                        'descuento': float(pack_info['descuento'])
+                    }
+                    for pack_info in packs_aplicables
+                ],
+                'total_descuentos': float(total_descuentos),
+                'fecha_creacion': venta_reserva.fecha_creacion.isoformat(),
+                'notas': notas
+            }
+
+            # Guardar en cache por 24 horas (idempotencia)
+            cache.set(cache_key, reserva_data, 60 * 60 * 24)
+
+            return Response({
+                'success': True,
+                'reserva': reserva_data,
+                'mensaje': f'Reserva creada exitosamente: {venta_reserva.id}'
+            }, status=status.HTTP_201_CREATED)
+
+    except Servicio.DoesNotExist as e:
+        logger.error(f'[Luna API] Servicio no encontrado: {str(e)}')
+        return Response({
+            'success': False,
+            'error': 'service_not_found',
+            'mensaje': 'Uno o más servicios no existen'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        logger.error(f'[Luna API] Error creando reserva: {str(e)}', exc_info=True)
+        return Response({
+            'success': False,
+            'error': 'internal_error',
+            'mensaje': 'Error interno al crear reserva'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def validar_disponibilidad_interna(servicios_data):
+    """
+    Función auxiliar para validar disponibilidad sin HTTP request.
+    Reutiliza la lógica de validar_disponibilidad.
+    """
+    try:
+        disponibilidad_items = []
+        errores_validacion = []
+
+        for idx, servicio_data in enumerate(servicios_data):
+            servicio_id = servicio_data.get('servicio_id')
+            fecha_str = servicio_data.get('fecha')
+            hora_str = servicio_data.get('hora')
+            cantidad_personas = servicio_data.get('cantidad_personas', 1)
+
+            if not all([servicio_id, fecha_str, hora_str]):
+                errores_validacion.append({
+                    'servicio_index': idx,
+                    'error': 'missing_fields',
+                    'mensaje': 'servicio_id, fecha y hora son requeridos'
+                })
+                continue
+
+            try:
+                servicio = Servicio.objects.get(id=servicio_id, activo=True)
+            except Servicio.DoesNotExist:
+                errores_validacion.append({
+                    'servicio_index': idx,
+                    'servicio_id': servicio_id,
+                    'error': 'service_not_found',
+                    'mensaje': f'Servicio con ID {servicio_id} no existe o no está activo'
+                })
+                continue
+
+            try:
+                fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+            except ValueError:
+                errores_validacion.append({
+                    'servicio_index': idx,
+                    'servicio_id': servicio_id,
+                    'error': 'invalid_date',
+                    'mensaje': f'Fecha {fecha_str} inválida'
+                })
+                continue
+
+            if fecha < timezone.now().date():
+                errores_validacion.append({
+                    'servicio_index': idx,
+                    'servicio_id': servicio_id,
+                    'error': 'past_date',
+                    'mensaje': f'No se puede reservar en fecha pasada'
+                })
+                continue
+
+            if cantidad_personas < servicio.capacidad_minima or cantidad_personas > servicio.capacidad_maxima:
+                errores_validacion.append({
+                    'servicio_index': idx,
+                    'servicio_id': servicio_id,
+                    'error': 'capacity_error',
+                    'mensaje': f'Capacidad debe estar entre {servicio.capacidad_minima} y {servicio.capacidad_maxima}'
+                })
+                continue
+
+        if errores_validacion:
+            return {
+                'success': False,
+                'errores': errores_validacion
+            }
+
+        return {
+            'success': True,
+            'disponibilidad': disponibilidad_items
+        }
+
+    except Exception as e:
+        logger.error(f'Error en validación interna: {str(e)}')
+        return {
+            'success': False,
+            'errores': [{'error': 'internal_error', 'mensaje': str(e)}]
+        }
 
 
 # ============================================================================
