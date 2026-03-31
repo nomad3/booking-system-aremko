@@ -27,14 +27,14 @@ try:
     url = f"{base_url}/api/luna/reservas/validar/"
     print(f"URL: {url}")
 
-    # Usar un servicio que sabemos existe (ID 12 típicamente es una tina)
+    # Usar un servicio que sabemos existe (ID 12 es Tina Calbuco - requiere 4 personas)
     body = json.dumps({
         "servicios": [
             {
                 "servicio_id": 12,
                 "fecha": "2026-04-15",
                 "hora": "14:30",
-                "cantidad_personas": 2
+                "cantidad_personas": 4
             }
         ]
     }).encode('utf-8')
@@ -224,7 +224,7 @@ except Exception as e:
 
 # Test 4: Validar múltiples servicios con descuento
 print("\n" + "-"*60)
-print("TEST 4: Múltiples Servicios - Detectar Descuentos")
+print("TEST 4: Validar Respuesta Completa (precios, capacidad)")
 print("-"*60)
 
 try:
@@ -237,13 +237,7 @@ try:
                 "servicio_id": 12,
                 "fecha": "2026-04-15",
                 "hora": "14:30",
-                "cantidad_personas": 2
-            },
-            {
-                "servicio_id": 20,  # Intentar con un masaje si existe
-                "fecha": "2026-04-15",
-                "hora": "16:00",
-                "cantidad_personas": 2
+                "cantidad_personas": 4
             }
         ]
     }).encode('utf-8')
@@ -259,13 +253,19 @@ try:
     print(f"   Respuesta: {json.dumps(data, indent=2, ensure_ascii=False)}")
 
     if data.get('success'):
-        num_descuentos = len(data.get('descuentos_aplicables', []))
-        if num_descuentos > 0:
-            resultados.append(("Múltiples Servicios", True, f"{num_descuentos} descuento(s) detectado(s)"))
+        disponibilidad = data.get('disponibilidad', [])
+        if len(disponibilidad) > 0:
+            item = disponibilidad[0]
+            # Verificar que tiene todos los campos esperados
+            tiene_campos = all(k in item for k in ['servicio_id', 'servicio_nombre', 'disponible', 'precio_estimado'])
+            if tiene_campos:
+                resultados.append(("Validar Respuesta", True, "Respuesta completa OK"))
+            else:
+                resultados.append(("Validar Respuesta", False, "Campos faltantes"))
         else:
-            resultados.append(("Múltiples Servicios", True, "Sin descuentos"))
+            resultados.append(("Validar Respuesta", False, "Sin disponibilidad"))
     else:
-        resultados.append(("Múltiples Servicios", False, "Error en validación"))
+        resultados.append(("Validar Respuesta", False, "Error en validación"))
 
 except urllib.error.HTTPError as e:
     if e.code == 307:
@@ -280,9 +280,9 @@ except urllib.error.HTTPError as e:
             print(f"✅ Status Code: {response.status}")
             print(f"   Respuesta: {json.dumps(data, indent=2, ensure_ascii=False)}")
             if data.get('success'):
-                resultados.append(("Múltiples Servicios", True, "OK"))
+                resultados.append(("Validar Respuesta", True, "OK"))
             else:
-                resultados.append(("Múltiples Servicios", False, "Error"))
+                resultados.append(("Validar Respuesta", False, "Error"))
         except urllib.error.HTTPError as e2:
             print(f"❌ Error después de redirect: HTTP {e2.code}")
             try:
@@ -290,17 +290,17 @@ except urllib.error.HTTPError as e:
                 print(f"   Detalles del error: {json.dumps(error_data, indent=2, ensure_ascii=False)}")
             except:
                 pass
-            resultados.append(("Múltiples Servicios", False, f"HTTP {e2.code}"))
+            resultados.append(("Validar Respuesta", False, f"HTTP {e2.code}"))
         except Exception as e2:
             print(f"❌ Error: {e2}")
-            resultados.append(("Múltiples Servicios", False, str(e2)))
+            resultados.append(("Validar Respuesta", False, str(e2)))
     else:
         print(f"❌ HTTP Error {e.code}")
-        resultados.append(("Múltiples Servicios", False, f"HTTP {e.code}"))
+        resultados.append(("Validar Respuesta", False, f"HTTP {e.code}"))
 
 except Exception as e:
     print(f"❌ Error: {e}")
-    resultados.append(("Múltiples Servicios", False, str(e)))
+    resultados.append(("Validar Respuesta", False, str(e)))
 
 # Test 5: Validar capacidad excedida (debe fallar)
 print("\n" + "-"*60)
