@@ -488,7 +488,7 @@ def validar_disponibilidad(request):
             bloqueos_slot = ServicioSlotBloqueo.objects.filter(
                 servicio=servicio,
                 fecha=fecha,
-                hora_inicio=hora_str
+                hora_slot=hora_str
             )
             if bloqueos_slot.exists():
                 errores_validacion.append({
