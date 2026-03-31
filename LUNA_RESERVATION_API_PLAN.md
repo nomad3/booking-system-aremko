@@ -2,9 +2,17 @@
 
 ## Resumen Ejecutivo
 
-Este documento describe el plan para permitir que Luna (agente AI) cree reservas completas a través de una API REST, siguiendo el mismo flujo que usa el sitio web.
+Este documento describe el plan para permitir que **Luna** (agente conversacional AI por WhatsApp) cree reservas completas a través de una API REST, siguiendo el mismo flujo que usa el sitio web.
+
+**Contexto**: Luna conversa con clientes vía WhatsApp, recopila información sobre servicios deseados, fechas, y datos personales, y luego crea la reserva en el sistema automáticamente.
 
 **Alcance**: Solo **CREAR** reservas. NO incluye modificar ni eliminar.
+
+**⚠️ IMPORTANTE**:
+- Esta implementación NO requiere migraciones de base de datos
+- Usamos modelos y tablas existentes
+- Cualquier migración futura se ejecutará manualmente en Render shell
+- Backup completo de BD y código antes de comenzar (ver `BACKUP_BEFORE_LUNA_API.md`)
 
 ---
 
@@ -56,17 +64,26 @@ Este documento describe el plan para permitir que Luna (agente AI) cree reservas
 ### Arquitectura Propuesta
 
 ```
-Luna (AI Agent)
+Cliente real
+    ↓
+    ↓ WhatsApp
+    ↓
+Luna (AI Agent conversacional)
+    ↓ (recopila: servicio, fecha, hora, datos personales)
     ↓
     ↓ HTTP POST /api/luna/reservas/create
     ↓
-API Endpoint (nuevo)
+API Endpoint (nuevo - sin migraciones)
     ↓
     ├─ Validar disponibilidad
     ├─ Validar cliente
     ├─ Calcular totales
-    ├─ Crear reserva (transacción)
-    └─ Retornar confirmación
+    ├─ Crear reserva (transacción con modelos existentes)
+    └─ Retornar confirmación a Luna
+        ↓
+    Luna confirma al cliente vía WhatsApp
+        ↓
+    Cliente recibe número de reserva e instrucciones de pago
 ```
 
 ---
@@ -862,6 +879,20 @@ def serializar_reserva(venta):
 
 ## 7. Plan de Implementación por Fases
 
+### ⚠️ Prerequisitos Antes de Comenzar
+
+**CRÍTICO - Hacer backup completo**:
+1. ✅ Crear backup manual de base de datos en Render
+2. ✅ Descargar backup localmente
+3. ✅ Crear tag de git: `git tag pre-luna-api-v1.0`
+4. ✅ Respaldar variables de entorno
+5. ✅ Documentar estado de migraciones: `python manage.py showmigrations`
+6. ✅ Revisar checklist completo en `BACKUP_BEFORE_LUNA_API.md`
+
+**Ventana de implementación recomendada**: Martes tarde (cuando estamos cerrados, bajo tráfico)
+
+---
+
 ### Fase 1: Infraestructura Base (2-3 días)
 
 **Tareas:**
@@ -875,9 +906,15 @@ def serializar_reserva(venta):
    path('api/luna/reservas/validar', luna_api_views.validar_disponibilidad),
    ```
 
+**Verificaciones**:
+- ✅ NO se requieren migraciones (usamos modelos existentes)
+- ✅ Solo se agregan archivos nuevos
+- ✅ No se modifica la estructura de BD
+
 **Criterio de Éxito:**
 - Endpoints responden con autenticación correcta
 - Rechazan requests sin API key válida
+- Sistema existente sigue funcionando sin cambios
 
 ---
 
@@ -997,18 +1034,33 @@ def serializar_reserva(venta):
 ### Prompt Actualizado para Luna
 
 ```
-You are Luna, an AI assistant for Aremko Spa. You can now CREATE RESERVATIONS directly.
+You are Luna, an AI assistant for Aremko Spa in Puerto Varas, Chile.
 
-## Reservation Flow
+## Your Role
 
-1. Customer asks to book a service
-2. Check availability: GET /ventas/get-available-hours/?servicio_id={ID}&fecha={DATE}
-3. Confirm details with customer:
-   - Service(s) they want
-   - Date and time
-   - Number of people
-   - Their contact information
-4. Create reservation: POST /api/luna/reservas/create
+You chat with customers via WhatsApp to:
+1. Answer questions about services
+2. Check availability in real-time
+3. **CREATE RESERVATIONS directly in the system**
+
+## Reservation Flow (via WhatsApp Conversation)
+
+1. **Customer asks** about booking a service (tinaja, masaje, cabaña)
+2. **You check availability**: GET /ventas/get-available-hours/?servicio_id={ID}&fecha={DATE}
+3. **You present** available options to customer in friendly Spanish
+4. **You collect** required information through conversation:
+   - Full name (nombre completo)
+   - Email address
+   - Phone number (must be Chilean format +56XXXXXXXXX)
+   - ID document (RUT chileno)
+   - City (comuna - default: Puerto Varas if not specified)
+5. **You confirm** all details with customer before creating
+6. **You create** reservation: POST /api/luna/reservas/create
+7. **You inform** customer of:
+   - Reservation number
+   - Total amount to pay
+   - Payment instructions (bank transfer details)
+   - Confirmation that they'll receive SMS/email
 
 ## Creating a Reservation
 
