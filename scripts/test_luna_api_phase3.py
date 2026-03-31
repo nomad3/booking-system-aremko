@@ -39,8 +39,8 @@ try:
             "email": "juan.test.luna@example.com",
             "telefono": "+56987654321",
             "documento_identidad": "11111111-1",  # RUT válido de prueba
-            "region_id": 10,  # Región de Los Lagos
-            "comuna_id": 101  # Puerto Varas (pertenece a Región 10)
+            "region_id": 14,  # Región Los Lagos
+            "comuna_id": 31   # Calbuco (pertenece a Región 14)
         },
         "servicios": [
             {
@@ -174,8 +174,8 @@ try:
             "nombre": "",  # Nombre vacío - debe fallar
             "email": "test@example.com",
             "telefono": "+56987654321",
-            "region_id": 1,
-            "comuna_id": 10
+            "region_id": 14,
+            "comuna_id": 31
         },
         "servicios": [
             {
@@ -240,8 +240,8 @@ try:
             "nombre": "Juan Pérez",
             "email": "test@example.com",
             "telefono": "+56987654321",
-            "region_id": 1,
-            "comuna_id": 10
+            "region_id": 14,
+            "comuna_id": 31
         },
         "servicios": [
             {
