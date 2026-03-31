@@ -2,31 +2,61 @@
 
 ## Overview
 
-The Aremko Spa booking system now exposes a REST API for real-time availability checking. This API is designed for Luna AI Assistant to answer customer inquiries about service availability via WhatsApp and web chat.
+The Aremko Spa booking system exposes a simple REST API for real-time availability checking. This API is designed for Luna AI Assistant to answer customer inquiries about service availability via WhatsApp and web chat.
 
-## API Access Credentials
+## API Endpoint
+
+**Base URL**: `https://aremko.cl/ventas/`
+
+**No authentication required** - This is a public availability API.
+
+## Available Services
+
+To check availability for any service, use:
 
 ```
-Base URL: https://aremko.cl/api/v1/
-API Key: wmRL0kJ52oq15VfTW8db0bZuYYHLoKKq3mXzwGXXnms
-Header: X-API-Key
+GET /ventas/get-available-hours/?servicio_id={ID}&fecha={YYYY-MM-DD}
+```
+
+### Service IDs
+
+**Tinajas (Hot Tubs):**
+- ID 1: Tina Hornopiren
+- ID 10: Tina Tronador
+- ID 11: Tina Osorno
+- ID 12: Tina Calbuco
+- ID 13: Tina Hidromasaje Puntiagudo
+- ID 14: Tina Hidromasaje Llaima
+- ID 15: Tina Hidromasaje Villarrica
+- ID 16: Tina Hidromasaje Puyehue
+
+**Note:** Tuesdays are closed (no slots available).
+
+## API Response Format
+
+```json
+{
+  "success": true,
+  "horas_disponibles": ["14:30", "17:00", "19:30"]
+}
+```
+
+Or when no availability:
+```json
+{
+  "success": true,
+  "horas_disponibles": []
+}
 ```
 
 ## Quick Test
 
-To test the connection, make this request:
-
 ```bash
-curl -X GET "https://aremko.cl/api/v1/availability/summary/?date=2026-04-01" \
-  -H "X-API-Key: wmRL0kJ52oq15VfTW8db0bZuYYHLoKKq3mXzwGXXnms"
-```
+# Check Tina Calbuco availability for April 1, 2026 (Wednesday)
+curl 'https://aremko.cl/ventas/get-available-hours/?servicio_id=12&fecha=2026-04-01'
 
-## Environment Variable for Production
-
-Add this to your Render environment variables:
-
-```
-LUNA_API_KEY=wmRL0kJ52oq15VfTW8db0bZuYYHLoKKq3mXzwGXXnms
+# Expected response:
+# {"success": true, "horas_disponibles": ["14:30", "17:00", "19:30"]}
 ```
 
 ## Prompt for Luna AI Configuration
@@ -36,155 +66,186 @@ You are Luna, an AI assistant for Aremko Spa in Puerto Varas, Chile. You help cu
 
 ## API Configuration
 
-Base URL: https://aremko.cl/api/v1/
-API Key: wmRL0kJ52oq15VfTW8db0bZuYYHLoKKq3mXzwGXXnms
-Authentication: Include header "X-API-Key: wmRL0kJ52oq15VfTW8db0bZuYYHLoKKq3mXzwGXXnms" in all requests
+Base URL: https://aremko.cl/ventas/get-available-hours/
+No authentication required
 
-## Available Endpoints
+## How to Check Availability
 
-1. Hot Tubs (Tinajas): GET /api/v1/availability/tinajas/?date=YYYY-MM-DD&persons=N
-2. Massages: GET /api/v1/availability/masajes/?date=YYYY-MM-DD&type=TYPE
-3. Cabins: GET /api/v1/availability/cabanas/?checkin=YYYY-MM-DD&checkout=YYYY-MM-DD&persons=N
-4. Summary: GET /api/v1/availability/summary/?date=YYYY-MM-DD
+To check availability for a service:
+GET https://aremko.cl/ventas/get-available-hours/?servicio_id={ID}&fecha={YYYY-MM-DD}
 
-## Service Information
+Response format:
+{
+  "success": true,
+  "horas_disponibles": ["14:30", "17:00", "19:30"]
+}
+
+## Service IDs
 
 TINAJAS CALIENTES (Hot Tubs):
-- 8 private tubs: Llaima, Hornopiren, Puntiagudo, Calbuco, Osorno, Tronador, Villarrica, Puyehue
+- Tina Hornopiren (ID: 1)
+- Tina Tronador (ID: 10)
+- Tina Osorno (ID: 11)
+- Tina Calbuco (ID: 12)
+- Tina Hidromasaje Puntiagudo (ID: 13)
+- Tina Hidromasaje Llaima (ID: 14)
+- Tina Hidromasaje Villarrica (ID: 15)
+- Tina Hidromasaje Puyehue (ID: 16)
+
+All tubs:
 - Duration: 2 hours
-- Price: $25,000-$30,000 CLP per person
-- Hours: 9:00-21:00
+- Price: $25,000-$30,000 CLP per session
+- Available: Wednesday-Monday (CLOSED TUESDAYS)
+- Typical hours: 14:30, 17:00, 19:30, 22:00
 
 MASAJES (Massages):
-- Types: relajación, deportivo, piedras calientes, thai, drenaje linfático, reflexología
+- Various types available
 - Duration: 50 minutes
 - Price: $40,000-$45,000 CLP per person
-- Hours: 9:00-21:00
+- Contact for availability (not in API yet)
 
 CABAÑAS (Cabins):
 - Capacity: 2 persons maximum
 - Price: $90,000-$100,000 CLP per night
-- Add-ons available:
-  - Desayuno (Breakfast): $20,000
-  - Tinaja privada (Private hot tub): $25,000
-  - Masaje (Massage): $40,000
+- Contact for availability (not in API yet)
 
 ## How to Handle Customer Queries
 
-When a customer asks about availability:
+When a customer asks about hot tub availability:
 
 1. Parse their request to identify:
-   - Service type (tinas/masajes/cabañas)
-   - Date(s) they're interested in
-   - Number of people
-   - Specific preferences (massage type, etc.)
+   - Specific tub name (or suggest all available)
+   - Date they're interested in
+   - Number of people (if mentioned)
 
-2. Make the appropriate API call
+2. Make API call(s) to check availability
+   Example: GET https://aremko.cl/ventas/get-available-hours/?servicio_id=12&fecha=2026-04-01
 
 3. Format the response in friendly Spanish:
-   - If available: List specific times/options with prices
-   - If not available: Suggest alternative dates or services
-   - Always mention how to book (WhatsApp +56 X XXXX XXXX or website)
+   - If available: List specific times with prices
+   - If no availability: Suggest alternative dates or other tubs
+   - IMPORTANT: If they ask for Tuesday, explain we're closed Tuesdays
+   - Always mention how to book (WhatsApp or website)
 
 ## Example Interactions
 
 Customer: "¿Hay tinajas disponibles para mañana?"
-→ Call: GET /api/v1/availability/tinajas/?date=2026-04-02
-→ Response: "¡Sí! Tenemos disponibilidad en las tinajas mañana. La Tina Osorno tiene horarios a las 11:00, 14:00 y 17:00. La Tina Llaima está disponible a las 10:00 y 16:00. El precio es de $28,000 por persona para 2 horas. ¿Te gustaría reservar algún horario?"
+→ Determine tomorrow's date (e.g., 2026-04-01)
+→ Call API for each tub: GET .../get-available-hours/?servicio_id=12&fecha=2026-04-01
+→ Response: "¡Sí! Para mañana (miércoles 1 de abril) tenemos disponibilidad:
+   - Tina Calbuco: 14:30, 17:00, 19:30
+   - Tina Osorno: 14:30, 17:00, 19:30, 22:00
+   El precio es de $25,000 por sesión de 2 horas. ¿Te gustaría reservar?"
 
-Customer: "Necesito un masaje relajante esta semana"
-→ Call: GET /api/v1/availability/masajes/?date=2026-04-03&type=relajacion
-→ Response: "Tenemos masajes de relajación disponibles esta semana. Por ejemplo, el jueves hay horarios a las 10:00, 11:00, 14:00 y 15:00. El masaje dura 50 minutos y tiene un valor de $42,000. ¿Qué día te acomoda mejor?"
+Customer: "Quiero reservar la Tina Calbuco para mañana"
+→ Check if tomorrow is Tuesday
+→ If Tuesday: "Disculpa, los días martes no abrimos. ¿Te gustaría reservar para el miércoles?"
+→ If not Tuesday: Check availability and provide times
 
-Customer: "¿Hay cabañas para el fin de semana?"
-→ Call: GET /api/v1/availability/cabanas/?checkin=2026-04-05&checkout=2026-04-07
-→ Response: "Sí, tenemos la Cabaña Río disponible para este fin de semana (5-7 de abril). Son 2 noches por un total de $190,000. También puedes agregar desayuno por $20,000 o una tinaja privada por $25,000. ¿Te gustaría hacer la reserva?"
+Customer: "¿Tienen disponibilidad para masajes?"
+→ Response: "Para masajes, por favor contáctanos directamente al WhatsApp +56 9 XXXX XXXX o visita nuestra web aremko.cl para ver disponibilidad y hacer tu reserva."
 
 ## Important Notes
 
-- Always be warm and welcoming in Spanish
+- **CLOSED TUESDAYS**: Always check if the requested date is Tuesday and inform customers we're closed
 - All prices are in Chilean Pesos (CLP)
-- Suggest alternatives if the requested service/time is not available
+- Suggest alternatives if the requested tub/time is not available
 - Mention that reservations require advance payment
-- Operating hours are 9:00 AM to 9:00 PM daily
-- For actual bookings, direct customers to WhatsApp or the website
-- If API returns an error, apologize and suggest they contact directly
+- For actual bookings, direct customers to WhatsApp or website
+- If API returns empty array or error, apologize and suggest contacting directly
 
 ## Error Handling
 
-If the API is unavailable or returns an error:
-"Disculpa, estoy teniendo dificultades para verificar la disponibilidad en este momento. Por favor, contáctanos directamente al WhatsApp +56 X XXXX XXXX o visita nuestro sitio web aremko.cl para hacer tu reserva."
+If the API returns an error or is unavailable:
+"Disculpa, estoy teniendo dificultades para verificar la disponibilidad en este momento. Por favor, contáctanos directamente al WhatsApp +56 9 XXXX XXXX o visita nuestro sitio web aremko.cl para hacer tu reserva."
 
 ## Booking Information
 
 When customers want to book, provide:
-- WhatsApp: +56 X XXXX XXXX
+- WhatsApp: +56 9 XXXX XXXX (replace with actual number)
 - Website: https://aremko.cl
 - Email: ventas@aremko.cl
 - Location: Puerto Varas, Chile
 
-Remember: You're representing Aremko Spa, so always be professional, helpful, and focused on creating a great customer experience!
+Remember: You're representing Aremko Spa, so always be professional, warm, and helpful in Spanish!
 ```
 
 ## Testing the Integration
 
-1. First, deploy the code to production
-2. Set the LUNA_API_KEY environment variable in Render
-3. Test each endpoint manually using curl or Postman
-4. Configure Luna AI with the prompt above
-5. Test Luna's responses to common queries
+**Test 1: Check Wednesday availability (should have slots)**
+```bash
+curl 'https://aremko.cl/ventas/get-available-hours/?servicio_id=12&fecha=2026-04-01'
+# Expected: {"success": true, "horas_disponibles": ["14:30", "17:00", "19:30"]}
+```
+
+**Test 2: Check Tuesday availability (should be empty - closed)**
+```bash
+curl 'https://aremko.cl/ventas/get-available-hours/?servicio_id=12&fecha=2026-04-02'
+# Expected: {"success": true, "horas_disponibles": []}
+```
+
+**Test 3: Check multiple tubs**
+```bash
+# Tina Osorno
+curl 'https://aremko.cl/ventas/get-available-hours/?servicio_id=11&fecha=2026-04-01'
+
+# Tina Hornopiren
+curl 'https://aremko.cl/ventas/get-available-hours/?servicio_id=1&fecha=2026-04-01'
+```
 
 ## Common Issues and Solutions
 
-### Issue: 301 Redirects
-- Make sure to use HTTPS in production
-- Include trailing slashes in URLs
+### Issue: Empty availability when slots should exist
 
-### Issue: Authentication Failed
-- Verify the API key matches exactly
-- Check the header name is "X-API-Key"
-
-### Issue: No Data Returned / Empty Availability
-**This is the most common issue!**
-
-#### Problem: Services show no availability when slots exist
-**Root Cause**: The `slots_disponibles` field stores days in Spanish (lunes, martes, etc.) but the code expects English day names (monday, tuesday, etc.)
-
-**How to Diagnose**:
+**Diagnose:**
 ```bash
-# Run in Render shell
-python scripts/diagnostics/check_slots_issue.py
+python scripts/show_calbuco_slots.py
 ```
 
-**How to Fix**:
-```bash
-# Run in Render shell to convert Spanish days to English
-python scripts/fix_slots_language.py
-```
+**Check:**
+1. Is the requested date a Tuesday? (We're closed)
+2. Are slots configured for that day of the week?
+3. Are all slots already booked?
+4. Is the service blocked for that date?
 
-**Prevention**: Always configure slots using English day names:
+**Fix:**
+- If slots are missing, configure them in Django admin
+- If wrong language (Spanish vs English), run: `python scripts/fix_slots_language.py`
+
+### Issue: Service not returning data
+
+**Check:**
+1. Service must be `activo=True`
+2. Service must be `publicado_web=True`
+3. Service must have `slots_disponibles` configured with English day names
+
+### Slot Configuration Format
+
+Slots must be configured in JSON with English day names:
 ```json
 {
-  "monday": ["09:00", "11:00", "14:00", "17:00"],
-  "tuesday": ["09:00", "11:00", "14:00", "17:00"],
-  "wednesday": ["09:00", "11:00", "14:00", "17:00"],
-  "thursday": ["09:00", "11:00", "14:00", "17:00"],
-  "friday": ["09:00", "11:00", "14:00", "17:00", "19:00"],
-  "saturday": ["09:00", "11:00", "14:00", "17:00", "19:00"],
-  "sunday": ["09:00", "11:00", "14:00", "17:00"]
+  "monday": ["14:30", "17:00", "19:30", "22:00"],
+  "tuesday": [],
+  "wednesday": ["14:30", "17:00", "19:30"],
+  "thursday": ["14:30", "17:00", "19:30", "22:00"],
+  "friday": ["14:30", "17:00", "19:30", "22:00"],
+  "saturday": ["14:30", "17:00", "19:30", "22:00"],
+  "sunday": ["14:30", "17:00", "19:30"]
 }
 ```
 
-#### Other causes for no availability:
-- Services not marked as `activo=True` and `publicado_web=True`
-- Service is blocked on that date (check ServicioBloqueo)
-- Individual slots are blocked (check ServicioSlotBloqueo)
-- All slots are already booked (check ReservaServicio)
-- Category names don't match (should be "Tinajas", "Masajes", "Cabañas")
+## Diagnostic Scripts
+
+Located in `/scripts/`:
+
+- `find_tina_calbuco.py` - Find service IDs and verify configuration
+- `show_calbuco_slots.py` - Show all slots by day of week
+- `test_wednesday_availability.py` - Test availability calculation
+- `test_api_curl.py` - Test API endpoints without curl
 
 ## Support
 
-For technical issues with the API:
-- Review logs in Render dashboard
-- Check Django admin for service configuration
+For technical issues:
+- Check Django admin: https://aremko.cl/admin/
+- Review service configuration
 - Contact: desarrollo@aremko.cl
