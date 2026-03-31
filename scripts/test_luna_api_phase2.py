@@ -71,6 +71,14 @@ except urllib.error.HTTPError as e:
                 resultados.append(("Validar - Caso Exitoso", True, "OK"))
             else:
                 resultados.append(("Validar - Caso Exitoso", False, "Error"))
+        except urllib.error.HTTPError as e2:
+            print(f"❌ Error después de redirect: HTTP {e2.code}")
+            try:
+                error_data = json.loads(e2.read().decode())
+                print(f"   Detalles del error: {json.dumps(error_data, indent=2, ensure_ascii=False)}")
+            except:
+                pass
+            resultados.append(("Validar - Caso Exitoso", False, f"HTTP {e2.code}"))
         except Exception as e2:
             print(f"❌ Error después de redirect: {e2}")
             resultados.append(("Validar - Caso Exitoso", False, str(e2)))
@@ -275,6 +283,14 @@ except urllib.error.HTTPError as e:
                 resultados.append(("Múltiples Servicios", True, "OK"))
             else:
                 resultados.append(("Múltiples Servicios", False, "Error"))
+        except urllib.error.HTTPError as e2:
+            print(f"❌ Error después de redirect: HTTP {e2.code}")
+            try:
+                error_data = json.loads(e2.read().decode())
+                print(f"   Detalles del error: {json.dumps(error_data, indent=2, ensure_ascii=False)}")
+            except:
+                pass
+            resultados.append(("Múltiples Servicios", False, f"HTTP {e2.code}"))
         except Exception as e2:
             print(f"❌ Error: {e2}")
             resultados.append(("Múltiples Servicios", False, str(e2)))
