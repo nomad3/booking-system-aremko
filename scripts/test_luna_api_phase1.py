@@ -12,7 +12,7 @@ print("\n" + "="*60)
 print("PRUEBA DE LUNA API - FASE 1")
 print("="*60)
 
-base_url = "https://aremko.cl"
+base_url = "https://aremko.cl/ventas"  # Ventas app URLs are under /ventas/
 api_key = "wmRL0kJ52oq15VfTW8db0bZuYYHLoKKq3mXzwGXXnms"
 
 resultados = []

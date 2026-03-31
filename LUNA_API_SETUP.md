@@ -47,7 +47,7 @@ wmRL0kJ52oq15VfTW8db0bZuYYHLoKKq3mXzwGXXnms
 ### 1. Health Check (sin autenticación)
 
 ```bash
-curl https://aremko.cl/api/luna/health
+curl https://aremko.cl/ventas/api/luna/health
 ```
 
 **Respuesta esperada**:
@@ -64,7 +64,7 @@ curl https://aremko.cl/api/luna/health
 ### 2. Test Connection (con autenticación)
 
 ```bash
-curl -X GET https://aremko.cl/api/luna/test \
+curl -X GET https://aremko.cl/ventas/api/luna/test \
   -H "X-Luna-API-Key: TU_API_KEY_AQUI"
 ```
 
@@ -97,7 +97,7 @@ curl -X GET https://aremko.cl/api/luna/test \
 ### 3. Listar Regiones
 
 ```bash
-curl -X GET https://aremko.cl/api/luna/regiones \
+curl -X GET https://aremko.cl/ventas/api/luna/regiones \
   -H "X-Luna-API-Key: TU_API_KEY_AQUI"
 ```
 
@@ -123,7 +123,7 @@ curl -X GET https://aremko.cl/api/luna/regiones \
 ### 4. Validar Disponibilidad (Fase 2 - en desarrollo)
 
 ```bash
-curl -X POST https://aremko.cl/api/luna/reservas/validar \
+curl -X POST https://aremko.cl/ventas/api/luna/reservas/validar \
   -H "X-Luna-API-Key: TU_API_KEY_AQUI" \
   -H "Content-Type: application/json" \
   -d '{
@@ -152,7 +152,7 @@ curl -X POST https://aremko.cl/api/luna/reservas/validar \
 ### 5. Crear Reserva (Fase 3 - en desarrollo)
 
 ```bash
-curl -X POST https://aremko.cl/api/luna/reservas/create \
+curl -X POST https://aremko.cl/ventas/api/luna/reservas/create \
   -H "X-Luna-API-Key: TU_API_KEY_AQUI" \
   -H "Content-Type: application/json" \
   -d '{
