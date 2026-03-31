@@ -5,6 +5,7 @@ Ejecutar: python scripts/test_luna_api_phase1.py
 """
 
 import urllib.request
+import urllib.error
 import json
 import sys
 
@@ -188,6 +189,29 @@ try:
     else:
         resultados.append(("Validar Disponibilidad", True, "Funciona"))
 
+except urllib.error.HTTPError as e:
+    if e.code == 307:
+        # Seguir el redirect manualmente
+        new_url = e.headers.get('Location')
+        print(f"   Siguiendo redirect a: {new_url}")
+        try:
+            req = urllib.request.Request(new_url, data=body, method='POST')
+            req.add_header('X-Luna-API-Key', api_key)
+            req.add_header('Content-Type', 'application/json')
+            response = urllib.request.urlopen(req, timeout=10)
+            data = json.loads(response.read().decode())
+            print(f"✅ Status Code: {response.status}")
+            print(f"   Respuesta: {json.dumps(data, indent=2)}")
+            if 'Fase 2' in data.get('mensaje', ''):
+                resultados.append(("Validar Disponibilidad", True, "Placeholder OK"))
+            else:
+                resultados.append(("Validar Disponibilidad", True, "Funciona"))
+        except Exception as e2:
+            print(f"❌ Error después de redirect: {e2}")
+            resultados.append(("Validar Disponibilidad", False, str(e2)))
+    else:
+        print(f"❌ HTTP Error {e.code}: {e.reason}")
+        resultados.append(("Validar Disponibilidad", False, f"HTTP {e.code}"))
 except Exception as e:
     print(f"❌ Error: {e}")
     resultados.append(("Validar Disponibilidad", False, str(e)))
@@ -236,6 +260,29 @@ try:
     else:
         resultados.append(("Crear Reserva", True, "Funciona"))
 
+except urllib.error.HTTPError as e:
+    if e.code == 307:
+        # Seguir el redirect manualmente
+        new_url = e.headers.get('Location')
+        print(f"   Siguiendo redirect a: {new_url}")
+        try:
+            req = urllib.request.Request(new_url, data=body, method='POST')
+            req.add_header('X-Luna-API-Key', api_key)
+            req.add_header('Content-Type', 'application/json')
+            response = urllib.request.urlopen(req, timeout=10)
+            data = json.loads(response.read().decode())
+            print(f"✅ Status Code: {response.status}")
+            print(f"   Respuesta: {json.dumps(data, indent=2)}")
+            if 'Fase 3' in data.get('mensaje', ''):
+                resultados.append(("Crear Reserva", True, "Placeholder OK"))
+            else:
+                resultados.append(("Crear Reserva", True, "Funciona"))
+        except Exception as e2:
+            print(f"❌ Error después de redirect: {e2}")
+            resultados.append(("Crear Reserva", False, str(e2)))
+    else:
+        print(f"❌ HTTP Error {e.code}: {e.reason}")
+        resultados.append(("Crear Reserva", False, f"HTTP {e.code}"))
 except Exception as e:
     print(f"❌ Error: {e}")
     resultados.append(("Crear Reserva", False, str(e)))
