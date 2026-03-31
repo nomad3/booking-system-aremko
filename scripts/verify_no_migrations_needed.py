@@ -86,14 +86,20 @@ for nombre, modelo in modelos_necesarios.items():
             campos_faltantes = []
 
             for campo in campos_criticos[nombre]:
-                # Remover _id para ForeignKeys
+                # Remover _id para ForeignKeys para verificar en el modelo
                 campo_real = campo.replace('_id', '')
 
-                if not hasattr(modelo, campo_real):
-                    campos_faltantes.append(campo)
-                    print(f"   ⚠️  Campo '{campo}' no encontrado")
-                else:
+                # Verificar usando _meta.get_field que es más confiable
+                try:
+                    modelo._meta.get_field(campo_real)
                     print(f"   ✅ Campo '{campo}' existe")
+                except Exception:
+                    # Fallback a hasattr para campos no estándar
+                    if hasattr(modelo, campo_real):
+                        print(f"   ✅ Campo '{campo}' existe")
+                    else:
+                        campos_faltantes.append(campo)
+                        print(f"   ⚠️  Campo '{campo}' no encontrado")
 
             if campos_faltantes:
                 errores.append(f"{nombre}: campos faltantes {campos_faltantes}")
