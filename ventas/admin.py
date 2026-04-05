@@ -249,6 +249,24 @@ class DetalleComandaInline(admin.TabularInline):
             formfield.widget.attrs['maxlength'] = 30
         return formfield
 
+    def has_add_permission(self, request, obj=None):
+        """Solo permitir agregar productos si la comanda está pendiente"""
+        if obj and obj.estado != 'pendiente':
+            return False
+        return super().has_add_permission(request, obj)
+
+    def has_change_permission(self, request, obj=None):
+        """Solo permitir editar productos si la comanda está pendiente"""
+        if obj and obj.estado != 'pendiente':
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        """Solo permitir eliminar productos si la comanda está pendiente"""
+        if obj and obj.estado != 'pendiente':
+            return False
+        return super().has_delete_permission(request, obj)
+
 
 class ComandaInline(admin.TabularInline):
     """
@@ -3177,20 +3195,22 @@ class ComandaAdmin(admin.ModelAdmin):
         return format_html('<span style="color:#999;">⚡ Inmediato</span>')
     entrega_objetivo_display.short_description = 'Entrega Objetivo'
 
-    def has_change_permission(self, request, obj=None):
-        """Solo permitir edición si la comanda está pendiente"""
-        if obj and obj.estado != 'pendiente':
-            # Para comandas procesando/entregadas, solo permitir vista
-            return request.user.has_perm('ventas.view_comanda')
-        return super().has_change_permission(request, obj)
+    # COMENTADO: Esta restricción causaba error 500 al guardar comandas no-pendientes
+    # porque Django perdía permisos inmediatamente después de cambiar el estado
+    # def has_change_permission(self, request, obj=None):
+    #     """Solo permitir edición si la comanda está pendiente"""
+    #     if obj and obj.estado != 'pendiente':
+    #         # Para comandas procesando/entregadas, solo permitir vista
+    #         return request.user.has_perm('ventas.view_comanda')
+    #     return super().has_change_permission(request, obj)
 
     def get_readonly_fields(self, request, obj=None):
-        """Hacer todos los campos readonly si la comanda no está pendiente"""
+        """Hacer algunos campos readonly según el estado"""
         readonly = list(self.readonly_fields)
         if obj and obj.estado != 'pendiente':
-            # Si no está pendiente, todos los campos son readonly
-            readonly.extend(['venta_reserva', 'estado', 'fecha_entrega_objetivo',
-                           'usuario_solicita', 'usuario_procesa', 'notas_generales'])
+            # Si no está pendiente, algunos campos se bloquean pero el estado se puede cambiar
+            readonly.extend(['venta_reserva', 'fecha_entrega_objetivo', 'usuario_solicita'])
+            # Permitimos cambiar: estado, usuario_procesa
         return readonly
 
     def get_form(self, request, obj=None, **kwargs):
