@@ -39,8 +39,12 @@ def lista_comandas(request):
             fecha = datetime.strptime(fecha_filtro, '%Y-%m-%d').date()
             comandas = comandas.filter(fecha_solicitud__date=fecha)
 
-        # Ordenar por prioridad: urgentes primero, luego por hora
-        comandas = comandas.order_by('-es_urgente', 'fecha_solicitud')
+        # Ordenar por hora (no podemos ordenar por es_urgente porque es una propiedad)
+        comandas = comandas.order_by('fecha_solicitud')
+
+        # Convertir a lista y ordenar por es_urgente en Python
+        comandas_list = list(comandas)
+        comandas_list.sort(key=lambda c: (not c.es_urgente, c.fecha_solicitud))
 
         # Estadísticas del día
         hoy = timezone.now().date()
@@ -63,7 +67,7 @@ def lista_comandas(request):
         }
 
         context = {
-            'comandas': comandas,
+            'comandas': comandas_list,  # Usar la lista ordenada en Python
             'estado_filtro': estado_filtro,
             'fecha_filtro': fecha_filtro,
             'stats': stats,
@@ -175,10 +179,14 @@ def comandas_cocina(request):
         'venta_reserva__cliente'
     ).prefetch_related(
         'detalles__producto'
-    ).order_by('-es_urgente', 'fecha_solicitud')
+    ).order_by('fecha_solicitud')
+
+    # Ordenar por urgencia en Python (es_urgente es una propiedad, no campo BD)
+    comandas_list = list(comandas)
+    comandas_list.sort(key=lambda c: (not c.es_urgente, c.fecha_solicitud))
 
     context = {
-        'comandas': comandas,
+        'comandas': comandas_list,
         'ahora': timezone.now()
     }
 
