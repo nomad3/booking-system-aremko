@@ -102,9 +102,9 @@ except Exception as e:
     resultados.append(("Crear Reserva Inicial", False, str(e)))
     sys.exit(1)
 
-# PASO 2: Agregar masajes a la reserva
+# PASO 2: Agregar otra tina a la reserva (mismo tipo de servicio)
 print("\n" + "-"*60)
-print(f"PASO 2: Agregar Masajes a Reserva {reserva_id}")
+print(f"PASO 2: Agregar Otra Tina a Reserva {reserva_id}")
 print("-"*60)
 
 try:
@@ -114,10 +114,10 @@ try:
     body = json.dumps({
         "servicios": [
             {
-                "servicio_id": 20,  # Masaje Relajante
+                "servicio_id": 13,  # Tina Hornopirén (si existe) o 14 (Tina Puelo)
                 "fecha": "2026-05-10",
-                "hora": "16:00",
-                "cantidad_personas": 2
+                "hora": "18:00",
+                "cantidad_personas": 4
             }
         ]
     }).encode('utf-8')
@@ -143,7 +143,7 @@ try:
         if descuentos > 0:
             print(f"   🎉 Descuentos aplicados: ${descuentos:,.0f}")
 
-        resultados.append(("Agregar Masajes", True, f"Total: ${nuevo_total:,.0f}"))
+        resultados.append(("Agregar Otra Tina", True, f"Total: ${nuevo_total:,.0f}"))
     else:
         resultados.append(("Agregar Masajes", False, "Error"))
 
@@ -160,9 +160,9 @@ except urllib.error.HTTPError as e:
             print(f"✅ Status Code: {response.status}")
             print(f"   Respuesta: {json.dumps(data, indent=2, ensure_ascii=False)}")
             if data.get('success'):
-                resultados.append(("Agregar Masajes", True, "OK"))
+                resultados.append(("Agregar Otra Tina", True, "OK"))
             else:
-                resultados.append(("Agregar Masajes", False, "Error"))
+                resultados.append(("Agregar Otra Tina", False, "Error"))
         except urllib.error.HTTPError as e2:
             print(f"❌ Error después de redirect: HTTP {e2.code}")
             try:
@@ -170,7 +170,7 @@ except urllib.error.HTTPError as e:
                 print(f"   Detalles: {json.dumps(error_data, indent=2, ensure_ascii=False)}")
             except:
                 pass
-            resultados.append(("Agregar Masajes", False, f"HTTP {e2.code}"))
+            resultados.append(("Agregar Otra Tina", False, f"HTTP {e2.code}"))
     else:
         print(f"❌ HTTP Error {e.code}")
         try:
