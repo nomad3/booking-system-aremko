@@ -3288,13 +3288,9 @@ class ComandaAdmin(admin.ModelAdmin):
         """Guardar el formset y crear ReservaProducto para nuevas comandas"""
         from django.contrib import messages
 
-        # Validar que la comanda sea editable
-        comanda = form.instance
-        if change and comanda.estado != 'pendiente':
-            messages.error(request,
-                f"❌ No se puede modificar una comanda en estado {comanda.get_estado_display()}"
-            )
-            return
+        # NOTA: No validamos estado aquí porque el inline ya tiene has_add/change/delete_permission
+        # que bloquea modificar productos cuando no está pendiente.
+        # Validar aquí causaba error 500 al cambiar estado y guardar.
 
         try:
             instances = formset.save(commit=False)
