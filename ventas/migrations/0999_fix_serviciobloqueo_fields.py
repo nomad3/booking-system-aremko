@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ventas', '0098_ajustar_verbose_names_resenas'),  # Ajusta esto a tu última migración
+        ('ventas', '0082_comandas_cliente_whatsapp'),  # Debe ejecutarse después de la migración de comandas cliente
     ]
 
     operations = [
