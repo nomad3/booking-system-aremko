@@ -114,10 +114,10 @@ try:
     body = json.dumps({
         "servicios": [
             {
-                "servicio_id": 13,  # Tina Hornopirén (si existe) o 14 (Tina Puelo)
+                "servicio_id": 13,  # Tina Hornopirén (capacidad máx: 3 personas)
                 "fecha": "2026-05-10",
                 "hora": "18:00",
-                "cantidad_personas": 4
+                "cantidad_personas": 2
             }
         ]
     }).encode('utf-8')
