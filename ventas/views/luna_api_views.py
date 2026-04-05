@@ -893,6 +893,174 @@ def crear_reserva(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['POST'])
+@authentication_classes([LunaAPIKeyAuthentication])
+def agregar_servicios_reserva(request, reserva_id):
+    """
+    Agrega servicios adicionales a una reserva existente.
+
+    POST /api/luna/reservas/{reserva_id}/servicios/
+
+    Body:
+    {
+        "servicios": [
+            {
+                "servicio_id": 9,
+                "fecha": "2026-04-30",
+                "hora": "16:00",
+                "cantidad_personas": 2
+            }
+        ]
+    }
+
+    Respuesta:
+    {
+        "success": true,
+        "reserva_id": 5434,
+        "numero": "RES-5434",
+        "servicios_agregados": [...],
+        "nuevo_total": 150000.0,
+        "saldo_pendiente": 150000.0
+    }
+    """
+    try:
+        # Buscar la reserva existente
+        try:
+            venta_reserva = VentaReserva.objects.get(id=reserva_id)
+        except VentaReserva.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'reserva_not_found',
+                'mensaje': f'Reserva con ID {reserva_id} no existe'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        servicios_data = request.data.get('servicios', [])
+
+        if not servicios_data:
+            return Response({
+                'success': False,
+                'error': 'validation_error',
+                'mensaje': 'Debe incluir al menos un servicio'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validar disponibilidad de los nuevos servicios
+        validacion_response = validar_disponibilidad_interna(servicios_data)
+
+        if not validacion_response['success']:
+            return Response({
+                'success': False,
+                'error': 'availability_error',
+                'errores': validacion_response.get('errores', []),
+                'mensaje': 'Uno o más servicios no están disponibles'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Iniciar transacción atómica
+        with transaction.atomic():
+            servicios_agregados = []
+            total_nuevos_servicios = 0
+
+            # Crear ReservaServicio para cada servicio nuevo
+            for servicio_data in servicios_data:
+                servicio = Servicio.objects.get(id=servicio_data['servicio_id'])
+
+                fecha = datetime.strptime(servicio_data['fecha'], '%Y-%m-%d').date()
+                hora = servicio_data['hora']
+                cantidad_personas = servicio_data['cantidad_personas']
+
+                # Calcular precio
+                if servicio.tipo_servicio == 'cabana':
+                    precio_unitario = servicio.precio_base
+                else:
+                    precio_unitario = servicio.precio_base
+
+                reserva_servicio = ReservaServicio.objects.create(
+                    venta_reserva=venta_reserva,
+                    servicio=servicio,
+                    fecha_agendamiento=fecha,
+                    hora_inicio=hora,
+                    cantidad_personas=cantidad_personas,
+                    precio_unitario_venta=precio_unitario
+                )
+
+                # Calcular subtotal
+                subtotal = reserva_servicio.calcular_precio()
+                total_nuevos_servicios += subtotal
+
+                servicios_agregados.append({
+                    'id': reserva_servicio.id,
+                    'servicio_id': servicio.id,
+                    'servicio_nombre': servicio.nombre,
+                    'fecha': servicio_data['fecha'],
+                    'hora': hora,
+                    'cantidad_personas': cantidad_personas,
+                    'precio_unitario': float(precio_unitario),
+                    'subtotal': float(subtotal)
+                })
+
+            # Recalcular descuentos con TODOS los servicios (antiguos + nuevos)
+            todos_servicios = []
+            for rs in venta_reserva.reservaservicios.all():
+                todos_servicios.append({
+                    'id': rs.servicio.id,
+                    'nombre': rs.servicio.nombre,
+                    'precio': float(rs.servicio.precio_base),
+                    'fecha': rs.fecha_agendamiento.strftime('%Y-%m-%d'),
+                    'hora': rs.hora_inicio,
+                    'cantidad_personas': rs.cantidad_personas,
+                    'tipo_servicio': rs.servicio.tipo_servicio,
+                    'subtotal': float(rs.calcular_precio())
+                })
+
+            # Calcular nuevo total con descuentos
+            packs_aplicables = PackDescuentoService.detectar_packs_aplicables(todos_servicios)
+            total_descuentos = sum(pack_info['descuento'] for pack_info in packs_aplicables)
+
+            # Calcular subtotal de todos los servicios
+            subtotal_total = sum(item['subtotal'] for item in todos_servicios)
+
+            # Actualizar total de VentaReserva
+            venta_reserva.total = subtotal_total - total_descuentos
+            venta_reserva.saldo_pendiente = venta_reserva.total - venta_reserva.pagado
+            venta_reserva.save()
+
+            logger.info(f'[Luna API] Servicios agregados a reserva {reserva_id}: {len(servicios_agregados)} servicio(s)')
+
+            # Preparar respuesta
+            return Response({
+                'success': True,
+                'reserva_id': venta_reserva.id,
+                'numero': f'RES-{venta_reserva.id}',
+                'servicios_agregados': servicios_agregados,
+                'descuentos_aplicados': [
+                    {
+                        'pack_nombre': pack_info['pack'].nombre,
+                        'descuento': float(pack_info['descuento'])
+                    }
+                    for pack_info in packs_aplicables
+                ],
+                'total_descuentos': float(total_descuentos),
+                'nuevo_total': float(venta_reserva.total),
+                'saldo_pendiente': float(venta_reserva.saldo_pendiente),
+                'mensaje': f'{len(servicios_agregados)} servicio(s) agregado(s) exitosamente'
+            }, status=status.HTTP_200_OK)
+
+    except Servicio.DoesNotExist as e:
+        logger.error(f'[Luna API] Servicio no encontrado: {str(e)}')
+        return Response({
+            'success': False,
+            'error': 'service_not_found',
+            'mensaje': 'Uno o más servicios no existen'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        logger.error(f'[Luna API] Error agregando servicios: {str(e)}', exc_info=True)
+        return Response({
+            'success': False,
+            'error': 'internal_error',
+            'mensaje': 'Error interno al agregar servicios'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 def validar_disponibilidad_interna(servicios_data):
     """
     Función auxiliar para validar disponibilidad sin HTTP request.
