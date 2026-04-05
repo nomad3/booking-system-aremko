@@ -129,6 +129,18 @@ class Producto(models.Model):
         help_text="Orden de visualización en el catálogo (menor número = primero)"
     )
 
+    # Campos para sistema de comandas de clientes (vía WhatsApp)
+    comanda_cliente = models.BooleanField(
+        default=False,
+        verbose_name="Disponible para Comanda de Cliente",
+        help_text="Si está marcado, el cliente puede ver y seleccionar este producto desde su link de comanda vía WhatsApp"
+    )
+    orden_comanda = models.IntegerField(
+        default=0,
+        verbose_name="Orden en Menú de Comanda",
+        help_text="Orden de visualización en el menú de comandas para clientes (menor número = primero)"
+    )
+
     class Meta:
         ordering = ['orden', 'nombre']
         verbose_name = "Producto"
@@ -4599,10 +4611,17 @@ class Comanda(models.Model):
     que aparecen en tiempo real en la cocina/bar.
     """
     ESTADO_CHOICES = [
+        # Estados para comandas creadas por personal (flujo original)
         ('pendiente', 'Pendiente'),
         ('procesando', 'En Proceso'),
         ('entregada', 'Entregada'),
         ('cancelada', 'Cancelada'),
+
+        # Estados para comandas creadas por clientes (vía WhatsApp)
+        ('borrador', 'Borrador'),                    # Cliente está armando su pedido
+        ('pendiente_pago', 'Pendiente de Pago'),     # Cliente finalizó pero no pagó
+        ('pago_confirmado', 'Pago Confirmado'),      # Pago Flow confirmado
+        ('pago_fallido', 'Pago Fallido'),            # Pago rechazado
     ]
 
     # Relaciones
@@ -4677,6 +4696,45 @@ class Comanda(models.Model):
         verbose_name='Fecha/Hora Entrega Objetivo',
         help_text='Para cuándo se necesita este pedido. Si es vacío, es para ahora (inmediato).',
         db_index=True
+    )
+
+    # Campos para sistema de comandas de clientes (vía WhatsApp)
+    token_acceso = models.CharField(
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='Token de Acceso',
+        help_text='Token único para acceso del cliente vía WhatsApp'
+    )
+    creada_por_cliente = models.BooleanField(
+        default=False,
+        verbose_name='Creada por Cliente',
+        help_text='Indica si la comanda fue creada por el cliente vía link de WhatsApp',
+        db_index=True
+    )
+    fecha_vencimiento_link = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Vencimiento del Link',
+        help_text='Fecha límite para usar el link de comanda (24-48 horas típicamente)'
+    )
+
+    # Campos para integración con Flow (pagos)
+    flow_order_id = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name='Flow Order ID',
+        help_text='ID de la orden en Flow'
+    )
+    flow_token = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name='Flow Token',
+        help_text='Token de pago de Flow'
     )
 
     # Metadata
@@ -4793,6 +4851,69 @@ class Comanda(models.Model):
     def notas(self):
         """Alias para notas_generales para compatibilidad"""
         return self.notas_generales or ""
+
+    # ========================================
+    # Métodos para sistema de comandas de clientes (vía WhatsApp)
+    # ========================================
+
+    def generar_token_acceso(self):
+        """Genera un token único para acceso del cliente"""
+        import secrets
+        self.token_acceso = secrets.token_urlsafe(32)
+        from django.utils import timezone
+        from datetime import timedelta
+        self.fecha_vencimiento_link = timezone.now() + timedelta(hours=48)
+        self.save()
+        return self.token_acceso
+
+    def es_link_valido(self):
+        """Verifica si el link aún es válido"""
+        from django.utils import timezone
+        if not self.fecha_vencimiento_link:
+            return False
+        return timezone.now() < self.fecha_vencimiento_link
+
+    def obtener_url_cliente(self):
+        """Obtiene la URL completa para el cliente"""
+        from django.urls import reverse
+        try:
+            from django.conf import settings
+            site_url = settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://www.aremko.cl'
+        except:
+            site_url = 'https://www.aremko.cl'
+
+        path = reverse('ventas:comanda_cliente', kwargs={'token': self.token_acceso})
+        return f"{site_url}{path}"
+
+    def obtener_mensaje_whatsapp(self):
+        """Genera el mensaje de WhatsApp con el link"""
+        url_cliente = self.obtener_url_cliente()
+        cliente = self.venta_reserva.cliente
+
+        mensaje = f"""Hola {cliente.nombre}! 👋
+
+Aquí está tu link para hacer tu pedido de cafetería/bar:
+
+{url_cliente}
+
+📱 Solo toca el link, selecciona lo que deseas y paga con tarjeta.
+⏰ El link es válido por 48 horas.
+
+¡Disfruta tu visita a Aremko! 🌿"""
+
+        return mensaje.strip()
+
+    def obtener_url_whatsapp(self):
+        """Genera la URL de WhatsApp con el mensaje pre-cargado"""
+        from urllib.parse import quote
+        cliente = self.venta_reserva.cliente
+        telefono = cliente.telefono.replace('+', '').replace(' ', '').replace('-', '')
+        mensaje = self.obtener_mensaje_whatsapp()
+        return f"https://wa.me/{telefono}?text={quote(mensaje)}"
+
+    # ========================================
+    # Fin métodos para comandas de clientes
+    # ========================================
 
     def save(self, *args, **kwargs):
         """
