@@ -382,7 +382,8 @@ class VentaReservaAdmin(admin.ModelAdmin):
         'estado_reserva', 'servicios_y_cantidades',
         'productos_y_cantidades', 'total_servicios',
         'total_productos', 'total', 'pagado', 'saldo_pendiente',
-        'generar_cotizacion_link', 'generar_resumen_link', 'generar_tips_link'
+        'generar_cotizacion_link', 'generar_resumen_link', 'generar_tips_link',
+        'link_comanda_whatsapp'
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
@@ -390,7 +391,8 @@ class VentaReservaAdmin(admin.ModelAdmin):
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
         'productos_y_cantidades', 'servicios_y_cantidades',
-        'total_productos', 'total_servicios', 'agregar_comanda_button'
+        'total_productos', 'total_servicios', 'agregar_comanda_button',
+        'link_comanda_whatsapp_detalle'
     )
     fieldsets = (
         (None, {
@@ -408,9 +410,14 @@ class VentaReservaAdmin(admin.ModelAdmin):
         ('Detalles', {
             'fields': ('comentarios',)
         }),
-        ('Gestión de Comandas', {
+        ('📱 Comanda del Cliente (WhatsApp)', {
+            'fields': ('link_comanda_whatsapp_detalle',),
+            'description': 'Genera un link único para que el cliente pueda crear su propia comanda de productos vía WhatsApp. El link incluye pago automático con Flow.',
+            'classes': ('collapse',)
+        }),
+        ('Gestión de Comandas (Personal)', {
             'fields': ('agregar_comanda_button',),
-            'description': 'Las comandas existentes se muestran más abajo en la sección "COMANDAS".'
+            'description': 'Las comandas creadas por el personal se muestran más abajo en la sección "COMANDAS".'
         }),
     )
     def changelist_view(self, request, extra_context=None):
@@ -566,6 +573,177 @@ class VentaReservaAdmin(admin.ModelAdmin):
         url = reverse('ventas:generar_cotizacion', args=[obj.id])
         return format_html('<a class="button" href="{}" target="_blank">💰 Cotización</a>', url)
     generar_cotizacion_link.short_description = 'Cotización'
+
+    def link_comanda_whatsapp(self, obj):
+        """Genera link de WhatsApp para que el cliente cree su comanda"""
+        from django.utils.html import format_html
+        from ventas.models import Comanda
+        from django.contrib.auth import get_user_model
+
+        if not obj or not obj.pk:
+            return '-'
+
+        # Buscar comanda activa con token válido
+        comanda = Comanda.objects.filter(
+            venta_reserva=obj,
+            token_acceso__isnull=False
+        ).first()
+
+        # Si no hay comanda o el token expiró, crear/actualizar
+        if not comanda or not comanda.es_link_valido():
+            # Crear nueva comanda en borrador si no existe
+            if not comanda:
+                # Obtener usuario Deborah como solicitante por defecto
+                User = get_user_model()
+                try:
+                    usuario_default = User.objects.get(username='Deborah')
+                except User.DoesNotExist:
+                    usuario_default = None
+
+                comanda = Comanda.objects.create(
+                    venta_reserva=obj,
+                    estado='borrador',
+                    creada_por_cliente=True,
+                    usuario_solicita=usuario_default
+                )
+            # Generar nuevo token (48 horas de validez)
+            comanda.generar_token_acceso()
+
+        # Obtener URLs
+        whatsapp_url = comanda.obtener_url_whatsapp()
+        cliente_url = comanda.obtener_url_cliente()
+
+        # Formatear fecha de vencimiento
+        vencimiento = comanda.fecha_vencimiento_link.strftime('%d/%m %H:%M') if comanda.fecha_vencimiento_link else 'N/A'
+
+        return format_html(
+            '<div style="display:flex; flex-direction:column; gap:4px;">'
+            '<a href="{}" target="_blank" '
+            'style="background:#25d366; color:white; padding:6px 12px; border-radius:4px; '
+            'text-decoration:none; font-size:11px; font-weight:600; text-align:center; white-space:nowrap;">'
+            '📱 WhatsApp'
+            '</a>'
+            '<input type="text" value="{}" readonly '
+            'style="width:120px; padding:4px; font-size:9px; font-family:monospace; '
+            'border:1px solid #ddd; border-radius:3px; background:#f9f9f9;" '
+            'onclick="this.select(); document.execCommand(\'copy\'); '
+            'alert(\'✓ Link copiado\');" '
+            'title="Click para copiar el link">'
+            '<span style="color:#666; font-size:9px;">Válido: {}</span>'
+            '</div>',
+            whatsapp_url,
+            cliente_url,
+            vencimiento
+        )
+    link_comanda_whatsapp.short_description = '📱 Comanda Cliente'
+
+    def link_comanda_whatsapp_detalle(self, obj):
+        """Versión extendida del link de WhatsApp para el formulario de detalle"""
+        from django.utils.html import format_html
+        from ventas.models import Comanda
+        from django.contrib.auth import get_user_model
+
+        if not obj or not obj.pk:
+            return format_html('<p style="color:#999;">Guarda la reserva primero.</p>')
+
+        # Buscar comanda activa con token válido
+        comanda = Comanda.objects.filter(
+            venta_reserva=obj,
+            token_acceso__isnull=False
+        ).first()
+
+        # Si no hay comanda o el token expiró, crear/actualizar
+        if not comanda or not comanda.es_link_valido():
+            # Crear nueva comanda en borrador si no existe
+            if not comanda:
+                # Obtener usuario Deborah como solicitante por defecto
+                User = get_user_model()
+                try:
+                    usuario_default = User.objects.get(username='Deborah')
+                except User.DoesNotExist:
+                    usuario_default = None
+
+                comanda = Comanda.objects.create(
+                    venta_reserva=obj,
+                    estado='borrador',
+                    creada_por_cliente=True,
+                    usuario_solicita=usuario_default
+                )
+            # Generar nuevo token (48 horas de validez)
+            comanda.generar_token_acceso()
+
+        # Obtener URLs
+        whatsapp_url = comanda.obtener_url_whatsapp()
+        cliente_url = comanda.obtener_url_cliente()
+        mensaje = comanda.obtener_mensaje_whatsapp()
+
+        # Formatear fecha de vencimiento
+        vencimiento = comanda.fecha_vencimiento_link.strftime('%d/%m/%Y %H:%M') if comanda.fecha_vencimiento_link else 'N/A'
+
+        # Verificar si el link es válido
+        is_valid = comanda.es_link_valido()
+        status_color = '#4caf50' if is_valid else '#f44336'
+        status_text = '✓ Activo' if is_valid else '✕ Expirado'
+
+        return format_html(
+            '<div style="background:#f5f5f5; padding:15px; border-radius:8px; border-left:4px solid {};">'
+            '<h3 style="margin:0 0 10px 0; color:#333;">📱 Link para Comanda de Cliente (WhatsApp)</h3>'
+
+            '<div style="margin-bottom:15px;">'
+            '<strong>Estado:</strong> '
+            '<span style="background:{}; color:white; padding:3px 10px; border-radius:4px; font-size:12px; font-weight:600;">{}</span>'
+            '</div>'
+
+            '<div style="margin-bottom:15px;">'
+            '<strong>URL del Cliente:</strong><br>'
+            '<input type="text" value="{}" readonly '
+            'style="width:100%; padding:8px; margin:5px 0; font-size:12px; font-family:monospace; '
+            'border:1px solid #ddd; border-radius:4px; background:white;" '
+            'onclick="this.select(); document.execCommand(\'copy\'); '
+            'this.style.background=\'#d4edda\'; '
+            'setTimeout(() => this.style.background=\'white\', 1000);" '
+            'title="Click para copiar">'
+            '<small style="color:#666;">Click en el campo para copiar al portapapeles</small>'
+            '</div>'
+
+            '<div style="margin-bottom:15px;">'
+            '<strong>Válido hasta:</strong> <span style="color:#666;">{}</span>'
+            '</div>'
+
+            '<div style="margin-bottom:15px;">'
+            '<a href="{}" target="_blank" '
+            'style="display:inline-block; background:#25d366; color:white; padding:12px 24px; '
+            'border-radius:6px; text-decoration:none; font-weight:600; font-size:14px;">'
+            '📱 Abrir WhatsApp con Mensaje Pre-cargado'
+            '</a>'
+            '</div>'
+
+            '<div style="background:white; padding:10px; border-radius:4px; border:1px solid #ddd;">'
+            '<strong style="color:#666; font-size:11px;">MENSAJE QUE RECIBIRÁ EL CLIENTE:</strong>'
+            '<pre style="white-space:pre-wrap; font-family:sans-serif; font-size:12px; '
+            'color:#333; margin:5px 0 0 0;">{}</pre>'
+            '</div>'
+
+            '<div style="margin-top:15px; padding:10px; background:#fff3cd; border-radius:4px;">'
+            '<strong style="color:#856404;">💡 Instrucciones:</strong>'
+            '<ul style="margin:5px 0; padding-left:20px; color:#856404; font-size:12px;">'
+            '<li>Click en "Abrir WhatsApp" para enviar el link al cliente</li>'
+            '<li>El cliente podrá crear su propia comanda seleccionando productos</li>'
+            '<li>El pago se procesa automáticamente vía Flow</li>'
+            '<li>Link válido por 48 horas desde su generación</li>'
+            '</ul>'
+            '</div>'
+
+            '</div>',
+            status_color,
+            status_color,
+            status_text,
+            cliente_url,
+            vencimiento,
+            whatsapp_url,
+            mensaje
+        )
+    link_comanda_whatsapp_detalle.short_description = 'Link WhatsApp para Cliente'
 
     class Media:
         css = {
