@@ -7,6 +7,7 @@ from .views import (
     admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, cotizacion_reserva_view, eliminar_reservas_no_pagadas_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple, inventario_view, agenda_operativa_view, luna_api_views
 )
 from . import api # Keep api module import as is
+from . import views_comandas_cliente # Import comandas de clientes views
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
 
 app_name = 'ventas'  # Define the app namespace
@@ -270,6 +271,16 @@ urlpatterns = [
     path('pagos-masajistas/reporte-mensual/', pagos_masajistas_views.reporte_mensual_masajistas, name='reporte_mensual_masajistas'),
     path('pagos-masajistas/reporte-mensual/detalle/', pagos_masajistas_views.detalle_mes_masajista, name='detalle_mes_masajista'),
     # === END SISTEMA DE PAGOS A MASAJISTAS ===
+
+    # === COMANDAS DE CLIENTES VÍA WHATSAPP ===
+    # URLs públicas (sin autenticación) protegidas por token
+    path('comanda-cliente/<str:token>/', views_comandas_cliente.comanda_cliente_menu, name='comanda_cliente'),
+    path('comanda-cliente/<str:token>/agregar-producto/', views_comandas_cliente.comanda_cliente_agregar_producto, name='comanda_cliente_agregar_producto'),
+    path('comanda-cliente/<str:token>/actualizar-cantidad/', views_comandas_cliente.comanda_cliente_actualizar_cantidad, name='comanda_cliente_actualizar_cantidad'),
+    path('comanda-cliente/<str:token>/finalizar/', views_comandas_cliente.comanda_cliente_finalizar, name='comanda_cliente_finalizar'),
+    path('comanda-cliente/<str:token>/pago-confirmacion/', views_comandas_cliente.comanda_cliente_pago_confirmacion, name='comanda_cliente_pago_confirmacion'),
+    path('comanda-cliente/<str:token>/pago-retorno/', views_comandas_cliente.comanda_cliente_pago_retorno, name='comanda_cliente_pago_retorno'),
+    # === END COMANDAS DE CLIENTES ===
 
     # API Router (Keep this last if possible, or ensure specific paths come first)
     path('', include(router.urls)),

@@ -676,10 +676,11 @@ class CategoriaProductoAdmin(admin.ModelAdmin):
     search_fields = ('nombre',)  # Añadir search_fields
 
 class ProductoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'categoria', 'precio_base', 'publicado_web', 'orden', 'cantidad_disponible', 'vista_previa_imagen')
+    list_display = ('nombre', 'categoria', 'precio_base', 'publicado_web', 'comanda_cliente',
+                    'orden', 'orden_comanda', 'cantidad_disponible', 'vista_previa_imagen')
     search_fields = ('nombre', 'categoria__nombre', 'descripcion_web')
-    list_filter = ('publicado_web', 'categoria', 'proveedor')
-    list_editable = ('publicado_web', 'orden')
+    list_filter = ('publicado_web', 'comanda_cliente', 'categoria', 'proveedor')
+    list_editable = ('publicado_web', 'comanda_cliente', 'orden', 'orden_comanda')
     autocomplete_fields = ['proveedor', 'categoria']
     ordering = ('orden', 'nombre')
 
@@ -691,6 +692,13 @@ class ProductoAdmin(admin.ModelAdmin):
             'fields': ('publicado_web', 'descripcion_web', 'imagen', 'orden'),
             'description': 'Configuración para mostrar el producto en el catálogo web público. '
                           'Los clientes verán estos productos y podrán consultar por WhatsApp.'
+        }),
+        ('📱 Comandas de Clientes (WhatsApp)', {
+            'fields': ('comanda_cliente', 'orden_comanda'),
+            'description': 'Habilita este producto para que los clientes puedan pedirlo '
+                          'directamente desde su link de comanda por WhatsApp. '
+                          'El "Orden en Menú" determina en qué posición aparece (menor = primero).',
+            'classes': ('collapse',)
         }),
     )
 
@@ -3099,16 +3107,20 @@ class ComandaAdmin(admin.ModelAdmin):
     """Admin para gestión de comandas"""
     list_display = (
         'id', 'hora_solicitud', 'cliente_nombre', 'estado_badge',
-        'entrega_objetivo_display', 'total_items', 'tiempo_espera_display', 'usuario_procesa'
+        'entrega_objetivo_display', 'total_items', 'tiempo_espera_display',
+        'usuario_procesa', 'link_cliente_badge'
     )
-    list_filter = ('estado', 'fecha_solicitud', 'fecha_entrega_objetivo', 'usuario_procesa')
-    search_fields = ('id', 'venta_reserva__cliente__nombre', 'notas_generales')
+    list_filter = ('estado', 'creada_por_cliente', 'fecha_solicitud', 'fecha_entrega_objetivo', 'usuario_procesa')
+    search_fields = ('id', 'venta_reserva__cliente__nombre', 'notas_generales', 'token_acceso')
     readonly_fields = ('fecha_solicitud', 'hora_solicitud', 'fecha_inicio_proceso',
-                       'fecha_entrega', 'tiempo_espera_display')
+                       'fecha_entrega', 'tiempo_espera_display', 'link_whatsapp_display',
+                       'url_cliente_display', 'token_acceso', 'creada_por_cliente',
+                       'fecha_vencimiento_link', 'flow_order_id', 'flow_token')
     autocomplete_fields = ['venta_reserva']  # Usar autocomplete para evitar timeout al cargar todas las reservas
     inlines = [DetalleComandaInline]
     date_hierarchy = 'fecha_solicitud'
     list_per_page = 50
+    actions = ['generar_links_whatsapp']
 
     # fieldsets se define dinámicamente en get_fieldsets()
 
@@ -3135,7 +3147,11 @@ class ComandaAdmin(admin.ModelAdmin):
             'pendiente': '#ff9800',
             'procesando': '#2196f3',
             'entregada': '#4caf50',
-            'cancelada': '#f44336'
+            'cancelada': '#f44336',
+            'borrador': '#9e9e9e',
+            'pendiente_pago': '#ff5722',
+            'pago_confirmado': '#8bc34a',
+            'pago_fallido': '#e91e63'
         }
         return format_html(
             '<span style="background:{}; color:white; padding:4px 12px; border-radius:12px; '
@@ -3144,6 +3160,99 @@ class ComandaAdmin(admin.ModelAdmin):
             obj.get_estado_display()
         )
     estado_badge.short_description = 'Estado'
+
+    def link_cliente_badge(self, obj):
+        """Muestra si tiene link activo para cliente"""
+        if obj.token_acceso and obj.es_link_valido():
+            return format_html(
+                '<span style="background:#4caf50; color:white; padding:4px 8px; border-radius:8px; '
+                'font-size:10px;">✓ Activo</span>'
+            )
+        elif obj.token_acceso:
+            return format_html(
+                '<span style="background:#999; color:white; padding:4px 8px; border-radius:8px; '
+                'font-size:10px;">✕ Expirado</span>'
+            )
+        return format_html(
+            '<span style="color:#999; font-size:10px;">Sin link</span>'
+        )
+    link_cliente_badge.short_description = 'Link Cliente'
+
+    def url_cliente_display(self, obj):
+        """Muestra la URL del cliente para copiar"""
+        if not obj.token_acceso:
+            return format_html('<em style="color:#999;">No generado</em>')
+
+        url = obj.obtener_url_cliente()
+        valido = obj.es_link_valido()
+
+        if valido:
+            return format_html(
+                '<div style="background:#f5f5f5; padding:10px; border-radius:4px;">'
+                '<strong>URL del Cliente:</strong><br>'
+                '<input type="text" value="{}" readonly style="width:100%; padding:5px; '
+                'margin:5px 0; font-size:11px; font-family:monospace;" '
+                'onclick="this.select(); document.execCommand(\'copy\'); '
+                'alert(\'URL copiada al portapapeles\');">'
+                '<div style="color:#4caf50; font-size:11px; margin-top:5px;">✓ Link válido hasta: {}</div>'
+                '</div>',
+                url,
+                obj.fecha_vencimiento_link.strftime('%d/%m/%Y %H:%M') if obj.fecha_vencimiento_link else 'N/A'
+            )
+        else:
+            return format_html(
+                '<div style="background:#ffebee; padding:10px; border-radius:4px;">'
+                '<strong>URL del Cliente:</strong><br>'
+                '<input type="text" value="{}" readonly style="width:100%; padding:5px; '
+                'margin:5px 0; font-size:11px; font-family:monospace; background:#fafafa;">'
+                '<div style="color:#f44336; font-size:11px; margin-top:5px;">✕ Link expirado</div>'
+                '</div>',
+                url
+            )
+    url_cliente_display.short_description = 'URL para Cliente'
+
+    def link_whatsapp_display(self, obj):
+        """Muestra el botón de WhatsApp"""
+        if not obj.token_acceso:
+            return format_html('<em style="color:#999;">Genera un token primero usando la acción "Generar links WhatsApp"</em>')
+
+        if not obj.es_link_valido():
+            return format_html('<em style="color:#f44336;">Link expirado - Genera uno nuevo</em>')
+
+        whatsapp_url = obj.obtener_url_whatsapp()
+        return format_html(
+            '<a href="{}" target="_blank" style="display:inline-block; background:#25d366; '
+            'color:white; padding:10px 20px; border-radius:8px; text-decoration:none; '
+            'font-weight:600; font-size:14px;">'
+            '📱 Abrir WhatsApp</a>'
+            '<p style="color:#666; font-size:11px; margin-top:8px;">'
+            'El mensaje se pre-cargará automáticamente con el link de la comanda.</p>',
+            whatsapp_url
+        )
+    link_whatsapp_display.short_description = 'Enviar por WhatsApp'
+
+    def generar_links_whatsapp(self, request, queryset):
+        """Acción para generar links de WhatsApp para comandas seleccionadas"""
+        from django.contrib import messages
+
+        generados = 0
+        for comanda in queryset:
+            # Solo generar para comandas sin token o con token expirado
+            if not comanda.token_acceso or not comanda.es_link_valido():
+                comanda.generar_token_acceso()
+                generados += 1
+
+        if generados > 0:
+            messages.success(
+                request,
+                f'✓ Se generaron {generados} link(s) de WhatsApp. Válidos por 48 horas.'
+            )
+        else:
+            messages.info(
+                request,
+                'Todas las comandas seleccionadas ya tienen links válidos.'
+            )
+    generar_links_whatsapp.short_description = '📱 Generar links de WhatsApp para clientes'
 
     def total_items(self, obj):
         """Cuenta total de items en la comanda"""
@@ -3235,7 +3344,7 @@ class ComandaAdmin(admin.ModelAdmin):
     def get_fieldsets(self, request, obj=None):
         """Personalizar fieldsets según si es creación o edición"""
         if obj:  # Editando una comanda existente
-            return (
+            fieldsets = [
                 ('Información de la Comanda', {
                     'fields': ('venta_reserva', 'estado', 'fecha_entrega_objetivo'),
                     'description': 'Fecha/hora objetivo: deja vacío para entrega inmediata, o programa para más tarde.'
@@ -3248,7 +3357,34 @@ class ComandaAdmin(admin.ModelAdmin):
                         'tiempo_espera_display'
                     )
                 }),
-            )
+            ]
+
+            # Agregar sección de Link de Cliente si tiene token
+            if obj.token_acceso:
+                fieldsets.append(
+                    ('📱 Link para Cliente (WhatsApp)', {
+                        'fields': (
+                            'creada_por_cliente',
+                            'url_cliente_display',
+                            'link_whatsapp_display',
+                            'token_acceso',
+                            'fecha_vencimiento_link'
+                        ),
+                        'description': 'Link personalizado para que el cliente cree su propia comanda vía WhatsApp.',
+                        'classes': ('collapse',)
+                    })
+                )
+
+            # Agregar sección de Pago Flow si tiene datos de pago
+            if obj.flow_order_id or obj.flow_token:
+                fieldsets.append(
+                    ('💳 Información de Pago (Flow)', {
+                        'fields': ('flow_order_id', 'flow_token'),
+                        'classes': ('collapse',)
+                    })
+                )
+
+            return tuple(fieldsets)
         else:  # Creando nueva comanda
             return (
                 ('Información de la Comanda', {
