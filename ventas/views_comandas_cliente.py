@@ -47,8 +47,7 @@ def comanda_cliente_menu(request, token):
     # Obtener productos disponibles para comandas de clientes
     productos = Producto.objects.filter(
         comanda_cliente=True,
-        activo=True,
-        stock__gt=0
+        cantidad_disponible__gt=0
     ).order_by('orden_comanda', 'nombre')
 
     # Obtener detalles actuales de la comanda (si existen)
@@ -106,15 +105,14 @@ def comanda_cliente_agregar_producto(request, token):
         producto = get_object_or_404(
             Producto,
             id=producto_id,
-            comanda_cliente=True,
-            activo=True
+            comanda_cliente=True
         )
 
         # Validar stock
-        if producto.stock < cantidad:
+        if producto.cantidad_disponible < cantidad:
             return JsonResponse({
                 'success': False,
-                'error': f'Stock insuficiente. Disponible: {producto.stock}'
+                'error': f'Stock insuficiente. Disponible: {producto.cantidad_disponible}'
             }, status=400)
 
         with transaction.atomic():
@@ -187,10 +185,10 @@ def comanda_cliente_actualizar_cantidad(request, token):
                 mensaje = 'Producto eliminado del pedido'
             else:
                 # Validar stock
-                if detalle.producto.stock < cantidad:
+                if detalle.producto.cantidad_disponible < cantidad:
                     return JsonResponse({
                         'success': False,
-                        'error': f'Stock insuficiente. Disponible: {detalle.producto.stock}'
+                        'error': f'Stock insuficiente. Disponible: {detalle.producto.cantidad_disponible}'
                     }, status=400)
 
                 # Actualizar cantidad
@@ -312,7 +310,7 @@ def comanda_cliente_pago_confirmacion(request, token):
                 # Descontar stock de productos
                 for detalle in comanda.detalles.all():
                     producto = detalle.producto
-                    producto.stock -= detalle.cantidad
+                    producto.cantidad_disponible -= detalle.cantidad
                     producto.save()
 
                 logger.info(f'Pago confirmado para comanda {comanda.id}')

@@ -141,8 +141,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING('-' * 40))
 
         productos_disponibles = Producto.objects.filter(
-            comanda_cliente=True,
-            activo=True
+            comanda_cliente=True
         ).count()
 
         self.stdout.write(f'   Productos habilitados: {productos_disponibles}')
