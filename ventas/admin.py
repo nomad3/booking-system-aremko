@@ -575,67 +575,51 @@ class VentaReservaAdmin(admin.ModelAdmin):
     generar_cotizacion_link.short_description = 'Cotización'
 
     def link_comanda_whatsapp(self, obj):
-        """Genera link de WhatsApp para que el cliente cree su comanda"""
+        """Muestra estado del link de comanda para el cliente"""
         from django.utils.html import format_html
+        from django.urls import reverse
         from ventas.models import Comanda
-        from django.contrib.auth import get_user_model
 
         if not obj or not obj.pk:
             return '-'
 
-        # Buscar comanda activa con token válido
+        # Buscar comanda activa con token
         comanda = Comanda.objects.filter(
             venta_reserva=obj,
-            token_acceso__isnull=False
+            token_acceso__isnull=False,
+            creada_por_cliente=True
         ).first()
 
-        # Si no hay comanda o el token expiró, crear/actualizar
-        if not comanda or not comanda.es_link_valido():
-            # Crear nueva comanda en borrador si no existe
-            if not comanda:
-                # Obtener usuario Deborah como solicitante por defecto
-                User = get_user_model()
-                try:
-                    usuario_default = User.objects.get(username='Deborah')
-                except User.DoesNotExist:
-                    usuario_default = None
+        # URL del detalle de la reserva
+        detail_url = reverse('admin:ventas_ventareserva_change', args=[obj.pk])
 
-                comanda = Comanda.objects.create(
-                    venta_reserva=obj,
-                    estado='borrador',
-                    creada_por_cliente=True,
-                    usuario_solicita=usuario_default
+        if comanda and comanda.es_link_valido():
+            # Hay un link válido - mostrar para copiar
+            try:
+                cliente_url = comanda.obtener_url_cliente()
+                return format_html(
+                    '<div style="display:flex; flex-direction:column; gap:3px;">'
+                    '<input type="text" value="{}" readonly '
+                    'style="width:150px; padding:4px; font-size:10px; font-family:monospace; '
+                    'border:1px solid #4caf50; border-radius:3px; background:#f1f8f4;" '
+                    'onclick="this.select(); document.execCommand(\'copy\'); '
+                    'this.style.background=\'#d4edda\';" '
+                    'title="Click para copiar">'
+                    '<span style="color:#4caf50; font-size:9px; font-weight:600;">✓ Link activo</span>'
+                    '</div>',
+                    cliente_url
                 )
-            # Generar nuevo token (48 horas de validez)
-            comanda.generar_token_acceso()
+            except:
+                pass
 
-        # Obtener URLs
-        whatsapp_url = comanda.obtener_url_whatsapp()
-        cliente_url = comanda.obtener_url_cliente()
-
-        # Formatear fecha de vencimiento
-        vencimiento = comanda.fecha_vencimiento_link.strftime('%d/%m %H:%M') if comanda.fecha_vencimiento_link else 'N/A'
-
+        # No hay link o expiró - mostrar botón para ir al detalle
         return format_html(
-            '<div style="display:flex; flex-direction:column; gap:4px;">'
-            '<a href="{}" target="_blank" '
-            'style="background:#25d366; color:white; padding:6px 12px; border-radius:4px; '
-            'text-decoration:none; font-size:11px; font-weight:600; text-align:center; white-space:nowrap;">'
-            '📱 WhatsApp'
-            '</a>'
-            '<input type="text" value="{}" readonly '
-            'style="width:120px; padding:4px; font-size:9px; font-family:monospace; '
-            'border:1px solid #ddd; border-radius:3px; background:#f9f9f9;" '
-            'onclick="this.select(); document.execCommand(\'copy\'); '
-            'alert(\'✓ Link copiado\');" '
-            'title="Click para copiar el link">'
-            '<span style="color:#666; font-size:9px;">Válido: {}</span>'
-            '</div>',
-            whatsapp_url,
-            cliente_url,
-            vencimiento
+            '<a href="{}" style="display:inline-block; background:#2196f3; color:white; '
+            'padding:4px 10px; border-radius:4px; text-decoration:none; font-size:10px; '
+            'font-weight:600;">Generar Link</a>',
+            detail_url
         )
-    link_comanda_whatsapp.short_description = '📱 Comanda Cliente'
+    link_comanda_whatsapp.short_description = '📱 Link Cliente'
 
     def link_comanda_whatsapp_detalle(self, obj):
         """Versión extendida del link de WhatsApp para el formulario de detalle"""
