@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aremko Spa - Error</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .error-container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px 30px;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .error-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        .error-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .error-message {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .error-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+            border: none;
+        }
+
+        .whatsapp-link {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .whatsapp-link a {
+            color: #25d366;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        {% if error == 'link_expirado' %}
+            <div class="error-icon">⏰</div>
+            <h1 class="error-title">Link Expirado</h1>
+            <p class="error-message">
+                Este link ha vencido y ya no puede ser utilizado.
+                Por favor, contacta al spa para solicitar un nuevo link.
+            </p>
+        {% elif error == 'comanda_no_editable' %}
+            <div class="error-icon">✓</div>
+            <h1 class="error-title">Pedido Procesado</h1>
+            <p class="error-message">
+                Este pedido ya ha sido procesado y no puede ser modificado.
+            </p>
+        {% else %}
+            <div class="error-icon">⚠️</div>
+            <h1 class="error-title">Error</h1>
+            <p class="error-message">
+                {{ mensaje|default:"Ha ocurrido un error. Por favor, intenta nuevamente." }}
+            </p>
+        {% endif %}
+
+        <div class="error-actions">
+            <a href="tel:+56XXXXXXXXX" class="btn btn-primary">
+                📞 Llamar al Spa
+            </a>
+            <a href="https://wa.me/56XXXXXXXXX" class="btn btn-secondary">
+                💬 WhatsApp
+            </a>
+        </div>
+
+        <div class="whatsapp-link">
+            <p style="font-size: 12px; color: #999; margin-bottom: 10px;">
+                ¿Necesitas ayuda?
+            </p>
+            <a href="https://wa.me/56XXXXXXXXX?text=Hola,%20necesito%20ayuda%20con%20mi%20pedido">
+                Contactar por WhatsApp
+            </a>
+        </div>
+    </div>
+</body>
+</html>

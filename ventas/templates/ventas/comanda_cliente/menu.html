@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aremko Spa - Tu Pedido</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding-bottom: 120px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .timer {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin-top: 10px;
+            display: inline-block;
+            font-size: 12px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .product-card:active {
+            transform: scale(0.98);
+        }
+
+        .product-content {
+            padding: 15px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .product-image {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            object-fit: cover;
+            background: #e0e0e0;
+            flex-shrink: 0;
+        }
+
+        .product-info {
+            flex: 1;
+        }
+
+        .product-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .product-price {
+            font-size: 18px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .product-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .qty-btn {
+            width: 36px;
+            height: 36px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 50%;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .qty-btn:active {
+            transform: scale(0.9);
+            background: #667eea;
+            color: white;
+        }
+
+        .qty-display {
+            min-width: 40px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .cart-float {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 40px);
+            max-width: 560px;
+            background: white;
+            border-radius: 16px;
+            padding: 15px 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            display: none;
+        }
+
+        .cart-float.visible {
+            display: block;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateX(-50%) translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .cart-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .cart-total {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .cart-items-count {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .btn-checkout {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn-checkout:active {
+            transform: scale(0.98);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .loader {
+            display: none;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading .loader {
+            display: block;
+        }
+
+        .loading .btn-checkout {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌿 Aremko Spa</h1>
+        <p>Tu pedido personalizado</p>
+        <div class="timer">
+            ⏱️ Link válido hasta: {{ vencimiento|date:"d/m/Y H:i" }}
+        </div>
+    </div>
+
+    <div class="container">
+        {% if productos %}
+            {% for producto in productos %}
+            <div class="product-card" data-product-id="{{ producto.id }}">
+                <div class="product-content">
+                    {% if producto.imagen %}
+                        <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}" class="product-image">
+                    {% else %}
+                        <div class="product-image"></div>
+                    {% endif %}
+
+                    <div class="product-info">
+                        <div class="product-name">{{ producto.nombre }}</div>
+                        <div class="product-price">${{ producto.precio_base|floatformat:0 }}</div>
+
+                        <div class="product-actions">
+                            <button class="qty-btn" onclick="updateQuantity({{ producto.id }}, -1)">−</button>
+                            <div class="qty-display" id="qty-{{ producto.id }}">0</div>
+                            <button class="qty-btn" onclick="updateQuantity({{ producto.id }}, 1)">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon">🍽️</div>
+                <p>No hay productos disponibles en este momento</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="cart-float" id="cartFloat">
+        <div class="cart-summary">
+            <div>
+                <div class="cart-items-count" id="cartCount">0 productos</div>
+                <div class="cart-total" id="cartTotal">$0</div>
+            </div>
+        </div>
+        <button class="btn-checkout" onclick="checkout()">
+            Continuar al Pago
+        </button>
+        <div class="loader"></div>
+    </div>
+
+    <script>
+        const TOKEN = '{{ token }}';
+        const cart = {};
+        const productos = {
+            {% for producto in productos %}
+            {{ producto.id }}: {
+                nombre: '{{ producto.nombre|escapejs }}',
+                precio: {{ producto.precio_base }},
+                stock: {{ producto.cantidad_disponible }}
+            },
+            {% endfor %}
+        };
+
+        // Cargar cantidades existentes del servidor
+        {% for detalle in detalles %}
+        cart[{{ detalle.producto.id }}] = {{ detalle.cantidad }};
+        document.getElementById('qty-{{ detalle.producto.id }}').textContent = {{ detalle.cantidad }};
+        {% endfor %}
+
+        function updateQuantity(productId, change) {
+            const currentQty = cart[productId] || 0;
+            const newQty = Math.max(0, currentQty + change);
+
+            // Validar stock
+            if (newQty > productos[productId].stock) {
+                alert(`Stock máximo disponible: ${productos[productId].stock}`);
+                return;
+            }
+
+            cart[productId] = newQty;
+            document.getElementById(`qty-${productId}`).textContent = newQty;
+
+            // Actualizar en el servidor
+            if (newQty > 0) {
+                addProduct(productId, 1);
+            } else {
+                updateProductQty(productId, 0);
+            }
+
+            updateCart();
+        }
+
+        function addProduct(productId, quantity) {
+            fetch(`/ventas/comanda-cliente/${TOKEN}/agregar-producto/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    producto_id: productId,
+                    cantidad: quantity
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert(data.error || 'Error al agregar producto');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+
+        function updateProductQty(productId, quantity) {
+            const detalleId = {{ '{' }}{% for detalle in detalles %}{{ detalle.producto.id }}: {{ detalle.id }},{% endfor %}{{ '}' }}[productId];
+
+            if (!detalleId) return;
+
+            fetch(`/ventas/comanda-cliente/${TOKEN}/actualizar-cantidad/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    detalle_id: detalleId,
+                    cantidad: quantity
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert(data.error || 'Error al actualizar cantidad');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+
+        function updateCart() {
+            let totalItems = 0;
+            let totalPrice = 0;
+
+            for (const [productId, qty] of Object.entries(cart)) {
+                if (qty > 0) {
+                    totalItems += qty;
+                    totalPrice += productos[productId].precio * qty;
+                }
+            }
+
+            const cartFloat = document.getElementById('cartFloat');
+
+            if (totalItems > 0) {
+                cartFloat.classList.add('visible');
+                document.getElementById('cartCount').textContent = `${totalItems} producto${totalItems !== 1 ? 's' : ''}`;
+                document.getElementById('cartTotal').textContent = `$${totalPrice.toLocaleString('es-CL')}`;
+            } else {
+                cartFloat.classList.remove('visible');
+            }
+        }
+
+        function checkout() {
+            const totalItems = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
+
+            if (totalItems === 0) {
+                alert('Agrega al menos un producto a tu pedido');
+                return;
+            }
+
+            if (confirm('¿Confirmar pedido y proceder al pago?')) {
+                document.getElementById('cartFloat').classList.add('loading');
+
+                fetch(`/ventas/comanda-cliente/${TOKEN}/finalizar/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.payment_url) {
+                        window.location.href = data.payment_url;
+                    } else {
+                        alert(data.error || 'Error al procesar el pago');
+                        document.getElementById('cartFloat').classList.remove('loading');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error al procesar el pago. Intenta nuevamente.');
+                    document.getElementById('cartFloat').classList.remove('loading');
+                });
+            }
+        }
+
+        // Inicializar carrito al cargar
+        updateCart();
+    </script>
+</body>
+</html>
