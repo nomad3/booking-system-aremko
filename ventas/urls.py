@@ -153,6 +153,14 @@ urlpatterns = [
     # Removed URL for get_service_providers as it's no longer needed
     # path('api/get-service-providers/<int:servicio_id>/', api_views.get_service_providers, name='get_service_providers'),
 
+    # WORKAROUND 2: Rutas bajo /api/ que sabemos que funciona en Render
+    path('api/comanda/<str:token>/', views_comandas_cliente.comanda_cliente_menu, name='comanda_cliente_api'),
+    path('api/comanda/<str:token>/add/', views_comandas_cliente.comanda_cliente_agregar_producto, name='comanda_cliente_agregar_producto_api'),
+    path('api/comanda/<str:token>/update/', views_comandas_cliente.comanda_cliente_actualizar_cantidad, name='comanda_cliente_actualizar_cantidad_api'),
+    path('api/comanda/<str:token>/checkout/', views_comandas_cliente.comanda_cliente_finalizar, name='comanda_cliente_finalizar_api'),
+    path('api/comanda/<str:token>/confirm/', views_comandas_cliente.comanda_cliente_pago_confirmacion, name='comanda_cliente_pago_confirmacion_api'),
+    path('api/comanda/<str:token>/return/', views_comandas_cliente.comanda_cliente_pago_retorno, name='comanda_cliente_pago_retorno_api'),
+
     # --- Remarketing/Automation API URLs ---
     path('api/campaigns/<int:campaign_id>/details/', api_views.get_campaign_details, name='get_campaign_details'), # Added campaign details endpoint
     path('api/campaigns/<int:campaign_id>/targets/', api_views.get_campaign_targets, name='get_campaign_targets'),

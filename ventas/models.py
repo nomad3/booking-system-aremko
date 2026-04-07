@@ -4873,12 +4873,12 @@ class Comanda(models.Model):
             return False
         return timezone.now() < self.fecha_vencimiento_link
 
-    def obtener_url_cliente(self, use_short_url=True):
+    def obtener_url_cliente(self):
         """Obtiene la URL completa para el cliente
 
-        Args:
-            use_short_url: Si True, usa la URL corta /ventas/c/<token>/ (workaround Render)
-                          Si False, usa la URL larga /ventas/comanda-cliente/<token>/
+        IMPORTANTE: Usa ruta /api/comanda/ como workaround temporal
+        debido a problema de routing en Render donde las rutas nuevas
+        bajo /ventas/ no llegan a Gunicorn.
         """
         from django.urls import reverse
         try:
@@ -4888,9 +4888,8 @@ class Comanda(models.Model):
         except:
             site_url = 'https://aremko-booking-system.onrender.com'
 
-        # WORKAROUND: Usar ruta corta temporalmente debido a problema de routing en Render
-        url_name = 'ventas:comanda_cliente_short' if use_short_url else 'ventas:comanda_cliente'
-        path = reverse(url_name, kwargs={'token': self.token_acceso})
+        # WORKAROUND: Usar ruta bajo /api/ que sabemos que funciona en Render
+        path = reverse('ventas:comanda_cliente_api', kwargs={'token': self.token_acceso})
         return f"{site_url}{path}"
 
     def obtener_mensaje_whatsapp(self):

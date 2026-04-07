@@ -330,7 +330,7 @@
         }
 
         function addProduct(productId, quantity) {
-            fetch(`/ventas/comanda-cliente/${TOKEN}/agregar-producto/`, {
+            fetch(`/ventas/api/comanda/${TOKEN}/add/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -356,7 +356,7 @@
 
             if (!detalleId) return;
 
-            fetch(`/ventas/comanda-cliente/${TOKEN}/actualizar-cantidad/`, {
+            fetch(`/ventas/api/comanda/${TOKEN}/update/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -410,7 +410,7 @@
             if (confirm('¿Confirmar pedido y proceder al pago?')) {
                 document.getElementById('cartFloat').classList.add('loading');
 
-                fetch(`/ventas/comanda-cliente/${TOKEN}/finalizar/`, {
+                fetch(`/ventas/api/comanda/${TOKEN}/checkout/`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
