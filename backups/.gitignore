@@ -1,4 +1,1 @@
-# Ignorar todos los respaldos pero mantener el directorio
-*
-!.gitignore
-!README.md
+Respaldos locales - no sincronizar con GitHub
