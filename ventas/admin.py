@@ -633,28 +633,50 @@ class VentaReservaAdmin(admin.ModelAdmin):
         # Buscar comanda activa con token válido
         comanda = Comanda.objects.filter(
             venta_reserva=obj,
-            token_acceso__isnull=False
+            token_acceso__isnull=False,
+            creada_por_cliente=True
         ).first()
 
-        # Si no hay comanda o el token expiró, crear/actualizar
-        if not comanda or not comanda.es_link_valido():
-            # Crear nueva comanda en borrador si no existe
-            if not comanda:
-                # Obtener usuario Deborah como solicitante por defecto
-                User = get_user_model()
-                try:
-                    usuario_default = User.objects.get(username='Deborah')
-                except User.DoesNotExist:
-                    usuario_default = None
+        # Si no hay comanda, mostrar botón para crear
+        if not comanda:
+            from django.urls import reverse
+            create_url = reverse('admin:ventas_ventareserva_change', args=[obj.pk])
+            return format_html(
+                '<div style="background:#fff3cd; padding:15px; border-radius:8px; border-left:4px solid #ffc107;">'
+                '<h3 style="margin:0 0 10px 0; color:#856404;">📱 Link para Comanda de Cliente</h3>'
+                '<p style="color:#856404; margin-bottom:15px;">No hay comanda creada para esta reserva.</p>'
+                '<a href="{}?crear_comanda=1" '
+                'style="display:inline-block; background:#007bff; color:white; padding:12px 24px; '
+                'border-radius:6px; text-decoration:none; font-weight:600; font-size:14px;">'
+                '➕ Generar Link de Comanda'
+                '</a>'
+                '<p style="color:#666; font-size:12px; margin-top:10px;">'
+                'Haz clic para crear una comanda y generar el link para el cliente.'
+                '</p>'
+                '</div>',
+                create_url
+            )
 
-                comanda = Comanda.objects.create(
-                    venta_reserva=obj,
-                    estado='borrador',
-                    creada_por_cliente=True,
-                    usuario_solicita=usuario_default
-                )
-            # Generar nuevo token (48 horas de validez)
-            comanda.generar_token_acceso()
+        # Si el token expiró, mostrar botón para regenerar
+        if not comanda.es_link_valido():
+            from django.urls import reverse
+            renew_url = reverse('admin:ventas_ventareserva_change', args=[obj.pk])
+            return format_html(
+                '<div style="background:#f8d7da; padding:15px; border-radius:8px; border-left:4px solid #f44336;">'
+                '<h3 style="margin:0 0 10px 0; color:#721c24;">📱 Link de Comanda Expirado</h3>'
+                '<p style="color:#721c24; margin-bottom:15px;">'
+                'El link expiró el {}. Genera uno nuevo para enviarlo al cliente.'
+                '</p>'
+                '<a href="{}?renovar_comanda={}" '
+                'style="display:inline-block; background:#28a745; color:white; padding:12px 24px; '
+                'border-radius:6px; text-decoration:none; font-weight:600; font-size:14px;">'
+                '🔄 Renovar Link (48 horas más)'
+                '</a>'
+                '</div>',
+                comanda.fecha_vencimiento_link.strftime('%d/%m/%Y %H:%M') if comanda.fecha_vencimiento_link else 'N/A',
+                renew_url,
+                comanda.id
+            )
 
         # Obtener URLs
         whatsapp_url = comanda.obtener_url_whatsapp()
@@ -728,6 +750,68 @@ class VentaReservaAdmin(admin.ModelAdmin):
             mensaje
         )
     link_comanda_whatsapp_detalle.short_description = 'Link WhatsApp para Cliente'
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        """Manejar creación y renovación de comandas via query params"""
+        from ventas.models import Comanda
+        from django.contrib.auth import get_user_model
+        from django.contrib import messages
+        from django.shortcuts import redirect
+
+        # Manejar creación de comanda
+        if request.GET.get('crear_comanda') and object_id:
+            try:
+                obj = self.get_object(request, object_id)
+
+                # Verificar que no exista ya una comanda
+                comanda_existente = Comanda.objects.filter(
+                    venta_reserva=obj,
+                    token_acceso__isnull=False,
+                    creada_por_cliente=True
+                ).first()
+
+                if comanda_existente and comanda_existente.es_link_valido():
+                    messages.warning(request, f'Ya existe una comanda activa para esta reserva.')
+                else:
+                    # Crear nueva comanda
+                    User = get_user_model()
+                    try:
+                        usuario_default = User.objects.get(username='Deborah')
+                    except User.DoesNotExist:
+                        usuario_default = request.user
+
+                    comanda = Comanda.objects.create(
+                        venta_reserva=obj,
+                        estado='borrador',
+                        creada_por_cliente=True,
+                        usuario_solicita=usuario_default
+                    )
+                    comanda.generar_token_acceso()
+
+                    messages.success(request, f'✅ Comanda #{comanda.id} creada exitosamente. Link válido por 48 horas.')
+
+                # Redirigir sin el parámetro
+                return redirect(f'/admin/ventas/ventareserva/{object_id}/change/')
+
+            except Exception as e:
+                messages.error(request, f'Error al crear comanda: {e}')
+
+        # Manejar renovación de comanda
+        if request.GET.get('renovar_comanda'):
+            try:
+                comanda_id = int(request.GET.get('renovar_comanda'))
+                comanda = Comanda.objects.get(id=comanda_id)
+                comanda.generar_token_acceso()  # Renueva el token por 48 horas más
+
+                messages.success(request, f'✅ Link renovado exitosamente. Válido por 48 horas más hasta {comanda.fecha_vencimiento_link.strftime("%d/%m/%Y %H:%M")}')
+
+                # Redirigir sin el parámetro
+                return redirect(f'/admin/ventas/ventareserva/{object_id}/change/')
+
+            except Exception as e:
+                messages.error(request, f'Error al renovar link: {e}')
+
+        return super().changeform_view(request, object_id, form_url, extra_context)
 
     class Media:
         css = {
