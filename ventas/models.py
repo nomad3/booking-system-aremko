@@ -4873,16 +4873,24 @@ class Comanda(models.Model):
             return False
         return timezone.now() < self.fecha_vencimiento_link
 
-    def obtener_url_cliente(self):
-        """Obtiene la URL completa para el cliente"""
+    def obtener_url_cliente(self, use_short_url=True):
+        """Obtiene la URL completa para el cliente
+
+        Args:
+            use_short_url: Si True, usa la URL corta /ventas/c/<token>/ (workaround Render)
+                          Si False, usa la URL larga /ventas/comanda-cliente/<token>/
+        """
         from django.urls import reverse
         try:
             from django.conf import settings
-            site_url = settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://www.aremko.cl'
+            # Usar el dominio de Render ya que www.aremko.cl aún no está configurado
+            site_url = 'https://aremko-booking-system.onrender.com'
         except:
-            site_url = 'https://www.aremko.cl'
+            site_url = 'https://aremko-booking-system.onrender.com'
 
-        path = reverse('ventas:comanda_cliente', kwargs={'token': self.token_acceso})
+        # WORKAROUND: Usar ruta corta temporalmente debido a problema de routing en Render
+        url_name = 'ventas:comanda_cliente_short' if use_short_url else 'ventas:comanda_cliente'
+        path = reverse(url_name, kwargs={'token': self.token_acceso})
         return f"{site_url}{path}"
 
     def obtener_mensaje_whatsapp(self):

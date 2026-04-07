@@ -280,6 +280,15 @@ urlpatterns = [
     path('comanda-cliente/<str:token>/finalizar/', views_comandas_cliente.comanda_cliente_finalizar, name='comanda_cliente_finalizar'),
     path('comanda-cliente/<str:token>/pago-confirmacion/', views_comandas_cliente.comanda_cliente_pago_confirmacion, name='comanda_cliente_pago_confirmacion'),
     path('comanda-cliente/<str:token>/pago-retorno/', views_comandas_cliente.comanda_cliente_pago_retorno, name='comanda_cliente_pago_retorno'),
+
+    # WORKAROUND: Rutas alternativas cortas para evitar problema de routing en Render
+    # Usar estas URLs temporalmente: /ventas/c/<token>/
+    path('c/<str:token>/', views_comandas_cliente.comanda_cliente_menu, name='comanda_cliente_short'),
+    path('c/<str:token>/add/', views_comandas_cliente.comanda_cliente_agregar_producto, name='comanda_cliente_agregar_producto_short'),
+    path('c/<str:token>/update/', views_comandas_cliente.comanda_cliente_actualizar_cantidad, name='comanda_cliente_actualizar_cantidad_short'),
+    path('c/<str:token>/checkout/', views_comandas_cliente.comanda_cliente_finalizar, name='comanda_cliente_finalizar_short'),
+    path('c/<str:token>/confirm/', views_comandas_cliente.comanda_cliente_pago_confirmacion, name='comanda_cliente_pago_confirmacion_short'),
+    path('c/<str:token>/return/', views_comandas_cliente.comanda_cliente_pago_retorno, name='comanda_cliente_pago_retorno_short'),
     # === END COMANDAS DE CLIENTES ===
 
     # API Router (Keep this last if possible, or ensure specific paths come first)
