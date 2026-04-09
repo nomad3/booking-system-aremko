@@ -1,60 +1,109 @@
 """
 Vistas públicas para sistema de comandas de clientes vía WhatsApp
-Los clientes acceden con un token único y pueden crear su propia comanda
+Los clientes acceden con un token único y pueden crear su propia comanda.
+Flujo multi-pedido: el cliente puede hacer varios pedidos durante su estadía;
+cada confirmación genera una comanda independiente para cocina y el pago se
+consolida al checkout en recepción.
 """
-from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, HttpResponseForbidden
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-from django.utils import timezone
 from django.db import transaction
-from django.conf import settings
-from decimal import Decimal
 import json
 import logging
 
-from ventas.models import Comanda, DetalleComanda, Producto, VentaReserva
-from ventas.services.flow_service import FlowService
+from ventas.models import Comanda, DetalleComanda, Producto, ReservaProducto
 
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _get_comanda_or_error(token):
+    """Valida token y expiración.  Devuelve (comanda, error_response)."""
+    comanda = Comanda.objects.filter(token_acceso=token).first()
+    if not comanda:
+        return None, JsonResponse({'success': False, 'error': 'Token inválido'}, status=404)
+    if not comanda.es_link_valido():
+        return None, None  # Expirado — el caller decide cómo responder
+    return comanda, None
+
+
+def _get_venta_reserva_from_token(token):
+    """Encuentra la VentaReserva asociada al token (puede estar en comanda activa o en una ya confirmada)."""
+    comanda = Comanda.objects.filter(token_acceso=token).select_related('venta_reserva').first()
+    if comanda:
+        return comanda.venta_reserva, comanda
+    return None, None
+
+
+# ---------------------------------------------------------------------------
+# Vista principal: menú de productos + historial de pedidos
+# ---------------------------------------------------------------------------
+
 def comanda_cliente_menu(request, token):
     """
-    Vista principal del menú de productos para el cliente
-    Acceso mediante token único enviado por WhatsApp
+    Muestra el menú para un nuevo pedido y el historial de pedidos anteriores.
+    El token siempre apunta a la comanda 'borrador' activa.
     """
-    # Validar token y obtener comanda
-    comanda = get_object_or_404(Comanda, token_acceso=token)
+    comanda = Comanda.objects.filter(token_acceso=token).select_related('venta_reserva__cliente').first()
 
-    # Verificar que el link no haya expirado
+    if not comanda:
+        return render(request, 'ventas/comanda_cliente/error.html', {
+            'error': 'token_invalido',
+            'mensaje': 'Este link no es válido. Solicita uno nuevo al spa.',
+        })
+
     if not comanda.es_link_valido():
-        context = {
+        return render(request, 'ventas/comanda_cliente/error.html', {
             'error': 'link_expirado',
-            'mensaje': 'Este link ha expirado. Por favor contacta al spa para solicitar uno nuevo.'
-        }
-        return render(request, 'ventas/comanda_cliente/error.html', context)
+            'mensaje': 'Este link ha expirado. Por favor contacta al spa para solicitar uno nuevo.',
+        })
 
-    # Verificar que la comanda esté en estado válido para edición
-    estados_validos = ['borrador', 'pendiente_pago']
-    if comanda.estado not in estados_validos:
-        context = {
-            'error': 'comanda_no_editable',
-            'mensaje': 'Esta comanda ya ha sido procesada y no puede ser modificada.'
-        }
-        return render(request, 'ventas/comanda_cliente/error.html', context)
+    # Si la comanda con el token ya no está en borrador (edge case: recarga
+    # tras confirmar antes de que se transfiera el token), buscar borrador activo.
+    if comanda.estado != 'borrador':
+        borrador = Comanda.objects.filter(
+            venta_reserva=comanda.venta_reserva,
+            creada_por_cliente=True,
+            estado='borrador',
+        ).first()
+        if borrador:
+            comanda = borrador
+        else:
+            # No hay borrador — no debería pasar, pero crear uno
+            comanda = Comanda.objects.create(
+                venta_reserva=comanda.venta_reserva,
+                estado='borrador',
+                creada_por_cliente=True,
+                token_acceso=token,
+                fecha_vencimiento_link=comanda.fecha_vencimiento_link,
+                usuario_solicita=comanda.usuario_solicita,
+            )
 
-    # Obtener productos disponibles para comandas de clientes
+    # Productos disponibles
     productos = Producto.objects.filter(
         comanda_cliente=True,
-        cantidad_disponible__gt=0
+        cantidad_disponible__gt=0,
     ).order_by('orden_comanda', 'nombre')
 
-    # Obtener detalles actuales de la comanda (si existen)
-    detalles_actuales = comanda.detalles.all()
+    # Carrito activo
+    detalles_actuales = comanda.detalles.select_related('producto').all()
+    subtotal = sum(d.subtotal for d in detalles_actuales)
 
-    # Calcular totales
-    subtotal = sum(det.subtotal for det in detalles_actuales)
+    # Pedidos anteriores confirmados (para historial)
+    pedidos_anteriores = (
+        Comanda.objects.filter(
+            venta_reserva=comanda.venta_reserva,
+            creada_por_cliente=True,
+            estado__in=['pendiente', 'procesando', 'entregada'],
+        )
+        .prefetch_related('detalles__producto')
+        .order_by('-fecha_solicitud')
+    )
 
     context = {
         'comanda': comanda,
@@ -63,81 +112,60 @@ def comanda_cliente_menu(request, token):
         'subtotal': subtotal,
         'token': token,
         'vencimiento': comanda.fecha_vencimiento_link,
+        'pedidos_anteriores': pedidos_anteriores,
+        'cliente_nombre': comanda.venta_reserva.cliente.nombre if comanda.venta_reserva and comanda.venta_reserva.cliente else '',
     }
 
     return render(request, 'ventas/comanda_cliente/menu.html', context)
 
 
+# ---------------------------------------------------------------------------
+# AJAX: agregar producto al carrito
+# ---------------------------------------------------------------------------
+
 @require_http_methods(["POST"])
 @csrf_exempt
 def comanda_cliente_agregar_producto(request, token):
-    """
-    Agregar un producto a la comanda del cliente (AJAX)
-    """
+    """Agregar un producto a la comanda del cliente (AJAX)."""
     try:
-        # Validar comanda
         comanda = get_object_or_404(Comanda, token_acceso=token)
 
         if not comanda.es_link_valido():
-            return JsonResponse({
-                'success': False,
-                'error': 'Link expirado'
-            }, status=403)
+            return JsonResponse({'success': False, 'error': 'Link expirado'}, status=403)
 
-        if comanda.estado not in ['borrador', 'pendiente_pago']:
-            return JsonResponse({
-                'success': False,
-                'error': 'Comanda no editable'
-            }, status=403)
+        if comanda.estado != 'borrador':
+            return JsonResponse({'success': False, 'error': 'Comanda no editable'}, status=403)
 
-        # Obtener datos del request
         data = json.loads(request.body)
         producto_id = data.get('producto_id')
         cantidad = int(data.get('cantidad', 1))
 
         if cantidad < 1:
-            return JsonResponse({
-                'success': False,
-                'error': 'Cantidad inválida'
-            }, status=400)
+            return JsonResponse({'success': False, 'error': 'Cantidad inválida'}, status=400)
 
-        # Validar producto
-        producto = get_object_or_404(
-            Producto,
-            id=producto_id,
-            comanda_cliente=True
-        )
+        producto = get_object_or_404(Producto, id=producto_id, comanda_cliente=True)
 
-        # Validar stock
         if producto.cantidad_disponible < cantidad:
             return JsonResponse({
                 'success': False,
-                'error': f'Stock insuficiente. Disponible: {producto.cantidad_disponible}'
+                'error': f'Stock insuficiente. Disponible: {producto.cantidad_disponible}',
             }, status=400)
 
         with transaction.atomic():
-            # Buscar si ya existe un detalle para este producto
             detalle, created = DetalleComanda.objects.get_or_create(
                 comanda=comanda,
                 producto=producto,
                 defaults={
                     'cantidad': cantidad,
                     'precio_unitario': producto.precio_base,
-                    'especificaciones': ''
-                }
+                    'especificaciones': '',
+                },
             )
 
             if not created:
-                # Si ya existe, incrementar la cantidad
                 detalle.cantidad += cantidad
                 detalle.save()
 
-            # Actualizar estado de la comanda si está en borrador
-            if comanda.estado == 'borrador':
-                comanda.estado = 'borrador'
-                comanda.save()
-
-            # Calcular nuevo total
             subtotal = sum(d.subtotal for d in comanda.detalles.all())
 
         return JsonResponse({
@@ -146,31 +174,27 @@ def comanda_cliente_agregar_producto(request, token):
             'detalle_id': detalle.id,
             'cantidad_total': detalle.cantidad,
             'subtotal_item': float(detalle.subtotal),
-            'subtotal_comanda': float(subtotal)
+            'subtotal_comanda': float(subtotal),
         })
 
     except Exception as e:
-        logger.error(f"Error al agregar producto a comanda: {str(e)}", exc_info=True)
-        return JsonResponse({
-            'success': False,
-            'error': 'Error al procesar la solicitud'
-        }, status=500)
+        logger.error(f"Error al agregar producto a comanda: {e}", exc_info=True)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
+
+# ---------------------------------------------------------------------------
+# AJAX: actualizar cantidad de un producto
+# ---------------------------------------------------------------------------
 
 @require_http_methods(["POST"])
 @csrf_exempt
 def comanda_cliente_actualizar_cantidad(request, token):
-    """
-    Actualizar la cantidad de un producto en la comanda (AJAX)
-    """
+    """Actualizar la cantidad de un producto en la comanda (AJAX)."""
     try:
         comanda = get_object_or_404(Comanda, token_acceso=token)
 
         if not comanda.es_link_valido():
-            return JsonResponse({
-                'success': False,
-                'error': 'Link expirado'
-            }, status=403)
+            return JsonResponse({'success': False, 'error': 'Link expirado'}, status=403)
 
         data = json.loads(request.body)
         detalle_id = data.get('detalle_id')
@@ -180,162 +204,118 @@ def comanda_cliente_actualizar_cantidad(request, token):
 
         with transaction.atomic():
             if cantidad <= 0:
-                # Eliminar el detalle
                 detalle.delete()
                 mensaje = 'Producto eliminado del pedido'
             else:
-                # Validar stock
                 if detalle.producto.cantidad_disponible < cantidad:
                     return JsonResponse({
                         'success': False,
-                        'error': f'Stock insuficiente. Disponible: {detalle.producto.cantidad_disponible}'
+                        'error': f'Stock insuficiente. Disponible: {detalle.producto.cantidad_disponible}',
                     }, status=400)
-
-                # Actualizar cantidad
                 detalle.cantidad = cantidad
                 detalle.save()
                 mensaje = 'Cantidad actualizada'
 
-            # Calcular nuevo total
             subtotal = sum(d.subtotal for d in comanda.detalles.all())
 
         return JsonResponse({
             'success': True,
             'mensaje': mensaje,
             'subtotal_item': float(detalle.subtotal) if cantidad > 0 else 0,
-            'subtotal_comanda': float(subtotal)
+            'subtotal_comanda': float(subtotal),
         })
 
     except Exception as e:
-        logger.error(f"Error al actualizar cantidad: {str(e)}", exc_info=True)
-        return JsonResponse({
-            'success': False,
-            'error': 'Error al procesar la solicitud'
-        }, status=500)
+        logger.error(f"Error al actualizar cantidad: {e}", exc_info=True)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
+
+# ---------------------------------------------------------------------------
+# AJAX: confirmar pedido (enviar a cocina, sin pago)
+# ---------------------------------------------------------------------------
 
 @require_http_methods(["POST"])
+@csrf_exempt
 def comanda_cliente_finalizar(request, token):
     """
-    Finalizar la comanda y proceder al pago con Flow
+    Confirma el pedido: marca la comanda como 'pendiente' (cocina), crea los
+    ReservaProducto para facturación, y genera una nueva comanda 'borrador'
+    con el mismo token para que el cliente pueda hacer otro pedido.
     """
     try:
         comanda = get_object_or_404(Comanda, token_acceso=token)
 
         if not comanda.es_link_valido():
-            return JsonResponse({
-                'success': False,
-                'error': 'Link expirado'
-            }, status=403)
+            return JsonResponse({'success': False, 'error': 'Link expirado'}, status=403)
 
-        # Validar que tenga productos
+        if comanda.estado != 'borrador':
+            return JsonResponse({'success': False, 'error': 'Este pedido ya fue confirmado'}, status=400)
+
         if not comanda.detalles.exists():
             return JsonResponse({
                 'success': False,
-                'error': 'Debe agregar al menos un producto al pedido'
+                'error': 'Agrega al menos un producto al pedido',
             }, status=400)
 
-        # Calcular total
-        total = sum(d.subtotal for d in comanda.detalles.all())
-
         with transaction.atomic():
-            # Actualizar estado a pendiente de pago
-            comanda.estado = 'pendiente_pago'
+            # 1. Crear ReservaProducto para cada detalle (para facturación al checkout)
+            for detalle in comanda.detalles.select_related('producto').all():
+                ReservaProducto.objects.create(
+                    venta_reserva=comanda.venta_reserva,
+                    producto=detalle.producto,
+                    cantidad=detalle.cantidad,
+                    precio_unitario_venta=detalle.precio_unitario,
+                )
+
+            # 2. Marcar comanda como pendiente (entra al flujo de cocina)
+            saved_token = comanda.token_acceso
+            saved_vencimiento = comanda.fecha_vencimiento_link
+            saved_usuario = comanda.usuario_solicita
+
+            comanda.estado = 'pendiente'
+            comanda.token_acceso = None  # Liberar token
             comanda.save()
 
-            # Crear orden de pago en Flow
-            flow_service = FlowService()
+            # 3. Crear nueva comanda borrador con el mismo token (para siguiente pedido)
+            Comanda.objects.create(
+                venta_reserva=comanda.venta_reserva,
+                estado='borrador',
+                creada_por_cliente=True,
+                token_acceso=saved_token,
+                fecha_vencimiento_link=saved_vencimiento,
+                usuario_solicita=saved_usuario,
+            )
 
-            # Preparar datos para Flow
-            order_data = {
-                'commerceOrder': f'COMANDA-{comanda.id}',
-                'subject': f'Pedido Aremko Spa - Comanda #{comanda.id}',
-                'currency': 'CLP',
-                'amount': int(total),
-                'email': comanda.venta_reserva.cliente.email if comanda.venta_reserva else 'cliente@aremko.cl',
-                'urlConfirmation': f'{settings.SITE_URL}/ventas/comanda-cliente/{token}/pago-confirmacion/',
-                'urlReturn': f'{settings.SITE_URL}/ventas/comanda-cliente/{token}/pago-retorno/',
-            }
-
-            # Crear pago en Flow
-            response = flow_service.create_payment(order_data)
-
-            if response.get('url') and response.get('token'):
-                # Guardar token de Flow
-                comanda.flow_token = response['token']
-                comanda.flow_order_id = f'COMANDA-{comanda.id}'
-                comanda.save()
-
-                return JsonResponse({
-                    'success': True,
-                    'payment_url': response['url'] + '?token=' + response['token']
-                })
-            else:
-                raise Exception('Error al crear pago en Flow')
-
-    except Exception as e:
-        logger.error(f"Error al finalizar comanda: {str(e)}", exc_info=True)
-
-        # Revertir estado si falló
-        if comanda.estado == 'pendiente_pago':
-            comanda.estado = 'borrador'
-            comanda.save()
+        # Resumen del pedido confirmado
+        items = [
+            {'nombre': d.producto.nombre, 'cantidad': d.cantidad, 'subtotal': float(d.subtotal)}
+            for d in comanda.detalles.select_related('producto').all()
+        ]
+        total = sum(i['subtotal'] for i in items)
 
         return JsonResponse({
-            'success': False,
-            'error': 'Error al procesar el pago. Por favor intente nuevamente.'
-        }, status=500)
+            'success': True,
+            'pedido_id': comanda.id,
+            'mensaje': f'Pedido #{comanda.id} enviado a cocina',
+            'items': items,
+            'total': total,
+        })
 
+    except Exception as e:
+        logger.error(f"Error al confirmar pedido: {e}", exc_info=True)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+# ---------------------------------------------------------------------------
+# Vistas de pago (legacy, mantenidas por compatibilidad de URLs)
+# ---------------------------------------------------------------------------
 
 @csrf_exempt
 def comanda_cliente_pago_confirmacion(request, token):
-    """
-    Webhook de confirmación de pago desde Flow
-    """
-    try:
-        flow_token = request.POST.get('token')
-
-        # Validar comanda
-        comanda = get_object_or_404(Comanda, token_acceso=token, flow_token=flow_token)
-
-        # Verificar pago con Flow
-        flow_service = FlowService()
-        payment_status = flow_service.get_payment_status(flow_token)
-
-        if payment_status.get('status') == 2:  # Pago exitoso
-            with transaction.atomic():
-                comanda.estado = 'pago_confirmado'
-                comanda.save()
-
-                # Descontar stock de productos
-                for detalle in comanda.detalles.all():
-                    producto = detalle.producto
-                    producto.cantidad_disponible -= detalle.cantidad
-                    producto.save()
-
-                logger.info(f'Pago confirmado para comanda {comanda.id}')
-        else:
-            comanda.estado = 'pago_fallido'
-            comanda.save()
-            logger.warning(f'Pago fallido para comanda {comanda.id}')
-
-        return JsonResponse({'status': 'ok'})
-
-    except Exception as e:
-        logger.error(f"Error en confirmación de pago: {str(e)}", exc_info=True)
-        return JsonResponse({'status': 'error'}, status=500)
+    """Webhook de pago (legacy — ya no se usa, se mantiene para evitar 404)."""
+    return JsonResponse({'status': 'deprecated'}, status=410)
 
 
 def comanda_cliente_pago_retorno(request, token):
-    """
-    Página de retorno después del pago
-    """
-    comanda = get_object_or_404(Comanda, token_acceso=token)
-
-    context = {
-        'comanda': comanda,
-        'exitoso': comanda.estado == 'pago_confirmado',
-        'total': sum(d.subtotal for d in comanda.detalles.all())
-    }
-
-    return render(request, 'ventas/comanda_cliente/pago_resultado.html', context)
+    """Página de retorno de pago (legacy)."""
+    return JsonResponse({'status': 'deprecated'}, status=410)
