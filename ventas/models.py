@@ -4874,21 +4874,11 @@ class Comanda(models.Model):
         return timezone.now() < self.fecha_vencimiento_link
 
     def obtener_url_cliente(self):
-        """Obtiene la URL completa para el cliente
-
-        IMPORTANTE: Usa ruta /api/comanda/ como workaround temporal
-        debido a problema de routing en Render donde las rutas nuevas
-        bajo /ventas/ no llegan a Gunicorn.
-        """
+        """Obtiene la URL completa para el cliente."""
         from django.urls import reverse
-        try:
-            from django.conf import settings
-            # Usar el dominio de Render ya que www.aremko.cl aún no está configurado
-            site_url = 'https://aremko-booking-system.onrender.com'
-        except:
-            site_url = 'https://aremko-booking-system.onrender.com'
-
-        # WORKAROUND: Usar ruta bajo /api/ que sabemos que funciona en Render
+        from django.conf import settings
+        # Dominio de producción. Override con COMANDA_PUBLIC_BASE_URL si se necesita.
+        site_url = getattr(settings, 'COMANDA_PUBLIC_BASE_URL', 'https://www.aremko.cl')
         path = reverse('ventas:comanda_cliente_api', kwargs={'token': self.token_acceso})
         return f"{site_url}{path}"
 
