@@ -118,23 +118,62 @@
         .prev-order-item { font-size: 13px; color: #555; padding: 2px 0; }
         .prev-order-total { font-size: 14px; font-weight: 700; margin-top: 6px; color: #333; }
 
-        /* --- Success overlay --- */
-        .success-overlay {
+        /* --- Overlay shared --- */
+        .overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200;
             display: flex; align-items: center; justify-content: center;
         }
-        .success-card {
+        .overlay-card {
             background: white; border-radius: 16px; padding: 30px;
-            max-width: 400px; width: calc(100% - 40px); text-align: center;
+            max-width: 420px; width: calc(100% - 40px); text-align: center;
         }
-        .success-icon { font-size: 60px; margin-bottom: 12px; }
-        .success-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; color: #155724; }
-        .success-msg { font-size: 14px; color: #555; margin-bottom: 20px; line-height: 1.5; }
-        .success-btn {
+        .overlay-icon { font-size: 60px; margin-bottom: 12px; }
+        .overlay-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; color: #155724; }
+        .overlay-msg { font-size: 14px; color: #555; margin-bottom: 20px; line-height: 1.5; }
+        .overlay-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white; border: none; padding: 14px 28px; border-radius: 10px;
-            font-size: 15px; font-weight: 600; cursor: pointer;
+            color: white; border: none; padding: 14px 24px; border-radius: 10px;
+            font-size: 15px; font-weight: 600; cursor: pointer; margin: 6px;
         }
+        .overlay-btn-outline {
+            background: white; color: #667eea; border: 2px solid #667eea;
+            padding: 12px 24px; border-radius: 10px;
+            font-size: 15px; font-weight: 600; cursor: pointer; margin: 6px;
+        }
+
+        /* --- Progress bar --- */
+        .progress-track {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            margin: 20px 0; position: relative; padding: 0 10px;
+        }
+        .progress-track::before {
+            content: ''; position: absolute; top: 18px; left: 30px; right: 30px;
+            height: 4px; background: #e0e0e0; z-index: 0;
+        }
+        .progress-fill {
+            position: absolute; top: 18px; left: 30px; height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2); z-index: 1;
+            transition: width .5s ease;
+        }
+        .progress-step {
+            display: flex; flex-direction: column; align-items: center;
+            z-index: 2; flex: 1;
+        }
+        .step-circle {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: #e0e0e0; display: flex; align-items: center; justify-content: center;
+            font-size: 16px; font-weight: 700; color: white; transition: background .3s;
+        }
+        .step-circle.active { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .step-circle.done   { background: #4caf50; }
+        .step-label { font-size: 11px; margin-top: 6px; color: #888; font-weight: 600; }
+        .step-label.active { color: #667eea; }
+        .step-label.done   { color: #4caf50; }
+
+        .order-items-list { text-align: left; margin: 16px auto; max-width: 280px; }
+        .order-items-list div { padding: 3px 0; font-size: 14px; color: #444; }
+        .order-total-line { font-size: 16px; font-weight: 700; margin-top: 8px; color: #333; }
+        .refresh-hint { font-size: 12px; color: #999; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -335,23 +374,106 @@
         function showSuccess(data) {
             const items = data.items || [];
             let itemsHtml = items.map(i =>
-                i.cantidad + 'x ' + i.nombre
-            ).join('<br>');
+                '<div>' + i.cantidad + 'x ' + i.nombre + '</div>'
+            ).join('');
 
             const overlay = document.createElement('div');
-            overlay.className = 'success-overlay';
+            overlay.className = 'overlay';
             overlay.innerHTML =
-                '<div class="success-card">' +
-                    '<div class="success-icon">&#9989;</div>' +
-                    '<div class="success-title">' + data.mensaje + '</div>' +
-                    '<div class="success-msg">' +
-                        itemsHtml + '<br><br>' +
-                        '<strong>Total: $' + (data.total || 0).toLocaleString('es-CL') + '</strong><br><br>' +
-                        'Tu pedido está siendo preparado.<br>El pago se realiza al salir en recepción.' +
+                '<div class="overlay-card">' +
+                    '<div class="overlay-icon">&#9989;</div>' +
+                    '<div class="overlay-title">' + data.mensaje + '</div>' +
+                    '<div class="overlay-msg">' +
+                        '<div class="order-items-list">' + itemsHtml + '</div>' +
+                        '<div class="order-total-line">Total: $' + (data.total || 0).toLocaleString('es-CL') + '</div>' +
+                        '<br>Tu pedido está siendo preparado.<br>El pago se realiza al salir en recepción.' +
                     '</div>' +
-                    '<button class="success-btn" onclick="location.reload()">Hacer otro pedido</button>' +
+                    '<div>' +
+                        '<button class="overlay-btn" onclick="showOrderTracking(' + data.pedido_id + ', this.closest(\'.overlay\'))">Ver pedido</button>' +
+                        '<button class="overlay-btn-outline" onclick="location.reload()">Hacer otro pedido</button>' +
+                    '</div>' +
                 '</div>';
             document.body.appendChild(overlay);
+        }
+
+        function showOrderTracking(pedidoId, previousOverlay) {
+            if (previousOverlay) previousOverlay.remove();
+
+            const estados = [
+                { key: 'pendiente', label: 'Pendiente', icon: '&#128203;' },
+                { key: 'procesando', label: 'Preparando', icon: '&#127859;' },
+                { key: 'entregada', label: 'Entregado', icon: '&#9989;' }
+            ];
+
+            const overlay = document.createElement('div');
+            overlay.className = 'overlay';
+            overlay.id = 'trackingOverlay';
+            overlay.innerHTML =
+                '<div class="overlay-card">' +
+                    '<div class="overlay-title">Pedido #' + pedidoId + '</div>' +
+                    '<div class="progress-track" id="progressTrack">' +
+                        '<div class="progress-fill" id="progressFill" style="width:0%"></div>' +
+                        estados.map(function(e) {
+                            return '<div class="progress-step">' +
+                                '<div class="step-circle" data-estado="' + e.key + '">' + e.icon + '</div>' +
+                                '<div class="step-label" data-estado="' + e.key + '">' + e.label + '</div>' +
+                            '</div>';
+                        }).join('') +
+                    '</div>' +
+                    '<div id="trackingItems" class="order-items-list"></div>' +
+                    '<div id="trackingTotal" class="order-total-line"></div>' +
+                    '<div class="refresh-hint" id="refreshHint">Actualizando estado...</div>' +
+                    '<div style="margin-top:20px">' +
+                        '<button class="overlay-btn-outline" onclick="location.reload()">Crear nuevo pedido</button>' +
+                    '</div>' +
+                '</div>';
+            document.body.appendChild(overlay);
+
+            function updateProgress(estado) {
+                var idx = estados.findIndex(function(e) { return e.key === estado; });
+                if (idx < 0) idx = 0;
+                // Fill width: 0% for first, 50% for second, 100% for third
+                var fillPct = idx === 0 ? '0%' : idx === 1 ? '50%' : '100%';
+                document.getElementById('progressFill').style.width = fillPct;
+
+                var circles = document.querySelectorAll('#progressTrack .step-circle');
+                var labels = document.querySelectorAll('#progressTrack .step-label');
+                circles.forEach(function(c, i) {
+                    c.className = 'step-circle';
+                    labels[i].className = 'step-label';
+                    if (i < idx) { c.classList.add('done'); labels[i].classList.add('done'); }
+                    else if (i === idx) { c.classList.add('active'); labels[i].classList.add('active'); }
+                });
+            }
+
+            function pollStatus() {
+                fetch('/ventas/api/comanda/' + TOKEN + '/status/' + pedidoId + '/')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.success) {
+                            updateProgress(data.estado);
+                            // Update items
+                            var itemsHtml = (data.items || []).map(function(i) {
+                                return '<div>' + i.cantidad + 'x ' + i.nombre + '</div>';
+                            }).join('');
+                            document.getElementById('trackingItems').innerHTML = itemsHtml;
+                            document.getElementById('trackingTotal').textContent =
+                                'Total: $' + (data.total || 0).toLocaleString('es-CL');
+
+                            if (data.estado === 'entregada') {
+                                document.getElementById('refreshHint').textContent = '&#127881; Pedido entregado';
+                            } else {
+                                setTimeout(pollStatus, 10000);
+                            }
+                        }
+                    })
+                    .catch(function(e) {
+                        console.error('Poll error:', e);
+                        setTimeout(pollStatus, 15000);
+                    });
+            }
+
+            pollStatus();
         }
 
         // Init

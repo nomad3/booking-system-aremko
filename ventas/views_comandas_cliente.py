@@ -307,6 +307,48 @@ def comanda_cliente_finalizar(request, token):
 
 
 # ---------------------------------------------------------------------------
+# AJAX: consultar estado de un pedido (polling desde tracking overlay)
+# ---------------------------------------------------------------------------
+
+@require_http_methods(["GET"])
+def comanda_cliente_status(request, token, pedido_id):
+    """Devuelve el estado actual de un pedido confirmado (para polling)."""
+    try:
+        # Verificar que el token pertenece a la misma venta_reserva
+        comanda_token = Comanda.objects.filter(token_acceso=token).select_related('venta_reserva').first()
+        if not comanda_token:
+            return JsonResponse({'success': False, 'error': 'Token inválido'}, status=404)
+
+        pedido = Comanda.objects.filter(
+            id=pedido_id,
+            venta_reserva=comanda_token.venta_reserva,
+            creada_por_cliente=True,
+        ).prefetch_related('detalles__producto').first()
+
+        if not pedido:
+            return JsonResponse({'success': False, 'error': 'Pedido no encontrado'}, status=404)
+
+        items = [
+            {'nombre': d.producto.nombre, 'cantidad': d.cantidad, 'subtotal': float(d.subtotal)}
+            for d in pedido.detalles.all()
+        ]
+        total = sum(i['subtotal'] for i in items)
+
+        return JsonResponse({
+            'success': True,
+            'pedido_id': pedido.id,
+            'estado': pedido.estado,
+            'estado_display': pedido.get_estado_display(),
+            'items': items,
+            'total': total,
+        })
+
+    except Exception as e:
+        logger.error(f"Error al consultar estado de pedido: {e}", exc_info=True)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+# ---------------------------------------------------------------------------
 # Vistas de pago (legacy, mantenidas por compatibilidad de URLs)
 # ---------------------------------------------------------------------------
 

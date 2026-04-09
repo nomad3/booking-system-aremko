@@ -158,6 +158,7 @@ urlpatterns = [
     path('api/comanda/<str:token>/add/', views_comandas_cliente.comanda_cliente_agregar_producto, name='comanda_cliente_agregar_producto_api'),
     path('api/comanda/<str:token>/update/', views_comandas_cliente.comanda_cliente_actualizar_cantidad, name='comanda_cliente_actualizar_cantidad_api'),
     path('api/comanda/<str:token>/checkout/', views_comandas_cliente.comanda_cliente_finalizar, name='comanda_cliente_finalizar_api'),
+    path('api/comanda/<str:token>/status/<int:pedido_id>/', views_comandas_cliente.comanda_cliente_status, name='comanda_cliente_status_api'),
     path('api/comanda/<str:token>/confirm/', views_comandas_cliente.comanda_cliente_pago_confirmacion, name='comanda_cliente_pago_confirmacion_api'),
     path('api/comanda/<str:token>/return/', views_comandas_cliente.comanda_cliente_pago_retorno, name='comanda_cliente_pago_retorno_api'),
 
@@ -286,6 +287,7 @@ urlpatterns = [
     path('comanda-cliente/<str:token>/agregar-producto/', views_comandas_cliente.comanda_cliente_agregar_producto, name='comanda_cliente_agregar_producto'),
     path('comanda-cliente/<str:token>/actualizar-cantidad/', views_comandas_cliente.comanda_cliente_actualizar_cantidad, name='comanda_cliente_actualizar_cantidad'),
     path('comanda-cliente/<str:token>/finalizar/', views_comandas_cliente.comanda_cliente_finalizar, name='comanda_cliente_finalizar'),
+    path('comanda-cliente/<str:token>/status/<int:pedido_id>/', views_comandas_cliente.comanda_cliente_status, name='comanda_cliente_status'),
     path('comanda-cliente/<str:token>/pago-confirmacion/', views_comandas_cliente.comanda_cliente_pago_confirmacion, name='comanda_cliente_pago_confirmacion'),
     path('comanda-cliente/<str:token>/pago-retorno/', views_comandas_cliente.comanda_cliente_pago_retorno, name='comanda_cliente_pago_retorno'),
 
@@ -295,6 +297,7 @@ urlpatterns = [
     path('c/<str:token>/add/', views_comandas_cliente.comanda_cliente_agregar_producto, name='comanda_cliente_agregar_producto_short'),
     path('c/<str:token>/update/', views_comandas_cliente.comanda_cliente_actualizar_cantidad, name='comanda_cliente_actualizar_cantidad_short'),
     path('c/<str:token>/checkout/', views_comandas_cliente.comanda_cliente_finalizar, name='comanda_cliente_finalizar_short'),
+    path('c/<str:token>/status/<int:pedido_id>/', views_comandas_cliente.comanda_cliente_status, name='comanda_cliente_status_short'),
     path('c/<str:token>/confirm/', views_comandas_cliente.comanda_cliente_pago_confirmacion, name='comanda_cliente_pago_confirmacion_short'),
     path('c/<str:token>/return/', views_comandas_cliente.comanda_cliente_pago_retorno, name='comanda_cliente_pago_retorno_short'),
     # === END COMANDAS DE CLIENTES ===
