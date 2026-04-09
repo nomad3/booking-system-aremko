@@ -4994,6 +4994,7 @@ class DetalleComanda(models.Model):
     def __str__(self):
         return f"{self.cantidad}x {self.producto.nombre}"
 
+    @property
     def subtotal(self):
         """Calcula el subtotal de este item"""
         return self.cantidad * self.precio_unitario
