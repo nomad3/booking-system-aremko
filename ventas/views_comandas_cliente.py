@@ -123,7 +123,7 @@ def comanda_cliente_agregar_producto(request, token):
                 defaults={
                     'cantidad': cantidad,
                     'precio_unitario': producto.precio_base,
-                    'notas': ''
+                    'especificaciones': ''
                 }
             )
 
