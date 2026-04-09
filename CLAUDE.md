@@ -171,13 +171,9 @@ permite_email = BooleanField()
 
 ### Critical Business Logic
 
-**Availability Calculation** (`ventas/views.py`):
-```python
-# Check ServicioBloqueo for blocked slots
-# Check existing ReservaServicio for capacity
-# Consider service min_capacity and max_capacity
-# Return available time slots for calendar display
-```
+**Availability Calculation**: See slot/calendar logic in `ventas/views.py`. Honors `ServicioBloqueo` (blocked slots), existing `ReservaServicio` load, and service `min_capacity`/`max_capacity`.
+
+**Phone Normalization**: Chilean numbers are stored with `+56` prefix. See `normalize_all_phones.py` and `test_phone_normalization.py`. Run `normalize_and_merge_clients` after bulk imports.
 
 **Client Segmentation** (`ventas/models.py`):
 - Frequency: new (0-1 visits), regular (2-4), VIP (5+)
@@ -222,8 +218,16 @@ CLOUDINARY_URL=cloudinary://key:secret@cloud_name
 
 # Anti-spam limits
 SMS_DAILY_LIMIT_PER_CLIENT=2
-EMAIL_WEEKLY_LIMIT_PER_CLIENT=3
+SMS_MONTHLY_LIMIT_PER_CLIENT=8
+EMAIL_WEEKLY_LIMIT_PER_CLIENT=1
+EMAIL_MONTHLY_LIMIT_PER_CLIENT=4
+
+# Automation endpoints (n8n, campaign targets) — required header X-API-KEY
+AUTOMATION_API_KEY=your-key
 ```
+
+### Scheduled Tasks (cron)
+`python manage.py send_communication_triggers` is the central cron entry point. It dispatches: 24h reminders, post-visit surveys (D+1), 90-day reactivation campaigns, birthday greetings, and segmented newsletters. Run from host cron or Render cron job.
 
 ## Deployment Configuration
 
@@ -243,30 +247,6 @@ EMAIL_WEEKLY_LIMIT_PER_CLIENT=3
 1. Development: Django serves from /static/
 2. Production: WhiteNoise with compressed manifest storage
 3. Media files: Cloudinary (primary) or GCS (fallback)
-
-## Common Troubleshooting
-
-### ServicioBloqueo Error 500
-- Check clean() method in models.py
-- Verify fecha field is not null
-- Use bypass scripts in root directory if needed
-
-### Duplicate Clients
-- Run `python manage.py normalize_and_merge_clients`
-- Check phone normalization (+56 prefix for Chile)
-- Verify email uniqueness
-
-### Communication Failures
-- Check Redvoiss credentials and API status
-- Verify SendGrid API key and sender domain
-- Review CommunicationLog for error details
-- Check anti-spam limits in Cliente model
-
-### Payment Integration Issues
-- Verify Flow.cl API credentials
-- Check webhook signature validation
-- Ensure FLOW_RETURN_URL and FLOW_CONFIRMATION_URL are correct
-- Review Pago model for transaction states
 
 ## Important Files for Specific Features
 
@@ -321,24 +301,6 @@ EMAIL_WEEKLY_LIMIT_PER_CLIENT=3
 - ReservaServicio: fecha, hora_inicio, servicio_id
 - CommunicationLog: cliente_id, created_at
 
-### Data Integrity
-- Soft deletes via is_deleted flags
-- Audit trail via MovimientoCliente
-- Transaction safety for payment processing
-- Cascade rules for related deletions
-
-## Security Considerations
-
-### Production Settings
-- DEBUG=False mandatory
-- ALLOWED_HOSTS restricted to domains
-- SECURE_SSL_REDIRECT=True
-- SESSION_COOKIE_SECURE=True
-- CSRF_COOKIE_SECURE=True
-- X_FRAME_OPTIONS='DENY'
-
-### API Security
-- Token authentication for integrations
-- API rate limiting via Django middleware
-- Webhook signature validation for payments
-- CORS configuration for frontend separation
+### Audit Trail
+- `MovimientoCliente` logs client-facing changes (see `/auditoria-movimientos/` report).
+- `CommunicationLog` is the source of truth for send attempts, costs and errors.
