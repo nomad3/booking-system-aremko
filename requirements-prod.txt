@@ -1,7 +1,7 @@
 # Production requirements without WeasyPrint
 # Copy all requirements except WeasyPrint
 
-Django>=4.2.0
+Django>=4.2.24,<4.3.0  # CVE-2025-57833 fix
 django-solo>=2.0.0
 Pillow>=10.0.0
 psycopg2-binary>=2.9.0
