@@ -574,7 +574,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
     generar_cotizacion_link.short_description = 'Cotización'
 
     def link_comanda_whatsapp(self, obj):
-        """Muestra estado del link de comanda para el cliente"""
+        """Botón de un clic: genera (si hace falta) + copia + abre WhatsApp."""
         from django.utils.html import format_html
         from django.urls import reverse
         from ventas.models import Comanda
@@ -582,41 +582,30 @@ class VentaReservaAdmin(admin.ModelAdmin):
         if not obj or not obj.pk:
             return '-'
 
-        # Buscar comanda activa con token
+        ajax_url = reverse('admin:ventas_ventareserva_generar_link_comanda', args=[obj.pk])
+
         comanda = Comanda.objects.filter(
             venta_reserva=obj,
             token_acceso__isnull=False,
             creada_por_cliente=True
         ).first()
 
-        # URL del detalle de la reserva
-        detail_url = reverse('admin:ventas_ventareserva_change', args=[obj.pk])
-
+        link_existente = ''
         if comanda and comanda.es_link_valido():
-            # Hay un link válido - mostrar para copiar
             try:
-                cliente_url = comanda.obtener_url_cliente()
-                return format_html(
-                    '<div style="display:flex; flex-direction:column; gap:3px;">'
-                    '<input type="text" value="{}" readonly '
-                    'style="width:150px; padding:4px; font-size:10px; font-family:monospace; '
-                    'border:1px solid #4caf50; border-radius:3px; background:#f1f8f4;" '
-                    'onclick="this.select(); document.execCommand(\'copy\'); '
-                    'this.style.background=\'#d4edda\';" '
-                    'title="Click para copiar">'
-                    '<span style="color:#4caf50; font-size:9px; font-weight:600;">✓ Link activo</span>'
-                    '</div>',
-                    cliente_url
-                )
-            except:
-                pass
+                link_existente = comanda.obtener_url_cliente()
+            except Exception:
+                link_existente = ''
 
-        # No hay link o expiró - mostrar botón para ir al detalle
         return format_html(
-            '<a href="{}" style="display:inline-block; background:#2196f3; color:white; '
-            'padding:4px 10px; border-radius:4px; text-decoration:none; font-size:10px; '
-            'font-weight:600;">Generar Link</a>',
-            detail_url
+            '<button type="button" class="aremko-link-comanda-btn" '
+            'data-ajax-url="{ajax}" data-existing="{link}" '
+            'style="background:#25d366; color:white; border:none; padding:6px 10px; '
+            'border-radius:4px; font-size:11px; font-weight:600; cursor:pointer; '
+            'white-space:nowrap;">📋 {label}</button>',
+            ajax=ajax_url,
+            link=link_existente,
+            label='Copiar link' if link_existente else 'Generar + copiar',
         )
     link_comanda_whatsapp.short_description = '📱 Link Cliente'
 
@@ -750,6 +739,75 @@ class VentaReservaAdmin(admin.ModelAdmin):
         )
     link_comanda_whatsapp_detalle.short_description = 'Link WhatsApp para Cliente'
 
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        custom = [
+            path(
+                '<int:object_id>/generar-link-comanda/',
+                self.admin_site.admin_view(self.generar_link_comanda_ajax),
+                name='ventas_ventareserva_generar_link_comanda',
+            ),
+        ]
+        return custom + urls
+
+    def generar_link_comanda_ajax(self, request, object_id):
+        """Crea (o reutiliza) la comanda con token y devuelve JSON con el link."""
+        from django.http import JsonResponse
+        from django.contrib.auth import get_user_model
+        from ventas.models import Comanda, VentaReserva
+
+        if request.method != 'POST':
+            return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+        try:
+            venta = VentaReserva.objects.get(pk=object_id)
+        except VentaReserva.DoesNotExist:
+            return JsonResponse({'error': 'not_found'}, status=404)
+
+        comanda = Comanda.objects.filter(
+            venta_reserva=venta,
+            token_acceso__isnull=False,
+            creada_por_cliente=True,
+        ).first()
+
+        created = False
+        renewed = False
+
+        if comanda and comanda.es_link_valido():
+            pass  # reutilizar
+        elif comanda:
+            # Existe pero expirada → renovar token
+            comanda.generar_token_acceso()
+            renewed = True
+        else:
+            User = get_user_model()
+            usuario = User.objects.filter(username='Deborah').first() or request.user
+            comanda = Comanda.objects.create(
+                venta_reserva=venta,
+                estado='borrador',
+                creada_por_cliente=True,
+                usuario_solicita=usuario,
+            )
+            comanda.generar_token_acceso()
+            created = True
+
+        try:
+            url_cliente = comanda.obtener_url_cliente()
+            whatsapp_url = comanda.obtener_url_whatsapp()
+        except Exception as e:
+            return JsonResponse({'error': 'url_generation_failed', 'detail': str(e)}, status=500)
+
+        return JsonResponse({
+            'ok': True,
+            'created': created,
+            'renewed': renewed,
+            'comanda_id': comanda.id,
+            'url': url_cliente,
+            'whatsapp_url': whatsapp_url,
+            'vence': comanda.fecha_vencimiento_link.isoformat() if comanda.fecha_vencimiento_link else None,
+        })
+
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         """Manejar creación y renovación de comandas via query params"""
         from ventas.models import Comanda
@@ -816,7 +874,10 @@ class VentaReservaAdmin(admin.ModelAdmin):
         css = {
             'all': ('admin/css/custom.css',)
         }
-        js = ('admin/js/autocomplete_config.js',)
+        js = (
+            'admin/js/autocomplete_config.js',
+            'admin/js/link_comanda_one_click.js',
+        )
 
 @admin.register(Proveedor)
 class ProveedorAdmin(admin.ModelAdmin):
