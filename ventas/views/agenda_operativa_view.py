@@ -5,11 +5,14 @@ organizados cronológicamente desde la hora actual en adelante.
 
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
 from django.db.models import Q, Min
 from django.utils import timezone
 from datetime import datetime, time, timedelta
 from collections import defaultdict
-from ..models import ReservaServicio, ReservaProducto, VentaReserva
+import json
+from ..models import ReservaServicio, ReservaProducto, VentaReserva, Comanda
 
 def staff_required(view_func):
     """Decorador para requerir que el usuario sea staff"""
@@ -572,6 +575,38 @@ def agenda_operativa(request):
             'fecha_hoy': hoy.strftime('%Y-%m-%d')
         }
 
+    # --- Comandas pendientes de clientes (para sección destacada) ---
+    comandas_pendientes = (
+        Comanda.objects.filter(
+            estado__in=['pendiente', 'procesando'],
+            creada_por_cliente=True,
+        )
+        .select_related('venta_reserva__cliente', 'usuario_procesa')
+        .prefetch_related('detalles__producto')
+        .order_by('fecha_solicitud')
+    )
+
+    comandas_data = []
+    for c in comandas_pendientes:
+        tiempo_espera = timezone.now() - c.fecha_solicitud
+        minutos = int(tiempo_espera.total_seconds() // 60)
+        items = [
+            {'nombre': d.producto.nombre, 'cantidad': d.cantidad}
+            for d in c.detalles.select_related('producto').all()
+        ]
+        cliente_nombre = ''
+        if c.venta_reserva and c.venta_reserva.cliente:
+            cliente_nombre = c.venta_reserva.cliente.nombre
+        comandas_data.append({
+            'id': c.id,
+            'estado': c.estado,
+            'cliente': cliente_nombre,
+            'reserva_id': c.venta_reserva_id,
+            'minutos_espera': minutos,
+            'items': items,
+            'usuario_procesa': c.usuario_procesa.get_short_name() if c.usuario_procesa else None,
+        })
+
     context = {
         'agenda': agenda_ordenada,
         'fecha_actual': hoy.strftime('%d/%m/%Y'),
@@ -586,7 +621,96 @@ def agenda_operativa(request):
         'tiene_tareas': len(agenda_ordenada) > 0,
         'debug_mode': debug_mode,
         'debug_info': debug_info,
-        'filtro_vista': filtro_vista  # Pasar filtro activo al template
+        'filtro_vista': filtro_vista,
+        'comandas_pendientes': comandas_data,
     }
 
     return render(request, 'ventas/agenda_operativa.html', context)
+
+
+# ---------------------------------------------------------------------------
+# AJAX: polling de comandas pendientes
+# ---------------------------------------------------------------------------
+
+@staff_required
+@require_http_methods(["GET"])
+def comandas_pendientes_api(request):
+    """Devuelve comandas pendientes/procesando de clientes (para polling)."""
+    comandas = (
+        Comanda.objects.filter(
+            estado__in=['pendiente', 'procesando'],
+            creada_por_cliente=True,
+        )
+        .select_related('venta_reserva__cliente', 'usuario_procesa')
+        .prefetch_related('detalles__producto')
+        .order_by('fecha_solicitud')
+    )
+
+    data = []
+    for c in comandas:
+        tiempo_espera = timezone.now() - c.fecha_solicitud
+        minutos = int(tiempo_espera.total_seconds() // 60)
+        items = [
+            {'nombre': d.producto.nombre, 'cantidad': d.cantidad}
+            for d in c.detalles.select_related('producto').all()
+        ]
+        cliente_nombre = ''
+        if c.venta_reserva and c.venta_reserva.cliente:
+            cliente_nombre = c.venta_reserva.cliente.nombre
+        data.append({
+            'id': c.id,
+            'estado': c.estado,
+            'cliente': cliente_nombre,
+            'reserva_id': c.venta_reserva_id,
+            'minutos_espera': minutos,
+            'items': items,
+            'usuario_procesa': c.usuario_procesa.get_short_name() if c.usuario_procesa else None,
+        })
+
+    return JsonResponse({'success': True, 'comandas': data})
+
+
+# ---------------------------------------------------------------------------
+# AJAX: cambiar estado de una comanda (registra usuario logueado)
+# ---------------------------------------------------------------------------
+
+@staff_required
+@require_http_methods(["POST"])
+def comanda_cambiar_estado_api(request):
+    """
+    Cambia el estado de una comanda y registra el usuario que hizo el cambio.
+    Body JSON: { comanda_id: int, nuevo_estado: 'procesando'|'entregada' }
+    """
+    try:
+        data = json.loads(request.body)
+        comanda_id = data.get('comanda_id')
+        nuevo_estado = data.get('nuevo_estado')
+
+        if nuevo_estado not in ('procesando', 'entregada'):
+            return JsonResponse({'success': False, 'error': 'Estado no válido'}, status=400)
+
+        comanda = Comanda.objects.get(id=comanda_id, creada_por_cliente=True)
+
+        if nuevo_estado == 'procesando':
+            comanda.estado = 'procesando'
+            comanda.usuario_procesa = request.user
+            comanda.fecha_inicio_proceso = timezone.now()
+            comanda.save()
+        elif nuevo_estado == 'entregada':
+            comanda.estado = 'entregada'
+            comanda.fecha_entrega = timezone.now()
+            if not comanda.usuario_procesa:
+                comanda.usuario_procesa = request.user
+            comanda.save()  # save() propaga fecha_entrega a ReservaProducto
+
+        return JsonResponse({
+            'success': True,
+            'comanda_id': comanda.id,
+            'nuevo_estado': comanda.estado,
+            'usuario': request.user.get_short_name() or request.user.username,
+        })
+
+    except Comanda.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Comanda no encontrada'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
