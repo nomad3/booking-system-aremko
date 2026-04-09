@@ -413,7 +413,6 @@ class VentaReservaAdmin(admin.ModelAdmin):
         ('📱 Comanda del Cliente (WhatsApp)', {
             'fields': ('link_comanda_whatsapp_detalle',),
             'description': 'Genera un link único para que el cliente pueda crear su propia comanda de productos vía WhatsApp. El link incluye pago automático con Flow.',
-            'classes': ('collapse',)
         }),
         ('Gestión de Comandas (Personal)', {
             'fields': ('agregar_comanda_button',),
