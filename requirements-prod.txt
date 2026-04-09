@@ -1,16 +1,16 @@
 # Production requirements without WeasyPrint
 # Copy all requirements except WeasyPrint
 
-Django>=4.2.24,<4.3.0  # CVE-2025-57833 fix
+Django>=4.2.30,<4.3.0  # Multiple CVE fixes (see requirements.txt)
 django-solo>=2.0.0
-Pillow>=10.0.0
+Pillow>=12.1.1  # CVE-2026-25990
 psycopg2-binary>=2.9.0
 gunicorn>=21.0.0
 whitenoise>=6.5.0
 django-storages[google]>=1.13.0
 google-cloud-storage>=2.10.0
 python-dotenv>=1.0.0
-requests>=2.31.0
+requests>=2.33.0  # CVE-2024-47081, CVE-2026-25645
 sendgrid>=6.10.0
 django-cors-headers>=4.2.0
 # WeasyPrint>=62.3  # Comentado temporalmente hasta resolver dependencias

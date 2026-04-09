@@ -5,7 +5,7 @@
 # ============================================================
 
 # Core Django (VULNERABILIDADES CRÍTICAS CORREGIDAS)
-Django>=4.2.24,<4.3.0  # Fixes: CVE-2024-38875, CVE-2024-41989, CVE-2024-41990, CVE-2024-42005, CVE-2024-45230, CVE-2024-53907, CVE-2024-53908, CVE-2025-32873, CVE-2025-57833 (SQLi via column aliases)
+Django>=4.2.30,<4.3.0  # Fixes: multiple CVEs incl. CVE-2025-64459 (SQLi via _connector), CVE-2025-57833, CVE-2026-33034 (DATA_UPLOAD_MAX_MEMORY_SIZE bypass), CVE-2026-3902 (ASGI header spoofing)
 psycopg2-binary>=2.9.9  # PostgreSQL adapter
 
 # Google APIs
@@ -15,7 +15,7 @@ google-auth-oauthlib>=1.2.0
 google-auth-httplib2>=0.2.0
 
 # HTTP Clients (VULNERABILIDADES CORREGIDAS)
-requests>=2.32.0  # Fixes: Certificate Verification Bypass, Proxy-Authorization Header Leak
+requests>=2.33.0  # Fixes: CVE-2024-47081 (.netrc leak), CVE-2026-25645 (temp file reuse)
 httpx>=0.27.2  # Cliente HTTP asíncrono
 
 # Django REST Framework
@@ -43,7 +43,7 @@ xlwt==1.3.0  # Para exportación a Excel (XLS viejo)
 openpyxl>=3.1.5  # Para importar/exportar Excel moderno (XLSX)
 
 # Media & Images (VULNERABILIDADES CORREGIDAS)
-Pillow>=10.4.0  # ImageField support - versión segura
+Pillow>=12.1.1  # ImageField support - Fixes CVE-2026-25990 (OOB write in PSD loader)
 
 # Utils
 phonenumbers>=8.13.48  # Phone number validation/formatting
