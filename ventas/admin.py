@@ -540,25 +540,38 @@ class VentaReservaAdmin(admin.ModelAdmin):
     generar_tips_link.short_description = 'Tips'
 
     def agregar_comanda_button(self, obj):
-        """Botón para agregar nueva comanda con productos"""
+        """Botón para agregar comanda — abre el mismo menú que usa el cliente."""
         from django.urls import reverse
         from django.utils.html import format_html
         if obj and obj.pk:
-            url = reverse('admin:ventas_comanda_add')
+            ajax_url = reverse('admin:ventas_ventareserva_generar_link_comanda', args=[obj.pk])
+            # Verificar si ya existe un borrador con token
+            comanda = Comanda.objects.filter(
+                venta_reserva=obj,
+                token_acceso__isnull=False,
+                creada_por_cliente=True,
+            ).first()
+            existing_url = ''
+            if comanda and comanda.es_link_valido():
+                try:
+                    existing_url = comanda.obtener_url_cliente()
+                except Exception:
+                    pass
             return format_html(
                 '<a href="javascript:void(0);" '
-                'onclick="window.open(\'{0}?venta_reserva={1}&_popup=1\', \'_blank\', '
-                '\'width=1000,height=800,scrollbars=yes,resizable=yes\'); return false;" '
+                'class="aremko-open-comanda-btn" '
+                'data-existing="{existing}" '
+                'data-ajax-url="{ajax}" '
                 'style="background:#4caf50; color:white; padding:10px 20px; border-radius:6px; '
                 'text-decoration:none; font-weight:600; font-size:13px; display:inline-block; '
                 'margin:10px 0; cursor:pointer;">'
                 '➕ Agregar Comanda con Productos'
                 '</a>'
                 '<p style="color:#666; font-size:12px; margin:5px 0 0 0;">'
-                'Se abrirá una ventana donde podrás agregar la comanda y sus productos. '
-                'Al guardar, se actualizará automáticamente esta reserva.'
+                'Se abrirá el menú de productos del cliente en una nueva ventana.'
                 '</p>',
-                url, obj.pk
+                existing=existing_url,
+                ajax=ajax_url,
             )
         return format_html(
             '<p style="color:#999;">Guarda la reserva primero para poder agregar comandas.</p>'

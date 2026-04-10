@@ -113,4 +113,53 @@
         e.preventDefault();
         handleClick(btn);
     });
+
+    // --- Botón "Agregar Comanda con Productos" (abre menú cliente) ---
+    async function handleOpenComanda(btn) {
+        const existing = btn.dataset.existing;
+        const ajaxUrl = btn.dataset.ajaxUrl;
+        const originalLabel = btn.textContent;
+
+        btn.disabled = true;
+        btn.textContent = '⏳ Abriendo...';
+
+        try {
+            let url = existing;
+
+            if (!url) {
+                const resp = await fetch(ajaxUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                });
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const data = await resp.json();
+                if (!data.ok) throw new Error(data.error || 'unknown');
+                url = data.url;
+                btn.dataset.existing = url;
+            }
+
+            window.open(url, '_blank');
+
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.textContent = '➕ Agregar Comanda con Productos';
+            }, 1000);
+        } catch (err) {
+            console.error('Error abriendo menú de comanda:', err);
+            showToast('Error: ' + err.message, 'error');
+            btn.disabled = false;
+            btn.textContent = originalLabel;
+        }
+    }
+
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.aremko-open-comanda-btn');
+        if (!btn) return;
+        e.preventDefault();
+        handleOpenComanda(btn);
+    });
 })();
