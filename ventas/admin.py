@@ -378,12 +378,11 @@ class VentaReservaAdmin(admin.ModelAdmin):
     list_per_page = 50
     autocomplete_fields = ['cliente']
     list_display = (
-        'id', 'cliente_info', 'fecha_reserva_corta', 'estado_pago',
+        'id', 'cliente_info', 'link_comanda_whatsapp', 'fecha_reserva_corta', 'estado_pago',
         'estado_reserva', 'servicios_y_cantidades',
         'productos_y_cantidades', 'total_servicios',
         'total_productos', 'total', 'pagado', 'saldo_pendiente',
         'generar_cotizacion_link', 'generar_resumen_link', 'generar_tips_link',
-        'link_comanda_whatsapp'
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
