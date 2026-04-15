@@ -64,6 +64,16 @@
                 <p><strong>Monto Pagado:</strong> ${{ venta.pagado|floatformat:0|intcomma }}</p>
                 <p>Recibirás un correo electrónico con los detalles completos.</p>
             </div>
+            <script>
+                if (typeof fbq !== 'undefined') {
+                    fbq('track', 'Purchase', {
+                        value: {{ venta.pagado|default:0 }},
+                        currency: 'CLP',
+                        content_ids: ['{{ venta.id }}'],
+                        content_type: 'product'
+                    });
+                }
+            </script>
             {% endif %}
 
         {% elif payment_status == 'rechazado' %}

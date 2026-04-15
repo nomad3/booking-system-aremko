@@ -380,6 +380,16 @@ Email para comprobante: ventas@aremko.cl</pre>
 
 {% block extra_script %}
 <script>
+    // Meta Pixel: InitiateCheckout al cargar la página de checkout
+    {% if cart.servicios or cart.giftcards %}
+    if (typeof fbq !== 'undefined') {
+        fbq('track', 'InitiateCheckout', {
+            value: {{ cart.total|default:0 }},
+            currency: 'CLP'
+        });
+    }
+    {% endif %}
+
     // --- Global Variables ---
     let isProcessingCheckout = false; // Flag to prevent double submission
 
@@ -645,6 +655,15 @@ Email para comprobante: ventas@aremko.cl</pre>
                     'value': data.total_reserva || 1.0,
                     'currency': 'CLP',
                     'transaction_id': data.reserva_id ? String(data.reserva_id) : ''
+                });
+            }
+
+            // Meta Pixel: Lead cuando la reserva se creó exitosamente (aún no pagada)
+            if (typeof fbq !== 'undefined') {
+                fbq('track', 'Lead', {
+                    value: data.total_reserva || 0,
+                    currency: 'CLP',
+                    content_ids: data.reserva_id ? [String(data.reserva_id)] : []
                 });
             }
         } else {
