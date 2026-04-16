@@ -6,7 +6,7 @@ from django.conf.urls.static import static # Import static
 # from ventas import views
 from django.contrib.auth import views as auth_views # Import auth views
 # Import the specific view functions needed for root URLs
-from ventas.views.public_views import homepage_view, empresas_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view
+from ventas.views.public_views import homepage_view, empresas_view, empresas_presentacion_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view
 # Removed direct import of ventas.urls
 
 from django.contrib.sitemaps.views import sitemap
@@ -37,6 +37,7 @@ urlpatterns = [
     path('productos/', productos_view, name='productos'),
     # Corporate landing pages (direct URLs without /ventas/ prefix)
     path('empresas/', empresas_view, name='empresas'),
+    path('empresas/presentacion/', empresas_presentacion_view, name='empresas_presentacion'),
     path('empresas/solicitar-cotizacion/', solicitar_cotizacion_empresa, name='solicitar_cotizacion_empresa'),
     # Include all URLs from the ventas app under the /ventas/ prefix
     path('ventas/', include('ventas.urls')), # Rely on app_name in ventas.urls
