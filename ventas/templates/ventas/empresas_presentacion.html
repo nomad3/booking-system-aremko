@@ -1,0 +1,433 @@
+{% extends 'ventas/base_public.html' %}
+{% load static %}
+
+{% block title %}Convenio Empresarial - Aremko Spa Boutique{% endblock %}
+{% block meta_description %}Convenio empresarial Aremko Spa Boutique. Descuentos permanentes en cabañas, tinas calientes y masajes junto al Río Pescado, Puerto Varas.{% endblock %}
+
+{% block extra_style %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  .pres-root {
+    --gold: #d4af37;
+    --gold-light: #f3e5ab;
+    --text-light: #f7f9fa;
+    --font-heading: 'Playfair Display', serif;
+    --font-body: 'Inter', sans-serif;
+    background: #000;
+    color: var(--text-light);
+    font-family: var(--font-body);
+  }
+
+  .pres-root .pres-slide {
+    position: relative;
+    min-height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-size: cover;
+    background-position: center;
+  }
+
+  .pres-root .pres-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 1;
+  }
+  .pres-root .pres-overlay.heavy { background: rgba(10, 15, 20, 0.82); }
+
+  .pres-root .pres-split {
+    position: absolute; inset: 0;
+    display: flex;
+    flex-direction: column;
+    z-index: 0;
+  }
+  .pres-root .pres-split-img {
+    flex: 1;
+    background-size: cover;
+    background-position: center;
+  }
+
+  .pres-root .pres-content {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    max-width: 900px;
+    padding: clamp(3rem, 8vw, 6rem) clamp(1.5rem, 5vw, 4rem);
+    text-align: left;
+    margin: 0 auto;
+  }
+  .pres-root .pres-content.center { text-align: center; }
+
+  .pres-root .pres-box {
+    background: transparent;
+    border-left: 4px solid var(--gold);
+    padding-left: clamp(1.2rem, 3vw, 2rem);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.75);
+  }
+  .pres-root .pres-box * {
+    text-shadow: 0 1px 3px rgba(0,0,0,0.75);
+  }
+
+  .pres-root .pres-subtitle {
+    font-size: clamp(0.95rem, 2.4vw, 1.3rem);
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    margin-bottom: 1.2rem;
+    color: var(--gold);
+  }
+  .pres-root .pres-title {
+    font-family: var(--font-heading);
+    font-size: clamp(2.8rem, 9vw, 6rem);
+    line-height: 1.05;
+    letter-spacing: 0.15em;
+    margin-bottom: 1.8rem;
+    font-weight: 400;
+  }
+  .pres-root .pres-divider {
+    height: 2px;
+    background: var(--gold);
+    width: 80px;
+    margin: 0 0 1.8rem 0;
+    border: none;
+  }
+  .pres-root .pres-content.center .pres-divider { margin: 0 auto 1.8rem; }
+  .pres-root .pres-sub-heading {
+    font-family: var(--font-heading);
+    font-size: clamp(1.4rem, 4vw, 2.4rem);
+    font-style: italic;
+    color: var(--gold-light);
+    line-height: 1.3;
+    margin-bottom: 1.8rem;
+    font-weight: 400;
+  }
+  .pres-root .pres-text-large {
+    font-size: clamp(1.05rem, 2.4vw, 1.4rem);
+    letter-spacing: 0.05em;
+    font-weight: 300;
+    margin-bottom: 1rem;
+  }
+  .pres-root .pres-text-small {
+    font-size: clamp(0.75rem, 1.8vw, 0.95rem);
+    letter-spacing: 0.25em;
+    opacity: 0.75;
+    text-transform: uppercase;
+  }
+  .pres-root .pres-slide-number {
+    font-size: clamp(0.85rem, 2vw, 1.05rem);
+    letter-spacing: 0.35em;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 1.4rem;
+    font-weight: 500;
+  }
+  .pres-root .pres-section-title {
+    font-family: var(--font-heading);
+    font-size: clamp(2rem, 6vw, 3.8rem);
+    line-height: 1.15;
+    margin-bottom: 1.8rem;
+    font-weight: 400;
+  }
+  .pres-root .pres-subsection-title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.5rem, 4.5vw, 2.6rem);
+    color: var(--gold);
+    line-height: 1.2;
+    margin: 2rem 0 0;
+    font-weight: 400;
+  }
+  .pres-root .pres-text-body {
+    font-size: clamp(1.05rem, 2.4vw, 1.5rem);
+    line-height: 1.55;
+    font-weight: 300;
+    margin-bottom: 1.2rem;
+  }
+  .pres-root .pres-text-body.big {
+    font-size: clamp(1.2rem, 2.8vw, 1.75rem);
+    line-height: 1.5;
+  }
+  .pres-root .pres-price-tag {
+    display: inline-block;
+    font-size: clamp(0.95rem, 2vw, 1.2rem);
+    letter-spacing: 0.15em;
+    background: var(--gold);
+    color: #111;
+    padding: 0.6rem 1.3rem;
+    margin: 1rem 0;
+    font-weight: 600;
+    text-shadow: none !important;
+  }
+
+  .pres-root .pres-bullets {
+    list-style: none;
+    margin: 1rem 0 0 0;
+    padding: 0;
+  }
+  .pres-root .pres-bullets li {
+    font-size: clamp(1.05rem, 2.4vw, 1.5rem);
+    line-height: 1.4;
+    padding: 0.6rem 0 0.6rem 2rem;
+    position: relative;
+    font-weight: 300;
+  }
+  .pres-root .pres-bullets li::before {
+    content: '—';
+    position: absolute;
+    left: 0;
+    color: var(--gold);
+    font-weight: 500;
+  }
+
+  .pres-root .pres-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2.5rem;
+  }
+  .pres-root .pres-card {
+    background: transparent;
+    border-left: 3px solid var(--gold);
+    padding: 1rem 0 1rem 1.5rem;
+    text-align: left;
+  }
+  .pres-root .pres-card h3 {
+    font-family: var(--font-heading);
+    font-size: clamp(1.2rem, 2.6vw, 1.6rem);
+    color: var(--gold);
+    margin: 0 0 0.6rem;
+    font-weight: 400;
+  }
+  .pres-root .pres-card p {
+    font-size: clamp(0.95rem, 2vw, 1.15rem);
+    line-height: 1.5;
+    font-weight: 300;
+    margin: 0;
+  }
+
+  .pres-root .pres-footer {
+    border-top: 1px solid rgba(255,255,255,0.25);
+    padding-top: 2rem;
+    margin-top: 3rem;
+  }
+  .pres-root .pres-golden-title {
+    color: var(--gold);
+    font-size: clamp(1rem, 2.2vw, 1.3rem);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+  .pres-root .pres-location {
+    font-size: clamp(1rem, 2.2vw, 1.2rem);
+    margin-bottom: 0.4rem;
+    font-weight: 300;
+  }
+  .pres-root .pres-legal {
+    margin-top: 1.5rem;
+    font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+    line-height: 1.5;
+    opacity: 0.7;
+  }
+  .pres-root .pres-legal p { margin-bottom: 0.3rem; }
+
+  .pres-root .pres-cta-wrap {
+    margin-top: 2.5rem;
+    text-align: center;
+  }
+  .pres-root .pres-cta {
+    display: inline-block;
+    background: var(--gold);
+    color: #111 !important;
+    padding: 1rem 2.5rem;
+    font-size: clamp(0.95rem, 2.2vw, 1.15rem);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 2px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .pres-root .pres-cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(212, 175, 55, 0.35);
+    color: #111 !important;
+  }
+
+  /* En pantallas grandes, split images se muestran lado a lado */
+  @media (min-width: 768px) {
+    .pres-root .pres-split { flex-direction: row; }
+    .pres-root .pres-split-img { height: 100%; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pres-root">
+
+  <!-- Slide 0: PORTADA -->
+  <section class="pres-slide" style="background-image: url('{% static "ventas/empresas_presentacion/portada_real.jpg" %}');">
+    <div class="pres-overlay"></div>
+    <div class="pres-content center">
+      <p class="pres-subtitle">A R E M K O</p>
+      <h1 class="pres-title">SPA<br>BOUTIQUE</h1>
+      <hr class="pres-divider">
+      <h2 class="pres-sub-heading">Bienestar junto al Río Pescado</h2>
+      <p class="pres-text-large">Convenios Empresariales</p>
+      <p class="pres-text-large" style="margin-bottom:2.5rem;">Región de los Lagos</p>
+      <p class="pres-text-small">PUERTO VARAS · 2026</p>
+    </div>
+  </section>
+
+  <!-- Slide 1: QUIÉNES SOMOS -->
+  <section class="pres-slide" style="background-image: url('{% static "ventas/empresas_presentacion/aremko_forest_1776353954686.png" %}');">
+    <div class="pres-overlay"></div>
+    <div class="pres-content">
+      <p class="pres-slide-number">01 · Quiénes Somos</p>
+      <h2 class="pres-section-title">REFUGIO EN EL BOSQUE DESDE 2013</h2>
+      <hr class="pres-divider">
+      <p class="pres-text-body big">
+        A 24 km de Puerto Varas, en el corazón del Río Pescado.
+      </p>
+      <ul class="pres-bullets">
+        <li>Silencio y bosque nativo</li>
+        <li>Agua caliente al aire libre</li>
+        <li>Espacios pequeños y cuidados</li>
+        <li>Tiempo sin apuro</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Slide 2: CABAÑAS -->
+  <section class="pres-slide">
+    <div class="pres-split">
+      <div class="pres-split-img" style="background-image: url('{% static "ventas/empresas_presentacion/cabana_real_1.jpg" %}');"></div>
+      <div class="pres-split-img" style="background-image: url('{% static "ventas/empresas_presentacion/cabana_real_2.jpg" %}');"></div>
+    </div>
+    <div class="pres-overlay"></div>
+    <div class="pres-content">
+      <div class="pres-box">
+        <p class="pres-slide-number">02 · Servicios</p>
+        <h2 class="pres-section-title">CABAÑAS</h2>
+        <hr class="pres-divider">
+        <p class="pres-price-tag">DESDE $90.000 / NOCHE</p>
+        <ul class="pres-bullets">
+          <li>5 cabañas para dos</li>
+          <li>Vista al bosque o río</li>
+          <li>Calefacción y aire acondicionado</li>
+          <li>Fibra óptica</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 3: TINAS -->
+  <section class="pres-slide">
+    <div class="pres-split">
+      <div class="pres-split-img" style="background-image: url('{% static "ventas/empresas_presentacion/tina_real_1.jpg" %}');"></div>
+      <div class="pres-split-img" style="background-image: url('{% static "ventas/empresas_presentacion/tina_real_2.jpg" %}');"></div>
+    </div>
+    <div class="pres-overlay"></div>
+    <div class="pres-content">
+      <div class="pres-box">
+        <p class="pres-slide-number">03 · Servicios</p>
+        <h2 class="pres-section-title">TINAS CALIENTES</h2>
+        <hr class="pres-divider">
+        <p class="pres-text-body big">
+          Dos horas frente al río. Privadas para dos.
+        </p>
+        <ul class="pres-bullets">
+          <li>Agua caliente al aire libre</li>
+          <li>Naturaleza y sonido del río</li>
+          <li>Descuento para empresas</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 4: MASAJES -->
+  <section class="pres-slide">
+    <div class="pres-split">
+      <div class="pres-split-img" style="background-image: url('{% static "ventas/empresas_presentacion/masaje_real_2.jpg" %}');"></div>
+      <div class="pres-split-img" style="background-image: url('{% static "ventas/empresas_presentacion/masaje_real_1.jpg" %}');"></div>
+    </div>
+    <div class="pres-overlay"></div>
+    <div class="pres-content">
+      <div class="pres-box">
+        <p class="pres-slide-number">04 · Servicios</p>
+        <h2 class="pres-section-title">MASAJES & TERAPIAS</h2>
+        <hr class="pres-divider">
+        <p class="pres-text-body big">
+          Terapias profesionales para soltar la semana.
+        </p>
+        <ul class="pres-bullets">
+          <li>Relajación</li>
+          <li>Descontracturante</li>
+          <li>Bienestar integral</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 5: CONVENIO -->
+  <section class="pres-slide" style="background-image: url('{% static "ventas/empresas_presentacion/beneficio_real.jpg" %}');">
+    <div class="pres-overlay"></div>
+    <div class="pres-content">
+      <div class="pres-box">
+        <p class="pres-slide-number">05 · Convenio</p>
+        <h2 class="pres-section-title">BENEFICIOS CORPORATIVOS</h2>
+        <hr class="pres-divider">
+        <ul class="pres-bullets">
+          <li>Descuentos permanentes</li>
+          <li>Pago en cuotas por planilla</li>
+          <li>Convenio simple y rápido</li>
+        </ul>
+        <h3 class="pres-subsection-title" style="margin-top:2.5rem;">SIN SUSCRIPCIÓN<br>SIN MÍNIMOS</h3>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 6: GIFT CARDS + CONTACTO -->
+  <section class="pres-slide" style="background-image: url('{% static "ventas/empresas_presentacion/footer_real.jpg" %}');">
+    <div class="pres-overlay heavy"></div>
+    <div class="pres-content center">
+      <p class="pres-slide-number">06 · Gift Cards</p>
+      <h2 class="pres-section-title" style="text-align:center;">PARA REGALAR CON SENTIDO</h2>
+
+      <div class="pres-cards">
+        <div class="pres-card">
+          <h3>Experiencia Privada</h3>
+          <p>Una tarde junto al río. Tina para dos, dos horas.</p>
+        </div>
+        <div class="pres-card">
+          <h3>Reconocimiento</h3>
+          <p>Un regalo que no queda olvidado en el cajón.</p>
+        </div>
+        <div class="pres-card">
+          <h3>Paquetes</h3>
+          <p>Experiencias combinadas. Reserva simple.</p>
+        </div>
+      </div>
+
+      <div class="pres-cta-wrap">
+        <a href="{% url 'ventas:empresas' %}#cotizacion" class="pres-cta">
+          Solicitar Cotización
+        </a>
+      </div>
+
+      <div class="pres-footer">
+        <h3 class="pres-golden-title">Contacto</h3>
+        <p class="pres-location">Río Pescado Km 4</p>
+        <p class="pres-location">Puerto Varas · Los Lagos</p>
+        <div class="pres-legal">
+          <p>Aremko Hotel Spa · RUT 76.485.192-7</p>
+          <p>Precios en CLP con IVA. Vigencia abril-diciembre 2026.</p>
+          <p>Descuentos no acumulables con otras promociones.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

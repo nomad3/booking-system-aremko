@@ -221,6 +221,18 @@ def empresas_view(request):
     }
     return render(request, 'ventas/empresas.html', context)
 
+
+def empresas_presentacion_view(request):
+    """
+    Presentación del Convenio Empresarial Aremko en formato visual tipo presentación.
+    Página independiente para compartir con clientes corporativos.
+    """
+    context = {
+        'page_title': 'Convenio Empresarial - Aremko Spa Boutique',
+        'meta_description': 'Convenio empresarial Aremko Spa Boutique. Descuentos permanentes en cabañas, tinas calientes y masajes junto al Río Pescado, Puerto Varas.',
+    }
+    return render(request, 'ventas/empresas_presentacion.html', context)
+
 def privacy_policy_view(request):
     """
     Vista para la página de Política de Privacidad.

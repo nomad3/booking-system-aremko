@@ -35,6 +35,7 @@ urlpatterns = [
     path('unsubscribe/<str:email>/', public_views.unsubscribe_view, name='unsubscribe'), # Desuscripción Newsletter
     path('email-preview-compliance/', public_views.email_preview_compliance, name='email_preview_compliance'), # Preview Email Compliance
     path('empresas/', public_views.empresas_view, name='empresas'),  # Landing page empresarial
+    path('empresas/presentacion/', public_views.empresas_presentacion_view, name='empresas_presentacion'),  # Presentación Convenio Empresarial
     path('empresas/solicitar-cotizacion/', public_views.solicitar_cotizacion_empresa, name='solicitar_cotizacion_empresa'),  # Form submission endpoint
     path('servicios-vendidos/', reporting_views.servicios_vendidos_view, name='servicios_vendidos'),
     path('productos-vendidos/', reporting_views.productos_vendidos_view, name='productos_vendidos'),
