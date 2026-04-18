@@ -897,8 +897,7 @@
                                 <div class="d-flex flex-wrap gap-3 justify-content-center">
                                     {% for monto in exp.montos_sugeridos %}
                                     <span class="badge"
-                                        style="background: {% if forloop.last %}var(--spa-gold){% else %}var(--spa-sage){% endif %}; font-size: 1rem; padding: 0.75rem 1.5rem;">${{
-                                        monto|floatformat:0|intcomma }}</span>
+                                        style="background: {% if forloop.last %}var(--spa-gold){% else %}var(--spa-sage){% endif %}; font-size: 1rem; padding: 0.75rem 1.5rem;">${{ monto|floatformat:0|intcomma }}</span>
                                     {% endfor %}
                                 </div>
                                 <p class="text-muted mt-3"><small>O elige el monto que prefieras</small></p>
