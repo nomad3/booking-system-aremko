@@ -11,7 +11,7 @@ sitemap: {{ request.scheme }}://{{ request.get_host }}{% url 'django.contrib.sit
 
 # === BUSINESS DESCRIPTION ===
 business_type: Spa, Wellness Center, Accommodation
-description: Aremko es un spa boutique ubicado en Puerto Varas, Chile. Ofrecemos experiencias de relajación y bienestar premium incluyendo masajes terapéuticos, tinajas calientes privadas con vista al lago, y alojamiento confortable en cabañas equipadas.
+description: Aremko es un spa boutique ubicado en Puerto Varas, Chile. Ofrecemos experiencias de relajación y bienestar premium incluyendo masajes terapéuticos, tinajas calientes privadas junto al Río Pescado, y alojamiento confortable en cabañas equipadas.
 
 # === MAIN SERVICES ===
 services:

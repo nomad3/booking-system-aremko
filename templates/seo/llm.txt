@@ -28,14 +28,14 @@ timezone: America/Santiago (UTC-3/UTC-4)
 ## Spa Services
 - Masajes Relajantes: Swedish massage, deep tissue, aromatherapy
 - Masajes Terapéuticos: Sports massage, therapeutic treatments
-- Tinajas Calientes: Private hot tubs with panoramic lake views
+- Tinajas Calientes: Private hot tubs by the Río Pescado in native forest
 - Experiencias de Pareja: Romantic couples packages
 - Tratamientos Faciales: Facial treatments and skin care
 
 ## Accommodation
 - Cabañas Equipadas: Fully equipped cabins with modern amenities
 - Alojamiento Confortable: Comfortable overnight stays
-- Vista al Lago: Lake view rooms available
+- Junto al Río Pescado: Cabins by the river in native forest
 - Escapadas de Fin de Semana: Weekend getaway packages
 
 ## Special Packages
@@ -161,8 +161,8 @@ value_proposition: Premium experience at competitive rates for the region
 Q: "¿Necesito reservar con anticipación?"
 A: Sí, especialmente en temporada alta y fines de semana.
 
-Q: "¿Tienen vista al lago?"
-A: Sí, las tinajas calientes ofrecen vista panorámica.
+Q: "¿Dónde están ubicados?"
+A: En Río Pescado Km 4, Puerto Varas. Las tinajas calientes están junto al río, en bosque nativo.
 
 Q: "¿Puedo ir solo por el día?"
 A: Sí, ofrecen paquetes day spa además del alojamiento.
