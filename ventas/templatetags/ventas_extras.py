@@ -115,6 +115,23 @@ def tina_display(servicio):
 
 
 @register.filter
+def imagenes_disponibles(obj):
+    """
+    Devuelve lista de URLs de imágenes disponibles (imagen, imagen_2, imagen_3)
+    para un Servicio o Producto. Omite las vacías.
+    """
+    urls = []
+    for attr in ('imagen', 'imagen_2', 'imagen_3'):
+        img = getattr(obj, attr, None)
+        if img:
+            try:
+                urls.append(img.url)
+            except (ValueError, AttributeError):
+                continue
+    return urls
+
+
+@register.filter
 def cabana_display(servicio):
     """
     Overrides de display para la categoría Alojamientos (cabañas + extras).

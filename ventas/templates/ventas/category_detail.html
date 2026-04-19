@@ -555,6 +555,60 @@ html {
     color: #777;
     margin-bottom: 10px;
 }
+
+/* Galería de imágenes en cards */
+.service-card .card-img-top,
+.service-card .card-carousel .carousel-item img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    display: block;
+}
+.card-carousel {
+    position: relative;
+}
+.card-carousel .carousel-control-prev,
+.card-carousel .carousel-control-next {
+    width: 12%;
+    opacity: 0.85;
+}
+.card-carousel .carousel-control-prev-icon,
+.card-carousel .carousel-control-next-icon {
+    background-color: rgba(0, 0, 0, 0.55);
+    border-radius: 50%;
+    width: 2rem;
+    height: 2rem;
+    background-size: 60%;
+}
+.card-carousel .carousel-indicators {
+    margin-bottom: 0.5rem;
+}
+.card-carousel .carousel-indicators [data-bs-target] {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    opacity: 0.6;
+}
+.card-carousel .carousel-indicators .active {
+    opacity: 1;
+    background-color: #fff;
+}
+
+/* Mobile: cards ocupan el ancho y la foto se hace más prominente */
+@media (max-width: 767.98px) {
+    .service-card .card-img-top,
+    .service-card .card-carousel .carousel-item img {
+        aspect-ratio: 4 / 3;
+    }
+    .service-card .card-title {
+        font-size: 1.25rem;
+    }
+    .service-card .price-total {
+        font-size: 1.5rem;
+    }
+}
 </style>
 {% endblock %}
 
@@ -616,14 +670,9 @@ html {
         </div>
         <div class="row">
             {% for servicio in masajes_online %}
-                <div class="col-lg-4 col-md-6 mb-4 service-card">
+                <div class="col-12 col-md-6 col-lg-4 mb-4 service-card">
                     <div class="card h-100">
-                        {% if servicio.imagen %}
-                            <img src="{{ servicio.imagen.url }}" class="card-img-top"
-                                 alt="{{ servicio.nombre }} en Aremko Spa Puerto Varas"
-                                 loading="lazy"
-                                 title="{{ servicio.nombre }}">
-                        {% endif %}
+                        {% include "ventas/partials/_service_gallery.html" with obj=servicio alt_text=servicio.nombre|add:" en Aremko Spa Puerto Varas" id_prefix="carousel-masaje-online" %}
                         <div class="card-body d-flex flex-column">
                             <span class="badge-reserva-web"><i class="fas fa-bolt me-1"></i>Reserva Online</span>
                             <h3 class="card-title h5">{{ servicio.nombre }}</h3>
@@ -651,14 +700,9 @@ html {
         </div>
         <div class="row">
             {% for servicio in masajes_especializados %}
-                <div class="col-lg-4 col-md-6 mb-4 service-card">
+                <div class="col-12 col-md-6 col-lg-4 mb-4 service-card">
                     <div class="card h-100">
-                        {% if servicio.imagen %}
-                            <img src="{{ servicio.imagen.url }}" class="card-img-top"
-                                 alt="{{ servicio.nombre }} en Aremko Spa Puerto Varas"
-                                 loading="lazy"
-                                 title="{{ servicio.nombre }}">
-                        {% endif %}
+                        {% include "ventas/partials/_service_gallery.html" with obj=servicio alt_text=servicio.nombre|add:" en Aremko Spa Puerto Varas" id_prefix="carousel-masaje-esp" %}
                         <div class="card-body d-flex flex-column">
                             <span class="badge-cita-previa"><i class="fas fa-comments me-1"></i>Cita Previa</span>
                             <h3 class="card-title h5">{{ servicio.nombre }}</h3>
@@ -696,14 +740,9 @@ html {
         <div class="row">
             {% for servicio in tinas_hidro %}
                 {% with disp=servicio|tina_display %}
-                <div class="col-lg-4 col-md-6 mb-4 service-card">
+                <div class="col-12 col-md-6 col-lg-4 mb-4 service-card">
                     <div class="card h-100">
-                        {% if servicio.imagen %}
-                            <img src="{{ servicio.imagen.url }}" class="card-img-top"
-                                 alt="{{ servicio.nombre }} - Tina con hidromasaje junto al Río Pescado en Puerto Varas"
-                                 loading="lazy"
-                                 title="{{ servicio.nombre }}">
-                        {% endif %}
+                        {% include "ventas/partials/_service_gallery.html" with obj=servicio alt_text=servicio.nombre|add:" - Tina con hidromasaje junto al Río Pescado en Puerto Varas" id_prefix="carousel-tina-hidro" %}
                         <div class="card-body d-flex flex-column">
                             <span class="badge-hidromasaje"><i class="fas fa-water me-1"></i>Con Hidromasaje</span>
                             <h3 class="card-title h5">{{ servicio.nombre }}</h3>
@@ -742,14 +781,9 @@ html {
         <div class="row">
             {% for servicio in tinas_trad %}
                 {% with disp=servicio|tina_display %}
-                <div class="col-lg-4 col-md-6 mb-4 service-card">
+                <div class="col-12 col-md-6 col-lg-4 mb-4 service-card">
                     <div class="card h-100">
-                        {% if servicio.imagen %}
-                            <img src="{{ servicio.imagen.url }}" class="card-img-top"
-                                 alt="{{ servicio.nombre }} - Tina caliente tradicional junto al Río Pescado en Puerto Varas"
-                                 loading="lazy"
-                                 title="{{ servicio.nombre }}">
-                        {% endif %}
+                        {% include "ventas/partials/_service_gallery.html" with obj=servicio alt_text=servicio.nombre|add:" - Tina caliente tradicional junto al Río Pescado en Puerto Varas" id_prefix="carousel-tina-trad" %}
                         <div class="card-body d-flex flex-column">
                             <span class="badge-tradicional"><i class="fas fa-leaf me-1"></i>Tradicional</span>
                             <h3 class="card-title h5">{{ servicio.nombre }}</h3>
@@ -795,13 +829,12 @@ html {
         <div class="row">
             {% for servicio in servicios %}
                 {% with disp=servicio|cabana_display %}
-                <div class="col-lg-4 col-md-6 mb-4 service-card">
+                <div class="col-12 col-md-6 col-lg-4 mb-4 service-card">
                     <div class="card h-100">
-                        {% if servicio.imagen %}
-                            <img src="{{ servicio.imagen.url }}" class="card-img-top"
-                                 alt="{% if disp.is_desayuno %}Desayuno boutique servido en cabaña junto al Río Pescado{% else %}{{ servicio.nombre }} - Cabaña boutique con tina caliente junto al Río Pescado en Puerto Varas{% endif %}"
-                                 loading="lazy"
-                                 title="{{ servicio.nombre }}">
+                        {% if disp.is_desayuno %}
+                            {% include "ventas/partials/_service_gallery.html" with obj=servicio alt_text="Desayuno boutique servido en cabaña junto al Río Pescado" id_prefix="carousel-desayuno" %}
+                        {% else %}
+                            {% include "ventas/partials/_service_gallery.html" with obj=servicio alt_text=servicio.nombre|add:" - Cabaña boutique con tina caliente junto al Río Pescado en Puerto Varas" id_prefix="carousel-cabana" %}
                         {% endif %}
                         <div class="card-body d-flex flex-column">
                             <span class="badge-boutique"><i class="fas {{ disp.badge_icon }} me-1"></i>{{ disp.badge_text }}</span>
@@ -843,13 +876,12 @@ html {
     {% else %}
     <div class="row">
         {% for servicio in servicios %}
-            <div class="col-lg-4 col-md-6 mb-4 service-card">
+            <div class="col-12 col-md-6 col-lg-4 mb-4 service-card">
                 <div class="card h-100">
-                    {% if servicio.imagen %}
-                        <img src="{{ servicio.imagen.url }}" class="card-img-top"
-                             alt="{% if categoria_actual.id == 3 %}{{ servicio.nombre }} - Cabaña de lujo en Puerto Varas con spa privado{% else %}{{ servicio.nombre }} en Aremko Spa Puerto Varas{% endif %}"
-                             loading="lazy"
-                             title="{{ servicio.nombre }}">
+                    {% if categoria_actual.id == 3 %}
+                        {% include "ventas/partials/_service_gallery.html" with obj=servicio alt_text=servicio.nombre|add:" - Cabaña de lujo en Puerto Varas con spa privado" id_prefix="carousel-srv" %}
+                    {% else %}
+                        {% include "ventas/partials/_service_gallery.html" with obj=servicio alt_text=servicio.nombre|add:" en Aremko Spa Puerto Varas" id_prefix="carousel-srv" %}
                     {% endif %}
                     <div class="card-body d-flex flex-column">
                         <h3 class="card-title h5">{{ servicio.nombre }}</h3>

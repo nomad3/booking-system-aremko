@@ -1,6 +1,7 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 {% load humanize %}
+{% load ventas_extras %}
 
 {% block title %}Productos Aremko - Tablas de Queso y Más | Puerto Varas{% endblock %}
 
@@ -82,11 +83,43 @@
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 
-.producto-imagen {
+.producto-imagen,
+.producto-card .card-img-top,
+.producto-card .card-carousel .carousel-item img {
     width: 100%;
     height: 280px;
     object-fit: cover;
     background-color: #f5f5f5;
+    display: block;
+}
+
+/* Carousel multi-imagen en producto-card */
+.producto-card .card-carousel { position: relative; }
+.producto-card .card-carousel .carousel-control-prev,
+.producto-card .card-carousel .carousel-control-next {
+    width: 12%;
+    opacity: 0.85;
+}
+.producto-card .card-carousel .carousel-control-prev-icon,
+.producto-card .card-carousel .carousel-control-next-icon {
+    background-color: rgba(0, 0, 0, 0.55);
+    border-radius: 50%;
+    width: 2rem;
+    height: 2rem;
+    background-size: 60%;
+}
+.producto-card .card-carousel .carousel-indicators { margin-bottom: 0.5rem; }
+.producto-card .card-carousel .carousel-indicators [data-bs-target] {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    opacity: 0.6;
+}
+.producto-card .card-carousel .carousel-indicators .active {
+    opacity: 1;
+    background-color: #fff;
 }
 
 .producto-body {
@@ -176,7 +209,9 @@
         font-size: 1.1rem;
     }
 
-    .producto-imagen {
+    .producto-imagen,
+    .producto-card .card-img-top,
+    .producto-card .card-carousel .carousel-item img {
         height: 220px;
     }
 
@@ -209,15 +244,17 @@
         {% if productos %}
             <div class="row">
                 {% for producto in productos %}
-                <div class="col-md-6 col-lg-4">
+                <div class="col-12 col-md-6 col-lg-4">
                     <div class="producto-card">
-                        {% if producto.imagen %}
-                            <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}" class="producto-imagen">
+                        {% with imgs_prod=producto|imagenes_disponibles %}
+                        {% if imgs_prod|length > 0 %}
+                            {% include "ventas/partials/_service_gallery.html" with obj=producto alt_text=producto.nombre id_prefix="carousel-producto" %}
                         {% else %}
                             <div class="producto-imagen" style="display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);">
                                 <i class="fas fa-image" style="font-size: 4rem; color: #ccc;"></i>
                             </div>
                         {% endif %}
+                        {% endwith %}
 
                         <div class="producto-body">
                             {% if producto.categoria %}

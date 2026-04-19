@@ -376,17 +376,43 @@
     }
 
     /* Style for service card images to be square */
-    .service-card .card-img-top {
+    .service-card .card-img-top,
+    .service-card .card-carousel .carousel-item img {
         width: 100%;
-        /* Ensure it takes the full width of the card */
         aspect-ratio: 1 / 1;
-        /* Make it square */
         height: auto !important;
-        /* Override fixed height to enforce aspect-ratio */
         object-fit: cover;
-        /* Cover the area, crop if needed */
         object-position: center;
-        /* Center the image content */
+        display: block;
+    }
+
+    /* Carousel multi-imagen en cards del homepage */
+    .service-card .card-carousel { position: relative; }
+    .service-card .card-carousel .carousel-control-prev,
+    .service-card .card-carousel .carousel-control-next {
+        width: 12%;
+        opacity: 0.85;
+    }
+    .service-card .card-carousel .carousel-control-prev-icon,
+    .service-card .card-carousel .carousel-control-next-icon {
+        background-color: rgba(0, 0, 0, 0.55);
+        border-radius: 50%;
+        width: 2rem;
+        height: 2rem;
+        background-size: 60%;
+    }
+    .service-card .card-carousel .carousel-indicators { margin-bottom: 0.5rem; }
+    .service-card .card-carousel .carousel-indicators [data-bs-target] {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(0, 0, 0, 0.3);
+        opacity: 0.6;
+    }
+    .service-card .card-carousel .carousel-indicators .active {
+        opacity: 1;
+        background-color: #fff;
     }
 
     /* Responsive adjustments for hero */
@@ -547,11 +573,9 @@
 
     <div class="row service-list"> {# Added class for easier selection #}
         {% for servicio in servicios %}
-        <div class="col-lg-4 col-md-6 service-card" data-category="{{ servicio.categoria.id }}">
+        <div class="col-12 col-md-6 col-lg-4 service-card" data-category="{{ servicio.categoria.id }}">
             <div class="card h-100">
-                {% if servicio.imagen %}
-                <img src="{{ servicio.imagen.url }}" class="card-img-top" alt="{{ servicio.nombre }}">
-                {% endif %}
+                {% include "ventas/partials/_service_gallery.html" with obj=servicio alt_text=servicio.nombre id_prefix="carousel-home-srv" %}
                 <div class="card-body">
                     <h5 class="card-title">{{ servicio.nombre }}</h5>
                     <p class="card-text text-muted"><small>{{ servicio.categoria.nombre }}</small></p>

@@ -121,7 +121,21 @@ class Producto(models.Model):
         blank=True,
         null=True,
         verbose_name="Imagen",
-        help_text="Foto del producto para el catálogo web"
+        help_text="Foto principal del producto para el catálogo web"
+    )
+    imagen_2 = models.ImageField(
+        upload_to='productos/',
+        blank=True,
+        null=True,
+        verbose_name="Imagen 2",
+        help_text="Segunda foto del producto (opcional, aparece en el carousel)"
+    )
+    imagen_3 = models.ImageField(
+        upload_to='productos/',
+        blank=True,
+        null=True,
+        verbose_name="Imagen 3",
+        help_text="Tercera foto del producto (opcional, aparece en el carousel)"
     )
     orden = models.IntegerField(
         default=0,
@@ -478,7 +492,19 @@ class Servicio(models.Model):
         upload_to='servicios/', # Subdirectory within MEDIA_ROOT (GCS bucket)
         blank=True,
         null=True,
-        help_text="Imagen representativa del servicio."
+        help_text="Imagen principal del servicio."
+    )
+    imagen_2 = models.ImageField(
+        upload_to='servicios/',
+        blank=True,
+        null=True,
+        help_text="Segunda imagen del servicio (opcional, aparece en el carousel de la card)."
+    )
+    imagen_3 = models.ImageField(
+        upload_to='servicios/',
+        blank=True,
+        null=True,
+        help_text="Tercera imagen del servicio (opcional, aparece en el carousel de la card)."
     )
     descripcion_web = models.TextField(
         blank=True,
