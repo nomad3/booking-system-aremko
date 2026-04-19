@@ -541,13 +541,12 @@
                 </div>
                 {% endwith %}
                 {% elif "alojamiento" in lower_nombre or "cabaña" in lower_nombre %}
-                {% with "fas fa-bed" as icon_class %}
-                <div class="category-card category-filter" data-category="{{ categoria.id }}"
-                    data-category-name="{{ categoria.nombre }}">
-                    <div class="category-icon"><i class="{{ icon_class }}"></i></div>
-                    <div class="category-name">{{ categoria.nombre }}</div>
-                </div>
-                {% endwith %}
+                {# Alojamientos: link directo a la landing dedicada (precios y specs boutique) #}
+                <a href="{% url 'alojamientos' %}" class="category-card"
+                   style="text-decoration: none; color: inherit;">
+                    <div class="category-icon"><i class="fas fa-bed"></i></div>
+                    <div class="category-name">Alojamientos</div>
+                </a>
                 {% elif "promo" in lower_nombre %}
                 {% with "fas fa-tags" as icon_class %}
                 <div class="category-card category-filter" data-category="{{ categoria.id }}"
