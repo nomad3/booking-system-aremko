@@ -445,12 +445,6 @@
                     {% if user.is_staff %}
                     <a href="{% url 'admin:index' %}" class="btn btn-outline-primary btn-sm ms-2">Admin</a>
                     {% endif %}
-                    {% else %}
-                    <a href="{% url 'login' %}" class="btn btn-outline-secondary btn-sm me-2">Ingresar</a>
-                    {# Added ventas: namespace for consistency #}
-                    <a href="{% url 'ventas:inicio_sistema' %}" class="btn btn-primary btn-sm">
-                        <i class="fas fa-user me-1"></i>Acceso Admin/Staff
-                    </a>
                     {% endif %}
                     {% endblock nav_extra %}
                 </div>
