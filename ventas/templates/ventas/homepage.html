@@ -525,21 +525,19 @@
                 {% with categoria.nombre|lower as lower_nombre %}
                 {% comment %} Assign icons based on category name {% endcomment %}
                 {% if "tina" in lower_nombre %}
-                {% with "fas fa-hot-tub" as icon_class %}
-                <div class="category-card category-filter" data-category="{{ categoria.id }}"
-                    data-category-name="{{ categoria.nombre }}">
-                    <div class="category-icon"><i class="{{ icon_class }}"></i></div>
-                    <div class="category-name">{{ categoria.nombre }}</div>
-                </div>
-                {% endwith %}
+                {# Tinas: link directo a la landing dedicada (split hidro/trad, precios totales) #}
+                <a href="{% url 'tinas' %}" class="category-card"
+                   style="text-decoration: none; color: inherit;">
+                    <div class="category-icon"><i class="fas fa-hot-tub"></i></div>
+                    <div class="category-name">Tinas Calientes</div>
+                </a>
                 {% elif "masaje" in lower_nombre %}
-                {% with "fas fa-hand-sparkles" as icon_class %}
-                <div class="category-card category-filter" data-category="{{ categoria.id }}"
-                    data-category-name="{{ categoria.nombre }}">
-                    <div class="category-icon"><i class="{{ icon_class }}"></i></div>
-                    <div class="category-name">{{ categoria.nombre }}</div>
-                </div>
-                {% endwith %}
+                {# Masajes: link directo a la landing dedicada (reserva online vs cita previa) #}
+                <a href="{% url 'masajes' %}" class="category-card"
+                   style="text-decoration: none; color: inherit;">
+                    <div class="category-icon"><i class="fas fa-hand-sparkles"></i></div>
+                    <div class="category-name">Masajes</div>
+                </a>
                 {% elif "alojamiento" in lower_nombre or "cabaña" in lower_nombre %}
                 {# Alojamientos: link directo a la landing dedicada (precios y specs boutique) #}
                 <a href="{% url 'alojamientos' %}" class="category-card"
