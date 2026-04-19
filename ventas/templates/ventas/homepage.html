@@ -356,6 +356,49 @@
     }
     .badge-hidromasaje { background: #6a1b9a; }
     .badge-tradicional { background: #2e7d32; }
+    .badge-grupo-4 {
+        display: inline-block;
+        background: #d97706;
+        color: #fff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 3px 9px;
+        border-radius: 20px;
+        margin-left: 6px;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
+    }
+
+    /* Callout grupal 4+ personas = 4 horas */
+    .group-promo-banner {
+        background: linear-gradient(135deg, #fff4e5 0%, #ffe8cc 100%);
+        border: 1px solid #f5b678;
+        border-left: 5px solid #d97706;
+        border-radius: 12px;
+        padding: 18px 24px;
+        margin: 20px 0 28px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        flex-wrap: wrap;
+    }
+    .group-promo-banner .group-promo-icon {
+        font-size: 2rem;
+        color: #d97706;
+        flex-shrink: 0;
+    }
+    .group-promo-banner .group-promo-body { flex: 1; min-width: 240px; }
+    .group-promo-banner h4 {
+        margin: 0 0 4px;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #7c2d12;
+    }
+    .group-promo-banner p {
+        margin: 0;
+        color: #4a2b13;
+        font-size: 0.95rem;
+    }
     .servicio-specs {
         list-style: none;
         padding: 0;
@@ -644,6 +687,14 @@
     {% with tinas_srv=servicios|filter_tinas %}
     {% with tinas_hidro=tinas_srv|filter_hidromasaje:1|order_by_capacity tinas_trad=tinas_srv|filter_hidromasaje:0|order_by_capacity %}
 
+    <div class="group-promo-banner" role="note">
+        <div class="group-promo-icon"><i class="fas fa-users"></i></div>
+        <div class="group-promo-body">
+            <h4>Grupo de 4 o más: 4 horas de tina por el mismo precio</h4>
+            <p>Las tinas <strong>Calbuco (4 personas)</strong> y <strong>Osorno (5–6 personas)</strong> incluyen 4 horas de uso exclusivo. Ideal para juntas y celebraciones.</p>
+        </div>
+    </div>
+
     {% if tinas_hidro %}
     <div class="tina-section-header hidromasaje">
         <h3><i class="fas fa-water me-2" style="color:#6a1b9a;"></i>Tinas con Hidromasaje</h3>
@@ -698,7 +749,7 @@
                 <div class="card h-100">
                     {% include "ventas/partials/_service_gallery.html" with obj=servicio alt_text=servicio.nombre|add:" - Tina caliente tradicional junto al Río Pescado en Puerto Varas" id_prefix="carousel-home-tina-trad" %}
                     <div class="card-body d-flex flex-column">
-                        <span class="badge-tradicional"><i class="fas fa-leaf me-1"></i>Tradicional</span>
+                        <span class="badge-tradicional"><i class="fas fa-leaf me-1"></i>Tradicional</span>{% if "calbuco" in servicio.nombre|lower or "osorno" in servicio.nombre|lower %}<span class="badge-grupo-4"><i class="fas fa-users me-1"></i>Grupo 4+ · 4h</span>{% endif %}
                         <h3 class="card-title h5">{{ servicio.nombre }}</h3>
                         <ul class="servicio-specs">
                             {% if not disp.hide_capacidad %}

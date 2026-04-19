@@ -124,8 +124,12 @@ def tina_display(servicio):
         overrides['unit_note'] = 'por niño adicional'
     elif 'osorno' in nombre:
         overrides['capacidad_texto'] = '5–6 personas'
-        overrides['duracion_texto'] = '4 horas de uso exclusivo'
+        overrides['duracion_texto'] = '4 horas de uso exclusivo · grupo 4+'
         overrides['unit_note'] = 'por tina · 5–6 personas'
+    elif 'calbuco' in nombre:
+        overrides['capacidad_texto'] = '4 personas'
+        overrides['duracion_texto'] = '4 horas de uso exclusivo · grupo 4+'
+        overrides['unit_note'] = 'por tina · 4 personas'
     elif 'yates' in nombre:
         overrides['duracion_texto'] = 'Uso ilimitado'
     return overrides
