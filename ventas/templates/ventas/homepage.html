@@ -3,11 +3,11 @@
 {% load humanize %} {# Load humanize template tags #}
 {% load ventas_extras %} {# Load custom filters #}
 
-{% block title %}Aremko Spa Puerto Varas: Masajes, Tinajas y Alojamiento{% endblock %} {# SEO Title #}
+{% block title %}Aremko Spa Boutique · Aguas calientes junto al Río Pescado · Puerto Varas{% endblock %} {# SEO Title #}
 
 {% block meta_description %}
 <meta name="description"
-    content="Descubre Aremko, tu spa en Puerto Varas. Ofrecemos masajes relajantes, tinajas calientes privadas y alojamiento confortable en la Región de Los Lagos. ¡Reserva tu escapada!">
+    content="Aremko Spa Boutique en Puerto Varas: aguas calientes privadas junto al Río Pescado, masajes y alojamiento en bosque nativo. Reserva tu tina online.">
 {% endblock %}
 
 {% block structured_data %}
@@ -299,15 +299,80 @@
         text-align: center;
     }
 
-    .hero-content h1 {
-        font-size: 3rem;
-        font-weight: 700;
-        margin-bottom: 20px;
+    .hero-kicker {
+        display: inline-block;
+        font-size: 0.85rem;
+        letter-spacing: 4px;
+        font-weight: 600;
+        text-transform: uppercase;
+        padding: 6px 16px;
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-radius: 30px;
+        margin-bottom: 22px;
+        color: #fff;
     }
 
-    .hero-content p {
-        font-size: 1.2rem;
-        margin-bottom: 30px;
+    .hero-content h1 {
+        font-size: 3.2rem;
+        font-weight: 700;
+        margin-bottom: 18px;
+        line-height: 1.15;
+    }
+
+    .hero-content .hero-subtitle {
+        font-size: 1.25rem;
+        margin-bottom: 32px;
+        opacity: 0.95;
+    }
+
+    /* Boutique differentiators */
+    .boutique-diff-section { padding: 70px 0; background: #fff; }
+    .boutique-diff-card {
+        text-align: center;
+        padding: 30px 20px;
+    }
+    .boutique-diff-icon {
+        font-size: 2.6rem;
+        color: var(--primary-color);
+        margin-bottom: 18px;
+    }
+    .boutique-diff-card h4 { font-weight: 700; margin-bottom: 10px; }
+    .boutique-diff-card p { color: #666; }
+
+    /* Cross-sell banners */
+    .crosssell-section { padding: 70px 0; background: #f8f9fa; }
+    .crosssell-card {
+        position: relative;
+        border-radius: 16px;
+        overflow: hidden;
+        min-height: 320px;
+        display: flex;
+        align-items: flex-end;
+        color: #fff;
+        background-size: cover;
+        background-position: center;
+        text-decoration: none;
+        transition: transform 0.3s ease;
+        margin-bottom: 24px;
+    }
+    .crosssell-card:hover { transform: translateY(-4px); color: #fff; }
+    .crosssell-card::before {
+        content: "";
+        position: absolute; inset: 0;
+        background: linear-gradient(180deg, rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.75) 100%);
+    }
+    .crosssell-card .crosssell-body {
+        position: relative;
+        padding: 28px 26px;
+        width: 100%;
+    }
+    .crosssell-card h3 { font-weight: 700; margin-bottom: 8px; }
+    .crosssell-card p { margin-bottom: 14px; opacity: 0.95; }
+    .crosssell-card .crosssell-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
     }
 
     .features-section {
@@ -495,129 +560,58 @@
 
 <!-- Hero Section -->
 <section class="hero-section"
-    style="background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), {% if hero_image_url %}url('{{ hero_image_url }}'){% else %}url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80'){% endif %};">
+    style="background-image: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), {% if hero_image_url %}url('{{ hero_image_url }}'){% else %}url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80'){% endif %};">
     <div class="container">
         <div class="hero-content">
-            <h1>{{ hero_title }}</h1>
-            <p>{{ hero_subtitle }}</p>
-            <a href="{{ hero_cta_link }}" class="btn btn-primary btn-lg">
-                <i class="fas fa-gift me-2"></i>{{ hero_cta_text }}
+            <span class="hero-kicker">AREMKO SPA BOUTIQUE</span>
+            <h1>Aguas calientes junto al Río Pescado</h1>
+            <p class="hero-subtitle">Puerto Varas · Experiencia privada en bosque nativo</p>
+            <a href="#tinas" class="btn btn-primary btn-lg">
+                <i class="fas fa-hot-tub me-2"></i>Reservar mi tina
             </a>
         </div>
     </div>
 </section>
 
-<!-- Services Section -->
-<section class="container mb-5" id="servicios">
-    <h2 class="section-title mb-4">Nuestras Experiencias</h2>
+<!-- Tinas estrella (mostradas por defecto en home) -->
+<section class="container mb-5" id="tinas">
+    <h2 class="section-title mb-4">Nuestras Tinas Calientes junto al Río</h2>
+    <p class="text-center text-muted mb-5" style="max-width: 720px; margin: 0 auto;">
+        Tinas privadas con vista al bosque nativo y al Río Pescado. Elige tu experiencia y reserva online.
+    </p>
 
-    <!-- Category Filter Cards -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-center flex-wrap">
-                {# Removed 'Todos' button, default will be 'Tinas' #}
-                {# <div class="category-card category-filter active" data-category="all">
-                    <div class="category-icon"><i class="fas fa-th-large"></i></div>
-                    <div class="category-name">Todos</div>
-                </div> #}
-                {% for categoria in categorias %}
-                {% if "Empresarial-" not in categoria.nombre %}
-                {% with categoria.nombre|lower as lower_nombre %}
-                {% comment %} Assign icons based on category name {% endcomment %}
-                {% if "tina" in lower_nombre %}
-                {# Tinas: link directo a la landing dedicada (split hidro/trad, precios totales) #}
-                <a href="{% url 'tinas' %}" class="category-card"
-                   style="text-decoration: none; color: inherit;">
-                    <div class="category-icon"><i class="fas fa-hot-tub"></i></div>
-                    <div class="category-name">Tinas Calientes</div>
-                </a>
-                {% elif "masaje" in lower_nombre %}
-                {# Masajes: link directo a la landing dedicada (reserva online vs cita previa) #}
-                <a href="{% url 'masajes' %}" class="category-card"
-                   style="text-decoration: none; color: inherit;">
-                    <div class="category-icon"><i class="fas fa-hand-sparkles"></i></div>
-                    <div class="category-name">Masajes</div>
-                </a>
-                {% elif "alojamiento" in lower_nombre or "cabaña" in lower_nombre %}
-                {# Alojamientos: link directo a la landing dedicada (precios y specs boutique) #}
-                <a href="{% url 'alojamientos' %}" class="category-card"
-                   style="text-decoration: none; color: inherit;">
-                    <div class="category-icon"><i class="fas fa-bed"></i></div>
-                    <div class="category-name">Alojamientos</div>
-                </a>
-                {% elif "promo" in lower_nombre %}
-                {% with "fas fa-tags" as icon_class %}
-                <div class="category-card category-filter" data-category="{{ categoria.id }}"
-                    data-category-name="{{ categoria.nombre }}">
-                    <div class="category-icon"><i class="{{ icon_class }}"></i></div>
-                    <div class="category-name">{{ categoria.nombre }}</div>
-                </div>
-                {% endwith %}
-                {% else %}
-                {% comment %} Default icon {% endcomment %}
-                {% with "fas fa-spa" as icon_class %}
-                <div class="category-card category-filter" data-category="{{ categoria.id }}"
-                    data-category-name="{{ categoria.nombre }}">
-                    <div class="category-icon"><i class="{{ icon_class }}"></i></div>
-                    <div class="category-name">{{ categoria.nombre }}</div>
-                </div>
-                {% endwith %}
-                {% endif %}
-                {% endwith %}
-                {% endif %}
-                {% endfor %}
-
-                {# Botón especial para Empresas que lleva a la landing page #}
-                <a href="{% url 'ventas:empresas' %}" class="category-card"
-                    style="text-decoration: none; color: inherit;">
-                    <div class="category-icon"><i class="fas fa-building"></i></div>
-                    <div class="category-name">Empresas</div>
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <div class="row service-list"> {# Added class for easier selection #}
+    <div class="row service-list">
         {% for servicio in servicios %}
+        {% if "tina" in servicio.categoria.nombre|lower %}
         <div class="col-12 col-md-6 col-lg-4 service-card" data-category="{{ servicio.categoria.id }}">
             <div class="card h-100">
                 {% include "ventas/partials/_service_gallery.html" with obj=servicio alt_text=servicio.nombre id_prefix="carousel-home-srv" %}
                 <div class="card-body">
                     <h5 class="card-title">{{ servicio.nombre }}</h5>
                     <p class="card-text text-muted"><small>{{ servicio.categoria.nombre }}</small></p>
-                    {# Display web description if it exists - Truncated #}
                     {% if servicio.descripcion_web %}
                     <div class="service-description-wrapper mb-2">
                         <p class="card-text service-description-truncated">
                             {{ servicio.descripcion_web|linebreaksbr }}
                         </p>
-                        {# Link to trigger the modal #}
                         <a href="#" class="ver-mas-link small" data-bs-toggle="modal"
                             data-bs-target="#serviceDescriptionModal"
                             data-description="{{ servicio.descripcion_web|linebreaksbr }}"
                             data-title="{{ servicio.nombre|escapejs }}">Ver más</a>
                     </div>
                     {% endif %}
-                    {% if servicio.tipo_servicio == 'cabana' %}
-                    <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small
-                            class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
-                    {% else %}
-                    <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por
-                            persona</small></p> {# Apply filters #}
-                    {% endif %}
+                    <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
 
                     {% if servicio.permite_reserva_web %}
-                    {# Botón de reserva directa por web #}
                     <button class="btn btn-primary w-100 js-open-booking-modal" data-servicio-id="{{ servicio.id }}"
                         data-servicio-nombre="{{ servicio.nombre|escapejs }}"
                         data-servicio-precio="{{ servicio.precio_base }}"
                         data-servicio-tipo="{{ servicio.tipo_servicio }}"
                         data-servicio-min="{{ servicio.capacidad_minima }}"
-                        data-servicio-max="{{ servicio.capacidad_maxima }}"> {# Add capacity #}
+                        data-servicio-max="{{ servicio.capacidad_maxima }}">
                         <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                     </button>
                     {% else %}
-                    {# Botones para reserva por WhatsApp cuando es complejo #}
                     <div class="d-grid gap-2">
                         <a href="https://wa.me/56976668080?text=Hola%2C%20quiero%20reservar%20{{ servicio.nombre|urlencode }}"
                            class="btn btn-success w-100" target="_blank">
@@ -633,15 +627,78 @@
                             data-readonly="true">
                             <i class="fas fa-calendar me-2"></i>Ver disponibilidad
                         </button>
-                        <small class="text-muted text-center mt-1">
-                            <i class="fas fa-info-circle"></i> Este servicio requiere coordinación especial
-                        </small>
                     </div>
                     {% endif %}
                 </div>
             </div>
         </div>
+        {% endif %}
         {% endfor %}
+    </div>
+
+    <div class="text-center mt-4">
+        <a href="{% url 'tinas' %}" class="btn btn-outline-primary">
+            Ver todas las tinas <i class="fas fa-arrow-right ms-2"></i>
+        </a>
+    </div>
+</section>
+
+<!-- Cross-sell masajes + alojamientos -->
+<section class="crosssell-section">
+    <div class="container">
+        <h2 class="section-title mb-5">También podemos ofrecerte</h2>
+        <div class="row">
+            <div class="col-md-6">
+                <a href="{% url 'masajes' %}" class="crosssell-card"
+                   style="background-image: url('https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1200&q=80');">
+                    <div class="crosssell-body">
+                        <h3>Masajes</h3>
+                        <p>Complementa tu tina con un masaje relajante o terapéutico.</p>
+                        <span class="crosssell-cta">Ver masajes <i class="fas fa-arrow-right"></i></span>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6">
+                <a href="{% url 'alojamientos' %}" class="crosssell-card"
+                   style="background-image: url('https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=1200&q=80');">
+                    <div class="crosssell-body">
+                        <h3>Alojamientos</h3>
+                        <p>Quédate la noche en nuestras cabañas boutique junto al río.</p>
+                        <span class="crosssell-cta">Ver cabañas <i class="fas fa-arrow-right"></i></span>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Diferenciales boutique -->
+<section class="boutique-diff-section" id="servicios">
+    <div class="container">
+        <h2 class="section-title mb-5">Una experiencia boutique</h2>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="boutique-diff-card">
+                    <div class="boutique-diff-icon"><i class="fas fa-leaf"></i></div>
+                    <h4>Entorno natural</h4>
+                    <p>Tinas al aire libre rodeadas de bosque nativo, con el sonido del Río Pescado de fondo.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="boutique-diff-card">
+                    <div class="boutique-diff-icon"><i class="fas fa-user-shield"></i></div>
+                    <h4>100% privado</h4>
+                    <p>Cada tina es exclusiva para tu grupo: sin compartir, sin interrupciones, a tu ritmo.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="boutique-diff-card">
+                    <div class="boutique-diff-icon"><i class="fas fa-concierge-bell"></i></div>
+                    <h4>Atención personalizada</h4>
+                    <p>Un equipo pequeño que cuida cada detalle para que tu escapada sea inolvidable.</p>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 
@@ -1129,21 +1186,6 @@
     document.addEventListener('DOMContentLoaded', function () {
         console.log("Homepage DOMContentLoaded");
 
-        // ---- INICIO CÓDIGO DE DIAGNÓSTICO ----
-        console.log("Attempting diagnostic hide...");
-        try {
-            const firstCard = document.querySelector('.service-card');
-            if (firstCard) {
-                firstCard.style.setProperty('display', 'none', 'important');
-                console.log("Diagnostic hide applied to first card.");
-            } else {
-                console.log("No service cards found for diagnostic hide.");
-            }
-        } catch (e) {
-            console.error("Error during diagnostic hide:", e);
-        }
-        // ---- FIN CÓDIGO DE DIAGNÓSTICO ----
-
         // Add listener for booking modal buttons
         document.querySelectorAll('.js-open-booking-modal').forEach(button => {
             button.addEventListener('click', function () {
@@ -1299,68 +1341,6 @@
         } else {
             console.error("Add to cart button element not found");
         }
-
-        // Function to filter services based on category ID
-        function filterServices(targetCategory) {
-            console.log("Filtering services for category:", targetCategory);
-            document.querySelectorAll('.service-card').forEach(card => {
-                const cardCategory = card.getAttribute('data-category');
-                // Show card if targetCategory is 'all' OR card's category matches targetCategory
-                if (targetCategory === 'all' || cardCategory === targetCategory) {
-                    card.style.display = 'block';
-                } else {
-                    card.style.display = 'none';
-                }
-            });
-        }
-
-        // Listener for category filter CARDS
-        document.querySelectorAll('.category-filter').forEach(cardElement => {
-            cardElement.addEventListener('click', function () {
-                const categoryId = this.getAttribute('data-category');
-                console.log("Category filter card clicked:", categoryId);
-
-                // Update active state
-                document.querySelectorAll('.category-filter').forEach(card => card.classList.remove('active'));
-                this.classList.add('active');
-
-                // Filter the services
-                filterServices(categoryId);
-            });
-        });
-        console.log("Event listeners added for category filter cards");
-
-        // --- Default Filter Logic ---
-        // Find the 'Tinas' category card and its ID
-        let defaultCategoryId = null;
-        const categoryCards = document.querySelectorAll('.category-filter');
-        categoryCards.forEach(card => {
-            // Use case-insensitive check for "Tinas" in the data-category-name attribute
-            const categoryName = card.getAttribute('data-category-name');
-            if (categoryName && categoryName.toLowerCase().includes('tinas')) {
-                defaultCategoryId = card.getAttribute('data-category');
-                card.classList.add('active'); // Set 'Tinas' card as active visually
-                console.log("Default category 'Tinas' found with ID:", defaultCategoryId);
-            }
-        });
-
-        // If 'Tinas' category was found, filter services initially
-        if (defaultCategoryId) {
-            filterServices(defaultCategoryId);
-            console.log("Initial filter applied for 'Tinas'");
-        } else {
-            // Fallback: If 'Tinas' not found, show all (or handle as needed)
-            console.warn("'Tinas' category not found for default filter. Showing all services.");
-            // Optionally activate the first category card if 'Tinas' isn't found
-            // if (categoryCards.length > 0) {
-            //     categoryCards[0].classList.add('active');
-            //     filterServices(categoryCards[0].getAttribute('data-category'));
-            // } else {
-            filterServices('all'); // Show all if no categories exist or Tinas not found
-            // }
-        }
-        // --- End Default Filter Logic ---
-
 
         // Listener for the service description modal
         const serviceDescriptionModalEl = document.getElementById('serviceDescriptionModal');
