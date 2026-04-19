@@ -459,6 +459,102 @@ html {
     text-align: center;
     justify-content: center;
 }
+
+/* Tinas y Cabañas: subtítulo funcional en cada card */
+.tina-section-header,
+.cabana-section-header {
+    margin: 40px 0 25px;
+    padding: 20px 25px;
+    border-radius: 12px;
+    border-left: 5px solid;
+}
+.tina-section-header.hidromasaje {
+    background: linear-gradient(135deg, #f3e5f5 0%, #ede7f6 100%);
+    border-left-color: #6a1b9a;
+}
+.tina-section-header.tradicional {
+    background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+    border-left-color: #2e7d32;
+}
+.cabana-section-header {
+    background: linear-gradient(135deg, #fff3e0 0%, #fce4ec 100%);
+    border-left-color: #8d6e63;
+}
+.tina-section-header h3,
+.cabana-section-header h3 {
+    margin: 0 0 6px;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+.tina-section-header p,
+.cabana-section-header p {
+    margin: 0;
+    color: #555;
+    font-size: 0.98rem;
+}
+.badge-hidromasaje {
+    display: inline-block;
+    background: #6a1b9a;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+    letter-spacing: 0.3px;
+}
+.badge-tradicional {
+    display: inline-block;
+    background: #2e7d32;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+    letter-spacing: 0.3px;
+}
+.badge-boutique {
+    display: inline-block;
+    background: #8d6e63;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+    letter-spacing: 0.3px;
+}
+.servicio-specs {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0 12px;
+    font-size: 0.92rem;
+    color: #444;
+}
+.servicio-specs li {
+    padding: 3px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.servicio-specs li i {
+    color: #8B4513;
+    width: 18px;
+    text-align: center;
+}
+.price-total {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #8B4513;
+    margin: 8px 0 4px;
+}
+.price-unit-note {
+    font-size: 0.8rem;
+    color: #777;
+    margin-bottom: 10px;
+}
 </style>
 {% endblock %}
 
@@ -499,9 +595,11 @@ html {
 <section class="container mb-5" id="servicios-categoria">
     <h2 class="section-title mb-4">
         {% if categoria_actual.id == 3 %}
-            Nuestras Cabañas Disponibles
+            Nuestras Cabañas Boutique
         {% elif categoria_actual.id == 2 %}
             Nuestros Masajes
+        {% elif categoria_actual.id == 1 %}
+            Nuestras Tinas Calientes junto al Río
         {% else %}
             Servicios Disponibles
         {% endif %}
@@ -585,6 +683,138 @@ html {
         {% endif %}
 
         {% endwith %}
+    {% elif categoria_actual.id == 1 %}
+        {# === TINAS: split hidromasaje / tradicional === #}
+        {% with tinas_hidro=servicios|filter_hidromasaje:1|order_by_capacity tinas_trad=servicios|filter_hidromasaje:0|order_by_capacity %}
+
+        {% if tinas_hidro %}
+        <div class="tina-section-header hidromasaje">
+            <h3><i class="fas fa-water me-2" style="color:#6a1b9a;"></i>Tinas con Hidromasaje</h3>
+            <p>Jets de hidromasaje para una experiencia boutique con agua caliente junto al Río Pescado. Uso privado y exclusivo.</p>
+        </div>
+        <div class="row">
+            {% for servicio in tinas_hidro %}
+                <div class="col-lg-4 col-md-6 mb-4 service-card">
+                    <div class="card h-100">
+                        {% if servicio.imagen %}
+                            <img src="{{ servicio.imagen.url }}" class="card-img-top"
+                                 alt="{{ servicio.nombre }} - Tina con hidromasaje junto al Río Pescado en Puerto Varas"
+                                 loading="lazy"
+                                 title="{{ servicio.nombre }}">
+                        {% endif %}
+                        <div class="card-body d-flex flex-column">
+                            <span class="badge-hidromasaje"><i class="fas fa-water me-1"></i>Con Hidromasaje</span>
+                            <h3 class="card-title h5">{{ servicio.nombre }}</h3>
+                            <ul class="servicio-specs">
+                                <li><i class="fas fa-users"></i>{{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}</li>
+                                <li><i class="far fa-clock"></i>{{ servicio.duracion|duration_in_hours }} de uso exclusivo</li>
+                                <li><i class="fas fa-spa"></i>Jets de hidromasaje · junto al río</li>
+                            </ul>
+                            <div class="price-total">${{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}</div>
+                            <div class="price-unit-note">por tina · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}</div>
+                            <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
+                                    data-servicio-id="{{ servicio.id }}"
+                                    data-servicio-nombre="{{ servicio.nombre|escapejs }}"
+                                    data-servicio-precio="{{ servicio.precio_base }}"
+                                    data-servicio-tipo="{{ servicio.tipo_servicio }}">
+                                <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if tinas_trad %}
+        <div class="tina-section-header tradicional">
+            <h3><i class="fas fa-leaf me-2" style="color:#2e7d32;"></i>Tinas Tradicionales junto al Río</h3>
+            <p>Aguas calientes en el bosque nativo. La experiencia original Aremko, con distintas capacidades para tu grupo.</p>
+        </div>
+        <div class="row">
+            {% for servicio in tinas_trad %}
+                <div class="col-lg-4 col-md-6 mb-4 service-card">
+                    <div class="card h-100">
+                        {% if servicio.imagen %}
+                            <img src="{{ servicio.imagen.url }}" class="card-img-top"
+                                 alt="{{ servicio.nombre }} - Tina caliente tradicional junto al Río Pescado en Puerto Varas"
+                                 loading="lazy"
+                                 title="{{ servicio.nombre }}">
+                        {% endif %}
+                        <div class="card-body d-flex flex-column">
+                            <span class="badge-tradicional"><i class="fas fa-leaf me-1"></i>Tradicional</span>
+                            <h3 class="card-title h5">{{ servicio.nombre }}</h3>
+                            <ul class="servicio-specs">
+                                <li><i class="fas fa-users"></i>{{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}</li>
+                                <li><i class="far fa-clock"></i>{{ servicio.duracion|duration_in_hours }} de uso exclusivo</li>
+                                <li><i class="fas fa-tree"></i>Bosque nativo · junto al río</li>
+                            </ul>
+                            <div class="price-total">${{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}</div>
+                            <div class="price-unit-note">por tina · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}</div>
+                            <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
+                                    data-servicio-id="{{ servicio.id }}"
+                                    data-servicio-nombre="{{ servicio.nombre|escapejs }}"
+                                    data-servicio-precio="{{ servicio.precio_base }}"
+                                    data-servicio-tipo="{{ servicio.tipo_servicio }}">
+                                <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if not tinas_hidro and not tinas_trad %}
+            <p class="text-center">No hay tinas disponibles en este momento.</p>
+        {% endif %}
+
+        {% endwith %}
+
+    {% elif categoria_actual.id == 3 %}
+        {# === CABAÑAS: cards con precio total y specs boutique === #}
+        <div class="cabana-section-header">
+            <h3><i class="fas fa-home me-2" style="color:#8d6e63;"></i>Cabañas Boutique junto al Río Pescado</h3>
+            <p>Cada cabaña es de uso exclusivo para dos personas. Despierta con el sonido del río en medio del bosque nativo.</p>
+        </div>
+        <div class="row">
+            {% for servicio in servicios %}
+                <div class="col-lg-4 col-md-6 mb-4 service-card">
+                    <div class="card h-100">
+                        {% if servicio.imagen %}
+                            <img src="{{ servicio.imagen.url }}" class="card-img-top"
+                                 alt="{{ servicio.nombre }} - Cabaña boutique con tina caliente junto al Río Pescado en Puerto Varas"
+                                 loading="lazy"
+                                 title="{{ servicio.nombre }}">
+                        {% endif %}
+                        <div class="card-body d-flex flex-column">
+                            <span class="badge-boutique"><i class="fas fa-gem me-1"></i>Boutique</span>
+                            <h3 class="card-title h5">{{ servicio.nombre }}</h3>
+                            <ul class="servicio-specs">
+                                <li><i class="fas fa-users"></i>{{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}</li>
+                                <li><i class="fas fa-bed"></i>Cama dos plazas · uso exclusivo</li>
+                                <li><i class="fas fa-wifi"></i>WiFi fibra óptica · calefacción</li>
+                                <li><i class="fas fa-tree"></i>Bosque nativo · junto al río</li>
+                            </ul>
+                            <div class="price-total">${{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}</div>
+                            <div class="price-unit-note">por noche · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}</div>
+                            <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
+                                    data-servicio-id="{{ servicio.id }}"
+                                    data-servicio-nombre="{{ servicio.nombre|escapejs }}"
+                                    data-servicio-precio="{{ servicio.precio_base }}"
+                                    data-servicio-tipo="{{ servicio.tipo_servicio }}">
+                                <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="col-12">
+                    <p class="text-center">No hay cabañas disponibles en este momento.</p>
+                </div>
+            {% endfor %}
+        </div>
+
     {% else %}
     <div class="row">
         {% for servicio in servicios %}
