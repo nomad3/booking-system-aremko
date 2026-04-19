@@ -794,25 +794,33 @@ html {
         </div>
         <div class="row">
             {% for servicio in servicios %}
+                {% with disp=servicio|cabana_display %}
                 <div class="col-lg-4 col-md-6 mb-4 service-card">
                     <div class="card h-100">
                         {% if servicio.imagen %}
                             <img src="{{ servicio.imagen.url }}" class="card-img-top"
-                                 alt="{{ servicio.nombre }} - Cabaña boutique con tina caliente junto al Río Pescado en Puerto Varas"
+                                 alt="{% if disp.is_desayuno %}Desayuno boutique servido en cabaña junto al Río Pescado{% else %}{{ servicio.nombre }} - Cabaña boutique con tina caliente junto al Río Pescado en Puerto Varas{% endif %}"
                                  loading="lazy"
                                  title="{{ servicio.nombre }}">
                         {% endif %}
                         <div class="card-body d-flex flex-column">
-                            <span class="badge-boutique"><i class="fas fa-gem me-1"></i>Boutique</span>
+                            <span class="badge-boutique"><i class="fas {{ disp.badge_icon }} me-1"></i>{{ disp.badge_text }}</span>
                             <h3 class="card-title h5">{{ servicio.nombre }}</h3>
                             <ul class="servicio-specs">
-                                <li><i class="fas fa-users"></i>{{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}</li>
-                                <li><i class="fas fa-bed"></i>Cama dos plazas · uso exclusivo</li>
-                                <li><i class="fas fa-wifi"></i>WiFi fibra óptica · calefacción</li>
-                                <li><i class="fas fa-tree"></i>Bosque nativo · junto al río</li>
+                                {% if disp.is_desayuno %}
+                                    <li><i class="fas fa-bread-slice"></i>Pan fresco · bagels · muffin casero</li>
+                                    <li><i class="fas fa-utensils"></i>Quesos, jamones y mermeladas</li>
+                                    <li><i class="fas fa-apple-alt"></i>Fruta de estación · jugo natural</li>
+                                    <li><i class="fas fa-mug-hot"></i>Café de grano · servido en tu cabaña</li>
+                                {% else %}
+                                    <li><i class="fas fa-users"></i>{{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}</li>
+                                    <li><i class="fas fa-bed"></i>Cama dos plazas · uso exclusivo</li>
+                                    <li><i class="fas fa-wifi"></i>WiFi fibra óptica · calefacción</li>
+                                    <li><i class="fas fa-tree"></i>Bosque nativo · junto al río</li>
+                                {% endif %}
                             </ul>
                             <div class="price-total">${{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}</div>
-                            <div class="price-unit-note">por noche · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}</div>
+                            <div class="price-unit-note">{% if disp.unit_note %}{{ disp.unit_note }}{% else %}por noche · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</div>
                             <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                     data-servicio-id="{{ servicio.id }}"
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}"
@@ -824,6 +832,7 @@ html {
                         </div>
                     </div>
                 </div>
+                {% endwith %}
             {% empty %}
                 <div class="col-12">
                     <p class="text-center">No hay cabañas disponibles en este momento.</p>

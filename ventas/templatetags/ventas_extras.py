@@ -112,3 +112,29 @@ def tina_display(servicio):
     elif 'yates' in nombre:
         overrides['duracion_texto'] = 'Uso ilimitado'
     return overrides
+
+
+@register.filter
+def cabana_display(servicio):
+    """
+    Overrides de display para la categoría Alojamientos (cabañas + extras).
+
+    Llaves:
+      - is_desayuno: bool, cambia el set de specs a ítems de desayuno
+      - badge_text / badge_icon: override de la etiqueta superior
+      - unit_note: texto bajo el precio (ej. "por desayuno · 2 personas")
+    """
+    nombre = (getattr(servicio, 'nombre', '') or '').lower()
+    overrides = {
+        'is_desayuno': False,
+        'badge_text': 'Boutique',
+        'badge_icon': 'fa-gem',
+        'unit_note': None,
+    }
+    if 'desayuno' in nombre:
+        overrides['is_desayuno'] = True
+        overrides['badge_text'] = 'Desayuno Boutique'
+        overrides['badge_icon'] = 'fa-mug-hot'
+        cap = getattr(servicio, 'capacidad_maxima', 1) or 1
+        overrides['unit_note'] = f'por desayuno · {cap} persona{"s" if cap > 1 else ""}'
+    return overrides
