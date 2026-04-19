@@ -160,7 +160,9 @@ def cabana_display(servicio):
     Llaves:
       - is_desayuno: bool, cambia el set de specs a ítems de desayuno
       - badge_text / badge_icon: override de la etiqueta superior
-      - unit_note: texto bajo el precio (ej. "por desayuno · 2 personas")
+      - unit_note: texto bajo el precio
+      - hook: frase evocadora única por cabaña (AR-015)
+      - quote / quote_source: testimonial real diferenciador (AR-015)
     """
     nombre = (getattr(servicio, 'nombre', '') or '').lower()
     overrides = {
@@ -168,6 +170,9 @@ def cabana_display(servicio):
         'badge_text': 'Boutique',
         'badge_icon': 'fa-gem',
         'unit_note': None,
+        'hook': None,
+        'quote': None,
+        'quote_source': None,
     }
     if 'desayuno' in nombre:
         overrides['is_desayuno'] = True
@@ -175,4 +180,51 @@ def cabana_display(servicio):
         overrides['badge_icon'] = 'fa-mug-hot'
         cap = getattr(servicio, 'capacidad_maxima', 1) or 1
         overrides['unit_note'] = f'por desayuno · {cap} persona{"s" if cap > 1 else ""}'
+        return overrides
+
+    # Copy único por cabaña (AR-015): hook narrativo + testimonial real
+    if 'torre' in nombre:
+        overrides['badge_text'] = 'La más demandada'
+        overrides['badge_icon'] = 'fa-crown'
+        overrides['hook'] = (
+            'La única de dos niveles. Torre redonda con dormitorio en la copa, '
+            'rodeado por 16 ventanales bajo una cúpula de domo.'
+        )
+        overrides['quote'] = '2 días aquí equivalen a una semana de vacaciones.'
+        overrides['quote_source'] = 'Trip.com'
+    elif 'arrayan' in nombre or 'arrayán' in nombre:
+        overrides['hook'] = (
+            'Por el árbol sagrado de corteza roja sedosa. Refugio íntimo en '
+            'maderas recicladas con luz filtrada entre helechos.'
+        )
+        overrides['quote'] = 'Privacidad en la naturaleza.'
+        overrides['quote_source'] = 'Trip.com'
+    elif 'coihue' in nombre:
+        overrides['hook'] = (
+            'Bajo el dosel denso del coihue patagónico. La más tranquila, '
+            'orientada al bosque más antiguo del terreno.'
+        )
+        overrides['quote'] = 'Hace meses no dormía tan bien y tanto.'
+        overrides['quote_source'] = 'pilarisl · Trip.com'
+    elif 'manio' in nombre or 'mañío' in nombre or 'mañio' in nombre:
+        overrides['hook'] = (
+            'Homenaje a la conífera de crecimiento lento. Interior cálido '
+            'en madera rosada con detalles contemporáneos.'
+        )
+        overrides['quote'] = 'El lugar es precioso, un lujo en Puerto Varas.'
+        overrides['quote_source'] = 'Trip.com'
+    elif 'canelo' in nombre:
+        overrides['hook'] = (
+            'Por el árbol sagrado mapuche de flores blancas aromáticas. '
+            'Diseño sobrio que mezcla lo nativo con lo moderno.'
+        )
+        overrides['quote'] = 'Un refugio para el alma.'
+        overrides['quote_source'] = 'Trip.com'
+    elif 'ulmo' in nombre:
+        overrides['hook'] = (
+            'Por la flor blanca que da la miel patagónica. Maderas '
+            'recicladas y ventanales orientados al bosque.'
+        )
+        overrides['quote'] = 'Sounds of nature — I would return a thousand times.'
+        overrides['quote_source'] = 'Trip.com'
     return overrides
