@@ -908,14 +908,9 @@
         const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
         const precioTotalInput = document.getElementById('precioTotal');
         if (cantidadPersonasSelect && precioTotalInput) {
-            const cantidadPersonas = parseInt(cantidadPersonasSelect.value);
-            let precioTotal = 0;
-            // Calculate price based on service type
-            if (currentServicioTipo === 'cabana') {
-                precioTotal = currentServicioPrecio; // Fixed price for cabin
-            } else {
-                precioTotal = currentServicioPrecio * cantidadPersonas; // Price per person for others
-            }
+            const cantidadPersonas = parseInt(cantidadPersonasSelect.value) || currentServicioMax || 1;
+            // Modelo uniforme: precio_base × cantidad (tinas, cabañas y masajes)
+            const precioTotal = currentServicioPrecio * cantidadPersonas;
             precioTotalInput.value = formatCLP(precioTotal);
             console.log("Updated total price:", formatCLP(precioTotal), "for type:", currentServicioTipo);
         }
@@ -1154,35 +1149,17 @@
                 const cantidadErrorMsg = cantidadPersonasSelect.parentNode.querySelector('.cantidad-error-msg');
                 if (cantidadErrorMsg) cantidadErrorMsg.style.display = 'none'; // Hide previous error
 
-                // Populate options dynamically based on min/max, only if not a cabin
-                cantidadPersonasSelect.innerHTML = ''; // Clear existing options
-                if (servicioTipo !== 'cabana') {
-                    // Use currentServicioMax as the upper limit for the loop
-                    for (let i = 1; i <= currentServicioMax; i++) {
-                        if (i >= currentServicioMin && i <= currentServicioMax) {
-                            const option = document.createElement('option');
-                            option.value = i;
-                            option.textContent = `${i} persona${i > 1 ? 's' : ''}`;
-                            cantidadPersonasSelect.appendChild(option);
-                        }
-                    }
-                    // Set default value to minimum if possible, otherwise the first valid option
-                    // Adjust the default value logic slightly to handle cases where min > currentServicioMax
-                    cantidadPersonasSelect.value = currentServicioMin <= currentServicioMax ? currentServicioMin : (cantidadPersonasSelect.options.length > 0 ? cantidadPersonasSelect.options[0].value : '1');
-                    cantidadPersonasSelect.disabled = false;
-                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'block';
-                    cantidadPersonasSelect.style.display = 'block';
-                } else {
-                    // Special handling for cabins (assuming fixed capacity, e.g., 2)
-                    const option = document.createElement('option');
-                    option.value = currentServicioMax; // Use max as the fixed value for cabins
-                    option.textContent = `${currentServicioMax} persona${currentServicioMax > 1 ? 's' : ''}`;
-                    cantidadPersonasSelect.appendChild(option);
-                    cantidadPersonasSelect.value = currentServicioMax;
-                    cantidadPersonasSelect.disabled = true;
-                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none';
-                    cantidadPersonasSelect.style.display = 'none';
-                }
+                // Regla de negocio: toda reserva web usa capacidad_maxima fija.
+                // Los ajustes (niños extra, personas adicionales) se coordinan por WhatsApp / admin.
+                cantidadPersonasSelect.innerHTML = '';
+                const optionFija = document.createElement('option');
+                optionFija.value = currentServicioMax;
+                optionFija.textContent = `${currentServicioMax} persona${currentServicioMax > 1 ? 's' : ''}`;
+                cantidadPersonasSelect.appendChild(optionFija);
+                cantidadPersonasSelect.value = currentServicioMax;
+                cantidadPersonasSelect.disabled = true;
+                if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none';
+                cantidadPersonasSelect.style.display = 'none';
 
                 // Update price and run initial validation after setting defaults
                 updatePrecioTotal();
