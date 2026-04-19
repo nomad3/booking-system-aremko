@@ -1007,9 +1007,11 @@ class ProductoAdmin(admin.ModelAdmin):
             'fields': ('nombre', 'categoria', 'proveedor', 'precio_base', 'cantidad_disponible')
         }),
         ('Publicación Web', {
-            'fields': ('publicado_web', 'descripcion_web', 'imagen', 'orden'),
+            'fields': ('publicado_web', 'descripcion_web', 'imagen', 'imagen_2', 'imagen_3', 'orden'),
             'description': 'Configuración para mostrar el producto en el catálogo web público. '
-                          'Los clientes verán estos productos y podrán consultar por WhatsApp.'
+                          'Los clientes verán estos productos y podrán consultar por WhatsApp. '
+                          'Puedes subir hasta 3 imágenes: la principal + 2 adicionales que se '
+                          'mostrarán en el carousel de la card.'
         }),
         ('📱 Comandas de Clientes (WhatsApp)', {
             'fields': ('comanda_cliente', 'orden_comanda'),
@@ -1101,7 +1103,7 @@ class ServicioAdmin(admin.ModelAdmin):
     list_editable = ('publicado_web', 'permite_reserva_web', 'visible_en_matriz')
     search_fields = ('nombre', 'descripcion_web')
     filter_horizontal = ('proveedores',)  # Para manejar ManyToMany de proveedores
-    readonly_fields = ('imagen_preview',)
+    readonly_fields = ('imagen_preview', 'imagen_2_preview', 'imagen_3_preview')
 
     fieldsets = (
         ('Información Básica', {
@@ -1121,14 +1123,18 @@ class ServicioAdmin(admin.ModelAdmin):
             'description': 'Control de visibilidad del servicio en diferentes partes del sistema. Si permite_reserva_web está desmarcado, se mostrará opción de WhatsApp.'
         }),
         ('Información Web', {
-            'fields': ('imagen_preview', 'imagen', 'descripcion_web'),
-            'description': 'Contenido e imágenes para la página web pública'
+            'fields': (
+                'imagen_preview', 'imagen',
+                'imagen_2_preview', 'imagen_2',
+                'imagen_3_preview', 'imagen_3',
+                'descripcion_web',
+            ),
+            'description': 'Imagen principal + hasta 2 imágenes adicionales que se muestran en el carousel de la card pública.'
         })
     )
 
-    def imagen_preview(self, obj):
-        """Vista previa de la imagen del servicio"""
-        if not obj or not obj.imagen:
+    def _render_preview(self, imagen_field):
+        if not imagen_field:
             return format_html('<p style="color: #999;">No hay imagen cargada</p>')
         try:
             return format_html(
@@ -1136,12 +1142,23 @@ class ServicioAdmin(admin.ModelAdmin):
                 '<img src="{}" style="max-width: 600px; max-height: 400px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px; padding: 5px;" />'
                 '<p style="color: #666; font-size: 12px; margin-top: 5px;">URL: {}</p>'
                 '</div>',
-                obj.imagen.url,
-                obj.imagen.url
+                imagen_field.url,
+                imagen_field.url
             )
         except Exception:
             return format_html('<p style="color: #999;">No se puede generar vista previa</p>')
-    imagen_preview.short_description = 'Vista previa actual'
+
+    def imagen_preview(self, obj):
+        return self._render_preview(obj.imagen if obj else None)
+    imagen_preview.short_description = 'Vista previa (principal)'
+
+    def imagen_2_preview(self, obj):
+        return self._render_preview(getattr(obj, 'imagen_2', None) if obj else None)
+    imagen_2_preview.short_description = 'Vista previa (imagen 2)'
+
+    def imagen_3_preview(self, obj):
+        return self._render_preview(getattr(obj, 'imagen_3', None) if obj else None)
+    imagen_3_preview.short_description = 'Vista previa (imagen 3)'
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
