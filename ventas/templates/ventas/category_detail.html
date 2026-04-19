@@ -694,6 +694,7 @@ html {
         </div>
         <div class="row">
             {% for servicio in tinas_hidro %}
+                {% with disp=servicio|tina_display %}
                 <div class="col-lg-4 col-md-6 mb-4 service-card">
                     <div class="card h-100">
                         {% if servicio.imagen %}
@@ -706,12 +707,16 @@ html {
                             <span class="badge-hidromasaje"><i class="fas fa-water me-1"></i>Con Hidromasaje</span>
                             <h3 class="card-title h5">{{ servicio.nombre }}</h3>
                             <ul class="servicio-specs">
-                                <li><i class="fas fa-users"></i>{{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}</li>
-                                <li><i class="far fa-clock"></i>{{ servicio.duracion|duration_in_hours }} de uso exclusivo</li>
+                                {% if not disp.hide_capacidad %}
+                                <li><i class="fas fa-users"></i>{% if disp.capacidad_texto %}{{ disp.capacidad_texto }}{% else %}{{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</li>
+                                {% endif %}
+                                {% if not disp.hide_duracion %}
+                                <li><i class="far fa-clock"></i>{% if disp.duracion_texto %}{{ disp.duracion_texto }}{% else %}{{ servicio.duracion|duration_in_hours }} de uso exclusivo{% endif %}</li>
+                                {% endif %}
                                 <li><i class="fas fa-spa"></i>Jets de hidromasaje · junto al río</li>
                             </ul>
-                            <div class="price-total">${{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}</div>
-                            <div class="price-unit-note">por tina · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}</div>
+                            <div class="price-total">${% if disp.precio_total %}{{ disp.precio_total|floatformat:0|intcomma }}{% else %}{{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}{% endif %}</div>
+                            <div class="price-unit-note">{% if disp.unit_note %}{{ disp.unit_note }}{% else %}por tina · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</div>
                             <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                     data-servicio-id="{{ servicio.id }}"
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}"
@@ -722,6 +727,7 @@ html {
                         </div>
                     </div>
                 </div>
+                {% endwith %}
             {% endfor %}
         </div>
         {% endif %}
@@ -733,6 +739,7 @@ html {
         </div>
         <div class="row">
             {% for servicio in tinas_trad %}
+                {% with disp=servicio|tina_display %}
                 <div class="col-lg-4 col-md-6 mb-4 service-card">
                     <div class="card h-100">
                         {% if servicio.imagen %}
@@ -745,12 +752,16 @@ html {
                             <span class="badge-tradicional"><i class="fas fa-leaf me-1"></i>Tradicional</span>
                             <h3 class="card-title h5">{{ servicio.nombre }}</h3>
                             <ul class="servicio-specs">
-                                <li><i class="fas fa-users"></i>{{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}</li>
-                                <li><i class="far fa-clock"></i>{{ servicio.duracion|duration_in_hours }} de uso exclusivo</li>
+                                {% if not disp.hide_capacidad %}
+                                <li><i class="fas fa-users"></i>{% if disp.capacidad_texto %}{{ disp.capacidad_texto }}{% else %}{{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</li>
+                                {% endif %}
+                                {% if not disp.hide_duracion %}
+                                <li><i class="far fa-clock"></i>{% if disp.duracion_texto %}{{ disp.duracion_texto }}{% else %}{{ servicio.duracion|duration_in_hours }} de uso exclusivo{% endif %}</li>
+                                {% endif %}
                                 <li><i class="fas fa-tree"></i>Bosque nativo · junto al río</li>
                             </ul>
-                            <div class="price-total">${{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}</div>
-                            <div class="price-unit-note">por tina · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}</div>
+                            <div class="price-total">${% if disp.precio_total %}{{ disp.precio_total|floatformat:0|intcomma }}{% else %}{{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}{% endif %}</div>
+                            <div class="price-unit-note">{% if disp.unit_note %}{{ disp.unit_note }}{% else %}por tina · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</div>
                             <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                     data-servicio-id="{{ servicio.id }}"
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}"
@@ -761,6 +772,7 @@ html {
                         </div>
                     </div>
                 </div>
+                {% endwith %}
             {% endfor %}
         </div>
         {% endif %}

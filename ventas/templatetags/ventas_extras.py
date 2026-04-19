@@ -73,3 +73,42 @@ def order_by_capacity(servicios):
         return sorted(servicios, key=lambda s: getattr(s, 'capacidad_maxima', 0) or 0)
     except (TypeError, AttributeError):
         return list(servicios) if servicios else []
+
+
+@register.filter
+def tina_display(servicio):
+    """
+    Devuelve overrides de display para tinas según nombre, sin tocar BD.
+
+    Llaves del dict:
+      - capacidad_texto: reemplaza el texto de capacidad (ej. "5–6 personas", "1 niño adicional")
+      - hide_capacidad: oculta la línea de capacidad
+      - duracion_texto: reemplaza el texto de duración (ej. "Uso ilimitado", "4 horas de uso exclusivo")
+      - hide_duracion: oculta la línea de duración
+      - precio_total: fuerza el precio total mostrado (None = calcular precio_base × capacidad_maxima)
+      - unit_note: texto bajo el precio (ej. "por niño adicional", "por tina · 5–6 personas")
+    """
+    nombre = (getattr(servicio, 'nombre', '') or '').lower()
+    overrides = {
+        'capacidad_texto': None,
+        'hide_capacidad': False,
+        'duracion_texto': None,
+        'hide_duracion': False,
+        'precio_total': None,
+        'unit_note': None,
+    }
+    if 'niño' in nombre or 'nino' in nombre:
+        overrides['capacidad_texto'] = '1 niño adicional'
+        overrides['hide_duracion'] = True
+        try:
+            overrides['precio_total'] = float(servicio.precio_base or 0)
+        except (TypeError, ValueError):
+            overrides['precio_total'] = 0
+        overrides['unit_note'] = 'por niño adicional'
+    elif 'osorno' in nombre:
+        overrides['capacidad_texto'] = '5–6 personas'
+        overrides['duracion_texto'] = '4 horas de uso exclusivo'
+        overrides['unit_note'] = 'por tina · 5–6 personas'
+    elif 'yates' in nombre:
+        overrides['duracion_texto'] = 'Uso ilimitado'
+    return overrides
