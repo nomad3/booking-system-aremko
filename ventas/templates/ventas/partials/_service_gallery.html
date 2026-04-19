@@ -1,11 +1,12 @@
-{# Galería de imágenes para card de Servicio / Producto.
-   Renderiza 1 imagen o un carousel Bootstrap 5 si hay 2-3 imágenes.
-   Contexto requerido:
-     - obj: instancia con campos imagen / imagen_2 / imagen_3 y un pk/id único
-     - alt_text: texto alternativo (string)
-     - id_prefix: prefijo del id del carousel (ej: "carousel-masaje-online")
-#}
 {% load ventas_extras %}
+{% comment %}
+Galería de imágenes para card de Servicio / Producto.
+Renderiza 1 imagen o un carousel Bootstrap 5 si hay 2-3 imágenes.
+Contexto requerido:
+  - obj: instancia con campos imagen / imagen_2 / imagen_3 y un pk/id único
+  - alt_text: texto alternativo (string)
+  - id_prefix: prefijo del id del carousel (ej: "carousel-masaje-online")
+{% endcomment %}
 {% with imgs=obj|imagenes_disponibles %}
 {% if imgs|length > 1 %}
 <div id="{{ id_prefix }}-{{ obj.id }}" class="carousel slide card-carousel" data-bs-interval="false" data-bs-touch="true">
