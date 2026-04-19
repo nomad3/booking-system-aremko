@@ -25,3 +25,13 @@ def duration_in_hours(minutes):
             return f"{hours_str} hora{'s' if hours > 1 else ''}"
     except (ValueError, TypeError, AttributeError):
         return "" # Return empty string if input is invalid
+
+
+@register.filter
+def filter_reserva_web(servicios, value):
+    """Filtra una lista de servicios por el campo permite_reserva_web."""
+    try:
+        target = bool(value)
+        return [s for s in servicios if bool(getattr(s, 'permite_reserva_web', False)) == target]
+    except (TypeError, AttributeError):
+        return []
