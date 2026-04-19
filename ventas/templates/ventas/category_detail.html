@@ -556,11 +556,11 @@ html {
     margin-bottom: 10px;
 }
 
-/* Galería de imágenes en cards */
+/* Galería de imágenes en cards — la foto manda */
 .service-card .card-img-top,
 .service-card .card-carousel .carousel-item img {
     width: 100%;
-    aspect-ratio: 4 / 3;
+    aspect-ratio: 1 / 1;      /* cuadrada en desktop/tablet: foto mucho más alta */
     object-fit: cover;
     display: block;
 }
@@ -596,17 +596,21 @@ html {
     background-color: #fff;
 }
 
-/* Mobile: cards ocupan el ancho y la foto se hace más prominente */
+/* Móvil: foto tipo portrait, domina la pantalla */
 @media (max-width: 767.98px) {
     .service-card .card-img-top,
     .service-card .card-carousel .carousel-item img {
-        aspect-ratio: 4 / 3;
+        aspect-ratio: 4 / 5;   /* más alta que ancha en celular */
+        max-height: 78vh;      /* no se desborda en pantallas cortas */
     }
     .service-card .card-title {
-        font-size: 1.25rem;
+        font-size: 1.35rem;
     }
     .service-card .price-total {
-        font-size: 1.5rem;
+        font-size: 1.6rem;
+    }
+    .service-card .card-body {
+        padding: 1.25rem;
     }
 }
 </style>

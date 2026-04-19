@@ -386,6 +386,15 @@
         display: block;
     }
 
+    /* Móvil: foto más alta para que domine la pantalla */
+    @media (max-width: 767.98px) {
+        .service-card .card-img-top,
+        .service-card .card-carousel .carousel-item img {
+            aspect-ratio: 4 / 5;
+            max-height: 78vh;
+        }
+    }
+
     /* Carousel multi-imagen en cards del homepage */
     .service-card .card-carousel { position: relative; }
     .service-card .card-carousel .carousel-control-prev,
