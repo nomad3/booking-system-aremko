@@ -556,10 +556,13 @@ html {
     margin-bottom: 10px;
 }
 
-/* Galería de imágenes en cards — la foto manda */
+/* Galería de imágenes en cards — la foto manda
+   (height: auto !important es crítico para vencer .card-img-top{height:200px}
+    definido en base_public.html) */
 .service-card .card-img-top,
 .service-card .card-carousel .carousel-item img {
     width: 100%;
+    height: auto !important;
     aspect-ratio: 1 / 1;      /* cuadrada en desktop/tablet: foto mucho más alta */
     object-fit: cover;
     display: block;
@@ -600,6 +603,7 @@ html {
 @media (max-width: 767.98px) {
     .service-card .card-img-top,
     .service-card .card-carousel .carousel-item img {
+        height: auto !important;
         aspect-ratio: 4 / 5;   /* más alta que ancha en celular */
         max-height: 78vh;      /* no se desborda en pantallas cortas */
     }
