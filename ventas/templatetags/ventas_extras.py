@@ -42,6 +42,23 @@ TINAS_HIDROMASAJE = {'llaima', 'villarrica', 'puntiagudo', 'puyehue'}
 
 
 @register.filter
+def filter_tinas(servicios):
+    """Filtra servicios a solo los de la categoría Tinas (por nombre de categoría)."""
+    try:
+        result = []
+        for s in servicios:
+            cat_name = ''
+            cat = getattr(s, 'categoria', None)
+            if cat is not None:
+                cat_name = (getattr(cat, 'nombre', '') or '').lower()
+            if 'tina' in cat_name:
+                result.append(s)
+        return result
+    except (TypeError, AttributeError):
+        return []
+
+
+@register.filter
 def filter_hidromasaje(servicios, value):
     """Separa tinas por hidromasaje basándose en el nombre. value=1 (con) / 0 (sin)."""
     try:
