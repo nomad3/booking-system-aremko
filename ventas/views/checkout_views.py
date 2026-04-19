@@ -14,6 +14,22 @@ from ..signals import validar_disponibilidad_admin
 from ..services.cliente_service import ClienteService
 from ..services.pack_descuento_service import PackDescuentoService
 
+# AR-014: Tinas con precio plano por capacidad (cobra capacidad_maxima completa,
+# ignora el cantidad_personas enviado desde el cliente para prevenir manipulación).
+TINAS_PRECIO_PLANO = {
+    'calbuco', 'osorno', 'tronador', 'hornopiren', 'hornopirén',
+    'llaima', 'puntiagudo', 'puyehue', 'villarrica',
+}
+
+
+def _es_tina_precio_plano(servicio):
+    """True si el servicio es una tina que debe cobrarse por capacidad_maxima."""
+    if getattr(servicio, 'tipo_servicio', None) != 'tina':
+        return False
+    nombre = (getattr(servicio, 'nombre', '') or '').lower()
+    return any(tag in nombre for tag in TINAS_PRECIO_PLANO)
+
+
 def cart_view(request):
     """
     Vista que renderiza la página del carrito de compras
@@ -64,6 +80,19 @@ def add_to_cart(request):
 
         try:
             servicio = Servicio.objects.get(id=servicio_id)
+
+            # --- AR-014: Server-side override para tinas de precio plano ---
+            # Estas tinas se cobran SIEMPRE por capacidad_maxima (precio plano por tina),
+            # ignorando el cantidad_personas enviado desde el cliente. Previene que
+            # un atacante manipule DevTools para enviar cantidad=1 y pagar menos.
+            if _es_tina_precio_plano(servicio):
+                cantidad_original = cantidad_personas
+                cantidad_personas = servicio.capacidad_maxima
+                if cantidad_original != cantidad_personas:
+                    print(
+                        f"[AR-014] Tina precio plano '{servicio.nombre}': "
+                        f"override cantidad_personas {cantidad_original} -> {cantidad_personas}"
+                    )
 
             # --- CRITICAL: Check if service is blocked on this date ---
             try:
