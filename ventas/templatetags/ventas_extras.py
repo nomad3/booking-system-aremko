@@ -227,4 +227,21 @@ def cabana_display(servicio):
         )
         overrides['quote'] = 'Sounds of nature — I would return a thousand times.'
         overrides['quote_source'] = 'Trip.com'
+    elif 'acantilado' in nombre:
+        overrides['badge_text'] = 'Vista al río'
+        overrides['badge_icon'] = 'fa-water'
+        overrides['hook'] = (
+            'Al borde del acantilado, con vista al Río Pescado y '
+            'la isla que lo divide en dos brazos.'
+        )
+    elif 'laurel' in nombre:
+        overrides['hook'] = (
+            'Construida íntegramente en laurel nativo reciclado. '
+            'Cada mueble y viga cuenta la historia del bosque.'
+        )
+    elif 'tepa' in nombre:
+        overrides['hook'] = (
+            'Junto a un tepa centenario, el árbol más aromático del '
+            'bosque valdiviano. Su perfume acompaña el despertar.'
+        )
     return overrides
