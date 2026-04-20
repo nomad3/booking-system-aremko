@@ -483,7 +483,7 @@ Email para comprobante: ventas@aremko.cl</pre>
     }
 
     async function fetchClientData(telefono) {
-        console.log(`🔍 VALIDANDO: "${telefono}"`);
+        console.log('[VALIDANDO] "' + telefono + '"');
 
         const phoneInput = document.getElementById('checkoutTelefono');
         const validationMsg = document.getElementById('phoneValidationMessage');
@@ -513,13 +513,13 @@ Email para comprobante: ventas@aremko.cl</pre>
             }
 
             // DEBUG: Mostrar limpieza de teléfono
-            console.log(`🔍 DEBUG Teléfono:`);
+            console.log('[DEBUG] Telefono:');
             console.log(`   Original: "${telefono}"`);
             console.log(`   Limpio: "${cleanedTelefono}"`);
 
             // Validar longitud mínima (contar solo dígitos)
             const digitCount = cleanedTelefono.replace(/[^0-9]/g, '').length;
-            console.log(`   Dígitos: ${digitCount}`);
+            console.log('   Digitos: ' + digitCount);
 
             if (digitCount < 9) {
                 validationMsg.textContent = 'Ingresa al menos 9 dígitos.';
@@ -527,8 +527,8 @@ Email para comprobante: ventas@aremko.cl</pre>
                 return;
             }
 
-            console.log(`🔍 Enviando al backend: ${cleanedTelefono}`);
-            console.log(`🔍 URL encoded: ${encodeURIComponent(cleanedTelefono)}`);
+            console.log('[BACKEND] Enviando: ' + cleanedTelefono);
+            console.log('[BACKEND] URL encoded: ' + encodeURIComponent(cleanedTelefono));
             const lookupUrl = `{% url 'ventas:checkout_get_client_details_by_phone' %}?telefono=${encodeURIComponent(cleanedTelefono)}`;
             const response = await fetch(lookupUrl);
 
@@ -575,12 +575,12 @@ Email para comprobante: ventas@aremko.cl</pre>
                             document.getElementById('checkoutComuna').value = data.comuna_id;
                         }
 
-                        console.log(`✅ Región y comuna cargadas: ${data.region_nombre} - ${data.comuna_nombre}`);
+                        console.log('[OK] Region y comuna cargadas: ' + data.region_nombre + ' - ' + data.comuna_nombre);
                     }
 
                     // Mostrar información adicional del cliente en consola
                     if (data.numero_visitas > 0) {
-                        console.log(`ℹ️ Cliente fidelizado: ${data.numero_visitas} visitas, gasto total: $${data.gasto_total.toLocaleString('es-CL')}`);
+                        console.log('[INFO] Cliente fidelizado: ' + data.numero_visitas + ' visitas, gasto total: $' + data.gasto_total.toLocaleString('es-CL'));
                     }
                 } else {
                     // Cliente nuevo pero teléfono válido
