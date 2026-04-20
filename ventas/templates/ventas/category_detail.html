@@ -982,7 +982,7 @@ html {
                                     data-servicio-precio="{{ servicio.precio_base }}"
                                     data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
                                     data-servicio-tipo="{{ servicio.tipo_servicio }}"
-                                    data-servicio-hora-fija="true">
+                                    data-servicio-requiere-tina="true">
                                 <i class="fas fa-plus me-2"></i>Agregar a mi reserva
                             </button>
                         </div>
@@ -1255,6 +1255,8 @@ html {
 {% endblock %}
 
 {% block modals %}
+{# Expone servicios del carrito a JS (para validar tina-first en decoraciones). #}
+{{ cart.servicios|json_script:"cart-servicios-data" }}
 <!-- Booking Modal -->
 <div class="modal fade" id="bookingModal" tabindex="-1" aria-labelledby="bookingModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -1505,24 +1507,62 @@ html {
                 currentServicioCapacidad = parseInt(this.dataset.servicioCapacidad) || 1;
                 const isReadonly = this.dataset.readonly === 'true'; // Check if in readonly mode
 
+                // --- Regla tina-first para decoraciones (Ambientaciones) ---
+                // La Agenda Operativa del día necesita fecha+hora exactas por
+                // servicio. Las decoraciones heredan el slot de la última tina
+                // agregada; si no hay tina en carrito, bloqueamos.
+                const requiereTina = this.dataset.servicioRequiereTina === 'true';
+                let tinaSlot = null;
+                if (requiereTina) {
+                    let cartServicios = [];
+                    try {
+                        const raw = document.getElementById('cart-servicios-data');
+                        if (raw) cartServicios = JSON.parse(raw.textContent) || [];
+                    } catch (e) { cartServicios = []; }
+                    const tinas = cartServicios.filter(s => s.tipo_servicio === 'tina');
+                    if (tinas.length === 0) {
+                        alert(
+                            'Primero agrega una tina a tu carrito.\n\n' +
+                            'Las decoraciones se coordinan con el horario de la tina reservada.'
+                        );
+                        return; // No abrir modal
+                    }
+                    tinaSlot = tinas[tinas.length - 1]; // última tina agregada
+                }
+
                 document.getElementById('servicioId').value = currentServicioId;
                 document.getElementById('servicioNombre').value = currentServicioNombre;
                 document.getElementById('fecha').value = '';
 
                 // Servicios con hora fija: cabañas (check-in 16:00) y decoraciones
-                // (staff coordina la hora con la tina reservada).
-                const horaFija = (currentServicioTipo === 'cabana') || (this.dataset.servicioHoraFija === 'true');
+                // (heredan hora de la tina, o 16:00 como fallback visual).
+                const horaFija = (currentServicioTipo === 'cabana') || requiereTina;
                 const horaSelectEl = document.getElementById('hora');
                 const horaFieldEl = horaSelectEl.closest('.mb-3');
                 if (horaFija) {
-                    horaSelectEl.innerHTML = '<option value="16:00" selected>16:00</option>';
-                    horaSelectEl.value = '16:00';
+                    const horaHeredada = (tinaSlot && tinaSlot.hora) ? tinaSlot.hora : '16:00';
+                    horaSelectEl.innerHTML = `<option value="${horaHeredada}" selected>${horaHeredada}</option>`;
+                    horaSelectEl.value = horaHeredada;
                     horaSelectEl.disabled = false;
                     if (horaFieldEl) horaFieldEl.style.display = 'none';
                 } else {
                     horaSelectEl.innerHTML = '<option value="">Selecciona una hora</option>';
                     horaSelectEl.disabled = true;
                     if (horaFieldEl) horaFieldEl.style.display = '';
+                }
+
+                // Para decoraciones: pre-rellenar fecha con la de la tina y
+                // ocultar el campo (el usuario no puede cambiarlo).
+                const fechaInputEl = document.getElementById('fecha');
+                const fechaFieldEl = fechaInputEl ? fechaInputEl.closest('.mb-3') : null;
+                if (requiereTina && tinaSlot && tinaSlot.fecha) {
+                    fechaInputEl.value = tinaSlot.fecha;
+                    if (fechaFieldEl) fechaFieldEl.style.display = 'none';
+                    // Habilitar el botón Agregar (no pasará por flatpickr onChange)
+                    const addBtnPre = document.getElementById('addToCartBtn');
+                    if (addBtnPre) addBtnPre.disabled = false;
+                } else if (fechaFieldEl) {
+                    fechaFieldEl.style.display = '';
                 }
 
                 // Regla de negocio: las reservas web siempre usan la capacidad_maxima del servicio

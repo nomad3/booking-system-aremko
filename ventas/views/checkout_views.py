@@ -118,6 +118,44 @@ def add_to_cart(request):
                         f"{hora_original!r} -> '16:00'"
                     )
 
+            # --- Ambientaciones: requieren tina previa en carrito ---
+            # Las decoraciones se venden como complemento de una tina. Para
+            # la Agenda Operativa del día se necesita fecha+hora exactas, por
+            # lo que heredan el slot de la última tina reservada. Si no hay
+            # tina en carrito, bloqueamos. (Defensa servidor contra manipulación
+            # cliente-side.)
+            cat_nombre = ''
+            if getattr(servicio, 'categoria', None):
+                cat_nombre = (servicio.categoria.nombre or '').lower()
+            if cat_nombre == 'ambientaciones':
+                cart_preview = request.session.get(
+                    'cart', {'servicios': [], 'total': 0}
+                )
+                tinas_en_cart = [
+                    s for s in cart_preview.get('servicios', [])
+                    if s.get('tipo_servicio') == 'tina'
+                ]
+                if not tinas_en_cart:
+                    messages.error(
+                        request,
+                        "Primero agrega una tina a tu carrito. Las decoraciones "
+                        "se coordinan con el horario de la tina reservada."
+                    )
+                    referer_url = request.META.get(
+                        'HTTP_REFERER', reverse('ventas:homepage')
+                    )
+                    return redirect(referer_url)
+                # Hereda fecha y hora de la última tina agregada
+                last_tina = tinas_en_cart[-1]
+                fecha_original, hora_original = fecha, hora
+                fecha = last_tina.get('fecha') or fecha
+                hora = last_tina.get('hora') or hora
+                print(
+                    f"[AMBIENTACION] '{servicio.nombre}': hereda slot de tina "
+                    f"'{last_tina.get('nombre')}' -> fecha {fecha_original!r}->"
+                    f"{fecha!r}, hora {hora_original!r}->{hora!r}"
+                )
+
             # --- CRITICAL: Check if service is blocked on this date ---
             try:
                 fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
