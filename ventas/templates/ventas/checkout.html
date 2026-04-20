@@ -403,16 +403,20 @@ Email para comprobante: ventas@aremko.cl</pre>
 
     async function loadRegiones() {
         const select = document.getElementById('checkoutRegion');
+        if (!select) {
+            // Carrito vacío u otro estado sin form — nada que hacer.
+            return;
+        }
         try {
             const response = await fetch('/ventas/api/regiones/', {
                 headers: { 'Accept': 'application/json' }
             });
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+                throw new Error('HTTP ' + response.status);
             }
             const data = await response.json();
             const regiones = normalizeListResponse(data);
-            console.log(`loadRegiones: ${regiones.length} regiones recibidas`);
+            console.log('loadRegiones: ' + regiones.length + ' regiones recibidas');
 
             if (regiones.length === 0) {
                 const opt = document.createElement('option');
@@ -441,12 +445,13 @@ Email para comprobante: ventas@aremko.cl</pre>
 
     async function loadComunas(regionId) {
         const select = document.getElementById('checkoutComuna');
+        if (!select) return;
         try {
-            const response = await fetch(`/ventas/api/comunas/?region=${regionId}`, {
+            const response = await fetch('/ventas/api/comunas/?region=' + regionId, {
                 headers: { 'Accept': 'application/json' }
             });
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+                throw new Error('HTTP ' + response.status);
             }
             const data = await response.json();
             const comunas = normalizeListResponse(data);
