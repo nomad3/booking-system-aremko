@@ -817,6 +817,7 @@ html {
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}"
                                     data-servicio-precio="{{ servicio.precio_base }}"
                                     data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
+                                    data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
                                     data-servicio-tipo="{{ servicio.tipo_servicio }}">
                                 <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                             </button>
@@ -904,6 +905,7 @@ html {
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}"
                                     data-servicio-precio="{{ servicio.precio_base }}"
                                     data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
+                                    data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
                                     data-servicio-tipo="{{ servicio.tipo_servicio }}">
                                 <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                             </button>
@@ -946,6 +948,7 @@ html {
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}"
                                     data-servicio-precio="{{ servicio.precio_base }}"
                                     data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
+                                    data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
                                     data-servicio-tipo="{{ servicio.tipo_servicio }}">
                                 <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                             </button>
@@ -985,6 +988,7 @@ html {
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}"
                                     data-servicio-precio="{{ servicio.precio_base }}"
                                     data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
+                                    data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
                                     data-servicio-tipo="{{ servicio.tipo_servicio }}"
                                     data-servicio-requiere-tina="true">
                                 <i class="fas fa-plus me-2"></i>Agregar a mi reserva
@@ -1047,6 +1051,7 @@ html {
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}"
                                     data-servicio-precio="{{ servicio.precio_base }}"
                                     data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
+                                    data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
                                     data-servicio-tipo="{{ servicio.tipo_servicio }}">
                                 <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                             </button>
@@ -1093,6 +1098,7 @@ html {
                                 data-servicio-nombre="{{ servicio.nombre|escapejs }}"
                                 data-servicio-precio="{{ servicio.precio_base }}"
                                 data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
+                                    data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
                                 data-servicio-tipo="{{ servicio.tipo_servicio }}">
                             <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                         </button>
@@ -1108,6 +1114,7 @@ html {
                                 data-servicio-nombre="{{ servicio.nombre|escapejs }}"
                                 data-servicio-precio="{{ servicio.precio_base }}"
                                 data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
+                                    data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
                                 data-servicio-tipo="{{ servicio.tipo_servicio }}"
                                 data-readonly="true">
                                 <i class="fas fa-calendar me-2"></i>Ver disponibilidad
@@ -1371,6 +1378,7 @@ html {
     let currentServicioPrecio = 0;
     let currentServicioTipo = 'otro';
     let currentServicioCapacidad = 1;
+    let currentServicioMin = 1;
 
     // Function to load available hours
     function loadAvailableHours(servicioId, fecha) {
@@ -1509,6 +1517,7 @@ html {
                 currentServicioPrecio = parseFloat(this.dataset.servicioPrecio);
                 currentServicioTipo = this.dataset.servicioTipo || 'otro';
                 currentServicioCapacidad = parseInt(this.dataset.servicioCapacidad) || 1;
+                currentServicioMin = parseInt(this.dataset.servicioMin) || 1;
                 const isReadonly = this.dataset.readonly === 'true'; // Check if in readonly mode
 
                 // --- Regla tina-first para decoraciones (Ambientaciones) ---
@@ -1569,26 +1578,42 @@ html {
                     fechaFieldEl.style.display = '';
                 }
 
-                // Regla de negocio: las reservas web siempre usan la capacidad_maxima del servicio
-                // (min == max por convención). Los ajustes por niños/personas extra se coordinan
-                // por WhatsApp desde admin.
+                // Regla de negocio:
+                //  - Tinas / cabañas / ambientaciones: capacidad fija (min == max).
+                //  - Masajes: el cliente elige entre capacidad_minima y capacidad_maxima
+                //    (ej. 1 o 2 masajes simultáneos en sala doble).
                 const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
                 const cantidadPersonasLabel = document.querySelector('label[for="cantidadPersonas"]');
+                cantidadPersonasSelect.innerHTML = '';
 
-                // Asegurar que la opción con capacidad_maxima exista en el select
-                if (!cantidadPersonasSelect.querySelector(`option[value="${currentServicioCapacidad}"]`)) {
+                if (currentServicioTipo === 'masaje' && currentServicioCapacidad > currentServicioMin) {
+                    for (let n = currentServicioMin; n <= currentServicioCapacidad; n++) {
+                        const opt = document.createElement('option');
+                        opt.value = n;
+                        opt.textContent = `${n} masaje${n > 1 ? 's' : ''}`;
+                        cantidadPersonasSelect.appendChild(opt);
+                    }
+                    cantidadPersonasSelect.value = String(currentServicioMin);
+                    cantidadPersonasSelect.disabled = false;
+                    if (cantidadPersonasLabel) {
+                        cantidadPersonasLabel.style.display = '';
+                        cantidadPersonasLabel.textContent = 'Cantidad de Masajes';
+                    }
+                    cantidadPersonasSelect.style.display = '';
+                    // Precio inicial con el mínimo; se recalcula en 'change'
+                    document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio * currentServicioMin);
+                } else {
                     const opt = document.createElement('option');
                     opt.value = currentServicioCapacidad;
                     opt.textContent = `${currentServicioCapacidad} persona${currentServicioCapacidad > 1 ? 's' : ''}`;
                     cantidadPersonasSelect.appendChild(opt);
+                    cantidadPersonasSelect.value = String(currentServicioCapacidad);
+                    cantidadPersonasSelect.disabled = true;
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none';
+                    cantidadPersonasSelect.style.display = 'none';
+                    // Precio total = precio_base × capacidad_maxima (modelo uniforme)
+                    document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio * currentServicioCapacidad);
                 }
-                cantidadPersonasSelect.value = String(currentServicioCapacidad);
-                cantidadPersonasSelect.disabled = true;
-                if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none';
-                cantidadPersonasSelect.style.display = 'none';
-
-                // Precio total = precio_base × capacidad_maxima (modelo uniforme)
-                document.getElementById('precioTotal').value = formatCLP(currentServicioPrecio * currentServicioCapacidad);
 
                 // Handle readonly mode
                 const addToCartBtn = document.getElementById('addToCartBtn');

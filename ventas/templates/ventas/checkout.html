@@ -394,11 +394,34 @@ Email para comprobante: ventas@aremko.cl</pre>
     let isProcessingCheckout = false; // Flag to prevent double submission
 
     // --- Region/Comuna Functions ---
+    // Extrae el array sin importar si DRF devuelve [] o {count, results: []}
+    function normalizeListResponse(data) {
+        if (Array.isArray(data)) return data;
+        if (data && Array.isArray(data.results)) return data.results;
+        return [];
+    }
+
     async function loadRegiones() {
+        const select = document.getElementById('checkoutRegion');
         try {
-            const response = await fetch('/ventas/api/regiones/');
-            const regiones = await response.json();
-            const select = document.getElementById('checkoutRegion');
+            const response = await fetch('/ventas/api/regiones/', {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            const regiones = normalizeListResponse(data);
+            console.log(`loadRegiones: ${regiones.length} regiones recibidas`);
+
+            if (regiones.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'No hay regiones disponibles';
+                opt.disabled = true;
+                select.appendChild(opt);
+                return;
+            }
 
             regiones.forEach(region => {
                 const option = document.createElement('option');
@@ -408,14 +431,25 @@ Email para comprobante: ventas@aremko.cl</pre>
             });
         } catch (error) {
             console.error('Error loading regiones:', error);
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Error al cargar regiones';
+            opt.disabled = true;
+            select.appendChild(opt);
         }
     }
 
     async function loadComunas(regionId) {
+        const select = document.getElementById('checkoutComuna');
         try {
-            const response = await fetch(`/ventas/api/comunas/?region=${regionId}`);
-            const comunas = await response.json();
-            const select = document.getElementById('checkoutComuna');
+            const response = await fetch(`/ventas/api/comunas/?region=${regionId}`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            const comunas = normalizeListResponse(data);
 
             // Clear previous options
             select.innerHTML = '<option value="">Seleccione una comuna</option>';

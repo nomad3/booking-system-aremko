@@ -1393,17 +1393,34 @@
                 const cantidadErrorMsg = cantidadPersonasSelect.parentNode.querySelector('.cantidad-error-msg');
                 if (cantidadErrorMsg) cantidadErrorMsg.style.display = 'none'; // Hide previous error
 
-                // Regla de negocio: toda reserva web usa capacidad_maxima fija.
-                // Los ajustes (niños extra, personas adicionales) se coordinan por WhatsApp / admin.
+                // Regla de negocio: tinas/cabañas usan capacidad_maxima fija.
+                // Masajes permiten elegir entre capacidad_minima y capacidad_maxima
+                // (p.ej. 1 o 2 masajes simultáneos en sala doble).
                 cantidadPersonasSelect.innerHTML = '';
-                const optionFija = document.createElement('option');
-                optionFija.value = currentServicioMax;
-                optionFija.textContent = `${currentServicioMax} persona${currentServicioMax > 1 ? 's' : ''}`;
-                cantidadPersonasSelect.appendChild(optionFija);
-                cantidadPersonasSelect.value = currentServicioMax;
-                cantidadPersonasSelect.disabled = true;
-                if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none';
-                cantidadPersonasSelect.style.display = 'none';
+                if (currentServicioTipo === 'masaje' && currentServicioMax > currentServicioMin) {
+                    for (let n = currentServicioMin; n <= currentServicioMax; n++) {
+                        const opt = document.createElement('option');
+                        opt.value = n;
+                        opt.textContent = `${n} masaje${n > 1 ? 's' : ''}`;
+                        cantidadPersonasSelect.appendChild(opt);
+                    }
+                    cantidadPersonasSelect.value = currentServicioMin;
+                    cantidadPersonasSelect.disabled = false;
+                    if (cantidadPersonasLabel) {
+                        cantidadPersonasLabel.style.display = '';
+                        cantidadPersonasLabel.textContent = 'Cantidad de Masajes';
+                    }
+                    cantidadPersonasSelect.style.display = '';
+                } else {
+                    const optionFija = document.createElement('option');
+                    optionFija.value = currentServicioMax;
+                    optionFija.textContent = `${currentServicioMax} persona${currentServicioMax > 1 ? 's' : ''}`;
+                    cantidadPersonasSelect.appendChild(optionFija);
+                    cantidadPersonasSelect.value = currentServicioMax;
+                    cantidadPersonasSelect.disabled = true;
+                    if (cantidadPersonasLabel) cantidadPersonasLabel.style.display = 'none';
+                    cantidadPersonasSelect.style.display = 'none';
+                }
 
                 // Update price and run initial validation after setting defaults
                 updatePrecioTotal();
