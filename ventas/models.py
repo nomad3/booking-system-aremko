@@ -1149,13 +1149,16 @@ class ReservaServicio(models.Model):
         return f"{self.servicio.nombre} reservado para {self.fecha_agendamiento} {self.hora_inicio}"
 
     def calcular_precio(self):
-        """Calcula el precio basado en el tipo de servicio."""
-        if self.servicio.tipo_servicio == 'cabana':
-            # Precio fijo para cabañas, independientemente de las personas (max 2)
-            return self.servicio.precio_base
-        else:
-            # Precio normal basado en personas para otros servicios
-            return self.servicio.precio_base * self.cantidad_personas
+        """Calcula el precio basado en el tipo de servicio.
+
+        El checkout fuerza cantidad_personas = capacidad_maxima para cabañas
+        y tinas de precio plano (ver AR-014 en checkout_views.add_to_cart),
+        por lo que precio_base × cantidad_personas ya representa el precio
+        plano total que paga el cliente. Mantener una regla distinta aquí
+        provocaría reportar en el admin la mitad (u otra fracción) de lo
+        realmente cobrado.
+        """
+        return self.servicio.precio_base * self.cantidad_personas
     
     # Add subtotal property for consistency in templates if needed
     @property
@@ -1170,14 +1173,14 @@ class ReservaServicio(models.Model):
     mostrar_valor_unitario.short_description = 'Valor Unitario'
 
     def mostrar_valor_total(self):
-        """Muestra el valor total calculado formateado."""
-        # Usar precio congelado si existe, sino calcular con precio actual
+        """Muestra el valor total calculado formateado.
+
+        Para cabañas y tinas de precio plano el checkout guarda
+        cantidad_personas = capacidad_maxima (AR-014), por lo que el total
+        siempre es precio_unitario × cantidad_personas, sin excepciones.
+        """
         if self.precio_unitario_venta:
-            # Usar precio congelado
-            if self.servicio.tipo_servicio == 'cabana':
-                valor = self.precio_unitario_venta  # Precio fijo para cabañas
-            else:
-                valor = self.precio_unitario_venta * self.cantidad_personas
+            valor = self.precio_unitario_venta * self.cantidad_personas
         else:
             # Fallback: calcular con precio actual del catálogo
             valor = self.calcular_precio()

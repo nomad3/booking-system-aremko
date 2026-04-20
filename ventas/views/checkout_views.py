@@ -505,12 +505,15 @@ def complete_checkout(request):
                         fecha = datetime.strptime(servicio_item['fecha'], '%Y-%m-%d').date()
 
                         # Create the reservation without pre_save validation
+                        # Congelamos el precio_base actual para que reportes
+                        # futuros reflejen el precio al que se vendió.
                         ReservaServicio.objects.create(
                             venta_reserva=venta,
                             servicio=servicio_obj,
                             fecha_agendamiento=fecha,
                             hora_inicio=servicio_item['hora'],
-                            cantidad_personas=servicio_item['cantidad_personas']
+                            cantidad_personas=servicio_item['cantidad_personas'],
+                            precio_unitario_venta=servicio_obj.precio_base
                         )
 
                     # Aplicar descuentos por pack como ReservaServicio
