@@ -603,6 +603,38 @@ html {
     letter-spacing: 0.3px;
 }
 
+/* AR-016/017: sección de Decoraciones dentro de la página de Tinas */
+.decoraciones-section {
+    margin-top: 40px;
+    padding-top: 28px;
+    border-top: 2px dashed #e5d5c2;
+}
+.decoraciones-header {
+    margin-bottom: 20px;
+}
+.decoraciones-header h3 {
+    color: #7c2d12;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.decoraciones-header p {
+    color: #6a4a35;
+    margin-bottom: 0;
+    font-size: 0.95rem;
+}
+.badge-decoracion {
+    display: inline-block;
+    background: #fce4ec;
+    color: #c2185b;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 14px;
+    margin-bottom: 6px;
+    letter-spacing: 0.3px;
+    align-self: flex-start;
+}
+
 /* Callout grupal 4+ personas = 4 horas */
 .group-promo-banner {
     background: linear-gradient(135deg, #fff4e5 0%, #ffe8cc 100%);
@@ -926,6 +958,40 @@ html {
         {% endif %}
 
         {% endwith %}
+
+        {# === Decoraciones como complemento de la tina === #}
+        {% if decoraciones %}
+        <div class="decoraciones-section">
+            <div class="decoraciones-header">
+                <h3><i class="fas fa-birthday-cake me-2" style="color:#c2185b;"></i>Personaliza tu celebración</h3>
+                <p>Complemento opcional para tu reserva de tina. Coordinamos la decoración con tu hora de llegada.</p>
+            </div>
+            <div class="row">
+                {% for servicio in decoraciones %}
+                <div class="col-12 col-md-6 col-lg-3 mb-4 service-card">
+                    <div class="card h-100">
+                        {% include "ventas/partials/_service_gallery.html" with obj=servicio alt_text=servicio.nombre|add:" en Aremko Spa Puerto Varas" id_prefix="carousel-deco" %}
+                        <div class="card-body d-flex flex-column">
+                            <span class="badge-decoracion"><i class="fas fa-heart me-1"></i>Complemento</span>
+                            <h3 class="card-title h6">{{ servicio.nombre }}</h3>
+                            <div class="price-total">${{ servicio.precio_base|floatformat:0|intcomma }}</div>
+                            <div class="price-unit-note">por decoración</div>
+                            <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
+                                    data-servicio-id="{{ servicio.id }}"
+                                    data-servicio-nombre="{{ servicio.nombre|escapejs }}"
+                                    data-servicio-precio="{{ servicio.precio_base }}"
+                                    data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
+                                    data-servicio-tipo="{{ servicio.tipo_servicio }}"
+                                    data-servicio-hora-fija="true">
+                                <i class="fas fa-plus me-2"></i>Agregar a mi reserva
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
 
     {% elif categoria_actual.id == 3 %}
         {# === CABAÑAS: cards con precio total y specs boutique === #}
@@ -1443,10 +1509,12 @@ html {
                 document.getElementById('servicioNombre').value = currentServicioNombre;
                 document.getElementById('fecha').value = '';
 
+                // Servicios con hora fija: cabañas (check-in 16:00) y decoraciones
+                // (staff coordina la hora con la tina reservada).
+                const horaFija = (currentServicioTipo === 'cabana') || (this.dataset.servicioHoraFija === 'true');
                 const horaSelectEl = document.getElementById('hora');
                 const horaFieldEl = horaSelectEl.closest('.mb-3');
-                if (currentServicioTipo === 'cabana') {
-                    // Cabañas: check-in fijo 16:00, no preguntamos hora al cliente.
+                if (horaFija) {
                     horaSelectEl.innerHTML = '<option value="16:00" selected>16:00</option>';
                     horaSelectEl.value = '16:00';
                     horaSelectEl.disabled = false;
@@ -1544,9 +1612,10 @@ html {
                 locale: "es",
                 onChange: function(selectedDates, dateStr) {
                     if (currentServicioId) {
-                        if (currentServicioTipo === 'cabana') {
-                            // Check-in fijo 16:00.
-                            const horaSel = document.getElementById('hora');
+                        const horaSel = document.getElementById('hora');
+                        const horaFijaActiva = horaSel && horaSel.value === '16:00' && horaSel.options.length === 1;
+                        if (currentServicioTipo === 'cabana' || horaFijaActiva) {
+                            // Hora fija (cabaña o decoración): no cargamos slots.
                             if (horaSel) { horaSel.value = '16:00'; }
                             if (typeof validateSelectedSlot === 'function') {
                                 validateSelectedSlot();

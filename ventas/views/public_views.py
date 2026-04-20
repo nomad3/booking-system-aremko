@@ -140,6 +140,17 @@ def categoria_detail_view(request, categoria_id):
     except Exception:
         pass
 
+    # Decoraciones (Ambientaciones) como complemento visible SOLO en la vista de Tinas.
+    # Se ofrecen como cross-sell: el cliente agrega una decoración a su reserva de tina
+    # y el staff coordina la hora con la de la tina.
+    decoraciones = None
+    if categoria.nombre.lower() == 'tinas':
+        decoraciones = Servicio.objects.filter(
+            categoria__nombre__iexact='Ambientaciones',
+            activo=True,
+            publicado_web=True,
+        ).order_by('precio_base', 'nombre')
+
     context = {
         'categoria_actual': categoria,
         'servicios': servicios,
@@ -148,6 +159,7 @@ def categoria_detail_view(request, categoria_id):
         'canonical_url': canonical_url,
         'category_hero_image': category_hero_image,
         'seo_content': seo_content,  # Pass SEO content to template
+        'decoraciones': decoraciones,
     }
     return render(request, 'ventas/category_detail.html', context)
 
