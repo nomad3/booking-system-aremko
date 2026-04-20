@@ -104,6 +104,7 @@ def tina_display(servicio):
       - hide_duracion: oculta la línea de duración
       - precio_total: fuerza el precio total mostrado (None = calcular precio_base × capacidad_maxima)
       - unit_note: texto bajo el precio (ej. "por niño adicional", "por tina · 5–6 personas")
+      - hook: frase evocadora única por tina (AR-015, hilo narrativo volcánico)
     """
     nombre = (getattr(servicio, 'nombre', '') or '').lower()
     overrides = {
@@ -113,6 +114,7 @@ def tina_display(servicio):
         'hide_duracion': False,
         'precio_total': None,
         'unit_note': None,
+        'hook': None,
     }
     if 'niño' in nombre or 'nino' in nombre:
         overrides['capacidad_texto'] = '1 niño adicional'
@@ -122,16 +124,63 @@ def tina_display(servicio):
         except (TypeError, ValueError):
             overrides['precio_total'] = 0
         overrides['unit_note'] = 'por niño adicional'
+        return overrides
+
+    # AR-015: hilo narrativo volcánico único por tina (SEO local + diferenciación)
+    # --- Hidromasaje ---
+    if 'llaima' in nombre:
+        overrides['hook'] = (
+            'El volcán más activo de Chile, con más de 50 erupciones '
+            'registradas. Hidromasaje con potencia volcánica.'
+        )
+    elif 'puntiagudo' in nombre:
+        overrides['hook'] = (
+            'Cono afilado como aguja de basalto, el perfil más '
+            'distintivo de la cordillera del sur.'
+        )
+    elif 'puyehue' in nombre:
+        overrides['hook'] = (
+            'Parque nacional y aguas termales milenarias. Jets '
+            'en el pulso del bosque valdiviano.'
+        )
+    elif 'villarrica' in nombre:
+        overrides['hook'] = (
+            'Cráter activo visible desde el sur: cumbre nevada '
+            'con fuego eterno en su interior.'
+        )
+    # --- Tradicionales ---
     elif 'osorno' in nombre:
         overrides['capacidad_texto'] = '5–6 personas'
         overrides['duracion_texto'] = '4 horas de uso exclusivo · grupo 4+'
         overrides['unit_note'] = 'por tina · 5–6 personas'
+        overrides['hook'] = (
+            'El Fuji chileno: cono perfecto coronado de nieve. '
+            'La foto postal del sur, en tu tina privada.'
+        )
     elif 'calbuco' in nombre:
         overrides['capacidad_texto'] = '4 personas'
         overrides['duracion_texto'] = '4 horas de uso exclusivo · grupo 4+'
         overrides['unit_note'] = 'por tina · 4 personas'
+        overrides['hook'] = (
+            'El gigante que rugió en 2015 con pluma visible a 400km. '
+            'Tina grupal para celebrar en grande.'
+        )
+    elif 'tronador' in nombre:
+        overrides['hook'] = (
+            'Tres cumbres entre Chile y Argentina coronadas de '
+            'glaciares eternos. El paisaje más imponente del sur.'
+        )
+    elif 'hornopiren' in nombre or 'hornopirén' in nombre:
+        overrides['hook'] = (
+            'Fiordo y volcán del sur profundo, puerta de entrada '
+            'a la Patagonia. Aguas calientes de la ruta original.'
+        )
     elif 'yates' in nombre:
         overrides['duracion_texto'] = 'Uso ilimitado'
+        overrides['hook'] = (
+            'Volcán remoto en la Patagonia profunda. La tina de '
+            'uso ilimitado para quienes buscan desconexión total.'
+        )
     return overrides
 
 

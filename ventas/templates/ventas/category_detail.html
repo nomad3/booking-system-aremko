@@ -851,6 +851,7 @@ html {
                         <div class="card-body d-flex flex-column">
                             <span class="badge-hidromasaje"><i class="fas fa-water me-1"></i>Con Hidromasaje</span>
                             <h3 class="card-title h5">{{ servicio.nombre }}</h3>
+                            {% if disp.hook %}<p class="cabana-hook">{{ disp.hook }}</p>{% endif %}
                             <ul class="servicio-specs">
                                 {% if not disp.hide_capacidad %}
                                 <li><i class="fas fa-users"></i>{% if disp.capacidad_texto %}{{ disp.capacidad_texto }}{% else %}{{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</li>
@@ -892,6 +893,7 @@ html {
                         <div class="card-body d-flex flex-column">
                             <span class="badge-tradicional"><i class="fas fa-leaf me-1"></i>Tradicional</span>{% if "calbuco" in servicio.nombre|lower or "osorno" in servicio.nombre|lower %}<span class="badge-grupo-4"><i class="fas fa-users me-1"></i>Grupo 4+ · 4h</span>{% endif %}
                             <h3 class="card-title h5">{{ servicio.nombre }}</h3>
+                            {% if disp.hook %}<p class="cabana-hook">{{ disp.hook }}</p>{% endif %}
                             <ul class="servicio-specs">
                                 {% if not disp.hide_capacidad %}
                                 <li><i class="fas fa-users"></i>{% if disp.capacidad_texto %}{{ disp.capacidad_texto }}{% else %}{{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</li>
