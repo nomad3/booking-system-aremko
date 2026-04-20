@@ -1361,8 +1361,20 @@
                 document.getElementById('servicioId').value = servicioId;
                 document.getElementById('servicioNombre').value = servicioNombre;
                 document.getElementById('fecha').value = '';
-                document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
-                document.getElementById('hora').disabled = true;
+
+                const horaSelectEl = document.getElementById('hora');
+                const horaFieldEl = horaSelectEl.closest('.mb-3');
+                if (servicioTipo === 'cabana') {
+                    // Cabañas: check-in fijo 16:00, no preguntamos hora al cliente.
+                    horaSelectEl.innerHTML = '<option value="16:00" selected>16:00</option>';
+                    horaSelectEl.value = '16:00';
+                    horaSelectEl.disabled = false;
+                    if (horaFieldEl) horaFieldEl.style.display = 'none';
+                } else {
+                    horaSelectEl.innerHTML = '<option value="">Selecciona una hora</option>';
+                    horaSelectEl.disabled = true;
+                    if (horaFieldEl) horaFieldEl.style.display = '';
+                }
                 document.getElementById('addToCartBtn').disabled = true; // Disable button initially
 
                 // Handle quantity selector based on service type and capacity
@@ -1456,7 +1468,14 @@
                 locale: "es",
                 onChange: function (selectedDates, dateStr) {
                     if (currentServicioId) {
-                        loadAvailableHours(currentServicioId, dateStr);
+                        if (currentServicioTipo === 'cabana') {
+                            // Check-in fijo 16:00: valida disponibilidad directo.
+                            const horaSel = document.getElementById('hora');
+                            if (horaSel) { horaSel.value = '16:00'; }
+                            validateSelectedSlot();
+                        } else {
+                            loadAvailableHours(currentServicioId, dateStr);
+                        }
                     }
                 }
             });

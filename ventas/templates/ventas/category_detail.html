@@ -1440,8 +1440,20 @@ html {
                 document.getElementById('servicioId').value = currentServicioId;
                 document.getElementById('servicioNombre').value = currentServicioNombre;
                 document.getElementById('fecha').value = '';
-                document.getElementById('hora').innerHTML = '<option value="">Selecciona una hora</option>';
-                document.getElementById('hora').disabled = true;
+
+                const horaSelectEl = document.getElementById('hora');
+                const horaFieldEl = horaSelectEl.closest('.mb-3');
+                if (currentServicioTipo === 'cabana') {
+                    // Cabañas: check-in fijo 16:00, no preguntamos hora al cliente.
+                    horaSelectEl.innerHTML = '<option value="16:00" selected>16:00</option>';
+                    horaSelectEl.value = '16:00';
+                    horaSelectEl.disabled = false;
+                    if (horaFieldEl) horaFieldEl.style.display = 'none';
+                } else {
+                    horaSelectEl.innerHTML = '<option value="">Selecciona una hora</option>';
+                    horaSelectEl.disabled = true;
+                    if (horaFieldEl) horaFieldEl.style.display = '';
+                }
 
                 // Regla de negocio: las reservas web siempre usan la capacidad_maxima del servicio
                 // (min == max por convención). Los ajustes por niños/personas extra se coordinan
@@ -1530,7 +1542,19 @@ html {
                 locale: "es",
                 onChange: function(selectedDates, dateStr) {
                     if (currentServicioId) {
-                        loadAvailableHours(currentServicioId, dateStr);
+                        if (currentServicioTipo === 'cabana') {
+                            // Check-in fijo 16:00.
+                            const horaSel = document.getElementById('hora');
+                            if (horaSel) { horaSel.value = '16:00'; }
+                            if (typeof validateSelectedSlot === 'function') {
+                                validateSelectedSlot();
+                            } else {
+                                const addBtn = document.getElementById('addToCartBtn');
+                                if (addBtn) addBtn.disabled = false;
+                            }
+                        } else {
+                            loadAvailableHours(currentServicioId, dateStr);
+                        }
                     }
                 }
             });

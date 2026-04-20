@@ -106,6 +106,18 @@ def add_to_cart(request):
                         f"{cantidad_original} -> {cantidad_personas}"
                     )
 
+            # --- Cabañas: check-in fijo a las 16:00 ---
+            # Alojamientos solo tienen un horario posible. Forzamos servidor
+            # para que cualquier hora enviada sea normalizada a 16:00.
+            if getattr(servicio, 'tipo_servicio', None) == 'cabana':
+                hora_original = hora
+                hora = '16:00'
+                if hora_original != hora:
+                    print(
+                        f"[CABANA] '{servicio.nombre}': override hora "
+                        f"{hora_original!r} -> '16:00'"
+                    )
+
             # --- CRITICAL: Check if service is blocked on this date ---
             try:
                 fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
