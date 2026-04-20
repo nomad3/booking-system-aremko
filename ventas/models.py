@@ -877,21 +877,14 @@ class VentaReserva(models.Model):
             )
         )['total'] or 0
 
-        # Para servicios: usar precio_unitario_venta si existe, sino precio_base
-        # IMPORTANTE: Las cabañas tienen precio fijo (no se multiplican por cantidad_personas)
-        # Otros servicios (tinas, masajes) sí se multiplican por cantidad_personas
-        from django.db.models import Case, When, Value, IntegerField
-
+        # Para servicios: usar precio_unitario_venta si existe, sino precio_base.
+        # El checkout fuerza cantidad_personas = capacidad_maxima para cabañas
+        # y tinas de precio plano (AR-014 en add_to_cart), por lo que el total
+        # es precio × cantidad_personas para todos los tipos sin excepción.
         total_servicios = self.reservaservicios.aggregate(
             total=models.Sum(
                 Coalesce(models.F('precio_unitario_venta'), models.F('servicio__precio_base')) *
-                Case(
-                    # Si es cabaña, multiplicar por 1 (precio fijo)
-                    When(servicio__tipo_servicio='cabana', then=Value(1)),
-                    # Si no es cabaña, multiplicar por cantidad_personas
-                    default=models.F('cantidad_personas'),
-                    output_field=IntegerField()
-                )
+                models.F('cantidad_personas')
             )
         )['total'] or 0
 
