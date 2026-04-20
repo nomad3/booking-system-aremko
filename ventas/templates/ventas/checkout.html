@@ -1,6 +1,7 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 {% load humanize %} {# Load humanize template tags #}
+{% load l10n %} {# Para |unlocalize al inyectar números en JavaScript #}
 
 {% block title %}Aremko - Finalizar Reserva{% endblock %}
 
@@ -384,7 +385,7 @@ Email para comprobante: ventas@aremko.cl</pre>
     {% if cart.servicios or cart.giftcards %}
     if (typeof fbq !== 'undefined') {
         fbq('track', 'InitiateCheckout', {
-            value: {{ cart.total|default:0 }},
+            value: {{ cart.total|default:0|unlocalize }},
             currency: 'CLP'
         });
     }
