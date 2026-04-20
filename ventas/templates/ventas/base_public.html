@@ -270,6 +270,22 @@
             text-align: center;
         }
 
+        /* AR-021: bloque Cómo llegar */
+        .como-llegar-block {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 24px 28px;
+            margin-bottom: 30px;
+        }
+        .como-llegar-block h5 { margin-bottom: 16px; }
+        .como-llegar-steps {
+            padding-left: 22px;
+            margin-bottom: 16px;
+            color: #ddd;
+        }
+        .como-llegar-steps li { margin-bottom: 8px; line-height: 1.5; }
+        .como-llegar-steps strong { color: #fff; }
+
         /* Shopping Cart Styles */
         .cart-icon {
             position: relative;
@@ -462,6 +478,21 @@
     <!-- Footer -->
     <footer class="footer" id="contacto">
         <div class="container">
+            {# AR-021: instrucciones de ruta — el pin de Google Maps ha confundido a visitantes #}
+            <div class="row como-llegar-block">
+                <div class="col-12">
+                    <h5><i class="fas fa-route me-2"></i>Cómo Llegar</h5>
+                    <ol class="como-llegar-steps">
+                        <li>Desde el centro de <strong>Puerto Varas</strong>, toma la <strong>Ruta 225</strong> hacia Ensenada.</li>
+                        <li>En el <strong>km 19</strong> toma el <strong>desvío señalizado a Río Pescado</strong> (gira a la derecha).</li>
+                        <li>Continúa <strong>4 km</strong> por el camino rural. Aremko está a la izquierda, junto al Río Pescado.</li>
+                    </ol>
+                    <a href="https://www.google.com/maps/search/?api=1&query=Aremko+Aguas+Calientes+Puerto+Varas"
+                       target="_blank" rel="noopener" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-map-marker-alt me-1"></i> Abrir en Google Maps
+                    </a>
+                </div>
+            </div>
             <div class="row">
                 <div class="col-lg-4 col-md-6 mb-4">
                     <h5>Aremko</h5>
@@ -504,7 +535,7 @@
                 <div class="col-lg-3 col-md-6 mb-4">
                     <h5>Contacto</h5>
                     <ul>
-                        <li><i class="fas fa-map-marker-alt me-2"></i> Rio Pescado Km 4 Puerto Varas, Chile</li>
+                        <li><i class="fas fa-map-marker-alt me-2"></i> Camino a Ensenada Km 19, desvío Río Pescado Km 4, Puerto Varas, Los Lagos, Chile</li>
                         <li><i class="fas fa-phone me-2"></i> +56 9 5790 2525</li>
                         <li><i class="fas fa-envelope me-2"></i> ventas@aremko.cl</li>
                     </ul>
