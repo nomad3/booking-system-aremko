@@ -172,13 +172,17 @@
 /* Category header styles */
 .category-header {
     position: relative;
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
     padding: 120px 0;
     margin-bottom: 50px;
     text-align: center;
+    /* Fallback color (sin imagen); el shorthand va PRIMERO para no pisar los longhand. */
     background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+    /* AR-017: longhand DESPUÉS del shorthand — si el template inyecta
+       style="background-image: url(...)", la imagen usará cover + center + no-repeat
+       (antes el shorthand reseteaba estos valores a auto/0%/repeat y la imagen tilaba). */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
 }
 
 .category-header::before {

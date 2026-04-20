@@ -307,7 +307,7 @@
                         </div>
 
                         <div class="cart-actions">
-                            <a href="{% url 'ventas:homepage' %}#servicios" class="btn btn-outline-secondary">Seguir Comprando</a>
+                            <a href="{{ continue_shopping_url|default:'/#servicios' }}" class="btn btn-outline-secondary">Seguir Comprando</a>
                             <a href="{% url 'ventas:giftcard_menu' %}" class="btn btn-outline-warning">
                                 <i class="fas fa-gift me-1"></i>Agregar GiftCard
                             </a>
@@ -324,7 +324,7 @@
                                     <p class="pack-suggestion-text">
                                         {{ sugerencia.mensaje }}
                                     </p>
-                                    <a href="{% url 'ventas:homepage' %}#servicios" class="pack-suggestion-btn">
+                                    <a href="{{ continue_shopping_url|default:'/#servicios' }}" class="pack-suggestion-btn">
                                         <i class="fas fa-plus-circle me-1"></i>Ver servicios disponibles
                                     </a>
                                 </div>

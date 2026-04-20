@@ -69,9 +69,22 @@ def cart_view(request):
     request.session['cart'] = cart
     request.session.modified = True
 
+    # "Seguir Comprando": si hay tina en carrito, volver a /tinas/ para que
+    # el cliente vea las decoraciones (complemento). Si no, a homepage.
+    tipos_en_cart = {s.get('tipo_servicio') for s in cart.get('servicios', [])}
+    if 'tina' in tipos_en_cart:
+        continue_shopping_url = reverse('tinas')
+    elif 'masaje' in tipos_en_cart:
+        continue_shopping_url = reverse('masajes')
+    elif 'cabana' in tipos_en_cart:
+        continue_shopping_url = reverse('alojamientos')
+    else:
+        continue_shopping_url = reverse('ventas:homepage') + '#servicios'
+
     context = {
         'cart': cart,
-        'sugerencias_pack': sugerencias
+        'sugerencias_pack': sugerencias,
+        'continue_shopping_url': continue_shopping_url,
     }
     return render(request, 'ventas/cart.html', context)
 
