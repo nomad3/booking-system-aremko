@@ -30,6 +30,15 @@ def _es_tina_precio_plano(servicio):
     return any(tag in nombre for tag in TINAS_PRECIO_PLANO)
 
 
+def _es_precio_plano_por_unidad(servicio):
+    """True si el servicio se cobra siempre por capacidad_maxima completa
+    (cabañas + tinas de precio plano). El total mostrado en la card es
+    precio_base × capacidad_maxima, por lo que el carrito debe reflejarlo."""
+    if getattr(servicio, 'tipo_servicio', None) == 'cabana':
+        return True
+    return _es_tina_precio_plano(servicio)
+
+
 def cart_view(request):
     """
     Vista que renderiza la página del carrito de compras
@@ -81,17 +90,20 @@ def add_to_cart(request):
         try:
             servicio = Servicio.objects.get(id=servicio_id)
 
-            # --- AR-014: Server-side override para tinas de precio plano ---
-            # Estas tinas se cobran SIEMPRE por capacidad_maxima (precio plano por tina),
-            # ignorando el cantidad_personas enviado desde el cliente. Previene que
-            # un atacante manipule DevTools para enviar cantidad=1 y pagar menos.
-            if _es_tina_precio_plano(servicio):
+            # --- AR-014: Server-side override para servicios de precio plano ---
+            # Cabañas y tinas flat se cobran SIEMPRE por capacidad_maxima
+            # (precio plano por unidad), ignorando el cantidad_personas enviado
+            # desde el cliente. Previene manipulación vía DevTools y alinea el
+            # subtotal del carrito con el total mostrado en la card
+            # (precio_base × capacidad_maxima).
+            if _es_precio_plano_por_unidad(servicio):
                 cantidad_original = cantidad_personas
                 cantidad_personas = servicio.capacidad_maxima
                 if cantidad_original != cantidad_personas:
                     print(
-                        f"[AR-014] Tina precio plano '{servicio.nombre}': "
-                        f"override cantidad_personas {cantidad_original} -> {cantidad_personas}"
+                        f"[AR-014] Precio plano '{servicio.nombre}' "
+                        f"({servicio.tipo_servicio}): override cantidad_personas "
+                        f"{cantidad_original} -> {cantidad_personas}"
                     )
 
             # --- CRITICAL: Check if service is blocked on this date ---
@@ -146,8 +158,11 @@ def add_to_cart(request):
                 'hora': hora,
                 'cantidad_personas': cantidad_personas,
                 'tipo_servicio': servicio.tipo_servicio, # Add service type to cart item
-                 # Calculate subtotal based on service type
-                'subtotal': float(servicio.precio_base) if servicio.tipo_servicio == 'cabana' else float(servicio.precio_base) * cantidad_personas
+                 # Subtotal = precio_base × cantidad_personas.
+                 # Para cabañas y tinas flat, cantidad_personas fue forzado
+                 # a capacidad_maxima arriba (AR-014), por lo que esto
+                 # coincide con el total mostrado en la card.
+                'subtotal': float(servicio.precio_base) * cantidad_personas
             }
 
             print(f"Cart item to add: {item}")
