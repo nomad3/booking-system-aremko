@@ -810,7 +810,8 @@ html {
                         <div class="card-body d-flex flex-column">
                             <span class="badge-reserva-web"><i class="fas fa-bolt me-1"></i>Reserva Online</span>
                             <h3 class="card-title h5">{{ servicio.nombre }}</h3>
-                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
+                            <p class="price mb-0">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
+                            <small class="text-muted d-block mb-2" style="font-size:0.75rem;">IVA incluido</small>
                             <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p>
                             <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                     data-servicio-id="{{ servicio.id }}"
@@ -841,7 +842,8 @@ html {
                         <div class="card-body d-flex flex-column">
                             <span class="badge-cita-previa"><i class="fas fa-comments me-1"></i>Cita Previa</span>
                             <h3 class="card-title h5">{{ servicio.nombre }}</h3>
-                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
+                            <p class="price mb-0">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
+                            <small class="text-muted d-block mb-2" style="font-size:0.75rem;">IVA incluido</small>
                             <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p>
                             <a href="https://wa.me/56976668080?text=Hola%2C%20quiero%20coordinar%20una%20sesi%C3%B3n%20de%20{{ servicio.nombre|urlencode }}"
                                class="btn btn-success w-100 mt-auto" target="_blank">
@@ -900,6 +902,7 @@ html {
                             </ul>
                             <div class="price-total">${% if disp.precio_total %}{{ disp.precio_total|floatformat:0|intcomma }}{% else %}{{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}{% endif %}</div>
                             <div class="price-unit-note">{% if disp.unit_note %}{{ disp.unit_note }}{% else %}por tina · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</div>
+                            <div class="price-unit-note" style="font-size:0.75rem;">IVA incluido</div>
                             <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                     data-servicio-id="{{ servicio.id }}"
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}"
@@ -943,6 +946,7 @@ html {
                             </ul>
                             <div class="price-total">${% if disp.precio_total %}{{ disp.precio_total|floatformat:0|intcomma }}{% else %}{{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}{% endif %}</div>
                             <div class="price-unit-note">{% if disp.unit_note %}{{ disp.unit_note }}{% else %}por tina · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</div>
+                            <div class="price-unit-note" style="font-size:0.75rem;">IVA incluido</div>
                             <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                     data-servicio-id="{{ servicio.id }}"
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}"
@@ -983,6 +987,7 @@ html {
                             <h3 class="card-title h6">{{ servicio.nombre }}</h3>
                             <div class="price-total">${{ servicio.precio_base|floatformat:0|intcomma }}</div>
                             <div class="price-unit-note">por decoración</div>
+                            <div class="price-unit-note" style="font-size:0.75rem;">IVA incluido</div>
                             <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                     data-servicio-id="{{ servicio.id }}"
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}"
@@ -1046,6 +1051,7 @@ html {
                             {% endif %}
                             <div class="price-total">${{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}</div>
                             <div class="price-unit-note">{% if disp.unit_note %}{{ disp.unit_note }}{% else %}por noche · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</div>
+                            <div class="price-unit-note" style="font-size:0.75rem;">IVA incluido</div>
                             <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                     data-servicio-id="{{ servicio.id }}"
                                     data-servicio-nombre="{{ servicio.nombre|escapejs }}"
@@ -1079,7 +1085,8 @@ html {
                     <div class="card-body d-flex flex-column">
                         <h3 class="card-title h5">{{ servicio.nombre }}</h3>
                         {% if servicio.tipo_servicio == 'cabana' %}
-                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
+                            <p class="price mb-0">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">(Precio por cabaña, máx 2 pers.)</small></p>
+                            <small class="text-muted d-block mb-2" style="font-size:0.75rem;">IVA incluido</small>
                             <div class="amenities mb-2">
                                 <small class="text-muted">
                                     <i class="fas fa-wifi me-1"></i> WiFi •
@@ -1088,7 +1095,8 @@ html {
                                 </small>
                             </div>
                         {% else %}
-                            <p class="price">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
+                            <p class="price mb-0">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
+                            <small class="text-muted d-block mb-2" style="font-size:0.75rem;">IVA incluido</small>
                         {% endif %}
                         <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p>
                         {% if servicio.permite_reserva_web %}
