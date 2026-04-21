@@ -115,7 +115,6 @@ TEMPLATES = [
                 'django.template.context_processors.tz',
                 'django.contrib.messages.context_processors.messages',  # Necesario
                 'ventas.context_processors.categorias_processor', # Add category processor
-                'ventas.context_processors.social_proof_processor', # AR-028: TA + Google badges
             ],
         },
     },
