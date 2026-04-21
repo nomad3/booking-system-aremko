@@ -15,27 +15,3 @@ def categorias_processor(request):
         cache.set('categorias_menu', categorias, 3600)  # 1 hora
 
     return {'todas_las_categorias': categorias}
-
-
-def social_proof_processor(request):
-    """
-    Inyecta cifras de reseñas externas (TripAdvisor + Google) en todos los
-    templates para la franja de social proof (AR-028). Actualizar estos
-    valores cuando suban las reseñas.
-    """
-    return {
-        'social_proof': {
-            # TripAdvisor — locationId 7138437
-            'ta_rating': '4.4',
-            'ta_reviews': 258,
-            'ta_ranking_pos': 1,
-            'ta_ranking_total': 14,
-            'ta_ranking_city': 'Puerto Varas',
-            'ta_url': 'https://www.tripadvisor.com/Hotel_Review-d7138437',
-            'ta_travellers_choice_year': 2024,  # Confirmar/actualizar
-            # Google Business Profile
-            'google_rating': '4.5',
-            'google_reviews': 660,
-            'google_url': 'https://www.google.com/search?q=Aremko+Aguas+Calientes+Puerto+Varas+rese%C3%B1as',
-        }
-    }
