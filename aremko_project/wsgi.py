@@ -1,5 +1,7 @@
 import os
 
+# AR-030 diagnostic no-op — 2026-04-21 (valida si cualquier deploy tumba el sitio)
+
 # Aplicar parche de compatibilidad para importlib.metadata ANTES de importar Django
 # Esto soluciona el error "module 'importlib.metadata' has no attribute 'packages_distributions'"
 # que ocurre en Python 3.9 con algunas librerías que esperan Python 3.10+
