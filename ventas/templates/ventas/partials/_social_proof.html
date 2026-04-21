@@ -1,0 +1,195 @@
+{% load static %}
+{# AR-028 — Franja de social proof (TripAdvisor + Google)
+   Uso:
+     {% include "ventas/partials/_social_proof.html" %}                 → variante por defecto (hero, full width)
+     {% include "ventas/partials/_social_proof.html" with variant="compact" %}  → versión footer / inline
+     {% include "ventas/partials/_social_proof.html" with variant="header" %}   → variante oscura (sobre fondo claro de /empresas/)
+   Datos vienen del context_processor `social_proof_processor`.
+#}
+{% if social_proof %}
+{% with sp=social_proof %}
+
+{% if variant == "compact" %}
+  {# --- Variante compacta (footer / barra fina) --- #}
+  <div class="social-proof-strip social-proof-strip--compact" aria-label="Calificaciones externas">
+    <a href="{{ sp.ta_url }}" target="_blank" rel="noopener"
+       class="sp-badge sp-badge--ta" aria-label="TripAdvisor: {{ sp.ta_rating }} de 5 basado en {{ sp.ta_reviews }} reseñas">
+      <i class="fab fa-tripadvisor" aria-hidden="true"></i>
+      <strong>{{ sp.ta_rating }}/5</strong>
+      <span class="sp-meta">· {{ sp.ta_reviews }} reseñas TripAdvisor</span>
+    </a>
+    <span class="sp-divider" aria-hidden="true">·</span>
+    <a href="{{ sp.google_url }}" target="_blank" rel="noopener"
+       class="sp-badge sp-badge--google" aria-label="Google: {{ sp.google_rating }} de 5 basado en {{ sp.google_reviews }} reseñas">
+      <i class="fab fa-google" aria-hidden="true"></i>
+      <strong>{{ sp.google_rating }}/5</strong>
+      <span class="sp-meta">· {{ sp.google_reviews }} reseñas Google</span>
+    </a>
+  </div>
+
+{% elif variant == "header" %}
+  {# --- Variante header (fondo claro, /empresas/) --- #}
+  <div class="social-proof-strip social-proof-strip--header" aria-label="Calificaciones externas">
+    <div class="sp-inner">
+      <a href="{{ sp.ta_url }}" target="_blank" rel="noopener" class="sp-badge sp-badge--ta">
+        <i class="fab fa-tripadvisor" aria-hidden="true"></i>
+        <div class="sp-text">
+          <strong>{{ sp.ta_rating }}/5</strong>
+          <span>{{ sp.ta_reviews }} reseñas · #{{ sp.ta_ranking_pos }} de {{ sp.ta_ranking_total }} en {{ sp.ta_ranking_city }}</span>
+        </div>
+      </a>
+      <a href="{{ sp.google_url }}" target="_blank" rel="noopener" class="sp-badge sp-badge--google">
+        <i class="fab fa-google" aria-hidden="true"></i>
+        <div class="sp-text">
+          <strong>{{ sp.google_rating }}/5</strong>
+          <span>{{ sp.google_reviews }} reseñas en Google</span>
+        </div>
+      </a>
+    </div>
+  </div>
+
+{% else %}
+  {# --- Variante por defecto (hero franja) --- #}
+  <section class="social-proof-strip" aria-label="Calificaciones externas">
+    <div class="container">
+      <div class="sp-grid">
+        <a href="{{ sp.ta_url }}" target="_blank" rel="noopener" class="sp-badge sp-badge--ta">
+          <i class="fab fa-tripadvisor sp-icon" aria-hidden="true"></i>
+          <div class="sp-text">
+            <div class="sp-rating">
+              <strong>{{ sp.ta_rating }}/5</strong>
+              <span class="sp-stars" aria-hidden="true">★★★★★</span>
+            </div>
+            <span class="sp-meta">{{ sp.ta_reviews }} reseñas · #{{ sp.ta_ranking_pos }} de {{ sp.ta_ranking_total }} alojamientos en {{ sp.ta_ranking_city }}</span>
+          </div>
+        </a>
+
+        {% if sp.ta_travellers_choice_year %}
+        <div class="sp-badge sp-badge--award" aria-label="Travellers' Choice {{ sp.ta_travellers_choice_year }}">
+          <i class="fas fa-award sp-icon" aria-hidden="true"></i>
+          <div class="sp-text">
+            <strong>Travellers' Choice</strong>
+            <span class="sp-meta">TripAdvisor {{ sp.ta_travellers_choice_year }}</span>
+          </div>
+        </div>
+        {% endif %}
+
+        <a href="{{ sp.google_url }}" target="_blank" rel="noopener" class="sp-badge sp-badge--google">
+          <i class="fab fa-google sp-icon" aria-hidden="true"></i>
+          <div class="sp-text">
+            <div class="sp-rating">
+              <strong>{{ sp.google_rating }}/5</strong>
+              <span class="sp-stars" aria-hidden="true">★★★★★</span>
+            </div>
+            <span class="sp-meta">{{ sp.google_reviews }} reseñas verificadas en Google</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+{% endwith %}
+{% endif %}
+
+{# Estilos encapsulados (se cargan una sola vez por página gracias a ID único) #}
+{% if not social_proof_styles_loaded %}
+<style id="social-proof-styles">
+  .social-proof-strip {
+    background: #fff;
+    border-top: 1px solid rgba(0,0,0,0.06);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    padding: 1.25rem 0;
+  }
+  .social-proof-strip .sp-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: stretch;
+    gap: 0.75rem 1.5rem;
+  }
+  .social-proof-strip .sp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
+    background: #f8f9fa;
+    color: #212529;
+    text-decoration: none;
+    transition: transform .15s ease, box-shadow .15s ease;
+    min-height: 60px;
+  }
+  .social-proof-strip a.sp-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+    text-decoration: none;
+  }
+  .social-proof-strip .sp-icon {
+    font-size: 1.75rem;
+    line-height: 1;
+  }
+  .social-proof-strip .sp-badge--ta .sp-icon { color: #00AF87; }
+  .social-proof-strip .sp-badge--google .sp-icon { color: #4285F4; }
+  .social-proof-strip .sp-badge--award .sp-icon { color: #C9A961; }
+  .social-proof-strip .sp-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+  }
+  .social-proof-strip .sp-rating {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+  }
+  .social-proof-strip .sp-rating strong { font-size: 1.05rem; }
+  .social-proof-strip .sp-stars { color: #F5A623; font-size: 0.85rem; letter-spacing: 1px; }
+  .social-proof-strip .sp-meta { font-size: 0.78rem; color: #6c757d; }
+
+  /* Variante compacta (footer) */
+  .social-proof-strip--compact {
+    background: transparent;
+    border: 0;
+    padding: 0.5rem 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem 1rem;
+  }
+  .social-proof-strip--compact .sp-badge {
+    background: transparent;
+    color: rgba(255,255,255,0.9);
+    min-height: auto;
+    padding: 0.25rem 0.5rem;
+  }
+  .social-proof-strip--compact .sp-badge .sp-meta { color: rgba(255,255,255,0.7); }
+  .social-proof-strip--compact .sp-divider { color: rgba(255,255,255,0.35); }
+  .social-proof-strip--compact a.sp-badge:hover { color: #fff; }
+  .social-proof-strip--compact .sp-badge .fab { font-size: 1rem; }
+
+  /* Variante header (empresas) */
+  .social-proof-strip--header {
+    background: linear-gradient(90deg, #FAF8F3 0%, #FFFFFF 50%, #FAF8F3 100%);
+    padding: 0.85rem 0;
+    border-bottom: 1px solid rgba(201,169,97,0.2);
+  }
+  .social-proof-strip--header .sp-inner {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+  .social-proof-strip--header .sp-badge { background: transparent; padding: 0.3rem 0.5rem; }
+
+  @media (max-width: 576px) {
+    .social-proof-strip .sp-badge { width: 100%; justify-content: center; }
+    .social-proof-strip .sp-grid { gap: 0.5rem; }
+    .social-proof-strip--compact { flex-direction: column; gap: 0.25rem; }
+    .social-proof-strip--compact .sp-divider { display: none; }
+  }
+</style>
+{% endif %}
