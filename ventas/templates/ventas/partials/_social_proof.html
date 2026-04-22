@@ -1,0 +1,35 @@
+{% comment %}
+AR-028 — Franja de social proof (TripAdvisor + Google)
+Estilos viven en ventas/static/css/modern.css (clase .social-proof-strip)
+Datos vienen del context_processor `social_proof_processor`.
+Uso: insertar en homepage.html con {% include ... %} (comentado para evitar recursion).
+{% endcomment %}
+{% if social_proof %}
+<section class="social-proof-strip" aria-label="Calificaciones externas">
+  <div class="container">
+    <div class="sp-grid">
+      <a href="{{ social_proof.ta_url }}" target="_blank" rel="noopener" class="sp-badge sp-badge--ta">
+        <i class="fab fa-tripadvisor sp-icon" aria-hidden="true"></i>
+        <div class="sp-text">
+          <div class="sp-rating">
+            <strong>{{ social_proof.ta_rating }}/5</strong>
+            <span class="sp-stars" aria-hidden="true">★★★★★</span>
+          </div>
+          <span class="sp-meta">{{ social_proof.ta_reviews }} reseñas · #{{ social_proof.ta_ranking_pos }} de {{ social_proof.ta_ranking_total }} alojamientos en {{ social_proof.ta_ranking_city }}</span>
+        </div>
+      </a>
+
+      <a href="{{ social_proof.google_url }}" target="_blank" rel="noopener" class="sp-badge sp-badge--google">
+        <i class="fab fa-google sp-icon" aria-hidden="true"></i>
+        <div class="sp-text">
+          <div class="sp-rating">
+            <strong>{{ social_proof.google_rating }}/5</strong>
+            <span class="sp-stars" aria-hidden="true">★★★★★</span>
+          </div>
+          <span class="sp-meta">{{ social_proof.google_reviews }} reseñas verificadas en Google</span>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+{% endif %}
