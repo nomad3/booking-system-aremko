@@ -1,8 +1,9 @@
-{# AR-028 — Franja de social proof (TripAdvisor + Google)
-   Estilos viven en ventas/static/css/modern.css (clase .social-proof-strip)
-   Datos vienen del context_processor `social_proof_processor`.
-   Uso: {% include "ventas/partials/_social_proof.html" %}
-#}
+{% comment %}
+AR-028 — Franja de social proof (TripAdvisor + Google)
+Estilos viven en ventas/static/css/modern.css (clase .social-proof-strip)
+Datos vienen del context_processor `social_proof_processor`.
+Uso: insertar en homepage.html con {% include ... %} (comentado para evitar recursion).
+{% endcomment %}
 {% if social_proof %}
 <section class="social-proof-strip" aria-label="Calificaciones externas">
   <div class="container">
