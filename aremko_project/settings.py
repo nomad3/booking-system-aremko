@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'ventas',
     'control_gestion',  # Módulo de Control de Gestión
     'api',  # API para Luna AI Assistant
+    'destino_puerto_varas',  # DPV: catálogo turístico + motor de recomendación + lead capture
 
     # Aplicaciones de terceros
     'rest_framework',
