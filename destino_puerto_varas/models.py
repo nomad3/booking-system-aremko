@@ -294,6 +294,12 @@ class LeadConversation(models.Model):
         related_name="conversations",
     )
     referred_to_aremko = models.BooleanField(default=False)
+    showed_interest_in_aremko = models.BooleanField(
+        default=False,
+        help_text="True si el usuario mencionó spa/masaje/tina/alojamiento durante la conversación.",
+    )
+    last_user_message_at = models.DateTimeField(null=True, blank=True)
+    last_assistant_message_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
