@@ -161,3 +161,90 @@ class CircuitPlace(models.Model):
 
     def __str__(self):
         return f"{self.circuit_day} · {self.place}"
+
+
+class AremkoRecommendation(models.Model):
+    name = models.CharField(max_length=150)
+    context_key = models.CharField(max_length=80, unique=True)
+    title = models.CharField(max_length=200)
+    message_text = models.TextField()
+    recommended_service_type = models.CharField(max_length=50, blank=True)
+    priority = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["priority", "name"]
+        verbose_name = "Recomendación Aremko"
+        verbose_name_plural = "Recomendaciones Aremko"
+
+    def __str__(self):
+        return f"{self.context_key} — {self.name}"
+
+
+class TravelTip(models.Model):
+    title = models.CharField(max_length=200)
+    tip_text = models.TextField()
+    interest = models.CharField(
+        max_length=30,
+        choices=InterestType.choices,
+        blank=True,
+    )
+    profile = models.CharField(
+        max_length=20,
+        choices=ProfileType.choices,
+        blank=True,
+    )
+    duration_case = models.ForeignKey(
+        DurationCase,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="travel_tips",
+    )
+    applies_when_raining = models.BooleanField(default=False)
+    applies_when_sunny = models.BooleanField(default=False)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["sort_order", "title"]
+        verbose_name = "Tip de viaje"
+        verbose_name_plural = "Tips de viaje"
+
+    def __str__(self):
+        return self.title
+
+
+class RecommendationRule(models.Model):
+    name = models.CharField(max_length=200)
+    duration_case = models.ForeignKey(
+        DurationCase,
+        on_delete=models.CASCADE,
+        related_name="recommendation_rules",
+    )
+    interest = models.CharField(
+        max_length=30,
+        choices=InterestType.choices,
+        blank=True,
+    )
+    profile = models.CharField(
+        max_length=20,
+        choices=ProfileType.choices,
+        blank=True,
+    )
+    is_rainy = models.BooleanField(null=True, blank=True)
+    recommended_circuit = models.ForeignKey(
+        Circuit,
+        on_delete=models.CASCADE,
+        related_name="recommendation_rules",
+    )
+    priority = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["priority", "name"]
+        verbose_name = "Regla de recomendación"
+        verbose_name_plural = "Reglas de recomendación"
+
+    def __str__(self):
+        return f"{self.name} → {self.recommended_circuit}"
