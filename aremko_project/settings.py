@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'ventas',
     'control_gestion',  # Módulo de Control de Gestión
     'api',  # API para Luna AI Assistant
+    'kits.apps.KitsConfig',  # Productos compuestos (Bill of Materials)
 
     # Aplicaciones de terceros
     'rest_framework',
