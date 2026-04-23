@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from django.http import Http404
 from rest_framework import generics
 
-from ..models import DurationCase, Place
-from ..selectors import get_published_circuit_by_slug, list_places, list_published_circuits
+from ..models import Circuit, DurationCase, Place
 from .serializers import (
     CircuitDetailSerializer,
     CircuitListSerializer,
@@ -14,21 +14,28 @@ from .serializers import (
 )
 
 
+def _truthy(value: str | None) -> bool | None:
+    if value is None:
+        return None
+    return value.lower() in ("1", "true", "yes")
+
+
 class CircuitListView(generics.ListAPIView):
     """GET /api/destino-puerto-varas/circuits/ — circuitos publicados."""
     serializer_class = CircuitListSerializer
 
     def get_queryset(self):
-        qs = list_published_circuits()
-        duration_code = self.request.query_params.get("duration_case")
-        interest = self.request.query_params.get("interest")
-        featured = self.request.query_params.get("featured")
+        qs = Circuit.objects.filter(published=True).order_by("sort_order", "number")
+        params = self.request.query_params
+        duration_code = params.get("duration_case")
+        interest = params.get("interest")
+        featured = _truthy(params.get("featured"))
         if duration_code:
             qs = qs.filter(duration_case__code=duration_code)
         if interest:
             qs = qs.filter(primary_interest=interest)
         if featured is not None:
-            qs = qs.filter(featured=featured.lower() in ("1", "true", "yes"))
+            qs = qs.filter(featured=featured)
         return qs
 
 
@@ -39,9 +46,12 @@ class CircuitDetailView(generics.RetrieveAPIView):
 
     def get_object(self):
         slug = self.kwargs[self.lookup_field]
-        circuit = get_published_circuit_by_slug(slug)
+        circuit = (
+            Circuit.objects.filter(published=True, slug=slug)
+            .prefetch_related("days__place_stops__place")
+            .first()
+        )
         if circuit is None:
-            from django.http import Http404
             raise Http404("Circuito no encontrado")
         return circuit
 
@@ -51,13 +61,14 @@ class PlaceListView(generics.ListAPIView):
     serializer_class = PlaceSerializer
 
     def get_queryset(self):
-        qs = list_places()
-        place_type = self.request.query_params.get("place_type")
-        rain_friendly = self.request.query_params.get("rain_friendly")
+        qs = Place.objects.filter(published=True).order_by("name")
+        params = self.request.query_params
+        place_type = params.get("place_type")
+        rain_friendly = _truthy(params.get("rain_friendly"))
         if place_type:
             qs = qs.filter(place_type=place_type)
         if rain_friendly is not None:
-            qs = qs.filter(is_rain_friendly=rain_friendly.lower() in ("1", "true", "yes"))
+            qs = qs.filter(is_rain_friendly=rain_friendly)
         return qs
 
 
