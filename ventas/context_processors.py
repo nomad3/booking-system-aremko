@@ -25,11 +25,11 @@ _SOCIAL_PROOF = {
     'ta_ranking_pos': 1,
     'ta_ranking_total': 14,
     'ta_ranking_city': 'Puerto Varas',
-    'ta_url': 'https://www.tripadvisor.com/Hotel_Review-d7138437',
+    'ta_url': 'https://www.tripadvisor.com.ar/Hotel_Review-g294299-d7138437-Reviews-Aremko_Aguas_Calientes_Spa-Puerto_Varas_Los_Lagos_Region.html',
     'ta_travellers_choice_year': 2024,
     'google_rating': '4.5',
     'google_reviews': 660,
-    'google_url': 'https://www.google.com/search?q=Aremko+Aguas+Calientes+Puerto+Varas+rese%C3%B1as',
+    'google_url': 'https://www.google.cl/travel/hotels/entity/ChoIspWGrpvPlLD_ARoNL2cvMTFidG1yZzV3bBAB/reviews',
 }
 
 
