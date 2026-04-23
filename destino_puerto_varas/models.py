@@ -2,7 +2,10 @@ from django.db import models
 
 from .enums import (
     BlockType,
+    ChannelType,
+    ConversationStatus,
     InterestType,
+    MessageSenderType,
     PlaceType,
     ProfileType,
     DurationType,
@@ -248,3 +251,81 @@ class RecommendationRule(models.Model):
 
     def __str__(self):
         return f"{self.name} → {self.recommended_circuit}"
+
+
+class LeadConversation(models.Model):
+    channel = models.CharField(
+        max_length=20,
+        choices=ChannelType.choices,
+        db_index=True,
+    )
+    external_id = models.CharField(max_length=120, blank=True, db_index=True)
+    contact_name = models.CharField(max_length=200, blank=True)
+    contact_phone = models.CharField(max_length=40, blank=True)
+    contact_email = models.EmailField(blank=True)
+    status = models.CharField(
+        max_length=30,
+        choices=ConversationStatus.choices,
+        default=ConversationStatus.OPEN,
+        db_index=True,
+    )
+    detected_interest = models.CharField(
+        max_length=30,
+        choices=InterestType.choices,
+        blank=True,
+    )
+    detected_profile = models.CharField(
+        max_length=20,
+        choices=ProfileType.choices,
+        blank=True,
+    )
+    detected_duration_case = models.ForeignKey(
+        DurationCase,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="conversations",
+    )
+    recommended_circuit = models.ForeignKey(
+        Circuit,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="conversations",
+    )
+    referred_to_aremko = models.BooleanField(default=False)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Conversación de lead"
+        verbose_name_plural = "Conversaciones de leads"
+
+    def __str__(self):
+        label = self.contact_name or self.contact_phone or self.external_id or "sin contacto"
+        return f"[{self.get_channel_display()}] {label}"
+
+
+class ConversationMessage(models.Model):
+    conversation = models.ForeignKey(
+        LeadConversation,
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    sender_type = models.CharField(
+        max_length=20,
+        choices=MessageSenderType.choices,
+    )
+    text = models.TextField()
+    metadata = models.JSONField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        verbose_name = "Mensaje de conversación"
+        verbose_name_plural = "Mensajes de conversación"
+
+    def __str__(self):
+        return f"{self.conversation} · {self.get_sender_type_display()} · {self.created_at:%Y-%m-%d %H:%M}"
