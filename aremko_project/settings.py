@@ -337,3 +337,12 @@ LOGGING = {
 # API Configuration for Luna AI Assistant
 import secrets
 LUNA_API_KEY = os.getenv('LUNA_API_KEY', secrets.token_urlsafe(32))
+
+# ──────────────── DPV — Destino Puerto Varas ────────────────
+# URLs de derivación hacia Aremko Spa
+AREMKO_RESERVATION_URL = "https://www.aremko.cl/"
+AREMKO_WHATSAPP_URL = "https://wa.me/56958655810"  # WhatsApp corporativo Aremko (piloto)
+
+# Webhook tokens (placeholders; no se usan todavía porque WhatsApp va por neonize, ver apéndice DPV-002)
+WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "dpv_dev_verify_token")
+INSTAGRAM_VERIFY_TOKEN = os.getenv("INSTAGRAM_VERIFY_TOKEN", "dpv_dev_verify_token")
