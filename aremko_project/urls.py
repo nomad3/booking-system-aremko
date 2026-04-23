@@ -49,6 +49,9 @@ urlpatterns = [
     # API endpoints
     path('api/', include('api.urls')),
 
+    # DPV — Destino Puerto Varas (catálogo + conversación + webhooks)
+    path('api/destino-puerto-varas/', include('destino_puerto_varas.api.urls')),
+
     # SEO endpoints
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
     path('robots.txt', TemplateView.as_view(template_name='seo/robots.txt', content_type='text/plain'), name='robots_txt'),
