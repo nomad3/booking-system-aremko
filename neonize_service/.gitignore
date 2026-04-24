@@ -1,0 +1,20 @@
+# Sesión local de neonize (nunca commitear)
+session.sqlite
+session.sqlite-*
+*.session
+
+# Datos locales
+data/
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/

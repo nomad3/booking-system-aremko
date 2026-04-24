@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'ventas',
     'control_gestion',  # Módulo de Control de Gestión
     'api',  # API para Luna AI Assistant
+    'destino_puerto_varas',  # DPV: catálogo turístico + motor de recomendación + lead capture
     'kits.apps.KitsConfig',  # Productos compuestos (Bill of Materials)
 
     # Aplicaciones de terceros
@@ -337,3 +338,41 @@ LOGGING = {
 # API Configuration for Luna AI Assistant
 import secrets
 LUNA_API_KEY = os.getenv('LUNA_API_KEY', secrets.token_urlsafe(32))
+
+# ──────────────── DPV — Destino Puerto Varas ────────────────
+# URLs de derivación hacia Aremko Spa
+AREMKO_RESERVATION_URL = "https://www.aremko.cl/"
+AREMKO_WHATSAPP_URL = "https://wa.me/56958655810"  # WhatsApp corporativo Aremko (piloto)
+
+# Webhook tokens (placeholders; no se usan todavía porque WhatsApp va por neonize, ver apéndice DPV-002)
+WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "dpv_dev_verify_token")
+INSTAGRAM_VERIFY_TOKEN = os.getenv("INSTAGRAM_VERIFY_TOKEN", "dpv_dev_verify_token")
+
+# ──────────────── DPV — LLM (OpenRouter) ────────────────
+DPV_LLM_ENABLED = os.getenv("DPV_LLM_ENABLED", "false").lower() == "true"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+DPV_LLM_MODEL = os.getenv("DPV_LLM_MODEL", "anthropic/claude-haiku-4.5")
+DPV_LLM_MAX_TOKENS = int(os.getenv("DPV_LLM_MAX_TOKENS", "500"))
+DPV_LLM_TEMPERATURE = float(os.getenv("DPV_LLM_TEMPERATURE", "0.7"))
+DPV_LLM_TIMEOUT_SECONDS = int(os.getenv("DPV_LLM_TIMEOUT_SECONDS", "30"))
+DPV_LLM_SITE_URL = os.getenv("DPV_LLM_SITE_URL", "https://www.aremko.cl")
+DPV_LLM_SITE_NAME = os.getenv("DPV_LLM_SITE_NAME", "Destino Puerto Varas Piloto")
+
+# ──────────────── DPV — Bot WhatsApp (DPV-006) ────────────────
+DPV_BOT_ENABLED = os.getenv("DPV_BOT_ENABLED", "false").lower() == "true"
+DPV_BOT_ENABLED_JIDS = [
+    j.strip() for j in os.getenv("DPV_BOT_ENABLED_JIDS", "").split(",") if j.strip()
+]
+NEONIZE_SERVICE_URL = os.getenv("NEONIZE_SERVICE_URL", "")
+NEONIZE_SERVICE_TOKEN = os.getenv("NEONIZE_SERVICE_TOKEN", "")
+NEONIZE_SERVICE_TIMEOUT_SECONDS = int(os.getenv("NEONIZE_SERVICE_TIMEOUT_SECONDS", "15"))
+
+# ──────────────── DPV — Bot Telegram (DPV-007) ────────────────
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
+TELEGRAM_API_BASE_URL = os.getenv("TELEGRAM_API_BASE_URL", "https://api.telegram.org")
+TELEGRAM_SEND_TIMEOUT_SECONDS = int(os.getenv("TELEGRAM_SEND_TIMEOUT_SECONDS", "15"))
+DPV_BOT_ENABLED_TELEGRAM_CHAT_IDS = [
+    c.strip() for c in os.getenv("DPV_BOT_ENABLED_TELEGRAM_CHAT_IDS", "").split(",") if c.strip()
+]
