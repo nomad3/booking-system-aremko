@@ -1,6 +1,8 @@
 from django.contrib import admin
+from django import forms
 
 from .models import (
+    AgentPromptTemplate,
     AremkoRecommendation,
     Circuit,
     CircuitDay,
@@ -230,3 +232,45 @@ class ConversationMessageAdmin(admin.ModelAdmin):
         t = obj.text or ""
         return (t[:80] + "…") if len(t) > 80 else t
     message_preview.short_description = "Mensaje (preview)"
+
+
+class AgentPromptTemplateForm(forms.ModelForm):
+    class Meta:
+        model = AgentPromptTemplate
+        fields = "__all__"
+        widgets = {
+            "system_prompt": forms.Textarea(attrs={"rows": 28, "cols": 100, "style": "font-family: monospace;"}),
+            "notes": forms.Textarea(attrs={"rows": 4, "cols": 100}),
+        }
+
+
+@admin.register(AgentPromptTemplate)
+class AgentPromptTemplateAdmin(admin.ModelAdmin):
+    form = AgentPromptTemplateForm
+    list_display = ("slug", "name", "is_active", "model_name", "temperature", "max_output_tokens", "history_window", "updated_at")
+    list_filter = ("is_active", "model_name")
+    search_fields = ("slug", "name", "system_prompt")
+    readonly_fields = ("created_at", "updated_at")
+    fieldsets = (
+        ("Identidad", {
+            "fields": ("slug", "name", "is_active"),
+            "description": (
+                "El agente busca el template con slug 'dpv-main-guide' y is_active=True. "
+                "Cambiar el slug desvincula el template del agente."
+            ),
+        }),
+        ("Prompt de sistema", {
+            "fields": ("system_prompt",),
+            "description": "Este texto se envía como 'system' al LLM en cada turno de conversación.",
+        }),
+        ("Parámetros del LLM", {
+            "fields": ("model_name", "temperature", "max_output_tokens"),
+        }),
+        ("Contexto conversacional", {
+            "fields": ("history_window",),
+            "description": "Cuántos mensajes anteriores enviar como contexto. Más mensajes = más coherencia pero más costo.",
+        }),
+        ("Auditoría", {
+            "fields": ("notes", "created_at", "updated_at"),
+        }),
+    )

@@ -1,8 +1,13 @@
-"""Máquina de estados conversacional. El estado se infiere desde LeadConversation,
-no se persiste. Sin IA — parsing y handlers determinísticos."""
+"""Máquina de estados conversacional (legacy) + delegación al agente LLM.
+
+Desde DPV-008, `process_incoming_message` delega al agente LLM (agent_service) si
+está disponible. La máquina de estados queda como fallback determinístico si el
+agente falla o está desactivado.
+"""
 
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 from typing import Optional
@@ -24,7 +29,7 @@ from ..constants import (
     STATE_REFERRED_TO_AREMKO,
     STATE_START,
 )
-from ..enums import ConversationStatus, DurationType, InterestType, ProfileType
+from ..enums import ConversationStatus, DurationType, InterestType, MessageSenderType, ProfileType
 from ..models import ConversationMessage, DurationCase, LeadConversation
 from .aremko_insertion import (
     get_aremko_recommendation_for_context,
@@ -34,6 +39,8 @@ from .aremko_referral_service import build_aremko_referral_payload
 from .channel_router import build_channel_action
 from .recommendation_engine import recommend_circuit
 from .response_builder import build_response
+
+logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -561,11 +568,11 @@ def handle_referral(conversation: LeadConversation) -> dict:
 # Entry point para IncomingMessageView
 # ─────────────────────────────────────────────────────────────────────────────
 
-def process_incoming_message(
+def _legacy_process_incoming_message(
     conversation: LeadConversation,
     message_text: str,
 ) -> dict:
-    """Procesa un mensaje entrante: detecta señales, infiere estado, despacha handler."""
+    """Máquina de estados determinística (fallback). No usa LLM conversacional."""
     # Señal global: menciones de Aremko
     if detect_aremko_interest(message_text):
         conversation.showed_interest_in_aremko = True
@@ -588,3 +595,67 @@ def process_incoming_message(
     if state == STATE_ASK_DURATION:
         return handle_ask_duration(conversation, message_text)
     return handle_start(conversation)
+
+
+def _persist_agent_message(
+    conversation: LeadConversation,
+    text: str,
+    metadata: dict,
+) -> None:
+    """Persiste la respuesta del agente LLM con su metadata (tokens, costo, latencia)."""
+    msg = ConversationMessage.objects.create(
+        conversation=conversation,
+        sender_type=MessageSenderType.ASSISTANT,
+        text=text,
+        llm_model=metadata.get("model", "") or "",
+        llm_input_tokens=metadata.get("input_tokens", 0) or 0,
+        llm_output_tokens=metadata.get("output_tokens", 0) or 0,
+        llm_latency_ms=metadata.get("latency_ms", 0) or 0,
+        llm_error=(metadata.get("error") or "")[:200],
+    )
+    conversation.last_assistant_message_at = timezone.now()
+    conversation.save(update_fields=["last_assistant_message_at", "updated_at"])
+    return msg
+
+
+def process_incoming_message(
+    conversation: LeadConversation,
+    message_text: str,
+) -> dict:
+    """Entry point del flujo conversacional.
+
+    Desde DPV-008, delega al agente LLM (agent_service.respond). Si el agente
+    está desactivado, sin template activo, o falla → cae al state machine legacy.
+    """
+    # Import tardío para evitar ciclos y permitir que settings estén cargados
+    from .agent_service import is_agent_available, respond as agent_respond
+
+    if is_agent_available():
+        try:
+            result = agent_respond(conversation, message_text)
+        except Exception as exc:
+            logger.exception("agent_service.respond falló: %s", exc)
+            result = None
+
+        if result and result.get("ok") and result.get("text"):
+            text = result["text"]
+            metadata = result.get("metadata") or {}
+            _persist_agent_message(conversation, text, metadata)
+            # Refrescar conversation por si una tool (refer_user_to_aremko) la mutó
+            conversation.refresh_from_db()
+            return build_response(
+                reply_type=REPLY_TYPE_INFO,
+                reply_text=text,
+                conversation=conversation,
+                recommended_circuit=conversation.recommended_circuit,
+                channel_action=build_channel_action(conversation),
+            )
+
+        # Agente disponible pero falló → loguear y caer al legacy
+        err = (result or {}).get("error", "unknown")
+        logger.warning(
+            "Agente LLM falló (conv=%s, error=%s); cayendo al state machine",
+            conversation.id, err,
+        )
+
+    return _legacy_process_incoming_message(conversation, message_text)

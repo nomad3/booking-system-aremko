@@ -346,3 +346,66 @@ class ConversationMessage(models.Model):
 
     def __str__(self):
         return f"{self.conversation} · {self.get_sender_type_display()} · {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class AgentPromptTemplate(models.Model):
+    """Prompt del agente conversacional LLM — editable desde Django admin.
+
+    El servicio agent_service busca el template activo por `slug` y lo usa
+    como system prompt. Cambiar el prompt no requiere deploy.
+    """
+
+    slug = models.SlugField(
+        max_length=80,
+        unique=True,
+        help_text="Identificador interno estable. Ej: 'dpv-main-guide'. No cambiar en caliente.",
+    )
+    name = models.CharField(
+        max_length=150,
+        help_text="Nombre descriptivo para el admin. Ej: 'Destino Puerto Varas · Guía principal'.",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Solo el template activo con el slug buscado será utilizado.",
+    )
+    system_prompt = models.TextField(
+        help_text=(
+            "Prompt de sistema del agente. Puede incluir instrucciones, tono, reglas, "
+            "políticas de derivación a Aremko, etc. Los lugares/circuitos los inyecta el "
+            "agent_service vía tools — NO los hardcodees aquí."
+        ),
+    )
+    model_name = models.CharField(
+        max_length=120,
+        default="anthropic/claude-3.5-sonnet",
+        help_text="Identificador del modelo en OpenRouter. Ej: 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o-mini'.",
+    )
+    temperature = models.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        default=0.7,
+        help_text="0.0 (muy predecible) a 1.0+ (más creativo). 0.5-0.8 recomendado para conversaciones.",
+    )
+    max_output_tokens = models.PositiveIntegerField(
+        default=600,
+        help_text="Tope de tokens de salida por respuesta. WhatsApp/Telegram = respuestas cortas.",
+    )
+    history_window = models.PositiveSmallIntegerField(
+        default=10,
+        help_text="Cuántos mensajes previos de la conversación enviar al LLM como contexto.",
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text="Notas internas sobre este template (ej: changelog, A/B test en curso).",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["slug"]
+        verbose_name = "Template de prompt del agente"
+        verbose_name_plural = "Templates de prompt del agente"
+
+    def __str__(self):
+        estado = "activo" if self.is_active else "inactivo"
+        return f"{self.name} [{self.slug}] ({estado})"
