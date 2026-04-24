@@ -8,6 +8,7 @@ from .views_conversation import (
     ContinueConversationView,
     InstagramWebhookView,
     StartConversationView,
+    TelegramWebhookView,
     WhatsAppWebhookView,
 )
 from .views_public import (
@@ -33,4 +34,5 @@ urlpatterns = [
     # Webhooks placeholder
     path("webhooks/whatsapp/", WhatsAppWebhookView.as_view(), name="webhook-whatsapp"),
     path("webhooks/instagram/", InstagramWebhookView.as_view(), name="webhook-instagram"),
+    path("webhooks/telegram/", TelegramWebhookView.as_view(), name="webhook-telegram"),
 ]

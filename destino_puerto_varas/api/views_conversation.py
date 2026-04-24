@@ -15,6 +15,7 @@ from ..services.channel_router import build_channel_action
 from ..services.conversation_flow_service import process_incoming_message
 from ..services.weather_adaptation_service import adapt_recommendation_for_weather
 from ..services.whatsapp_inbound_service import handle_incoming_message
+from ..services.telegram_inbound_service import handle_incoming_update
 from .serializers import (
     ContinueConversationRequestSerializer,
     StartConversationRequestSerializer,
@@ -138,6 +139,33 @@ class WhatsAppWebhookView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
         result = handle_incoming_message(request.data or {})
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class TelegramWebhookView(APIView):
+    """POST /api/destino-puerto-varas/webhooks/telegram/
+
+    Recibe Updates de Telegram Bot API. Autentica por header
+    X-Telegram-Bot-Api-Secret-Token vs settings.TELEGRAM_WEBHOOK_SECRET.
+    """
+
+    authentication_classes: list = []
+    permission_classes: list = []
+
+    def post(self, request, *args, **kwargs):
+        expected_secret = getattr(settings, "TELEGRAM_WEBHOOK_SECRET", "")
+        provided = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+        if not expected_secret or provided != expected_secret:
+            return Response(
+                {"detail": "invalid_secret"}, status=status.HTTP_401_UNAUTHORIZED
+            )
+        try:
+            result = handle_incoming_update(request.data or {})
+        except Exception:
+            return Response(
+                {"status": "error", "reason": "internal"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         return Response(result, status=status.HTTP_200_OK)
 
 
