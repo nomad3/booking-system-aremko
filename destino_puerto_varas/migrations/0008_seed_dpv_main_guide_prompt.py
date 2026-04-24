@@ -65,7 +65,7 @@ def seed_prompt(apps, schema_editor):
             "name": SEED_NAME,
             "is_active": True,
             "system_prompt": SEED_PROMPT,
-            "model_name": "anthropic/claude-3.5-sonnet",
+            "model_name": "anthropic/claude-haiku-4.5",
             "temperature": 0.7,
             "max_output_tokens": 600,
             "history_window": 10,

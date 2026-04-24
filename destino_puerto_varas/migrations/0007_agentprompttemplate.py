@@ -55,7 +55,7 @@ class Migration(migrations.Migration):
                 (
                     "model_name",
                     models.CharField(
-                        default="anthropic/claude-3.5-sonnet",
+                        default="anthropic/claude-haiku-4.5",
                         help_text="Identificador del modelo en OpenRouter. Ej: 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o-mini'.",
                         max_length=120,
                     ),
