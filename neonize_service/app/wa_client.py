@@ -3,6 +3,10 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+import httpx
+
+from .config import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -64,6 +68,19 @@ class WAClient:
                 sender_jid = str(ev.Info.MessageSource.Sender)
             except Exception:
                 sender_jid = "(unknown)"
+            try:
+                from_me = bool(getattr(ev.Info.MessageSource, "IsFromMe", False))
+            except Exception:
+                from_me = False
+            try:
+                message_id = str(getattr(ev.Info, "ID", "") or "")
+            except Exception:
+                message_id = ""
+            try:
+                ts = getattr(ev.Info, "Timestamp", None)
+                timestamp = int(ts.timestamp()) if ts is not None and hasattr(ts, "timestamp") else int(ts or 0)
+            except Exception:
+                timestamp = 0
             text = ""
             try:
                 msg = ev.Message
@@ -74,8 +91,18 @@ class WAClient:
             except Exception:
                 text = "(unable to extract text)"
             self._last_message_preview = f"{sender_jid}: {text[:80]}"
-            logger.info("WA msg from %s: %s", sender_jid, text[:200])
-            # DPV-005: solo log. El forward a Django llega en DPV-006.
+            logger.info("WA msg from %s (from_me=%s id=%s): %s", sender_jid, from_me, message_id, text[:200])
+
+            # DPV-006: forward a Django
+            payload = {
+                "event_type": "message",
+                "from_me": from_me,
+                "jid": sender_jid,
+                "message_id": message_id,
+                "text": text,
+                "timestamp": timestamp,
+            }
+            asyncio.create_task(self._forward_to_django(payload))
 
         @self._client.event(PairStatusEv)
         async def on_pair(_, ev):
@@ -136,3 +163,34 @@ class WAClient:
 
     def get_qr_data(self) -> Optional[str]:
         return self._qr_data
+
+    async def _forward_to_django(self, payload: dict):
+        """DPV-006: POST del evento 'message' al webhook Django con retries."""
+        s = get_settings()
+        url = (s.django_webhook_url or "").strip()
+        if not url:
+            logger.debug("django_webhook_url vacío; forward omitido")
+            return
+        headers = {}
+        if s.django_webhook_token:
+            headers["X-Auth-Token"] = s.django_webhook_token
+        max_retries = max(0, int(s.django_webhook_max_retries))
+        timeout = int(s.django_webhook_timeout_seconds)
+        backoff = 1.0
+        for attempt in range(max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    resp = await client.post(url, json=payload, headers=headers)
+                if 200 <= resp.status_code < 300:
+                    logger.info("forward OK (attempt=%d) status=%s", attempt + 1, resp.status_code)
+                    return
+                logger.warning(
+                    "forward no-OK attempt=%d status=%s body=%s",
+                    attempt + 1, resp.status_code, resp.text[:300],
+                )
+            except Exception as exc:
+                logger.warning("forward exception attempt=%d: %s", attempt + 1, exc)
+            if attempt < max_retries:
+                await asyncio.sleep(backoff)
+                backoff *= 2
+        logger.error("forward a Django falló tras %d intentos", max_retries + 1)
