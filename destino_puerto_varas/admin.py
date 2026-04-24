@@ -201,8 +201,32 @@ class LeadConversationAdmin(admin.ModelAdmin):
 
 @admin.register(ConversationMessage)
 class ConversationMessageAdmin(admin.ModelAdmin):
-    list_display = ("conversation", "sender_type", "created_at")
-    list_filter = ("sender_type",)
+    list_display = (
+        "created_at",
+        "conversation",
+        "sender_type",
+        "message_preview",
+        "llm_model",
+        "llm_input_tokens",
+        "llm_output_tokens",
+        "llm_cost_usd",
+        "llm_latency_ms",
+    )
+    list_filter = ("sender_type", "llm_model")
     search_fields = ("text", "conversation__contact_name", "conversation__contact_phone")
-    readonly_fields = ("created_at",)
+    readonly_fields = (
+        "created_at",
+        "conversation",
+        "llm_model",
+        "llm_input_tokens",
+        "llm_output_tokens",
+        "llm_cost_usd",
+        "llm_latency_ms",
+        "llm_error",
+    )
     ordering = ("-created_at",)
+
+    def message_preview(self, obj):
+        t = obj.text or ""
+        return (t[:80] + "…") if len(t) > 80 else t
+    message_preview.short_description = "Mensaje (preview)"
