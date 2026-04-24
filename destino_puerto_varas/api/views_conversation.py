@@ -14,6 +14,7 @@ from ..selectors import get_or_create_conversation
 from ..services.channel_router import build_channel_action
 from ..services.conversation_flow_service import process_incoming_message
 from ..services.weather_adaptation_service import adapt_recommendation_for_weather
+from ..services.whatsapp_inbound_service import handle_incoming_message
 from .serializers import (
     ContinueConversationRequestSerializer,
     StartConversationRequestSerializer,
@@ -128,9 +129,16 @@ class WhatsAppWebhookView(APIView):
         return Response({"detail": "verification failed"}, status=status.HTTP_403_FORBIDDEN)
 
     def post(self, request, *args, **kwargs):
-        # Placeholder: recibe el evento y responde 200 para no perder el ACK.
-        # La lógica de enrutamiento a process_incoming_message se añade en DPV-003.
-        return Response({"received": True}, status=status.HTTP_200_OK)
+        # DPV-006: recibe eventos del servicio neonize. Auth por token simétrico.
+        expected_token = getattr(settings, "NEONIZE_SERVICE_TOKEN", "")
+        provided_token = request.headers.get("X-Auth-Token", "")
+        if not expected_token or provided_token != expected_token:
+            return Response(
+                {"detail": "invalid or missing X-Auth-Token"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        result = handle_incoming_message(request.data or {})
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class InstagramWebhookView(APIView):
