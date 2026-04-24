@@ -59,6 +59,7 @@ class ChannelType(models.TextChoices):
     WHATSAPP = "WHATSAPP", "WhatsApp"
     INSTAGRAM = "INSTAGRAM", "Instagram"
     WEB = "WEB", "Web"
+    TELEGRAM = "TELEGRAM", "Telegram"
 
 
 class MessageSenderType(models.TextChoices):
