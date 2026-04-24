@@ -346,3 +346,14 @@ AREMKO_WHATSAPP_URL = "https://wa.me/56958655810"  # WhatsApp corporativo Aremko
 # Webhook tokens (placeholders; no se usan todavía porque WhatsApp va por neonize, ver apéndice DPV-002)
 WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "dpv_dev_verify_token")
 INSTAGRAM_VERIFY_TOKEN = os.getenv("INSTAGRAM_VERIFY_TOKEN", "dpv_dev_verify_token")
+
+# ──────────────── DPV — LLM (OpenRouter) ────────────────
+DPV_LLM_ENABLED = os.getenv("DPV_LLM_ENABLED", "false").lower() == "true"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+DPV_LLM_MODEL = os.getenv("DPV_LLM_MODEL", "anthropic/claude-haiku-4.5")
+DPV_LLM_MAX_TOKENS = int(os.getenv("DPV_LLM_MAX_TOKENS", "500"))
+DPV_LLM_TEMPERATURE = float(os.getenv("DPV_LLM_TEMPERATURE", "0.7"))
+DPV_LLM_TIMEOUT_SECONDS = int(os.getenv("DPV_LLM_TIMEOUT_SECONDS", "30"))
+DPV_LLM_SITE_URL = os.getenv("DPV_LLM_SITE_URL", "https://www.aremko.cl")
+DPV_LLM_SITE_NAME = os.getenv("DPV_LLM_SITE_NAME", "Destino Puerto Varas Piloto")
