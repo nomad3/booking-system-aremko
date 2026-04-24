@@ -25,6 +25,13 @@ def _mask(value: str) -> str:
 class Command(BaseCommand):
     help = "Reporta el estado del agente LLM conversacional (DPV-008)."
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--test-call",
+            action="store_true",
+            help="Además hace una llamada de prueba al LLM con una conversación dummy.",
+        )
+
     def handle(self, *args, **options):
         from destino_puerto_varas.models import AgentPromptTemplate
         from destino_puerto_varas.services.agent_service import (
@@ -84,3 +91,74 @@ class Command(BaseCommand):
                 self.stdout.write("    Causa: OPENROUTER_API_KEY está vacío.")
             else:
                 self.stdout.write("    Causa: template activo no encontrado o inactivo.")
+            return
+
+        if not options.get("test_call"):
+            self.stdout.write("")
+            self.stdout.write(
+                "Para probar una llamada real al LLM: python manage.py check_dpv_agent --test-call"
+            )
+            return
+
+        # Test call: conversación dummy, usuario dice "hola"
+        from destino_puerto_varas.enums import ChannelType, ConversationStatus
+        from destino_puerto_varas.models import LeadConversation
+        from destino_puerto_varas.services.agent_service import respond
+
+        self.stdout.write("")
+        self.stdout.write(self.style.MIGRATE_HEADING("Test call contra el LLM"))
+        self.stdout.write("  Creando conversación dummy (canal=WEB, external_id=check_dpv_agent_test)...")
+
+        dummy, _ = LeadConversation.objects.get_or_create(
+            channel=ChannelType.WEB,
+            external_id="check_dpv_agent_test",
+            defaults={
+                "status": ConversationStatus.OPEN,
+                "contact_name": "Diagnóstico agente",
+            },
+        )
+        # Reset de banderas para no contaminar el test
+        dummy.referred_to_aremko = False
+        dummy.showed_interest_in_aremko = False
+        dummy.status = ConversationStatus.OPEN
+        dummy.detected_interest = ""
+        dummy.detected_profile = ""
+        dummy.detected_duration_case = None
+        dummy.recommended_circuit = None
+        dummy.save()
+
+        self.stdout.write('  Enviando mensaje: "hola"...')
+        result = respond(dummy, "hola")
+
+        self.stdout.write("")
+        self.stdout.write(f"  ok ......... {result.get('ok')}")
+        self.stdout.write(f"  error ...... {result.get('error', '-')}")
+        meta = result.get("metadata") or {}
+        self.stdout.write(f"  model ...... {meta.get('model', '-')}")
+        self.stdout.write(f"  tokens in .. {meta.get('input_tokens', 0)}")
+        self.stdout.write(f"  tokens out . {meta.get('output_tokens', 0)}")
+        self.stdout.write(f"  latency .... {meta.get('latency_ms', 0)} ms")
+        tool_calls = result.get("tool_calls") or []
+        self.stdout.write(f"  tool_calls . {len(tool_calls)}")
+        for i, tc in enumerate(tool_calls):
+            self.stdout.write(f"    [{i}] {tc.get('name')} args={tc.get('arguments')}")
+        text = result.get("text") or ""
+        self.stdout.write("")
+        self.stdout.write("  Respuesta del LLM:")
+        if text:
+            self.stdout.write("  " + "─" * 60)
+            for line in text.splitlines() or [text]:
+                self.stdout.write(f"  {line}")
+            self.stdout.write("  " + "─" * 60)
+        else:
+            self.stdout.write(self.style.ERROR("    (vacía)"))
+
+        if result.get("ok"):
+            self.stdout.write("")
+            self.stdout.write(self.style.SUCCESS("✓ El agente respondió correctamente."))
+        else:
+            self.stdout.write("")
+            self.stdout.write(self.style.ERROR(
+                "✗ El agente falló. El error arriba indica la causa "
+                "(modelo inexistente, rate limit, créditos, etc.)."
+            ))
