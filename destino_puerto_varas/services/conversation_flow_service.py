@@ -205,6 +205,80 @@ def _append_assistant_message(conversation: LeadConversation, text: str) -> Conv
     return msg
 
 
+def _record_llm_metadata_if_any(msg: ConversationMessage, metadata: dict) -> None:
+    """Persiste metadata LLM (tokens, costo, latencia, error) si corresponde."""
+    if not metadata:
+        return
+    from .llm.cost_tracker import CostTracker
+    CostTracker.record_to_message(
+        msg,
+        model=metadata.get("model", "") or "",
+        input_tokens=int(metadata.get("input_tokens", 0) or 0),
+        output_tokens=int(metadata.get("output_tokens", 0) or 0),
+        latency_ms=int(metadata.get("latency_ms", 0) or 0),
+        error=metadata.get("error", "") or "",
+    )
+
+
+def _circuit_first_day_summary(circuit) -> str:
+    """Saca el summary del día 1 del circuit, o string vacío."""
+    if circuit is None:
+        return ""
+    first_day = circuit.days.order_by("day_number").first()
+    return (first_day.summary or first_day.title) if first_day else ""
+
+
+def _circuit_top_place_name(circuit) -> str:
+    """Nombre del primer place is_main_stop o el primer place en general."""
+    if circuit is None:
+        return ""
+    from ..models import CircuitPlace
+    main = (
+        CircuitPlace.objects
+        .filter(circuit_day__circuit=circuit, is_main_stop=True)
+        .select_related("place")
+        .order_by("circuit_day__day_number", "visit_order")
+        .first()
+    )
+    if main:
+        return main.place.name
+    any_cp = (
+        CircuitPlace.objects
+        .filter(circuit_day__circuit=circuit)
+        .select_related("place")
+        .order_by("circuit_day__day_number", "visit_order")
+        .first()
+    )
+    return any_cp.place.name if any_cp else ""
+
+
+def _circuit_places_for_follow_up(circuit) -> list:
+    """Lista de dicts {name, place_type, short_description} para el prompt FOLLOW_UP."""
+    if circuit is None:
+        return []
+    from ..models import CircuitPlace
+    stops = (
+        CircuitPlace.objects
+        .filter(circuit_day__circuit=circuit)
+        .select_related("place")
+        .order_by("circuit_day__day_number", "visit_order")
+    )
+    seen = set()
+    items = []
+    for s in stops:
+        if s.place_id in seen:
+            continue
+        seen.add(s.place_id)
+        items.append({
+            "name": s.place.name,
+            "place_type": s.place.get_place_type_display(),
+            "short_description": s.place.short_description,
+        })
+        if len(items) >= 5:
+            break
+    return items
+
+
 def _count_parse_retries(conversation: LeadConversation, state: str) -> int:
     """Cuenta mensajes consecutivos del usuario en el mismo estado sin parseo exitoso.
     Simple: cuenta mensajes USER desde el último cambio detectado."""
@@ -358,19 +432,43 @@ def handle_recommend_circuit(conversation: LeadConversation) -> dict:
         )
 
     if circuit is not None:
-        text = f"Te recomiendo: {circuit.name}.\n{circuit.short_description}"
+        fallback_text = f"Te recomiendo: {circuit.name}.\n{circuit.short_description}"
         if result["reasons"]:
-            text += "\n\nPor qué: " + "; ".join(result["reasons"]) + "."
+            fallback_text += "\n\nPor qué: " + "; ".join(result["reasons"]) + "."
     else:
-        text = "No encontré un circuito exacto. Puedo derivarte al equipo de Aremko para asesoría personalizada."
+        fallback_text = "No encontré un circuito exacto. Puedo derivarte al equipo de Aremko para asesoría personalizada."
 
     if aremko_reco is not None:
-        text += f"\n\n💧 {aremko_reco.title}: {aremko_reco.message_text}"
+        fallback_text += f"\n\n💧 {aremko_reco.title}: {aremko_reco.message_text}"
 
-    _append_assistant_message(conversation, text)
+    # LLM: solo si hay un circuit para redactar — si no, mandamos fallback tal cual
+    final_text = fallback_text
+    llm_metadata: dict = {}
+    if circuit is not None:
+        from .llm.llm_reply_service import get_llm_reply_service
+        llm_ctx = {
+            "circuit": {
+                "name": circuit.name,
+                "duration_label": circuit.duration_case.name,
+                "short_description": circuit.short_description,
+            },
+            "first_day_summary": _circuit_first_day_summary(circuit),
+            "top_place_name": _circuit_top_place_name(circuit),
+            "aremko_recommendation": (
+                {"title": aremko_reco.title, "message_text": aremko_reco.message_text}
+                if aremko_reco else None
+            ),
+        }
+        llm_result = get_llm_reply_service().reply_recommend_circuit(llm_ctx, fallback_text)
+        final_text = llm_result["text"]
+        llm_metadata = llm_result.get("metadata") or {}
+
+    msg = _append_assistant_message(conversation, final_text)
+    _record_llm_metadata_if_any(msg, llm_metadata)
+
     return build_response(
         reply_type=REPLY_TYPE_RECOMMENDATION,
-        reply_text=text,
+        reply_text=final_text,
         conversation=conversation,
         recommended_circuit=circuit,
         aremko_recommendation=aremko_reco,
@@ -384,14 +482,27 @@ def handle_follow_up(conversation: LeadConversation, message_text: str) -> dict:
         conversation.save(update_fields=["showed_interest_in_aremko", "updated_at"])
         return handle_referral(conversation)
 
-    text = (
+    fallback_text = (
         "Puedo darte más detalle del circuito, sugerir restaurantes o actividades. "
         "¿Qué te gustaría profundizar?"
     )
-    _append_assistant_message(conversation, text)
+
+    circuit = conversation.recommended_circuit
+    from .llm.llm_reply_service import get_llm_reply_service
+    llm_ctx = {
+        "recommended_circuit": {"name": circuit.name} if circuit else None,
+        "available_places": _circuit_places_for_follow_up(circuit),
+    }
+    llm_result = get_llm_reply_service().reply_follow_up(llm_ctx, message_text, fallback_text)
+    final_text = llm_result["text"]
+    llm_metadata = llm_result.get("metadata") or {}
+
+    msg = _append_assistant_message(conversation, final_text)
+    _record_llm_metadata_if_any(msg, llm_metadata)
+
     return build_response(
         reply_type=REPLY_TYPE_INFO,
-        reply_text=text,
+        reply_text=final_text,
         conversation=conversation,
         recommended_circuit=conversation.recommended_circuit,
         channel_action=build_channel_action(conversation),
