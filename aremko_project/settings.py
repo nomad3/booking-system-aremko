@@ -357,3 +357,12 @@ DPV_LLM_TEMPERATURE = float(os.getenv("DPV_LLM_TEMPERATURE", "0.7"))
 DPV_LLM_TIMEOUT_SECONDS = int(os.getenv("DPV_LLM_TIMEOUT_SECONDS", "30"))
 DPV_LLM_SITE_URL = os.getenv("DPV_LLM_SITE_URL", "https://www.aremko.cl")
 DPV_LLM_SITE_NAME = os.getenv("DPV_LLM_SITE_NAME", "Destino Puerto Varas Piloto")
+
+# ──────────────── DPV — Bot WhatsApp (DPV-006) ────────────────
+DPV_BOT_ENABLED = os.getenv("DPV_BOT_ENABLED", "false").lower() == "true"
+DPV_BOT_ENABLED_JIDS = [
+    j.strip() for j in os.getenv("DPV_BOT_ENABLED_JIDS", "").split(",") if j.strip()
+]
+NEONIZE_SERVICE_URL = os.getenv("NEONIZE_SERVICE_URL", "")
+NEONIZE_SERVICE_TOKEN = os.getenv("NEONIZE_SERVICE_TOKEN", "")
+NEONIZE_SERVICE_TIMEOUT_SECONDS = int(os.getenv("NEONIZE_SERVICE_TIMEOUT_SECONDS", "15"))
