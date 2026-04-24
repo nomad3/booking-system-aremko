@@ -334,6 +334,10 @@ class ConversationMessage(models.Model):
     llm_cost_usd = models.DecimalField(max_digits=10, decimal_places=6, default=0)
     llm_latency_ms = models.PositiveIntegerField(default=0)
     llm_error = models.CharField(max_length=200, blank=True, default="")
+    # ─── External message dedup (DPV-006) ───
+    external_message_id = models.CharField(
+        max_length=120, blank=True, default="", db_index=True
+    )
 
     class Meta:
         ordering = ["created_at"]
