@@ -327,6 +327,13 @@ class ConversationMessage(models.Model):
     text = models.TextField()
     metadata = models.JSONField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # ─── LLM metadata (DPV-004) ───
+    llm_model = models.CharField(max_length=80, blank=True, default="")
+    llm_input_tokens = models.PositiveIntegerField(default=0)
+    llm_output_tokens = models.PositiveIntegerField(default=0)
+    llm_cost_usd = models.DecimalField(max_digits=10, decimal_places=6, default=0)
+    llm_latency_ms = models.PositiveIntegerField(default=0)
+    llm_error = models.CharField(max_length=200, blank=True, default="")
 
     class Meta:
         ordering = ["created_at"]
