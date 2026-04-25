@@ -6,7 +6,7 @@ from django import forms
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.utils.text import slugify
 
 from .enums import PlaceType
@@ -755,13 +755,14 @@ class PlaceEnrichmentDraftAdmin(admin.ModelAdmin):
         if fields.get("accessibility_notes"):
             rows.append(("♿", str(fields["accessibility_notes"])[:120]))
 
-        rows_html = ""
-        for emoji, text in rows:
-            rows_html += format_html(
-                '<div style="font-size:13px;line-height:1.5;color:#3a3a3a;margin:3px 0;">'
-                '<span style="display:inline-block;width:22px;">{}</span>{}</div>',
-                emoji, text,
-            )
+        # Usar format_html_join para que el resultado sea SafeString (si concatenamos
+        # con += desde "", queda str normal y format_html final lo escapa).
+        rows_html = format_html_join(
+            "",
+            '<div style="font-size:13px;line-height:1.5;color:#3a3a3a;margin:3px 0;">'
+            '<span style="display:inline-block;width:22px;">{}</span>{}</div>',
+            rows,
+        )
 
         # ─── Dato curioso (de extra_data) ───
         curioso_html = ""
