@@ -606,11 +606,23 @@ class PlaceEnrichmentDraftAdmin(admin.ModelAdmin):
         "applied_at",
         "reviewed_at",
         "proposed_data_pretty",
+        "mobile_preview",
     )
     ordering = ("-created_at",)
     actions = ["accion_aprobar", "accion_rechazar", "accion_aplicar_aprobados"]
     fieldsets = (
         ("Lugar", {"fields": ("place", "status")}),
+        (
+            "📱 Vista previa móvil (cómo lo verá el turista)",
+            {
+                "fields": ("mobile_preview",),
+                "description": (
+                    "Simulación de cómo se vería este lugar como mensaje de chat (Telegram/"
+                    "WhatsApp). Refleja los datos actuales del JSON de abajo — si los editas, "
+                    "guarda y refresca para actualizar la previa."
+                ),
+            },
+        ),
         (
             "Datos propuestos por la IA (revísalos)",
             {
@@ -662,6 +674,144 @@ class PlaceEnrichmentDraftAdmin(admin.ModelAdmin):
         except (TypeError, ValueError):
             return str(obj.proposed_data)
     proposed_data_pretty.short_description = "Vista formateada"
+
+    def mobile_preview(self, obj):
+        """Simula cómo se vería este lugar al turista en Telegram/WhatsApp."""
+        if not obj or not obj.proposed_data:
+            return format_html(
+                "<div style='color:#999;font-style:italic;'>Sin datos para previsualizar.</div>"
+            )
+
+        place = obj.place
+        data = obj.proposed_data or {}
+        fields = data.get("fields") or {}
+        long_desc = (data.get("long_description") or "").strip()
+        extra = data.get("extra_data") or {}
+        photos = data.get("photos") or []
+
+        type_icons = {
+            "ATTRACTION": "📍", "RESTAURANT": "🍴", "ACTIVITY": "🚣",
+            "VIEWPOINT": "🔭", "CAFE": "☕", "SHOP": "🛍",
+            "PARK": "🌲", "MUSEUM": "🏛", "OTHER": "📍",
+        }
+        icon = type_icons.get(place.place_type, "📍")
+
+        # ─── Header ───
+        header_html = format_html(
+            '<div style="font-size:15px;font-weight:600;color:#1a1a1a;margin-bottom:2px;">{} {}</div>',
+            icon, place.name,
+        )
+        loc_label = place.location_label or place.get_place_type_display()
+        sub_html = format_html(
+            '<div style="font-size:12px;color:#777;margin-bottom:10px;">{}</div>',
+            loc_label,
+        )
+
+        # ─── Foto (si hay) ───
+        photo_html = ""
+        if photos and isinstance(photos, list):
+            url = (photos[0].get("url") or "").strip() if isinstance(photos[0], dict) else ""
+            if url:
+                photo_html = format_html(
+                    '<div style="margin:8px 0 10px 0;border-radius:10px;overflow:hidden;">'
+                    '<img src="{}" alt="" style="width:100%;display:block;max-height:220px;object-fit:cover;"/></div>',
+                    url,
+                )
+
+        # ─── Descripción larga (truncada) ───
+        desc_html = ""
+        if long_desc:
+            preview = long_desc if len(long_desc) <= 280 else long_desc[:280].rsplit(" ", 1)[0] + "…"
+            desc_html = format_html(
+                '<div style="font-size:14px;line-height:1.5;color:#2a2a2a;margin-bottom:10px;">{}</div>',
+                preview,
+            )
+
+        # ─── Datos clave ───
+        rows = []
+        if fields.get("elevation_m"):
+            rows.append(("⛰", f"{fields['elevation_m']:,} m de altura".replace(",", ".")))
+        if fields.get("distance_from_pv_km"):
+            km = fields["distance_from_pv_km"]
+            extra_dist = f" · {fields['drive_time_from_pv_min']} min en auto" if fields.get("drive_time_from_pv_min") else ""
+            rows.append(("📍", f"{km} km de Puerto Varas{extra_dist}"))
+        if fields.get("year_established"):
+            rows.append(("📅", f"Establecido en {fields['year_established']}"))
+        if fields.get("entry_fee_clp") is not None:
+            fee = "Entrada gratuita" if fields["entry_fee_clp"] == 0 else f"Entrada: ${fields['entry_fee_clp']:,} CLP".replace(",", ".")
+            rows.append(("🎟", fee))
+        if fields.get("best_season"):
+            rows.append(("🌤", str(fields["best_season"])))
+
+        # Infraestructura
+        infra = []
+        if fields.get("has_parking"): infra.append("🅿 Estacionamiento")
+        if fields.get("has_restrooms"): infra.append("🚻 Baños")
+        if fields.get("has_conaf_office"): infra.append("🏠 CONAF")
+        if fields.get("has_food_service"): infra.append("🍴 Comida")
+        if infra:
+            rows.append(("✓", " · ".join(infra)))
+
+        if fields.get("accessibility_notes"):
+            rows.append(("♿", str(fields["accessibility_notes"])[:120]))
+
+        rows_html = ""
+        for emoji, text in rows:
+            rows_html += format_html(
+                '<div style="font-size:13px;line-height:1.5;color:#3a3a3a;margin:3px 0;">'
+                '<span style="display:inline-block;width:22px;">{}</span>{}</div>',
+                emoji, text,
+            )
+
+        # ─── Dato curioso (de extra_data) ───
+        curioso_html = ""
+        for k in ("datos_curiosos", "historia", "dato_curioso"):
+            v = extra.get(k)
+            if v:
+                txt = v if isinstance(v, str) else (v[0] if isinstance(v, list) and v else "")
+                if txt:
+                    txt_short = txt[:200] + ("…" if len(txt) > 200 else "")
+                    curioso_html = format_html(
+                        '<div style="margin-top:10px;padding:8px 10px;background:#fff8e1;border-left:3px solid #f5b800;border-radius:6px;font-size:12px;color:#5a4500;">'
+                        '<strong>💡 ¿Sabías que…?</strong><br>{}</div>',
+                        txt_short,
+                    )
+                    break
+
+        # ─── Composición final (chat bubble dentro de mockup phone) ───
+        return format_html(
+            '<div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;">'
+            # Phone frame
+            '<div style="width:360px;background:#e5ded8;border:1px solid #c8c0b8;border-radius:24px;padding:14px 10px;'
+            'box-shadow:0 6px 20px rgba(0,0,0,.12);font-family:-apple-system,BlinkMacSystemFont,\\"Segoe UI\\",sans-serif;">'
+            # Status bar
+            '<div style="display:flex;justify-content:space-between;font-size:11px;color:#555;padding:0 12px 8px 12px;">'
+            '<span>9:41</span><span>📶 ⚡ 87%</span></div>'
+            # Bot header
+            '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#075e54;color:#fff;border-radius:8px 8px 0 0;">'
+            '<div style="width:32px;height:32px;border-radius:50%;background:#0e8e7e;display:flex;align-items:center;justify-content:center;font-size:16px;">🌋</div>'
+            '<div><div style="font-size:13px;font-weight:600;">Destino Puerto Varas</div>'
+            '<div style="font-size:10px;opacity:.85;">en línea</div></div></div>'
+            # Bubble
+            '<div style="background:#fff;padding:12px 14px;border-radius:0 0 8px 8px 12px 12px 12px 4px;'
+            'max-width:100%;box-shadow:0 1px 1px rgba(0,0,0,.05);">'
+            '{}{}{}{}{}{}'  # header, sub, photo, desc, rows, curioso
+            '<div style="font-size:10px;color:#999;text-align:right;margin-top:6px;">9:42 ✓✓</div>'
+            '</div></div>'
+            # Notas al lado
+            '<div style="flex:1;min-width:280px;font-size:12px;color:#666;line-height:1.6;">'
+            '<strong>Nota:</strong> esto es una simulación. El bot real puede reformular el texto '
+            'según la pregunta del turista. Los emoticones y colores varían según la app (Telegram/WhatsApp).'
+            '<br><br><strong>Fotos:</strong> {} foto(s) propuesta(s).'
+            '<br><strong>Extra data:</strong> {} clave(s) temática(s).'
+            '<br><strong>Long description:</strong> {} caracteres.'
+            '</div></div>',
+            header_html, sub_html, photo_html, desc_html, rows_html, curioso_html,
+            len(photos) if isinstance(photos, list) else 0,
+            len(extra) if isinstance(extra, dict) else 0,
+            len(long_desc),
+        )
+    mobile_preview.short_description = "📱 Vista móvil"
 
     @admin.action(description="✓ Aprobar (sin aplicar todavía)")
     def accion_aprobar(self, request, queryset):
