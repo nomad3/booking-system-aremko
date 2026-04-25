@@ -1,0 +1,66 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo;
+    <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo;
+    <a href="{% url 'admin:destino_puerto_varas_place_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <div style="background:#eef6fb;padding:14px 18px;border-left:4px solid #0c4b78;margin:0 0 18px 0;max-width:780px;">
+        <strong>Cómo funciona:</strong> escribe el nombre del lugar y opcionalmente su ubicación.
+        Al enviar, el sistema:
+        <ol style="margin:8px 0 8px 22px;">
+            <li>Crea el lugar como borrador (no publicado).</li>
+            <li>Busca info en la web con <strong>Perplexity Search</strong>.</li>
+            <li>Estructura los datos con <strong>Claude</strong> (altura, año, infraestructura, distancia, descripción editorial, datos extra).</li>
+            <li>Te lleva al borrador para que revises, edites y aprueb-es+apliques.</li>
+        </ol>
+        <em>El proceso toma 15-40 segundos. No cierres la ventana.</em>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <ul class="errorlist">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+        {% endif %}
+
+        <fieldset class="module aligned">
+            {% for field in form %}
+                <div class="form-row{% if field.errors %} errors{% endif %}">
+                    <div>
+                        {{ field.label_tag }}
+                        {{ field }}
+                        {% if field.help_text %}
+                            <div class="help">{{ field.help_text|safe }}</div>
+                        {% endif %}
+                        {% if field.errors %}
+                            <ul class="errorlist">{% for error in field.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </fieldset>
+
+        <div class="submit-row">
+            <input type="submit"
+                   value="🤖 Crear y enriquecer con IA"
+                   class="default"
+                   onclick="this.value='⏳ Buscando y sintetizando...'; this.disabled=true; this.form.submit();">
+            <a href="{% url 'admin:destino_puerto_varas_place_changelist' %}"
+               class="button cancel-link"
+               style="margin-left:12px;">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

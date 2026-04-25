@@ -1,0 +1,13 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block object-tools-items %}
+    {% if quick_create_url %}
+        <li>
+            <a href="{{ quick_create_url }}" class="addlink" style="background-color:#0c4b78;border-color:#0c4b78;">
+                {% trans "+ Crear lugar con IA" %}
+            </a>
+        </li>
+    {% endif %}
+    {{ block.super }}
+{% endblock %}

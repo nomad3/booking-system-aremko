@@ -3,9 +3,13 @@ import logging
 
 from django.contrib import admin, messages
 from django import forms
-from django.urls import reverse
+from django.shortcuts import redirect
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
 from django.utils.html import format_html
+from django.utils.text import slugify
 
+from .enums import PlaceType
 from .models import (
     AgentPromptTemplate,
     AremkoRecommendation,
@@ -170,6 +174,41 @@ class PlacePhotoInline(admin.TabularInline):
     preview.short_description = "Vista previa"
 
 
+class PlaceQuickCreateForm(forms.Form):
+    """Formulario para crear un Place nuevo y dispararle enrichment IA."""
+    name = forms.CharField(
+        label="Nombre del lugar",
+        max_length=200,
+        widget=forms.TextInput(attrs={"placeholder": "Ej: Volcán Osorno", "size": 60}),
+        help_text="Nombre completo y reconocible. Mientras más específico, mejor búsqueda.",
+    )
+    place_type = forms.ChoiceField(
+        label="Tipo de lugar",
+        choices=PlaceType.choices,
+        initial=PlaceType.ATTRACTION,
+    )
+    location_label = forms.CharField(
+        label="Ubicación / contexto",
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={"placeholder": "Ej: Ensenada, Petrohué, Frutillar", "size": 60}),
+        help_text="Comuna/sector de referencia. Ayuda a la IA a desambiguar lugares con nombres parecidos.",
+    )
+    short_description = forms.CharField(
+        label="Descripción breve (opcional)",
+        max_length=500,
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 2, "cols": 60}),
+        help_text="Si la dejas vacía, la IA generará la descripción larga (long_description).",
+    )
+    publish_after = forms.BooleanField(
+        label="Publicar inmediatamente",
+        required=False,
+        initial=False,
+        help_text="Si lo dejas desmarcado, el lugar queda como borrador (no aparece al público).",
+    )
+
+
 @admin.register(Place)
 class PlaceAdmin(admin.ModelAdmin):
     list_display = (
@@ -288,6 +327,112 @@ class PlaceAdmin(admin.ModelAdmin):
                 f"✗ {fail} lugar(es) fallaron. Revisa logs.",
                 level=messages.WARNING,
             )
+
+    # ──────────────────────────────────────────────────────────────────
+    # "+ Crear lugar con IA" — formulario custom de creación con enrichment
+    # ──────────────────────────────────────────────────────────────────
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "crear-con-ia/",
+                self.admin_site.admin_view(self.quick_create_with_ai),
+                name="dpv_place_quick_create",
+            ),
+        ]
+        return custom + urls
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["quick_create_url"] = reverse("admin:dpv_place_quick_create")
+        return super().changelist_view(request, extra_context=extra_context)
+
+    def quick_create_with_ai(self, request):
+        from .services.place_enrichment_service import (
+            enrich_place,
+            is_enrichment_available,
+        )
+
+        if request.method == "POST":
+            form = PlaceQuickCreateForm(request.POST)
+            if form.is_valid():
+                if not is_enrichment_available():
+                    messages.error(
+                        request,
+                        "Faltan credenciales: necesito PERPLEXITY_API_KEY (search) "
+                        "y OPENROUTER_API_KEY (synthesis) en las env vars.",
+                    )
+                    return redirect("admin:dpv_place_quick_create")
+
+                name = form.cleaned_data["name"].strip()
+                base_slug = slugify(name) or "lugar"
+                slug = base_slug
+                n = 2
+                while Place.objects.filter(slug=slug).exists():
+                    slug = f"{base_slug}-{n}"
+                    n += 1
+
+                place = Place.objects.create(
+                    name=name,
+                    slug=slug,
+                    place_type=form.cleaned_data["place_type"],
+                    location_label=form.cleaned_data["location_label"] or "",
+                    short_description=form.cleaned_data["short_description"] or "",
+                    published=form.cleaned_data.get("publish_after", False),
+                )
+                messages.info(request, f"Lugar '{name}' creado (slug: {slug}).")
+
+                try:
+                    draft = enrich_place(place, save=True)
+                except Exception as exc:
+                    logger.exception("quick_create_with_ai: enrich_place lanzó excepción")
+                    messages.error(
+                        request,
+                        f"La IA falló: {exc}. El lugar quedó creado, "
+                        "puedes enriquecerlo después con la acción 'Enriquecer con IA'.",
+                    )
+                    return redirect("admin:destino_puerto_varas_place_change", place.id)
+
+                if not draft:
+                    messages.warning(
+                        request,
+                        "enrich_place retornó None (revisa logs). "
+                        "El lugar quedó creado pero sin borrador.",
+                    )
+                    return redirect("admin:destino_puerto_varas_place_change", place.id)
+
+                if draft.status == PlaceEnrichmentDraft.STATUS_REJECTED:
+                    messages.warning(
+                        request,
+                        f"Borrador generado pero la IA falló: {draft.review_notes}. "
+                        "Lugar creado; reintenta o llena los campos a mano.",
+                    )
+                else:
+                    messages.success(
+                        request,
+                        "✓ Borrador IA generado. Revísalo abajo, edita lo que quieras "
+                        "y aprueba+aplica para volcarlo al lugar.",
+                    )
+                return redirect(
+                    "admin:destino_puerto_varas_placeenrichmentdraft_change",
+                    draft.id,
+                )
+        else:
+            form = PlaceQuickCreateForm()
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Crear lugar con IA",
+            "form": form,
+            "opts": self.model._meta,
+            "has_view_permission": self.has_view_permission(request),
+        }
+        return TemplateResponse(
+            request,
+            "admin/destino_puerto_varas/place/quick_create.html",
+            context,
+        )
 
 
 @admin.register(CircuitPlace)
