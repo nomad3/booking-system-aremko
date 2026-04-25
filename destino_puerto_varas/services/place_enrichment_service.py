@@ -349,6 +349,14 @@ _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
 
 
 def _parse_json(text: str) -> tuple[dict[str, Any] | None, str]:
+    """Parsea el primer objeto JSON en `text`.
+
+    Tolerante a:
+    - Bloques markdown (```json ... ```)
+    - Texto antes del primer `{`
+    - Contenido extra después del cierre del JSON (citas, comentarios, otro bloque)
+      → usa JSONDecoder.raw_decode() en vez de json.loads().
+    """
     if not text:
         return None, "respuesta vacía"
 
@@ -363,8 +371,12 @@ def _parse_json(text: str) -> tuple[dict[str, Any] | None, str]:
             return None, "no se encontró objeto JSON"
         candidate = candidate[first_brace:]
 
+    decoder = json.JSONDecoder()
     try:
-        return json.loads(candidate), ""
+        obj, _end = decoder.raw_decode(candidate)
+        if not isinstance(obj, dict):
+            return None, f"objeto JSON no es dict (got {type(obj).__name__})"
+        return obj, ""
     except json.JSONDecodeError as exc:
         return None, f"JSONDecodeError: {exc}"
 
