@@ -200,6 +200,61 @@ class DurationCaseAdmin(admin.ModelAdmin):
     ordering = ("sort_order", "days")
 
 
+class CircuitManualCreateForm(forms.Form):
+    """Form de creación manual de Circuit.
+
+    El usuario elige las paradas en orden (sortable JS). La IA NO selecciona
+    paradas — solo propone 3 nombres alternativos + narrativa + flags.
+    El usuario elige el nombre en un segundo paso.
+    """
+
+    duration_case = forms.ModelChoiceField(
+        label="Duración",
+        queryset=DurationCase.objects.filter(is_active=True).order_by("sort_order", "days"),
+        required=True,
+        help_text="Define cuántos días tendrá el circuito.",
+    )
+    primary_interest = forms.ChoiceField(
+        label="Interés primario",
+        choices=InterestType.choices,
+        required=True,
+        help_text="El tema principal del circuito.",
+    )
+    recommended_profile = forms.ChoiceField(
+        label="Perfil recomendado",
+        choices=[("", "(no aplica)")] + list(ProfileType.choices),
+        required=False,
+    )
+    places_ordered = forms.CharField(
+        widget=forms.HiddenInput(),
+        required=True,
+        help_text="IDs de Places en orden separados por coma (controlado por JS sortable).",
+    )
+
+    def clean_places_ordered(self):
+        raw = (self.cleaned_data.get("places_ordered") or "").strip()
+        if not raw:
+            raise forms.ValidationError("Debes agregar al menos 1 parada.")
+        try:
+            ids = [int(x.strip()) for x in raw.split(",") if x.strip()]
+        except ValueError:
+            raise forms.ValidationError("Formato de paradas inválido.")
+        if not ids:
+            raise forms.ValidationError("Debes agregar al menos 1 parada.")
+
+        # Validar que TODOS estén publicados
+        valid = set(
+            Place.objects.filter(id__in=ids, published=True).values_list("id", flat=True)
+        )
+        invalid = [pid for pid in ids if pid not in valid]
+        if invalid:
+            raise forms.ValidationError(
+                f"Estos Places no existen o no están publicados: {invalid}. "
+                "Las paradas de un circuito deben ser Places publicados."
+            )
+        return ids
+
+
 class CircuitQuickCreateForm(forms.Form):
     """Form de quick-create de Circuit con IA.
 
@@ -350,12 +405,23 @@ class CircuitAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.quick_create_circuit_with_ai),
                 name="dpv_circuit_quick_create",
             ),
+            path(
+                "crear-manual/",
+                self.admin_site.admin_view(self.manual_create_circuit),
+                name="dpv_circuit_manual_create",
+            ),
+            path(
+                "crear-manual/revisar/<int:draft_id>/",
+                self.admin_site.admin_view(self.manual_review_branding),
+                name="dpv_circuit_manual_review",
+            ),
         ]
         return custom + urls
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
         extra_context["quick_create_url"] = reverse("admin:dpv_circuit_quick_create")
+        extra_context["manual_create_url"] = reverse("admin:dpv_circuit_manual_create")
         return super().changelist_view(request, extra_context=extra_context)
 
     def quick_create_circuit_with_ai(self, request):
@@ -464,6 +530,167 @@ class CircuitAdmin(admin.ModelAdmin):
         return TemplateResponse(
             request,
             "admin/destino_puerto_varas/circuit/quick_create.html",
+            context,
+        )
+
+    # ─── Form 2 modo Manual: 2 pasos (paradas → revisar nombre → crear) ───
+    def manual_create_circuit(self, request):
+        """Step 1 manual: usuario elige paradas en orden + parámetros básicos."""
+        from .services.circuit_narrative_service import propose_circuit_branding
+
+        if request.method == "POST":
+            form = CircuitManualCreateForm(request.POST)
+            if form.is_valid():
+                from django.conf import settings as dj_settings
+
+                if not getattr(dj_settings, "OPENROUTER_API_KEY", ""):
+                    messages.error(
+                        request,
+                        "OPENROUTER_API_KEY no está configurada en Render.",
+                    )
+                    return redirect("admin:dpv_circuit_manual_create")
+
+                place_ids = form.cleaned_data["places_ordered"]
+                # Preservar orden — Place.objects.filter no garantiza orden por IDs
+                places_by_id = {
+                    p.id: p
+                    for p in Place.objects.filter(id__in=place_ids, published=True)
+                }
+                places_in_order = [places_by_id[pid] for pid in place_ids if pid in places_by_id]
+
+                try:
+                    draft = propose_circuit_branding(
+                        places_in_order=places_in_order,
+                        duration_case=form.cleaned_data["duration_case"],
+                        primary_interest=form.cleaned_data["primary_interest"],
+                        recommended_profile=form.cleaned_data.get("recommended_profile") or "",
+                    )
+                except Exception as exc:
+                    logger.exception("manual_create_circuit: propose_circuit_branding falló")
+                    messages.error(request, f"La IA falló: {exc}.")
+                    return redirect("admin:dpv_circuit_manual_create")
+
+                if not draft:
+                    messages.error(request, "El servicio retornó None. Revisa configuración del LLM.")
+                    return redirect("admin:dpv_circuit_manual_create")
+
+                if draft.status == CircuitCompositionDraft.STATUS_REJECTED:
+                    messages.warning(
+                        request,
+                        f"La IA falló componiendo el branding: {draft.review_notes}.",
+                    )
+                    return redirect(
+                        "admin:destino_puerto_varas_circuitcompositiondraft_change",
+                        draft.id,
+                    )
+
+                return redirect("admin:dpv_circuit_manual_review", draft.id)
+        else:
+            form = CircuitManualCreateForm()
+
+        # Catálogo para el autocomplete del sortable
+        published_places = list(
+            Place.objects.filter(published=True).order_by("name").values(
+                "id", "name", "place_type", "location_label"
+            )
+        )
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Crear circuito manual",
+            "form": form,
+            "opts": self.model._meta,
+            "has_view_permission": self.has_view_permission(request),
+            "published_places_json": json.dumps(published_places, ensure_ascii=False),
+        }
+        return TemplateResponse(
+            request,
+            "admin/destino_puerto_varas/circuit/manual_create.html",
+            context,
+        )
+
+    def manual_review_branding(self, request, draft_id):
+        """Step 2 manual: usuario revisa las 3 propuestas de nombre y elige una."""
+        from .services.circuit_composer_service import apply_manual_composition
+
+        draft = get_object_or_404(CircuitCompositionDraft, pk=draft_id)
+
+        if draft.status not in (
+            CircuitCompositionDraft.STATUS_DRAFT,
+            CircuitCompositionDraft.STATUS_APPROVED,
+        ):
+            messages.warning(
+                request,
+                f"Este borrador ya está en estado {draft.get_status_display()}, no se puede revisar.",
+            )
+            if draft.created_circuit_id:
+                return redirect(
+                    "admin:destino_puerto_varas_circuit_change", draft.created_circuit_id
+                )
+            return redirect("admin:destino_puerto_varas_circuit_changelist")
+
+        proposed = draft.proposed_data or {}
+        options = proposed.get("name_options") or []
+
+        if request.method == "POST":
+            try:
+                chosen_index = int(request.POST.get("chosen_name_index", "0"))
+            except ValueError:
+                chosen_index = 0
+            if chosen_index < 0 or chosen_index >= len(options):
+                messages.error(request, "Índice de nombre inválido.")
+                return redirect("admin:dpv_circuit_manual_review", draft.id)
+
+            try:
+                circuit = apply_manual_composition(
+                    draft,
+                    chosen_name_index=chosen_index,
+                    reviewer=request.user.username,
+                )
+            except Exception as exc:
+                logger.exception("manual_review_branding: apply_manual_composition falló")
+                messages.error(request, f"Error creando el circuito: {exc}.")
+                return redirect("admin:dpv_circuit_manual_review", draft.id)
+
+            if not circuit:
+                messages.warning(request, "apply_manual_composition retornó None. Revisa logs.")
+                return redirect("admin:dpv_circuit_manual_review", draft.id)
+
+            messages.success(
+                request,
+                f"✓ Circuito '#{circuit.number} {circuit.name}' creado con "
+                f"{circuit.days.count()} día(s) y {sum(d.place_stops.count() for d in circuit.days.all())} parada(s). "
+                "Revísalo abajo y publícalo cuando esté listo.",
+            )
+            return redirect("admin:destino_puerto_varas_circuit_change", circuit.id)
+
+        # GET: render con paradas + 3 cards
+        place_ids_in_order = draft.anchor_place_ids or []
+        places_by_id = {p.id: p for p in Place.objects.filter(id__in=place_ids_in_order)}
+        ordered_places = [places_by_id[pid] for pid in place_ids_in_order if pid in places_by_id]
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Revisa y elige el nombre del circuito",
+            "draft": draft,
+            "ordered_places": ordered_places,
+            "name_options": options,
+            "long_description": proposed.get("long_description", ""),
+            "day_summaries": proposed.get("day_summaries", {}),
+            "flags": {
+                "is_romantic": proposed.get("is_romantic", False),
+                "is_family_friendly": proposed.get("is_family_friendly", False),
+                "is_adventure": proposed.get("is_adventure", False),
+                "is_rain_friendly": proposed.get("is_rain_friendly", False),
+                "is_premium": proposed.get("is_premium", False),
+            },
+            "rationale": proposed.get("rationale", ""),
+            "opts": self.model._meta,
+            "has_view_permission": self.has_view_permission(request),
+        }
+        return TemplateResponse(
+            request,
+            "admin/destino_puerto_varas/circuit/manual_create_review.html",
             context,
         )
 

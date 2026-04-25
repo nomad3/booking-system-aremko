@@ -9,5 +9,12 @@
             </a>
         </li>
     {% endif %}
+    {% if manual_create_url %}
+        <li>
+            <a href="{{ manual_create_url }}" class="addlink" style="background-color:#388e3c;border-color:#2e7d32;">
+                {% trans "+ Crear circuito manual" %}
+            </a>
+        </li>
+    {% endif %}
     {{ block.super }}
 {% endblock %}

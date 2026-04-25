@@ -307,3 +307,240 @@ def _normalize(parsed: dict[str, Any]) -> dict[str, Any]:
         for k, v in raw_summaries.items():
             out["day_summaries"][str(k)] = str(v or "").strip()
     return out
+
+
+# ─── Form 2 (modo Manual): branding desde paradas ya elegidas ───
+#
+# A diferencia de generate_circuit_narrative (que opera sobre un Circuit ya
+# creado), propose_circuit_branding recibe las paradas + parámetros y propone
+# el "vestido" del circuito sin tocar la BD: 3 nombres alternativos, narrativa,
+# day summaries y flags inferidos. El usuario elige el nombre, y recién ahí se
+# crea el Circuit.
+
+BRANDING_SYSTEM_PROMPT = """Eres un editor de turismo experto en Puerto Varas y la \
+región de Los Lagos (Chile). Recibes una secuencia de paradas que el usuario eligió \
+manualmente para armar un circuito turístico. Tu trabajo es darle "vestido editorial": \
+proponer 3 alternativas de nombre, redactar la narrativa, los resúmenes por día y \
+deducir flags booleanos.
+
+Reglas no negociables:
+1. NO inventes paradas — usa exclusivamente las que aparecen en el contexto.
+2. NO afirmes datos no verificables (altura, año, servicios) que no estén en el contexto.
+3. Los 3 nombres deben ser DISTINTOS en estilo: uno descriptivo, uno evocador, uno \
+   con guiño cultural/local. Máximo 60 caracteres cada uno.
+4. Cada nombre debe traer su short_description acompañante (1-2 oraciones, max 240 chars).
+5. La narrativa larga (long_description) es UNA sola para todos los nombres (no se \
+   reescribe por cada propuesta) — 400-700 palabras, tono cercano, evocador, español \
+   de Chile, sin clichés.
+6. Los flags booleanos se deducen de las paradas reales, no del título o de la idea.
+
+Devuelve SOLO JSON, sin texto antes/después, sin bloque markdown:
+
+{
+  "name_options": [
+    {"name": "Nombre alternativo 1", "slug": "slug-1", "short_description": "..."},
+    {"name": "Nombre alternativo 2", "slug": "slug-2", "short_description": "..."},
+    {"name": "Nombre alternativo 3", "slug": "slug-3", "short_description": "..."}
+  ],
+  "long_description": "<400-700 palabras: hook + paradas en orden + cierre>",
+  "day_summaries": {"1": "...", "2": "..."},
+  "is_romantic": false,
+  "is_family_friendly": false,
+  "is_adventure": false,
+  "is_rain_friendly": false,
+  "is_premium": false,
+  "rationale": "Por qué los flags y los nombres encajan con las paradas (1-3 oraciones)."
+}
+
+JSON estricto: comillas dobles, sin trailing commas.
+"""
+
+
+def propose_circuit_branding(
+    *,
+    places_in_order: list,
+    duration_case,
+    primary_interest: str = "",
+    recommended_profile: str = "",
+    save_draft: bool = True,
+    model: str | None = None,
+):
+    """Propone branding (nombres + narrativa + flags) para un set de paradas.
+
+    Retorna `CircuitCompositionDraft` (mode=manual implícito) con `proposed_data`
+    que tiene `name_options` (3), `long_description`, `day_summaries`, flags.
+    Las paradas se guardan en `anchor_place_ids` para referencia al aplicar.
+
+    `places_in_order` es una lista de Place ya ordenada por el usuario.
+    """
+    from ..models import CircuitCompositionDraft  # local import: evita circular
+
+    provider = OpenRouterProvider()
+    if not provider.api_key:
+        logger.warning("propose_circuit_branding: OPENROUTER_API_KEY no configurada")
+        return None
+
+    place_ids = [p.id for p in places_in_order]
+    user_prompt = _build_branding_context(
+        places_in_order=places_in_order,
+        duration_case=duration_case,
+        primary_interest=primary_interest,
+        recommended_profile=recommended_profile,
+    )
+
+    result = provider.generate(
+        system_prompt=BRANDING_SYSTEM_PROMPT,
+        user_prompt=user_prompt,
+        model=model,
+        max_tokens=3000,
+        temperature=0.7,  # más creatividad: estamos generando 3 alternativas distintas
+    )
+
+    base_kwargs = {
+        "user_idea": "(modo manual — paradas elegidas por el usuario)",
+        "duration_case": duration_case,
+        "primary_interest": primary_interest or "",
+        "recommended_profile": recommended_profile or "",
+        "anchor_place_ids": place_ids,
+        "llm_model": result.model,
+        "llm_input_tokens": result.input_tokens,
+        "llm_output_tokens": result.output_tokens,
+        "llm_latency_ms": result.latency_ms,
+    }
+
+    if not result.ok:
+        draft = CircuitCompositionDraft(
+            status=CircuitCompositionDraft.STATUS_REJECTED,
+            proposed_data={"mode": "manual"},
+            review_notes=f"[auto] LLM falló: {result.error}",
+            **base_kwargs,
+        )
+        if save_draft:
+            draft.save()
+        return draft
+
+    parsed, parse_error = _parse_json(result.text)
+    if not parsed:
+        draft = CircuitCompositionDraft(
+            status=CircuitCompositionDraft.STATUS_REJECTED,
+            proposed_data={"mode": "manual", "raw_text": result.text},
+            review_notes=f"[auto] No pude parsear JSON: {parse_error}",
+            **base_kwargs,
+        )
+        if save_draft:
+            draft.save()
+        return draft
+
+    proposed = _normalize_branding(parsed)
+    proposed["mode"] = "manual"
+
+    draft = CircuitCompositionDraft(
+        status=CircuitCompositionDraft.STATUS_DRAFT,
+        proposed_data=proposed,
+        review_notes="",
+        **base_kwargs,
+    )
+    if save_draft:
+        draft.save()
+    return draft
+
+
+def _build_branding_context(
+    *,
+    places_in_order: list,
+    duration_case,
+    primary_interest: str,
+    recommended_profile: str,
+) -> str:
+    lines: list[str] = []
+    lines.append("=== PARÁMETROS ===")
+    if duration_case:
+        lines.append(
+            f"Duración: {duration_case.days} día(s) / {duration_case.nights} noche(s) "
+            f"— {duration_case.name} (code={duration_case.code})"
+        )
+    if primary_interest:
+        lines.append(f"Interés primario (decidido por usuario): {primary_interest}")
+    if recommended_profile:
+        lines.append(f"Perfil recomendado: {recommended_profile}")
+    lines.append("")
+    lines.append("=== PARADAS EN ORDEN (de partida a llegada) ===")
+    if not places_in_order:
+        lines.append("(sin paradas — error: este flujo requiere al menos 1 parada)")
+        return "\n".join(lines)
+
+    for idx, p in enumerate(places_in_order, start=1):
+        lines.append("")
+        lines.append(f"Parada {idx}: {p.name} (id={p.id})")
+        if p.location_label:
+            lines.append(f"  Ubicación: {p.location_label}")
+        lines.append(f"  Tipo: {p.get_place_type_display()}")
+        if p.short_description:
+            lines.append(f"  Descripción breve: {p.short_description}")
+        if p.long_description:
+            desc = p.long_description.strip()
+            if len(desc) > 350:
+                desc = desc[:350] + "..."
+            lines.append(f"  Descripción larga: {desc}")
+        if p.elevation_m:
+            lines.append(f"  Altitud: {p.elevation_m} m")
+        if p.distance_from_pv_km:
+            lines.append(f"  Distancia desde Pto Varas: {p.distance_from_pv_km} km")
+        flags_p = []
+        if p.is_rain_friendly: flags_p.append("apto lluvia")
+        if p.is_romantic: flags_p.append("romántico")
+        if p.is_family_friendly: flags_p.append("apto familias")
+        if p.is_adventure_related: flags_p.append("aventura")
+        if flags_p:
+            lines.append(f"  Etiquetas: {', '.join(flags_p)}")
+        if p.entry_fee_clp is not None:
+            fee = "gratis" if p.entry_fee_clp == 0 else f"${p.entry_fee_clp:,} CLP"
+            lines.append(f"  Entrada: {fee}")
+
+    lines.append("")
+    lines.append("=== INSTRUCCIÓN ===")
+    lines.append(
+        "Genera el branding del circuito según el formato JSON en el system prompt. "
+        "Recuerda: 3 alternativas de nombre con estilos distintos, una narrativa única."
+    )
+    return "\n".join(lines)
+
+
+def _normalize_branding(parsed: dict[str, Any]) -> dict[str, Any]:
+    """Coacciona tipos del payload de branding sin mutar el input."""
+    from django.utils.text import slugify  # local: evita ciclos en imports
+
+    out: dict[str, Any] = {
+        "name_options": [],
+        "long_description": str(parsed.get("long_description") or "").strip(),
+        "day_summaries": {},
+        "is_romantic": bool(parsed.get("is_romantic")),
+        "is_family_friendly": bool(parsed.get("is_family_friendly")),
+        "is_adventure": bool(parsed.get("is_adventure")),
+        "is_rain_friendly": bool(parsed.get("is_rain_friendly")),
+        "is_premium": bool(parsed.get("is_premium")),
+        "rationale": str(parsed.get("rationale") or "").strip(),
+    }
+
+    raw_options = parsed.get("name_options") or []
+    if isinstance(raw_options, list):
+        for opt in raw_options[:3]:
+            if not isinstance(opt, dict):
+                continue
+            name = str(opt.get("name") or "").strip()[:200]
+            if not name:
+                continue
+            slug = slugify(str(opt.get("slug") or name))[:200]
+            short = str(opt.get("short_description") or "").strip()[:255]
+            out["name_options"].append({
+                "name": name,
+                "slug": slug,
+                "short_description": short,
+            })
+
+    raw_summaries = parsed.get("day_summaries") or {}
+    if isinstance(raw_summaries, dict):
+        for k, v in raw_summaries.items():
+            out["day_summaries"][str(k)] = str(v or "").strip()
+
+    return out

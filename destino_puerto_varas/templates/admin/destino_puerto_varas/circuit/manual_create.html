@@ -1,0 +1,246 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    {{ form.media }}
+    <style>
+        #places-builder { max-width: 880px; margin: 18px 0; }
+        #places-add-row { display: flex; gap: 8px; align-items: center; margin: 10px 0 18px 0; }
+        #place-search-input {
+            flex: 1; padding: 8px 10px; font-size: 14px;
+            border: 1px solid #aaa; border-radius: 4px;
+        }
+        #places-sortable {
+            list-style: none; padding: 0; margin: 0;
+            border: 1px dashed #aaa; border-radius: 4px; min-height: 60px;
+            background: #fafafa;
+        }
+        #places-sortable.empty::before {
+            content: "Aún no agregas paradas. Búscalas arriba y se irán agregando aquí en orden.";
+            display: block; padding: 18px; color: #888; font-style: italic; text-align: center;
+        }
+        .stop-item {
+            background: #fff; border-bottom: 1px solid #ddd;
+            padding: 10px 14px; cursor: move; display: flex; align-items: center; gap: 12px;
+        }
+        .stop-item:hover { background: #f0f7fb; }
+        .stop-item:last-child { border-bottom: none; }
+        .stop-handle { color: #888; font-size: 18px; user-select: none; }
+        .stop-order { min-width: 28px; font-weight: 600; color: #0c4b78; }
+        .stop-info { flex: 1; }
+        .stop-name { font-weight: 600; }
+        .stop-meta { font-size: 12px; color: #666; }
+        .stop-remove {
+            background: #c62828; color: #fff; border: none; border-radius: 4px;
+            padding: 4px 10px; cursor: pointer; font-size: 12px;
+        }
+        .stop-remove:hover { background: #a01818; }
+        .ui-sortable-helper { box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .ui-sortable-placeholder { background: #fffaeb !important; visibility: visible !important; height: 50px; border: 2px dashed #f5b800; }
+    </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo;
+    <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo;
+    <a href="{% url 'admin:destino_puerto_varas_circuit_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <div style="background:#eef6fb;padding:14px 18px;border-left:4px solid #0c4b78;margin:0 0 18px 0;max-width:880px;">
+        <strong>Modo manual:</strong> tú eliges las paradas en el orden que quieras (de partida a llegada).
+        La IA solo:
+        <ol style="margin:8px 0 8px 22px;">
+            <li>Propone <strong>3 alternativas de nombre</strong> con sus descripciones cortas.</li>
+            <li>Redacta la <strong>narrativa larga</strong> (long_description).</li>
+            <li>Genera los <strong>resúmenes de cada día</strong> (auto-distribuye paradas según la duración).</li>
+            <li>Deduce los <strong>flags</strong> (romántico, familia, lluvia, etc.) a partir de las paradas elegidas.</li>
+        </ol>
+        En el siguiente paso eliges qué nombre prefieres y se crea el Circuit.
+        <br><em>Restricción dura: solo puedes agregar Places que ya estén publicados.</em>
+    </div>
+
+    <form method="post" novalidate id="manual-create-form">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <ul class="errorlist">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+        {% endif %}
+
+        <fieldset class="module aligned">
+            <h2>Parámetros</h2>
+
+            <div class="form-row{% if form.duration_case.errors %} errors{% endif %}">
+                <div>
+                    {{ form.duration_case.label_tag }} {{ form.duration_case }}
+                    {% if form.duration_case.help_text %}<div class="help">{{ form.duration_case.help_text }}</div>{% endif %}
+                    {% for e in form.duration_case.errors %}<p class="errornote">{{ e }}</p>{% endfor %}
+                </div>
+            </div>
+            <div class="form-row{% if form.primary_interest.errors %} errors{% endif %}">
+                <div>
+                    {{ form.primary_interest.label_tag }} {{ form.primary_interest }}
+                    {% if form.primary_interest.help_text %}<div class="help">{{ form.primary_interest.help_text }}</div>{% endif %}
+                    {% for e in form.primary_interest.errors %}<p class="errornote">{{ e }}</p>{% endfor %}
+                </div>
+            </div>
+            <div class="form-row{% if form.recommended_profile.errors %} errors{% endif %}">
+                <div>
+                    {{ form.recommended_profile.label_tag }} {{ form.recommended_profile }}
+                    {% for e in form.recommended_profile.errors %}<p class="errornote">{{ e }}</p>{% endfor %}
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="module aligned">
+            <h2>Paradas (de partida a llegada)</h2>
+
+            <div id="places-builder">
+                <div id="places-add-row">
+                    <input type="text"
+                           id="place-search-input"
+                           placeholder="Busca un Place publicado por nombre o ubicación..."
+                           autocomplete="off">
+                    <select id="place-search-select" style="min-width:280px;"></select>
+                    <button type="button" id="place-add-btn" class="button" style="background:#0c4b78;color:#fff;">+ Agregar</button>
+                </div>
+
+                <ul id="places-sortable" class="empty"></ul>
+
+                {{ form.places_ordered }}
+                {% for e in form.places_ordered.errors %}<p class="errornote" style="margin-top:8px;">{{ e }}</p>{% endfor %}
+
+                <div class="help" style="margin-top:8px;">
+                    💡 Arrastra los items para reordenar. Click en ✗ para quitar una parada.
+                </div>
+            </div>
+        </fieldset>
+
+        <div class="submit-row">
+            <input type="submit"
+                   id="submit-btn"
+                   value="🤖 Componer branding con IA"
+                   class="default">
+            <a href="{% url 'admin:destino_puerto_varas_circuit_changelist' %}"
+               class="button cancel-link"
+               style="margin-left:12px;">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<script id="published-places-data" type="application/json">{{ published_places_json|safe }}</script>
+
+<script>
+(function() {
+    'use strict';
+
+    var $ = django.jQuery;
+    var PLACES = JSON.parse(document.getElementById('published-places-data').textContent || '[]');
+    var addedIds = new Set();
+
+    var $select = $('#place-search-select');
+    var $search = $('#place-search-input');
+    var $sortable = $('#places-sortable');
+    var $hidden = $('#id_places_ordered');
+    var $form = $('#manual-create-form');
+    var $submitBtn = $('#submit-btn');
+
+    function refreshSelect() {
+        $select.empty().append('<option value="">— Elige una parada —</option>');
+        var q = ($search.val() || '').toLowerCase().trim();
+        var matches = PLACES.filter(function(p) {
+            if (addedIds.has(p.id)) return false;
+            if (!q) return true;
+            return (p.name || '').toLowerCase().indexOf(q) !== -1
+                || (p.location_label || '').toLowerCase().indexOf(q) !== -1;
+        });
+        matches.slice(0, 50).forEach(function(p) {
+            var label = p.name + (p.location_label ? ' — ' + p.location_label : '');
+            $select.append($('<option>').val(p.id).text(label));
+        });
+    }
+
+    function refreshOrder() {
+        var ids = [];
+        $sortable.find('li.stop-item').each(function(idx) {
+            var id = $(this).data('place-id');
+            ids.push(id);
+            $(this).find('.stop-order').text((idx + 1) + '.');
+        });
+        $hidden.val(ids.join(','));
+        $sortable.toggleClass('empty', ids.length === 0);
+    }
+
+    function addPlace(placeId) {
+        placeId = parseInt(placeId, 10);
+        if (!placeId || addedIds.has(placeId)) return;
+        var p = PLACES.find(function(x) { return x.id === placeId; });
+        if (!p) return;
+        addedIds.add(placeId);
+
+        var $li = $('<li class="stop-item"></li>')
+            .attr('data-place-id', p.id)
+            .append('<span class="stop-handle">≡</span>')
+            .append('<span class="stop-order"></span>')
+            .append(
+                $('<div class="stop-info"></div>')
+                    .append($('<div class="stop-name"></div>').text(p.name))
+                    .append($('<div class="stop-meta"></div>').text(
+                        (p.place_type || '') + (p.location_label ? ' · ' + p.location_label : '')
+                    ))
+            )
+            .append(
+                $('<button type="button" class="stop-remove">✗ Quitar</button>')
+                    .on('click', function() {
+                        addedIds.delete(p.id);
+                        $li.remove();
+                        refreshOrder();
+                        refreshSelect();
+                    })
+            );
+
+        $sortable.append($li);
+        refreshOrder();
+        refreshSelect();
+        $select.val('');
+    }
+
+    $('#place-add-btn').on('click', function() {
+        var pid = $select.val();
+        if (pid) addPlace(pid);
+    });
+
+    $search.on('input', refreshSelect);
+    $select.on('change', function() {
+        // Permitir agregar también con Enter en el select
+    });
+
+    $sortable.sortable({
+        handle: '.stop-handle',
+        axis: 'y',
+        update: refreshOrder,
+        placeholder: 'ui-sortable-placeholder'
+    });
+
+    $form.on('submit', function() {
+        if (!$hidden.val()) {
+            alert('Agrega al menos una parada antes de continuar.');
+            return false;
+        }
+        $submitBtn.val('⏳ Componiendo (15-30s)...').prop('disabled', true);
+    });
+
+    // Init
+    refreshSelect();
+})();
+</script>
+{% endblock %}

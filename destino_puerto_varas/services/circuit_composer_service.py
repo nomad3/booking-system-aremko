@@ -522,3 +522,161 @@ def _safe_choice(value: Any, valid_values: list[str], default: str) -> str:
     if value and str(value) in valid_values:
         return str(value)
     return default
+
+
+# ─── Modo Manual: aplicar branding + paradas elegidas por el usuario ───
+
+
+@transaction.atomic
+def apply_manual_composition(
+    draft: CircuitCompositionDraft,
+    *,
+    chosen_name_index: int,
+    reviewer: str = "",
+    publish: bool = False,
+) -> Circuit | None:
+    """Aplica un draft generado por propose_circuit_branding (modo manual).
+
+    `draft.anchor_place_ids` contiene la lista ordenada de Places elegidos.
+    `draft.proposed_data["name_options"]` tiene las 3 alternativas.
+    `chosen_name_index` (0,1,2) es la elegida por el usuario.
+
+    Auto-distribuye las paradas en N días donde N = duration_case.days.
+    """
+    if draft.status not in (
+        CircuitCompositionDraft.STATUS_DRAFT,
+        CircuitCompositionDraft.STATUS_APPROVED,
+    ):
+        logger.warning(
+            "apply_manual_composition: draft #%s no aplicable (status=%s)",
+            draft.id,
+            draft.status,
+        )
+        return None
+
+    proposed = draft.proposed_data or {}
+    options = proposed.get("name_options") or []
+    if not options:
+        logger.warning("apply_manual_composition: draft #%s sin name_options", draft.id)
+        return None
+    try:
+        chosen = options[int(chosen_name_index)]
+    except (IndexError, TypeError, ValueError):
+        logger.warning(
+            "apply_manual_composition: índice %s inválido (options=%d)",
+            chosen_name_index,
+            len(options),
+        )
+        return None
+
+    place_ids = draft.anchor_place_ids or []
+    if not place_ids:
+        logger.warning("apply_manual_composition: draft #%s sin paradas", draft.id)
+        return None
+
+    duration_case = draft.duration_case
+    if not duration_case:
+        logger.error("apply_manual_composition: draft #%s sin duration_case", draft.id)
+        return None
+
+    # Resolver Places preservando el orden y filtrando por publicado
+    places_by_id = {p.id: p for p in Place.objects.filter(id__in=place_ids, published=True)}
+    places_in_order = [places_by_id[pid] for pid in place_ids if pid in places_by_id]
+    if not places_in_order:
+        logger.warning("apply_manual_composition: ninguna parada está publicada")
+        return None
+
+    # Auto-distribuir paradas en N días
+    n_days = max(1, duration_case.days)
+    distribution = _distribute_stops_across_days(places_in_order, n_days)
+
+    # Slug + number únicos
+    name = chosen.get("name", "Circuito sin nombre")[:200]
+    base_slug = slugify(chosen.get("slug") or name)[:200] or "circuito"
+    slug = base_slug
+    n = 2
+    while Circuit.objects.filter(slug=slug).exists():
+        slug = f"{base_slug}-{n}"
+        n += 1
+    next_number = (Circuit.objects.order_by("-number").values_list("number", flat=True).first() or 0) + 1
+
+    circuit = Circuit.objects.create(
+        number=next_number,
+        name=name,
+        slug=slug,
+        short_description=(chosen.get("short_description") or "")[:255],
+        long_description=(proposed.get("long_description") or "").strip(),
+        duration_case=duration_case,
+        primary_interest=_safe_choice(
+            draft.primary_interest,
+            InterestType.values,
+            InterestType.MIXED,
+        ),
+        recommended_profile=_safe_choice(
+            draft.recommended_profile,
+            ProfileType.values,
+            "",
+        ),
+        is_romantic=bool(proposed.get("is_romantic")),
+        is_family_friendly=bool(proposed.get("is_family_friendly")),
+        is_adventure=bool(proposed.get("is_adventure")),
+        is_rain_friendly=bool(proposed.get("is_rain_friendly")),
+        is_premium=bool(proposed.get("is_premium")),
+        published=publish,
+    )
+
+    day_summaries = proposed.get("day_summaries") or {}
+    for day_idx, places_for_day in enumerate(distribution, start=1):
+        block = BlockType.FULL_DAY
+        if n_days == 1:
+            block = BlockType.HALF_DAY if duration_case.nights == 0 and len(places_for_day) <= 2 else BlockType.FULL_DAY
+        day = CircuitDay.objects.create(
+            circuit=circuit,
+            day_number=day_idx,
+            title=f"Día {day_idx}",
+            block_type=block,
+            summary=str(day_summaries.get(str(day_idx)) or "").strip(),
+            sort_order=day_idx,
+        )
+        for stop_idx, place in enumerate(places_for_day, start=1):
+            CircuitPlace.objects.create(
+                circuit_day=day,
+                place=place,
+                visit_order=stop_idx,
+                is_main_stop=(stop_idx == 1 and len(places_for_day) > 1),
+            )
+
+    circuit.places_signature = circuit.compute_places_signature()
+    if (proposed.get("long_description") or "").strip():
+        circuit.last_narrative_at = timezone.now()
+    circuit.save(update_fields=["places_signature", "last_narrative_at", "updated_at"])
+
+    draft.status = CircuitCompositionDraft.STATUS_APPLIED
+    draft.created_circuit = circuit
+    draft.applied_at = timezone.now()
+    if reviewer and not draft.reviewed_by:
+        draft.reviewed_by = reviewer
+    if not draft.reviewed_at:
+        draft.reviewed_at = timezone.now()
+    draft.proposed_data = {**proposed, "chosen_name_index": int(chosen_name_index)}
+    draft.save()
+    return circuit
+
+
+def _distribute_stops_across_days(places: list, n_days: int) -> list[list]:
+    """Reparte `places` en `n_days` listas conservando el orden.
+
+    Ej: 7 places en 3 días → [3, 2, 2].
+    """
+    if n_days <= 1:
+        return [list(places)]
+    total = len(places)
+    base = total // n_days
+    extra = total % n_days
+    out: list[list] = []
+    cursor = 0
+    for i in range(n_days):
+        size = base + (1 if i < extra else 0)
+        out.append(list(places[cursor : cursor + size]))
+        cursor += size
+    return out

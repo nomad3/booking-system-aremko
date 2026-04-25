@@ -1,0 +1,196 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <style>
+        .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 1200px; }
+        @media (max-width: 980px) { .review-grid { grid-template-columns: 1fr; } }
+
+        .panel { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 16px 18px; margin-bottom: 18px; }
+        .panel h2 { margin: 0 0 12px 0; padding: 0 0 8px 0; border-bottom: 1px solid #eee; font-size: 16px; }
+
+        .stops-list { list-style: none; padding: 0; margin: 0; }
+        .stop-row { padding: 10px 12px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px; }
+        .stop-row:last-child { border-bottom: none; }
+        .stop-num { background: #0c4b78; color: #fff; width: 26px; height: 26px; border-radius: 50%;
+                     display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+        .stop-day-tag { background: #fffaeb; color: #5a4500; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: auto; }
+
+        .name-card {
+            border: 2px solid #ddd; border-radius: 6px; padding: 14px 18px; margin-bottom: 14px;
+            cursor: pointer; transition: all 0.15s ease;
+        }
+        .name-card:hover { border-color: #0c4b78; background: #f7fbfe; }
+        .name-card.selected { border-color: #388e3c; background: #f0f9f0; box-shadow: 0 2px 6px rgba(56,142,60,0.2); }
+        .name-card input[type="radio"] { margin-right: 10px; transform: scale(1.3); }
+        .name-card-name { font-size: 18px; font-weight: 600; color: #1a1a1a; }
+        .name-card-slug { font-family: monospace; font-size: 12px; color: #888; margin-top: 4px; }
+        .name-card-short { margin-top: 10px; color: #444; line-height: 1.5; }
+
+        .narrative-box { background: #fafafa; padding: 14px; border-radius: 4px; line-height: 1.6;
+                          max-height: 380px; overflow-y: auto; white-space: pre-wrap; }
+        .day-summary { background: #f7fbfe; border-left: 3px solid #0c4b78; padding: 8px 12px; margin: 8px 0; border-radius: 4px; font-size: 13px; }
+
+        .flag-pill { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin-right: 6px; margin-bottom: 4px; }
+        .flag-on { background: #e6f4ea; color: #1a7a2e; border: 1px solid #c5e3cc; }
+        .flag-off { background: #f5f5f5; color: #aaa; border: 1px solid #e5e5e5; }
+
+        .submit-area { background: #fffaeb; border: 2px solid #f5b800; border-radius: 6px; padding: 16px 20px; margin-top: 20px; max-width: 1200px; }
+        .submit-area .btn-primary {
+            background: #388e3c; color: #fff; border: 1px solid #2e7d32;
+            padding: 12px 24px; font-size: 15px; font-weight: 600; border-radius: 4px; cursor: pointer;
+        }
+        .submit-area .btn-primary:disabled { background: #999; border-color: #999; cursor: not-allowed; }
+    </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo;
+    <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo;
+    <a href="{% url 'admin:destino_puerto_varas_circuit_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo;
+    <a href="{% url 'admin:dpv_circuit_manual_create' %}">Crear circuito manual</a>
+    &rsaquo; Revisar
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <p style="max-width:880px;color:#555;margin-bottom:18px;">
+        Tus paradas están listas y la IA generó <strong>3 propuestas de nombre</strong> + narrativa.
+        Elige la que más te guste y se creará el Circuit (sin publicar — lo publicas tú después).
+    </p>
+
+    <form method="post" id="review-form">
+        {% csrf_token %}
+
+        <div class="review-grid">
+            <!-- Columna izquierda: paradas + narrativa + day summaries -->
+            <div>
+                <div class="panel">
+                    <h2>📍 Paradas elegidas (en orden)</h2>
+                    <ul class="stops-list">
+                        {% for p in ordered_places %}
+                        <li class="stop-row">
+                            <span class="stop-num">{{ forloop.counter }}</span>
+                            <div>
+                                <strong>{{ p.name }}</strong>
+                                {% if p.location_label %}<br><small style="color:#888;">{{ p.location_label }}</small>{% endif %}
+                            </div>
+                            <span class="stop-day-tag">{{ p.get_place_type_display }}</span>
+                        </li>
+                        {% empty %}
+                        <li class="stop-row"><em>(sin paradas)</em></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <div class="panel">
+                    <h2>📝 Narrativa propuesta (long_description)</h2>
+                    <div class="narrative-box">{{ long_description|default:"(la IA no generó narrativa)" }}</div>
+                </div>
+
+                {% if day_summaries %}
+                <div class="panel">
+                    <h2>📅 Resúmenes por día</h2>
+                    {% for day_num, summary in day_summaries.items %}
+                        <div class="day-summary">
+                            <strong>Día {{ day_num }}:</strong> {{ summary }}
+                        </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="panel">
+                    <h2>🏷 Flags inferidos</h2>
+                    <div>
+                        <span class="flag-pill {% if flags.is_romantic %}flag-on{% else %}flag-off{% endif %}">
+                            {% if flags.is_romantic %}✓{% else %}—{% endif %} Romántico
+                        </span>
+                        <span class="flag-pill {% if flags.is_family_friendly %}flag-on{% else %}flag-off{% endif %}">
+                            {% if flags.is_family_friendly %}✓{% else %}—{% endif %} Familiar
+                        </span>
+                        <span class="flag-pill {% if flags.is_adventure %}flag-on{% else %}flag-off{% endif %}">
+                            {% if flags.is_adventure %}✓{% else %}—{% endif %} Aventura
+                        </span>
+                        <span class="flag-pill {% if flags.is_rain_friendly %}flag-on{% else %}flag-off{% endif %}">
+                            {% if flags.is_rain_friendly %}✓{% else %}—{% endif %} Apto lluvia
+                        </span>
+                        <span class="flag-pill {% if flags.is_premium %}flag-on{% else %}flag-off{% endif %}">
+                            {% if flags.is_premium %}✓{% else %}—{% endif %} Premium
+                        </span>
+                    </div>
+                    {% if rationale %}
+                    <p style="margin-top:12px;color:#666;font-size:13px;font-style:italic;">{{ rationale }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Columna derecha: 3 cards de nombre -->
+            <div>
+                <div class="panel">
+                    <h2>✨ Elige el nombre del circuito</h2>
+                    {% if name_options %}
+                        {% for opt in name_options %}
+                        <label class="name-card{% if forloop.first %} selected{% endif %}" data-card-index="{{ forloop.counter0 }}">
+                            <input type="radio"
+                                   name="chosen_name_index"
+                                   value="{{ forloop.counter0 }}"
+                                   {% if forloop.first %}checked{% endif %}>
+                            <span class="name-card-name">{{ opt.name }}</span>
+                            <div class="name-card-slug">/{{ opt.slug }}</div>
+                            <div class="name-card-short">{{ opt.short_description }}</div>
+                        </label>
+                        {% endfor %}
+                    {% else %}
+                        <p style="color:#c62828;">
+                            La IA no generó propuestas de nombre. Revisa el draft #{{ draft.id }}
+                            o vuelve atrás y reintenta.
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="submit-area">
+            <p style="margin:0 0 12px 0;color:#5a4500;">
+                Al confirmar se creará el <strong>Circuit</strong> con el nombre elegido,
+                sus <strong>{{ ordered_places|length }} parada(s)</strong> auto-distribuidas
+                en <strong>{{ draft.duration_case.days }} día(s)</strong>, y los flags inferidos.
+                Quedará en estado <strong>borrador</strong> (sin publicar).
+            </p>
+            <button type="submit" class="btn-primary" id="confirm-btn"
+                    {% if not name_options %}disabled{% endif %}>
+                ✓ Crear circuito con el nombre seleccionado
+            </button>
+            <a href="{% url 'admin:dpv_circuit_manual_create' %}"
+               style="margin-left:12px;color:#5a4500;">← Volver a editar paradas</a>
+        </div>
+    </form>
+</div>
+
+<script>
+(function() {
+    'use strict';
+    var $ = django.jQuery;
+    $('.name-card').on('click', function(e) {
+        if (e.target.tagName === 'INPUT') return; // ya manejado
+        var $radio = $(this).find('input[type="radio"]');
+        $radio.prop('checked', true).trigger('change');
+    });
+    $('input[name="chosen_name_index"]').on('change', function() {
+        $('.name-card').removeClass('selected');
+        $(this).closest('.name-card').addClass('selected');
+    });
+    $('#review-form').on('submit', function() {
+        $('#confirm-btn').prop('disabled', true).text('⏳ Creando circuito...');
+    });
+})();
+</script>
+{% endblock %}
