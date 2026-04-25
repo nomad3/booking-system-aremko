@@ -726,3 +726,136 @@ class CircuitNarrativeDraft(models.Model):
 
     def __str__(self):
         return f"{self.circuit} · {self.get_status_display()} · {self.created_at:%Y-%m-%d}"
+
+
+class CircuitCompositionDraft(models.Model):
+    """Borrador de circuito completo armado por IA a partir de una idea libre.
+
+    A diferencia de CircuitNarrativeDraft (que solo redacta narrativa para un
+    Circuit ya armado), este draft compone el circuito desde cero:
+    selecciona paradas del catálogo de Places publicados, las distribuye en
+    días, propone metadata (nombre, slug, flags) y opcionalmente la narrativa.
+
+    Flujo:
+        1. Usuario describe la idea en el quick-create form.
+        2. Servicio circuit_composer_service llama al LLM con catálogo + idea.
+        3. Se crea este draft con proposed_data (sin tocar Circuit todavía).
+        4. Usuario revisa el draft. Si aprueba: apply_composition crea Circuit +
+           CircuitDay + CircuitPlace y marca el draft como APPLIED.
+
+    Estructura de proposed_data:
+        {
+          "name": "Romántico de un día con tinas",
+          "slug": "romantico-un-dia-tinas",
+          "short_description": "...",
+          "long_description": "...",
+          "primary_interest": "RELAX_ROMANTIC",
+          "recommended_profile": "COUPLE",
+          "duration_case_code": "FULL_DAY",
+          "is_romantic": true,
+          "is_family_friendly": false,
+          "is_adventure": false,
+          "is_rain_friendly": true,
+          "is_premium": false,
+          "days": [
+             {
+                "day_number": 1,
+                "title": "Mañana",
+                "block_type": "HALF_DAY",
+                "summary": "...",
+                "stops": [
+                    {"place_id": 12, "visit_order": 1, "is_main_stop": false},
+                    {"place_id": 7,  "visit_order": 2, "is_main_stop": true},
+                ],
+             },
+             ...
+          ],
+          "gaps_detected": ["Faltaría un café entre Frutillar y Pto Varas"],
+          "rationale": "Por qué la IA eligió estas paradas..."
+        }
+    """
+
+    STATUS_DRAFT = "draft"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+    STATUS_APPLIED = "applied"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Borrador (pendiente revisión)"),
+        (STATUS_APPROVED, "Aprobado (listo para aplicar)"),
+        (STATUS_REJECTED, "Rechazado"),
+        (STATUS_APPLIED, "Aplicado (Circuit creado)"),
+    ]
+
+    # ─── Input del usuario ───
+    user_idea = models.TextField(
+        help_text="Descripción libre del circuito que el usuario pidió.",
+    )
+    duration_case = models.ForeignKey(
+        DurationCase,
+        on_delete=models.PROTECT,
+        related_name="composition_drafts",
+        null=True,
+        blank=True,
+        help_text="Duración pedida en el form. La IA debe respetarla.",
+    )
+    primary_interest = models.CharField(
+        max_length=30,
+        choices=InterestType.choices,
+        blank=True,
+        help_text="Interés primario pedido en el form.",
+    )
+    recommended_profile = models.CharField(
+        max_length=20,
+        choices=ProfileType.choices,
+        blank=True,
+    )
+    anchor_place_ids = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="IDs de Places que el usuario pidió incluir obligatoriamente.",
+    )
+
+    # ─── Estado del draft ───
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_DRAFT,
+        db_index=True,
+    )
+    proposed_data = models.JSONField(
+        default=dict,
+        help_text="Estructura propuesta por la IA. Ver docstring del modelo.",
+    )
+
+    # ─── Resultado al aplicar ───
+    created_circuit = models.ForeignKey(
+        Circuit,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="composition_drafts",
+        help_text="Circuit que este draft creó al aplicarse.",
+    )
+
+    # ─── Métricas LLM ───
+    llm_model = models.CharField(max_length=80, blank=True, default="")
+    llm_input_tokens = models.PositiveIntegerField(default=0)
+    llm_output_tokens = models.PositiveIntegerField(default=0)
+    llm_latency_ms = models.PositiveIntegerField(default=0)
+
+    # ─── Auditoría ───
+    review_notes = models.TextField(blank=True)
+    reviewed_by = models.CharField(max_length=80, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Borrador de circuito (composición IA)"
+        verbose_name_plural = "Borradores de circuito (composición IA)"
+
+    def __str__(self):
+        proposed_name = (self.proposed_data or {}).get("name") or "(sin nombre)"
+        return f"{proposed_name} · {self.get_status_display()} · {self.created_at:%Y-%m-%d}"

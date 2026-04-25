@@ -11,11 +11,12 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.text import slugify
 
-from .enums import PartnershipLevel, PlaceType
+from .enums import InterestType, PartnershipLevel, PlaceType, ProfileType
 from .models import (
     AgentPromptTemplate,
     AremkoRecommendation,
     Circuit,
+    CircuitCompositionDraft,
     CircuitDay,
     CircuitNarrativeDraft,
     CircuitPlace,
@@ -199,6 +200,57 @@ class DurationCaseAdmin(admin.ModelAdmin):
     ordering = ("sort_order", "days")
 
 
+class CircuitQuickCreateForm(forms.Form):
+    """Form de quick-create de Circuit con IA.
+
+    El usuario describe la idea libre + parámetros básicos, y el composer arma
+    un borrador con paradas seleccionadas del catálogo de Places publicados.
+    """
+
+    user_idea = forms.CharField(
+        label="Idea del circuito",
+        widget=forms.Textarea(attrs={
+            "rows": 4,
+            "cols": 70,
+            "placeholder": (
+                "Ejemplo: Circuito romántico de un día con tinas calientes, "
+                "vistas al lago y un buen restaurante para almorzar."
+            ),
+        }),
+        help_text=(
+            "Describe en lenguaje natural qué tipo de circuito quieres. "
+            "Mientras más específico, mejor (incluye intereses, ánimo, restricciones)."
+        ),
+    )
+    duration_case = forms.ModelChoiceField(
+        label="Duración",
+        queryset=DurationCase.objects.filter(is_active=True).order_by("sort_order", "days"),
+        required=True,
+        help_text="La IA respetará exactamente esta duración.",
+    )
+    primary_interest = forms.ChoiceField(
+        label="Interés primario",
+        choices=[("", "(la IA decide)")] + list(InterestType.choices),
+        required=False,
+        help_text="Si lo dejas vacío, la IA inferirá del texto de la idea.",
+    )
+    recommended_profile = forms.ChoiceField(
+        label="Perfil recomendado",
+        choices=[("", "(la IA decide)")] + list(ProfileType.choices),
+        required=False,
+    )
+    anchor_places = forms.ModelMultipleChoiceField(
+        label="Lugares ancla (opcional)",
+        queryset=Place.objects.filter(published=True).order_by("name"),
+        required=False,
+        widget=admin.widgets.FilteredSelectMultiple(verbose_name="Places", is_stacked=False),
+        help_text=(
+            "Lugares que DEBEN aparecer en el circuito. Solo se muestran Places "
+            "publicados (las paradas de un circuito tienen que existir y estar publicadas)."
+        ),
+    )
+
+
 @admin.register(Circuit)
 class CircuitAdmin(admin.ModelAdmin):
     list_display = (
@@ -288,6 +340,132 @@ class CircuitAdmin(admin.ModelAdmin):
                 f"✗ {fail} circuito(s) fallaron.",
                 level=messages.WARNING,
             )
+
+    # ─── Form 2 (Fase A): Quick-Create de Circuit con IA ───
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "crear-con-ia/",
+                self.admin_site.admin_view(self.quick_create_circuit_with_ai),
+                name="dpv_circuit_quick_create",
+            ),
+        ]
+        return custom + urls
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["quick_create_url"] = reverse("admin:dpv_circuit_quick_create")
+        return super().changelist_view(request, extra_context=extra_context)
+
+    def quick_create_circuit_with_ai(self, request):
+        from .services.circuit_composer_service import (
+            apply_composition,
+            compose_circuit_from_idea,
+            is_composer_available,
+        )
+
+        if request.method == "POST":
+            form = CircuitQuickCreateForm(request.POST)
+            if form.is_valid():
+                if not is_composer_available():
+                    messages.error(
+                        request,
+                        "OPENROUTER_API_KEY no está configurada en Render. "
+                        "El composer no puede llamar al LLM.",
+                    )
+                    return redirect("admin:dpv_circuit_quick_create")
+
+                anchor_ids = list(
+                    form.cleaned_data.get("anchor_places", []).values_list("id", flat=True)
+                )
+
+                try:
+                    draft = compose_circuit_from_idea(
+                        user_idea=form.cleaned_data["user_idea"],
+                        duration_case=form.cleaned_data["duration_case"],
+                        primary_interest=form.cleaned_data.get("primary_interest") or "",
+                        recommended_profile=form.cleaned_data.get("recommended_profile") or "",
+                        anchor_place_ids=anchor_ids,
+                    )
+                except Exception as exc:
+                    logger.exception("quick_create_circuit_with_ai: composer lanzó excepción")
+                    messages.error(
+                        request,
+                        f"La IA falló componiendo: {exc}. Intenta de nuevo.",
+                    )
+                    return redirect("admin:dpv_circuit_quick_create")
+
+                if not draft:
+                    messages.error(
+                        request,
+                        "El composer retornó None. Revisa la configuración del LLM.",
+                    )
+                    return redirect("admin:dpv_circuit_quick_create")
+
+                if draft.status == CircuitCompositionDraft.STATUS_REJECTED:
+                    messages.warning(
+                        request,
+                        f"La IA no logró componer un circuito válido: {draft.review_notes}. "
+                        "Revisa el borrador o intenta con otra idea.",
+                    )
+                    return redirect(
+                        "admin:destino_puerto_varas_circuitcompositiondraft_change",
+                        draft.id,
+                    )
+
+                # Aplicar inmediatamente: crear Circuit + Days + Stops (sin publicar)
+                try:
+                    circuit = apply_composition(draft, reviewer=request.user.username)
+                except Exception as exc:
+                    logger.exception("quick_create_circuit_with_ai: apply_composition falló")
+                    messages.error(
+                        request,
+                        f"Error aplicando la composición: {exc}. "
+                        "El borrador quedó guardado para revisión manual.",
+                    )
+                    return redirect(
+                        "admin:destino_puerto_varas_circuitcompositiondraft_change",
+                        draft.id,
+                    )
+
+                if not circuit:
+                    messages.warning(
+                        request,
+                        "apply_composition retornó None. Revisa el borrador manualmente.",
+                    )
+                    return redirect(
+                        "admin:destino_puerto_varas_circuitcompositiondraft_change",
+                        draft.id,
+                    )
+
+                gaps = (draft.proposed_data or {}).get("gaps_detected") or []
+                warnings = (draft.proposed_data or {}).get("validation_warnings") or []
+                msg = (
+                    f"✓ Circuito '#{circuit.number} {circuit.name}' creado con "
+                    f"{circuit.days.count()} día(s). Revísalo abajo y publícalo cuando esté listo."
+                )
+                if gaps:
+                    msg += f" La IA detectó gaps: {gaps[0]}"
+                if warnings:
+                    msg += f" Advertencias: {warnings[0]}"
+                messages.success(request, msg)
+                return redirect("admin:destino_puerto_varas_circuit_change", circuit.id)
+        else:
+            form = CircuitQuickCreateForm()
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Crear circuito con IA",
+            "form": form,
+            "opts": self.model._meta,
+            "has_view_permission": self.has_view_permission(request),
+        }
+        return TemplateResponse(
+            request,
+            "admin/destino_puerto_varas/circuit/quick_create.html",
+            context,
+        )
 
 
 @admin.register(CircuitDay)
@@ -1313,6 +1491,95 @@ class CircuitNarrativeDraftAdmin(admin.ModelAdmin):
                 f"✗ {fail} narrativa(s) fallaron.",
                 level=messages.WARNING,
             )
+
+
+@admin.register(CircuitCompositionDraft)
+class CircuitCompositionDraftAdmin(admin.ModelAdmin):
+    """Admin para inspeccionar/depurar borradores de composición de Circuit con IA.
+
+    El flujo normal aplica el draft inmediatamente y crea el Circuit, pero si
+    la IA falla (status=REJECTED) o el apply lanza excepción, el draft queda
+    aquí para revisión manual.
+    """
+    list_display = (
+        "id",
+        "short_idea",
+        "status",
+        "duration_case",
+        "primary_interest",
+        "created_circuit",
+        "llm_model",
+        "created_at",
+    )
+    list_filter = ("status", "primary_interest", "duration_case", "llm_model")
+    search_fields = ("user_idea", "review_notes", "created_circuit__name")
+    readonly_fields = (
+        "user_idea",
+        "duration_case",
+        "primary_interest",
+        "recommended_profile",
+        "anchor_place_ids",
+        "proposed_data_pretty",
+        "created_circuit",
+        "llm_model",
+        "llm_input_tokens",
+        "llm_output_tokens",
+        "llm_latency_ms",
+        "reviewed_by",
+        "reviewed_at",
+        "applied_at",
+        "created_at",
+        "updated_at",
+    )
+    fieldsets = (
+        ("Input del usuario", {
+            "fields": (
+                "user_idea",
+                ("duration_case", "primary_interest", "recommended_profile"),
+                "anchor_place_ids",
+            ),
+        }),
+        ("Estado", {
+            "fields": ("status", "review_notes", "created_circuit"),
+        }),
+        ("Propuesta IA", {
+            "fields": ("proposed_data_pretty",),
+        }),
+        ("Métricas LLM", {
+            "fields": (
+                "llm_model",
+                ("llm_input_tokens", "llm_output_tokens", "llm_latency_ms"),
+            ),
+            "classes": ("collapse",),
+        }),
+        ("Auditoría", {
+            "fields": (
+                ("reviewed_by", "reviewed_at"),
+                "applied_at",
+                ("created_at", "updated_at"),
+            ),
+            "classes": ("collapse",),
+        }),
+    )
+
+    def short_idea(self, obj):
+        idea = (obj.user_idea or "").strip()
+        return (idea[:80] + "…") if len(idea) > 80 else idea
+    short_idea.short_description = "Idea"
+
+    def proposed_data_pretty(self, obj):
+        if not obj.proposed_data:
+            return "—"
+        try:
+            pretty = json.dumps(obj.proposed_data, ensure_ascii=False, indent=2)
+        except (TypeError, ValueError):
+            pretty = str(obj.proposed_data)
+        return format_html(
+            '<pre style="background:#f5f5f5;padding:10px;border-radius:4px;'
+            'max-height:600px;overflow:auto;font-size:12px;">{}</pre>',
+            pretty,
+        )
+    proposed_data_pretty.short_description = "Estructura propuesta"
 
 
 @admin.register(PlacePhoto)

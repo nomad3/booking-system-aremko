@@ -1,0 +1,73 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    {{ form.media }}
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo;
+    <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo;
+    <a href="{% url 'admin:destino_puerto_varas_circuit_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <div style="background:#eef6fb;padding:14px 18px;border-left:4px solid #0c4b78;margin:0 0 18px 0;max-width:880px;">
+        <strong>Cómo funciona:</strong> escribe la idea del circuito, define duración e intereses,
+        y opcionalmente fija "lugares ancla" (paradas obligatorias). Al enviar, el sistema:
+        <ol style="margin:8px 0 8px 22px;">
+            <li>Lee tu catálogo de <strong>Places publicados</strong>.</li>
+            <li>Le pide a <strong>Claude</strong> que arme un circuito coherente seleccionando paradas del catálogo.</li>
+            <li>Crea el <strong>Circuit</strong> + sus <strong>días</strong> + sus <strong>paradas</strong> (sin publicar).</li>
+            <li>Te lleva al edit del Circuit para revisar y publicar cuando esté listo.</li>
+        </ol>
+        <em>Restricción dura: la IA solo usa Places que ya existen y están publicados.
+        Si detecta gaps en tu catálogo, te lo informa pero no inventa lugares nuevos.</em>
+        <br><em>El proceso toma 10-25 segundos. No cierres la ventana.</em>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <ul class="errorlist">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+        {% endif %}
+
+        <fieldset class="module aligned">
+            {% for field in form %}
+                <div class="form-row{% if field.errors %} errors{% endif %}">
+                    <div>
+                        {{ field.label_tag }}
+                        {{ field }}
+                        {% if field.help_text %}
+                            <div class="help">{{ field.help_text|safe }}</div>
+                        {% endif %}
+                        {% if field.errors %}
+                            <ul class="errorlist">{% for error in field.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </fieldset>
+
+        <div class="submit-row">
+            <input type="submit"
+                   value="🤖 Componer circuito con IA"
+                   class="default"
+                   onclick="this.value='⏳ Armando paradas y narrativa...'; this.disabled=true; this.form.submit();">
+            <a href="{% url 'admin:destino_puerto_varas_circuit_changelist' %}"
+               class="button cancel-link"
+               style="margin-left:12px;">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
