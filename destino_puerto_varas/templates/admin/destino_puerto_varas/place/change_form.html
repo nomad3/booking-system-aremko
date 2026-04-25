@@ -25,28 +25,37 @@
             </div>
 
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid #f5d77a;">
-                <form method="post" action="{{ pending_draft_apply_url }}" style="display:inline;margin:0;">
-                    {% csrf_token %}
-                    <button type="submit" class="default" style="background:#388e3c;border-color:#2e7d32;font-weight:600;font-size:14px;padding:10px 18px;">
-                        ✓ Aplicar y publicar
-                    </button>
-                </form>
+                {# Botones con formaction → cada uno redirige el submit del form admin
+                   a su propia URL. formnovalidate evita que la validación HTML5 del form
+                   bloquee el submit cuando short_description aún está vacío. #}
+                <button type="submit"
+                        formaction="{{ pending_draft_apply_url }}"
+                        formmethod="post"
+                        formnovalidate
+                        class="default"
+                        style="background:#388e3c;border-color:#2e7d32;font-weight:600;font-size:14px;padding:10px 18px;">
+                    ✓ Aplicar y publicar
+                </button>
 
-                <form method="post" action="{{ pending_draft_re_enrich_url }}" style="display:inline;margin:0;"
-                      onsubmit="this.querySelector('button').innerHTML='⏳ Re-enriqueciendo...';this.querySelector('button').disabled=true;">
-                    {% csrf_token %}
-                    <button type="submit" class="button" style="background:#0c4b78;color:#fff;border-color:#093a5e;padding:10px 16px;">
-                        🔁 Re-enriquecer (descarta este, hace nueva búsqueda IA)
-                    </button>
-                </form>
+                <button type="submit"
+                        formaction="{{ pending_draft_re_enrich_url }}"
+                        formmethod="post"
+                        formnovalidate
+                        class="button"
+                        onclick="this.innerHTML='⏳ Re-enriqueciendo... (15-40s)';"
+                        style="background:#0c4b78;color:#fff;border-color:#093a5e;padding:10px 16px;">
+                    🔁 Re-enriquecer (descarta este, hace nueva búsqueda IA)
+                </button>
 
-                <form method="post" action="{{ pending_draft_discard_url }}" style="display:inline;margin:0;"
-                      onsubmit="return confirm('¿Descartar este borrador IA? El lugar queda creado pero sin datos enriquecidos.');">
-                    {% csrf_token %}
-                    <button type="submit" class="button" style="background:#c62828;color:#fff;border-color:#a01818;padding:10px 16px;">
-                        ✗ Descartar
-                    </button>
-                </form>
+                <button type="submit"
+                        formaction="{{ pending_draft_discard_url }}"
+                        formmethod="post"
+                        formnovalidate
+                        class="button"
+                        onclick="return confirm('¿Descartar este borrador IA? El lugar queda creado pero sin datos enriquecidos.');"
+                        style="background:#c62828;color:#fff;border-color:#a01818;padding:10px 16px;">
+                    ✗ Descartar
+                </button>
 
                 <a href="{{ pending_draft_change_url }}" style="margin-left:auto;font-size:12px;color:#5a4500;">
                     Editar JSON propuesto →
