@@ -131,6 +131,7 @@ markdown ```. Estructura exacta:
     "sun": "<...>",
     "notes": "<observaciones generales o vacío>"
   },
+  "short_description": "<gancho de 1 frase, 80-160 caracteres, tono editorial, sin punto final>",
   "long_description": "<texto editorial 250-400 palabras en español, tono inspiracional pero informativo, basado en los snippets>",
   "extra_data": {
     "<clave_snake_case>": <valor o lista de strings>
@@ -307,6 +308,19 @@ def apply_draft(draft: PlaceEnrichmentDraft, *, reviewer: str = "") -> bool:
     if long_desc:
         place.long_description = long_desc
 
+    # short_description: usar la propuesta de la IA, o auto-derivar de long_desc
+    # si está vacía. Es campo requerido (max 255), no debe quedar vacío al guardar.
+    short_desc = (proposed.get("short_description") or "").strip()
+    if not short_desc and long_desc:
+        # Tomar primera frase, recortar a 240 chars y agregar … si se cortó
+        first_sentence = long_desc.strip().split(". ")[0].strip()
+        if len(first_sentence) > 240:
+            short_desc = first_sentence[:240].rsplit(" ", 1)[0] + "…"
+        else:
+            short_desc = first_sentence
+    if short_desc and not place.short_description:
+        place.short_description = short_desc[:255]
+
     extra = proposed.get("extra_data") or {}
     if extra:
         merged = dict(place.extra_data or {})
@@ -452,6 +466,7 @@ def _parse_json(text: str) -> tuple[dict[str, Any] | None, str]:
 def _normalize_proposed_data(parsed: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {
         "fields": {},
+        "short_description": str(parsed.get("short_description") or "").strip()[:255],
         "long_description": str(parsed.get("long_description") or "").strip(),
         "extra_data": parsed.get("extra_data") or {},
         "photos": parsed.get("photos") or [],

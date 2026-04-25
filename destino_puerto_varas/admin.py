@@ -248,7 +248,7 @@ class PlaceAdmin(admin.ModelAdmin):
     ordering = ("name",)
     readonly_fields = ("last_enriched_at", "created_at", "updated_at", "drafts_link")
     inlines = [PlacePhotoInline]
-    actions = ["accion_enriquecer_con_ia"]
+    actions = ["accion_enriquecer_con_ia", "accion_autoderivar_short_desc"]
     fieldsets = (
         ("Identidad", {
             "fields": ("name", "slug", "place_type", "partnership_level", "location_label", "published"),
@@ -357,6 +357,30 @@ class PlaceAdmin(admin.ModelAdmin):
                 f"✗ {fail} lugar(es) fallaron. Revisa logs.",
                 level=messages.WARNING,
             )
+
+    @admin.action(description="✏ Auto-derivar 'short_description' desde long_description (si está vacío)")
+    def accion_autoderivar_short_desc(self, request, queryset):
+        ok, skipped = 0, 0
+        for place in queryset:
+            if place.short_description:
+                skipped += 1
+                continue
+            if not place.long_description:
+                skipped += 1
+                continue
+            first_sentence = place.long_description.strip().split(". ")[0].strip()
+            if len(first_sentence) > 240:
+                short = first_sentence[:240].rsplit(" ", 1)[0] + "…"
+            else:
+                short = first_sentence
+            place.short_description = short[:255]
+            place.save(update_fields=["short_description", "updated_at"])
+            ok += 1
+        self.message_user(
+            request,
+            f"✓ {ok} lugar(es) actualizado(s). {skipped} saltado(s) (ya tenían short_desc o no hay long_desc).",
+            level=messages.SUCCESS if ok else messages.WARNING,
+        )
 
     # ──────────────────────────────────────────────────────────────────
     # "+ Crear lugar con IA" — formulario custom de creación con enrichment
