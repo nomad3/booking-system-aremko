@@ -1,20 +1,22 @@
-"""Cliente HTTP para Perplexity API.
+"""Cliente HTTP para Perplexity Search API.
 
-Perplexity es búsqueda web sintetizada por LLM con citas — ideal para enriquecer
-Places con info turística (altura, infraestructura, fauna, accesos, etc.).
+Endpoint: POST {base_url}/search
+Body: {"query": str, "max_results": int, "max_tokens_per_page": int}
 
-Endpoint usado: POST {base_url}/chat/completions (OpenAI-compatible).
-Modelo recomendado: 'sonar-pro' (con búsqueda web activa + síntesis).
+Devuelve resultados de búsqueda web (URLs + snippets), NO síntesis. Para sintetizar
+en JSON estructurado usamos OpenRouter (Claude) en place_enrichment_service.py.
+
+Esta separación (search → synthesis) es deliberada:
+  - Perplexity Search es muy bueno encontrando páginas relevantes.
+  - Claude/Haiku via OpenRouter es bueno extrayendo y estructurando datos.
+  - Cada uno hace lo suyo; debugging y costos quedan separados.
 
 Uso:
-    from destino_puerto_varas.services.perplexity_client import query_perplexity
-    result = query_perplexity(
-        system="...",
-        user="Información turística de Volcán Osorno...",
-    )
-    if result["ok"]:
-        print(result["text"])
-        print(result["citations"])  # lista de URLs
+    from destino_puerto_varas.services.perplexity_client import search_perplexity
+    result = search_perplexity("Volcán Osorno altura turismo Puerto Varas")
+    if result.ok:
+        for r in result.results:
+            print(r["title"], r["url"], r["snippet"][:100])
 """
 
 from __future__ import annotations
@@ -32,26 +34,18 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class PerplexityResult:
+class PerplexitySearchResult:
     ok: bool = False
-    text: str = ""
-    citations: list[str] = field(default_factory=list)
+    results: list[dict[str, Any]] = field(default_factory=list)
     raw_response: dict[str, Any] = field(default_factory=dict)
-    model: str = ""
-    input_tokens: int = 0
-    output_tokens: int = 0
     latency_ms: int = 0
     error: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "ok": self.ok,
-            "text": self.text,
-            "citations": self.citations,
+            "results": self.results,
             "raw_response": self.raw_response,
-            "model": self.model,
-            "input_tokens": self.input_tokens,
-            "output_tokens": self.output_tokens,
             "latency_ms": self.latency_ms,
             "error": self.error,
         }
@@ -61,39 +55,39 @@ def is_perplexity_configured() -> bool:
     return bool(getattr(settings, "PERPLEXITY_API_KEY", "").strip())
 
 
-def query_perplexity(
-    system: str,
-    user: str,
+def search_perplexity(
+    query: str,
     *,
-    model: str | None = None,
-    temperature: float = 0.2,
-    max_tokens: int = 2000,
+    max_results: int | None = None,
+    max_tokens_per_page: int | None = None,
     timeout: int | None = None,
-) -> PerplexityResult:
-    """Llama a Perplexity y retorna texto + citas.
+) -> PerplexitySearchResult:
+    """Llama a Perplexity Search API y retorna lista de resultados normalizados.
 
-    Temperature baja (0.2) por defecto: queremos hechos verificables, no creatividad.
+    Cada resultado tiene shape: {"title": str, "url": str, "snippet": str}
+    (algunos campos pueden venir vacíos según la respuesta del API).
     """
     api_key = getattr(settings, "PERPLEXITY_API_KEY", "").strip()
     base_url = getattr(settings, "PERPLEXITY_BASE_URL", "https://api.perplexity.ai")
-    default_model = getattr(settings, "PERPLEXITY_MODEL", "sonar-pro")
+    default_max_results = getattr(settings, "PERPLEXITY_SEARCH_MAX_RESULTS", 5)
+    default_max_tokens = getattr(settings, "PERPLEXITY_SEARCH_MAX_TOKENS_PER_PAGE", 512)
     default_timeout = getattr(settings, "PERPLEXITY_TIMEOUT_SECONDS", 60)
 
-    result = PerplexityResult(model=model or default_model)
+    result = PerplexitySearchResult()
 
     if not api_key:
         result.error = "PERPLEXITY_API_KEY no configurada"
         return result
 
-    url = f"{base_url.rstrip('/')}/chat/completions"
+    if not query or not query.strip():
+        result.error = "query vacía"
+        return result
+
+    url = f"{base_url.rstrip('/')}/search"
     payload = {
-        "model": result.model,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "temperature": temperature,
-        "max_tokens": max_tokens,
+        "query": query.strip(),
+        "max_results": max_results or default_max_results,
+        "max_tokens_per_page": max_tokens_per_page or default_max_tokens,
     }
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -131,17 +125,31 @@ def query_perplexity(
         return result
 
     result.raw_response = data
-    try:
-        result.text = data["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError):
-        result.error = "estructura de respuesta inesperada"
+    raw_results = (
+        data.get("results")
+        or data.get("search_results")
+        or data.get("data")
+        or []
+    )
+    if not isinstance(raw_results, list):
+        result.error = f"estructura inesperada: results no es lista (got {type(raw_results).__name__})"
         return result
 
-    # Perplexity devuelve citas en data["citations"] (lista de URLs)
-    result.citations = data.get("citations") or []
+    normalized: list[dict[str, Any]] = []
+    for item in raw_results:
+        if not isinstance(item, dict):
+            continue
+        normalized.append({
+            "title": str(item.get("title") or "").strip(),
+            "url": str(item.get("url") or item.get("link") or "").strip(),
+            "snippet": str(
+                item.get("snippet")
+                or item.get("content")
+                or item.get("text")
+                or ""
+            ).strip(),
+        })
 
-    usage = data.get("usage") or {}
-    result.input_tokens = int(usage.get("prompt_tokens") or 0)
-    result.output_tokens = int(usage.get("completion_tokens") or 0)
+    result.results = normalized
     result.ok = True
     return result

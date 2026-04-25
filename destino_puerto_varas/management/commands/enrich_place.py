@@ -58,12 +58,15 @@ class Command(BaseCommand):
 
         if not is_enrichment_available():
             self.stdout.write(self.style.ERROR(
-                "  ✗ PERPLEXITY_API_KEY no configurada en settings/env. Aborto."
+                "  ✗ Faltan credenciales: necesito PERPLEXITY_API_KEY (search) "
+                "y OPENROUTER_API_KEY (synthesis). Aborto."
             ))
             return
 
         self.stdout.write("")
-        self.stdout.write("  Llamando a Perplexity (puede tardar 10-30s)...")
+        self.stdout.write("  [1/2] Buscando en web (Perplexity Search)...")
+        self.stdout.write("  [2/2] Sintetizando JSON (OpenRouter Claude)...")
+        self.stdout.write("  (puede tardar 15-40s en total)")
         draft = enrich_place(place, save=not dry)
 
         if not draft:

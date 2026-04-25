@@ -362,8 +362,12 @@ DPV_LLM_SITE_NAME = os.getenv("DPV_LLM_SITE_NAME", "Destino Puerto Varas Piloto"
 # ──────────────── DPV — CMS-IA: Perplexity (búsqueda web) ────────────────
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY", "")
 PERPLEXITY_BASE_URL = os.getenv("PERPLEXITY_BASE_URL", "https://api.perplexity.ai")
-PERPLEXITY_MODEL = os.getenv("PERPLEXITY_MODEL", "sonar-pro")
 PERPLEXITY_TIMEOUT_SECONDS = int(os.getenv("PERPLEXITY_TIMEOUT_SECONDS", "60"))
+# Endpoint /search: cuántos resultados pedir y cuánto contenido por página.
+PERPLEXITY_SEARCH_MAX_RESULTS = int(os.getenv("PERPLEXITY_SEARCH_MAX_RESULTS", "5"))
+PERPLEXITY_SEARCH_MAX_TOKENS_PER_PAGE = int(
+    os.getenv("PERPLEXITY_SEARCH_MAX_TOKENS_PER_PAGE", "512")
+)
 
 # ──────────────── DPV — Bot WhatsApp (DPV-006) ────────────────
 DPV_BOT_ENABLED = os.getenv("DPV_BOT_ENABLED", "false").lower() == "true"
