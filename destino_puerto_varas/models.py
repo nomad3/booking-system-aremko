@@ -6,6 +6,7 @@ from .enums import (
     ConversationStatus,
     InterestType,
     MessageSenderType,
+    PartnershipLevel,
     PlaceType,
     ProfileType,
     DurationType,
@@ -218,6 +219,52 @@ class Place(models.Model):
         null=True,
         blank=True,
         help_text="Última vez que un draft IA fue aprobado y aplicado a este lugar.",
+    )
+    # ─── Datos comerciales (negocios, restaurantes, teatros, museos, etc.) ───
+    partnership_level = models.CharField(
+        max_length=20,
+        choices=PartnershipLevel.choices,
+        default=PartnershipLevel.LISTED,
+        db_index=True,
+        help_text=(
+            "Nivel de relación comercial. PROPIO=Aremko; PARTNER=acuerdo activo; "
+            "LISTED=mencionable sin acuerdo; DIRECTORY=solo referencia (atracción natural, "
+            "iglesia, etc. sin relación comercial)."
+        ),
+    )
+    phone = models.CharField(
+        max_length=40,
+        blank=True,
+        help_text="Teléfono de contacto (formato libre).",
+    )
+    website = models.URLField(
+        max_length=300,
+        blank=True,
+        help_text="Sitio web oficial.",
+    )
+    instagram = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text="Handle de Instagram (sin @) o URL.",
+    )
+    reservations_url = models.URLField(
+        max_length=400,
+        blank=True,
+        help_text="URL directa para reservar (si aplica).",
+    )
+    price_range = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text="$, $$, $$$, $$$$ — escala de precios relativa.",
+    )
+    opening_hours = models.JSONField(
+        blank=True,
+        default=dict,
+        help_text=(
+            "Horarios estructurados. Estructura sugerida: "
+            "{'mon': '09:00-18:00', 'tue': '09:00-18:00', ..., 'sun': 'cerrado', "
+            "'notes': 'cerrado feriados'}. Vacío si no aplica."
+        ),
     )
     published = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)

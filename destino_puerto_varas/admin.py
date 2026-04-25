@@ -9,7 +9,7 @@ from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
 from django.utils.text import slugify
 
-from .enums import PlaceType
+from .enums import PartnershipLevel, PlaceType
 from .models import (
     AgentPromptTemplate,
     AremkoRecommendation,
@@ -187,6 +187,16 @@ class PlaceQuickCreateForm(forms.Form):
         choices=PlaceType.choices,
         initial=PlaceType.ATTRACTION,
     )
+    partnership_level = forms.ChoiceField(
+        label="Nivel de relación comercial",
+        choices=PartnershipLevel.choices,
+        initial=PartnershipLevel.LISTED,
+        help_text=(
+            "PROPIO=Aremko · PARTNER=acuerdo activo (Teatro del Lago, "
+            "restaurantes aliados) · LISTED=mencionable sin acuerdo · "
+            "DIRECTORY=referencial (volcanes, iglesias, museos públicos)."
+        ),
+    )
     location_label = forms.CharField(
         label="Ubicación / contexto",
         max_length=200,
@@ -214,6 +224,7 @@ class PlaceAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "place_type",
+        "partnership_level",
         "location_label",
         "elevation_m",
         "entry_fee_clp",
@@ -222,6 +233,7 @@ class PlaceAdmin(admin.ModelAdmin):
     )
     list_filter = (
         "place_type",
+        "partnership_level",
         "published",
         "is_rain_friendly",
         "is_romantic",
@@ -239,13 +251,31 @@ class PlaceAdmin(admin.ModelAdmin):
     actions = ["accion_enriquecer_con_ia"]
     fieldsets = (
         ("Identidad", {
-            "fields": ("name", "slug", "place_type", "location_label", "published"),
+            "fields": ("name", "slug", "place_type", "partnership_level", "location_label", "published"),
+            "description": (
+                "<strong>partnership_level</strong>: PROPIO=Aremko; PARTNER=acuerdo activo "
+                "(Teatro del Lago, restaurantes aliados); LISTED=mencionable sin acuerdo; "
+                "DIRECTORY=referencial (atracciones naturales, iglesias, museos públicos)."
+            ),
         }),
         ("Ubicación", {
             "fields": ("latitude", "longitude", "distance_from_pv_km", "drive_time_from_pv_min"),
         }),
         ("Descripción editorial", {
             "fields": ("short_description", "long_description"),
+        }),
+        ("Datos comerciales (negocios / restaurantes / teatros / museos)", {
+            "fields": (
+                ("phone", "website"),
+                ("instagram", "reservations_url"),
+                ("price_range",),
+                "opening_hours",
+            ),
+            "description": (
+                "Llenar solo si aplica al tipo de lugar (un volcán no tiene horarios). "
+                "<strong>opening_hours</strong>: JSON con claves mon/tue/wed/thu/fri/sat/sun "
+                "+ opcional 'notes'. Ej: <code>{\"mon\":\"09:00-18:00\",\"sun\":\"cerrado\"}</code>."
+            ),
         }),
         ("Datos estructurados (enriquecibles por IA)", {
             "fields": (
@@ -377,6 +407,7 @@ class PlaceAdmin(admin.ModelAdmin):
                     name=name,
                     slug=slug,
                     place_type=form.cleaned_data["place_type"],
+                    partnership_level=form.cleaned_data["partnership_level"],
                     location_label=form.cleaned_data["location_label"] or "",
                     short_description=form.cleaned_data["short_description"] or "",
                     published=form.cleaned_data.get("publish_after", False),
@@ -846,29 +877,73 @@ class PlaceEnrichmentDraftAdmin(admin.ModelAdmin):
     def accion_aplicar_aprobados(self, request, queryset):
         from .services.place_enrichment_service import apply_draft
 
-        ok, fail = 0, 0
-        for draft in queryset.filter(status=PlaceEnrichmentDraft.STATUS_APPROVED):
+        total = queryset.count()
+        approved_qs = queryset.filter(status=PlaceEnrichmentDraft.STATUS_APPROVED)
+        approved_count = approved_qs.count()
+        skipped_not_approved = total - approved_count
+
+        ok, fail_empty, fail_exc, fail_other = 0, 0, 0, 0
+        details: list[str] = []
+
+        for draft in approved_qs:
+            label = f"#{draft.id} ({draft.place.name})"
+            proposed = draft.proposed_data or {}
+            has_fields = bool((proposed.get("fields") or {}))
+            has_long = bool((proposed.get("long_description") or "").strip())
+            has_extra = bool((proposed.get("extra_data") or {}))
+            has_photos = bool((proposed.get("photos") or []))
+
+            if not (has_fields or has_long or has_extra or has_photos):
+                fail_empty += 1
+                details.append(
+                    f"⚠ {label}: proposed_data vacío — saltado. "
+                    "Borra este draft y vuelve a enriquecer el Place."
+                )
+                continue
+
             try:
-                if apply_draft(draft, reviewer=request.user.username):
-                    ok += 1
-                else:
-                    fail += 1
-            except Exception:
-                logger.exception("Error aplicando draft #%s", draft.id)
-                fail += 1
-        if ok:
-            self.message_user(
-                request,
-                f"✓ {ok} borrador(es) aplicado(s). Los Places se actualizaron y se "
-                "crearon PlacePhotos.",
-                level=messages.SUCCESS,
-            )
-        if fail:
-            self.message_user(
-                request,
-                f"✗ {fail} borrador(es) fallaron al aplicar.",
-                level=messages.WARNING,
-            )
+                applied = apply_draft(draft, reviewer=request.user.username)
+            except Exception as exc:
+                logger.exception("Error aplicando draft %s", label)
+                fail_exc += 1
+                details.append(f"✗ {label}: excepción — {exc}")
+                continue
+
+            if applied:
+                # Releer Place desde DB para confirmar que se escribió
+                draft.refresh_from_db()
+                place = draft.place
+                place.refresh_from_db()
+                summary_bits = []
+                if place.long_description:
+                    summary_bits.append(f"long_desc={len(place.long_description)} chars")
+                if place.elevation_m:
+                    summary_bits.append(f"alt={place.elevation_m}m")
+                if place.distance_from_pv_km:
+                    summary_bits.append(f"dist={place.distance_from_pv_km}km")
+                if place.extra_data:
+                    summary_bits.append(f"extra={len(place.extra_data)} keys")
+                summary = ", ".join(summary_bits) or "sin campos no-null"
+                details.append(f"✓ {label}: aplicado ({summary})")
+                ok += 1
+            else:
+                fail_other += 1
+                details.append(
+                    f"✗ {label}: apply_draft retornó False (status={draft.status})"
+                )
+
+        # Mensaje resumen
+        self.message_user(
+            request,
+            f"Resumen: {total} draft(s) seleccionados, {approved_count} aprobados, "
+            f"{skipped_not_approved} saltados (no aprobados). "
+            f"Aplicados: {ok}. Vacíos: {fail_empty}. Excepciones: {fail_exc}. Otros: {fail_other}.",
+            level=messages.SUCCESS if ok else messages.WARNING,
+        )
+        # Detalle por draft
+        for line in details:
+            level = messages.SUCCESS if line.startswith("✓") else messages.WARNING
+            self.message_user(request, line, level=level)
 
 
 class CircuitNarrativeDraftForm(forms.ModelForm):

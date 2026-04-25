@@ -36,15 +36,32 @@ class BlockType(models.TextChoices):
 
 
 class PlaceType(models.TextChoices):
+    # Naturales / atracciones
     ATTRACTION = "ATTRACTION", "Atracción"
-    RESTAURANT = "RESTAURANT", "Restaurante"
-    ACTIVITY = "ACTIVITY", "Actividad"
     VIEWPOINT = "VIEWPOINT", "Mirador"
+    PARK = "PARK", "Parque"
+    # Comerciales
+    RESTAURANT = "RESTAURANT", "Restaurante"
     CAFE = "CAFE", "Café"
     SHOP = "SHOP", "Tienda"
-    PARK = "PARK", "Parque"
+    LODGING = "LODGING", "Alojamiento"
+    SPA = "SPA", "Spa / Bienestar"
+    TOUR_OPERATOR = "TOUR_OPERATOR", "Operador turístico"
+    BUSINESS = "BUSINESS", "Empresa / Servicio"
+    ACTIVITY = "ACTIVITY", "Actividad"
+    # Culturales / institucionales
     MUSEUM = "MUSEUM", "Museo"
+    THEATER = "THEATER", "Teatro / Sala"
+    CHURCH = "CHURCH", "Iglesia"
+    CULTURAL_CENTER = "CULTURAL_CENTER", "Centro cultural"
     OTHER = "OTHER", "Otro"
+
+
+class PartnershipLevel(models.TextChoices):
+    OWNED = "OWNED", "Propio (Aremko)"
+    PARTNER = "PARTNER", "Partner / Aliado"
+    LISTED = "LISTED", "Listado (sin acuerdo comercial)"
+    DIRECTORY = "DIRECTORY", "Directorio (referencial)"
 
 
 class ConversationStatus(models.TextChoices):

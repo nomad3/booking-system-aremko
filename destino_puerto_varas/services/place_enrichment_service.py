@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 # Campos estructurados que la IA debe intentar llenar.
 STRUCTURED_FIELDS = [
+    # Naturales / atracciones
     "elevation_m",
     "year_established",
     "has_parking",
@@ -46,6 +47,12 @@ STRUCTURED_FIELDS = [
     "accessibility_notes",
     "distance_from_pv_km",
     "drive_time_from_pv_min",
+    # Comerciales (negocios, restaurantes, teatros, museos)
+    "phone",
+    "website",
+    "instagram",
+    "reservations_url",
+    "price_range",
 ]
 
 INT_FIELDS = {
@@ -61,7 +68,16 @@ BOOL_FIELDS = {
     "has_food_service",
 }
 FLOAT_FIELDS = {"distance_from_pv_km"}
-STR_FIELDS = {"best_season", "accessibility_notes"}
+STR_FIELDS = {
+    "best_season",
+    "accessibility_notes",
+    "phone",
+    "website",
+    "instagram",
+    "reservations_url",
+    "price_range",
+}
+JSON_FIELDS = {"opening_hours"}
 
 
 SYSTEM_PROMPT = """Eres un asistente experto en turismo en la región de Los Lagos, Chile, \
@@ -98,7 +114,22 @@ markdown ```. Estructura exacta:
     "best_season": "<string en español o vacío>",
     "accessibility_notes": "<string en español o vacío>",
     "distance_from_pv_km": <float|null>,
-    "drive_time_from_pv_min": <int|null>
+    "drive_time_from_pv_min": <int|null>,
+    "phone": "<teléfono en formato libre o vacío>",
+    "website": "<URL del sitio oficial o vacío>",
+    "instagram": "<handle sin @ o URL o vacío>",
+    "reservations_url": "<URL para reservar o vacío>",
+    "price_range": "<$, $$, $$$, $$$$ o vacío>"
+  },
+  "opening_hours": {
+    "mon": "<HH:MM-HH:MM o 'cerrado' o vacío>",
+    "tue": "<...>",
+    "wed": "<...>",
+    "thu": "<...>",
+    "fri": "<...>",
+    "sat": "<...>",
+    "sun": "<...>",
+    "notes": "<observaciones generales o vacío>"
   },
   "long_description": "<texto editorial 250-400 palabras en español, tono inspiracional pero informativo, basado en los snippets>",
   "extra_data": {
@@ -112,6 +143,13 @@ markdown ```. Estructura exacta:
 Notas:
 - entry_fee_clp: 0 si la entrada es explícitamente gratis, null si los snippets no lo mencionan.
 - distance_from_pv_km y drive_time_from_pv_min: desde el centro de Puerto Varas.
+- Datos comerciales (phone, website, instagram, reservations_url, price_range, opening_hours): \
+  llena solo si el lugar es un negocio (restaurante, café, teatro, museo, alojamiento, tienda, \
+  spa, operador). Para atracciones naturales o miradores, déjalos vacíos/null/objeto vacío.
+- opening_hours: omite el objeto entero (devuelve {}) si no aplica o no hay datos. \
+  Usa formato "HH:MM-HH:MM" (24h) para días abiertos, "cerrado" para días cerrados.
+- price_range: usa la convención $ (económico), $$ (medio), $$$ (alto), $$$$ (premium). \
+  Solo si los snippets lo mencionan o se infiere claramente.
 - El JSON debe ser válido (comillas dobles, sin trailing commas).
 """
 
@@ -260,6 +298,9 @@ def apply_draft(draft: PlaceEnrichmentDraft, *, reviewer: str = "") -> bool:
     fields = proposed.get("fields") or {}
     for key, value in fields.items():
         if key in STRUCTURED_FIELDS and value is not None:
+            # Para campos string, no sobreescribir con vacío
+            if key in STR_FIELDS and not str(value).strip():
+                continue
             setattr(place, key, value)
 
     long_desc = proposed.get("long_description")
@@ -271,6 +312,15 @@ def apply_draft(draft: PlaceEnrichmentDraft, *, reviewer: str = "") -> bool:
         merged = dict(place.extra_data or {})
         merged.update(extra)
         place.extra_data = merged
+
+    # opening_hours (JSONField, merge no-destructivo)
+    proposed_hours = proposed.get("opening_hours") or {}
+    if isinstance(proposed_hours, dict) and proposed_hours:
+        merged_hours = dict(place.opening_hours or {})
+        for k, v in proposed_hours.items():
+            if v:  # no sobreescribir con vacío
+                merged_hours[k] = v
+        place.opening_hours = merged_hours
 
     place.last_enriched_at = timezone.now()
     place.save()
@@ -322,8 +372,26 @@ def _build_synthesis_prompt(place: Place, results: list[dict[str, Any]]) -> str:
         lines.append(f"Ubicación: {place.location_label}")
     if place.place_type:
         lines.append(f"Tipo: {place.get_place_type_display()}")
+    if place.partnership_level:
+        lines.append(f"Relación comercial: {place.get_partnership_level_display()}")
     if place.short_description:
         lines.append(f"Descripción breve actual: {place.short_description}")
+
+    # Hint a la IA sobre si extraer datos comerciales
+    commercial_types = {
+        "RESTAURANT", "CAFE", "SHOP", "LODGING", "SPA",
+        "TOUR_OPERATOR", "BUSINESS", "THEATER", "MUSEUM", "CULTURAL_CENTER",
+    }
+    if place.place_type in commercial_types:
+        lines.append(
+            "NOTA: este es un negocio/establecimiento. Intenta extraer phone, "
+            "website, instagram, opening_hours, price_range si aparecen en los snippets."
+        )
+    else:
+        lines.append(
+            "NOTA: este NO es un negocio. Deja vacíos los campos comerciales "
+            "(phone, website, instagram, reservations_url, price_range, opening_hours)."
+        )
 
     lines.append("")
     lines.append("=== RESULTADOS DE BÚSQUEDA WEB (Perplexity) ===")
@@ -387,7 +455,12 @@ def _normalize_proposed_data(parsed: dict[str, Any]) -> dict[str, Any]:
         "long_description": str(parsed.get("long_description") or "").strip(),
         "extra_data": parsed.get("extra_data") or {},
         "photos": parsed.get("photos") or [],
+        "opening_hours": parsed.get("opening_hours") or {},
     }
+
+    # Limpiar opening_hours — solo dict, ignora otros tipos
+    if not isinstance(out["opening_hours"], dict):
+        out["opening_hours"] = {}
 
     raw_fields = parsed.get("fields") or {}
     for key in STRUCTURED_FIELDS:
