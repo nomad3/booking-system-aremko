@@ -60,6 +60,21 @@ class Circuit(models.Model):
     published = models.BooleanField(default=False, db_index=True)
     featured = models.BooleanField(default=False)
     sort_order = models.PositiveSmallIntegerField(default=0)
+    # ─── Narrativa IA (DPV CMS-IA · Capa 3) ───
+    places_signature = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=(
+            "Hash de las paradas en orden, calculado al generar la narrativa. "
+            "Si difiere del hash actual, la narrativa quedó stale y conviene regenerarla."
+        ),
+    )
+    last_narrative_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Última vez que se aplicó una narrativa IA al long_description.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -70,6 +85,26 @@ class Circuit(models.Model):
 
     def __str__(self):
         return f"#{self.number} — {self.name}"
+
+    def compute_places_signature(self) -> str:
+        """SHA256 corto de las paradas en orden (day_number, visit_order, place_id).
+
+        Permite detectar cambios sin guardar snapshot completo.
+        """
+        import hashlib
+
+        tuples = []
+        for day in self.days.order_by("day_number", "sort_order"):
+            for stop in day.place_stops.order_by("visit_order"):
+                tuples.append((day.day_number, stop.visit_order, stop.place_id))
+        raw = "|".join(f"{d}-{v}-{p}" for d, v, p in tuples)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
+
+    def is_narrative_stale(self) -> bool:
+        """True si las paradas cambiaron desde que se generó la narrativa."""
+        if not self.places_signature:
+            return True
+        return self.compute_places_signature() != self.places_signature
 
 
 class CircuitDay(models.Model):
@@ -130,6 +165,60 @@ class Place(models.Model):
     safety_notes = models.TextField(blank=True)
     did_you_know = models.TextField(blank=True)
     nobody_tells_you = models.TextField(blank=True)
+    # ─── Datos estructurados enriquecibles por IA (DPV CMS-IA) ───
+    elevation_m = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Altitud en metros sobre el nivel del mar (ej: 2652 para Volcán Osorno).",
+    )
+    year_established = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Año de creación / declaración (ej: 1926 para Parque Vicente Pérez Rosales).",
+    )
+    has_parking = models.BooleanField(default=False)
+    has_restrooms = models.BooleanField(default=False)
+    has_conaf_office = models.BooleanField(default=False)
+    has_food_service = models.BooleanField(default=False)
+    entry_fee_clp = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Entrada en CLP (0 = gratis, null = no aplica/desconocido).",
+    )
+    best_season = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text="Mejor temporada para visitar. Ej: 'Diciembre a marzo' o 'Todo el año'.",
+    )
+    accessibility_notes = models.TextField(
+        blank=True,
+        help_text="Accesibilidad para personas con movilidad reducida, niños pequeños, etc.",
+    )
+    distance_from_pv_km = models.DecimalField(
+        max_digits=5,
+        decimal_places=1,
+        null=True,
+        blank=True,
+        help_text="Distancia en km desde Puerto Varas centro.",
+    )
+    drive_time_from_pv_min = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Tiempo en auto desde Puerto Varas centro (minutos).",
+    )
+    extra_data = models.JSONField(
+        blank=True,
+        default=dict,
+        help_text=(
+            "Campos no anticipados que la IA puede extraer (glaciar, fauna, "
+            "infraestructura adicional, etc.). Estructura libre."
+        ),
+    )
+    last_enriched_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Última vez que un draft IA fue aprobado y aplicado a este lugar.",
+    )
     published = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -409,3 +498,184 @@ class AgentPromptTemplate(models.Model):
     def __str__(self):
         estado = "activo" if self.is_active else "inactivo"
         return f"{self.name} [{self.slug}] ({estado})"
+
+
+class PlacePhoto(models.Model):
+    """Foto asociada a un Place. Inicialmente desde la web (source_url),
+    luego reemplazables por fotos propias.
+    """
+
+    place = models.ForeignKey(
+        Place,
+        on_delete=models.CASCADE,
+        related_name="photos",
+    )
+    image = models.ImageField(
+        upload_to="dpv/places/",
+        blank=True,
+        null=True,
+        help_text="Foto subida a storage (Cloudinary). Opcional si solo tenemos source_url.",
+    )
+    source_url = models.URLField(
+        blank=True,
+        max_length=500,
+        help_text="URL de origen si la foto vino de la web (Wikipedia, Unsplash, etc.). "
+                  "Para fotos propias, dejar vacío.",
+    )
+    caption = models.CharField(max_length=255, blank=True)
+    credit = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Atribución (ej: 'Foto: Wikimedia Commons, CC-BY-SA').",
+    )
+    is_primary = models.BooleanField(
+        default=False,
+        help_text="Foto principal del lugar (la que sale primero).",
+    )
+    order = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["place", "order", "id"]
+        verbose_name = "Foto de lugar"
+        verbose_name_plural = "Fotos de lugares"
+
+    def __str__(self):
+        marker = " ★" if self.is_primary else ""
+        return f"{self.place.name} · foto #{self.order}{marker}"
+
+
+class PlaceEnrichmentDraft(models.Model):
+    """Borrador generado por IA para enriquecer un Place.
+    Requiere revisión humana antes de aplicarse al Place real.
+    """
+
+    STATUS_DRAFT = "draft"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+    STATUS_APPLIED = "applied"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Borrador (pendiente revisión)"),
+        (STATUS_APPROVED, "Aprobado (listo para aplicar)"),
+        (STATUS_REJECTED, "Rechazado"),
+        (STATUS_APPLIED, "Aplicado al Place"),
+    ]
+
+    place = models.ForeignKey(
+        Place,
+        on_delete=models.CASCADE,
+        related_name="enrichment_drafts",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_DRAFT,
+        db_index=True,
+    )
+    proposed_data = models.JSONField(
+        default=dict,
+        help_text=(
+            "Estructura: {'fields': {'elevation_m': 2652, ...}, "
+            "'extra_data': {...}, 'photos': [{url, caption, credit}, ...], "
+            "'long_description': '...'}"
+        ),
+    )
+    raw_search_response = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="Respuesta cruda del proveedor de búsqueda (Perplexity) para auditoría.",
+    )
+    search_provider = models.CharField(
+        max_length=40,
+        default="perplexity",
+        help_text="Proveedor usado: perplexity, tavily, brave, etc.",
+    )
+    llm_model = models.CharField(max_length=80, blank=True, default="")
+    llm_input_tokens = models.PositiveIntegerField(default=0)
+    llm_output_tokens = models.PositiveIntegerField(default=0)
+    llm_latency_ms = models.PositiveIntegerField(default=0)
+    review_notes = models.TextField(
+        blank=True,
+        help_text="Comentarios del revisor humano (qué se cambió, por qué se rechazó, etc.).",
+    )
+    reviewed_by = models.CharField(
+        max_length=80,
+        blank=True,
+        help_text="Username de quien revisó (admin Django).",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Borrador de enriquecimiento"
+        verbose_name_plural = "Borradores de enriquecimiento"
+
+    def __str__(self):
+        return f"{self.place.name} · {self.get_status_display()} · {self.created_at:%Y-%m-%d}"
+
+
+class CircuitNarrativeDraft(models.Model):
+    """Borrador de narrativa editorial para un Circuit, generado por IA.
+
+    Análogo a PlaceEnrichmentDraft pero para Circuits. Toma los Places ordenados
+    del circuito y le pide al LLM que arme un texto continuo y coherente.
+    Requiere revisión humana antes de aplicarse.
+    """
+
+    STATUS_DRAFT = "draft"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+    STATUS_APPLIED = "applied"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Borrador (pendiente revisión)"),
+        (STATUS_APPROVED, "Aprobado (listo para aplicar)"),
+        (STATUS_REJECTED, "Rechazado"),
+        (STATUS_APPLIED, "Aplicado al Circuit"),
+    ]
+
+    circuit = models.ForeignKey(
+        Circuit,
+        on_delete=models.CASCADE,
+        related_name="narrative_drafts",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_DRAFT,
+        db_index=True,
+    )
+    places_signature = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text="Hash de paradas en el momento de generar (para auditar staleness).",
+    )
+    proposed_data = models.JSONField(
+        default=dict,
+        help_text=(
+            "Estructura: {'circuit_long_description': '...', "
+            "'day_summaries': {'1': '...', '2': '...'}}"
+        ),
+    )
+    llm_model = models.CharField(max_length=80, blank=True, default="")
+    llm_input_tokens = models.PositiveIntegerField(default=0)
+    llm_output_tokens = models.PositiveIntegerField(default=0)
+    llm_latency_ms = models.PositiveIntegerField(default=0)
+    review_notes = models.TextField(blank=True)
+    reviewed_by = models.CharField(max_length=80, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Borrador de narrativa"
+        verbose_name_plural = "Borradores de narrativa"
+
+    def __str__(self):
+        return f"{self.circuit} · {self.get_status_display()} · {self.created_at:%Y-%m-%d}"

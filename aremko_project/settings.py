@@ -359,6 +359,12 @@ DPV_LLM_TIMEOUT_SECONDS = int(os.getenv("DPV_LLM_TIMEOUT_SECONDS", "30"))
 DPV_LLM_SITE_URL = os.getenv("DPV_LLM_SITE_URL", "https://www.aremko.cl")
 DPV_LLM_SITE_NAME = os.getenv("DPV_LLM_SITE_NAME", "Destino Puerto Varas Piloto")
 
+# ──────────────── DPV — CMS-IA: Perplexity (búsqueda web) ────────────────
+PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY", "")
+PERPLEXITY_BASE_URL = os.getenv("PERPLEXITY_BASE_URL", "https://api.perplexity.ai")
+PERPLEXITY_MODEL = os.getenv("PERPLEXITY_MODEL", "sonar-pro")
+PERPLEXITY_TIMEOUT_SECONDS = int(os.getenv("PERPLEXITY_TIMEOUT_SECONDS", "60"))
+
 # ──────────────── DPV — Bot WhatsApp (DPV-006) ────────────────
 DPV_BOT_ENABLED = os.getenv("DPV_BOT_ENABLED", "false").lower() == "true"
 DPV_BOT_ENABLED_JIDS = [

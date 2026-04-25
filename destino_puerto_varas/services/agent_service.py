@@ -16,12 +16,15 @@ from typing import Optional
 from django.conf import settings
 
 from ..enums import ConversationStatus, InterestType, MessageSenderType, ProfileType
+from django.db.models import Q
+
 from ..models import (
     AgentPromptTemplate,
     Circuit,
     CircuitDay,
     ConversationMessage,
     LeadConversation,
+    Place,
 )
 from .llm.openrouter_provider import OpenRouterProvider
 
@@ -42,7 +45,9 @@ TOOL_DEFINITIONS = [
             "name": "list_circuits",
             "description": (
                 "Lista circuitos turísticos publicados en Puerto Varas. "
-                "Usa filtros opcionales para afinar. Retorna hasta 8 circuitos."
+                "Usa filtros opcionales para afinar. Si retorna 0 con filtros estrictos, "
+                "automáticamente vuelve a buscar relajando filtros y marca "
+                "'broadened=true'. Retorna hasta 8 circuitos."
             ),
             "parameters": {
                 "type": "object",
@@ -59,13 +64,25 @@ TOOL_DEFINITIONS = [
                     },
                     "duration_days": {
                         "type": "integer",
-                        "minimum": 1,
+                        "minimum": 0,
                         "maximum": 7,
-                        "description": "Días de duración. Usa 1 para medio día o día completo.",
+                        "description": "Días. Usa 0 para medio día, 1 para día completo, 2-3 para multi-día.",
                     },
                     "is_rainy": {
                         "type": "boolean",
                         "description": "Si es true, prioriza circuitos aptos para lluvia.",
+                    },
+                    "is_romantic": {
+                        "type": "boolean",
+                        "description": "True si el viajero busca algo romántico (pareja).",
+                    },
+                    "is_family_friendly": {
+                        "type": "boolean",
+                        "description": "True si viaja con niños.",
+                    },
+                    "is_adventure": {
+                        "type": "boolean",
+                        "description": "True si busca aventura/actividad física.",
                     },
                 },
             },
@@ -76,18 +93,46 @@ TOOL_DEFINITIONS = [
         "function": {
             "name": "get_circuit_detail",
             "description": (
-                "Obtiene el detalle completo de un circuito: descripción larga, días, "
-                "lugares principales por día. Usa el slug que viene de list_circuits."
+                "Detalle completo de un circuito: narrativa editorial, días con resumen, "
+                "y CADA lugar de visita con datos enriquecidos (altura, año, infraestructura, "
+                "entrada, distancia/tiempo desde Pto Varas, fotos). Usa el slug de list_circuits."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "slug": {
                         "type": "string",
-                        "description": "Slug del circuito (ej: 'circuito-volcanico-1-dia').",
+                        "description": "Slug del circuito (ej: 'aventura-lago-llanquihue-3d2n').",
                     },
                 },
                 "required": ["slug"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_place_detail",
+            "description": (
+                "Información detallada de UN lugar específico: descripción, altura, año, "
+                "infraestructura (parking/baños/CONAF), entrada, distancia/tiempo desde "
+                "Puerto Varas, datos curiosos, fotos. Usar cuando el usuario pregunta por "
+                "un atractivo puntual ('cuánto mide el Volcán Osorno', 'cómo llego a "
+                "Petrohué', 'tiene baños el parque...'). Acepta slug exacto O un nombre "
+                "para búsqueda parcial."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string",
+                        "description": "Slug exacto del lugar (preferido si lo conoces).",
+                    },
+                    "name_query": {
+                        "type": "string",
+                        "description": "Búsqueda por nombre parcial (case-insensitive). Ej: 'osorno', 'petrohué'.",
+                    },
+                },
             },
         },
     },
@@ -120,42 +165,134 @@ TOOL_DEFINITIONS = [
 # Tool implementations
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _circuit_brief(c: Circuit) -> dict:
+    """Representación corta de un circuito para list_circuits."""
+    return {
+        "number": c.number,
+        "name": c.name,
+        "slug": c.slug,
+        "duration_label": c.duration_case.name if c.duration_case_id else "",
+        "duration_days": c.duration_case.days if c.duration_case_id else None,
+        "duration_nights": c.duration_case.nights if c.duration_case_id else None,
+        "primary_interest": c.primary_interest,
+        "recommended_profile": c.recommended_profile or "",
+        "short_description": c.short_description,
+        "is_romantic": c.is_romantic,
+        "is_family_friendly": c.is_family_friendly,
+        "is_adventure": c.is_adventure,
+        "is_rain_friendly": c.is_rain_friendly,
+        "is_premium": c.is_premium,
+    }
+
+
+def _place_summary(place: Place, *, include_long_desc: bool = False) -> dict:
+    """Datos enriquecidos de un Place para enviar al LLM como contexto."""
+    primary_photo = place.photos.filter(is_primary=True).first() or place.photos.order_by("order").first()
+    photo_url = ""
+    photo_credit = ""
+    if primary_photo:
+        if primary_photo.image:
+            photo_url = primary_photo.image.url
+        elif primary_photo.source_url:
+            photo_url = primary_photo.source_url
+        photo_credit = primary_photo.credit
+
+    summary = {
+        "name": place.name,
+        "slug": place.slug,
+        "place_type": place.place_type,
+        "location_label": place.location_label,
+        "short_description": place.short_description,
+        "elevation_m": place.elevation_m,
+        "year_established": place.year_established,
+        "has_parking": place.has_parking,
+        "has_restrooms": place.has_restrooms,
+        "has_conaf_office": place.has_conaf_office,
+        "has_food_service": place.has_food_service,
+        "entry_fee_clp": place.entry_fee_clp,
+        "best_season": place.best_season,
+        "accessibility_notes": place.accessibility_notes,
+        "distance_from_pv_km": float(place.distance_from_pv_km) if place.distance_from_pv_km is not None else None,
+        "drive_time_from_pv_min": place.drive_time_from_pv_min,
+        "primary_photo_url": photo_url,
+        "primary_photo_credit": photo_credit,
+        "photos_count": place.photos.count(),
+    }
+    if include_long_desc:
+        summary["long_description"] = place.long_description or ""
+        summary["did_you_know"] = place.did_you_know or ""
+        summary["practical_tips"] = place.practical_tips or ""
+        summary["safety_notes"] = place.safety_notes or ""
+        # extra_data puede ser grande — limitamos a primeras 8 claves
+        extra = place.extra_data or {}
+        if extra:
+            summary["extra_data"] = dict(list(extra.items())[:8])
+    return summary
+
+
 def _tool_list_circuits(arguments: dict) -> dict:
-    qs = Circuit.objects.filter(published=True)
+    """Lista circuitos con filtros + broadening automático si 0 resultados."""
+    base_qs = Circuit.objects.filter(published=True)
+
     interest = arguments.get("interest")
     profile = arguments.get("profile")
     duration_days = arguments.get("duration_days")
     is_rainy = arguments.get("is_rainy")
+    is_romantic = arguments.get("is_romantic")
+    is_family_friendly = arguments.get("is_family_friendly")
+    is_adventure = arguments.get("is_adventure")
 
-    if interest:
-        qs = qs.filter(primary_interest=interest)
-    if profile:
-        qs = qs.filter(recommended_profile=profile)
-    if duration_days is not None:
-        qs = qs.filter(duration_case__days=duration_days)
-    if is_rainy:
-        qs = qs.filter(is_rain_friendly=True)
+    def _apply(qs, *, with_profile=True, with_duration=True, with_flags=True):
+        if interest:
+            qs = qs.filter(primary_interest=interest)
+        if with_profile and profile:
+            qs = qs.filter(recommended_profile=profile)
+        if with_duration and duration_days is not None:
+            qs = qs.filter(duration_case__days=duration_days)
+        if is_rainy:
+            qs = qs.filter(is_rain_friendly=True)
+        if with_flags:
+            if is_romantic:
+                qs = qs.filter(is_romantic=True)
+            if is_family_friendly:
+                qs = qs.filter(is_family_friendly=True)
+            if is_adventure:
+                qs = qs.filter(is_adventure=True)
+        return qs
 
-    circuits = qs.select_related("duration_case").order_by("sort_order", "number")[:8]
-    results = []
-    for c in circuits:
-        duration_label = c.duration_case.name if c.duration_case_id else ""
-        results.append({
-            "number": c.number,
-            "name": c.name,
-            "slug": c.slug,
-            "duration_label": duration_label,
-            "primary_interest": c.primary_interest,
-            "recommended_profile": c.recommended_profile or "",
-            "short_description": c.short_description,
-            "is_romantic": c.is_romantic,
-            "is_family_friendly": c.is_family_friendly,
-            "is_adventure": c.is_adventure,
-            "is_rain_friendly": c.is_rain_friendly,
-            "is_premium": c.is_premium,
-        })
+    # Estrategia: probar de más estricto a más permisivo
+    attempts = [
+        ("strict", lambda: _apply(base_qs)),
+        ("no_profile", lambda: _apply(base_qs, with_profile=False)),
+        ("no_profile_no_flags", lambda: _apply(base_qs, with_profile=False, with_flags=False)),
+        ("only_interest", lambda: _apply(base_qs, with_profile=False, with_duration=False, with_flags=False)),
+        ("all_published", lambda: base_qs),
+    ]
 
-    return {"count": len(results), "circuits": results}
+    chosen_label = "strict"
+    chosen_qs = None
+    for label, builder in attempts:
+        qs = builder().select_related("duration_case").order_by("sort_order", "number")
+        if qs.exists():
+            chosen_qs = qs
+            chosen_label = label
+            break
+
+    circuits = list((chosen_qs or base_qs.none())[:8])
+    results = [_circuit_brief(c) for c in circuits]
+
+    response = {
+        "count": len(results),
+        "circuits": results,
+        "broadened": chosen_label != "strict",
+        "broadening_strategy": chosen_label,
+    }
+    if chosen_label != "strict":
+        response["note"] = (
+            "Los filtros estrictos no encontraron circuitos. Se relajaron filtros para "
+            "ofrecer alternativas. Mencionalo al usuario si es relevante."
+        )
+    return response
 
 
 def _tool_get_circuit_detail(arguments: dict) -> dict:
@@ -163,20 +300,26 @@ def _tool_get_circuit_detail(arguments: dict) -> dict:
     if not slug:
         return {"error": "missing_slug"}
 
-    circuit = Circuit.objects.filter(published=True, slug=slug).select_related("duration_case").first()
+    circuit = (
+        Circuit.objects.filter(published=True, slug=slug)
+        .select_related("duration_case")
+        .first()
+    )
     if not circuit:
         return {"error": "circuit_not_found", "slug": slug}
 
     days_data = []
-    for day in CircuitDay.objects.filter(circuit=circuit).order_by("day_number", "sort_order"):
+    for day in (
+        CircuitDay.objects.filter(circuit=circuit)
+        .order_by("day_number", "sort_order")
+        .prefetch_related("place_stops__place__photos")
+    ):
         places = []
-        for stop in day.place_stops.select_related("place").order_by("visit_order")[:5]:
-            places.append({
-                "name": stop.place.name,
-                "type": stop.place.place_type,
-                "short_description": stop.place.short_description,
-                "is_main_stop": stop.is_main_stop,
-            })
+        for stop in day.place_stops.order_by("visit_order")[:6]:
+            place_info = _place_summary(stop.place)
+            place_info["is_main_stop"] = stop.is_main_stop
+            place_info["visit_order"] = stop.visit_order
+            places.append(place_info)
         days_data.append({
             "day_number": day.day_number,
             "title": day.title,
@@ -190,6 +333,8 @@ def _tool_get_circuit_detail(arguments: dict) -> dict:
         "name": circuit.name,
         "slug": circuit.slug,
         "duration_label": circuit.duration_case.name if circuit.duration_case_id else "",
+        "duration_days": circuit.duration_case.days if circuit.duration_case_id else None,
+        "duration_nights": circuit.duration_case.nights if circuit.duration_case_id else None,
         "primary_interest": circuit.primary_interest,
         "recommended_profile": circuit.recommended_profile or "",
         "short_description": circuit.short_description,
@@ -201,6 +346,55 @@ def _tool_get_circuit_detail(arguments: dict) -> dict:
         "is_premium": circuit.is_premium,
         "days": days_data,
     }
+
+
+def _tool_get_place_detail(arguments: dict) -> dict:
+    """Busca un Place por slug exacto o por nombre parcial. Retorna datos completos."""
+    slug = (arguments.get("slug") or "").strip()
+    name_query = (arguments.get("name_query") or "").strip()
+
+    place = None
+    if slug:
+        place = (
+            Place.objects.filter(published=True, slug=slug)
+            .prefetch_related("photos")
+            .first()
+        )
+    if not place and name_query:
+        # Búsqueda parcial case-insensitive en nombre o slug
+        place = (
+            Place.objects.filter(published=True)
+            .filter(Q(name__icontains=name_query) | Q(slug__icontains=name_query))
+            .prefetch_related("photos")
+            .order_by("name")
+            .first()
+        )
+
+    if not place:
+        return {
+            "error": "place_not_found",
+            "slug": slug,
+            "name_query": name_query,
+        }
+
+    data = _place_summary(place, include_long_desc=True)
+    # Lista de fotos (no solo la primaria)
+    photos = []
+    for photo in place.photos.order_by("order", "id")[:6]:
+        url = ""
+        if photo.image:
+            url = photo.image.url
+        elif photo.source_url:
+            url = photo.source_url
+        if url:
+            photos.append({
+                "url": url,
+                "caption": photo.caption,
+                "credit": photo.credit,
+                "is_primary": photo.is_primary,
+            })
+    data["photos"] = photos
+    return data
 
 
 def _tool_refer_user_to_aremko(conversation: LeadConversation, arguments: dict) -> dict:
@@ -330,6 +524,8 @@ def respond(conversation: LeadConversation, user_message: str) -> dict:
             return _tool_list_circuits(arguments)
         if name == "get_circuit_detail":
             return _tool_get_circuit_detail(arguments)
+        if name == "get_place_detail":
+            return _tool_get_place_detail(arguments)
         if name == "refer_user_to_aremko":
             return _tool_refer_user_to_aremko(conversation, arguments)
         return {"error": f"unknown_tool: {name}"}
