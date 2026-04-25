@@ -3,9 +3,11 @@ import logging
 
 from django.contrib import admin, messages
 from django import forms
-from django.shortcuts import redirect
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
+from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.text import slugify
 
@@ -28,6 +30,144 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def render_draft_mobile_preview(draft):
+    """Renderiza el preview móvil (chat bubble + datos) del borrador IA.
+
+    Reutilizable por PlaceAdmin (panel inline) y PlaceEnrichmentDraftAdmin.
+    Retorna SafeString.
+    """
+    if not draft or not draft.proposed_data:
+        return format_html(
+            "<div style='color:#999;font-style:italic;'>Sin datos para previsualizar.</div>"
+        )
+
+    place = draft.place
+    data = draft.proposed_data or {}
+    fields = data.get("fields") or {}
+    long_desc = (data.get("long_description") or "").strip()
+    extra = data.get("extra_data") or {}
+    photos = data.get("photos") or []
+
+    type_icons = {
+        "ATTRACTION": "📍", "RESTAURANT": "🍴", "ACTIVITY": "🚣",
+        "VIEWPOINT": "🔭", "CAFE": "☕", "SHOP": "🛍",
+        "PARK": "🌲", "MUSEUM": "🏛", "LODGING": "🛏",
+        "SPA": "🧖", "TOUR_OPERATOR": "🚐", "BUSINESS": "🏢",
+        "THEATER": "🎭", "CHURCH": "⛪", "CULTURAL_CENTER": "🏛",
+        "OTHER": "📍",
+    }
+    icon = type_icons.get(place.place_type, "📍")
+
+    header_html = format_html(
+        '<div style="font-size:15px;font-weight:600;color:#1a1a1a;margin-bottom:2px;">{} {}</div>',
+        icon, place.name,
+    )
+    loc_label = place.location_label or place.get_place_type_display()
+    sub_html = format_html(
+        '<div style="font-size:12px;color:#777;margin-bottom:10px;">{}</div>',
+        loc_label,
+    )
+
+    photo_html = ""
+    if photos and isinstance(photos, list):
+        url = (photos[0].get("url") or "").strip() if isinstance(photos[0], dict) else ""
+        if url:
+            photo_html = format_html(
+                '<div style="margin:8px 0 10px 0;border-radius:10px;overflow:hidden;">'
+                '<img src="{}" alt="" style="width:100%;display:block;max-height:220px;object-fit:cover;"/></div>',
+                url,
+            )
+
+    desc_html = ""
+    if long_desc:
+        preview = long_desc if len(long_desc) <= 280 else long_desc[:280].rsplit(" ", 1)[0] + "…"
+        desc_html = format_html(
+            '<div style="font-size:14px;line-height:1.5;color:#2a2a2a;margin-bottom:10px;">{}</div>',
+            preview,
+        )
+
+    rows = []
+    if fields.get("elevation_m"):
+        rows.append(("⛰", f"{fields['elevation_m']:,} m de altura".replace(",", ".")))
+    if fields.get("distance_from_pv_km"):
+        km = fields["distance_from_pv_km"]
+        extra_dist = f" · {fields['drive_time_from_pv_min']} min en auto" if fields.get("drive_time_from_pv_min") else ""
+        rows.append(("📍", f"{km} km de Puerto Varas{extra_dist}"))
+    if fields.get("year_established"):
+        rows.append(("📅", f"Establecido en {fields['year_established']}"))
+    if fields.get("entry_fee_clp") is not None:
+        fee = "Entrada gratuita" if fields["entry_fee_clp"] == 0 else f"Entrada: ${fields['entry_fee_clp']:,} CLP".replace(",", ".")
+        rows.append(("🎟", fee))
+    if fields.get("best_season"):
+        rows.append(("🌤", str(fields["best_season"])))
+    if fields.get("phone"):
+        rows.append(("📞", str(fields["phone"])))
+    if fields.get("website"):
+        rows.append(("🌐", str(fields["website"])[:80]))
+    if fields.get("price_range"):
+        rows.append(("💰", str(fields["price_range"])))
+
+    infra = []
+    if fields.get("has_parking"): infra.append("🅿 Estacionamiento")
+    if fields.get("has_restrooms"): infra.append("🚻 Baños")
+    if fields.get("has_conaf_office"): infra.append("🏠 CONAF")
+    if fields.get("has_food_service"): infra.append("🍴 Comida")
+    if infra:
+        rows.append(("✓", " · ".join(infra)))
+
+    if fields.get("accessibility_notes"):
+        rows.append(("♿", str(fields["accessibility_notes"])[:120]))
+
+    rows_html = format_html_join(
+        "",
+        '<div style="font-size:13px;line-height:1.5;color:#3a3a3a;margin:3px 0;">'
+        '<span style="display:inline-block;width:22px;">{}</span>{}</div>',
+        rows,
+    )
+
+    curioso_html = ""
+    for k in ("datos_curiosos", "historia", "dato_curioso"):
+        v = extra.get(k)
+        if v:
+            txt = v if isinstance(v, str) else (v[0] if isinstance(v, list) and v else "")
+            if txt:
+                txt_short = txt[:200] + ("…" if len(txt) > 200 else "")
+                curioso_html = format_html(
+                    '<div style="margin-top:10px;padding:8px 10px;background:#fff8e1;border-left:3px solid #f5b800;border-radius:6px;font-size:12px;color:#5a4500;">'
+                    '<strong>💡 ¿Sabías que…?</strong><br>{}</div>',
+                    txt_short,
+                )
+                break
+
+    return format_html(
+        '<div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;">'
+        '<div style="width:360px;background:#e5ded8;border:1px solid #c8c0b8;border-radius:24px;padding:14px 10px;'
+        'box-shadow:0 6px 20px rgba(0,0,0,.12);font-family:-apple-system,BlinkMacSystemFont,\\"Segoe UI\\",sans-serif;">'
+        '<div style="display:flex;justify-content:space-between;font-size:11px;color:#555;padding:0 12px 8px 12px;">'
+        '<span>9:41</span><span>📶 ⚡ 87%</span></div>'
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#075e54;color:#fff;border-radius:8px 8px 0 0;">'
+        '<div style="width:32px;height:32px;border-radius:50%;background:#0e8e7e;display:flex;align-items:center;justify-content:center;font-size:16px;">🌋</div>'
+        '<div><div style="font-size:13px;font-weight:600;">Destino Puerto Varas</div>'
+        '<div style="font-size:10px;opacity:.85;">en línea</div></div></div>'
+        '<div style="background:#fff;padding:12px 14px;border-radius:0 0 8px 8px 12px 12px 12px 4px;'
+        'max-width:100%;box-shadow:0 1px 1px rgba(0,0,0,.05);">'
+        '{}{}{}{}{}{}'
+        '<div style="font-size:10px;color:#999;text-align:right;margin-top:6px;">9:42 ✓✓</div>'
+        '</div></div>'
+        '<div style="flex:1;min-width:280px;font-size:12px;color:#666;line-height:1.6;">'
+        '<strong>Nota:</strong> esto es una simulación. El bot real puede reformular el texto '
+        'según la pregunta del turista.'
+        '<br><br><strong>Fotos:</strong> {} foto(s) propuesta(s).'
+        '<br><strong>Extra data:</strong> {} clave(s) temática(s).'
+        '<br><strong>Long description:</strong> {} caracteres.'
+        '</div></div>',
+        header_html, sub_html, photo_html, desc_html, rows_html, curioso_html,
+        len(photos) if isinstance(photos, list) else 0,
+        len(extra) if isinstance(extra, dict) else 0,
+        len(long_desc),
+    )
 
 
 class CircuitPlaceInline(admin.TabularInline):
@@ -394,6 +534,21 @@ class PlaceAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.quick_create_with_ai),
                 name="dpv_place_quick_create",
             ),
+            path(
+                "<int:place_id>/aplicar-y-publicar/",
+                self.admin_site.admin_view(self.aplicar_y_publicar_view),
+                name="dpv_place_apply_publish",
+            ),
+            path(
+                "<int:place_id>/re-enriquecer/",
+                self.admin_site.admin_view(self.re_enriquecer_view),
+                name="dpv_place_re_enrich",
+            ),
+            path(
+                "<int:place_id>/descartar-draft/",
+                self.admin_site.admin_view(self.descartar_draft_view),
+                name="dpv_place_discard_draft",
+            ),
         ]
         return custom + urls
 
@@ -401,6 +556,179 @@ class PlaceAdmin(admin.ModelAdmin):
         extra_context = extra_context or {}
         extra_context["quick_create_url"] = reverse("admin:dpv_place_quick_create")
         return super().changelist_view(request, extra_context=extra_context)
+
+    # ─── Override para inyectar el panel del draft pendiente ───
+    change_form_template = "admin/destino_puerto_varas/place/change_form.html"
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        extra_context = extra_context or {}
+        try:
+            place = Place.objects.get(pk=object_id)
+        except (Place.DoesNotExist, ValueError):
+            return super().change_view(request, object_id, form_url, extra_context)
+
+        pending = (
+            place.enrichment_drafts
+            .filter(status__in=[
+                PlaceEnrichmentDraft.STATUS_DRAFT,
+                PlaceEnrichmentDraft.STATUS_APPROVED,
+            ])
+            .order_by("-created_at")
+            .first()
+        )
+        if pending:
+            extra_context["pending_draft"] = pending
+            extra_context["pending_draft_preview"] = render_draft_mobile_preview(pending)
+            extra_context["pending_draft_change_url"] = reverse(
+                "admin:destino_puerto_varas_placeenrichmentdraft_change", args=[pending.id]
+            )
+            extra_context["pending_draft_apply_url"] = reverse(
+                "admin:dpv_place_apply_publish", args=[place.id]
+            )
+            extra_context["pending_draft_re_enrich_url"] = reverse(
+                "admin:dpv_place_re_enrich", args=[place.id]
+            )
+            extra_context["pending_draft_discard_url"] = reverse(
+                "admin:dpv_place_discard_draft", args=[place.id]
+            )
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    # ─── Acciones del panel inline (botones) ───
+    def aplicar_y_publicar_view(self, request, place_id):
+        from .services.place_enrichment_service import apply_draft
+
+        if request.method != "POST":
+            return redirect("admin:destino_puerto_varas_place_change", place_id)
+
+        place = get_object_or_404(Place, pk=place_id)
+        pending = (
+            place.enrichment_drafts
+            .filter(status__in=[
+                PlaceEnrichmentDraft.STATUS_DRAFT,
+                PlaceEnrichmentDraft.STATUS_APPROVED,
+            ])
+            .order_by("-created_at")
+            .first()
+        )
+        if not pending:
+            messages.warning(request, "No hay borrador pendiente para este lugar.")
+            return redirect("admin:destino_puerto_varas_place_change", place_id)
+
+        proposed = pending.proposed_data or {}
+        has_content = bool(
+            (proposed.get("fields") or {})
+            or (proposed.get("long_description") or "").strip()
+            or (proposed.get("extra_data") or {})
+            or (proposed.get("photos") or [])
+        )
+        if not has_content:
+            messages.error(
+                request,
+                "El borrador está vacío. Re-enriquece o descarta antes de aplicar.",
+            )
+            return redirect("admin:destino_puerto_varas_place_change", place_id)
+
+        # Aprobar si está en draft
+        if pending.status == PlaceEnrichmentDraft.STATUS_DRAFT:
+            pending.status = PlaceEnrichmentDraft.STATUS_APPROVED
+            pending.reviewed_by = request.user.username
+            pending.reviewed_at = timezone.now()
+            pending.save()
+
+        # Aplicar
+        try:
+            ok = apply_draft(pending, reviewer=request.user.username)
+        except Exception as exc:
+            logger.exception("aplicar_y_publicar_view: error en apply_draft")
+            messages.error(request, f"Error aplicando: {exc}")
+            return redirect("admin:destino_puerto_varas_place_change", place_id)
+
+        if not ok:
+            messages.warning(
+                request,
+                f"apply_draft retornó False (status={pending.status}). Revisa logs.",
+            )
+            return redirect("admin:destino_puerto_varas_place_change", place_id)
+
+        # Publicar
+        place.refresh_from_db()
+        if not place.published:
+            place.published = True
+            place.save(update_fields=["published", "updated_at"])
+
+        messages.success(
+            request,
+            f"✓ Borrador aplicado y '{place.name}' publicado. "
+            "Los datos están abajo en el formulario.",
+        )
+        return redirect("admin:destino_puerto_varas_place_change", place_id)
+
+    def re_enriquecer_view(self, request, place_id):
+        from .services.place_enrichment_service import (
+            enrich_place,
+            is_enrichment_available,
+        )
+
+        if request.method != "POST":
+            return redirect("admin:destino_puerto_varas_place_change", place_id)
+
+        place = get_object_or_404(Place, pk=place_id)
+
+        if not is_enrichment_available():
+            messages.error(
+                request,
+                "Faltan credenciales: PERPLEXITY_API_KEY u OPENROUTER_API_KEY.",
+            )
+            return redirect("admin:destino_puerto_varas_place_change", place_id)
+
+        # Marcar drafts pendientes como rechazados
+        place.enrichment_drafts.filter(
+            status__in=[
+                PlaceEnrichmentDraft.STATUS_DRAFT,
+                PlaceEnrichmentDraft.STATUS_APPROVED,
+            ]
+        ).update(
+            status=PlaceEnrichmentDraft.STATUS_REJECTED,
+            reviewed_by=request.user.username,
+            reviewed_at=timezone.now(),
+            review_notes="Reemplazado al re-enriquecer.",
+        )
+
+        try:
+            draft = enrich_place(place)
+        except Exception as exc:
+            logger.exception("re_enriquecer_view: error en enrich_place")
+            messages.error(request, f"Error re-enriqueciendo: {exc}")
+            return redirect("admin:destino_puerto_varas_place_change", place_id)
+
+        if draft and draft.status == PlaceEnrichmentDraft.STATUS_DRAFT:
+            messages.success(request, "✓ Nuevo borrador IA generado. Revísalo arriba.")
+        else:
+            status = draft.status if draft else "None"
+            messages.warning(request, f"La IA no generó borrador válido (status={status}).")
+        return redirect("admin:destino_puerto_varas_place_change", place_id)
+
+    def descartar_draft_view(self, request, place_id):
+        if request.method != "POST":
+            return redirect("admin:destino_puerto_varas_place_change", place_id)
+
+        place = get_object_or_404(Place, pk=place_id)
+        n = place.enrichment_drafts.filter(
+            status__in=[
+                PlaceEnrichmentDraft.STATUS_DRAFT,
+                PlaceEnrichmentDraft.STATUS_APPROVED,
+            ]
+        ).update(
+            status=PlaceEnrichmentDraft.STATUS_REJECTED,
+            reviewed_by=request.user.username,
+            reviewed_at=timezone.now(),
+            review_notes="Descartado desde la página del Place.",
+        )
+        if n:
+            messages.info(request, f"✓ {n} borrador(es) descartado(s).")
+        else:
+            messages.warning(request, "No había borradores pendientes.")
+        return redirect("admin:destino_puerto_varas_place_change", place_id)
 
     def quick_create_with_ai(self, request):
         from .services.place_enrichment_service import (
@@ -461,18 +789,15 @@ class PlaceAdmin(admin.ModelAdmin):
                     messages.warning(
                         request,
                         f"Borrador generado pero la IA falló: {draft.review_notes}. "
-                        "Lugar creado; reintenta o llena los campos a mano.",
+                        "Lugar creado; reintenta con 'Re-enriquecer' o llena los campos a mano.",
                     )
                 else:
                     messages.success(
                         request,
-                        "✓ Borrador IA generado. Revísalo abajo, edita lo que quieras "
-                        "y aprueba+aplica para volcarlo al lugar.",
+                        "✓ Borrador IA generado. Revísalo arriba en la vista previa, "
+                        "y haz click en 'Aplicar y publicar'.",
                     )
-                return redirect(
-                    "admin:destino_puerto_varas_placeenrichmentdraft_change",
-                    draft.id,
-                )
+                return redirect("admin:destino_puerto_varas_place_change", place.id)
         else:
             form = PlaceQuickCreateForm()
 
@@ -732,142 +1057,9 @@ class PlaceEnrichmentDraftAdmin(admin.ModelAdmin):
 
     def mobile_preview(self, obj):
         """Simula cómo se vería este lugar al turista en Telegram/WhatsApp."""
-        if not obj or not obj.proposed_data:
-            return format_html(
-                "<div style='color:#999;font-style:italic;'>Sin datos para previsualizar.</div>"
-            )
-
-        place = obj.place
-        data = obj.proposed_data or {}
-        fields = data.get("fields") or {}
-        long_desc = (data.get("long_description") or "").strip()
-        extra = data.get("extra_data") or {}
-        photos = data.get("photos") or []
-
-        type_icons = {
-            "ATTRACTION": "📍", "RESTAURANT": "🍴", "ACTIVITY": "🚣",
-            "VIEWPOINT": "🔭", "CAFE": "☕", "SHOP": "🛍",
-            "PARK": "🌲", "MUSEUM": "🏛", "OTHER": "📍",
-        }
-        icon = type_icons.get(place.place_type, "📍")
-
-        # ─── Header ───
-        header_html = format_html(
-            '<div style="font-size:15px;font-weight:600;color:#1a1a1a;margin-bottom:2px;">{} {}</div>',
-            icon, place.name,
-        )
-        loc_label = place.location_label or place.get_place_type_display()
-        sub_html = format_html(
-            '<div style="font-size:12px;color:#777;margin-bottom:10px;">{}</div>',
-            loc_label,
-        )
-
-        # ─── Foto (si hay) ───
-        photo_html = ""
-        if photos and isinstance(photos, list):
-            url = (photos[0].get("url") or "").strip() if isinstance(photos[0], dict) else ""
-            if url:
-                photo_html = format_html(
-                    '<div style="margin:8px 0 10px 0;border-radius:10px;overflow:hidden;">'
-                    '<img src="{}" alt="" style="width:100%;display:block;max-height:220px;object-fit:cover;"/></div>',
-                    url,
-                )
-
-        # ─── Descripción larga (truncada) ───
-        desc_html = ""
-        if long_desc:
-            preview = long_desc if len(long_desc) <= 280 else long_desc[:280].rsplit(" ", 1)[0] + "…"
-            desc_html = format_html(
-                '<div style="font-size:14px;line-height:1.5;color:#2a2a2a;margin-bottom:10px;">{}</div>',
-                preview,
-            )
-
-        # ─── Datos clave ───
-        rows = []
-        if fields.get("elevation_m"):
-            rows.append(("⛰", f"{fields['elevation_m']:,} m de altura".replace(",", ".")))
-        if fields.get("distance_from_pv_km"):
-            km = fields["distance_from_pv_km"]
-            extra_dist = f" · {fields['drive_time_from_pv_min']} min en auto" if fields.get("drive_time_from_pv_min") else ""
-            rows.append(("📍", f"{km} km de Puerto Varas{extra_dist}"))
-        if fields.get("year_established"):
-            rows.append(("📅", f"Establecido en {fields['year_established']}"))
-        if fields.get("entry_fee_clp") is not None:
-            fee = "Entrada gratuita" if fields["entry_fee_clp"] == 0 else f"Entrada: ${fields['entry_fee_clp']:,} CLP".replace(",", ".")
-            rows.append(("🎟", fee))
-        if fields.get("best_season"):
-            rows.append(("🌤", str(fields["best_season"])))
-
-        # Infraestructura
-        infra = []
-        if fields.get("has_parking"): infra.append("🅿 Estacionamiento")
-        if fields.get("has_restrooms"): infra.append("🚻 Baños")
-        if fields.get("has_conaf_office"): infra.append("🏠 CONAF")
-        if fields.get("has_food_service"): infra.append("🍴 Comida")
-        if infra:
-            rows.append(("✓", " · ".join(infra)))
-
-        if fields.get("accessibility_notes"):
-            rows.append(("♿", str(fields["accessibility_notes"])[:120]))
-
-        # Usar format_html_join para que el resultado sea SafeString (si concatenamos
-        # con += desde "", queda str normal y format_html final lo escapa).
-        rows_html = format_html_join(
-            "",
-            '<div style="font-size:13px;line-height:1.5;color:#3a3a3a;margin:3px 0;">'
-            '<span style="display:inline-block;width:22px;">{}</span>{}</div>',
-            rows,
-        )
-
-        # ─── Dato curioso (de extra_data) ───
-        curioso_html = ""
-        for k in ("datos_curiosos", "historia", "dato_curioso"):
-            v = extra.get(k)
-            if v:
-                txt = v if isinstance(v, str) else (v[0] if isinstance(v, list) and v else "")
-                if txt:
-                    txt_short = txt[:200] + ("…" if len(txt) > 200 else "")
-                    curioso_html = format_html(
-                        '<div style="margin-top:10px;padding:8px 10px;background:#fff8e1;border-left:3px solid #f5b800;border-radius:6px;font-size:12px;color:#5a4500;">'
-                        '<strong>💡 ¿Sabías que…?</strong><br>{}</div>',
-                        txt_short,
-                    )
-                    break
-
-        # ─── Composición final (chat bubble dentro de mockup phone) ───
-        return format_html(
-            '<div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;">'
-            # Phone frame
-            '<div style="width:360px;background:#e5ded8;border:1px solid #c8c0b8;border-radius:24px;padding:14px 10px;'
-            'box-shadow:0 6px 20px rgba(0,0,0,.12);font-family:-apple-system,BlinkMacSystemFont,\\"Segoe UI\\",sans-serif;">'
-            # Status bar
-            '<div style="display:flex;justify-content:space-between;font-size:11px;color:#555;padding:0 12px 8px 12px;">'
-            '<span>9:41</span><span>📶 ⚡ 87%</span></div>'
-            # Bot header
-            '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#075e54;color:#fff;border-radius:8px 8px 0 0;">'
-            '<div style="width:32px;height:32px;border-radius:50%;background:#0e8e7e;display:flex;align-items:center;justify-content:center;font-size:16px;">🌋</div>'
-            '<div><div style="font-size:13px;font-weight:600;">Destino Puerto Varas</div>'
-            '<div style="font-size:10px;opacity:.85;">en línea</div></div></div>'
-            # Bubble
-            '<div style="background:#fff;padding:12px 14px;border-radius:0 0 8px 8px 12px 12px 12px 4px;'
-            'max-width:100%;box-shadow:0 1px 1px rgba(0,0,0,.05);">'
-            '{}{}{}{}{}{}'  # header, sub, photo, desc, rows, curioso
-            '<div style="font-size:10px;color:#999;text-align:right;margin-top:6px;">9:42 ✓✓</div>'
-            '</div></div>'
-            # Notas al lado
-            '<div style="flex:1;min-width:280px;font-size:12px;color:#666;line-height:1.6;">'
-            '<strong>Nota:</strong> esto es una simulación. El bot real puede reformular el texto '
-            'según la pregunta del turista. Los emoticones y colores varían según la app (Telegram/WhatsApp).'
-            '<br><br><strong>Fotos:</strong> {} foto(s) propuesta(s).'
-            '<br><strong>Extra data:</strong> {} clave(s) temática(s).'
-            '<br><strong>Long description:</strong> {} caracteres.'
-            '</div></div>',
-            header_html, sub_html, photo_html, desc_html, rows_html, curioso_html,
-            len(photos) if isinstance(photos, list) else 0,
-            len(extra) if isinstance(extra, dict) else 0,
-            len(long_desc),
-        )
+        return render_draft_mobile_preview(obj)
     mobile_preview.short_description = "📱 Vista móvil"
+
 
     @admin.action(description="✓ Aprobar (sin aplicar todavía)")
     def accion_aprobar(self, request, queryset):
