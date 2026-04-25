@@ -335,6 +335,7 @@ class CircuitAdmin(admin.ModelAdmin):
     inlines = [CircuitDayInline]
     ordering = ("sort_order", "number")
     readonly_fields = (
+        "paradas_panel",
         "places_signature",
         "last_narrative_at",
         "narrative_status_display",
@@ -356,6 +357,72 @@ class CircuitAdmin(admin.ModelAdmin):
             return "—"
         return self.narrative_status(obj)
     narrative_status_display.short_description = "Estado narrativa"
+
+    def paradas_panel(self, obj):
+        """Muestra TODAS las paradas en orden real (día → visit_order) + botón editar."""
+        if not obj.pk:
+            return format_html(
+                '<em style="color:#888;">Guarda el circuito primero para ver y editar paradas.</em>'
+            )
+
+        rows = []
+        global_idx = 0
+        for day in obj.days.order_by("day_number", "sort_order").prefetch_related(
+            "place_stops__place"
+        ):
+            for stop in day.place_stops.order_by("visit_order"):
+                global_idx += 1
+                main_badge = (
+                    ' <span style="background:#fff3cd;color:#856404;padding:1px 6px;'
+                    'border-radius:3px;font-size:11px;">⭐ main</span>'
+                    if stop.is_main_stop
+                    else ""
+                )
+                rows.append(
+                    format_html(
+                        '<tr>'
+                        '<td style="padding:6px 10px;color:#0c4b78;font-weight:600;width:34px;">{}.</td>'
+                        '<td style="padding:6px 10px;">{}{}</td>'
+                        '<td style="padding:6px 10px;color:#666;font-size:12px;white-space:nowrap;">'
+                        'Día {} · #{}</td>'
+                        '</tr>',
+                        global_idx,
+                        stop.place.name,
+                        format_html(main_badge) if main_badge else "",
+                        day.day_number,
+                        stop.visit_order,
+                    )
+                )
+
+        if not rows:
+            table_html = format_html(
+                '<div style="padding:14px;background:#fff8e1;border:1px dashed #f5b800;'
+                'border-radius:4px;color:#856404;">'
+                'Este circuito no tiene paradas. Click en "✏️ Editar paradas" para agregar.'
+                '</div>'
+            )
+        else:
+            table_html = format_html(
+                '<table style="border-collapse:collapse;background:#fff;border:1px solid #ddd;'
+                'border-radius:4px;width:100%;max-width:680px;">{}</table>',
+                format_html("".join(rows)),
+            )
+
+        edit_url = reverse("admin:dpv_circuit_edit_places", args=[obj.pk])
+        button_html = format_html(
+            '<div style="margin-top:10px;">'
+            '<a href="{}" class="button" '
+            'style="background:#0c4b78;color:#fff;padding:8px 14px;border-radius:4px;'
+            'text-decoration:none;display:inline-block;">'
+            '✏️ Editar paradas (drag &amp; drop)</a>'
+            '<span style="margin-left:10px;color:#666;font-size:12px;">'
+            '— al editar, la narrativa quedará marcada como stale (regenerar con IA).'
+            '</span></div>',
+            edit_url,
+        )
+        return format_html('{}{}', table_html, button_html)
+
+    paradas_panel.short_description = "Paradas (en orden real)"
 
     @admin.action(description="📝 Generar narrativa con IA (genera borrador)")
     def accion_generar_narrativa(self, request, queryset):
@@ -414,6 +481,11 @@ class CircuitAdmin(admin.ModelAdmin):
                 "crear-manual/revisar/<int:draft_id>/",
                 self.admin_site.admin_view(self.manual_review_branding),
                 name="dpv_circuit_manual_review",
+            ),
+            path(
+                "<int:circuit_id>/editar-paradas/",
+                self.admin_site.admin_view(self.edit_circuit_places),
+                name="dpv_circuit_edit_places",
             ),
         ]
         return custom + urls
@@ -691,6 +763,120 @@ class CircuitAdmin(admin.ModelAdmin):
         return TemplateResponse(
             request,
             "admin/destino_puerto_varas/circuit/manual_create_review.html",
+            context,
+        )
+
+    # ─── Editor de paradas (drag & drop) sobre un Circuit existente ───
+    def edit_circuit_places(self, request, circuit_id):
+        """Editor unificado: agregar/quitar/reordenar paradas en un Circuit existente.
+
+        En POST: wipe + rebuild de CircuitPlace en transacción atómica.
+        Las paradas se redistribuyen entre los días existentes preservando el orden
+        global. La narrativa queda automáticamente stale (places_signature cambia).
+        """
+        from django.db import transaction
+        from .services.circuit_composer_service import _distribute_stops_across_days
+
+        circuit = get_object_or_404(Circuit, pk=circuit_id)
+
+        if request.method == "POST":
+            raw = (request.POST.get("places_ordered") or "").strip()
+            try:
+                new_ids = [int(x.strip()) for x in raw.split(",") if x.strip()]
+            except ValueError:
+                messages.error(request, "Formato de paradas inválido.")
+                return redirect("admin:dpv_circuit_edit_places", circuit.id)
+
+            if not new_ids:
+                messages.error(request, "Debes dejar al menos 1 parada.")
+                return redirect("admin:dpv_circuit_edit_places", circuit.id)
+
+            valid_ids = set(
+                Place.objects.filter(id__in=new_ids, published=True).values_list(
+                    "id", flat=True
+                )
+            )
+            invalid = [pid for pid in new_ids if pid not in valid_ids]
+            if invalid:
+                messages.error(
+                    request,
+                    f"Estos Places no existen o no están publicados: {invalid}.",
+                )
+                return redirect("admin:dpv_circuit_edit_places", circuit.id)
+
+            places_by_id = {p.id: p for p in Place.objects.filter(id__in=new_ids)}
+            ordered_places = [places_by_id[pid] for pid in new_ids]
+
+            existing_days = list(circuit.days.order_by("day_number", "sort_order"))
+            if not existing_days:
+                # Defensivo: si no hay días, crear el Día 1
+                from .enums import BlockType
+                day1 = CircuitDay.objects.create(
+                    circuit=circuit,
+                    day_number=1,
+                    title="Día 1",
+                    block_type=BlockType.FULL_DAY,
+                    summary="",
+                    sort_order=1,
+                )
+                existing_days = [day1]
+
+            n_days = len(existing_days)
+            distribution = _distribute_stops_across_days(ordered_places, n_days)
+
+            with transaction.atomic():
+                # Wipe paradas actuales
+                CircuitPlace.objects.filter(circuit_day__circuit=circuit).delete()
+                # Rebuild distribuyendo entre los días existentes
+                for day, day_places in zip(existing_days, distribution):
+                    for idx, place in enumerate(day_places, start=1):
+                        CircuitPlace.objects.create(
+                            circuit_day=day,
+                            place=place,
+                            visit_order=idx,
+                            is_main_stop=False,
+                        )
+
+            messages.success(
+                request,
+                f"✓ Paradas actualizadas: {len(new_ids)} parada(s) distribuida(s) "
+                f"en {n_days} día(s). La narrativa quedó stale — regenérala con la "
+                "acción 'Generar narrativa con IA' en el changelist.",
+            )
+            return redirect("admin:destino_puerto_varas_circuit_change", circuit.id)
+
+        # GET: cargar paradas actuales en el sortable
+        current_stops = []
+        for day in circuit.days.order_by("day_number", "sort_order").prefetch_related(
+            "place_stops__place"
+        ):
+            for stop in day.place_stops.order_by("visit_order"):
+                current_stops.append({
+                    "id": stop.place.id,
+                    "name": stop.place.name,
+                    "place_type": stop.place.place_type,
+                    "location_label": stop.place.location_label,
+                })
+
+        published_places = list(
+            Place.objects.filter(published=True).order_by("name").values(
+                "id", "name", "place_type", "location_label"
+            )
+        )
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": f"Editar paradas — #{circuit.number} {circuit.name}",
+            "circuit": circuit,
+            "opts": self.model._meta,
+            "has_view_permission": self.has_view_permission(request),
+            "published_places_json": json.dumps(published_places, ensure_ascii=False),
+            "current_stops_json": json.dumps(current_stops, ensure_ascii=False),
+            "n_days": circuit.days.count(),
+        }
+        return TemplateResponse(
+            request,
+            "admin/destino_puerto_varas/circuit/edit_places.html",
             context,
         )
 

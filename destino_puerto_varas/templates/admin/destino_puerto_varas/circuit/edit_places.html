@@ -1,0 +1,240 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrahead %}
+    {{ block.super }}
+    {# jQuery + Django admin init + jQuery UI desde CDN para .sortable() #}
+    <script src="{% static 'admin/js/vendor/jquery/jquery.js' %}"></script>
+    <script src="{% static 'admin/js/jquery.init.js' %}"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"
+            integrity="sha256-lSjKY0/srUM9BE3dPm+c4fBo1dky2v27Gdjm2uoZaL0="
+            crossorigin="anonymous"></script>
+{% endblock %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <style>
+        #places-builder { max-width: 880px; margin: 18px 0; }
+        #places-add-row { display: flex; gap: 8px; align-items: center; margin: 10px 0 18px 0; }
+        #place-search-input {
+            flex: 1; padding: 8px 10px; font-size: 14px;
+            border: 1px solid #aaa; border-radius: 4px;
+        }
+        #places-sortable {
+            list-style: none; padding: 0; margin: 0;
+            border: 1px dashed #aaa; border-radius: 4px; min-height: 60px;
+            background: #fafafa;
+        }
+        #places-sortable.empty::before {
+            content: "Sin paradas. Agrega al menos una.";
+            display: block; padding: 18px; color: #888; font-style: italic; text-align: center;
+        }
+        .stop-item {
+            background: #fff; border-bottom: 1px solid #ddd;
+            padding: 10px 14px; cursor: move; display: flex; align-items: center; gap: 12px;
+        }
+        .stop-item:hover { background: #f0f7fb; }
+        .stop-item:last-child { border-bottom: none; }
+        .stop-handle { color: #888; font-size: 18px; user-select: none; }
+        .stop-order { min-width: 28px; font-weight: 600; color: #0c4b78; }
+        .stop-info { flex: 1; }
+        .stop-name { font-weight: 600; }
+        .stop-meta { font-size: 12px; color: #666; }
+        .stop-remove {
+            background: #c62828; color: #fff; border: none; border-radius: 4px;
+            padding: 4px 10px; cursor: pointer; font-size: 12px;
+        }
+        .stop-remove:hover { background: #a01818; }
+        .ui-sortable-helper { box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .ui-sortable-placeholder {
+            background: #fffaeb !important; visibility: visible !important;
+            height: 50px; border: 2px dashed #f5b800;
+        }
+    </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo;
+    <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo;
+    <a href="{% url 'admin:destino_puerto_varas_circuit_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo;
+    <a href="{% url 'admin:destino_puerto_varas_circuit_change' circuit.id %}">#{{ circuit.number }} {{ circuit.name }}</a>
+    &rsaquo; Editar paradas
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <div style="background:#eef6fb;padding:14px 18px;border-left:4px solid #0c4b78;
+                margin:0 0 18px 0;max-width:880px;">
+        <strong>Editor de paradas:</strong> arrastra para reordenar, click <em>+ Agregar</em> para
+        sumar, click ✗ para quitar.
+        <ul style="margin:8px 0 0 22px;">
+            <li>Las paradas se redistribuirán automáticamente entre los <strong>{{ n_days }} día(s)</strong>
+                existentes del circuito, conservando el orden global.</li>
+            <li>Solo puedes agregar Places <strong>publicados</strong>.</li>
+            <li>Al guardar, la <strong>narrativa quedará desactualizada</strong> (stale) y conviene
+                regenerarla con la acción del changelist.</li>
+        </ul>
+    </div>
+
+    <form method="post" id="edit-places-form">
+        {% csrf_token %}
+
+        <fieldset class="module aligned">
+            <h2>Paradas (de partida a llegada)</h2>
+
+            <div id="places-builder">
+                <div id="places-add-row">
+                    <input type="text"
+                           id="place-search-input"
+                           placeholder="Busca un Place publicado por nombre o ubicación..."
+                           autocomplete="off">
+                    <select id="place-search-select" style="min-width:280px;"></select>
+                    <button type="button" id="place-add-btn" class="button"
+                            style="background:#0c4b78;color:#fff;">+ Agregar</button>
+                </div>
+
+                <ul id="places-sortable"></ul>
+
+                <input type="hidden" name="places_ordered" id="id_places_ordered" value="">
+
+                <div class="help" style="margin-top:8px;">
+                    💡 Arrastra los items para reordenar. Click en ✗ para quitar una parada.
+                </div>
+            </div>
+        </fieldset>
+
+        <div class="submit-row">
+            <input type="submit"
+                   id="submit-btn"
+                   value="💾 Guardar paradas"
+                   class="default">
+            <a href="{% url 'admin:destino_puerto_varas_circuit_change' circuit.id %}"
+               class="button cancel-link"
+               style="margin-left:12px;">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<script id="published-places-data" type="application/json">{{ published_places_json|safe }}</script>
+<script id="current-stops-data" type="application/json">{{ current_stops_json|safe }}</script>
+
+<script>
+(function() {
+    'use strict';
+
+    var $ = django.jQuery;
+    var PLACES = JSON.parse(document.getElementById('published-places-data').textContent || '[]');
+    var CURRENT = JSON.parse(document.getElementById('current-stops-data').textContent || '[]');
+    var addedIds = new Set();
+
+    var $select = $('#place-search-select');
+    var $search = $('#place-search-input');
+    var $sortable = $('#places-sortable');
+    var $hidden = $('#id_places_ordered');
+    var $form = $('#edit-places-form');
+    var $submitBtn = $('#submit-btn');
+
+    function refreshSelect() {
+        $select.empty().append('<option value="">— Elige una parada —</option>');
+        var q = ($search.val() || '').toLowerCase().trim();
+        var matches = PLACES.filter(function(p) {
+            if (addedIds.has(p.id)) return false;
+            if (!q) return true;
+            return (p.name || '').toLowerCase().indexOf(q) !== -1
+                || (p.location_label || '').toLowerCase().indexOf(q) !== -1;
+        });
+        matches.slice(0, 50).forEach(function(p) {
+            var label = p.name + (p.location_label ? ' — ' + p.location_label : '');
+            $select.append($('<option>').val(p.id).text(label));
+        });
+    }
+
+    function refreshOrder() {
+        var ids = [];
+        $sortable.find('li.stop-item').each(function(idx) {
+            var id = $(this).data('place-id');
+            ids.push(id);
+            $(this).find('.stop-order').text((idx + 1) + '.');
+        });
+        $hidden.val(ids.join(','));
+        $sortable.toggleClass('empty', ids.length === 0);
+    }
+
+    function buildLi(p) {
+        var $li = $('<li class="stop-item"></li>')
+            .attr('data-place-id', p.id)
+            .append('<span class="stop-handle">≡</span>')
+            .append('<span class="stop-order"></span>')
+            .append(
+                $('<div class="stop-info"></div>')
+                    .append($('<div class="stop-name"></div>').text(p.name))
+                    .append($('<div class="stop-meta"></div>').text(
+                        (p.place_type || '') + (p.location_label ? ' · ' + p.location_label : '')
+                    ))
+            )
+            .append(
+                $('<button type="button" class="stop-remove">✗ Quitar</button>')
+                    .on('click', function() {
+                        addedIds.delete(p.id);
+                        $li.remove();
+                        refreshOrder();
+                        refreshSelect();
+                    })
+            );
+        return $li;
+    }
+
+    function addPlace(placeId) {
+        placeId = parseInt(placeId, 10);
+        if (!placeId || addedIds.has(placeId)) return;
+        var p = PLACES.find(function(x) { return x.id === placeId; });
+        if (!p) return;
+        addedIds.add(placeId);
+        $sortable.append(buildLi(p));
+        refreshOrder();
+        refreshSelect();
+        $select.val('');
+    }
+
+    $('#place-add-btn').on('click', function() {
+        var pid = $select.val();
+        if (pid) addPlace(pid);
+    });
+
+    $search.on('input', refreshSelect);
+
+    $sortable.sortable({
+        handle: '.stop-handle',
+        axis: 'y',
+        update: refreshOrder,
+        placeholder: 'ui-sortable-placeholder'
+    });
+
+    $form.on('submit', function() {
+        if (!$hidden.val()) {
+            alert('Debes dejar al menos una parada.');
+            return false;
+        }
+        if (!confirm('¿Guardar nuevos paradas? La narrativa actual quedará marcada como stale.')) {
+            return false;
+        }
+        $submitBtn.val('⏳ Guardando...').prop('disabled', true);
+    });
+
+    // Init: pre-cargar paradas actuales en el sortable
+    CURRENT.forEach(function(p) {
+        addedIds.add(p.id);
+        $sortable.append(buildLi(p));
+    });
+    refreshOrder();
+    refreshSelect();
+})();
+</script>
+{% endblock %}
