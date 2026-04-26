@@ -118,8 +118,21 @@ def render_draft_mobile_preview(draft):
     if fields.get("has_restrooms"): infra.append("🚻 Baños")
     if fields.get("has_conaf_office"): infra.append("🏠 CONAF")
     if fields.get("has_food_service"): infra.append("🍴 Comida")
+    if fields.get("has_tourist_info"): infra.append("ℹ Info turística")
+    if fields.get("pet_friendly"): infra.append("🐶 Mascotas")
     if infra:
         rows.append(("✓", " · ".join(infra)))
+
+    if fields.get("recommended_visit_duration"):
+        rows.append(("⏱", str(fields["recommended_visit_duration"])))
+    if fields.get("requires_reservation"):
+        rows.append(("📌", "Requiere reserva anticipada"))
+    if fields.get("payment_methods"):
+        rows.append(("💳", str(fields["payment_methods"])[:120]))
+    if fields.get("parking_details"):
+        rows.append(("🅿", str(fields["parking_details"])[:120]))
+    if fields.get("nearby_food_options"):
+        rows.append(("🍽", str(fields["nearby_food_options"])[:150]))
 
     if fields.get("accessibility_notes"):
         rows.append(("♿", str(fields["accessibility_notes"])[:120]))
@@ -1026,6 +1039,20 @@ class PlaceAdmin(admin.ModelAdmin):
                 "preferir este campo cuando los precios son complejos (diferencial por "
                 "edad/origen, café por consumo, restaurante por menú, estacionamiento por "
                 "hora). El agente del bot lo usa primero para responder sobre precios."
+            ),
+        }),
+        ("Servicios prácticos (lo que el turista necesita saber)", {
+            "fields": (
+                ("requires_reservation", "pet_friendly", "has_tourist_info"),
+                "recommended_visit_duration",
+                "payment_methods",
+                "parking_details",
+                "nearby_food_options",
+            ),
+            "description": (
+                "Datos que determinan si una persona visita o no: ¿necesita reservar? "
+                "¿cuánto tiempo dura la visita? ¿aceptan tarjeta o solo efectivo? "
+                "¿hay dónde comer cerca? La IA los llena en el enriquecimiento."
             ),
         }),
         ("Información extra (JSON libre)", {

@@ -54,6 +54,14 @@ STRUCTURED_FIELDS = [
     "instagram",
     "reservations_url",
     "price_range",
+    # Servicios prácticos al turista
+    "requires_reservation",
+    "recommended_visit_duration",
+    "payment_methods",
+    "pet_friendly",
+    "has_tourist_info",
+    "nearby_food_options",
+    "parking_details",
 ]
 
 INT_FIELDS = {
@@ -67,6 +75,9 @@ BOOL_FIELDS = {
     "has_restrooms",
     "has_conaf_office",
     "has_food_service",
+    "requires_reservation",
+    "pet_friendly",
+    "has_tourist_info",
 }
 FLOAT_FIELDS = {"distance_from_pv_km"}
 STR_FIELDS = {
@@ -78,6 +89,10 @@ STR_FIELDS = {
     "instagram",
     "reservations_url",
     "price_range",
+    "recommended_visit_duration",
+    "payment_methods",
+    "nearby_food_options",
+    "parking_details",
 }
 JSON_FIELDS = {"opening_hours"}
 
@@ -122,7 +137,14 @@ markdown ```. Estructura exacta:
     "website": "<URL del sitio oficial o vacío>",
     "instagram": "<handle sin @ o URL o vacío>",
     "reservations_url": "<URL para reservar o vacío>",
-    "price_range": "<$, $$, $$$, $$$$ o vacío>"
+    "price_range": "<$, $$, $$$, $$$$ o vacío>",
+    "requires_reservation": <true|false|null>,
+    "recommended_visit_duration": "<ej. '1-2 horas', 'medio día', 'jornada completa', o vacío>",
+    "payment_methods": "<ej. 'Efectivo, tarjeta, transferencia. No acepta dólares', o vacío>",
+    "pet_friendly": <true|false|null>,
+    "has_tourist_info": <true|false|null>,
+    "nearby_food_options": "<si el lugar NO tiene restaurante propio: opciones cercanas, o vacío>",
+    "parking_details": "<detalle si has_parking=true: pago/gratis, capacidad, horarios, o vacío>"
   },
   "opening_hours": {
     "mon": "<HH:MM-HH:MM o 'cerrado' o vacío>",
@@ -162,6 +184,21 @@ Notas:
   Usa formato "HH:MM-HH:MM" (24h) para días abiertos, "cerrado" para días cerrados.
 - price_range: usa la convención $ (económico), $$ (medio), $$$ (alto), $$$$ (premium). \
   Solo si los snippets lo mencionan o se infiere claramente.
+- requires_reservation: true si los snippets mencionan reserva/cupo/entrada anticipada \
+  obligatoria (museos con cupo, tours, restaurantes con reserva). null si no se menciona.
+- recommended_visit_duration: tiempo típico de visita SI los snippets lo mencionan o se \
+  infiere claramente (ej. mirador = '30 min - 1 hora', volcán con ascenso = 'jornada completa').
+- payment_methods: extrae si los snippets mencionan formas de pago aceptadas. Importante \
+  en Chile rural — a veces solo efectivo, a veces no aceptan dólares.
+- pet_friendly: true solo si los snippets explicitan que aceptan mascotas, false si \
+  explicitan que no, null si no se menciona.
+- has_tourist_info: true si hay caseta/centro de informaciones turísticas (Sernatur, \
+  oficina municipal de turismo, kiosco informativo). NO confundir con has_conaf_office.
+- nearby_food_options: SOLO si el lugar NO es restaurante/café/lodging. Resume opciones \
+  de comida cercanas según los snippets. Si no se menciona nada de comida cerca y el lugar \
+  parece aislado, deja vacío (no inventes 'no hay opciones').
+- parking_details: SOLO si has_parking=true. Detalla si es pago/gratis, capacidad, horario. \
+  Vacío si los snippets no dan detalle.
 - El JSON debe ser válido (comillas dobles, sin trailing commas).
 """
 
@@ -229,7 +266,17 @@ def enrich_place(
     # Segunda búsqueda focalizada en precios. Si falla, seguimos con la general.
     price_query = _build_price_search_query(place)
     price_result = search_perplexity(price_query)
-    merged_results = _merge_search_results(pp_result.results, price_result.results)
+
+    # Tercera búsqueda focalizada en SERVICIOS PRÁCTICOS (qué necesita saber el
+    # turista antes de visitar): reserva, duración, baños, comida cerca, etc.
+    services_query = _build_services_search_query(place)
+    services_result = search_perplexity(services_query)
+
+    merged_results = _merge_search_results(
+        pp_result.results,
+        price_result.results,
+        services_result.results,
+    )
 
     if not merged_results:
         logger.warning("enrich_place: Perplexity devolvió 0 resultados para '%s'", query)
@@ -260,11 +307,15 @@ def enrich_place(
     raw_audit = {
         "query": query,
         "price_query": price_query,
+        "services_query": services_query,
         "perplexity_results": pp_result.results,
         "perplexity_price_results": price_result.results,
+        "perplexity_services_results": services_result.results,
         "perplexity_price_error": price_result.error,
+        "perplexity_services_error": services_result.error,
         "perplexity_latency_ms": pp_result.latency_ms,
         "perplexity_price_latency_ms": price_result.latency_ms,
+        "perplexity_services_latency_ms": services_result.latency_ms,
         "merged_results_count": len(merged_results),
         "synthesis_text": llm_result.text,
         "synthesis_error": llm_result.error,
@@ -422,24 +473,41 @@ def _build_price_search_query(place: Place) -> str:
     return " ".join(parts)
 
 
-def _merge_search_results(
-    primary: list[dict[str, Any]] | None,
-    secondary: list[dict[str, Any]] | None,
-) -> list[dict[str, Any]]:
-    """Une dos listas de resultados Perplexity, deduplicando por URL.
+def _build_services_search_query(place: Place) -> str:
+    """Arma un query Perplexity FOCALIZADO en servicios prácticos al turista.
 
-    Mantiene el orden: primero los del query general, luego los de precios
-    que no estuvieran ya presentes.
+    Razón: el turista necesita saber antes de visitar — reserva, duración,
+    métodos de pago, mascotas, info turística, comida cerca, estacionamiento.
+    Estos datos se diluyen en queries generales y a la IA no le llegan snippets.
+    """
+    parts = [place.name]
+    if place.location_label and place.location_label not in place.name:
+        parts.append(place.location_label)
+    parts.append(
+        "reserva tiempo duracion visita pago efectivo tarjeta mascotas "
+        "informacion turistica donde comer cerca estacionamiento"
+    )
+    return " ".join(parts)
+
+
+def _merge_search_results(
+    *result_lists: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """Une N listas de resultados Perplexity, deduplicando por URL.
+
+    Mantiene el orden de las listas: primero los del query general, luego los
+    de precios y servicios que no estuvieran ya presentes.
     """
     merged: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
-    for r in (primary or []) + (secondary or []):
-        url = (r.get("url") or "").strip()
-        key = url or (r.get("title") or "").strip()
-        if not key or key in seen_urls:
-            continue
-        seen_urls.add(key)
-        merged.append(r)
+    for results in result_lists:
+        for r in results or []:
+            url = (r.get("url") or "").strip()
+            key = url or (r.get("title") or "").strip()
+            if not key or key in seen_urls:
+                continue
+            seen_urls.add(key)
+            merged.append(r)
     return merged
 
 

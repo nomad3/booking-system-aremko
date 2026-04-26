@@ -276,6 +276,46 @@ class Place(models.Model):
             "'notes': 'cerrado feriados'}. Vacío si no aplica."
         ),
     )
+    # ─── Servicios prácticos (lo que el turista necesita saber antes de visitar) ───
+    requires_reservation = models.BooleanField(
+        default=False,
+        help_text="¿Requiere reservar/comprar entrada anticipada? (museos con cupo, tours, etc.)",
+    )
+    recommended_visit_duration = models.CharField(
+        max_length=80,
+        blank=True,
+        help_text="Tiempo recomendado de visita. Ej: '1-2 horas', 'medio día', 'jornada completa'.",
+    )
+    payment_methods = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text=(
+            "Métodos de pago aceptados. Ej: 'Efectivo, tarjeta, transferencia. "
+            "No acepta dólares'. Relevante en zonas rurales donde a veces es solo efectivo."
+        ),
+    )
+    pet_friendly = models.BooleanField(
+        default=False,
+        help_text="¿Acepta mascotas?",
+    )
+    has_tourist_info = models.BooleanField(
+        default=False,
+        help_text="¿Hay centro/oficina de informaciones turísticas (Sernatur, municipal, etc.)?",
+    )
+    nearby_food_options = models.TextField(
+        blank=True,
+        help_text=(
+            "Opciones de comida cercanas si el lugar no tiene restaurante propio. "
+            "Ej: 'Restaurantes a 5 km en Ensenada' o 'Sin opciones cercanas, llevar vianda'."
+        ),
+    )
+    parking_details = models.TextField(
+        blank=True,
+        help_text=(
+            "Detalle del estacionamiento si has_parking=True. "
+            "Ej: 'Pago $1.500/día' o 'Gratuito, capacidad 30 autos'."
+        ),
+    )
     published = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
