@@ -199,7 +199,10 @@ def enrich_place(
         logger.warning("enrich_place: OPENROUTER_API_KEY no configurada")
         return None
 
-    # ─── Paso 1: búsqueda web ───
+    # ─── Paso 1: búsqueda web (general + precios en paralelo conceptual) ───
+    # Hacemos 2 queries: una general (datos turísticos/infra) y otra enfocada en
+    # PRECIOS. Perplexity prioriza relevancia y diluye temas si se mezclan; con
+    # query separada para precios garantizamos snippets con tarifas reales.
     query = _build_search_query(place)
     pp_result = search_perplexity(query)
 
@@ -223,14 +226,20 @@ def enrich_place(
             draft.save()
         return draft
 
-    if not pp_result.results:
+    # Segunda búsqueda focalizada en precios. Si falla, seguimos con la general.
+    price_query = _build_price_search_query(place)
+    price_result = search_perplexity(price_query)
+    merged_results = _merge_search_results(pp_result.results, price_result.results)
+
+    if not merged_results:
         logger.warning("enrich_place: Perplexity devolvió 0 resultados para '%s'", query)
         draft = PlaceEnrichmentDraft(
             place=place,
             status=PlaceEnrichmentDraft.STATUS_REJECTED,
             proposed_data={},
             raw_search_response={"perplexity_results": [],
-                                 "query": query},
+                                 "query": query,
+                                 "price_query": price_query},
             search_provider="perplexity-search",
             review_notes="[auto] Perplexity devolvió 0 resultados.",
         )
@@ -239,7 +248,7 @@ def enrich_place(
         return draft
 
     # ─── Paso 2: síntesis con OpenRouter ───
-    user_prompt = _build_synthesis_prompt(place, pp_result.results)
+    user_prompt = _build_synthesis_prompt(place, merged_results)
     llm_result = provider.generate(
         system_prompt=SYSTEM_PROMPT,
         user_prompt=user_prompt,
@@ -250,8 +259,13 @@ def enrich_place(
 
     raw_audit = {
         "query": query,
+        "price_query": price_query,
         "perplexity_results": pp_result.results,
+        "perplexity_price_results": price_result.results,
+        "perplexity_price_error": price_result.error,
         "perplexity_latency_ms": pp_result.latency_ms,
+        "perplexity_price_latency_ms": price_result.latency_ms,
+        "merged_results_count": len(merged_results),
         "synthesis_text": llm_result.text,
         "synthesis_error": llm_result.error,
     }
@@ -379,15 +393,54 @@ def apply_draft(draft: PlaceEnrichmentDraft, *, reviewer: str = "") -> bool:
 
 
 def _build_search_query(place: Place) -> str:
-    """Arma el query para Perplexity Search.
+    """Arma el query general para Perplexity Search.
 
-    Combina nombre + ubicación + términos turísticos relevantes.
+    Combina nombre + ubicación + términos turísticos relevantes (infra/acceso).
     """
     parts = [place.name]
     if place.location_label and place.location_label not in place.name:
         parts.append(place.location_label)
-    parts.append("Puerto Varas Chile turismo altura infraestructura acceso")
+    parts.append(
+        "Puerto Varas Chile turismo altura infraestructura acceso horario"
+    )
     return " ".join(parts)
+
+
+def _build_price_search_query(place: Place) -> str:
+    """Arma un query Perplexity FOCALIZADO en precios/tarifas.
+
+    Razón: si mezclamos términos de precio en el query general, Perplexity
+    los diluye con altura/infra y devuelve pocos snippets con tarifas.
+    Con query separado garantizamos snippets monetarios.
+    """
+    parts = [place.name]
+    if place.location_label and place.location_label not in place.name:
+        parts.append(place.location_label)
+    parts.append(
+        "precio entrada tarifa valor adulto niño extranjero CLP cuanto cuesta"
+    )
+    return " ".join(parts)
+
+
+def _merge_search_results(
+    primary: list[dict[str, Any]] | None,
+    secondary: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """Une dos listas de resultados Perplexity, deduplicando por URL.
+
+    Mantiene el orden: primero los del query general, luego los de precios
+    que no estuvieran ya presentes.
+    """
+    merged: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    for r in (primary or []) + (secondary or []):
+        url = (r.get("url") or "").strip()
+        key = url or (r.get("title") or "").strip()
+        if not key or key in seen_urls:
+            continue
+        seen_urls.add(key)
+        merged.append(r)
+    return merged
 
 
 def _build_synthesis_prompt(place: Place, results: list[dict[str, Any]]) -> str:
