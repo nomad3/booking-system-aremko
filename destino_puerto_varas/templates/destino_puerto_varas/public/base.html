@@ -1,0 +1,105 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f5e6f">
+  <title>{% block title %}Destino Puerto Varas{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Guía turística de Puerto Varas y la Región de Los Lagos: circuitos, lugares y experiencias.{% endblock %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-bg: #f7f3ec;
+      --color-surface: #ffffff;
+      --color-ink: #1a2e35;
+      --color-ink-soft: #4a5d65;
+      --color-accent: #0f5e6f;
+      --color-accent-warm: #c47238;
+      --color-line: #e0d8c8;
+      --color-shadow: rgba(15, 94, 111, 0.12);
+      --radius-sm: 8px;
+      --radius-md: 16px;
+      --radius-lg: 28px;
+      --font-display: "Fraunces", Georgia, serif;
+      --font-body: "Inter", -apple-system, system-ui, sans-serif;
+      --max-content: 980px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--color-bg);
+      color: var(--color-ink);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--color-accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .dpv-header {
+      padding: 20px 24px;
+      max-width: var(--max-content);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .dpv-header__brand {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: var(--color-accent);
+      letter-spacing: 0.02em;
+    }
+    .dpv-header__nav a {
+      margin-left: 18px;
+      color: var(--color-ink-soft);
+      font-size: 0.95rem;
+    }
+
+    .dpv-footer {
+      padding: 40px 24px 60px;
+      max-width: var(--max-content);
+      margin: 0 auto;
+      text-align: center;
+      color: var(--color-ink-soft);
+      font-size: 0.9rem;
+      border-top: 1px solid var(--color-line);
+      margin-top: 60px;
+    }
+
+    @media (max-width: 600px) {
+      .dpv-header { flex-direction: column; gap: 8px; }
+      .dpv-header__nav a { margin: 0 10px; }
+    }
+
+    {% block extra_css %}{% endblock %}
+  </style>
+</head>
+<body>
+  <header class="dpv-header">
+    <a href="/dpv/" class="dpv-header__brand">Destino Puerto Varas</a>
+    <nav class="dpv-header__nav">
+      <a href="/dpv/">Circuitos</a>
+    </nav>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="dpv-footer">
+    <p>Destino Puerto Varas · Guía turística de la Región de Los Lagos, Chile.</p>
+    <p>Una iniciativa de <a href="https://www.aremko.cl" target="_blank" rel="noopener">Aremko Spa Boutique</a>.</p>
+  </footer>
+
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

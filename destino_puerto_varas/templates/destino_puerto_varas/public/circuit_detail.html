@@ -1,0 +1,459 @@
+{% extends "destino_puerto_varas/public/base.html" %}
+
+{% block title %}{{ circuit.name }} · Destino Puerto Varas{% endblock %}
+{% block meta_description %}{{ circuit.short_description }}{% endblock %}
+
+{% block extra_css %}
+.circuit-hero {
+  max-width: var(--max-content);
+  margin: 24px auto 40px;
+  padding: 0 24px;
+  text-align: center;
+}
+.circuit-hero__eyebrow {
+  display: inline-block;
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-accent-warm);
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+.circuit-hero__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  line-height: 1.1;
+  margin: 0 0 16px;
+  color: var(--color-ink);
+}
+.circuit-hero__subtitle {
+  font-size: 1.1rem;
+  color: var(--color-ink-soft);
+  max-width: 680px;
+  margin: 0 auto 24px;
+}
+.circuit-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 20px;
+  font-size: 0.95rem;
+  color: var(--color-ink-soft);
+}
+.circuit-hero__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--color-surface);
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+}
+
+.itinerary {
+  max-width: var(--max-content);
+  margin: 0 auto;
+  padding: 0 24px;
+  position: relative;
+}
+.itinerary__intro {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--color-ink);
+  margin: 0 0 32px;
+}
+
+.stop {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 20px;
+  position: relative;
+  padding-bottom: 32px;
+}
+.stop:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 64px;
+  left: 31px;
+  bottom: 0;
+  width: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--color-accent) 0 6px,
+    transparent 6px 12px
+  );
+  opacity: 0.4;
+}
+.stop__number {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.6rem;
+  box-shadow: 0 6px 18px var(--color-shadow);
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.stop__card {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-line);
+  overflow: hidden;
+  box-shadow: 0 4px 14px var(--color-shadow);
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.stop__card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px var(--color-shadow);
+}
+.stop__photo {
+  background: linear-gradient(135deg, #cfe4e8 0%, #a8c8cf 100%);
+  background-size: cover;
+  background-position: center;
+  min-height: 140px;
+}
+.stop__photo--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--color-accent);
+  opacity: 0.6;
+}
+.stop__body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.stop__day-tag {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-accent-warm);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.stop__name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  margin: 0 0 6px;
+  color: var(--color-ink);
+}
+.stop__location {
+  font-size: 0.9rem;
+  color: var(--color-ink-soft);
+  margin: 0 0 8px;
+}
+.stop__excerpt {
+  font-size: 0.95rem;
+  color: var(--color-ink-soft);
+  margin: 0 0 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.stop__cta {
+  font-size: 0.85rem;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .stop { grid-template-columns: 48px 1fr; gap: 14px; }
+  .stop__number { width: 48px; height: 48px; font-size: 1.2rem; }
+  .stop:not(:last-child)::before { top: 48px; left: 23px; }
+  .stop__card { grid-template-columns: 1fr; }
+  .stop__photo { min-height: 160px; }
+}
+
+/* Modal */
+.dpv-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 30, 35, 0.6);
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+  padding: 0;
+}
+.dpv-modal.is-open { display: flex; }
+.dpv-modal__panel {
+  background: var(--color-surface);
+  width: 100%;
+  max-width: 720px;
+  max-height: 92vh;
+  overflow-y: auto;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  position: relative;
+  animation: slideUp 0.25s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.dpv-modal__close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  cursor: pointer;
+  z-index: 2;
+}
+.dpv-modal__hero {
+  height: 240px;
+  background: linear-gradient(135deg, #cfe4e8 0%, #a8c8cf 100%);
+  background-size: cover;
+  background-position: center;
+}
+.dpv-modal__body { padding: 24px 28px 32px; }
+.dpv-modal__title {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+.dpv-modal__location {
+  color: var(--color-ink-soft);
+  font-size: 0.95rem;
+  margin: 0 0 18px;
+}
+.dpv-modal__section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-line);
+}
+.dpv-modal__section h4 {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  margin: 0 0 8px;
+  color: var(--color-accent);
+}
+.dpv-modal__section p { margin: 0; color: var(--color-ink-soft); }
+.dpv-modal__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+.dpv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: var(--color-ink-soft);
+}
+.dpv-chip--accent { background: #fff3e8; border-color: #f0c9a5; color: #8a4318; }
+.dpv-modal__cta {
+  display: inline-block;
+  margin-top: 20px;
+  background: var(--color-accent);
+  color: #fff;
+  padding: 12px 22px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.dpv-modal__cta:hover { text-decoration: none; opacity: 0.9; }
+
+@media (min-width: 700px) {
+  .dpv-modal { align-items: center; padding: 24px; }
+  .dpv-modal__panel { border-radius: var(--radius-lg); }
+}
+{% endblock %}
+
+{% block content %}
+<section class="circuit-hero">
+  <div class="circuit-hero__eyebrow">Circuito #{{ circuit.number }}</div>
+  <h1 class="circuit-hero__title">{{ circuit.name }}</h1>
+  <p class="circuit-hero__subtitle">{{ circuit.short_description }}</p>
+  <div class="circuit-hero__meta">
+    {% if circuit.duration_case %}<span class="circuit-hero__meta-item">{{ circuit.duration_case.name }}</span>{% endif %}
+    <span class="circuit-hero__meta-item">{{ total_stops }} {% if total_stops == 1 %}parada{% else %}paradas{% endif %}</span>
+    {% if circuit.is_romantic %}<span class="circuit-hero__meta-item">Romántico</span>{% endif %}
+    {% if circuit.is_family_friendly %}<span class="circuit-hero__meta-item">Familiar</span>{% endif %}
+    {% if circuit.is_adventure %}<span class="circuit-hero__meta-item">Aventura</span>{% endif %}
+    {% if circuit.is_rain_friendly %}<span class="circuit-hero__meta-item">Apto día lluvioso</span>{% endif %}
+    {% if circuit.is_premium %}<span class="circuit-hero__meta-item">Premium</span>{% endif %}
+  </div>
+</section>
+
+<section class="itinerary">
+  <p class="itinerary__intro">Itinerario sugerido</p>
+
+  {% for entry in stops %}
+    {% with place=entry.place photo=entry.primary_photo %}
+    <article class="stop">
+      <div class="stop__number">{{ entry.global_index }}</div>
+      <div
+        class="stop__card"
+        data-stop-modal="modal-stop-{{ entry.global_index }}"
+        role="button"
+        tabindex="0"
+        aria-label="Ver detalle de {{ place.name }}"
+      >
+        {% if photo and photo.image %}
+          <div class="stop__photo" style="background-image: url('{{ photo.image.url }}');"></div>
+        {% elif photo and photo.source_url %}
+          <div class="stop__photo" style="background-image: url('{{ photo.source_url }}');"></div>
+        {% else %}
+          <div class="stop__photo stop__photo--placeholder">{{ entry.global_index }}</div>
+        {% endif %}
+        <div class="stop__body">
+          {% if entry.day %}<div class="stop__day-tag">Día {{ entry.day.day_number }}{% if entry.day.title %} · {{ entry.day.title }}{% endif %}</div>{% endif %}
+          <h2 class="stop__name">{{ place.name }}</h2>
+          {% if place.location_label %}<p class="stop__location">{{ place.location_label }}</p>{% endif %}
+          {% if place.short_description %}<p class="stop__excerpt">{{ place.short_description }}</p>{% endif %}
+          <span class="stop__cta">Ver detalle →</span>
+        </div>
+      </div>
+    </article>
+    {% endwith %}
+  {% endfor %}
+</section>
+
+{# ─── Modales (uno por parada) ─── #}
+{% for entry in stops %}
+  {% with place=entry.place photo=entry.primary_photo %}
+  <div class="dpv-modal" id="modal-stop-{{ entry.global_index }}" role="dialog" aria-modal="true" aria-labelledby="modal-stop-{{ entry.global_index }}-title">
+    <div class="dpv-modal__panel">
+      <button type="button" class="dpv-modal__close" data-close-modal aria-label="Cerrar">×</button>
+      {% if photo and photo.image %}
+        <div class="dpv-modal__hero" style="background-image: url('{{ photo.image.url }}');"></div>
+      {% elif photo and photo.source_url %}
+        <div class="dpv-modal__hero" style="background-image: url('{{ photo.source_url }}');"></div>
+      {% else %}
+        <div class="dpv-modal__hero"></div>
+      {% endif %}
+      <div class="dpv-modal__body">
+        <h3 class="dpv-modal__title" id="modal-stop-{{ entry.global_index }}-title">{{ place.name }}</h3>
+        {% if place.location_label %}<p class="dpv-modal__location">📍 {{ place.location_label }}</p>{% endif %}
+
+        {% if place.long_description %}
+        <div class="dpv-modal__section">
+          <h4>Sobre el lugar</h4>
+          <p>{{ place.long_description|linebreaksbr }}</p>
+        </div>
+        {% endif %}
+
+        {% if place.recommended_visit_duration or place.entry_fee_text or place.requires_reservation or place.payment_methods %}
+        <div class="dpv-modal__section">
+          <h4>Datos prácticos</h4>
+          {% if place.recommended_visit_duration %}<p><strong>Tiempo sugerido:</strong> {{ place.recommended_visit_duration }}</p>{% endif %}
+          {% if place.entry_fee_text %}<p><strong>Tarifas:</strong> {{ place.entry_fee_text|linebreaksbr }}</p>{% endif %}
+          {% if place.requires_reservation %}<p><strong>Reserva previa:</strong> Sí, requerida</p>{% endif %}
+          {% if place.payment_methods %}<p><strong>Pago:</strong> {{ place.payment_methods }}</p>{% endif %}
+        </div>
+        {% endif %}
+
+        {% if place.parking_details or place.nearby_food_options %}
+        <div class="dpv-modal__section">
+          <h4>Logística</h4>
+          {% if place.parking_details %}<p><strong>Estacionamiento:</strong> {{ place.parking_details }}</p>{% endif %}
+          {% if place.nearby_food_options %}<p><strong>Comida cerca:</strong> {{ place.nearby_food_options }}</p>{% endif %}
+        </div>
+        {% endif %}
+
+        {% if place.practical_tips %}
+        <div class="dpv-modal__section">
+          <h4>Consejos prácticos</h4>
+          <p>{{ place.practical_tips|linebreaksbr }}</p>
+        </div>
+        {% endif %}
+
+        {% if place.did_you_know %}
+        <div class="dpv-modal__section">
+          <h4>¿Sabías que…?</h4>
+          <p>{{ place.did_you_know|linebreaksbr }}</p>
+        </div>
+        {% endif %}
+
+        <div class="dpv-modal__chips">
+          {% if place.has_parking %}<span class="dpv-chip">🅿️ Estacionamiento</span>{% endif %}
+          {% if place.has_restrooms %}<span class="dpv-chip">🚻 Baños</span>{% endif %}
+          {% if place.has_food_service %}<span class="dpv-chip">🍴 Comida en sitio</span>{% endif %}
+          {% if place.has_tourist_info %}<span class="dpv-chip">ℹ️ Info turística</span>{% endif %}
+          {% if place.pet_friendly %}<span class="dpv-chip">🐾 Pet-friendly</span>{% endif %}
+          {% if place.is_rain_friendly %}<span class="dpv-chip">☔ Día lluvioso</span>{% endif %}
+          {% if place.is_family_friendly %}<span class="dpv-chip">👨‍👩‍👧 Familiar</span>{% endif %}
+          {% if place.is_romantic %}<span class="dpv-chip dpv-chip--accent">💕 Romántico</span>{% endif %}
+          {% if place.is_adventure_related %}<span class="dpv-chip">🎒 Aventura</span>{% endif %}
+        </div>
+
+        {% if place.latitude and place.longitude %}
+          <a class="dpv-modal__cta" href="https://www.google.com/maps/dir/?api=1&destination={{ place.latitude }},{{ place.longitude }}" target="_blank" rel="noopener">Cómo llegar →</a>
+        {% elif place.location_label %}
+          <a class="dpv-modal__cta" href="https://www.google.com/maps/search/?api=1&query={{ place.name|urlencode }}+{{ place.location_label|urlencode }}" target="_blank" rel="noopener">Cómo llegar →</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+{% endfor %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function() {
+    const triggers = document.querySelectorAll('[data-stop-modal]');
+    const closeBtns = document.querySelectorAll('[data-close-modal]');
+
+    function openModal(id) {
+      const modal = document.getElementById(id);
+      if (!modal) return;
+      modal.classList.add('is-open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeAll() {
+      document.querySelectorAll('.dpv-modal.is-open').forEach(m => m.classList.remove('is-open'));
+      document.body.style.overflow = '';
+    }
+
+    triggers.forEach(t => {
+      t.addEventListener('click', () => openModal(t.dataset.stopModal));
+      t.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openModal(t.dataset.stopModal);
+        }
+      });
+    });
+
+    closeBtns.forEach(b => b.addEventListener('click', closeAll));
+
+    document.querySelectorAll('.dpv-modal').forEach(m => {
+      m.addEventListener('click', (e) => { if (e.target === m) closeAll(); });
+    });
+
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
+  })();
+</script>
+{% endblock %}

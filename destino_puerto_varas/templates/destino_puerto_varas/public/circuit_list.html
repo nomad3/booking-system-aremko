@@ -1,0 +1,144 @@
+{% extends "destino_puerto_varas/public/base.html" %}
+
+{% block title %}Circuitos · Destino Puerto Varas{% endblock %}
+
+{% block extra_css %}
+.list-hero {
+  max-width: var(--max-content);
+  margin: 24px auto 40px;
+  padding: 0 24px;
+  text-align: center;
+}
+.list-hero__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2rem, 5vw, 3rem);
+  margin: 0 0 12px;
+}
+.list-hero__subtitle {
+  color: var(--color-ink-soft);
+  max-width: 640px;
+  margin: 0 auto;
+  font-size: 1.05rem;
+}
+
+.circuit-grid {
+  max-width: var(--max-content);
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+.circuit-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-line);
+  box-shadow: 0 4px 14px var(--color-shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.circuit-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px var(--color-shadow);
+}
+.circuit-card__hero {
+  height: 140px;
+  background: linear-gradient(135deg, #0f5e6f 0%, #297888 60%, #c47238 100%);
+  display: flex;
+  align-items: flex-end;
+  padding: 12px 16px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.95;
+}
+.circuit-card__body {
+  padding: 18px 20px 22px;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+.circuit-card__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  margin: 0 0 8px;
+  color: var(--color-ink);
+}
+.circuit-card__title a { color: inherit; }
+.circuit-card__title a:hover { color: var(--color-accent); text-decoration: none; }
+.circuit-card__desc {
+  font-size: 0.95rem;
+  color: var(--color-ink-soft);
+  margin: 0 0 14px;
+  flex-grow: 1;
+}
+.circuit-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--color-ink-soft);
+}
+.circuit-card__chip {
+  background: var(--color-bg);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.circuit-card__cta {
+  margin-top: 16px;
+  font-size: 0.9rem;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--color-ink-soft);
+}
+{% endblock %}
+
+{% block content %}
+<section class="list-hero">
+  <h1 class="list-hero__title">Circuitos por Puerto Varas y la Región de Los Lagos</h1>
+  <p class="list-hero__subtitle">Itinerarios curados para descubrir lagos, volcanes, parques nacionales y pueblos típicos del sur de Chile.</p>
+</section>
+
+{% if circuits %}
+<section class="circuit-grid">
+  {% for circuit in circuits %}
+  <article class="circuit-card">
+    <div class="circuit-card__hero">{% if circuit.duration_case %}{{ circuit.duration_case.name }}{% else %}Circuito{% endif %}</div>
+    <div class="circuit-card__body">
+      <h2 class="circuit-card__title">
+        <a href="{% url 'destino_puerto_varas_public:circuit-detail' slug=circuit.slug %}">
+          {{ circuit.name }}
+        </a>
+      </h2>
+      <p class="circuit-card__desc">{{ circuit.short_description }}</p>
+      <div class="circuit-card__meta">
+        {% if circuit.is_romantic %}<span class="circuit-card__chip">Romántico</span>{% endif %}
+        {% if circuit.is_family_friendly %}<span class="circuit-card__chip">Familiar</span>{% endif %}
+        {% if circuit.is_adventure %}<span class="circuit-card__chip">Aventura</span>{% endif %}
+        {% if circuit.is_rain_friendly %}<span class="circuit-card__chip">Día lluvioso</span>{% endif %}
+        {% if circuit.is_premium %}<span class="circuit-card__chip">Premium</span>{% endif %}
+      </div>
+      <a class="circuit-card__cta" href="{% url 'destino_puerto_varas_public:circuit-detail' slug=circuit.slug %}">Ver itinerario →</a>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+<div class="empty-state">
+  <p>Estamos publicando los primeros circuitos. Vuelve pronto.</p>
+</div>
+{% endif %}
+{% endblock %}
