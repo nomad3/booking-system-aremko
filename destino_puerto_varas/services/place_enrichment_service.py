@@ -43,6 +43,7 @@ STRUCTURED_FIELDS = [
     "has_conaf_office",
     "has_food_service",
     "entry_fee_clp",
+    "entry_fee_text",
     "best_season",
     "accessibility_notes",
     "distance_from_pv_km",
@@ -71,6 +72,7 @@ FLOAT_FIELDS = {"distance_from_pv_km"}
 STR_FIELDS = {
     "best_season",
     "accessibility_notes",
+    "entry_fee_text",
     "phone",
     "website",
     "instagram",
@@ -111,6 +113,7 @@ markdown ```. Estructura exacta:
     "has_conaf_office": <true|false|null>,
     "has_food_service": <true|false|null>,
     "entry_fee_clp": <int|null>,
+    "entry_fee_text": "<string libre con el detalle de tarifas tal como aparece, o vacío>",
     "best_season": "<string en español o vacío>",
     "accessibility_notes": "<string en español o vacío>",
     "distance_from_pv_km": <float|null>,
@@ -142,7 +145,15 @@ markdown ```. Estructura exacta:
 }
 
 Notas:
-- entry_fee_clp: 0 si la entrada es explícitamente gratis, null si los snippets no lo mencionan.
+- entry_fee_clp: valor representativo único en CLP (típicamente adulto chileno). 0 si \
+  es explícitamente gratis, null si los snippets no lo mencionan o si no aplica un valor único.
+- entry_fee_text: SIEMPRE intenta llenar este campo cuando hay precios involucrados — es \
+  el detalle de tarifas tal como aparece en los snippets. Cubre TODOS los modelos de \
+  cobro: precio fijo ('$5.000 entrada general'), diferencial por edad/origen ('Adultos \
+  chilenos $4.000, niños $2.000, extranjeros $7.000'), por consumo ('Café desde $3.500, \
+  almuerzo $9.000-$15.000'), por hora ('Estacionamiento $1.500/hora'), por evento \
+  ('Entrada general $25.000, palco $40.000'), o gratis ('Entrada liberada'). Vacío solo \
+  si no hay ninguna mención al precio o no aplica (ej. mirador público sin caseta).
 - distance_from_pv_km y drive_time_from_pv_min: desde el centro de Puerto Varas.
 - Datos comerciales (phone, website, instagram, reservations_url, price_range, opening_hours): \
   llena solo si el lugar es un negocio (restaurante, café, teatro, museo, alojamiento, tienda, \

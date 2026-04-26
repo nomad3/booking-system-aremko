@@ -98,7 +98,10 @@ def render_draft_mobile_preview(draft):
         rows.append(("📍", f"{km} km de Puerto Varas{extra_dist}"))
     if fields.get("year_established"):
         rows.append(("📅", f"Establecido en {fields['year_established']}"))
-    if fields.get("entry_fee_clp") is not None:
+    if fields.get("entry_fee_text"):
+        # Texto libre tiene precedencia (precios complejos: diferencial, por consumo, etc.)
+        rows.append(("🎟", str(fields["entry_fee_text"])[:200]))
+    elif fields.get("entry_fee_clp") is not None:
         fee = "Entrada gratuita" if fields["entry_fee_clp"] == 0 else f"Entrada: ${fields['entry_fee_clp']:,} CLP".replace(",", ".")
         rows.append(("🎟", fee))
     if fields.get("best_season"):
@@ -1013,12 +1016,16 @@ class PlaceAdmin(admin.ModelAdmin):
                 ("elevation_m", "year_established"),
                 ("has_parking", "has_restrooms", "has_conaf_office", "has_food_service"),
                 ("entry_fee_clp", "best_season"),
+                "entry_fee_text",
                 "accessibility_notes",
             ),
             "description": (
                 "Estos campos los puede llenar la IA. Para hacerlo: selecciona el lugar "
                 "en la lista y aplica la acción 'Enriquecer con IA'. Genera un borrador "
-                "para revisar antes de publicar."
+                "para revisar antes de publicar. <br><strong>entry_fee_text</strong>: "
+                "preferir este campo cuando los precios son complejos (diferencial por "
+                "edad/origen, café por consumo, restaurante por menú, estacionamiento por "
+                "hora). El agente del bot lo usa primero para responder sobre precios."
             ),
         }),
         ("Información extra (JSON libre)", {

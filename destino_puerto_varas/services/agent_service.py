@@ -95,7 +95,10 @@ TOOL_DEFINITIONS = [
             "description": (
                 "Detalle completo de un circuito: narrativa editorial, días con resumen, "
                 "y CADA lugar de visita con datos enriquecidos (altura, año, infraestructura, "
-                "entrada, distancia/tiempo desde Pto Varas, fotos). Usa el slug de list_circuits."
+                "entrada, tarifas detalladas, distancia/tiempo desde Pto Varas, fotos). "
+                "Si el usuario pregunta por precios/tarifas, prioriza el campo `entry_fee_text` "
+                "(detalle real con diferenciales adulto/niño/extranjero, por consumo, etc.) "
+                "sobre `entry_fee_clp` (valor único representativo). Usa el slug de list_circuits."
             ),
             "parameters": {
                 "type": "object",
@@ -115,11 +118,13 @@ TOOL_DEFINITIONS = [
             "name": "get_place_detail",
             "description": (
                 "Información detallada de UN lugar específico: descripción, altura, año, "
-                "infraestructura (parking/baños/CONAF), entrada, distancia/tiempo desde "
-                "Puerto Varas, datos curiosos, fotos. Usar cuando el usuario pregunta por "
-                "un atractivo puntual ('cuánto mide el Volcán Osorno', 'cómo llego a "
-                "Petrohué', 'tiene baños el parque...'). Acepta slug exacto O un nombre "
-                "para búsqueda parcial."
+                "infraestructura (parking/baños/CONAF), entrada, tarifas detalladas, "
+                "distancia/tiempo desde Puerto Varas, datos curiosos, fotos. Usar cuando "
+                "el usuario pregunta por un atractivo puntual ('cuánto mide el Volcán "
+                "Osorno', 'cómo llego a Petrohué', 'cuánto cuesta entrar a...', 'tiene "
+                "baños el parque...'). Si pregunta por precios, prioriza `entry_fee_text` "
+                "(detalle real con diferenciales) sobre `entry_fee_clp` (valor único). "
+                "Acepta slug exacto O un nombre para búsqueda parcial."
             ),
             "parameters": {
                 "type": "object",
@@ -210,6 +215,7 @@ def _place_summary(place: Place, *, include_long_desc: bool = False) -> dict:
         "has_conaf_office": place.has_conaf_office,
         "has_food_service": place.has_food_service,
         "entry_fee_clp": place.entry_fee_clp,
+        "entry_fee_text": place.entry_fee_text,
         "best_season": place.best_season,
         "accessibility_notes": place.accessibility_notes,
         "distance_from_pv_km": float(place.distance_from_pv_km) if place.distance_from_pv_km is not None else None,

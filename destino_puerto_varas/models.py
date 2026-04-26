@@ -184,7 +184,17 @@ class Place(models.Model):
     entry_fee_clp = models.PositiveIntegerField(
         null=True,
         blank=True,
-        help_text="Entrada en CLP (0 = gratis, null = no aplica/desconocido).",
+        help_text="Entrada en CLP (0 = gratis, null = no aplica/desconocido). Valor representativo único.",
+    )
+    entry_fee_text = models.TextField(
+        blank=True,
+        default="",
+        help_text=(
+            "Detalle de tarifas en texto libre. Cubre casos donde entry_fee_clp no basta: "
+            "diferencial adulto/niño/extranjero, café por consumo, restaurante por menú, "
+            "estacionamiento por hora, museo por exposición, etc. "
+            "Ej: 'Adultos chilenos $4.000, niños $2.000, extranjeros $7.000'."
+        ),
     )
     best_season = models.CharField(
         max_length=120,
