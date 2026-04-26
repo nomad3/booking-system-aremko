@@ -366,9 +366,12 @@ details.dpv-modal__details > div { margin-top: 8px; }
   <div class="circuit-hero__meta">
     {% if circuit.duration_case %}<span class="circuit-hero__meta-item">{{ circuit.duration_case.name }}</span>{% endif %}
     <span class="circuit-hero__meta-item">{{ total_stops }} {% if total_stops == 1 %}parada{% else %}paradas{% endif %}</span>
+    {% if circuit.is_nature %}<span class="circuit-hero__meta-item">🏞️ Naturaleza</span>{% endif %}
+    {% if circuit.is_culture %}<span class="circuit-hero__meta-item">🏛️ Cultura</span>{% endif %}
+    {% if circuit.is_gastronomy %}<span class="circuit-hero__meta-item">🍴 Gastronomía</span>{% endif %}
+    {% if circuit.is_adventure %}<span class="circuit-hero__meta-item">🎒 Aventura</span>{% endif %}
+    {% if circuit.is_family_friendly %}<span class="circuit-hero__meta-item">👨‍👩‍👧 Familiar</span>{% endif %}
     {% if circuit.is_romantic %}<span class="circuit-hero__meta-item">Romántico</span>{% endif %}
-    {% if circuit.is_family_friendly %}<span class="circuit-hero__meta-item">Familiar</span>{% endif %}
-    {% if circuit.is_adventure %}<span class="circuit-hero__meta-item">Aventura</span>{% endif %}
     {% if circuit.is_rain_friendly %}<span class="circuit-hero__meta-item">Apto día lluvioso</span>{% endif %}
     {% if circuit.is_premium %}<span class="circuit-hero__meta-item">Premium</span>{% endif %}
   </div>

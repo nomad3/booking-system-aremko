@@ -94,6 +94,20 @@ TOOL_DEFINITIONS = [
                         "type": "boolean",
                         "description": "True si busca aventura/actividad física.",
                     },
+                    "categories": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": ["nature", "culture", "gastronomy", "adventure", "family"],
+                        },
+                        "description": (
+                            "Categorías que le interesan al turista (multi-valor, OR). "
+                            "Ej: ['culture','gastronomy'] devuelve circuitos de cultura O "
+                            "gastronomía O ambos. Equivalencias: nature=is_nature, "
+                            "culture=is_culture, gastronomy=is_gastronomy, "
+                            "adventure=is_adventure, family=is_family_friendly."
+                        ),
+                    },
                 },
             },
         },
@@ -201,6 +215,9 @@ def _circuit_brief(c: Circuit) -> dict:
         "is_adventure": c.is_adventure,
         "is_rain_friendly": c.is_rain_friendly,
         "is_premium": c.is_premium,
+        "is_nature": c.is_nature,
+        "is_culture": c.is_culture,
+        "is_gastronomy": c.is_gastronomy,
     }
 
 
@@ -268,8 +285,17 @@ def _tool_list_circuits(arguments: dict) -> dict:
     is_romantic = arguments.get("is_romantic")
     is_family_friendly = arguments.get("is_family_friendly")
     is_adventure = arguments.get("is_adventure")
+    raw_categories = arguments.get("categories") or []
+    category_map = {
+        "nature": "is_nature",
+        "culture": "is_culture",
+        "gastronomy": "is_gastronomy",
+        "adventure": "is_adventure",
+        "family": "is_family_friendly",
+    }
+    categories = [c for c in raw_categories if c in category_map]
 
-    def _apply(qs, *, with_profile=True, with_duration=True, with_flags=True):
+    def _apply(qs, *, with_profile=True, with_duration=True, with_flags=True, with_categories=True):
         if interest:
             qs = qs.filter(primary_interest=interest)
         if with_profile and profile:
@@ -285,14 +311,24 @@ def _tool_list_circuits(arguments: dict) -> dict:
                 qs = qs.filter(is_family_friendly=True)
             if is_adventure:
                 qs = qs.filter(is_adventure=True)
+        if with_categories and categories:
+            from django.db.models import Q
+            cat_q = Q()
+            for cat in categories:
+                cat_q |= Q(**{category_map[cat]: True})
+            qs = qs.filter(cat_q).distinct()
         return qs
 
-    # Estrategia: probar de más estricto a más permisivo
+    # Estrategia: probar de más estricto a más permisivo.
+    # Las categorías (multi-valor con OR interno) son lo más cercano a la intención
+    # del turista, así que se relajan AL FINAL: primero soltamos profile/duration/flags.
     attempts = [
         ("strict", lambda: _apply(base_qs)),
         ("no_profile", lambda: _apply(base_qs, with_profile=False)),
         ("no_profile_no_flags", lambda: _apply(base_qs, with_profile=False, with_flags=False)),
-        ("only_interest", lambda: _apply(base_qs, with_profile=False, with_duration=False, with_flags=False)),
+        ("only_categories", lambda: _apply(
+            base_qs, with_profile=False, with_duration=False, with_flags=False,
+        )),
         ("all_published", lambda: base_qs),
     ]
 

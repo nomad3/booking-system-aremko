@@ -10,7 +10,28 @@ from django.http import Http404
 from django.shortcuts import render
 from django.views.generic import View
 
+from django.db.models import Q
+
 from .models import Circuit, CircuitDay, CircuitPlace, Place
+
+
+# Mapeo de slugs de categoría → flag del modelo Circuit (filtro UI/agente).
+# Multi-valor: el turista puede combinar varias y se aplica OR (la unión).
+CATEGORY_FILTERS = {
+    "nature": "is_nature",
+    "culture": "is_culture",
+    "gastronomy": "is_gastronomy",
+    "adventure": "is_adventure",
+    "family": "is_family_friendly",
+}
+
+CATEGORY_LABELS = [
+    ("nature", "Naturaleza escénica", "🏞️"),
+    ("culture", "Cultura y patrimonio", "🏛️"),
+    ("gastronomy", "Gastronomía", "🍴"),
+    ("adventure", "Aventura", "🎒"),
+    ("family", "Viaje familiar", "👨‍👩‍👧"),
+]
 
 
 class CircuitListPublicView(View):
@@ -24,7 +45,22 @@ class CircuitListPublicView(View):
             .select_related("duration_case")
             .order_by("sort_order", "number")
         )
-        return render(request, self.template_name, {"circuits": circuits})
+
+        # Categorías seleccionadas por el turista (OR semantics).
+        # Acepta repetidos: ?cat=nature&cat=culture
+        selected = [c for c in request.GET.getlist("cat") if c in CATEGORY_FILTERS]
+        if selected:
+            q = Q()
+            for cat in selected:
+                q |= Q(**{CATEGORY_FILTERS[cat]: True})
+            circuits = circuits.filter(q).distinct()
+
+        context = {
+            "circuits": circuits,
+            "categories": CATEGORY_LABELS,
+            "selected_categories": set(selected),
+        }
+        return render(request, self.template_name, context)
 
 
 class CircuitDetailPublicView(View):

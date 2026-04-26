@@ -73,6 +73,9 @@ Estructura de salida (JSON estricto, sin texto antes ni después):
   "is_adventure": false,
   "is_rain_friendly": false,
   "is_premium": false,
+  "is_nature": false,
+  "is_culture": false,
+  "is_gastronomy": false,
   "days": [
     {
       "day_number": 1,
@@ -266,6 +269,9 @@ def apply_composition(
         is_adventure=bool(proposed.get("is_adventure")),
         is_rain_friendly=bool(proposed.get("is_rain_friendly")),
         is_premium=bool(proposed.get("is_premium")),
+        is_nature=bool(proposed.get("is_nature")),
+        is_culture=bool(proposed.get("is_culture")),
+        is_gastronomy=bool(proposed.get("is_gastronomy")),
         published=publish,
     )
 
@@ -438,6 +444,9 @@ def _normalize(parsed: dict[str, Any]) -> dict[str, Any]:
         "is_adventure": bool(parsed.get("is_adventure")),
         "is_rain_friendly": bool(parsed.get("is_rain_friendly")),
         "is_premium": bool(parsed.get("is_premium")),
+        "is_nature": bool(parsed.get("is_nature")),
+        "is_culture": bool(parsed.get("is_culture")),
+        "is_gastronomy": bool(parsed.get("is_gastronomy")),
         "days": [],
         "gaps_detected": [],
         "rationale": str(parsed.get("rationale") or "").strip(),
@@ -511,6 +520,23 @@ def _validate_against_catalog(
         warnings.append(
             "La IA no incluyó estos anchor places: "
             + ", ".join(str(x) for x in sorted(missing_anchors))
+        )
+
+    # Auto-inferencia de categorías multi-valor a partir del place_type real de
+    # las paradas. La IA puede proponer flags, pero el catálogo manda: si una
+    # parada es THEATER/MUSEUM, el circuito ES de cultura aunque el LLM no lo marque.
+    if used_ids:
+        types_in_circuit = set(
+            Place.objects.filter(id__in=used_ids).values_list("place_type", flat=True)
+        )
+        proposed["is_culture"] = bool(
+            proposed.get("is_culture") or types_in_circuit & {"THEATER", "MUSEUM", "CHURCH", "CULTURAL_CENTER"}
+        )
+        proposed["is_gastronomy"] = bool(
+            proposed.get("is_gastronomy") or types_in_circuit & {"RESTAURANT", "CAFE"}
+        )
+        proposed["is_nature"] = bool(
+            proposed.get("is_nature") or types_in_circuit & {"PARK", "VIEWPOINT", "ATTRACTION"}
         )
 
     proposed["validation_warnings"] = warnings
@@ -622,6 +648,9 @@ def apply_manual_composition(
         is_adventure=bool(proposed.get("is_adventure")),
         is_rain_friendly=bool(proposed.get("is_rain_friendly")),
         is_premium=bool(proposed.get("is_premium")),
+        is_nature=bool(proposed.get("is_nature")),
+        is_culture=bool(proposed.get("is_culture")),
+        is_gastronomy=bool(proposed.get("is_gastronomy")),
         published=publish,
     )
 

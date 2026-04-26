@@ -58,6 +58,19 @@ class Circuit(models.Model):
     is_adventure = models.BooleanField(default=False)
     is_rain_friendly = models.BooleanField(default=False)
     is_premium = models.BooleanField(default=False)
+    # Categorías multi-valor del estudio DPV (filtro UI + agente)
+    is_nature = models.BooleanField(
+        default=False,
+        help_text="Naturaleza escénica (parques, miradores, lagos, volcanes).",
+    )
+    is_culture = models.BooleanField(
+        default=False,
+        help_text="Cultura y patrimonio (museos, teatros, iglesias, pueblos típicos).",
+    )
+    is_gastronomy = models.BooleanField(
+        default=False,
+        help_text="Gastronomía (restaurantes, mercados, cervecerías, repostería).",
+    )
     published = models.BooleanField(default=False, db_index=True)
     featured = models.BooleanField(default=False)
     sort_order = models.PositiveSmallIntegerField(default=0)
