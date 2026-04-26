@@ -82,13 +82,19 @@ class Command(BaseCommand):
             from destino_puerto_varas.services.place_enrichment_service import apply_draft
 
             d = place.enrichment_drafts.filter(
-                status=PlaceEnrichmentDraft.STATUS_DRAFT
+                status__in=[
+                    PlaceEnrichmentDraft.STATUS_DRAFT,
+                    PlaceEnrichmentDraft.STATUS_APPROVED,
+                ]
             ).order_by("-created_at").first()
             if not d:
-                self.stdout.write(self.style.WARNING("\nNo hay drafts en STATUS_DRAFT para aplicar."))
+                self.stdout.write(
+                    self.style.WARNING("\nNo hay drafts pendientes (DRAFT/APPROVED) para aplicar.")
+                )
                 return
-            d.status = PlaceEnrichmentDraft.STATUS_APPROVED
-            d.save(update_fields=["status"])
+            if d.status != PlaceEnrichmentDraft.STATUS_APPROVED:
+                d.status = PlaceEnrichmentDraft.STATUS_APPROVED
+                d.save(update_fields=["status"])
             ok = apply_draft(d, reviewer="inspect_place_draft")
             if ok:
                 self.stdout.write(self.style.SUCCESS(f"\n✓ Draft #{d.id} aplicado al Place."))
