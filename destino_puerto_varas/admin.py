@@ -1254,18 +1254,35 @@ class PlaceAdmin(admin.ModelAdmin):
             return redirect("admin:destino_puerto_varas_place_change", place_id)
 
         # Aprobar si está en draft
+        original_status = pending.status
         if pending.status == PlaceEnrichmentDraft.STATUS_DRAFT:
             pending.status = PlaceEnrichmentDraft.STATUS_APPROVED
             pending.reviewed_by = request.user.username
             pending.reviewed_at = timezone.now()
             pending.save()
 
-        # Aplicar
+        # Aplicar — si falla, revertir status + persistir error en review_notes
+        # para que el draft no quede colgado en 'approved' sin feedback.
         try:
             ok = apply_draft(pending, reviewer=request.user.username)
         except Exception as exc:
             logger.exception("aplicar_y_publicar_view: error en apply_draft")
-            messages.error(request, f"Error aplicando: {exc}")
+            from django.db import transaction
+            try:
+                with transaction.atomic():
+                    pending.refresh_from_db()
+                    pending.status = original_status or PlaceEnrichmentDraft.STATUS_DRAFT
+                    pending.review_notes = (
+                        f"[auto] apply_draft falló: {type(exc).__name__}: {exc}"
+                    )[:1000]
+                    pending.save(update_fields=["status", "review_notes"])
+            except Exception:
+                logger.exception("aplicar_y_publicar_view: rollback de status también falló")
+            messages.error(
+                request,
+                f"Error aplicando borrador #{pending.id}: {exc}. "
+                "Status revertido a draft. Revisa review_notes.",
+            )
             return redirect("admin:destino_puerto_varas_place_change", place_id)
 
         if not ok:
