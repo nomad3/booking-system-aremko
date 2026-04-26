@@ -33,31 +33,41 @@ SYSTEM_PROMPT = """Eres un copywriter editorial de turismo especializado en Puer
 y la región de Los Lagos (Chile). Tu trabajo es transformar la lista de paradas de un \
 circuito turístico en una narrativa atractiva, coherente y útil para el viajero.
 
+REGLA CRÍTICA — ORDEN DE PARADAS (no negociable):
+- Las paradas vienen NUMERADAS en el contexto (Parada 1, Parada 2, ...).
+- Debes mencionarlas EN ESE MISMO ORDEN ESTRICTO en la narrativa y en los day_summaries.
+- PROHIBIDO reordenar paradas según tu criterio narrativo, geográfico o "lógico".
+- PROHIBIDO omitir paradas o inventar paradas intermedias.
+- El usuario YA decidió la ruta óptima; tu trabajo es vestirla con palabras, NO rediseñarla.
+- Si te parece que el orden no es óptimo (ej. ida y vuelta innecesaria), igual respétalo: \
+  no es tu decisión.
+- Las transiciones entre paradas ("desde aquí, ...", "tras unos minutos, ...") deben ir \
+  SIEMPRE de la parada N a la parada N+1, nunca saltar atrás ni adelante.
+
 Reglas de tono:
 - Cercano, evocador, sensorial — pero sin caer en clichés gastados.
 - Español de Chile, sin modismos de otros países.
 - Hechos verificables: solo afirma lo que aparece en los datos del lugar (no inventes \
   altura, año, infraestructura).
 - Nunca menciones que el texto fue generado por IA.
-- Conecta las paradas con transiciones suaves ("desde aquí, ...", "tras unos minutos en \
-  auto, ...", "al caer la tarde, ...").
 
 Formato de respuesta — DEVUELVE SOLO JSON, sin texto antes/después, sin bloque ```. \
 Estructura exacta:
 
 {
-  "circuit_long_description": "<texto editorial 400-700 palabras describiendo el circuito completo, día por día, lugar por lugar>",
+  "circuit_long_description": "<texto editorial 400-700 palabras describiendo el circuito completo, día por día, lugar por lugar EN EL ORDEN DADO>",
   "day_summaries": {
-    "1": "<resumen del día 1, 80-150 palabras>",
-    "2": "<resumen del día 2, 80-150 palabras>"
+    "1": "<resumen del día 1 mencionando paradas EN ORDEN, 80-150 palabras>",
+    "2": "<resumen del día 2 mencionando paradas EN ORDEN, 80-150 palabras>"
   }
 }
 
 - circuit_long_description debe abrir con un hook (qué hace especial este circuito), \
-  recorrer cada parada en orden con ~50-80 palabras por parada, y cerrar con una nota \
-  evocadora.
+  recorrer cada parada EN EL ORDEN DADO con ~50-80 palabras por parada, y cerrar con una \
+  nota evocadora.
 - day_summaries: una clave por cada día del circuito (claves como string, "1", "2", ...). \
-  Si el circuito es de 1 día (medio día), solo "1".
+  Si el circuito es de 1 día (medio día), solo "1". Cada resumen DEBE listar las paradas \
+  de ese día en el orden exacto recibido.
 - El JSON debe ser válido (comillas dobles, sin trailing commas).
 """
 
@@ -263,10 +273,25 @@ def _build_circuit_context(circuit: Circuit) -> str:
             if place.did_you_know:
                 lines.append(f"    Dato curioso: {place.did_you_know[:200]}")
 
+    # ─── Bloque de orden obligatorio (belt & suspenders) ───
+    lines.append("")
+    lines.append("=== ORDEN OBLIGATORIO (RESPETAR ESTRICTO) ===")
+    lines.append(
+        "Las paradas deben mencionarse en este orden EXACTO. NO reordenes, NO omitas, "
+        "NO inviertas. Si te parece subóptimo, IGUAL respétalo:"
+    )
+    for day in days:
+        names = []
+        for stop in day.place_stops.order_by("visit_order"):
+            names.append(f"{stop.visit_order}.{stop.place.name}")
+        if names:
+            lines.append(f"  Día {day.day_number}: {' → '.join(names)}")
+
     lines.append("")
     lines.append("=== INSTRUCCIÓN ===")
     lines.append(
-        "Genera la narrativa editorial siguiendo el formato JSON especificado en el system prompt."
+        "Genera la narrativa editorial siguiendo el formato JSON especificado en el system prompt. "
+        "Tu narrativa SOLO es válida si recorre las paradas en el orden listado arriba."
     )
     return "\n".join(lines)
 
@@ -323,6 +348,16 @@ manualmente para armar un circuito turístico. Tu trabajo es darle "vestido edit
 proponer 3 alternativas de nombre, redactar la narrativa, los resúmenes por día y \
 deducir flags booleanos.
 
+REGLA CRÍTICA — ORDEN DE PARADAS (no negociable):
+- Las paradas vienen NUMERADAS en el contexto (Parada 1, Parada 2, ...).
+- Debes mencionarlas EN ESE MISMO ORDEN ESTRICTO en la long_description y en los day_summaries.
+- PROHIBIDO reordenar paradas según tu criterio narrativo, geográfico o "lógico".
+- PROHIBIDO omitir paradas o inventar paradas intermedias.
+- El usuario YA decidió la ruta; tu trabajo es vestirla con palabras, NO rediseñarla.
+- Si te parece que el orden no es óptimo (ej. ida y vuelta innecesaria), igual respétalo.
+- Las transiciones ("luego de aquí, ...", "tras unos minutos, ...") deben ir SIEMPRE de \
+  la parada N a la parada N+1, nunca saltar atrás ni adelante.
+
 Reglas no negociables:
 1. NO inventes paradas — usa exclusivamente las que aparecen en el contexto.
 2. NO afirmes datos no verificables (altura, año, servicios) que no estén en el contexto.
@@ -331,8 +366,9 @@ Reglas no negociables:
 4. Cada nombre debe traer su short_description acompañante (1-2 oraciones, max 240 chars).
 5. La narrativa larga (long_description) es UNA sola para todos los nombres (no se \
    reescribe por cada propuesta) — 400-700 palabras, tono cercano, evocador, español \
-   de Chile, sin clichés.
-6. Los flags booleanos se deducen de las paradas reales, no del título o de la idea.
+   de Chile, sin clichés. Recorre las paradas EN EL ORDEN DADO.
+6. Los day_summaries deben listar las paradas del día EN EL ORDEN EXACTO recibido.
+7. Los flags booleanos se deducen de las paradas reales, no del título o de la idea.
 
 Devuelve SOLO JSON, sin texto antes/después, sin bloque markdown:
 
@@ -497,11 +533,25 @@ def _build_branding_context(
             fee = "gratis" if p.entry_fee_clp == 0 else f"${p.entry_fee_clp:,} CLP"
             lines.append(f"  Entrada: {fee}")
 
+    # ─── Bloque de orden obligatorio (belt & suspenders) ───
+    order_summary = " → ".join(
+        f"{idx}.{p.name}" for idx, p in enumerate(places_in_order, start=1)
+    )
+    lines.append("")
+    lines.append("=== ORDEN OBLIGATORIO (RESPETAR ESTRICTO) ===")
+    lines.append(
+        "El usuario eligió esta secuencia de paradas. Tu long_description y day_summaries "
+        "DEBEN mencionarlas en este orden EXACTO. NO reordenes, NO omitas, NO inviertas. "
+        "Si te parece subóptimo, IGUAL respétalo (no es tu decisión)."
+    )
+    lines.append(f"  Orden: {order_summary}")
+
     lines.append("")
     lines.append("=== INSTRUCCIÓN ===")
     lines.append(
         "Genera el branding del circuito según el formato JSON en el system prompt. "
-        "Recuerda: 3 alternativas de nombre con estilos distintos, una narrativa única."
+        "Recuerda: 3 alternativas de nombre con estilos distintos, una narrativa única "
+        "que respete el ORDEN OBLIGATORIO listado arriba."
     )
     return "\n".join(lines)
 
