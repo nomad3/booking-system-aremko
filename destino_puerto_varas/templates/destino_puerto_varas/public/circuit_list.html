@@ -107,6 +107,34 @@
   color: var(--color-ink-soft);
 }
 
+.circuit-card--coming-soon {
+  opacity: 0.78;
+}
+.circuit-card--coming-soon .circuit-card__hero {
+  filter: saturate(0.6);
+}
+.circuit-card__badge {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.95);
+  color: #6b3a07;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 4px;
+  margin-left: auto;
+}
+.circuit-card__hero--with-badge {
+  justify-content: space-between;
+}
+.circuit-card__cta--disabled {
+  color: var(--color-ink-soft);
+  cursor: default;
+  pointer-events: none;
+}
+
 .filter-bar {
   max-width: var(--max-content);
   margin: 0 auto 24px;
@@ -179,13 +207,21 @@
 {% if circuits %}
 <section class="circuit-grid">
   {% for circuit in circuits %}
-  <article class="circuit-card">
-    <div class="circuit-card__hero">{% if circuit.duration_case %}{{ circuit.duration_case.name }}{% else %}Circuito{% endif %}</div>
+  {% with is_coming_soon=circuit.days_count|default:0 %}
+  <article class="circuit-card{% if not circuit.days_count %} circuit-card--coming-soon{% endif %}">
+    <div class="circuit-card__hero{% if not circuit.days_count %} circuit-card__hero--with-badge{% endif %}">
+      <span>{% if circuit.duration_case %}{{ circuit.duration_case.name }}{% else %}Circuito{% endif %}</span>
+      {% if not circuit.days_count %}<span class="circuit-card__badge">Próximamente</span>{% endif %}
+    </div>
     <div class="circuit-card__body">
       <h2 class="circuit-card__title">
-        <a href="{% url 'destino_puerto_varas_public:circuit-detail' slug=circuit.slug %}">
+        {% if circuit.days_count %}
+          <a href="{% url 'destino_puerto_varas_public:circuit-detail' slug=circuit.slug %}">
+            {{ circuit.name }}
+          </a>
+        {% else %}
           {{ circuit.name }}
-        </a>
+        {% endif %}
       </h2>
       <p class="circuit-card__desc">{{ circuit.short_description }}</p>
       <div class="circuit-card__meta">
@@ -198,9 +234,14 @@
         {% if circuit.is_rain_friendly %}<span class="circuit-card__chip">Día lluvioso</span>{% endif %}
         {% if circuit.is_premium %}<span class="circuit-card__chip">Premium</span>{% endif %}
       </div>
-      <a class="circuit-card__cta" href="{% url 'destino_puerto_varas_public:circuit-detail' slug=circuit.slug %}">Ver itinerario →</a>
+      {% if circuit.days_count %}
+        <a class="circuit-card__cta" href="{% url 'destino_puerto_varas_public:circuit-detail' slug=circuit.slug %}">Ver itinerario →</a>
+      {% else %}
+        <span class="circuit-card__cta circuit-card__cta--disabled">Itinerario en preparación</span>
+      {% endif %}
     </div>
   </article>
+  {% endwith %}
   {% endfor %}
 </section>
 {% else %}

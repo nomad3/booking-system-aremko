@@ -10,7 +10,7 @@ from django.http import Http404
 from django.shortcuts import render
 from django.views.generic import View
 
-from django.db.models import Q
+from django.db.models import Count, Q
 
 from .models import Circuit, CircuitDay, CircuitPlace, Place
 
@@ -43,6 +43,7 @@ class CircuitListPublicView(View):
         circuits = (
             Circuit.objects.filter(published=True)
             .select_related("duration_case")
+            .annotate(days_count=Count("days"))
             .order_by("sort_order", "number")
         )
 
@@ -77,6 +78,9 @@ class CircuitDetailPublicView(View):
         )
         if circuit is None:
             raise Http404("Circuito no encontrado")
+        # Circuitos "Próximamente" no tienen días aún — no exponer detalle vacío.
+        if not circuit.days.exists():
+            raise Http404("Circuito en preparación")
 
         # Aplanar paradas en orden global, conservando referencia al día
         stops: list[dict] = []
