@@ -3,6 +3,21 @@
 {% block title %}{{ circuit.name }} · Destino Puerto Varas{% endblock %}
 {% block meta_description %}{{ circuit.short_description }}{% endblock %}
 
+{% block og_type %}article{% endblock %}
+{% block og_title %}{{ circuit.name }}{% endblock %}
+{% block og_description %}{{ circuit.short_description }}{% endblock %}
+{% block og_image %}
+  {% with first=stops.0 %}
+    {% if first.primary_photo and first.primary_photo.image %}
+      <meta property="og:image" content="{{ first.primary_photo.image.url }}">
+    {% elif first.primary_photo and first.primary_photo.source_url %}
+      <meta property="og:image" content="{{ first.primary_photo.source_url }}">
+    {% else %}
+      <meta property="og:image" content="https://www.aremko.cl/static/aremko_logo.png">
+    {% endif %}
+  {% endwith %}
+{% endblock %}
+
 {% block extra_css %}
 .circuit-hero {
   max-width: var(--max-content);

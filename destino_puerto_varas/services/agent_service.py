@@ -33,6 +33,16 @@ logger = logging.getLogger(__name__)
 
 AGENT_SLUG = "dpv-main-guide"
 
+# Base URL del sitio público DPV (hoy montado en aremko.cl/dpv;
+# cuando migre a destinopuertovaras.cl basta con cambiar el setting).
+DPV_PUBLIC_BASE_URL = getattr(
+    settings, "DPV_PUBLIC_BASE_URL", "https://www.aremko.cl/dpv"
+).rstrip("/")
+
+
+def _circuit_public_url(slug: str) -> str:
+    return f"{DPV_PUBLIC_BASE_URL}/circuitos/{slug}/"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Tools: definición JSON-Schema que ve el LLM
@@ -98,7 +108,10 @@ TOOL_DEFINITIONS = [
                 "entrada, tarifas detalladas, distancia/tiempo desde Pto Varas, fotos). "
                 "Si el usuario pregunta por precios/tarifas, prioriza el campo `entry_fee_text` "
                 "(detalle real con diferenciales adulto/niño/extranjero, por consumo, etc.) "
-                "sobre `entry_fee_clp` (valor único representativo). Usa el slug de list_circuits."
+                "sobre `entry_fee_clp` (valor único representativo). Usa el slug de list_circuits. "
+                "El response incluye `public_url` con el itinerario visual del circuito en el sitio "
+                "Destino Puerto Varas (acuarelas, mapa de paradas, datos prácticos completos): "
+                "compartilo SIEMPRE al usuario cuando muestres un circuito en detalle."
             ),
             "parameters": {
                 "type": "object",
@@ -176,6 +189,7 @@ def _circuit_brief(c: Circuit) -> dict:
         "number": c.number,
         "name": c.name,
         "slug": c.slug,
+        "public_url": _circuit_public_url(c.slug),
         "duration_label": c.duration_case.name if c.duration_case_id else "",
         "duration_days": c.duration_case.days if c.duration_case_id else None,
         "duration_nights": c.duration_case.nights if c.duration_case_id else None,
@@ -345,6 +359,7 @@ def _tool_get_circuit_detail(arguments: dict) -> dict:
         "number": circuit.number,
         "name": circuit.name,
         "slug": circuit.slug,
+        "public_url": _circuit_public_url(circuit.slug),
         "duration_label": circuit.duration_case.name if circuit.duration_case_id else "",
         "duration_days": circuit.duration_case.days if circuit.duration_case_id else None,
         "duration_nights": circuit.duration_case.nights if circuit.duration_case_id else None,

@@ -6,6 +6,16 @@
   <meta name="theme-color" content="#0f5e6f">
   <title>{% block title %}Destino Puerto Varas{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}Guía turística de Puerto Varas y la Región de Los Lagos: circuitos, lugares y experiencias.{% endblock %}">
+
+  {# ─── Open Graph (Telegram, WhatsApp, Facebook) ─── #}
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+  <meta property="og:site_name" content="Destino Puerto Varas">
+  <meta property="og:title" content="{% block og_title %}Destino Puerto Varas{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}Guía turística de Puerto Varas y la Región de Los Lagos: circuitos, lugares y experiencias.{% endblock %}">
+  <meta property="og:url" content="{{ request.build_absolute_uri }}">
+  {% block og_image %}<meta property="og:image" content="https://www.aremko.cl/static/aremko_logo.png">{% endblock %}
+  <meta name="twitter:card" content="summary_large_image">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
