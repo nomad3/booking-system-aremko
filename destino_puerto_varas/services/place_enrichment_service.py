@@ -199,6 +199,14 @@ Notas:
   parece aislado, deja vacío (no inventes 'no hay opciones').
 - parking_details: SOLO si has_parking=true. Detalla si es pago/gratis, capacidad, horario. \
   Vacío si los snippets no dan detalle.
+- LÍMITES DE LARGO (no excedas — campos CharField):
+    * best_season: máx 120 chars (ej. "Diciembre a marzo (verano)")
+    * recommended_visit_duration: máx 80 chars (ej. "1-2 horas")
+    * payment_methods: máx 200 chars
+    * instagram: máx 120 chars
+    * phone: máx 40 chars
+    * price_range: máx 20 chars (solo el símbolo $$$)
+    * Para detalles largos usa entry_fee_text, accessibility_notes, nearby_food_options, parking_details (texto libre sin límite).
 - El JSON debe ser válido (comillas dobles, sin trailing commas).
 """
 
@@ -378,6 +386,11 @@ def apply_draft(draft: PlaceEnrichmentDraft, *, reviewer: str = "") -> bool:
             # Para campos string, no sobreescribir con vacío
             if key in STR_FIELDS and not str(value).strip():
                 continue
+            # Defensa: truncar al max_length del CharField si la IA se pasó.
+            # Sin esto, place.save() revienta con StringDataRightTruncation y
+            # el draft queda en 'approved' sin aplicarse (la transacción revierte).
+            if key in STR_FIELDS:
+                value = _truncate_to_field(place, key, value)
             setattr(place, key, value)
 
     long_desc = proposed.get("long_description")
@@ -631,6 +644,23 @@ def _normalize_proposed_data(parsed: dict[str, Any]) -> dict[str, Any]:
             out["fields"][key] = value
 
     return out
+
+
+def _truncate_to_field(place: Place, field_name: str, value: Any) -> str:
+    """Trunca `value` al max_length del CharField si aplica.
+
+    TextField no tiene max_length → devuelve el valor sin tocar.
+    Si excede, agrega '…' al final para señalar truncado.
+    """
+    text = str(value)
+    try:
+        field = place._meta.get_field(field_name)
+    except Exception:
+        return text
+    max_len = getattr(field, "max_length", None)
+    if not max_len or len(text) <= max_len:
+        return text
+    return text[: max_len - 1].rstrip() + "…"
 
 
 def _coerce_int(value: Any) -> int | None:
