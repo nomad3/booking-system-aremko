@@ -46,12 +46,15 @@ class CircuitDetailPublicView(View):
         stops: list[dict] = []
         global_index = 1
         for day in circuit.days.all().order_by("day_number", "sort_order"):
+            day_extra_title = _day_extra_title(day)
             for stop in day.place_stops.all().order_by("visit_order"):
                 stops.append({
                     "global_index": global_index,
                     "day": day,
+                    "day_extra_title": day_extra_title,
                     "stop": stop,
                     "place": stop.place,
+                    "place_icon": _place_icon(stop.place.place_type),
                     "primary_photo": _primary_photo(stop.place),
                 })
                 global_index += 1
@@ -71,3 +74,42 @@ def _primary_photo(place: Place):
         return None
     primary = next((p for p in photos if p.is_primary), None)
     return primary or photos[0]
+
+
+# Emoji por tipo de lugar para el placeholder de foto
+PLACE_TYPE_ICONS = {
+    "ATTRACTION": "🏞️",
+    "VIEWPOINT": "🔭",
+    "PARK": "🌲",
+    "RESTAURANT": "🍴",
+    "CAFE": "☕",
+    "SHOP": "🛍️",
+    "LODGING": "🛏️",
+    "SPA": "💆",
+    "TOUR_OPERATOR": "🎒",
+    "BUSINESS": "🏢",
+    "ACTIVITY": "⛰️",
+    "MUSEUM": "🏛️",
+    "THEATER": "🎭",
+    "CHURCH": "⛪",
+    "CULTURAL_CENTER": "🎨",
+    "OTHER": "📍",
+}
+
+
+def _place_icon(place_type: str) -> str:
+    return PLACE_TYPE_ICONS.get(place_type, "📍")
+
+
+def _day_extra_title(day) -> str:
+    """Devuelve el título del día solo si aporta info más allá del 'Día N'.
+
+    Evita duplicar 'DÍA 1 · DÍA 1' cuando el title viene como 'Día 1' literal.
+    """
+    title = (day.title or "").strip()
+    if not title:
+        return ""
+    normalized = title.lower().replace("dia", "día")
+    if normalized == f"día {day.day_number}":
+        return ""
+    return title

@@ -129,10 +129,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-display);
-  font-size: 2rem;
-  color: var(--color-accent);
-  opacity: 0.6;
+  font-size: 2.6rem;
+  filter: drop-shadow(0 2px 4px rgba(15,94,111,0.25));
 }
 .stop__body {
   padding: 16px 20px;
@@ -239,7 +237,13 @@
 .dpv-modal__location {
   color: var(--color-ink-soft);
   font-size: 0.95rem;
-  margin: 0 0 18px;
+  margin: 0 0 14px;
+}
+.dpv-modal__lead {
+  font-size: 1rem;
+  color: var(--color-ink);
+  margin: 0 0 4px;
+  line-height: 1.5;
 }
 .dpv-modal__section {
   margin-top: 18px;
@@ -253,12 +257,62 @@
   color: var(--color-accent);
 }
 .dpv-modal__section p { margin: 0; color: var(--color-ink-soft); }
+.dpv-modal__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dpv-modal__fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--color-bg);
+  border-radius: 10px;
+  border: 1px solid var(--color-line);
+}
+.dpv-modal__fact-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.dpv-modal__fact-value {
+  font-size: 0.95rem;
+  color: var(--color-ink);
+}
 .dpv-modal__chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 14px;
 }
+details.dpv-modal__details {
+  margin: 0;
+}
+details.dpv-modal__details > summary {
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--color-accent);
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+}
+details.dpv-modal__details > summary::-webkit-details-marker { display: none; }
+details.dpv-modal__details > summary::after {
+  content: "▾";
+  font-size: 0.8rem;
+  transition: transform 0.2s ease;
+}
+details.dpv-modal__details[open] > summary::after { transform: rotate(180deg); }
+details.dpv-modal__details > div { margin-top: 8px; }
 .dpv-chip {
   display: inline-flex;
   align-items: center;
@@ -324,10 +378,10 @@
         {% elif photo and photo.source_url %}
           <div class="stop__photo" style="background-image: url('{{ photo.source_url }}');"></div>
         {% else %}
-          <div class="stop__photo stop__photo--placeholder">{{ entry.global_index }}</div>
+          <div class="stop__photo stop__photo--placeholder" aria-hidden="true">{{ entry.place_icon }}</div>
         {% endif %}
         <div class="stop__body">
-          {% if entry.day %}<div class="stop__day-tag">Día {{ entry.day.day_number }}{% if entry.day.title %} · {{ entry.day.title }}{% endif %}</div>{% endif %}
+          {% if entry.day %}<div class="stop__day-tag">Día {{ entry.day.day_number }}{% if entry.day_extra_title %} · {{ entry.day_extra_title }}{% endif %}</div>{% endif %}
           <h2 class="stop__name">{{ place.name }}</h2>
           {% if place.location_label %}<p class="stop__location">{{ place.location_label }}</p>{% endif %}
           {% if place.short_description %}<p class="stop__excerpt">{{ place.short_description }}</p>{% endif %}
@@ -356,20 +410,28 @@
         <h3 class="dpv-modal__title" id="modal-stop-{{ entry.global_index }}-title">{{ place.name }}</h3>
         {% if place.location_label %}<p class="dpv-modal__location">📍 {{ place.location_label }}</p>{% endif %}
 
-        {% if place.long_description %}
-        <div class="dpv-modal__section">
-          <h4>Sobre el lugar</h4>
-          <p>{{ place.long_description|linebreaksbr }}</p>
-        </div>
+        {# ─── Datos prácticos: lo que el turista necesita saber primero ─── #}
+        {% if place.short_description %}
+        <p class="dpv-modal__lead">{{ place.short_description }}</p>
         {% endif %}
 
-        {% if place.recommended_visit_duration or place.entry_fee_text or place.requires_reservation or place.payment_methods %}
+        {% if place.recommended_visit_duration or place.entry_fee_text or place.entry_fee_clp or place.best_season or place.distance_from_pv_km or place.drive_time_from_pv_min or place.requires_reservation or place.payment_methods %}
         <div class="dpv-modal__section">
           <h4>Datos prácticos</h4>
-          {% if place.recommended_visit_duration %}<p><strong>Tiempo sugerido:</strong> {{ place.recommended_visit_duration }}</p>{% endif %}
-          {% if place.entry_fee_text %}<p><strong>Tarifas:</strong> {{ place.entry_fee_text|linebreaksbr }}</p>{% endif %}
-          {% if place.requires_reservation %}<p><strong>Reserva previa:</strong> Sí, requerida</p>{% endif %}
-          {% if place.payment_methods %}<p><strong>Pago:</strong> {{ place.payment_methods }}</p>{% endif %}
+          <ul class="dpv-modal__facts">
+            {% if place.entry_fee_text %}
+              <li class="dpv-modal__fact"><span class="dpv-modal__fact-label">Tarifas</span><span class="dpv-modal__fact-value">{{ place.entry_fee_text|linebreaksbr }}</span></li>
+            {% elif place.entry_fee_clp == 0 %}
+              <li class="dpv-modal__fact"><span class="dpv-modal__fact-label">Entrada</span><span class="dpv-modal__fact-value">Gratis</span></li>
+            {% elif place.entry_fee_clp %}
+              <li class="dpv-modal__fact"><span class="dpv-modal__fact-label">Entrada</span><span class="dpv-modal__fact-value">${{ place.entry_fee_clp|stringformat:"d" }} CLP</span></li>
+            {% endif %}
+            {% if place.recommended_visit_duration %}<li class="dpv-modal__fact"><span class="dpv-modal__fact-label">Tiempo sugerido</span><span class="dpv-modal__fact-value">{{ place.recommended_visit_duration }}</span></li>{% endif %}
+            {% if place.drive_time_from_pv_min %}<li class="dpv-modal__fact"><span class="dpv-modal__fact-label">Desde Pto. Varas</span><span class="dpv-modal__fact-value">{{ place.drive_time_from_pv_min }} min{% if place.distance_from_pv_km %} · {{ place.distance_from_pv_km }} km{% endif %}</span></li>{% elif place.distance_from_pv_km %}<li class="dpv-modal__fact"><span class="dpv-modal__fact-label">Desde Pto. Varas</span><span class="dpv-modal__fact-value">{{ place.distance_from_pv_km }} km</span></li>{% endif %}
+            {% if place.best_season %}<li class="dpv-modal__fact"><span class="dpv-modal__fact-label">Mejor temporada</span><span class="dpv-modal__fact-value">{{ place.best_season }}</span></li>{% endif %}
+            {% if place.requires_reservation %}<li class="dpv-modal__fact"><span class="dpv-modal__fact-label">Reserva previa</span><span class="dpv-modal__fact-value">Requerida</span></li>{% endif %}
+            {% if place.payment_methods %}<li class="dpv-modal__fact"><span class="dpv-modal__fact-label">Pago</span><span class="dpv-modal__fact-value">{{ place.payment_methods }}</span></li>{% endif %}
+          </ul>
         </div>
         {% endif %}
 
@@ -385,6 +447,15 @@
         <div class="dpv-modal__section">
           <h4>Consejos prácticos</h4>
           <p>{{ place.practical_tips|linebreaksbr }}</p>
+        </div>
+        {% endif %}
+
+        {% if place.long_description %}
+        <div class="dpv-modal__section">
+          <details class="dpv-modal__details">
+            <summary>Sobre el lugar</summary>
+            <div><p>{{ place.long_description|linebreaksbr }}</p></div>
+          </details>
         </div>
         {% endif %}
 
