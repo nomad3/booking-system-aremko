@@ -46,6 +46,7 @@ class CircuitListPublicView(View):
         circuits = (
             Circuit.objects.filter(published=True)
             .select_related("duration_case")
+            .prefetch_related("days__place_stops__place__photos")
             .annotate(days_count=Count("days"))
             .filter(days_count__gt=0)
             .order_by("sort_order", "number")
@@ -60,8 +61,14 @@ class CircuitListPublicView(View):
                 q |= Q(**{CATEGORY_FILTERS[cat]: True})
             circuits = circuits.filter(q).distinct()
 
+        # Resolver hero_url por circuito: hero_image propio → foto del primer
+        # place del Día 1 → None (cae al gradiente actual del template).
+        circuit_list = list(circuits)
+        for c in circuit_list:
+            c.hero_url = _resolve_circuit_hero_url(c)
+
         context = {
-            "circuits": circuits,
+            "circuits": circuit_list,
             "categories": CATEGORY_LABELS,
             "selected_categories": set(selected),
         }
@@ -118,6 +125,31 @@ def _primary_photo(place: Place):
         return None
     primary = next((p for p in photos if p.is_primary), None)
     return primary or photos[0]
+
+
+def _resolve_circuit_hero_url(circuit) -> str:
+    """URL para la imagen hero del circuito en el listado.
+
+    Prioridad: hero_image propio del circuito → foto principal del primer
+    place del Día 1 → string vacío (template cae al gradiente).
+    """
+    if getattr(circuit, "hero_image", None):
+        try:
+            return circuit.hero_image.url
+        except (ValueError, AttributeError):
+            pass
+    for day in circuit.days.all().order_by("day_number", "sort_order"):
+        for stop in day.place_stops.all().order_by("visit_order"):
+            photo = _primary_photo(stop.place)
+            if photo and photo.image:
+                try:
+                    return photo.image.url
+                except (ValueError, AttributeError):
+                    continue
+            if photo and photo.source_url:
+                return photo.source_url
+        break  # solo Día 1
+    return ""
 
 
 # Emoji por tipo de lugar para el placeholder de foto

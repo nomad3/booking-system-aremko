@@ -71,6 +71,21 @@ class Circuit(models.Model):
         default=False,
         help_text="Gastronomía (restaurantes, mercados, cervecerías, repostería).",
     )
+    hero_image = models.ImageField(
+        upload_to="dpv/circuits/",
+        blank=True,
+        null=True,
+        help_text=(
+            "Imagen hero para la tarjeta del circuito en el listado público. "
+            "Recomendado: acuarela del paisaje principal (ratio ~16:9, ~1200×675 px). "
+            "Si está vacía, el sitio usa la primera foto del primer lugar como fallback."
+        ),
+    )
+    hero_image_credit = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Atribución/crédito de la imagen (ej: 'Acuarela generada por IA').",
+    )
     published = models.BooleanField(default=False, db_index=True)
     featured = models.BooleanField(default=False)
     sort_order = models.PositiveSmallIntegerField(default=0)

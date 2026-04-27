@@ -47,8 +47,10 @@
   box-shadow: 0 12px 28px var(--color-shadow);
 }
 .circuit-card__hero {
-  height: 140px;
+  height: 160px;
   background: linear-gradient(135deg, #0f5e6f 0%, #297888 60%, #c47238 100%);
+  background-size: cover;
+  background-position: center;
   display: flex;
   align-items: flex-end;
   padding: 12px 16px;
@@ -58,7 +60,19 @@
   font-size: 0.9rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  opacity: 0.95;
+  position: relative;
+}
+.circuit-card__hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0) 50%, rgba(0,0,0,0.55) 100%);
+  pointer-events: none;
+}
+.circuit-card__hero > * {
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.45);
 }
 .circuit-card__body {
   padding: 18px 20px 22px;
@@ -209,7 +223,8 @@
   {% for circuit in circuits %}
   {% with is_coming_soon=circuit.days_count|default:0 %}
   <article class="circuit-card{% if not circuit.days_count %} circuit-card--coming-soon{% endif %}">
-    <div class="circuit-card__hero{% if not circuit.days_count %} circuit-card__hero--with-badge{% endif %}">
+    <div class="circuit-card__hero{% if not circuit.days_count %} circuit-card__hero--with-badge{% endif %}"
+         {% if circuit.hero_url %}style="background-image: url('{{ circuit.hero_url }}');"{% endif %}>
       <span>{% if circuit.duration_case %}{{ circuit.duration_case.name }}{% else %}Circuito{% endif %}</span>
       {% if not circuit.days_count %}<span class="circuit-card__badge">Próximamente</span>{% endif %}
     </div>
