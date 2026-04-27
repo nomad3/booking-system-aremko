@@ -327,6 +327,7 @@ class CircuitAdmin(admin.ModelAdmin):
     list_display = (
         "number",
         "name",
+        "sort_order",
         "duration_case",
         "primary_interest",
         "recommended_profile",
@@ -334,6 +335,8 @@ class CircuitAdmin(admin.ModelAdmin):
         "published",
         "featured",
     )
+    list_display_links = ("name",)
+    list_editable = ("sort_order", "published", "featured")
     list_filter = (
         "published",
         "featured",
