@@ -237,14 +237,9 @@ class Command(BaseCommand):
         # 3) Circuits + Days + Stops
         next_number = self._next_circuit_number()
         for entry in AREMKO_CIRCUITS:
-            circuit = self._upsert_circuit(entry, next_number, dry_run=dry_run)
-            if circuit is None:
-                continue
-            if circuit.pk and not dry_run:
-                # solo avanzar si efectivamente se creó nuevo
-                if Circuit.objects.filter(number=next_number, slug=entry["slug"]).exists():
-                    next_number += 1
-            else:
+            circuit, was_created = self._upsert_circuit(entry, next_number, dry_run=dry_run)
+            # Avanzar solo si se intentó crear nuevo (real o dry-run); skip si ya existía.
+            if was_created:
                 next_number += 1
             self._ensure_days_and_stops(circuit, entry, children_by_slug, dry_run=dry_run)
 
@@ -277,12 +272,19 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"  [ok place] {slug}"))
         return place
 
-    def _upsert_circuit(self, entry: dict, number: int, dry_run: bool) -> Circuit | None:
+    def _upsert_circuit(
+        self, entry: dict, number: int, dry_run: bool
+    ) -> tuple[Circuit | None, bool]:
+        """Devuelve (circuit_or_None, was_created).
+
+        was_created=True si se creó (o se crearía en dry-run) un Circuit nuevo.
+        was_created=False si ya existía (skip) o si hubo error.
+        """
         slug = entry["slug"]
         existing = Circuit.objects.filter(slug=slug).first()
         if existing:
             self.stdout.write(self.style.WARNING(f"  [skip circuit] {slug} ya existe"))
-            return existing
+            return existing, False
 
         duration = DurationCase.objects.filter(code=entry["duration_code"]).first()
         if duration is None:
@@ -290,11 +292,11 @@ class Command(BaseCommand):
                 f"  [error] DurationCase {entry['duration_code']} no existe. "
                 "Corré load_dpv_circuits_from_study primero."
             ))
-            return None
+            return None, False
 
         if dry_run:
             self.stdout.write(f"  [dry-run] crearía Circuit #{number} {slug}")
-            return None
+            return None, True
 
         payload = dict(
             number=number,
@@ -314,7 +316,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             circuit = Circuit.objects.create(**payload)
         self.stdout.write(self.style.SUCCESS(f"  [ok circuit] #{number} {slug}"))
-        return circuit
+        return circuit, True
 
     def _ensure_days_and_stops(
         self,
