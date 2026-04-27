@@ -443,10 +443,14 @@ class CircuitAdmin(admin.ModelAdmin):
 
     paradas_panel.short_description = "Paradas (en orden real)"
 
-    @admin.action(description="📝 Generar narrativa con IA (genera borrador)")
+    @admin.action(description="📝 Generar y aplicar narrativa con IA")
     def accion_generar_narrativa(self, request, queryset):
-        from .services.circuit_narrative_service import generate_circuit_narrative
+        from .services.circuit_narrative_service import (
+            apply_narrative_draft,
+            generate_circuit_narrative,
+        )
         from django.conf import settings
+        from django.utils import timezone
 
         if not getattr(settings, "OPENROUTER_API_KEY", ""):
             self.message_user(
@@ -460,7 +464,15 @@ class CircuitAdmin(admin.ModelAdmin):
         for circuit in queryset:
             try:
                 draft = generate_circuit_narrative(circuit)
-                if draft and draft.status == CircuitNarrativeDraft.STATUS_DRAFT:
+                if not draft or draft.status != CircuitNarrativeDraft.STATUS_DRAFT:
+                    fail += 1
+                    continue
+                # Auto-aprobar y aplicar al Circuit en el mismo paso.
+                draft.status = CircuitNarrativeDraft.STATUS_APPROVED
+                draft.reviewed_by = request.user.username
+                draft.reviewed_at = timezone.now()
+                draft.save()
+                if apply_narrative_draft(draft, reviewer=request.user.username):
                     ok += 1
                 else:
                     fail += 1
@@ -471,14 +483,15 @@ class CircuitAdmin(admin.ModelAdmin):
         if ok:
             self.message_user(
                 request,
-                f"✓ {ok} borrador(es) de narrativa generado(s). Revísalos en "
-                "'Borradores de narrativa'.",
+                f"✓ {ok} narrativa(s) generada(s) y aplicada(s) al circuito. "
+                "Long description y day summaries actualizados.",
                 level=messages.SUCCESS,
             )
         if fail:
             self.message_user(
                 request,
-                f"✗ {fail} circuito(s) fallaron.",
+                f"✗ {fail} circuito(s) fallaron. Revisa 'Borradores de narrativa' "
+                "para diagnóstico.",
                 level=messages.WARNING,
             )
 
