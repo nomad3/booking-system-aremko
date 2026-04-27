@@ -19,6 +19,8 @@ Uso:
 """
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
@@ -45,6 +47,8 @@ AREMKO_HUB = {
     "place_type": PlaceType.SPA,
     "partnership_level": PartnershipLevel.OWNED,
     "location_label": "Río Pescado, Puerto Varas",
+    "latitude": Decimal("-41.277611"),
+    "longitude": Decimal("-72.768611"),
     "short_description": (
         "Spa boutique con tinas calientes al aire libre, masajes y cabañas frente al río. "
         "Aguas calientes junto al río."
@@ -70,6 +74,8 @@ AREMKO_CHILDREN = [
         "place_type": PlaceType.SPA,
         "partnership_level": PartnershipLevel.OWNED,
         "location_label": "Aremko Spa Boutique, Puerto Varas",
+        "latitude": Decimal("-41.277611"),
+        "longitude": Decimal("-72.768611"),
         "short_description": (
             "Tinas calientes al aire libre frente al río. 2 horas de tinas en un spa de 3 horas total."
         ),
@@ -90,6 +96,8 @@ AREMKO_CHILDREN = [
         "place_type": PlaceType.SPA,
         "partnership_level": PartnershipLevel.OWNED,
         "location_label": "Aremko Spa Boutique, Puerto Varas",
+        "latitude": Decimal("-41.277611"),
+        "longitude": Decimal("-72.768611"),
         "short_description": (
             "Combo de tinas calientes y masaje para 2. Experiencia de spa de 4 horas."
         ),
@@ -109,6 +117,8 @@ AREMKO_CHILDREN = [
         "place_type": PlaceType.LODGING,
         "partnership_level": PartnershipLevel.OWNED,
         "location_label": "Aremko Spa Boutique, Puerto Varas",
+        "latitude": Decimal("-41.277611"),
+        "longitude": Decimal("-72.768611"),
         "short_description": (
             "Cabaña boutique + tinas calientes + masajes para 2. Estadía de 1 noche con desayuno."
         ),
