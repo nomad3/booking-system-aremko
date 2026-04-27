@@ -991,6 +991,7 @@ class PlaceAdmin(admin.ModelAdmin):
         "name",
         "place_type",
         "partnership_level",
+        "parent_place",
         "location_label",
         "elevation_m",
         "entry_fee_clp",
@@ -1010,6 +1011,7 @@ class PlaceAdmin(admin.ModelAdmin):
         "has_conaf_office",
     )
     search_fields = ("name", "slug", "location_label", "short_description")
+    autocomplete_fields = ("parent_place",)
     prepopulated_fields = {"slug": ("name",)}
     ordering = ("name",)
     readonly_fields = ("last_enriched_at", "created_at", "updated_at", "drafts_link")
@@ -1017,11 +1019,14 @@ class PlaceAdmin(admin.ModelAdmin):
     actions = ["accion_enriquecer_con_ia", "accion_autoderivar_short_desc"]
     fieldsets = (
         ("Identidad", {
-            "fields": ("name", "slug", "place_type", "partnership_level", "location_label", "published"),
+            "fields": ("name", "slug", "parent_place", "place_type", "partnership_level", "location_label", "published"),
             "description": (
                 "<strong>partnership_level</strong>: PROPIO=Aremko; PARTNER=acuerdo activo "
                 "(Teatro del Lago, restaurantes aliados); LISTED=mencionable sin acuerdo; "
-                "DIRECTORY=referencial (atracciones naturales, iglesias, museos públicos)."
+                "DIRECTORY=referencial (atracciones naturales, iglesias, museos públicos). "
+                "<br><strong>parent_place</strong>: deja vacío para lugares standalone. Úsalo "
+                "solo cuando este Place es un sub-servicio de otro (ej: 'Aremko Tinas' tiene "
+                "como parent 'Aremko Spa Boutique')."
             ),
         }),
         ("Ubicación", {

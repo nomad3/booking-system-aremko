@@ -166,6 +166,19 @@ class CircuitDay(models.Model):
 class Place(models.Model):
     name = models.CharField(max_length=200)
     slug = models.SlugField(max_length=220, unique=True)
+    parent_place = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="children",
+        help_text=(
+            "Place padre cuando este lugar es un sub-servicio o variante de otro. "
+            "Ej: 'Aremko Tinas Calientes' tiene como parent 'Aremko Spa Boutique'. "
+            "El padre concentra autoridad SEO + branding; los hijos son entradas concretas "
+            "para circuitos con duración específica. Vacío para lugares standalone."
+        ),
+    )
     place_type = models.CharField(
         max_length=30,
         choices=PlaceType.choices,

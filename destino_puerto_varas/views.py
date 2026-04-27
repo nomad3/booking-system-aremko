@@ -46,7 +46,7 @@ class CircuitListPublicView(View):
         circuits = (
             Circuit.objects.filter(published=True)
             .select_related("duration_case")
-            .prefetch_related("days__place_stops__place__photos")
+            .prefetch_related("days__place_stops__place__photos", "days__place_stops__place__parent_place")
             .annotate(days_count=Count("days"))
             .filter(days_count__gt=0)
             .order_by("sort_order", "number")
@@ -84,7 +84,7 @@ class CircuitDetailPublicView(View):
         circuit = (
             Circuit.objects.filter(published=True, slug=slug)
             .select_related("duration_case")
-            .prefetch_related("days__place_stops__place__photos")
+            .prefetch_related("days__place_stops__place__photos", "days__place_stops__place__parent_place")
             .first()
         )
         if circuit is None:

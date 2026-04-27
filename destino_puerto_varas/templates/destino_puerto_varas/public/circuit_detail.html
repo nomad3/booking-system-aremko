@@ -351,6 +351,34 @@ details.dpv-modal__details > div { margin-top: 8px; }
   font-size: 0.95rem;
 }
 .dpv-modal__cta:hover { text-decoration: none; opacity: 0.9; }
+.dpv-modal__cta--aremko {
+  margin-right: 10px;
+  background: #c47238;
+}
+
+/* ─── Aremko badge & breadcrumb (partnership_level=OWNED) ─── */
+.stop__aremko-badge {
+  display: inline-block;
+  background: #c47238;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 3px;
+  margin-bottom: 6px;
+}
+.dpv-modal__breadcrumb {
+  font-size: 0.85rem;
+  color: var(--color-ink-soft);
+  margin: 0 0 8px;
+}
+.dpv-modal__breadcrumb-link {
+  color: #c47238;
+  font-weight: 600;
+}
 
 @media (min-width: 700px) {
   .dpv-modal { align-items: center; padding: 24px; }
@@ -400,6 +428,7 @@ details.dpv-modal__details > div { margin-top: 8px; }
         {% endif %}
         <div class="stop__body">
           {% if entry.day %}<div class="stop__day-tag">Día {{ entry.day.day_number }}{% if entry.day_extra_title %} · {{ entry.day_extra_title }}{% endif %}</div>{% endif %}
+          {% if place.partnership_level == 'OWNED' %}<span class="stop__aremko-badge">Aremko Spa Boutique</span>{% endif %}
           <h2 class="stop__name">{{ place.name }}</h2>
           {% if place.location_label %}<p class="stop__location">{{ place.location_label }}</p>{% endif %}
           {% if place.short_description %}<p class="stop__excerpt">{{ place.short_description }}</p>{% endif %}
@@ -426,6 +455,11 @@ details.dpv-modal__details > div { margin-top: 8px; }
       {% endif %}
       <div class="dpv-modal__body">
         <h3 class="dpv-modal__title" id="modal-stop-{{ entry.global_index }}-title">{{ place.name }}</h3>
+        {% if place.parent_place %}
+          <p class="dpv-modal__breadcrumb">
+            Parte de <span class="dpv-modal__breadcrumb-link">{{ place.parent_place.name }}</span>
+          </p>
+        {% endif %}
         {% if place.location_label %}<p class="dpv-modal__location">📍 {{ place.location_label }}</p>{% endif %}
 
         {# ─── Datos prácticos: lo que el turista necesita saber primero ─── #}
@@ -496,6 +530,9 @@ details.dpv-modal__details > div { margin-top: 8px; }
           {% if place.is_adventure_related %}<span class="dpv-chip">🎒 Aventura</span>{% endif %}
         </div>
 
+        {% if place.partnership_level == 'OWNED' and place.reservations_url %}
+          <a class="dpv-modal__cta dpv-modal__cta--aremko" href="{{ place.reservations_url }}" target="_blank" rel="noopener">Reservar en aremko.cl →</a>
+        {% endif %}
         {% if place.latitude and place.longitude %}
           <a class="dpv-modal__cta" href="https://www.google.com/maps/dir/?api=1&destination={{ place.latitude }},{{ place.longitude }}" target="_blank" rel="noopener">Cómo llegar →</a>
         {% elif place.location_label %}
