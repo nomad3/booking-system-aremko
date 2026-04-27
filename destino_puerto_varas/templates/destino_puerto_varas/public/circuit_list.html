@@ -190,6 +190,17 @@
   text-decoration: underline;
   align-self: center;
 }
+.filter-section {
+  max-width: var(--max-content);
+  margin: 0 auto 8px;
+  padding: 0 24px;
+  text-align: center;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  font-weight: 600;
+}
 {% endblock %}
 
 {% block content %}
@@ -198,25 +209,48 @@
   <p class="list-hero__subtitle">Itinerarios curados para descubrir lagos, volcanes, parques nacionales y pueblos típicos del sur de Chile.</p>
 </section>
 
+<div class="filter-section">Tema</div>
 <nav class="filter-bar" aria-label="Filtrar circuitos por categoría">
   {% for slug, label, icon in categories %}
     {% if slug in selected_categories %}
       {# Si está activa, al hacer click se desactiva (quita del querystring) #}
       <a class="filter-bar__chip filter-bar__chip--active"
-         href="?{% for s in selected_categories %}{% if s != slug %}cat={{ s }}&amp;{% endif %}{% endfor %}">
+         href="?{% for s in selected_categories %}{% if s != slug %}cat={{ s }}&amp;{% endif %}{% endfor %}{% for d in selected_durations %}dur={{ d }}&amp;{% endfor %}">
         {{ icon }} {{ label }}
       </a>
     {% else %}
       <a class="filter-bar__chip"
-         href="?{% for s in selected_categories %}cat={{ s }}&amp;{% endfor %}cat={{ slug }}">
+         href="?{% for s in selected_categories %}cat={{ s }}&amp;{% endfor %}{% for d in selected_durations %}dur={{ d }}&amp;{% endfor %}cat={{ slug }}">
         {{ icon }} {{ label }}
       </a>
     {% endif %}
   {% endfor %}
-  {% if selected_categories %}
-    <a class="filter-bar__clear" href="?">Limpiar filtros</a>
-  {% endif %}
 </nav>
+
+{% if durations %}
+<div class="filter-section">Duración</div>
+<nav class="filter-bar" aria-label="Filtrar circuitos por duración">
+  {% for code, label, icon in durations %}
+    {% if code in selected_durations %}
+      <a class="filter-bar__chip filter-bar__chip--active"
+         href="?{% for s in selected_categories %}cat={{ s }}&amp;{% endfor %}{% for d in selected_durations %}{% if d != code %}dur={{ d }}&amp;{% endif %}{% endfor %}">
+        {{ icon }} {{ label }}
+      </a>
+    {% else %}
+      <a class="filter-bar__chip"
+         href="?{% for s in selected_categories %}cat={{ s }}&amp;{% endfor %}{% for d in selected_durations %}dur={{ d }}&amp;{% endfor %}dur={{ code }}">
+        {{ icon }} {{ label }}
+      </a>
+    {% endif %}
+  {% endfor %}
+</nav>
+{% endif %}
+
+{% if any_filter_active %}
+<div class="filter-bar" style="margin-top: 4px;">
+  <a class="filter-bar__clear" href="?">Limpiar filtros</a>
+</div>
+{% endif %}
 
 {% if circuits %}
 <section class="circuit-grid">

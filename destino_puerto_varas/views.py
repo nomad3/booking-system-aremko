@@ -12,7 +12,7 @@ from django.views.generic import View
 
 from django.db.models import Count, Q
 
-from .models import Circuit, CircuitDay, CircuitPlace, Place
+from .models import Circuit, CircuitDay, CircuitPlace, DurationCase, Place
 
 
 # Mapeo de slugs de categoría → flag del modelo Circuit (filtro UI/agente).
@@ -32,6 +32,14 @@ CATEGORY_LABELS = [
     ("adventure", "Aventura", "🎒"),
     ("family", "Viaje familiar", "👨‍👩‍👧"),
 ]
+
+# Iconos por código DurationCase (lo que no esté aquí cae a "🗓️").
+DURATION_ICONS = {
+    "DPV_HALF_DAY": "🌤️",
+    "DPV_FULL_DAY": "☀️",
+    "DPV_2D1N": "🗓️",
+    "DPV_3D2N": "🗓️",
+}
 
 
 class CircuitListPublicView(View):
@@ -61,6 +69,28 @@ class CircuitListPublicView(View):
                 q |= Q(**{CATEGORY_FILTERS[cat]: True})
             circuits = circuits.filter(q).distinct()
 
+        # Duraciones disponibles a partir de los circuitos publicados (con días).
+        # Solo se ofrecen las que tienen al menos un circuito que pasaría el
+        # resto de filtros activos — evita chips sin resultados.
+        duration_options_qs = (
+            DurationCase.objects.filter(circuits__in=circuits)
+            .distinct()
+            .order_by("sort_order", "days")
+        )
+        duration_options = [
+            (dc.code, dc.name, DURATION_ICONS.get(dc.code, "🗓️"))
+            for dc in duration_options_qs
+        ]
+        valid_duration_codes = {code for code, _, _ in duration_options}
+
+        # Duraciones seleccionadas (OR semantics igual que categorías).
+        # Acepta: ?dur=DPV_HALF_DAY&dur=DPV_FULL_DAY
+        selected_durations = [
+            d for d in request.GET.getlist("dur") if d in valid_duration_codes
+        ]
+        if selected_durations:
+            circuits = circuits.filter(duration_case__code__in=selected_durations).distinct()
+
         # Resolver hero_url por circuito: hero_image propio → foto del primer
         # place del Día 1 → None (cae al gradiente actual del template).
         circuit_list = list(circuits)
@@ -71,6 +101,9 @@ class CircuitListPublicView(View):
             "circuits": circuit_list,
             "categories": CATEGORY_LABELS,
             "selected_categories": set(selected),
+            "durations": duration_options,
+            "selected_durations": set(selected_durations),
+            "any_filter_active": bool(selected) or bool(selected_durations),
         }
         return render(request, self.template_name, context)
 
