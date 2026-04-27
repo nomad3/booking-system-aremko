@@ -44,14 +44,14 @@ AREMKO_HUB = {
     "name": "Aremko Spa Boutique",
     "place_type": PlaceType.SPA,
     "partnership_level": PartnershipLevel.OWNED,
-    "location_label": "Puerto Varas, junto al río Maullín",
+    "location_label": "Río Pescado, Puerto Varas",
     "short_description": (
         "Spa boutique con tinas calientes al aire libre, masajes y cabañas frente al río. "
         "Aguas calientes junto al río."
     ),
     "long_description": (
         "Aremko Spa Boutique combina aguas termales, masajes terapéuticos y cabañas "
-        "boutique en un entorno natural junto al río Maullín, a pocos minutos de Puerto "
+        "boutique en un entorno natural junto al río Pescado, a pocos minutos de Puerto "
         "Varas centro. El spa ofrece tres experiencias diferenciadas según el tiempo "
         "disponible: tinas calientes (medio día), tinas + masajes (medio día extendido) "
         "o estancia completa con alojamiento."
@@ -113,7 +113,7 @@ AREMKO_CHILDREN = [
             "Cabaña boutique + tinas calientes + masajes para 2. Estadía de 1 noche con desayuno."
         ),
         "long_description": (
-            "Estancia completa de 1 noche en cabaña boutique frente al río Maullín. Incluye "
+            "Estancia completa de 1 noche en cabaña boutique frente al río Pescado. Incluye "
             "tinas calientes al atardecer, masajes para 2 personas y desayuno. Experiencia "
             "de 24 horas pensada para parejas que buscan un retiro romántico cerca de Puerto Varas."
         ),
@@ -147,7 +147,7 @@ AREMKO_CIRCUITS = [
         "day_title": "Tarde de tinas",
         "day_summary": (
             "Llegas a Aremko Spa Boutique a media tarde. Tinas calientes al aire libre "
-            "junto al río Maullín durante 2 horas. Cambio y descanso. Total ~3 horas."
+            "junto al río Pescado durante 2 horas. Cambio y descanso. Total ~3 horas."
         ),
     },
     {
@@ -202,7 +202,7 @@ AREMKO_CIRCUITS = [
                 "title": "Día 2 · Despertar junto al río",
                 "block_type": BlockType.AREMKO_MOMENT,
                 "summary": (
-                    "Desayuno en la cabaña, mañana libre frente al río Maullín. "
+                    "Desayuno en la cabaña, mañana libre frente al río Pescado. "
                     "Checkout al mediodía."
                 ),
                 "child_slug": "aremko-estancia-completa",
