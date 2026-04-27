@@ -275,8 +275,18 @@ def _place_summary(place: Place, *, include_long_desc: bool = False) -> dict:
 
 
 def _tool_list_circuits(arguments: dict) -> dict:
-    """Lista circuitos con filtros + broadening automático si 0 resultados."""
-    base_qs = Circuit.objects.filter(published=True)
+    """Lista circuitos con filtros + broadening automático si 0 resultados.
+
+    Excluye circuitos sin itinerario armado (sin días) — el agente no debe
+    recomendarle al turista circuitos que aparecen como "Próximamente".
+    """
+    from django.db.models import Count
+
+    base_qs = (
+        Circuit.objects.filter(published=True)
+        .annotate(_days_count=Count("days"))
+        .filter(_days_count__gt=0)
+    )
 
     interest = arguments.get("interest")
     profile = arguments.get("profile")

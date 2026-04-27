@@ -20,9 +20,16 @@ from ..models import Circuit, DurationCase, RecommendationRule
 
 
 def get_default_circuit_for_duration(duration_case: DurationCase) -> Optional[Circuit]:
-    """Circuit default para un DurationCase: featured primero, luego sort_order ASC, updated_at DESC."""
+    """Circuit default para un DurationCase: featured primero, luego sort_order ASC, updated_at DESC.
+
+    Excluye circuitos sin itinerario armado (los "Próximamente").
+    """
+    from django.db.models import Count
+
     return (
         Circuit.objects.filter(published=True, duration_case=duration_case)
+        .annotate(_days_count=Count("days"))
+        .filter(_days_count__gt=0)
         .order_by("-featured", "sort_order", "-updated_at")
         .first()
     )

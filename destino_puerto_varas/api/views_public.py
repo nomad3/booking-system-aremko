@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.db.models import Count
 from django.http import Http404
 from rest_framework import generics
 
@@ -25,7 +26,13 @@ class CircuitListView(generics.ListAPIView):
     serializer_class = CircuitListSerializer
 
     def get_queryset(self):
-        qs = Circuit.objects.filter(published=True).order_by("sort_order", "number")
+        # Solo circuitos con itinerario armado — los "Próximamente" se ocultan.
+        qs = (
+            Circuit.objects.filter(published=True)
+            .annotate(_days_count=Count("days"))
+            .filter(_days_count__gt=0)
+            .order_by("sort_order", "number")
+        )
         params = self.request.query_params
         duration_code = params.get("duration_case")
         interest = params.get("interest")

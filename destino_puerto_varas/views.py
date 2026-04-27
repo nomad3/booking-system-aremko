@@ -40,10 +40,14 @@ class CircuitListPublicView(View):
     template_name = "destino_puerto_varas/public/circuit_list.html"
 
     def get(self, request):
+        # Solo mostrar circuitos con itinerario armado (paradas/días).
+        # Los circuitos sin paradas se mantienen en BD pero ocultos al turista;
+        # aparecerán automáticamente al armarles paradas en el admin.
         circuits = (
             Circuit.objects.filter(published=True)
             .select_related("duration_case")
             .annotate(days_count=Count("days"))
+            .filter(days_count__gt=0)
             .order_by("sort_order", "number")
         )
 
