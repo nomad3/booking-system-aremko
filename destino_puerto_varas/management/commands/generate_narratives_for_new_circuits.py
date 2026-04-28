@@ -1,13 +1,14 @@
 """Genera narrativas IA (long_description) para los 8 circuits poblados
 en la tanda 2026-04-27/28.
 
-Crea drafts vía generate_circuit_narrative para cada uno. Los drafts
-quedan en estado DRAFT y deben revisarse/aplicarse vía admin.
+Crea drafts vía generate_circuit_narrative para cada uno. Con --apply
+además aprueba y aplica el draft al Circuit (long_description + day summaries).
 
 Uso:
     python manage.py generate_narratives_for_new_circuits --dry-run
     python manage.py generate_narratives_for_new_circuits
     python manage.py generate_narratives_for_new_circuits --skip-existing
+    python manage.py generate_narratives_for_new_circuits --skip-existing --apply
 """
 from __future__ import annotations
 
@@ -42,16 +43,30 @@ class Command(BaseCommand):
             action="store_true",
             help="Salta circuits que ya tienen long_description > 200 chars.",
         )
+        parser.add_argument(
+            "--apply",
+            action="store_true",
+            help="Tras generar el draft, lo aprueba y aplica al Circuit.",
+        )
 
     def handle(self, *args, **options):
+        from destino_puerto_varas.models import CircuitNarrativeDraft
         from destino_puerto_varas.services.circuit_narrative_service import (
+            apply_narrative_draft,
             generate_circuit_narrative,
         )
 
         dry = options["dry_run"]
         skip_existing = options["skip_existing"]
+        apply = options["apply"]
 
-        generated, skipped, failed = 0, 0, 0
+        if dry and apply:
+            self.stdout.write(self.style.WARNING(
+                "(--dry-run + --apply): --apply ignorado (no hay draft persistido)"
+            ))
+            apply = False
+
+        generated, applied_count, skipped, failed = 0, 0, 0, 0
 
         for n in NEW_CIRCUIT_NUMBERS:
             c = Circuit.objects.filter(number=n).first()
@@ -98,14 +113,33 @@ class Command(BaseCommand):
 
             generated += 1
 
+            if apply and draft.id:
+                if draft.status != CircuitNarrativeDraft.STATUS_APPROVED:
+                    draft.status = CircuitNarrativeDraft.STATUS_APPROVED
+                    draft.save(update_fields=["status"])
+                ok = apply_narrative_draft(
+                    draft, reviewer="generate_narratives_for_new_circuits"
+                )
+                if ok:
+                    self.stdout.write(self.style.SUCCESS(
+                        f"  ✓ draft #{draft.id} aplicado al Circuit"
+                    ))
+                    applied_count += 1
+                else:
+                    self.stdout.write(self.style.ERROR(
+                        f"  ✗ apply_narrative_draft retornó False"
+                    ))
+
         self.stdout.write("")
         self.stdout.write(self.style.MIGRATE_HEADING(
-            f"Resumen: generados={generated}, skipped={skipped}, failed={failed}"
+            f"Resumen: generados={generated}, "
+            f"aplicados={applied_count}, skipped={skipped}, failed={failed}"
         ))
         if dry:
             self.stdout.write(self.style.WARNING("(--dry-run: no se persistió ningún draft)"))
-        elif generated:
+        elif generated and not apply:
             self.stdout.write(
                 "Revisa los drafts en admin → "
-                "Borradores de narrativa de Circuit y aplícalos."
+                "Borradores de narrativa de Circuit y aplícalos. "
+                "(O re-corre con --apply para auto-aplicar.)"
             )
