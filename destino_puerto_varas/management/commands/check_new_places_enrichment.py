@@ -1,9 +1,15 @@
 """Verifica el estado de enriquecimiento de los 23 Places nuevos creados
 en la tanda de stub-population (2026-04-27/28).
 
+Criterio de enriquecimiento (post draft aplicado):
+  - long_description > 100 chars (narrativa "Sobre el lugar")
+  - best_season presente
+  - recommended_visit_duration OR nearby_food_options presente (datos prácticos)
+  - tiene draft aplicado en PlaceEnrichmentDraft
+
 Marca cada Place como:
-  - OK   → tiene long_description (>100 chars) + practical_tips + best_season
-  - GAP  → falta alguno de esos 3 campos
+  - OK   → cumple los 3 criterios
+  - GAP  → falta alguno
   - MISS → no existe en la BD
 
 Uso:
@@ -67,13 +73,14 @@ class Command(BaseCommand):
                 continue
 
             long_ok = len(p.long_description) > 100
-            tips_ok = bool(p.practical_tips)
             season_ok = bool(p.best_season)
+            practical_ok = bool(p.recommended_visit_duration) or bool(p.nearby_food_options)
+            applied_draft = p.enrichment_drafts.filter(status="applied").exists()
 
-            if long_ok and tips_ok and season_ok:
+            if long_ok and season_ok and practical_ok and applied_draft:
                 ok.append((slug, p))
             else:
-                gaps.append((slug, p, long_ok, tips_ok, season_ok))
+                gaps.append((slug, p, long_ok, season_ok, practical_ok, applied_draft))
 
         self.stdout.write("")
         self.stdout.write(self.style.MIGRATE_HEADING(
@@ -89,20 +96,22 @@ class Command(BaseCommand):
             for slug, p in ok:
                 self.stdout.write(
                     f"  ✓ {slug}  long={len(p.long_description)} "
-                    f"tips={len(p.practical_tips)} season={p.best_season!r}"
+                    f"season={p.best_season!r}"
                 )
             self.stdout.write("")
 
         if gaps:
             self.stdout.write(self.style.WARNING("[GAP — falta enrichment]"))
-            for slug, p, long_ok, tips_ok, season_ok in gaps:
+            for slug, p, long_ok, season_ok, practical_ok, applied_draft in gaps:
                 marks = []
                 if not long_ok:
                     marks.append(f"long={len(p.long_description)}")
-                if not tips_ok:
-                    marks.append("tips=∅")
                 if not season_ok:
                     marks.append("season=∅")
+                if not practical_ok:
+                    marks.append("practical=∅")
+                if not applied_draft:
+                    marks.append("draft=∅")
                 self.stdout.write(f"  ⚠ {slug}  ({', '.join(marks)})")
             self.stdout.write("")
             self.stdout.write(self.style.MIGRATE_HEADING("Comandos enrich_place sugeridos:"))
