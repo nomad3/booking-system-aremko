@@ -46,11 +46,11 @@ class Command(BaseCommand):
             f"rain_friendly={c.is_rain_friendly} premium={c.is_premium}"
         )
 
-        days = list(c.circuit_days.all().prefetch_related("circuitplace_set__place"))
+        days = list(c.days.all().prefetch_related("place_stops__place"))
         self.stdout.write(f"  days: {len(days)}")
         for d in days:
             self.stdout.write(f"    Day {d.day_number} — {d.title} [{d.block_type}]")
-            for sp in d.circuitplace_set.all().order_by("visit_order"):
+            for sp in d.place_stops.all().order_by("visit_order"):
                 self.stdout.write(f"      - {sp.visit_order:>3} {sp.place.slug} (main={sp.is_main_stop})")
 
         if patterns:
