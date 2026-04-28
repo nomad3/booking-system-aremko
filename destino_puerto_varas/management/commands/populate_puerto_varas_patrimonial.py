@@ -21,7 +21,7 @@ from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from destino_puerto_varas.enums import PartnershipLevel, PlaceType
+from destino_puerto_varas.enums import BlockType, PartnershipLevel, PlaceType
 from destino_puerto_varas.models import Circuit, CircuitDay, CircuitPlace, Place
 
 
@@ -33,12 +33,11 @@ NEW_PLACES = [
         "name": "Iglesia del Sagrado Corazón de Jesús",
         "place_type": PlaceType.CHURCH,
         "partnership_level": PartnershipLevel.LISTED,
-        "city": "Puerto Varas",
+        "location_label": "Puerto Varas — Plaza de Armas",
         "latitude": Decimal("-41.319167"),
         "longitude": Decimal("-72.985000"),
         "is_family_friendly": True,
         "is_rain_friendly": True,
-        "is_culture": True,
         "short_description": (
             "Iglesia patrimonial de 1918 inspirada en la Marienkirche de Marienberg, Alemania. "
             "Monumento Histórico Nacional, ícono visual del cerro frente a la Plaza de Armas."
@@ -49,12 +48,11 @@ NEW_PLACES = [
         "name": "Barrio patrimonial alemán",
         "place_type": PlaceType.ATTRACTION,
         "partnership_level": PartnershipLevel.LISTED,
-        "city": "Puerto Varas",
+        "location_label": "Puerto Varas — calles Decher, Klenner, María Brunn",
         "latitude": Decimal("-41.318500"),
         "longitude": Decimal("-72.987000"),
         "is_family_friendly": True,
         "is_rain_friendly": False,
-        "is_culture": True,
         "short_description": (
             "Recorrido caminable por las casas declaradas Monumento Nacional (Casa Kuschel, "
             "Casa Yunge, Casa Maldonado, entre otras) en las calles Decher, Klenner, San "
@@ -140,6 +138,7 @@ class Command(BaseCommand):
                 day_number=1,
                 defaults={
                     "title": DAY_TITLE,
+                    "block_type": BlockType.HALF_DAY,
                     "summary": DAY_SUMMARY,
                     "sort_order": 10,
                 },
