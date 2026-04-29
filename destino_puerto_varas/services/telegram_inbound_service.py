@@ -31,6 +31,15 @@ logger = logging.getLogger(__name__)
 # Prefijo para que los external_id de Telegram no choquen con los de WhatsApp
 EXTERNAL_USER_ID_PREFIX = "telegram:"
 
+# Comandos que limpian el historial conversacional. Útil cuando el LLM se
+# ancla a respuestas previas (ej. "no tengo X" repetido) y no se contradice
+# aunque el catálogo esté actualizado.
+RESET_COMMANDS = {"/reset", "/start", "/nuevo", "/empezar"}
+RESET_REPLY = (
+    "Listo, empezamos de cero. Cuéntame, ¿qué te trae por Puerto Varas o cuánto "
+    "tiempo tienes para visitar la zona?"
+)
+
 
 def _chat_id_is_allowed(chat_id: str) -> bool:
     """Respeta el kill-switch global DPV_BOT_ENABLED + whitelist por chat_id."""
@@ -158,6 +167,28 @@ def handle_incoming_update(update: dict) -> dict:
         return {"status": "ignored", "reason": "duplicate"}
 
     external_user_id = f"{EXTERNAL_USER_ID_PREFIX}{chat_id}"
+
+    # Comando de reset: elimina la conversación previa para limpiar contexto.
+    # La próxima interacción creará una conversación fresca vía
+    # get_or_create_conversation.
+    if text.lower() in RESET_COMMANDS:
+        deleted_count, _ = LeadConversation.objects.filter(
+            channel=ChannelType.TELEGRAM,
+            external_id=external_user_id,
+        ).delete()
+        sent = _dispatch_send_telegram(chat_id, RESET_REPLY)
+        logger.info(
+            "Reset command from %s: deleted %s LeadConversation rows",
+            external_user_id, deleted_count,
+        )
+        return {
+            "status": "handled",
+            "reason": "reset_command",
+            "reply_text": RESET_REPLY,
+            "reply_sent": sent,
+            "deleted_records": deleted_count,
+        }
+
     conv, _created = get_or_create_conversation(ChannelType.TELEGRAM, external_user_id)
     _sync_contact_fields(conv, from_info)
 
