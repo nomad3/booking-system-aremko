@@ -1,0 +1,386 @@
+{% extends "destino_puerto_varas/public/base.html" %}
+{% load l10n %}
+
+{% block title %}{{ place.name }} · Destino Puerto Varas{% endblock %}
+{% block meta_description %}{{ place.short_description|default:place.long_description|truncatechars:160 }}{% endblock %}
+
+{% block og_title %}{{ place.name }} · Destino Puerto Varas{% endblock %}
+{% block og_description %}{{ place.short_description|default:place.long_description|truncatechars:160 }}{% endblock %}
+{% if primary_photo %}
+  {% if primary_photo.image %}
+    {% block og_image %}<meta property="og:image" content="{{ primary_photo.image.url }}">{% endblock %}
+  {% elif primary_photo.source_url %}
+    {% block og_image %}<meta property="og:image" content="{{ primary_photo.source_url }}">{% endblock %}
+  {% endif %}
+{% endif %}
+
+{# DPV-SEO-001 #8: si la Place no califica para indexarse, agregar noindex,follow #}
+{% if not is_seo_ready %}
+  {% block extra_head %}<meta name="robots" content="noindex,follow">{% endblock %}
+{% endif %}
+
+{% block json_ld %}
+{% if is_seo_ready %}
+{% localize off %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TouristAttraction",
+      "@id": "https://destinopuertovaras.cl/lugares/{{ place.slug }}/#attraction",
+      "name": "{{ place.name|escapejs }}",
+      "description": "{{ place.short_description|default:place.long_description|truncatechars:300|escapejs }}",
+      "url": "https://destinopuertovaras.cl/lugares/{{ place.slug }}/"{% if primary_photo %},
+      "image": "{% if primary_photo.image %}{{ primary_photo.image.url }}{% else %}{{ primary_photo.source_url }}{% endif %}"{% endif %}{% if place.location_label %},
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "{{ place.location_label|escapejs }}",
+        "addressRegion": "Los Lagos",
+        "addressCountry": "CL"
+      }{% endif %}{% if place.latitude and place.longitude %},
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": {{ place.latitude }},
+        "longitude": {{ place.longitude }}
+      }{% endif %}
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Destino Puerto Varas",
+          "item": "https://destinopuertovaras.cl/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "{{ place.name|escapejs }}",
+          "item": "https://destinopuertovaras.cl/lugares/{{ place.slug }}/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+{% endlocalize %}
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+.place-hero {
+  max-width: var(--max-content);
+  margin: 24px auto 32px;
+  padding: 0 24px;
+}
+.place-hero__photo {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: linear-gradient(135deg, #0f5e6f 0%, #297888 60%, #c47238 100%);
+  position: relative;
+  box-shadow: 0 8px 24px var(--color-shadow);
+}
+.place-hero__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+.place-hero__photo-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 4rem;
+  color: rgba(255,255,255,0.85);
+}
+.place-hero__credit {
+  font-size: 0.75rem;
+  color: var(--color-ink-soft);
+  margin-top: 6px;
+  text-align: right;
+}
+.place-hero__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  margin: 18px 0 6px;
+  color: var(--color-ink);
+}
+.place-hero__location {
+  color: var(--color-ink-soft);
+  font-size: 1rem;
+  margin: 0 0 10px;
+}
+.place-hero__short {
+  font-size: 1.05rem;
+  color: var(--color-ink);
+  max-width: 720px;
+  margin: 0;
+}
+
+.place-section {
+  max-width: var(--max-content);
+  margin: 32px auto;
+  padding: 0 24px;
+}
+.place-section__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.4rem;
+  margin: 0 0 14px;
+  color: var(--color-accent);
+}
+.place-section__body {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--color-ink);
+  white-space: pre-line;
+}
+
+.place-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.place-fact {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+}
+.place-fact__label {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+.place-fact__value {
+  font-size: 0.98rem;
+  color: var(--color-ink);
+  margin: 0;
+}
+
+.related-circuits {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: 0 4px 14px var(--color-shadow);
+}
+.related-circuits__intro {
+  margin: 0 0 18px;
+  color: var(--color-ink-soft);
+  font-size: 1rem;
+}
+.related-circuits__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.related-circuits__item a {
+  display: block;
+  padding: 14px 16px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  background: var(--color-bg);
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+.related-circuits__item a:hover {
+  border-color: var(--color-accent);
+  background: #fff;
+  text-decoration: none;
+}
+.related-circuits__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  margin: 0 0 4px;
+  color: var(--color-ink);
+}
+.related-circuits__meta {
+  font-size: 0.85rem;
+  color: var(--color-ink-soft);
+}
+.related-circuits__cta {
+  display: inline-block;
+  margin-top: 12px;
+  font-weight: 600;
+  color: var(--color-accent);
+  font-size: 0.92rem;
+}
+
+.place-photos-extra {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.place-photos-extra li {
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg);
+}
+.place-photos-extra img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.place-back {
+  max-width: var(--max-content);
+  margin: 24px auto 0;
+  padding: 0 24px;
+  font-size: 0.92rem;
+}
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'destino_puerto_varas_public:circuit-list' %}" class="place-back">← Volver a circuitos</a>
+
+<section class="place-hero">
+  <div class="place-hero__photo">
+    {% if primary_photo and primary_photo.image %}
+      <img src="{{ primary_photo.image.url }}"
+           alt="{{ place.name }}{% if place.location_label %} – {{ place.location_label }}{% endif %}"
+           loading="eager" decoding="async">
+    {% elif primary_photo and primary_photo.source_url %}
+      <img src="{{ primary_photo.source_url }}"
+           alt="{{ place.name }}{% if place.location_label %} – {{ place.location_label }}{% endif %}"
+           loading="eager" decoding="async">
+    {% else %}
+      <div class="place-hero__photo-placeholder">{{ place_icon }}</div>
+    {% endif %}
+  </div>
+  {% if primary_photo and primary_photo.credit %}
+    <p class="place-hero__credit">{{ primary_photo.credit }}</p>
+  {% endif %}
+  <h1 class="place-hero__title">{{ place.name }}</h1>
+  {% if place.location_label %}<p class="place-hero__location">📍 {{ place.location_label }}</p>{% endif %}
+  {% if place.short_description %}<p class="place-hero__short">{{ place.short_description }}</p>{% endif %}
+</section>
+
+{% if place.long_description %}
+<section class="place-section">
+  <h2 class="place-section__title">Sobre este lugar</h2>
+  <div class="place-section__body">{{ place.long_description }}</div>
+</section>
+{% endif %}
+
+{# Datos prácticos — solo mostramos los que están llenos #}
+{% if place.best_season or place.recommended_visit_duration or place.entry_fee_clp is not None or place.entry_fee_text or place.distance_from_pv_km or place.drive_time_from_pv_min or place.opening_hours or place.has_parking or place.has_restrooms or place.has_food_service or place.requires_reservation or place.accessibility_notes %}
+<section class="place-section">
+  <h2 class="place-section__title">Datos prácticos</h2>
+  <ul class="place-facts">
+    {% if place.best_season %}
+    <li class="place-fact">
+      <p class="place-fact__label">Mejor temporada</p>
+      <p class="place-fact__value">{{ place.best_season }}</p>
+    </li>
+    {% endif %}
+    {% if place.recommended_visit_duration %}
+    <li class="place-fact">
+      <p class="place-fact__label">Tiempo recomendado</p>
+      <p class="place-fact__value">{{ place.recommended_visit_duration }}</p>
+    </li>
+    {% endif %}
+    {% if place.distance_from_pv_km %}
+    <li class="place-fact">
+      <p class="place-fact__label">Distancia desde Puerto Varas</p>
+      <p class="place-fact__value">{{ place.distance_from_pv_km }} km{% if place.drive_time_from_pv_min %} · ~{{ place.drive_time_from_pv_min }} min en auto{% endif %}</p>
+    </li>
+    {% endif %}
+    {% if place.entry_fee_clp is not None or place.entry_fee_text %}
+    <li class="place-fact">
+      <p class="place-fact__label">Entrada</p>
+      <p class="place-fact__value">
+        {% if place.entry_fee_text %}{{ place.entry_fee_text }}
+        {% elif place.entry_fee_clp == 0 %}Gratuita
+        {% else %}${{ place.entry_fee_clp|stringformat:",d"|cut:"," }}{% endif %}
+      </p>
+    </li>
+    {% endif %}
+    {% if place.has_parking %}<li class="place-fact"><p class="place-fact__label">Estacionamiento</p><p class="place-fact__value">Sí{% if place.parking_details %} · {{ place.parking_details }}{% endif %}</p></li>{% endif %}
+    {% if place.has_restrooms %}<li class="place-fact"><p class="place-fact__label">Baños</p><p class="place-fact__value">Disponibles</p></li>{% endif %}
+    {% if place.has_food_service %}<li class="place-fact"><p class="place-fact__label">Servicio de comida</p><p class="place-fact__value">En el lugar</p></li>{% endif %}
+    {% if place.requires_reservation %}<li class="place-fact"><p class="place-fact__label">Reserva</p><p class="place-fact__value">Anticipada requerida</p></li>{% endif %}
+    {% if place.accessibility_notes %}<li class="place-fact"><p class="place-fact__label">Accesibilidad</p><p class="place-fact__value">{{ place.accessibility_notes }}</p></li>{% endif %}
+  </ul>
+</section>
+{% endif %}
+
+{% if place.practical_tips %}
+<section class="place-section">
+  <h2 class="place-section__title">Tips para tu visita</h2>
+  <div class="place-section__body">{{ place.practical_tips }}</div>
+</section>
+{% endif %}
+
+{% if place.did_you_know %}
+<section class="place-section">
+  <h2 class="place-section__title">¿Sabías que…?</h2>
+  <div class="place-section__body">{{ place.did_you_know }}</div>
+</section>
+{% endif %}
+
+{# Galería extra (si hay más fotos además de la primaria) #}
+{% if photos|length > 1 %}
+<section class="place-section">
+  <h2 class="place-section__title">Más fotos</h2>
+  <ul class="place-photos-extra">
+    {% for ph in photos %}
+      {% if not forloop.first %}
+      <li>
+        {% if ph.image %}
+          <img src="{{ ph.image.url }}" alt="{{ place.name }} — foto {{ forloop.counter }}" loading="lazy" decoding="async">
+        {% elif ph.source_url %}
+          <img src="{{ ph.source_url }}" alt="{{ place.name }} — foto {{ forloop.counter }}" loading="lazy" decoding="async">
+        {% endif %}
+      </li>
+      {% endif %}
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{# CTA fuerte: convertir tráfico informacional en intent transaccional dentro de DPV #}
+{% if related_circuits %}
+<section class="place-section">
+  <div class="related-circuits">
+    <h2 class="place-section__title">Vive {{ place.name }} en uno de nuestros circuitos</h2>
+    <p class="related-circuits__intro">Itinerarios curados que incluyen este lugar como una de sus paradas.</p>
+    <ul class="related-circuits__list">
+      {% for c in related_circuits %}
+      <li class="related-circuits__item">
+        <a href="{% url 'destino_puerto_varas_public:circuit-detail' slug=c.slug %}">
+          <p class="related-circuits__name">{{ c.name }}</p>
+          <p class="related-circuits__meta">{{ c.duration_case.name }}{% if c.short_description %} · {{ c.short_description|truncatechars:80 }}{% endif %}</p>
+          <span class="related-circuits__cta">Ver itinerario →</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

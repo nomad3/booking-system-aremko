@@ -14,14 +14,17 @@ from django.views.generic import TemplateView
 from destino_puerto_varas.sitemaps import (
     CircuitSitemap,
     DPVHomeSitemap,
+    PlaceSitemap,
 )
 
 # DPV-SEO-001 #1: sitemaps propios de DPV. Antes se reusaban los de Aremko
 # (HomepageSitemap, MainPagesSitemap…) cuyos reverse() fallaban en este
 # URLConf, devolviendo HTTP 500.
+# DPV-SEO-001 #8: PlaceSitemap filtra atractivos públicos SEO-ready; comercios fuera.
 sitemaps = {
     "home": DPVHomeSitemap,
     "circuits": CircuitSitemap,
+    "places": PlaceSitemap,
 }
 
 urlpatterns = [

@@ -151,6 +151,51 @@ class CircuitDetailPublicView(View):
         return render(request, self.template_name, context)
 
 
+class PlaceDetailPublicView(View):
+    """Detalle público de un Place (DPV-SEO-001 #8 Opción A).
+
+    Muestra ficha del lugar + circuitos donde aparece como stop.
+    Si Place.is_seo_ready=False, renderea con noindex,follow.
+    """
+
+    template_name = "destino_puerto_varas/public/place_detail.html"
+
+    def get(self, request, slug: str):
+        place = (
+            Place.objects.filter(published=True, slug=slug)
+            .prefetch_related("photos", "parent_place")
+            .first()
+        )
+        if place is None:
+            raise Http404("Lugar no encontrado")
+
+        # Circuitos donde este lugar aparece como stop (publicados, con días).
+        related_circuits = (
+            Circuit.objects.filter(
+                published=True,
+                days__place_stops__place=place,
+            )
+            .annotate(days_count=Count("days"))
+            .filter(days_count__gt=0)
+            .select_related("duration_case")
+            .distinct()
+            .order_by("sort_order", "number")
+        )
+
+        photos = list(place.photos.all().order_by("-is_primary", "order", "id"))
+        primary = photos[0] if photos else None
+
+        context = {
+            "place": place,
+            "primary_photo": primary,
+            "photos": photos,
+            "related_circuits": related_circuits,
+            "place_icon": _place_icon(place.place_type),
+            "is_seo_ready": place.is_seo_ready,
+        }
+        return render(request, self.template_name, context)
+
+
 def _primary_photo(place: Place):
     """Devuelve la foto principal del lugar o la primera disponible."""
     photos = list(place.photos.all())

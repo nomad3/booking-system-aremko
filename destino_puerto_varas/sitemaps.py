@@ -11,10 +11,11 @@ Estos sitemaps usan exclusivamente URLs del namespace
 from __future__ import annotations
 
 from django.contrib.sitemaps import Sitemap
+from django.db import models
 from django.db.models import Count
 from django.urls import reverse
 
-from .models import Circuit
+from .models import Circuit, Place
 
 
 class DPVHomeSitemap(Sitemap):
@@ -54,5 +55,44 @@ class CircuitSitemap(Sitemap):
     def location(self, obj: Circuit):
         return reverse(
             "destino_puerto_varas_public:circuit-detail",
+            kwargs={"slug": obj.slug},
+        )
+
+
+class PlaceSitemap(Sitemap):
+    """Páginas de Place que califican como SEO-ready (DPV-SEO-001 #8 Opción A).
+
+    Filtros:
+    - Solo atractivos públicos (ATTRACTION, VIEWPOINT, PARK, MUSEUM, THEATER,
+      CHURCH, CULTURAL_CENTER) o propiedades de Aremko (OWNED).
+    - long_description ≥ 200 caracteres.
+    - ≥ 1 foto.
+    - ≥ 2 datos prácticos llenos.
+
+    Comercios de terceros (RESTAURANT, CAFE, LODGING no-OWNED, etc.) NO entran
+    al sitemap para evitar pasar autoridad SEO a competencia indirecta.
+    """
+
+    changefreq = "monthly"
+    priority = 0.6
+
+    def items(self):
+        # Pre-filtro barato a nivel SQL; la regla completa la decide is_seo_ready.
+        qs = (
+            Place.objects.filter(published=True)
+            .filter(
+                models.Q(place_type__in=Place.SEO_INDEXABLE_PLACE_TYPES)
+                | models.Q(partnership_level="OWNED")
+            )
+            .prefetch_related("photos")
+        )
+        return [p for p in qs if p.is_seo_ready]
+
+    def lastmod(self, obj: Place):
+        return obj.updated_at
+
+    def location(self, obj: Place):
+        return reverse(
+            "destino_puerto_varas_public:place-detail",
             kwargs={"slug": obj.slug},
         )

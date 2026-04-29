@@ -649,6 +649,10 @@ details.dpv-modal__details > div { margin-top: 8px; }
         {% if place.partnership_level == 'OWNED' and place.reservations_url %}
           <a class="dpv-modal__cta dpv-modal__cta--aremko" href="{{ place.reservations_url }}" target="_blank" rel="noopener">Reservar en aremko.cl →</a>
         {% endif %}
+        {# DPV-SEO-001 #8: link a página completa del Place si califica para SEO. #}
+        {% if place.is_seo_ready %}
+          <a class="dpv-modal__cta" href="{% url 'destino_puerto_varas_public:place-detail' slug=place.slug %}">Ver página completa →</a>
+        {% endif %}
         {% if place.latitude and place.longitude %}
           <a class="dpv-modal__cta" href="https://www.google.com/maps/dir/?api=1&destination={{ place.latitude }},{{ place.longitude }}" target="_blank" rel="noopener">Cómo llegar →</a>
         {% elif place.location_label %}

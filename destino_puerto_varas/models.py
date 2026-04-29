@@ -369,6 +369,60 @@ class Place(models.Model):
     def __str__(self):
         return self.name
 
+    # ─── SEO — Place pages indexables (DPV-SEO-001 #8 Opción A refinada) ───
+    SEO_INDEXABLE_PLACE_TYPES = {
+        "ATTRACTION", "VIEWPOINT", "PARK",
+        "MUSEUM", "THEATER", "CHURCH", "CULTURAL_CENTER",
+    }
+
+    def _practical_score(self) -> int:
+        """Cuenta cuántos 'datos prácticos' tiene llenos (para threshold SEO).
+
+        Cada uno suma 1 si está poblado. Threshold para indexar: ≥2.
+        """
+        score = 0
+        if (self.best_season or "").strip():
+            score += 1
+        if (self.recommended_visit_duration or "").strip():
+            score += 1
+        if self.entry_fee_clp is not None or (self.entry_fee_text or "").strip():
+            score += 1
+        if (self.accessibility_notes or "").strip():
+            score += 1
+        if (self.practical_tips or "").strip():
+            score += 1
+        if self.has_parking or self.has_restrooms or self.has_food_service:
+            score += 1
+        return score
+
+    @property
+    def is_seo_ready(self) -> bool:
+        """¿Esta Place califica para indexarse en Google?
+
+        Reglas (todas deben cumplirse):
+        - Tipo "atractivo público" sin dueño comercial competidor, O propiedad de Aremko (OWNED).
+        - long_description ≥ 200 caracteres.
+        - ≥ 1 foto asociada.
+        - ≥ 2 datos prácticos llenos.
+
+        Las que no califiquen siguen renderándose pero con noindex y fuera del sitemap.
+        Esto evita pasar autoridad SEO a comercios competidores (restaurantes, hoteles,
+        tour operators de terceros) y filtra páginas thin.
+        """
+        if not self.published:
+            return False
+        type_ok = (
+            self.place_type in self.SEO_INDEXABLE_PLACE_TYPES
+            or self.partnership_level == "OWNED"
+        )
+        if not type_ok:
+            return False
+        if len((self.long_description or "").strip()) < 200:
+            return False
+        if not self.photos.exists():
+            return False
+        return self._practical_score() >= 2
+
 
 class CircuitPlace(models.Model):
     circuit_day = models.ForeignKey(
