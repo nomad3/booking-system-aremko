@@ -1,0 +1,62 @@
+{
+  "circuit_slug": "puelo-termas-del-sol-columpios",
+  "publish": true,
+  "new_places": [
+    {
+      "slug": "ferry-tagua-tagua",
+      "name": "Ferry Lago Tagua-Tagua",
+      "place_type": "ATTRACTION",
+      "partnership_level": "LISTED",
+      "location_label": "Punta Canelo · Lago Tagua-Tagua, Comuna de Cochamó, Región de Los Lagos",
+      "latitude": "-41.620000",
+      "longitude": "-72.220000",
+      "is_family_friendly": true,
+      "is_rain_friendly": false,
+      "is_romantic": true,
+      "is_adventure_related": false,
+      "short_description": "Cruce escénico en barcaza por el Lago Tagua-Tagua entre Punta Canelo y Punta Maldonado, ritual obligado para acceder al valle del río Puelo. Aguas verdes esmeralda enmarcadas por montañas y bosque siempreverde."
+    },
+    {
+      "slug": "columpios-rio-puelo",
+      "name": "Columpios panorámicos · Valle del Puelo",
+      "place_type": "VIEWPOINT",
+      "partnership_level": "LISTED",
+      "location_label": "Valle del Río Puelo · Comuna de Cochamó, Región de Los Lagos",
+      "latitude": "-41.650000",
+      "longitude": "-72.180000",
+      "is_family_friendly": true,
+      "is_rain_friendly": false,
+      "is_romantic": true,
+      "is_adventure_related": true,
+      "short_description": "Columpios suspendidos sobre el valle del Río Puelo, ícono fotográfico viral de la zona. Vista panorámica al río serpenteante, las montañas y el bosque andino. Punto romántico y aventurero a la vez."
+    },
+    {
+      "slug": "termas-del-sol-puelo",
+      "name": "Termas del Sol · Valle del Puelo",
+      "place_type": "ATTRACTION",
+      "partnership_level": "LISTED",
+      "location_label": "Termas del Sol · Valle del Río Puelo, Comuna de Cochamó, Región de Los Lagos",
+      "latitude": "-41.660000",
+      "longitude": "-72.020000",
+      "is_family_friendly": true,
+      "is_rain_friendly": true,
+      "is_romantic": true,
+      "is_adventure_related": false,
+      "short_description": "Pozones termales naturales rodeados por bosque andino con vista al valle del Río Puelo. Aguas calientes al aire libre, ideales para cierre relajante de jornada al atardecer. Acceso por trayecto rural escénico."
+    }
+  ],
+  "days": [
+    {
+      "day_number": 1,
+      "title": "Día 1 · Valle del Puelo: cruce, columpios y atardecer termal",
+      "block_type": "FULL_DAY",
+      "summary": "Salida temprana hacia el sur con pasada por Ralún para desayuno y primera vista de la confluencia del Estuario de Reloncaví. Cruce del Lago Tagua-Tagua en barcaza escénica, ritual obligado para acceder al valle del río Puelo. Mediodía y tarde en los columpios panorámicos suspendidos sobre el río, ícono fotográfico viral del valle, ideal para fotos en pareja. Cierre del día con baño termal al atardecer en las Termas del Sol, con aguas calientes al aire libre rodeadas de bosque andino y vista al valle iluminado por la luz dorada.",
+      "stops": [
+        {"slug": "ralun", "visit_order": 1, "is_main_stop": false},
+        {"slug": "ferry-tagua-tagua", "visit_order": 2, "is_main_stop": false},
+        {"slug": "columpios-rio-puelo", "visit_order": 3, "is_main_stop": false},
+        {"slug": "termas-del-sol-puelo", "visit_order": 4, "is_main_stop": true}
+      ]
+    }
+  ]
+}
