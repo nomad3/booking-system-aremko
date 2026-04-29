@@ -1,0 +1,62 @@
+{
+  "circuit_slug": "maullin-carelmapu",
+  "circuit_name": "Humedales y río Maullín",
+  "publish": true,
+  "new_places": [
+    {
+      "slug": "maullin-pueblo",
+      "name": "Maullín · pueblo costero",
+      "place_type": "ATTRACTION",
+      "partnership_level": "LISTED",
+      "location_label": "Centro de Maullín · Comuna de Maullín, Región de Los Lagos",
+      "latitude": "-41.620000",
+      "longitude": "-73.610000",
+      "is_family_friendly": true,
+      "is_rain_friendly": false,
+      "is_romantic": false,
+      "is_adventure_related": false,
+      "short_description": "Pueblo costero en la ribera norte del río Maullín. Plaza, iglesia, mercado de mariscos y restaurantes con curanto y pescados frescos. Punto de partida del recorrido por los humedales."
+    },
+    {
+      "slug": "humedales-rio-maullin",
+      "name": "Humedales del río Maullín",
+      "place_type": "PARK",
+      "partnership_level": "LISTED",
+      "location_label": "Humedales del Río Maullín · Comuna de Maullín, Región de Los Lagos",
+      "latitude": "-41.640000",
+      "longitude": "-73.640000",
+      "is_family_friendly": true,
+      "is_rain_friendly": false,
+      "is_romantic": false,
+      "is_adventure_related": true,
+      "short_description": "Sitio RAMSAR de humedales costeros en el estuario del río Maullín. Avistamiento de aves migratorias (cisnes coscoroba, flamencos, zarapitos). Paseo en bote opcional desde caletas locales."
+    },
+    {
+      "slug": "desembocadura-rio-maullin",
+      "name": "Desembocadura del río Maullín",
+      "place_type": "VIEWPOINT",
+      "partnership_level": "LISTED",
+      "location_label": "Boca del Río Maullín · Comuna de Maullín, Región de Los Lagos",
+      "latitude": "-41.625000",
+      "longitude": "-73.685000",
+      "is_family_friendly": true,
+      "is_rain_friendly": false,
+      "is_romantic": true,
+      "is_adventure_related": false,
+      "short_description": "Boca del río Maullín al océano Pacífico, con dunas, playa abierta y vista al horizonte marino. Atardeceres dramáticos y avistamiento de lobos marinos. Cierre escénico de la jornada."
+    }
+  ],
+  "days": [
+    {
+      "day_number": 1,
+      "title": "Día 1 · Humedales y desembocadura del río Maullín",
+      "block_type": "FULL_DAY",
+      "summary": "Salida hacia la costa por la Ruta 5 hasta el desvío a Maullín. Llegada al pueblo costero para desayuno con vista al río y recorrido por la plaza, iglesia y mercado de mariscos. Mañana en los humedales del río Maullín, sitio RAMSAR de fama internacional para avistamiento de aves migratorias, con paseo en bote opcional desde caletas locales. Tarde en la desembocadura del río al océano, con dunas, playa abierta y posibilidad de avistar lobos marinos. Cierre escénico con el atardecer dorado sobre el Pacífico antes del retorno a Puerto Varas.",
+      "stops": [
+        {"slug": "maullin-pueblo", "visit_order": 1, "is_main_stop": false},
+        {"slug": "humedales-rio-maullin", "visit_order": 2, "is_main_stop": true},
+        {"slug": "desembocadura-rio-maullin", "visit_order": 3, "is_main_stop": false}
+      ]
+    }
+  ]
+}

@@ -93,6 +93,7 @@ class Command(BaseCommand):
         new_places = data.get("new_places") or []
         days = data["days"]
         publish = bool(data.get("publish", True))
+        circuit_name_override = (data.get("circuit_name") or "").strip()
 
         try:
             circuit = Circuit.objects.get(slug=circuit_slug)
@@ -126,10 +127,18 @@ class Command(BaseCommand):
             )
 
         if dry:
-            self._print_dry_run(new_places, days, publish, circuit)
+            self._print_dry_run(new_places, days, publish, circuit, circuit_name_override)
             return
 
         with transaction.atomic():
+            if circuit_name_override and circuit.name != circuit_name_override:
+                old_name = circuit.name
+                circuit.name = circuit_name_override
+                circuit.save(update_fields=["name"])
+                self.stdout.write(self.style.SUCCESS(
+                    f"  ✓ Circuit renombrado: '{old_name}' → '{circuit_name_override}'"
+                ))
+
             for p in new_places:
                 self._upsert_place(p)
 
@@ -220,9 +229,13 @@ class Command(BaseCommand):
             f"{stop['slug']}{suffix}"
         )
 
-    def _print_dry_run(self, new_places, days, publish, circuit):
+    def _print_dry_run(self, new_places, days, publish, circuit, circuit_name_override=""):
         self.stdout.write("")
         self.stdout.write("  [dry-run] Crearía:")
+        if circuit_name_override and circuit.name != circuit_name_override:
+            self.stdout.write(
+                f"    · Circuit.name: '{circuit.name}' → '{circuit_name_override}'"
+            )
         for p in new_places:
             exists = Place.objects.filter(slug=p["slug"]).exists()
             tag = "(ya existe)" if exists else "NUEVO"
