@@ -15,7 +15,7 @@ from typing import Optional
 
 from django.conf import settings
 
-from ..enums import ConversationStatus, InterestType, MessageSenderType, ProfileType
+from ..enums import ConversationStatus, InterestType, MessageSenderType, PlaceType, ProfileType
 from django.db.models import Q
 
 from ..models import (
@@ -167,6 +167,46 @@ TOOL_DEFINITIONS = [
                     "name_query": {
                         "type": "string",
                         "description": "Búsqueda por nombre parcial (case-insensitive). Ej: 'osorno', 'petrohué'.",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_places",
+            "description": (
+                "Lista lugares (places) publicados con filtros opcionales. Úsalo "
+                "cuando el usuario pregunta por una CATEGORÍA de lugares ('qué "
+                "museos hay', 'qué iglesias', 'qué miradores', 'qué parques', "
+                "'qué restaurantes'). NO usar para un lugar específico por nombre "
+                "— para eso usa get_place_detail. La respuesta incluye "
+                "'total_available' con el total que cumple los filtros (puede ser "
+                "mayor que 'count' por el cap por llamada). Devuelve hasta 30 "
+                "lugares; si necesitas más, refina filtros."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "place_type": {
+                        "type": "string",
+                        "enum": [pt.value for pt in PlaceType],
+                        "description": (
+                            "Tipo de lugar: MUSEUM=museo, CHURCH=iglesia, "
+                            "VIEWPOINT=mirador, PARK=parque, RESTAURANT=restaurante, "
+                            "CAFE=café, ATTRACTION=atracción natural, SHOP=tienda, "
+                            "LODGING=alojamiento, SPA=spa, THEATER=teatro, "
+                            "CULTURAL_CENTER=centro cultural."
+                        ),
+                    },
+                    "is_family_friendly": {"type": "boolean"},
+                    "is_romantic": {"type": "boolean"},
+                    "is_rain_friendly": {"type": "boolean"},
+                    "is_adventure_related": {"type": "boolean"},
+                    "name_query": {
+                        "type": "string",
+                        "description": "Búsqueda parcial por nombre o slug (case-insensitive).",
                     },
                 },
             },
@@ -478,6 +518,36 @@ def _tool_get_place_detail(arguments: dict) -> dict:
     return data
 
 
+def _tool_list_places(arguments: dict) -> dict:
+    """Lista places publicados con filtros opcionales (categoría / flags)."""
+    qs = Place.objects.filter(published=True)
+
+    place_type = arguments.get("place_type")
+    if place_type:
+        qs = qs.filter(place_type=place_type)
+    if arguments.get("is_family_friendly"):
+        qs = qs.filter(is_family_friendly=True)
+    if arguments.get("is_romantic"):
+        qs = qs.filter(is_romantic=True)
+    if arguments.get("is_rain_friendly"):
+        qs = qs.filter(is_rain_friendly=True)
+    if arguments.get("is_adventure_related"):
+        qs = qs.filter(is_adventure_related=True)
+    name_query = (arguments.get("name_query") or "").strip()
+    if name_query:
+        qs = qs.filter(Q(name__icontains=name_query) | Q(slug__icontains=name_query))
+
+    total_available = qs.count()
+    places = list(qs.order_by("name").prefetch_related("photos")[:30])
+    results = [_place_summary(p, include_long_desc=False) for p in places]
+
+    return {
+        "count": len(results),
+        "total_available": total_available,
+        "places": results,
+    }
+
+
 def _tool_refer_user_to_aremko(conversation: LeadConversation, arguments: dict) -> dict:
     reason = (arguments.get("reason") or "")[:500]
     reservation_url = getattr(settings, "AREMKO_RESERVATION_URL", "") or "https://www.aremko.cl/"
@@ -607,6 +677,8 @@ def respond(conversation: LeadConversation, user_message: str) -> dict:
             return _tool_get_circuit_detail(arguments)
         if name == "get_place_detail":
             return _tool_get_place_detail(arguments)
+        if name == "list_places":
+            return _tool_list_places(arguments)
         if name == "refer_user_to_aremko":
             return _tool_refer_user_to_aremko(conversation, arguments)
         return {"error": f"unknown_tool: {name}"}
