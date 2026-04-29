@@ -1,23 +1,15 @@
 {% extends "destino_puerto_varas/public/base.html" %}
-{% load l10n %}
+{% load l10n humanize %}
 
 {% block title %}{{ place.name }} · Destino Puerto Varas{% endblock %}
 {% block meta_description %}{{ place.short_description|default:place.long_description|truncatechars:160 }}{% endblock %}
 
 {% block og_title %}{{ place.name }} · Destino Puerto Varas{% endblock %}
 {% block og_description %}{{ place.short_description|default:place.long_description|truncatechars:160 }}{% endblock %}
-{% if primary_photo %}
-  {% if primary_photo.image %}
-    {% block og_image %}<meta property="og:image" content="{{ primary_photo.image.url }}">{% endblock %}
-  {% elif primary_photo.source_url %}
-    {% block og_image %}<meta property="og:image" content="{{ primary_photo.source_url }}">{% endblock %}
-  {% endif %}
-{% endif %}
+{% block og_image %}{% if primary_photo and primary_photo.image %}<meta property="og:image" content="{{ primary_photo.image.url }}">{% elif primary_photo and primary_photo.source_url %}<meta property="og:image" content="{{ primary_photo.source_url }}">{% else %}{{ block.super }}{% endif %}{% endblock %}
 
 {# DPV-SEO-001 #8: si la Place no califica para indexarse, agregar noindex,follow #}
-{% if not is_seo_ready %}
-  {% block extra_head %}<meta name="robots" content="noindex,follow">{% endblock %}
-{% endif %}
+{% block extra_head %}{% if not is_seo_ready %}<meta name="robots" content="noindex,follow">{% endif %}{% endblock %}
 
 {% block json_ld %}
 {% if is_seo_ready %}
@@ -288,7 +280,7 @@
 {% endif %}
 
 {# Datos prácticos — solo mostramos los que están llenos #}
-{% if place.best_season or place.recommended_visit_duration or place.entry_fee_clp is not None or place.entry_fee_text or place.distance_from_pv_km or place.drive_time_from_pv_min or place.opening_hours or place.has_parking or place.has_restrooms or place.has_food_service or place.requires_reservation or place.accessibility_notes %}
+{% if place.best_season or place.recommended_visit_duration or place.entry_fee_clp != None or place.entry_fee_text or place.distance_from_pv_km or place.drive_time_from_pv_min or place.opening_hours or place.has_parking or place.has_restrooms or place.has_food_service or place.requires_reservation or place.accessibility_notes %}
 <section class="place-section">
   <h2 class="place-section__title">Datos prácticos</h2>
   <ul class="place-facts">
@@ -310,13 +302,13 @@
       <p class="place-fact__value">{{ place.distance_from_pv_km }} km{% if place.drive_time_from_pv_min %} · ~{{ place.drive_time_from_pv_min }} min en auto{% endif %}</p>
     </li>
     {% endif %}
-    {% if place.entry_fee_clp is not None or place.entry_fee_text %}
+    {% if place.entry_fee_clp != None or place.entry_fee_text %}
     <li class="place-fact">
       <p class="place-fact__label">Entrada</p>
       <p class="place-fact__value">
         {% if place.entry_fee_text %}{{ place.entry_fee_text }}
         {% elif place.entry_fee_clp == 0 %}Gratuita
-        {% else %}${{ place.entry_fee_clp|stringformat:",d"|cut:"," }}{% endif %}
+        {% else %}${{ place.entry_fee_clp|intcomma }}{% endif %}
       </p>
     </li>
     {% endif %}
