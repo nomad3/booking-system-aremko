@@ -1,4 +1,5 @@
 {% extends "destino_puerto_varas/public/base.html" %}
+{% load l10n %}
 
 {% block title %}{{ circuit.name }} · Destino Puerto Varas{% endblock %}
 {% block meta_description %}{{ circuit.short_description }}{% endblock %}
@@ -48,7 +49,7 @@
           "name": "{{ entry.place.name|escapejs }}"
           {% if entry.place.short_description %},"description": "{{ entry.place.short_description|escapejs }}"{% endif %}
           {% if entry.place.location_label %},"address": "{{ entry.place.location_label|escapejs }}"{% endif %}
-          {% if entry.place.latitude and entry.place.longitude %},"geo": {"@type": "GeoCoordinates","latitude": {{ entry.place.latitude }},"longitude": {{ entry.place.longitude }}}{% endif %}
+          {% if entry.place.latitude and entry.place.longitude %},"geo": {"@type": "GeoCoordinates","latitude": {% localize off %}{{ entry.place.latitude }}{% endlocalize %},"longitude": {% localize off %}{{ entry.place.longitude }}{% endlocalize %}}{% endif %}
         }{% if not forloop.last %},{% endif %}
         {% endfor %}
       ],
