@@ -482,14 +482,26 @@ def _tool_get_place_detail(arguments: dict) -> dict:
             .first()
         )
     if not place and name_query:
-        # Búsqueda parcial case-insensitive en nombre o slug
-        place = (
+        base_qs = (
             Place.objects.filter(published=True)
-            .filter(Q(name__icontains=name_query) | Q(slug__icontains=name_query))
             .prefetch_related("photos")
             .order_by("name")
-            .first()
         )
+        # Estrategia 1 (multi-palabra): si query tiene 2+ palabras de ≥3 chars,
+        # exige que TODAS estén en name o slug (AND). Esto evita que "termas
+        # cochamó" devuelva "Cascada Escondida Cochamó" (que sólo matchea por
+        # "cochamó").
+        words = [w for w in name_query.split() if len(w) >= 3]
+        if len(words) >= 2:
+            q = Q()
+            for w in words:
+                q &= Q(name__icontains=w) | Q(slug__icontains=w)
+            place = base_qs.filter(q).first()
+        # Estrategia 2 (fallback): substring exacto en name o slug
+        if not place:
+            place = base_qs.filter(
+                Q(name__icontains=name_query) | Q(slug__icontains=name_query)
+            ).first()
 
     if not place:
         return {
@@ -535,7 +547,16 @@ def _tool_list_places(arguments: dict) -> dict:
         qs = qs.filter(is_adventure_related=True)
     name_query = (arguments.get("name_query") or "").strip()
     if name_query:
-        qs = qs.filter(Q(name__icontains=name_query) | Q(slug__icontains=name_query))
+        words = [w for w in name_query.split() if len(w) >= 3]
+        if len(words) >= 2:
+            q = Q()
+            for w in words:
+                q &= Q(name__icontains=w) | Q(slug__icontains=w)
+            qs = qs.filter(q)
+        else:
+            qs = qs.filter(
+                Q(name__icontains=name_query) | Q(slug__icontains=name_query)
+            )
 
     total_available = qs.count()
     places = list(qs.order_by("name").prefetch_related("photos")[:30])
