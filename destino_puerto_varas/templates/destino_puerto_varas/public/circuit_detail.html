@@ -22,6 +22,64 @@
   {% endif %}
 {% endblock %}
 
+{% block json_ld %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TouristTrip",
+      "@id": "https://destinopuertovaras.cl{{ request.path }}#trip",
+      "name": "{{ circuit.name|escapejs }}",
+      "description": "{{ circuit.short_description|escapejs }}",
+      "url": "https://destinopuertovaras.cl{{ request.path }}",
+      "touristType": [
+        {% if circuit.is_nature %}"Naturaleza"{% if circuit.is_culture or circuit.is_gastronomy or circuit.is_adventure or circuit.is_family_friendly or circuit.is_romantic %},{% endif %}{% endif %}
+        {% if circuit.is_culture %}"Cultura"{% if circuit.is_gastronomy or circuit.is_adventure or circuit.is_family_friendly or circuit.is_romantic %},{% endif %}{% endif %}
+        {% if circuit.is_gastronomy %}"Gastronomía"{% if circuit.is_adventure or circuit.is_family_friendly or circuit.is_romantic %},{% endif %}{% endif %}
+        {% if circuit.is_adventure %}"Aventura"{% if circuit.is_family_friendly or circuit.is_romantic %},{% endif %}{% endif %}
+        {% if circuit.is_family_friendly %}"Familiar"{% if circuit.is_romantic %},{% endif %}{% endif %}
+        {% if circuit.is_romantic %}"Romántico"{% endif %}
+      ],
+      "itinerary": [
+        {% for entry in stops %}
+        {
+          "@type": "TouristAttraction",
+          "name": "{{ entry.place.name|escapejs }}"
+          {% if entry.place.short_description %},"description": "{{ entry.place.short_description|escapejs }}"{% endif %}
+          {% if entry.place.location_label %},"address": "{{ entry.place.location_label|escapejs }}"{% endif %}
+          {% if entry.place.latitude and entry.place.longitude %},"geo": {"@type": "GeoCoordinates","latitude": {{ entry.place.latitude }},"longitude": {{ entry.place.longitude }}}{% endif %}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      ],
+      "provider": {
+        "@type": "Organization",
+        "name": "Destino Puerto Varas",
+        "url": "https://destinopuertovaras.cl/"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Inicio",
+          "item": "https://destinopuertovaras.cl/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "{{ circuit.name|escapejs }}",
+          "item": "https://destinopuertovaras.cl{{ request.path }}"
+        }
+      ]
+    }
+  ]
+}
+</script>
+{% endblock %}
+
 {% block extra_css %}
 .circuit-hero {
   max-width: var(--max-content);

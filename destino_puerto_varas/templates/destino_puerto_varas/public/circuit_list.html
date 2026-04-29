@@ -4,6 +4,36 @@
 {% block og_title %}Circuitos · Destino Puerto Varas{% endblock %}
 {% block og_description %}Itinerarios curados para descubrir lagos, volcanes, parques nacionales y pueblos típicos del sur de Chile.{% endblock %}
 
+{% block json_ld %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://destinopuertovaras.cl/#organization",
+      "name": "Destino Puerto Varas",
+      "url": "https://destinopuertovaras.cl/",
+      "description": "Guía turística de Puerto Varas y la Región de Los Lagos: circuitos, lugares y experiencias.",
+      "areaServed": {
+        "@type": "Place",
+        "name": "Región de Los Lagos, Chile"
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://destinopuertovaras.cl/#website",
+      "url": "https://destinopuertovaras.cl/",
+      "name": "Destino Puerto Varas",
+      "description": "Itinerarios curados para descubrir lagos, volcanes, parques nacionales y pueblos típicos del sur de Chile.",
+      "inLanguage": "es-CL",
+      "publisher": { "@id": "https://destinopuertovaras.cl/#organization" }
+    }
+  ]
+}
+</script>
+{% endblock %}
+
 {% block extra_css %}
 .list-hero {
   max-width: var(--max-content);
