@@ -34,8 +34,10 @@ urlpatterns = [
     # SEO
     path("sitemap.xml", sitemap, {"sitemaps": sitemaps},
          name="django.contrib.sitemaps.views.sitemap"),
+    # DPV-SEO-001 #2: robots.txt propio de DPV (apunta al sitemap de
+    # destinopuertovaras.cl, no al de aremko.cl; sin /ventas/...).
     path("robots.txt", TemplateView.as_view(
-        template_name="seo/robots.txt", content_type="text/plain"
+        template_name="seo/robots_dpv.txt", content_type="text/plain"
     ), name="robots_txt"),
 
     # DPV en root — catch-all al final

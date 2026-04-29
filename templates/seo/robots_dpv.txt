@@ -1,0 +1,47 @@
+# robots.txt para destinopuertovaras.cl
+# Destino Puerto Varas — guía de circuitos turísticos del sur de Chile
+
+# === REGLAS POR DEFECTO PARA TODOS LOS BOTS ===
+User-agent: *
+
+# Permitir páginas públicas
+Allow: /
+Allow: /circuitos/
+Allow: /static/
+Allow: /media/
+
+# Bloquear áreas privadas
+Disallow: /admin/
+Disallow: /accounts/
+Disallow: /api/
+
+# === REGLAS ESPECÍFICAS DE BOTS ===
+
+# Google
+User-agent: Googlebot
+Allow: /
+Allow: /circuitos/
+Disallow: /admin/
+Disallow: /accounts/
+Disallow: /api/
+
+# Bing
+User-agent: Bingbot
+Allow: /
+Allow: /circuitos/
+Disallow: /admin/
+Disallow: /accounts/
+Disallow: /api/
+
+# Bots agresivos
+User-agent: SemrushBot
+Crawl-delay: 10
+
+User-agent: AhrefsBot
+Crawl-delay: 10
+
+User-agent: MJ12bot
+Disallow: /
+
+# === SITEMAPS ===
+Sitemap: https://destinopuertovaras.cl/sitemap.xml
