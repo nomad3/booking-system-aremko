@@ -1,0 +1,48 @@
+{
+  "circuit_slug": "isla-puluqui-calbuco",
+  "publish": true,
+  "new_places": [
+    {
+      "slug": "isla-puluqui-san-jose",
+      "name": "Isla Puluqui · San José",
+      "place_type": "ATTRACTION",
+      "partnership_level": "LISTED",
+      "location_label": "San José de Puluqui · Isla Puluqui, Calbuco, Región de Los Lagos",
+      "latitude": "-41.870000",
+      "longitude": "-73.040000",
+      "is_family_friendly": true,
+      "is_rain_friendly": false,
+      "is_romantic": true,
+      "is_adventure_related": true,
+      "short_description": "Pueblo principal de Puluqui, la mayor isla del archipiélago de Calbuco. Iglesia rural, plaza y caleta de pescadores. Acceso en lancha desde Calbuco; ambiente isleño auténtico de Los Lagos."
+    },
+    {
+      "slug": "isla-puluqui-costa-occidental",
+      "name": "Isla Puluqui · costa occidental",
+      "place_type": "VIEWPOINT",
+      "partnership_level": "LISTED",
+      "location_label": "Costa occidental · Isla Puluqui, Calbuco, Región de Los Lagos",
+      "latitude": "-41.890000",
+      "longitude": "-73.080000",
+      "is_family_friendly": true,
+      "is_rain_friendly": false,
+      "is_romantic": true,
+      "is_adventure_related": true,
+      "short_description": "Costa interior occidental de Puluqui con playas tranquilas, miradores al canal de Calbuco y parches de bosque siempreverde. Ideal para caminatas costeras al ritmo de la marea."
+    }
+  ],
+  "days": [
+    {
+      "day_number": 1,
+      "title": "Día 1 · Cruce a Isla Puluqui desde Calbuco",
+      "block_type": "FULL_DAY",
+      "summary": "Salida temprana desde la costanera de Calbuco para tomar la barcaza local hacia Isla Puluqui, la mayor del archipiélago. Llegada al pueblo de San José para recorrer la iglesia rural, la plaza y la caleta de pescadores con su flota artesanal. Tarde de exploración por la costa occidental con playas tranquilas, miradores al canal y bosque siempreverde. Retorno por la tarde y cierre del recorrido cruzando nuevamente el pedraplén con vista al archipiélago de Calbuco bajo la luz del atardecer.",
+      "stops": [
+        {"slug": "costanera-calbuco", "visit_order": 1, "is_main_stop": false},
+        {"slug": "isla-puluqui-san-jose", "visit_order": 2, "is_main_stop": true},
+        {"slug": "isla-puluqui-costa-occidental", "visit_order": 3, "is_main_stop": false},
+        {"slug": "pedraplen-calbuco", "visit_order": 4, "is_main_stop": false}
+      ]
+    }
+  ]
+}
