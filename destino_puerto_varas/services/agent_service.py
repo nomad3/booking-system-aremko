@@ -55,9 +55,13 @@ TOOL_DEFINITIONS = [
             "name": "list_circuits",
             "description": (
                 "Lista circuitos turísticos publicados en Puerto Varas. "
-                "Usa filtros opcionales para afinar. Si retorna 0 con filtros estrictos, "
-                "automáticamente vuelve a buscar relajando filtros y marca "
-                "'broadened=true'. Retorna hasta 8 circuitos."
+                "Usa filtros opcionales para afinar resultados. Si retorna 0 con "
+                "filtros estrictos, automáticamente relaja filtros y marca "
+                "'broadened=true'. La respuesta incluye 'total_available' con el "
+                "total de circuitos publicados disponibles en la región (puede ser "
+                "mayor que 'count' si hay filtros aplicados). Devuelve hasta 30 "
+                "circuitos por llamada; si necesitas más, refina filtros o llama "
+                "varias veces con criterios distintos."
             ),
             "parameters": {
                 "type": "object",
@@ -351,11 +355,14 @@ def _tool_list_circuits(arguments: dict) -> dict:
             chosen_label = label
             break
 
-    circuits = list((chosen_qs or base_qs.none())[:8])
+    circuits = list((chosen_qs or base_qs.none())[:30])
     results = [_circuit_brief(c) for c in circuits]
+
+    total_available = base_qs.count()
 
     response = {
         "count": len(results),
+        "total_available": total_available,
         "circuits": results,
         "broadened": chosen_label != "strict",
         "broadening_strategy": chosen_label,
