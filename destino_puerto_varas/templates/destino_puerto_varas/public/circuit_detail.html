@@ -84,6 +84,26 @@
   margin: 0 0 32px;
 }
 
+.circuit-narrative {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 24px 16px;
+}
+.circuit-narrative__title {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: var(--color-ink);
+  margin: 0 0 16px;
+}
+.circuit-narrative__body {
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--color-ink);
+}
+.circuit-narrative__body p {
+  margin: 0 0 14px;
+}
+
 .stop {
   display: grid;
   grid-template-columns: 64px 1fr;
@@ -408,6 +428,15 @@ details.dpv-modal__details > div { margin-top: 8px; }
     {% if circuit.is_premium %}<span class="circuit-hero__meta-item">Premium</span>{% endif %}
   </div>
 </section>
+
+{% if circuit.long_description %}
+<section class="circuit-narrative">
+  <h2 class="circuit-narrative__title">Sobre el circuito</h2>
+  <div class="circuit-narrative__body">
+    {{ circuit.long_description|linebreaks }}
+  </div>
+</section>
+{% endif %}
 
 <section class="itinerary">
   <p class="itinerary__intro">Itinerario sugerido</p>
