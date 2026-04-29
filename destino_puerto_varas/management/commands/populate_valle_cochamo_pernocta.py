@@ -42,11 +42,10 @@ NEW_PLACES = [
         "is_romantic": False,
         "is_adventure_related": True,
         "short_description": (
-            "Sector La Junta del Valle de Cochamó, conocido como 'el "
-            "Yosemite chileno' por sus paredes graníticas de cientos de "
-            "metros. Toboganes naturales en granito pulido, río Cochamó "
-            "de aguas cristalinas y campamento histórico de escaladores. "
-            "Acceso por sendero de 3-4 horas desde el pueblo."
+            "Sector La Junta del Valle de Cochamó, 'el Yosemite chileno' "
+            "por sus paredes graníticas. Toboganes naturales pulidos por "
+            "el río y campamento histórico de escaladores. Acceso por "
+            "sendero de 3-4 horas desde el pueblo de Cochamó."
         ),
     },
 ]
