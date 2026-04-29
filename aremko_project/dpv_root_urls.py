@@ -11,18 +11,17 @@ from django.contrib.sitemaps.views import sitemap
 from django.urls import include, path
 from django.views.generic import TemplateView
 
-from ventas.sitemaps import (
-    CategoriaSitemap,
-    CorporatePagesSitemap,
-    HomepageSitemap,
-    MainPagesSitemap,
+from destino_puerto_varas.sitemaps import (
+    CircuitSitemap,
+    DPVHomeSitemap,
 )
 
+# DPV-SEO-001 #1: sitemaps propios de DPV. Antes se reusaban los de Aremko
+# (HomepageSitemap, MainPagesSitemap…) cuyos reverse() fallaban en este
+# URLConf, devolviendo HTTP 500.
 sitemaps = {
-    "homepage": HomepageSitemap,
-    "main-pages": MainPagesSitemap,
-    "corporate": CorporatePagesSitemap,
-    "categorias": CategoriaSitemap,
+    "home": DPVHomeSitemap,
+    "circuits": CircuitSitemap,
 }
 
 urlpatterns = [
