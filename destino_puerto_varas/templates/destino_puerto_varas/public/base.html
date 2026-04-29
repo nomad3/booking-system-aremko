@@ -7,12 +7,15 @@
   <title>{% block title %}Destino Puerto Varas{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}Guía turística de Puerto Varas y la Región de Los Lagos: circuitos, lugares y experiencias.{% endblock %}">
 
+  {# ─── Canonical (DPV-SEO-001 #3) — apex hardcoded para que UTMs/www no dupliquen ─── #}
+  <link rel="canonical" href="{% block canonical %}https://destinopuertovaras.cl{{ request.path }}{% endblock %}">
+
   {# ─── Open Graph (Telegram, WhatsApp, Facebook) ─── #}
   <meta property="og:type" content="{% block og_type %}website{% endblock %}">
   <meta property="og:site_name" content="Destino Puerto Varas">
   <meta property="og:title" content="{% block og_title %}Destino Puerto Varas{% endblock %}">
   <meta property="og:description" content="{% block og_description %}Guía turística de Puerto Varas y la Región de Los Lagos: circuitos, lugares y experiencias.{% endblock %}">
-  <meta property="og:url" content="{{ request.build_absolute_uri }}">
+  <meta property="og:url" content="https://destinopuertovaras.cl{{ request.path }}">
   {% block og_image %}<meta property="og:image" content="https://www.aremko.cl/static/aremko_logo.png">{% endblock %}
   <meta name="twitter:card" content="summary_large_image">
 
