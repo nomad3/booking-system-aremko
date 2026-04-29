@@ -14,8 +14,8 @@
 | 2 | Agregar `Sitemap:` directive en robots.txt | 🔴 Crítico | 🔄 En progreso | Pendiente deploy + verificación |
 | 3 | Agregar `<link rel="canonical">` self-referencing en template base | 🔴 Crítico | ✅ Completado | Verificado en home + circuit detail. Commit 1847b5b |
 | 4 | Implementar JSON-LD estructurado | 🔴 Crítico | ✅ Completado | Validado: home (Org+WebSite) + detail (TouristTrip 5 stops + BreadcrumbList). Commits d36f9f1, 7c403bf |
-| 5 | Convertir CSS `background-image` → `<img alt>` en templates listing/detail | 🟡 Importante | 🔄 En progreso | Pendiente deploy + verificación |
-| 6 | Cambiar `og:image` default de homepage (no usar logo Aremko) | 🟡 Importante | ⏳ Pendiente | Crear hero acuarela DPV |
+| 5 | Convertir CSS `background-image` → `<img alt>` en templates listing/detail | 🟡 Importante | ✅ Completado | Verificado: cards (`alt={{ circuit.name }}`), stops (`alt={{ place.name }} – {{ location }}`), modal hero. loading=lazy. Commit 79db9f9 |
+| 6 | Cambiar `og:image` default de homepage (no usar logo Aremko) | 🟡 Importante | 🔄 En progreso | Pendiente deploy + verificación |
 | 7 | Configurar Google Search Console + verificar dominio + enviar sitemap | 🟡 Importante | ⏳ Pendiente | Requiere acceso del usuario; depende de #1 |
 | 8 | Decidir si abrir páginas de Place a público (long-tail SEO) | 🟢 Estratégico | ⏳ Pendiente | Diseño actual: places no son URLs públicas |
 | 9 | PageSpeed Insights con API key (Core Web Vitals) | 🟢 Estratégico | ⏳ Pendiente | Rate-limit sin key; obtener API key |
@@ -96,3 +96,4 @@
 - 2026-04-29 · #2 🔄 código listo. Hallazgo: DPV servía la robots.txt de Aremko (`Sitemap: aremko.cl/sitemap.xml` + `/ventas/...` Disallow). Fix: nuevo `templates/seo/robots_dpv.txt` apuntando a `destinopuertovaras.cl/sitemap.xml`; `dpv_root_urls.py` ahora carga ese template. Commit 82a2667 pushed; queda purgar cache Cloudflare (TTL 4h) o esperar.
 - 2026-04-29 · #3 ✅ resuelto. Fix: `<link rel="canonical" href="https://destinopuertovaras.cl{{ request.path }}">` en `base.html`; `og:url` alineado al mismo formato. Commit 1847b5b. Verificado en home (`/`) y circuit detail (`/circuitos/calbuco-pedraplen-costanera/`).
 - 2026-04-29 · #4 ✅ resuelto. Bloque `{% block json_ld %}` en `base.html`. Home: `Organization` + `WebSite` con `@graph`. Circuit detail: `TouristTrip` con `itinerary` + `BreadcrumbList`. **Bug encontrado y arreglado**: lat/lng salían con coma decimal (`-41,756`) por locale `es-CL`, rompiendo el JSON; fix con `{% load l10n %}` + `{% localize off %}`. Commits d36f9f1 (impl) + 7c403bf (locale fix). JSON validado con Python json.loads en prod: 2 items en @graph, TouristTrip con 5 stops, BreadcrumbList con 2 niveles.
+- 2026-04-29 · #5 ✅ resuelto. `background-image` CSS → `<img alt loading=lazy decoding=async>` en `circuit_list.html` (hero del card) y `circuit_detail.html` (stop photo + modal hero). Alts descriptivos: cards usan `circuit.name`; stops usan `place.name – location_label`; modal usa `place.name`. CSS ajustado: `position: absolute + object-fit: cover` para mantener layout; regla `> *:not(img)` para que overlay y badges queden encima. Commit 79db9f9.
