@@ -219,9 +219,18 @@
 }
 .stop__photo {
   background: linear-gradient(135deg, #cfe4e8 0%, #a8c8cf 100%);
-  background-size: cover;
-  background-position: center;
   min-height: 140px;
+  position: relative;
+  overflow: hidden;
+}
+.stop__photo-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }
 .stop__photo--placeholder {
   display: flex;
@@ -322,8 +331,15 @@
 .dpv-modal__hero {
   height: 240px;
   background: linear-gradient(135deg, #cfe4e8 0%, #a8c8cf 100%);
-  background-size: cover;
-  background-position: center;
+  position: relative;
+  overflow: hidden;
+}
+.dpv-modal__hero-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }
 .dpv-modal__body { padding: 24px 28px 32px; }
 .dpv-modal__title {
@@ -512,9 +528,13 @@ details.dpv-modal__details > div { margin-top: 8px; }
         aria-label="Ver detalle de {{ place.name }}"
       >
         {% if photo and photo.image %}
-          <div class="stop__photo" style="background-image: url('{{ photo.image.url }}');"></div>
+          <div class="stop__photo">
+            <img class="stop__photo-img" src="{{ photo.image.url }}" alt="{{ place.name }}{% if place.location_label %} – {{ place.location_label }}{% endif %}" loading="lazy" decoding="async">
+          </div>
         {% elif photo and photo.source_url %}
-          <div class="stop__photo" style="background-image: url('{{ photo.source_url }}');"></div>
+          <div class="stop__photo">
+            <img class="stop__photo-img" src="{{ photo.source_url }}" alt="{{ place.name }}{% if place.location_label %} – {{ place.location_label }}{% endif %}" loading="lazy" decoding="async">
+          </div>
         {% else %}
           <div class="stop__photo stop__photo--placeholder" aria-hidden="true">{{ entry.place_icon }}</div>
         {% endif %}
@@ -539,9 +559,13 @@ details.dpv-modal__details > div { margin-top: 8px; }
     <div class="dpv-modal__panel">
       <button type="button" class="dpv-modal__close" data-close-modal aria-label="Cerrar">×</button>
       {% if photo and photo.image %}
-        <div class="dpv-modal__hero" style="background-image: url('{{ photo.image.url }}');"></div>
+        <div class="dpv-modal__hero">
+          <img class="dpv-modal__hero-img" src="{{ photo.image.url }}" alt="{{ place.name }}" loading="lazy" decoding="async">
+        </div>
       {% elif photo and photo.source_url %}
-        <div class="dpv-modal__hero" style="background-image: url('{{ photo.source_url }}');"></div>
+        <div class="dpv-modal__hero">
+          <img class="dpv-modal__hero-img" src="{{ photo.source_url }}" alt="{{ place.name }}" loading="lazy" decoding="async">
+        </div>
       {% else %}
         <div class="dpv-modal__hero"></div>
       {% endif %}
