@@ -95,9 +95,9 @@
 </head>
 <body>
   <header class="dpv-header">
-    <a href="/dpv/" class="dpv-header__brand">Destino Puerto Varas</a>
+    <a href="{% url 'destino_puerto_varas_public:circuit-list' %}" class="dpv-header__brand">Destino Puerto Varas</a>
     <nav class="dpv-header__nav">
-      <a href="/dpv/">Circuitos</a>
+      <a href="{% url 'destino_puerto_varas_public:circuit-list' %}">Circuitos</a>
     </nav>
   </header>
 
