@@ -10,6 +10,7 @@ __pycache__/
 
 # Archivos sensibles y de backup
 *.json
+!destino_puerto_varas/data/circuits/*.json
 *backup*
 
 *secret*

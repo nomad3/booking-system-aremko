@@ -1,0 +1,91 @@
+{
+  "circuit_slug": "calbuco-pedraplen-costanera",
+  "publish": true,
+  "new_places": [
+    {
+      "slug": "pedraplen-calbuco",
+      "name": "Pedraplén de Calbuco",
+      "place_type": "ATTRACTION",
+      "partnership_level": "LISTED",
+      "location_label": "Pedraplén Caicaén · Calbuco, Región de Los Lagos",
+      "latitude": "-41.756000",
+      "longitude": "-73.148000",
+      "is_family_friendly": true,
+      "is_rain_friendly": false,
+      "is_romantic": false,
+      "is_adventure_related": false,
+      "short_description": "Camino sobre el mar que conecta la isla de Calbuco con el continente. Vistas al volcán Calbuco y al archipiélago a ambos lados; parada obligada al entrar o salir de la ciudad."
+    },
+    {
+      "slug": "costanera-calbuco",
+      "name": "Costanera de Calbuco",
+      "place_type": "ATTRACTION",
+      "partnership_level": "LISTED",
+      "location_label": "Costanera centro · Calbuco, Región de Los Lagos",
+      "latitude": "-41.770000",
+      "longitude": "-73.139000",
+      "is_family_friendly": true,
+      "is_rain_friendly": false,
+      "is_romantic": false,
+      "is_adventure_related": false,
+      "short_description": "Paseo costero del centro de Calbuco con vista a las islas Puluqui, Tabón y Chaullín. Embarcaderos locales, feria de mariscos y punto de salida de lanchas a las islas vecinas."
+    },
+    {
+      "slug": "isla-chaullin-calbuco",
+      "name": "Isla Chaullín (Helvecia)",
+      "place_type": "ATTRACTION",
+      "partnership_level": "LISTED",
+      "location_label": "Isla Chaullín · frente a Calbuco, Región de Los Lagos",
+      "latitude": "-41.810000",
+      "longitude": "-73.105000",
+      "is_family_friendly": true,
+      "is_rain_friendly": false,
+      "is_romantic": true,
+      "is_adventure_related": false,
+      "short_description": "Pequeña isla frente a Calbuco, accesible en lancha desde el muelle local en pocos minutos. Se recorre a pie en aproximadamente una hora; ambiente rural y vistas al archipiélago."
+    },
+    {
+      "slug": "iglesia-miraflores-calbuco",
+      "name": "Iglesia de Calbuco · centro patrimonial",
+      "place_type": "CHURCH",
+      "partnership_level": "LISTED",
+      "location_label": "Plaza centro · Calbuco, Región de Los Lagos",
+      "latitude": "-41.770500",
+      "longitude": "-73.137500",
+      "is_family_friendly": true,
+      "is_rain_friendly": true,
+      "is_romantic": false,
+      "is_adventure_related": false,
+      "short_description": "Iglesia patrimonial del centro insular de Calbuco. Plaza principal, casco histórico y gastronomía local en torno al edificio. Punto de referencia urbano de la isla."
+    },
+    {
+      "slug": "mirador-cerro-arena-calbuco",
+      "name": "Mirador Cerro La Arena · Calbuco",
+      "place_type": "VIEWPOINT",
+      "partnership_level": "LISTED",
+      "location_label": "Cerro La Arena · Calbuco, Región de Los Lagos",
+      "latitude": "-41.774000",
+      "longitude": "-73.135000",
+      "is_family_friendly": true,
+      "is_rain_friendly": false,
+      "is_romantic": true,
+      "is_adventure_related": false,
+      "short_description": "Mirador panorámico del cerro local con vista al volcán Calbuco, a las islas Puluqui y Tabón y al seno de Reloncaví. Cierre clásico del recorrido urbano insular."
+    }
+  ],
+  "days": [
+    {
+      "day_number": 1,
+      "title": "Día 1 · Calbuco urbano insular + Isla Chaullín",
+      "block_type": "FULL_DAY",
+      "summary": "Jornada en la isla de Calbuco con cruce del pedraplén y vistas al volcán homónimo. Paseo por la costanera y embarcaderos del centro antes de tomar la lancha a la encantadora isla Chaullín, que se recorre a pie en aproximadamente una hora con ambiente rural y vistas al archipiélago. Retorno con visita a la iglesia patrimonial del casco histórico y cierre fotográfico desde el mirador del cerro local sobre el seno de Reloncaví.",
+      "stops": [
+        {"slug": "pedraplen-calbuco", "visit_order": 1, "is_main_stop": false},
+        {"slug": "costanera-calbuco", "visit_order": 2, "is_main_stop": false},
+        {"slug": "isla-chaullin-calbuco", "visit_order": 3, "is_main_stop": true},
+        {"slug": "iglesia-miraflores-calbuco", "visit_order": 4, "is_main_stop": false},
+        {"slug": "mirador-cerro-arena-calbuco", "visit_order": 5, "is_main_stop": false}
+      ]
+    }
+  ]
+}
