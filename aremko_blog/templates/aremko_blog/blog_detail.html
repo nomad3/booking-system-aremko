@@ -161,6 +161,56 @@
   transition: border-color 0.15s;
 }
 .aremko-related__card:hover { border-color: #888; }
+
+/* Comparison cards (alternativa responsive a tablas) */
+.aremko-compare {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 32px 0;
+}
+.aremko-compare__col {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+}
+.aremko-compare__col--featured {
+  background: linear-gradient(135deg, #fff7ec 0%, #f3e7d3 100%);
+  border-color: #b8743a;
+  border-width: 2px;
+  order: -1;
+}
+.aremko-compare__col h4 {
+  font-weight: 700;
+  margin: 0 0 14px;
+  font-size: 1.02rem;
+  color: #222;
+}
+.aremko-compare__col--featured h4 { color: #8f5928; }
+.aremko-compare__col dl { margin: 0; padding: 0; }
+.aremko-compare__col dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #888;
+  margin-top: 10px;
+  font-weight: 600;
+}
+.aremko-compare__col dt:first-child { margin-top: 0; }
+.aremko-compare__col dd {
+  margin: 3px 0 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: #333;
+}
+.aremko-compare__col--featured dd { font-weight: 600; color: #222; }
+@media (max-width: 768px) {
+  .aremko-compare { grid-template-columns: 1fr; gap: 12px; }
+  .aremko-compare__col--featured { order: -1; }
+}
 </style>
 {% endblock %}
 

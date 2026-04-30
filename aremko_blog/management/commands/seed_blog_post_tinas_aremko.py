@@ -230,17 +230,50 @@ después de comer. Antes del asado o entre comidas funciona perfecto.
 
 Esto da para un post completo (lo escribiremos pronto), pero la versión corta:
 
-| | Tinaja leñera tradicional | **Tinaja Aremko** | Jacuzzi / hot tub de hotel |
-|---|---|---|---|
-| Calefacción | Leña | **Aerotermia + solar (48 paneles)** | Eléctrica o gas |
-| Huella ambiental | Humo + bosque nativo | **Cero combustión, energía propia** | Red eléctrica/gas |
-| Control de temperatura | Manual (juicio del operador) | **Sensores, máx 40°C garantizado** | Termostato |
-| Garantía si llega fría | Te jodiste | **Servicio gratis si ≤ 37°C** | Reclamo a recepción |
-| Material | Madera | **Madera nativa** | Acrílico |
-| Chorros | No | No (es ritual, no centrifugado) | Sí |
-| Banda sonora | Crepitar de leña | **Río Pescado, 365 días/año** | Música ambiente |
-| Horario | Cierra al anochecer | **Hasta las 00:00** | Hasta las 22:00 |
-| Vibra | Ritual rústico | **Ritual + sostenible + nocturno** | Spa de hotel |
+<div class="aremko-compare">
+  <div class="aremko-compare__col">
+    <h4>Tinaja leñera tradicional</h4>
+    <dl>
+      <dt>Calefacción</dt><dd>Leña</dd>
+      <dt>Huella ambiental</dt><dd>Humo + bosque nativo</dd>
+      <dt>Control de temperatura</dt><dd>Manual (juicio del operador)</dd>
+      <dt>Garantía si llega fría</dt><dd>Te jodiste</dd>
+      <dt>Material</dt><dd>Madera</dd>
+      <dt>Chorros</dt><dd>No</dd>
+      <dt>Banda sonora</dt><dd>Crepitar de leña</dd>
+      <dt>Horario</dt><dd>Cierra al anochecer</dd>
+      <dt>Vibra</dt><dd>Ritual rústico</dd>
+    </dl>
+  </div>
+  <div class="aremko-compare__col aremko-compare__col--featured">
+    <h4>Tinaja Aremko</h4>
+    <dl>
+      <dt>Calefacción</dt><dd>Aerotermia + solar (48 paneles)</dd>
+      <dt>Huella ambiental</dt><dd>Cero combustión, energía propia</dd>
+      <dt>Control de temperatura</dt><dd>Sensores, máx 40°C garantizado</dd>
+      <dt>Garantía si llega fría</dt><dd>Servicio gratis si ≤ 37°C</dd>
+      <dt>Material</dt><dd>Madera nativa</dd>
+      <dt>Chorros</dt><dd>No (es ritual, no centrifugado)</dd>
+      <dt>Banda sonora</dt><dd>Río Pescado, 365 días/año</dd>
+      <dt>Horario</dt><dd>Hasta las 00:00</dd>
+      <dt>Vibra</dt><dd>Ritual + sostenible + nocturno</dd>
+    </dl>
+  </div>
+  <div class="aremko-compare__col">
+    <h4>Jacuzzi / hot tub de hotel</h4>
+    <dl>
+      <dt>Calefacción</dt><dd>Eléctrica o gas</dd>
+      <dt>Huella ambiental</dt><dd>Red eléctrica/gas</dd>
+      <dt>Control de temperatura</dt><dd>Termostato</dd>
+      <dt>Garantía si llega fría</dt><dd>Reclamo a recepción</dd>
+      <dt>Material</dt><dd>Acrílico</dd>
+      <dt>Chorros</dt><dd>Sí</dd>
+      <dt>Banda sonora</dt><dd>Música ambiente</dd>
+      <dt>Horario</dt><dd>Hasta las 22:00</dd>
+      <dt>Vibra</dt><dd>Spa de hotel</dd>
+    </dl>
+  </div>
+</div>
 
 Los tres son válidos. Pero si vienes a Puerto Varas y eliges "jacuzzi de hotel",
 estás pagando por algo que existe igual en Santiago. Y si eliges tinaja leñera,
