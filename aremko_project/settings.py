@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'api',  # API para Luna AI Assistant
     'destino_puerto_varas',  # DPV: catálogo turístico + motor de recomendación + lead capture
     'kits.apps.KitsConfig',  # Productos compuestos (Bill of Materials)
+    'aremko_blog.apps.AremkoBlogConfig',  # Blog editorial aremko.cl (DPV-SEO-002 #6 mirror, app aislada)
 
     # Aplicaciones de terceros
     'rest_framework',

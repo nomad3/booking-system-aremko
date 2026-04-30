@@ -16,6 +16,7 @@ from ventas.sitemaps import (
     CorporatePagesSitemap,
     CategoriaSitemap
 )
+from aremko_blog.sitemaps import AremkoBlogIndexSitemap, AremkoBlogPostSitemap
 from django.views.generic import TemplateView
 
 sitemaps = {
@@ -23,7 +24,8 @@ sitemaps = {
     'main-pages': MainPagesSitemap,
     'corporate': CorporatePagesSitemap,
     'categorias': CategoriaSitemap,
-    # 'blog': BlogSitemap,  # Agregar cuando exista el blog
+    'blog_index': AremkoBlogIndexSitemap,
+    'blog_posts': AremkoBlogPostSitemap,
 }
 
 urlpatterns = [
@@ -54,6 +56,9 @@ urlpatterns = [
 
     # DPV — Sitio público (preview en infra Aremko; futuro destinopuertovaras.cl)
     path('dpv/', include('destino_puerto_varas.urls')),
+
+    # Aremko · Blog editorial (app aislada — portable si DPV se separa después)
+    path('blog/', include('aremko_blog.urls', namespace='aremko_blog')),
 
     # SEO endpoints
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),

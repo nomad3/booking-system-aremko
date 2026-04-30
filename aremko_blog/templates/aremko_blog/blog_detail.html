@@ -1,0 +1,212 @@
+{% extends "ventas/base_public.html" %}
+{% load l10n %}
+
+{% block title %}{{ post.title }} · Aremko Spa Boutique{% endblock %}
+{% block og_title %}{{ post.title }}{% endblock %}
+{% block og_description %}{% if post.meta_description %}{{ post.meta_description }}{% else %}{{ post.intro|truncatewords:24 }}{% endif %}{% endblock %}
+{% block meta_description %}<meta name="description" content="{% if post.meta_description %}{{ post.meta_description }}{% else %}{{ post.intro|truncatechars:160 }}{% endif %}">{% endblock %}
+{% block twitter_title %}{{ post.title }}{% endblock %}
+{% block twitter_description %}{% if post.meta_description %}{{ post.meta_description }}{% else %}{{ post.intro|truncatewords:24 }}{% endif %}{% endblock %}
+{% block og_image %}{% if post.hero_image %}<meta property="og:image" content="{{ post.hero_image.url }}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">{% else %}{{ block.super }}{% endif %}{% endblock %}
+
+{% block structured_data %}
+{% localize off %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "@id": "{{ request.scheme }}://{{ request.get_host }}{{ request.path }}#article",
+  "headline": "{{ post.title|escapejs }}",
+  "description": "{% if post.meta_description %}{{ post.meta_description|escapejs }}{% else %}{{ post.intro|truncatechars:160|escapejs }}{% endif %}",
+  "url": "{{ request.scheme }}://{{ request.get_host }}{{ request.path }}",
+  {% if post.hero_image %}"image": "{{ post.hero_image.url }}",{% endif %}
+  "inLanguage": "es-CL",
+  {% if post.published_at %}"datePublished": "{{ post.published_at|date:'c' }}",{% endif %}
+  "dateModified": "{{ post.updated_at|date:'c' }}",
+  "publisher": {
+    "@type": "Organization",
+    "name": "Aremko Spa Boutique",
+    "url": "{{ request.scheme }}://{{ request.get_host }}/"
+  },
+  "mainEntityOfPage": "{{ request.scheme }}://{{ request.get_host }}{{ request.path }}"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Inicio", "item": "{{ request.scheme }}://{{ request.get_host }}/"},
+    {"@type": "ListItem", "position": 2, "name": "Blog", "item": "{{ request.scheme }}://{{ request.get_host }}{% url 'aremko_blog:blog-list' %}"},
+    {"@type": "ListItem", "position": 3, "name": "{{ post.title|escapejs }}"}
+  ]
+}
+</script>
+{% if post.faq_schema_json %}
+<script type="application/ld+json">
+{{ post.faq_schema_json|safe }}
+</script>
+{% endif %}
+{% endlocalize %}
+{% endblock %}
+
+{% block extra_style %}
+.aremko-post {
+  max-width: 740px;
+  margin: 0 auto;
+  padding: 24px 24px 80px;
+}
+.aremko-post__breadcrumbs {
+  font-size: 0.85rem;
+  color: #888;
+  margin: 16px 0 24px;
+}
+.aremko-post__breadcrumbs a { color: #555; text-decoration: none; }
+.aremko-post__breadcrumbs a:hover { text-decoration: underline; }
+.aremko-post__cluster {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #b8743a;
+  margin-bottom: 8px;
+}
+.aremko-post__title {
+  font-weight: 700;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  line-height: 1.2;
+  margin: 0 0 14px;
+}
+.aremko-post__meta { color: #888; font-size: 0.9rem; margin-bottom: 28px; }
+.aremko-post__hero {
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 32px;
+  background: linear-gradient(135deg, #d8c4a8 0%, #b8743a 100%);
+}
+.aremko-post__hero img { width: 100%; height: 100%; object-fit: cover; }
+.aremko-post__intro {
+  font-size: 1.15rem;
+  line-height: 1.65;
+  color: #333;
+  margin: 0 0 36px;
+  border-left: 3px solid #b8743a;
+  padding-left: 18px;
+}
+.aremko-post__body { font-size: 1.05rem; line-height: 1.75; color: #222; }
+.aremko-post__body h2 {
+  font-weight: 600;
+  font-size: 1.6rem;
+  margin: 40px 0 12px;
+}
+.aremko-post__body h3 {
+  font-weight: 600;
+  font-size: 1.25rem;
+  margin: 28px 0 10px;
+}
+.aremko-post__body p { margin: 0 0 18px; }
+.aremko-post__body ul, .aremko-post__body ol { margin: 0 0 18px; padding-left: 24px; }
+.aremko-post__body li { margin-bottom: 6px; }
+.aremko-post__body a { color: #b8743a; text-decoration: underline; }
+.aremko-post__body img { max-width: 100%; border-radius: 10px; margin: 24px 0; }
+.aremko-post__body blockquote {
+  border-left: 3px solid #ddd;
+  padding-left: 18px;
+  color: #555;
+  margin: 24px 0;
+  font-style: italic;
+}
+.aremko-post__cta {
+  margin: 48px 0 0;
+  padding: 28px;
+  background: linear-gradient(135deg, #fff7ec 0%, #f3e7d3 100%);
+  border-radius: 14px;
+  text-align: center;
+}
+.aremko-post__cta a {
+  display: inline-block;
+  padding: 12px 24px;
+  background: #b8743a;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 999px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.aremko-post__cta a:hover { background: #8f5928; }
+.aremko-related {
+  max-width: 1100px;
+  margin: 60px auto 100px;
+  padding: 0 24px;
+}
+.aremko-related__title {
+  font-weight: 600;
+  font-size: 1.4rem;
+  margin: 0 0 20px;
+  text-align: center;
+}
+.aremko-related__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+.aremko-related__card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 18px;
+  border: 1px solid #eee;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s;
+}
+.aremko-related__card:hover { border-color: #888; }
+{% endblock %}
+
+{% block content %}
+<article class="aremko-post">
+  <nav class="aremko-post__breadcrumbs" aria-label="Breadcrumb">
+    <a href="/">Inicio</a> · <a href="{% url 'aremko_blog:blog-list' %}">Blog</a>
+  </nav>
+  {% if post.cluster %}<div class="aremko-post__cluster">{{ post.get_cluster_display }}</div>{% endif %}
+  <h1 class="aremko-post__title">{{ post.title }}</h1>
+  <div class="aremko-post__meta">
+    {% if post.published_at %}{{ post.published_at|date:"j \\d\\e F, Y" }}{% endif %}
+  </div>
+
+  {% if post.hero_image %}
+    <div class="aremko-post__hero">
+      <img src="{{ post.hero_image.url }}"
+           alt="{{ post.title }}"
+           fetchpriority="high"
+           loading="eager">
+    </div>
+    {% if post.hero_image_credit %}
+      <div style="font-size:.78rem;color:#999;margin:-24px 0 28px;text-align:right;">{{ post.hero_image_credit }}</div>
+    {% endif %}
+  {% endif %}
+
+  {% if post.intro %}<div class="aremko-post__intro">{{ post.intro }}</div>{% endif %}
+
+  <div class="aremko-post__body">{{ body_html|safe }}</div>
+
+  {% if post.cta_text and post.cta_url %}
+    <div class="aremko-post__cta">
+      <a href="{{ post.cta_url }}">{{ post.cta_text }}</a>
+    </div>
+  {% endif %}
+</article>
+
+{% if related_posts %}
+<section class="aremko-related">
+  <h2 class="aremko-related__title">También te puede interesar</h2>
+  <div class="aremko-related__grid">
+    {% for r in related_posts %}
+      <a href="{% url 'aremko_blog:blog-detail' slug=r.slug %}" class="aremko-related__card">
+        <div class="aremko-post__cluster" style="margin:0 0 6px;">{{ r.get_cluster_display }}</div>
+        <div style="font-weight:600;">{{ r.title }}</div>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

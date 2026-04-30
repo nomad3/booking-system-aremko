@@ -1,0 +1,145 @@
+{% extends "ventas/base_public.html" %}
+
+{% block title %}Blog · Aremko Spa Boutique{% endblock %}
+{% block og_title %}Blog · Aremko Spa Boutique Puerto Varas{% endblock %}
+{% block og_description %}Tinas calientes, masajes, escapadas a orilla del río Pescado: relatos del anfitrión que opera el spa.{% endblock %}
+{% block meta_description %}<meta name="description" content="Blog de Aremko Spa Boutique Puerto Varas: tinas calientes, masajes, escapadas a orilla del río Pescado.">{% endblock %}
+{% block twitter_title %}Blog · Aremko Spa Boutique{% endblock %}
+{% block twitter_description %}Tinas calientes, masajes, escapadas a orilla del río Pescado: relatos del anfitrión que opera el spa.{% endblock %}
+
+{% block extra_style %}
+.aremko-blog-hero {
+  max-width: 980px;
+  margin: 32px auto 40px;
+  padding: 0 24px;
+  text-align: center;
+}
+.aremko-blog-hero h1 {
+  font-weight: 700;
+  font-size: clamp(2rem, 5vw, 3rem);
+  margin: 0 0 12px;
+}
+.aremko-blog-hero p {
+  color: #555;
+  max-width: 640px;
+  margin: 0 auto;
+}
+.aremko-blog-filters {
+  max-width: 980px;
+  margin: 0 auto 32px;
+  padding: 0 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.aremko-blog-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #d4d4d4;
+  background: #fff;
+  color: #333;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: all 0.15s;
+}
+.aremko-blog-filter:hover { border-color: #888; color: #000; }
+.aremko-blog-filter--active {
+  background: #b8743a;
+  color: #fff;
+  border-color: #b8743a;
+}
+.aremko-blog-grid {
+  max-width: 1100px;
+  margin: 0 auto 80px;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 28px;
+}
+.aremko-blog-card {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.aremko-blog-card:hover { transform: translateY(-4px); box-shadow: 0 6px 20px rgba(0,0,0,0.10); }
+.aremko-blog-card__hero {
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, #d8c4a8 0%, #b8743a 100%);
+  position: relative;
+  overflow: hidden;
+}
+.aremko-blog-card__hero img { width: 100%; height: 100%; object-fit: cover; }
+.aremko-blog-card__body { padding: 20px; flex: 1; display: flex; flex-direction: column; }
+.aremko-blog-card__cluster {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #b8743a;
+  margin-bottom: 6px;
+}
+.aremko-blog-card__title {
+  font-weight: 600;
+  font-size: 1.25rem;
+  margin: 0 0 10px;
+  line-height: 1.3;
+}
+.aremko-blog-card__intro { color: #555; font-size: 0.95rem; line-height: 1.5; margin: 0 0 12px; }
+.aremko-blog-card__date { color: #888; font-size: 0.85rem; margin-top: auto; }
+.aremko-blog-empty {
+  max-width: 520px;
+  margin: 60px auto 80px;
+  padding: 0 24px;
+  text-align: center;
+  color: #666;
+}
+{% endblock %}
+
+{% block content %}
+<section class="aremko-blog-hero">
+  <h1>Blog</h1>
+  <p>Tinas calientes, masajes, escapadas a orilla del río Pescado y otras ideas del anfitrión que opera Aremko Spa Boutique.</p>
+</section>
+
+{% if clusters %}
+<nav class="aremko-blog-filters" aria-label="Filtros por cluster">
+  <a href="{% url 'aremko_blog:blog-list' %}" class="aremko-blog-filter {% if not selected_cluster %}aremko-blog-filter--active{% endif %}">Todos</a>
+  {% for c in clusters %}
+    <a href="?c={{ c.slug }}" class="aremko-blog-filter {% if c.active %}aremko-blog-filter--active{% endif %}">{{ c.icon }} {{ c.label }}</a>
+  {% endfor %}
+</nav>
+{% endif %}
+
+{% if posts %}
+<div class="aremko-blog-grid">
+  {% for post in posts %}
+    <a href="{% url 'aremko_blog:blog-detail' slug=post.slug %}" class="aremko-blog-card">
+      <div class="aremko-blog-card__hero">
+        {% if post.hero_image %}
+          <img src="{{ post.hero_image.url }}" alt="{{ post.title }}" loading="lazy">
+        {% endif %}
+      </div>
+      <div class="aremko-blog-card__body">
+        {% if post.cluster %}<div class="aremko-blog-card__cluster">{{ post.get_cluster_display }}</div>{% endif %}
+        <h2 class="aremko-blog-card__title">{{ post.title }}</h2>
+        {% if post.intro %}<p class="aremko-blog-card__intro">{{ post.intro|truncatewords:24 }}</p>{% endif %}
+        {% if post.published_at %}<div class="aremko-blog-card__date">{{ post.published_at|date:"j \\d\\e F, Y" }}</div>{% endif %}
+      </div>
+    </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="aremko-blog-empty">
+  <p>Aún no publicamos posts en esta sección. Vuelve pronto: estamos preparando relatos sobre tinas, masajes, el río y más.</p>
+</div>
+{% endif %}
+{% endblock %}
