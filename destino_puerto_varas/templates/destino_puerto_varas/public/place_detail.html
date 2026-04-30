@@ -6,7 +6,7 @@
 
 {% block og_title %}{{ place.name }} · Destino Puerto Varas{% endblock %}
 {% block og_description %}{{ place.short_description|default:place.long_description|truncatechars:160 }}{% endblock %}
-{% block og_image %}{% if primary_photo and primary_photo.image %}<meta property="og:image" content="{{ primary_photo.image.url }}">{% elif primary_photo and primary_photo.source_url %}<meta property="og:image" content="{{ primary_photo.source_url }}">{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image %}{% if primary_photo and primary_photo.image %}<meta property="og:image" content="{{ primary_photo.image.url|cld_transform:'f_auto,q_auto,w_1200' }}">{% elif primary_photo and primary_photo.source_url %}<meta property="og:image" content="{{ primary_photo.source_url|cld_transform:'f_auto,q_auto,w_1200' }}">{% else %}{{ block.super }}{% endif %}{% endblock %}
 
 {# DPV-SEO-001 #8: si la Place no califica para indexarse, agregar noindex,follow #}
 {% block extra_head %}{% if not is_seo_ready %}<meta name="robots" content="noindex,follow">{% endif %}{% endblock %}
