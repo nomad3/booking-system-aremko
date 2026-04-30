@@ -23,6 +23,7 @@ CATEGORY_FILTERS = {
     "gastronomy": "is_gastronomy",
     "adventure": "is_adventure",
     "family": "is_family_friendly",
+    "romance": "is_romantic",
 }
 
 CATEGORY_LABELS = [
@@ -31,6 +32,7 @@ CATEGORY_LABELS = [
     ("gastronomy", "Gastronomía", "🍴"),
     ("adventure", "Aventura", "🎒"),
     ("family", "Viaje familiar", "👨‍👩‍👧"),
+    ("romance", "Escapada Romántica", "💕"),
 ]
 
 # Iconos por código DurationCase (lo que no esté aquí cae a "🗓️").
