@@ -2133,7 +2133,15 @@ class BlogPostAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("title",)}
     readonly_fields = ("created_at", "updated_at")
     date_hierarchy = "published_at"
+    save_on_top = True
     fieldsets = (
+        ("Publicación", {
+            "fields": ("is_published", "published_at"),
+            "description": (
+                "is_published=True + published_at ≤ ahora → aparece en /blog/ y sitemap. "
+                "Si solo seteas is_published=True sin fecha, no aparece hasta llenar published_at."
+            ),
+        }),
         ("Identidad", {
             "fields": ("title", "slug", "cluster"),
         }),
@@ -2161,13 +2169,6 @@ class BlogPostAdmin(admin.ModelAdmin):
             "description": (
                 "Pegar JSON-LD FAQPage si el post incluye FAQ. "
                 "Se inyecta tal cual en <script type='application/ld+json'>."
-            ),
-        }),
-        ("Publicación", {
-            "fields": ("is_published", "published_at"),
-            "description": (
-                "is_published=True + published_at ≤ ahora → aparece en /blog/ y sitemap. "
-                "Si solo seteas is_published=True sin fecha, no aparece hasta llenar published_at."
             ),
         }),
         ("Auditoría", {
