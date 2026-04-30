@@ -1,4 +1,5 @@
 {% extends "destino_puerto_varas/public/base.html" %}
+{% load dpv_image %}
 
 {% block title %}Circuitos · Destino Puerto Varas{% endblock %}
 {% block og_title %}Circuitos · Destino Puerto Varas{% endblock %}
@@ -298,7 +299,7 @@
   <article class="circuit-card{% if not circuit.days_count %} circuit-card--coming-soon{% endif %}">
     <div class="circuit-card__hero{% if not circuit.days_count %} circuit-card__hero--with-badge{% endif %}">
       {% if circuit.hero_url %}
-        <img class="circuit-card__hero-img" src="{{ circuit.hero_url }}" alt="{{ circuit.name }}" loading="lazy" decoding="async">
+        <img class="circuit-card__hero-img" src="{{ circuit.hero_url|cld_transform:'f_auto,q_auto,w_800' }}" alt="{{ circuit.name }}" loading="lazy" decoding="async">
       {% endif %}
       <span>{% if circuit.duration_case %}{{ circuit.duration_case.name }}{% else %}Circuito{% endif %}</span>
       {% if not circuit.days_count %}<span class="circuit-card__badge">Próximamente</span>{% endif %}

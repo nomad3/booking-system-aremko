@@ -1,5 +1,5 @@
 {% extends "destino_puerto_varas/public/base.html" %}
-{% load l10n %}
+{% load l10n dpv_image %}
 
 {% block title %}{{ circuit.name }} · Destino Puerto Varas{% endblock %}
 {% block meta_description %}{{ circuit.short_description }}{% endblock %}
@@ -9,15 +9,15 @@
 {% block og_description %}{{ circuit.short_description }}{% endblock %}
 {% block og_image %}
   {% if circuit.hero_image %}
-    <meta property="og:image" content="{{ circuit.hero_image.url }}">
+    <meta property="og:image" content="{{ circuit.hero_image.url|cld_transform:'f_auto,q_auto,w_1200' }}">
   {% else %}
     {% with first=stops.0 %}
       {% if first.primary_photo and first.primary_photo.image %}
-        <meta property="og:image" content="{{ first.primary_photo.image.url }}">
+        <meta property="og:image" content="{{ first.primary_photo.image.url|cld_transform:'f_auto,q_auto,w_1200' }}">
       {% elif first.primary_photo and first.primary_photo.source_url %}
-        <meta property="og:image" content="{{ first.primary_photo.source_url }}">
+        <meta property="og:image" content="{{ first.primary_photo.source_url|cld_transform:'f_auto,q_auto,w_1200' }}">
       {% else %}
-        <meta property="og:image" content="https://res.cloudinary.com/dtuncr1pi/image/upload/v1/dpv/circuits/volcan_osorno_acuarela_ynjofh">
+        <meta property="og:image" content="https://res.cloudinary.com/dtuncr1pi/image/upload/f_auto,q_auto,w_1200/v1/dpv/circuits/volcan_osorno_acuarela_ynjofh">
       {% endif %}
     {% endwith %}
   {% endif %}
@@ -529,11 +529,11 @@ details.dpv-modal__details > div { margin-top: 8px; }
       >
         {% if photo and photo.image %}
           <div class="stop__photo">
-            <img class="stop__photo-img" src="{{ photo.image.url }}" alt="{{ place.name }}{% if place.location_label %} – {{ place.location_label }}{% endif %}" loading="lazy" decoding="async">
+            <img class="stop__photo-img" src="{{ photo.image.url|cld_transform:'f_auto,q_auto,w_600' }}" alt="{{ place.name }}{% if place.location_label %} – {{ place.location_label }}{% endif %}" loading="lazy" decoding="async">
           </div>
         {% elif photo and photo.source_url %}
           <div class="stop__photo">
-            <img class="stop__photo-img" src="{{ photo.source_url }}" alt="{{ place.name }}{% if place.location_label %} – {{ place.location_label }}{% endif %}" loading="lazy" decoding="async">
+            <img class="stop__photo-img" src="{{ photo.source_url|cld_transform:'f_auto,q_auto,w_600' }}" alt="{{ place.name }}{% if place.location_label %} – {{ place.location_label }}{% endif %}" loading="lazy" decoding="async">
           </div>
         {% else %}
           <div class="stop__photo stop__photo--placeholder" aria-hidden="true">{{ entry.place_icon }}</div>
@@ -560,11 +560,11 @@ details.dpv-modal__details > div { margin-top: 8px; }
       <button type="button" class="dpv-modal__close" data-close-modal aria-label="Cerrar">×</button>
       {% if photo and photo.image %}
         <div class="dpv-modal__hero">
-          <img class="dpv-modal__hero-img" src="{{ photo.image.url }}" alt="{{ place.name }}" loading="lazy" decoding="async">
+          <img class="dpv-modal__hero-img" src="{{ photo.image.url|cld_transform:'f_auto,q_auto,w_1200' }}" alt="{{ place.name }}" loading="lazy" decoding="async">
         </div>
       {% elif photo and photo.source_url %}
         <div class="dpv-modal__hero">
-          <img class="dpv-modal__hero-img" src="{{ photo.source_url }}" alt="{{ place.name }}" loading="lazy" decoding="async">
+          <img class="dpv-modal__hero-img" src="{{ photo.source_url|cld_transform:'f_auto,q_auto,w_1200' }}" alt="{{ place.name }}" loading="lazy" decoding="async">
         </div>
       {% else %}
         <div class="dpv-modal__hero"></div>

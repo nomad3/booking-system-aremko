@@ -1,5 +1,5 @@
 {% extends "destino_puerto_varas/public/base.html" %}
-{% load l10n humanize %}
+{% load l10n humanize dpv_image %}
 
 {% block title %}{{ place.name }} · Destino Puerto Varas{% endblock %}
 {% block meta_description %}{{ place.short_description|default:place.long_description|truncatechars:160 }}{% endblock %}
@@ -253,13 +253,13 @@
 <section class="place-hero">
   <div class="place-hero__photo">
     {% if primary_photo and primary_photo.image %}
-      <img src="{{ primary_photo.image.url }}"
+      <img src="{{ primary_photo.image.url|cld_transform:'f_auto,q_auto,w_1600' }}"
            alt="{{ place.name }}{% if place.location_label %} – {{ place.location_label }}{% endif %}"
-           loading="eager" decoding="async">
+           loading="eager" decoding="async" fetchpriority="high">
     {% elif primary_photo and primary_photo.source_url %}
-      <img src="{{ primary_photo.source_url }}"
+      <img src="{{ primary_photo.source_url|cld_transform:'f_auto,q_auto,w_1600' }}"
            alt="{{ place.name }}{% if place.location_label %} – {{ place.location_label }}{% endif %}"
-           loading="eager" decoding="async">
+           loading="eager" decoding="async" fetchpriority="high">
     {% else %}
       <div class="place-hero__photo-placeholder">{{ place_icon }}</div>
     {% endif %}
@@ -344,9 +344,9 @@
       {% if not forloop.first %}
       <li>
         {% if ph.image %}
-          <img src="{{ ph.image.url }}" alt="{{ place.name }} — foto {{ forloop.counter }}" loading="lazy" decoding="async">
+          <img src="{{ ph.image.url|cld_transform:'f_auto,q_auto,w_600' }}" alt="{{ place.name }} — foto {{ forloop.counter }}" loading="lazy" decoding="async">
         {% elif ph.source_url %}
-          <img src="{{ ph.source_url }}" alt="{{ place.name }} — foto {{ forloop.counter }}" loading="lazy" decoding="async">
+          <img src="{{ ph.source_url|cld_transform:'f_auto,q_auto,w_600' }}" alt="{{ place.name }} — foto {{ forloop.counter }}" loading="lazy" decoding="async">
         {% endif %}
       </li>
       {% endif %}
