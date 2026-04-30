@@ -27,7 +27,8 @@ TITLE = "Tinas calientes en Puerto Varas: la guía que tu lumbar ya estaba pidie
 KEYWORD_ROOT = "tinas calientes puerto varas"
 META_DESCRIPTION = (
     "Guía práctica de tinas calientes en Puerto Varas: temperatura, tiempo, "
-    "ritual y por qué la tinaja chilena le saca tres cuerpos al jacuzzi de hotel."
+    "ritual, aerotermia + paneles solares, río Pescado al lado y horarios "
+    "hasta medianoche."
 )
 CLUSTER = BlogCluster.TINAS
 CTA_TEXT = "Reserva tu cabaña con tina caliente"
@@ -43,36 +44,127 @@ INTRO = (
 )
 
 BODY_MD = """\
-## Qué es una tina caliente (y por qué no es lo que crees)
+## Qué es una tina caliente (y qué no)
 
-Spoiler: una tina caliente **no es un jacuzzi**. No tiene chorros que te masajean
-con la sutileza de un lavarropas en centrifugado, no tiene panel digital con LED
-azules, y no se calienta con un calefactor eléctrico que sube tu cuenta de la luz
-mientras intenta llegar a 38°C.
+Una tina caliente **no es un jacuzzi**. No tiene chorros que te masajean con la
+sutileza de un lavarropas en centrifugado, no tiene panel digital con LED
+azules, y no es esa cosa acrílica de hotel que viste en una foto de
+booking.com.
 
-Una tina caliente, en su versión sur de Chile, es una **tinaja de madera** —
-generalmente alerce, raulí o ciprés— calentada con **fuego de leña**. Sí: leña
-de verdad, la que cruje y huele. El fuego va abajo, el agua arriba, la madera
-hace de aislante térmico, y tú adentro pensando por qué nadie te avisó antes
-que esto existía.
+Pero —spoiler número dos— **tampoco es la tinaja-con-leña que probablemente
+te imaginabas**. La tinaja chilena clásica se calienta quemando leña abajo.
+Funciona, sí, pero también: humea, ensucia el cielo de Puerto Varas, y se
+come bosque nativo a un ritmo que en 2026 ya cuesta defender.
 
-> El término "hot tub" es la versión gringa, "jacuzzi" es la marca registrada
-> que se nos quedó como sinónimo (igual que kleenex y confort), y "tinaja"
-> es como le dicen los chilenos. Los tres pueden ser lo mismo o tres cosas
-> distintas según quién te la venda. Hablaremos de las diferencias más abajo.
+Una tina caliente bien hecha es una **tinaja de madera** —alerce, raulí,
+ciprés— con agua a 38-40°C, ritual largo, vista al volcán y olor a sur de
+Chile. La pregunta interesante es **cómo la calientas**. Ahí es donde
+empieza a divergir el cuento.
 
-## La tinaja chilena: madera, leña y un fuego que va lento
+> El término "hot tub" es la versión gringa, "jacuzzi" es la marca
+> registrada que se nos quedó como sinónimo (igual que kleenex y confort),
+> y "tinaja" es como le dicen los chilenos. Los tres pueden ser lo mismo o
+> tres cosas distintas según quién te la venda. Hablaremos de las
+> diferencias más abajo.
 
-La tinaja se demora. Eso ya descarta a cualquier persona que confunda relajación
-con eficiencia. Desde que se prende el fuego hasta que está lista, pasan entre
-**90 minutos y 2 horas**. Tiempo suficiente para que mires el [volcán Osorno](https://www.aremko.cl/),
-te tomes algo, escuches el río Pescado al fondo, y te preguntes por qué decidiste
-vivir en Santiago.
+## Cómo se calientan las tinas Aremko (y por qué no quemamos un solo palo)
 
-La leña le da algo que el agua eléctrica no tiene: **olor**. La cabaña, la
-toalla y eventualmente tu pelo van a oler levemente a fogata. No es un bug,
-es una feature. Los gringos pagarían 200 dólares extra en un retiro wellness
-por esta exacta vibra; tú la tienes incluida.
+Las tinas Aremko se calientan con **aerotermia**. Suena a palabra de
+folleto, pero es simple: una **bomba de calor** extrae calor del aire
+ambiente —incluso del aire frío de Puerto Varas en julio— y lo transfiere
+al agua. La electricidad que necesita la bomba no genera el calor: solo
+mueve el calor que ya está afuera. Por eso es 3-5 veces más eficiente que
+un calentador eléctrico tradicional. Es el mismo principio que un
+refrigerador, pero al revés.
+
+¿Y de dónde sale esa electricidad? De **48 paneles solares** instalados en
+Aremko, **funcionando hace más de un año**. Energía renovable propia, sin
+red, sin combustión, sin humo.
+
+Traducido a lo que importa:
+
+- **Cero leña**: no quemamos bosque nativo, ni eucalipto, ni nada. El cielo
+  de Puerto Varas no se nubla por nuestra culpa.
+- **Cero CO₂ directo**: la combustión no existe. Lo único que se mueve es
+  el compresor de la bomba.
+- **Energía propia**: el sol calienta tu tina, en serio. Si los paneles no
+  alcanzan en un día gris, hay red de respaldo, pero el grueso del año el
+  motor es el cielo.
+- **Sensores de temperatura**: el sistema **no permite que el agua pase de
+  40°C**. No hay olla quemada, no hay "se nos pasó la mano con la leña", no
+  hay riesgo de meterse a 45°C porque el operador se distrajo. La
+  temperatura está controlada electrónicamente todo el tiempo.
+
+Sí, los gringos cobran 200 dólares extra por esto en sus retiros
+"eco-luxury". Nosotros lo hicimos porque vivimos al lado del río Pescado
+y nos da rabia ver bosque nativo arder por algo que ya se puede resolver
+con un panel solar y una bomba de calor.
+
+## La garantía de los 37°C: si está fría, es gratis
+
+Esto no lo hace nadie más en Puerto Varas, así que vale la pena decirlo
+directo: **si tu tina llega y está a 37°C o menos, te devolvemos el dinero
+o el servicio es gratis**. Sin discusión, sin "es que el operador", sin
+"está calentando todavía".
+
+¿Por qué la garantía? Porque la queja silenciosa más común en spas y
+termas de Chile es justamente esa: **llegas, te metes, y el agua está
+tibia**. Te jode, no reclamas porque "para qué", y nunca vuelves. Pasa
+todo el rato. Nosotros decidimos que en vez de pedir disculpas, mejor
+asumimos el costo.
+
+¿Cómo lo logramos sin perder plata cada semana? Por la combinación de
+arriba: **aerotermia + sensores + agenda con tiempos reales de
+calentamiento**. Si el sistema dice que la tina está lista, está a
+38-40°C, no "casi". Y si por alguna razón excepcional eso falla, el costo
+lo asumimos nosotros, no tú.
+
+Es la única forma honesta de decir "tina caliente": que esté caliente.
+
+## A metros del río Pescado: la única tina con esa banda sonora
+
+Esto es lo que hace que las tinas Aremko **no se puedan replicar en
+ningún otro spa de Puerto Varas**: estamos a metros del **río Pescado**,
+que suena —no exagero— **365 días al año**.
+
+No es un riachuelo estacional ni un canal artificial. Es un río de verdad
+que pasa fuerte, hace su rumor, y no se detiene en invierno ni cuando
+todos los influencers terminaron de fotografiarlo. Cuando entras a la
+tina, lo que escuchas no es música ambiente de Spotify ni un fuente
+artificial: es agua corriente real, en la frecuencia exacta del **ruido
+blanco natural**.
+
+Y eso —spoiler científico— **te baja el cortisol, te ayuda a dormir
+mejor, y le pone freno al loop mental** que arrastras desde el lunes. No
+es esoterismo, es fisiología: el cerebro humano evolucionó cerca de ríos
+y arroyos. Reconoce el sonido como "zona segura" y suelta tensiones que
+no sabías que tenías.
+
+Hazle la prueba: cualquier otra tina o sauna o termas en Puerto Varas las
+escuchas en silencio o con música de fondo. La nuestra suena a río. Es
+una diferencia que **no necesita explicación, solo necesita estar ahí**.
+
+## Abierto hasta medianoche: la única tina nocturna de Puerto Varas
+
+Acá viene el otro diferencial práctico: **funcionamos hasta las 00:00**.
+
+Suena anecdótico hasta que lo piensas. **Termas de Puyehue, Cascadas, los
+spas urbanos**: todos cierran entre las 18:00 y las 20:00. Si saliste de
+tu trabajo a las 19:00, tu única opción para terminar el día con una tina
+caliente era… ninguna.
+
+Aremko abre sesiones de tina **hasta las 12 de la noche**. A 20 minutos
+del centro de Puerto Varas. La logística cambia totalmente:
+
+- **Sales del trabajo a las 18:00 o 19:00.**
+- Pasas a la casa, dejas el celular, te tomas un mate.
+- **A las 21:30 entras a la tinaja**, mientras afuera ya está oscuro y el
+  río suena más fuerte porque la ciudad bajó el volumen.
+- A las 22:30 sales, cenas, duermes.
+
+Es la única manera —en Puerto Varas— de meter una tina caliente dentro
+de un día normal sin pedir vacaciones. Para residentes de la zona y para
+quien viene en escapada corta, es una ventana que ningún otro lugar te da.
 
 ## ¿A qué temperatura? La regla del 38-40, no del "hierve"
 
@@ -83,9 +175,12 @@ La temperatura ideal de una tinaja está entre **38°C y 40°C**. Punto.
 - **40°C** → ya empieza a ser intenso. 15-20 minutos máximo, sales rojo.
 - **Sobre 41°C** → no es tina, es sopa. No lo hagas.
 
-Antes de meterte, **pon la mano**. Si retiras la mano en menos de 3 segundos,
-todavía no es tu turno. Esto suena obvio hasta que ves a alguien quemarse el
-empeine porque "creí que estaba bien".
+En tinajas leñeras tradicionales tenías que poner la mano antes de
+meterte para asegurarte que no estaba demasiado caliente —el operador
+podía haberse pasado de leña. En Aremko los **sensores no dejan que el
+agua suba de 40°C**, así que ese paso ya no aplica. Pero si alguna vez te
+metes a una tinaja leñera y el agua quema en el primer segundo, retírate:
+no es tu turno todavía.
 
 ## ¿Cuánto rato? La trampa del "me quedo dos horas"
 
@@ -131,38 +226,47 @@ Otro error de novato: **meterse después de un asado pesado**. La sangre está
 trabajando en la digestión, le sumas calor, y mareo asegurado. Espera 1 hora
 después de comer. Antes del asado o entre comidas funciona perfecto.
 
-## Tina vs jacuzzi vs hot tub: por qué te están vendiendo lo mismo con tres nombres
+## Tinaja leñera vs Aremko vs jacuzzi de hotel: tres caminos al mismo destino
 
 Esto da para un post completo (lo escribiremos pronto), pero la versión corta:
 
-| | Tinaja chilena | Jacuzzi (hotel) | Hot tub |
+| | Tinaja leñera tradicional | **Tinaja Aremko** | Jacuzzi / hot tub de hotel |
 |---|---|---|---|
-| Calefacción | Leña | Eléctrica | Eléctrica/gas |
-| Material | Madera | Acrílico | Acrílico/madera |
-| Chorros | No | Sí | Sí |
-| Ambiente | Outdoor con vista | Indoor o terraza | Outdoor |
-| Calienta en | 90-120 min | 30-60 min | 30-60 min |
-| Vibra | Ritual | Spa de hotel | Spa portátil |
+| Calefacción | Leña | **Aerotermia + solar (48 paneles)** | Eléctrica o gas |
+| Huella ambiental | Humo + bosque nativo | **Cero combustión, energía propia** | Red eléctrica/gas |
+| Control de temperatura | Manual (juicio del operador) | **Sensores, máx 40°C garantizado** | Termostato |
+| Garantía si llega fría | Te jodiste | **Servicio gratis si ≤ 37°C** | Reclamo a recepción |
+| Material | Madera | **Madera nativa** | Acrílico |
+| Chorros | No | No (es ritual, no centrifugado) | Sí |
+| Banda sonora | Crepitar de leña | **Río Pescado, 365 días/año** | Música ambiente |
+| Horario | Cierra al anochecer | **Hasta las 00:00** | Hasta las 22:00 |
+| Vibra | Ritual rústico | **Ritual + sostenible + nocturno** | Spa de hotel |
 
 Los tres son válidos. Pero si vienes a Puerto Varas y eliges "jacuzzi de hotel",
-estás pagando por algo que existe igual en Santiago. La tinaja es **la versión
-del sur**: lenta, con leña, con olor, con el río de fondo.
+estás pagando por algo que existe igual en Santiago. Y si eliges tinaja leñera,
+te llevas el ritual pero le sumas humo al cielo. La opción Aremko es la que
+mantiene **el ritual del sur sin el costo ambiental** — y le suma el río.
 
 ## La excusa de Puerto Varas
 
 Puerto Varas tiene un combo difícil de igualar: **frío suficiente** para que
 la tina caliente tenga sentido emocional (no es lo mismo en febrero a 28°C),
-**vista al volcán Osorno**, **río Pescado al lado**, y **kuchen alemán** a 5
-minutos en auto. Es ridículo no usar esa combinación.
+**vista al volcán Osorno**, **río Pescado al lado** que suena todo el año, y
+**kuchen alemán** a 5 minutos en auto. Es ridículo no usar esa combinación.
+
+Y a diferencia del resto de la oferta de la zona, en Aremko podés hacerlo
+**de noche, después del trabajo, sin pedir vacaciones**. Estás a 20 minutos
+del centro, abrimos hasta medianoche, y el río suena más fuerte cuando la
+ciudad bajó el volumen.
 
 Si vas a hacerlo bien:
 
-1. **Llega en la tarde**, no muy temprano — la magia de la tina está al
-   atardecer, cuando empieza a oscurecer y el fuego se ve.
+1. **Reserva en la tarde-noche** — la magia de la tina está cuando ya
+   oscureció y el río es lo único que se escucha.
 2. **Pide [masaje descontracturante](https://www.aremko.cl/masajes/) antes** —
-   las primeras dos horas son el masaje, después la tina cierra el sello.
-3. **Cena tarde** — vas a salir de la tina con hambre y sed. Calzona con
-   reservar restaurante a las 21:00, no a las 19:30.
+   primero el masaje, después la tina cierra el sello.
+3. **Cena tarde** — vas a salir con hambre. Calzona con reservar restaurante
+   a las 22:30, no a las 20:00. O cocina simple en la cabaña.
 4. **Reserva domingo a jueves** si puedes — más tranquilo, suele haber tarifas
    mejores, y no compartes el sector con un grupo de despedida de soltera.
 
@@ -176,11 +280,48 @@ incluida en la mayoría de los alojamientos boutique con tinaja. En Aremko las
 [cabañas con tina](https://www.aremko.cl/alojamientos/) la tienen incluida en
 la tarifa nocturna.
 
+### ¿Cómo se calientan las tinas si no usan leña?
+
+Con **aerotermia**: una bomba de calor extrae calor del aire y lo transfiere
+al agua. La electricidad que mueve la bomba sale de **48 paneles solares
+propios** que llevan más de un año funcionando. Cero combustión, cero leña,
+cero humo en el cielo de Puerto Varas.
+
+### ¿Y si llego y la tina está fría?
+
+Es gratis. **Si la tina está a 37°C o menos al momento de tu llegada, te
+devolvemos el dinero o el servicio no se cobra.** Es la única garantía de
+temperatura en spas de Puerto Varas. Pasa que casi nunca aplica: los
+sensores del sistema no permiten que el agua se entregue bajo el rango
+38-40°C, así que la garantía es más promesa estructural que algo que
+estés esperando ejecutar.
+
+### ¿No me puedo quemar si los sensores fallan?
+
+Los sensores tienen un **tope físico de 40°C**. El sistema no permite
+calentar más allá de ese punto, así que el escenario "agua hirviendo"
+que sí puede pasar en una tinaja leñera mal calibrada, acá no existe. Si
+te llega más caliente de lo que esperabas, tu cuerpo está reaccionando al
+shock térmico (entrar congelado a 38°C), no a que el agua esté a 45°C.
+
+### ¿Hasta qué hora puedo reservar tina?
+
+**Hasta las 00:00.** Es el único spa con tinas en Puerto Varas que opera de
+noche. Termas y spas de la zona cierran entre 18:00 y 20:00. Si saliste de
+trabajar a las 19:00, igual alcanzas a tener una sesión completa.
+
+### ¿Por qué importa estar al lado del río Pescado?
+
+Porque el río suena los 365 días del año. Esa frecuencia constante es
+**ruido blanco natural**: baja el cortisol, ayuda a dormir y le pone freno
+al loop mental. No es lo mismo escuchar música ambiente de spa que escuchar
+un río real corriendo a metros.
+
 ### ¿Tengo que reservar con anticipación?
 
 Sí. La tinaja necesita **90-120 minutos para calentar**, así que no es algo
 que se prende cuando llegas. Reserva al menos 24 horas antes con horario
-específico — el operador necesita saber a qué hora encender la leña.
+específico — necesitamos saber a qué hora encender la bomba.
 
 ### ¿Se puede usar en invierno con lluvia?
 
@@ -188,12 +329,6 @@ Es **mejor** en invierno con lluvia. Suena contraintuitivo, pero el contraste
 entre agua caliente / aire frío / lluvia cayendo es el momento peak de la
 experiencia. La mayoría de las tinajas tienen techo parcial o quincho cerca
 para resguardarse al salir.
-
-### ¿Es como un jacuzzi normal?
-
-No. Ver la tabla más arriba. Resumen: la tinaja chilena calienta con leña, no
-tiene chorros, y la sesión es 3-4 veces más larga (incluyendo calentamiento).
-Es una experiencia, no un servicio express.
 
 ### ¿Necesito traje de baño?
 
@@ -227,6 +362,49 @@ FAQ_ITEMS = [
         ),
     },
     {
+        "question": "¿Cómo se calientan las tinas si no usan leña?",
+        "answer": (
+            "Con aerotermia: una bomba de calor extrae calor del aire y lo "
+            "transfiere al agua. La electricidad que mueve la bomba sale de 48 "
+            "paneles solares propios que llevan más de un año funcionando. "
+            "Cero combustión, cero leña, cero humo."
+        ),
+    },
+    {
+        "question": "¿Y si llego y la tina está fría?",
+        "answer": (
+            "Es gratis. Si la tina está a 37°C o menos al momento de tu "
+            "llegada, devolvemos el dinero o el servicio no se cobra. Es la "
+            "única garantía de temperatura en spas de Puerto Varas."
+        ),
+    },
+    {
+        "question": "¿Me puedo quemar si los sensores fallan?",
+        "answer": (
+            "Los sensores tienen tope físico de 40°C: el sistema no permite "
+            "calentar más allá. El escenario de agua hirviendo que sí puede "
+            "pasar en tinajas leñeras mal calibradas, acá no existe."
+        ),
+    },
+    {
+        "question": "¿Hasta qué hora puedo reservar tina?",
+        "answer": (
+            "Hasta las 00:00. Aremko es el único spa con tinas en Puerto Varas "
+            "que opera de noche. Termas y spas de la zona cierran entre 18:00 "
+            "y 20:00, así que si saliste de trabajar a las 19:00 igual alcanzas "
+            "una sesión completa."
+        ),
+    },
+    {
+        "question": "¿Por qué importa estar al lado del río Pescado?",
+        "answer": (
+            "Porque el río suena los 365 días del año. Esa frecuencia constante "
+            "es ruido blanco natural: baja el cortisol, ayuda a dormir y frena "
+            "el loop mental. No es lo mismo escuchar música ambiente de spa que "
+            "un río real corriendo a metros."
+        ),
+    },
+    {
         "question": "¿Tengo que reservar con anticipación?",
         "answer": (
             "Sí. La tinaja necesita 90-120 minutos para calentar, así que no es "
@@ -239,14 +417,6 @@ FAQ_ITEMS = [
         "answer": (
             "Es mejor en invierno con lluvia. El contraste entre agua caliente, "
             "aire frío y lluvia cayendo es el momento peak de la experiencia."
-        ),
-    },
-    {
-        "question": "¿Es como un jacuzzi normal?",
-        "answer": (
-            "No. La tinaja chilena calienta con leña, no tiene chorros, y la "
-            "sesión es 3-4 veces más larga (incluyendo calentamiento). Es una "
-            "experiencia, no un servicio express."
         ),
     },
     {
