@@ -53,7 +53,7 @@ class CategoriaSitemap(Sitemap):
     priority = 0.8
 
     def items(self):
-        return CategoriaServicio.objects.filter(activo=True)
+        return CategoriaServicio.objects.all()
 
     def location(self, obj):
         return reverse('ventas:categoria_detail', args=[obj.id])
