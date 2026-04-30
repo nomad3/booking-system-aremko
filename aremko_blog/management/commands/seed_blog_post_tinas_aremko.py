@@ -46,20 +46,15 @@ INTRO = (
 BODY_MD = """\
 ## Qué es una tina caliente (y qué no)
 
-Una tina caliente **no es un jacuzzi**. No tiene chorros que te masajean con la
-sutileza de un lavarropas en centrifugado, no tiene panel digital con LED
-azules, y no es esa cosa acrílica de hotel que viste en una foto de
-booking.com.
+**No es la tinaja-con-leña que probablemente te imaginabas.** La tinaja
+chilena clásica se calienta quemando leña abajo. Funciona, sí, pero
+también: humea, ensucia el cielo de Puerto Varas, y se come bosque nativo
+a un ritmo que en 2026 ya cuesta defender.
 
-Pero —spoiler número dos— **tampoco es la tinaja-con-leña que probablemente
-te imaginabas**. La tinaja chilena clásica se calienta quemando leña abajo.
-Funciona, sí, pero también: humea, ensucia el cielo de Puerto Varas, y se
-come bosque nativo a un ritmo que en 2026 ya cuesta defender.
-
-Una tina caliente bien hecha es una **tinaja de madera** —alerce, raulí,
-ciprés— con agua a 38-40°C, ritual largo, vista al volcán y olor a sur de
-Chile. La pregunta interesante es **cómo la calientas**. Ahí es donde
-empieza a divergir el cuento.
+Una tina caliente bien hecha es una **tinaja de madera nativa** —alerce,
+ciprés— con agua a 38-40°C, ritual largo, vista al río Pescado y olor a
+sur de Chile. La pregunta interesante es **cómo la calientas**. Ahí es
+donde empieza a divergir el cuento.
 
 > El término "hot tub" es la versión gringa, "jacuzzi" es la marca
 > registrada que se nos quedó como sinónimo (igual que kleenex y confort),
@@ -78,8 +73,8 @@ un calentador eléctrico tradicional. Es el mismo principio que un
 refrigerador, pero al revés.
 
 ¿Y de dónde sale esa electricidad? De **48 paneles solares** instalados en
-Aremko, **funcionando hace más de un año**. Energía renovable propia, sin
-red, sin combustión, sin humo.
+Aremko Spa Boutique, **funcionando hace más de un año**. Energía renovable
+propia, sin red, sin combustión, sin humo.
 
 Traducido a lo que importa:
 
@@ -153,11 +148,11 @@ spas urbanos**: todos cierran entre las 18:00 y las 20:00. Si saliste de
 tu trabajo a las 19:00, tu única opción para terminar el día con una tina
 caliente era… ninguna.
 
-Aremko abre sesiones de tina **hasta las 12 de la noche**. A 20 minutos
-del centro de Puerto Varas. La logística cambia totalmente:
+Aremko Spa Boutique abre sesiones de tina **hasta las 12 de la noche**. A
+20 minutos del centro de Puerto Varas. La logística cambia totalmente:
 
 - **Sales del trabajo a las 18:00 o 19:00.**
-- Pasas a la casa, dejas el celular, te tomas un mate.
+- Pasas a la casa, dejas el celular, te tomas un café.
 - **A las 21:30 entras a la tinaja**, mientras afuera ya está oscuro y el
   río suena más fuerte porque la ciudad bajó el volumen.
 - A las 22:30 sales, cenas, duermes.
@@ -177,8 +172,8 @@ La temperatura ideal de una tinaja está entre **38°C y 40°C**. Punto.
 
 En tinajas leñeras tradicionales tenías que poner la mano antes de
 meterte para asegurarte que no estaba demasiado caliente —el operador
-podía haberse pasado de leña. En Aremko los **sensores no dejan que el
-agua suba de 40°C**, así que ese paso ya no aplica. Pero si alguna vez te
+podía haberse pasado de leña. En Aremko Spa Boutique los **sensores no
+dejan que el agua suba de 40°C**, así que ese paso ya no aplica. Pero si alguna vez te
 metes a una tinaja leñera y el agua quema en el primer segundo, retírate:
 no es tu turno todavía.
 
@@ -226,7 +221,7 @@ Otro error de novato: **meterse después de un asado pesado**. La sangre está
 trabajando en la digestión, le sumas calor, y mareo asegurado. Espera 1 hora
 después de comer. Antes del asado o entre comidas funciona perfecto.
 
-## Tinaja leñera vs Aremko vs jacuzzi de hotel: tres caminos al mismo destino
+## Tinaja leñera vs Aremko Spa Boutique vs jacuzzi de hotel: tres caminos al mismo destino
 
 Esto da para un post completo (lo escribiremos pronto), pero la versión corta:
 
@@ -284,13 +279,13 @@ mantiene **el ritual del sur sin el costo ambiental** — y le suma el río.
 
 Puerto Varas tiene un combo difícil de igualar: **frío suficiente** para que
 la tina caliente tenga sentido emocional (no es lo mismo en febrero a 28°C),
-**vista al volcán Osorno**, **río Pescado al lado** que suena todo el año, y
-**kuchen alemán** a 5 minutos en auto. Es ridículo no usar esa combinación.
+**río Pescado al lado** que suena todo el año, y **kuchen alemán** a 5
+minutos en auto. Es ridículo no usar esa combinación.
 
-Y a diferencia del resto de la oferta de la zona, en Aremko podés hacerlo
-**de noche, después del trabajo, sin pedir vacaciones**. Estás a 20 minutos
-del centro, abrimos hasta medianoche, y el río suena más fuerte cuando la
-ciudad bajó el volumen.
+Y a diferencia del resto de la oferta de la zona, en Aremko Spa Boutique
+puedes hacerlo **de noche, después del trabajo, sin pedir vacaciones**.
+Estás a 20 minutos del centro, abrimos hasta medianoche, y el río suena
+más fuerte cuando la ciudad bajó el volumen.
 
 Si vas a hacerlo bien:
 
@@ -298,8 +293,9 @@ Si vas a hacerlo bien:
    oscureció y el río es lo único que se escucha.
 2. **Pide [masaje descontracturante](https://www.aremko.cl/masajes/) antes** —
    primero el masaje, después la tina cierra el sello.
-3. **Cena tarde** — vas a salir con hambre. Calzona con reservar restaurante
-   a las 22:30, no a las 20:00. O cocina simple en la cabaña.
+3. **Cena tarde** — vas a salir con hambre. Reserva en restaurante a las
+   22:30, no a las 20:00. O cocina simple en tu casa o pide una pizza en la
+   cabaña si alojas en Aremko.
 4. **Reserva domingo a jueves** si puedes — más tranquilo, suele haber tarifas
    mejores, y no compartes el sector con un grupo de despedida de soltera.
 
@@ -307,11 +303,11 @@ Si vas a hacerlo bien:
 
 ### ¿Cuánto cuesta una tina caliente en Puerto Varas?
 
-Como servicio independiente (sin alojamiento) anda entre $25.000 y $50.000 por
-sesión para 2 personas, dependiendo del lugar. Como combo con cabaña, viene
-incluida en la mayoría de los alojamientos boutique con tinaja. En Aremko las
-[cabañas con tina](https://www.aremko.cl/alojamientos/) la tienen incluida en
-la tarifa nocturna.
+Como servicio independiente (sin alojamiento), $50.000 por sesión para 2
+personas. Como combo con cabaña, viene incluida: en Aremko Spa Boutique
+[la cabaña con tina caliente](https://www.aremko.cl/alojamientos/)
+**domingo a jueves cuesta $110.000**, una de las mejores relaciones
+precio/experiencia del lago.
 
 ### ¿Cómo se calientan las tinas si no usan leña?
 
@@ -352,15 +348,17 @@ un río real corriendo a metros.
 
 ### ¿Tengo que reservar con anticipación?
 
-Sí. La tinaja necesita **90-120 minutos para calentar**, así que no es algo
-que se prende cuando llegas. Reserva al menos 24 horas antes con horario
-específico — necesitamos saber a qué hora encender la bomba.
+Sí, pero **no porque la tina demore en calentarse**. El agua ya la tenemos
+caliente todo el día (gracias al combo aerotermia + paneles solares): es
+llegar, llenar, usar. La razón para reservar es la **demanda**: los
+sábados se llenan rápido, así que si quieres asegurar horario, reserva al
+menos 24 horas antes.
 
 ### ¿Se puede usar en invierno con lluvia?
 
 Es **mejor** en invierno con lluvia. Suena contraintuitivo, pero el contraste
 entre agua caliente / aire frío / lluvia cayendo es el momento peak de la
-experiencia. La mayoría de las tinajas tienen techo parcial o quincho cerca
+experiencia. Las tinajas en Aremko tienen **techo total** y quincho cerca
 para resguardarse al salir.
 
 ### ¿Necesito traje de baño?
@@ -378,10 +376,10 @@ de tres días.
 
 ### ¿La tinaja viene con masaje?
 
-No automáticamente, pero el combo masaje + tina es el clásico. En Aremko se
-puede [reservar el combo](https://www.aremko.cl/masajes/): masaje primero
-(45-60 min), tinaja después. El orden importa: la tinaja como cierre cuando
-el cuerpo ya está suelto.
+No automáticamente, pero el combo masaje + tina es el clásico. En Aremko
+Spa Boutique se puede [reservar el combo](https://www.aremko.cl/masajes/):
+masaje primero (45-60 min), tinaja después. El orden importa: la tinaja
+como cierre cuando el cuerpo ya está suelto.
 """
 
 # JSON-LD FAQPage para schema.org
@@ -389,9 +387,9 @@ FAQ_ITEMS = [
     {
         "question": "¿Cuánto cuesta una tina caliente en Puerto Varas?",
         "answer": (
-            "Como servicio independiente (sin alojamiento) anda entre $25.000 y "
-            "$50.000 por sesión para 2 personas. Como combo con cabaña, viene "
-            "incluida en la mayoría de los alojamientos boutique con tinaja."
+            "Como servicio independiente (sin alojamiento), $50.000 por sesión "
+            "para 2 personas. En Aremko Spa Boutique la cabaña con tina caliente "
+            "domingo a jueves cuesta $110.000."
         ),
     },
     {
@@ -440,16 +438,18 @@ FAQ_ITEMS = [
     {
         "question": "¿Tengo que reservar con anticipación?",
         "answer": (
-            "Sí. La tinaja necesita 90-120 minutos para calentar, así que no es "
-            "algo que se prende cuando llegas. Reserva al menos 24 horas antes "
-            "con horario específico."
+            "Sí, pero no porque la tina demore en calentarse: el agua ya está "
+            "caliente todo el día (aerotermia + paneles solares). Se reserva "
+            "porque hay demanda, sobre todo los sábados; con 24 horas de "
+            "anticipación aseguras horario."
         ),
     },
     {
         "question": "¿Se puede usar en invierno con lluvia?",
         "answer": (
             "Es mejor en invierno con lluvia. El contraste entre agua caliente, "
-            "aire frío y lluvia cayendo es el momento peak de la experiencia."
+            "aire frío y lluvia cayendo es el momento peak. Las tinajas en "
+            "Aremko tienen techo total."
         ),
     },
     {
