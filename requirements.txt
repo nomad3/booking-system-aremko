@@ -57,3 +57,6 @@ WeasyPrint>=62.3  # PDF generation
 
 # Email Service
 django-anymail[sendgrid]>=10.3  # SendGrid integration
+
+# Blog (DPV-SEO-002)
+markdown>=3.6  # Markdown → HTML render para BlogPost.body_md

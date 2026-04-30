@@ -1,0 +1,200 @@
+{% extends "destino_puerto_varas/public/base.html" %}
+{% load dpv_image l10n %}
+
+{% block title %}{{ post.title }} · Destino Puerto Varas{% endblock %}
+{% block og_title %}{{ post.title }}{% endblock %}
+{% block og_description %}{% if post.meta_description %}{{ post.meta_description }}{% else %}{{ post.intro|truncatewords:24 }}{% endif %}{% endblock %}
+{% block meta_description %}{% if post.meta_description %}{{ post.meta_description }}{% else %}{{ post.intro|truncatechars:160 }}{% endif %}{% endblock %}
+{% block og_type %}article{% endblock %}
+
+{% block og_image %}{% if post.hero_image %}<meta property="og:image" content="{{ post.hero_image.url|cld_transform:'f_auto,q_auto,w_1200' }}">{% else %}{{ block.super }}{% endif %}{% endblock %}
+
+{% block json_ld %}
+{% localize off %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "@id": "https://destinopuertovaras.cl{{ request.path }}#article",
+  "headline": "{{ post.title|escapejs }}",
+  "description": "{% if post.meta_description %}{{ post.meta_description|escapejs }}{% else %}{{ post.intro|truncatechars:160|escapejs }}{% endif %}",
+  "url": "https://destinopuertovaras.cl{{ request.path }}",
+  {% if post.hero_image %}"image": "{{ post.hero_image.url|cld_transform:'f_auto,q_auto,w_1200' }}",{% endif %}
+  "inLanguage": "es-CL",
+  {% if post.published_at %}"datePublished": "{{ post.published_at|date:'c' }}",{% endif %}
+  "dateModified": "{{ post.updated_at|date:'c' }}",
+  "publisher": {
+    "@type": "Organization",
+    "name": "Destino Puerto Varas",
+    "url": "https://destinopuertovaras.cl/"
+  },
+  "mainEntityOfPage": "https://destinopuertovaras.cl{{ request.path }}"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://destinopuertovaras.cl/"},
+    {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://destinopuertovaras.cl/blog/"},
+    {"@type": "ListItem", "position": 3, "name": "{{ post.title|escapejs }}"}
+  ]
+}
+</script>
+{% if post.faq_schema_json %}
+<script type="application/ld+json">
+{{ post.faq_schema_json|safe }}
+</script>
+{% endif %}
+{% endlocalize %}
+{% endblock %}
+
+{% block extra_css %}
+.post {
+  max-width: 740px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
+.post__breadcrumbs {
+  font-size: 0.85rem;
+  color: #888;
+  margin: 16px 0 24px;
+}
+.post__breadcrumbs a { color: #555; text-decoration: none; }
+.post__breadcrumbs a:hover { text-decoration: underline; }
+.post__cluster {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent, #0c5160);
+  margin-bottom: 8px;
+}
+.post__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  line-height: 1.2;
+  margin: 0 0 14px;
+}
+.post__meta {
+  color: #888;
+  font-size: 0.9rem;
+  margin-bottom: 28px;
+}
+.post__hero {
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 32px;
+  background: linear-gradient(135deg, #c4d8df 0%, #8eaeb8 100%);
+}
+.post__hero img { width: 100%; height: 100%; object-fit: cover; }
+.post__intro {
+  font-size: 1.15rem;
+  line-height: 1.65;
+  color: #333;
+  margin: 0 0 36px;
+  border-left: 3px solid var(--color-accent, #0c5160);
+  padding-left: 18px;
+}
+.post__body {
+  font-size: 1.05rem;
+  line-height: 1.75;
+  color: #222;
+}
+.post__body h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.6rem;
+  margin: 40px 0 12px;
+}
+.post__body h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.25rem;
+  margin: 28px 0 10px;
+}
+.post__body p { margin: 0 0 18px; }
+.post__body ul, .post__body ol { margin: 0 0 18px; padding-left: 24px; }
+.post__body li { margin-bottom: 6px; }
+.post__body a { color: var(--color-accent, #0c5160); text-decoration: underline; }
+.post__body img { max-width: 100%; border-radius: 10px; margin: 24px 0; }
+.post__body blockquote {
+  border-left: 3px solid #ddd;
+  padding-left: 18px;
+  color: #555;
+  margin: 24px 0;
+  font-style: italic;
+}
+.related {
+  max-width: 1100px;
+  margin: 60px auto 100px;
+  padding: 0 24px;
+}
+.related__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.4rem;
+  margin: 0 0 20px;
+  text-align: center;
+}
+.related__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+.related__card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 18px;
+  border: 1px solid #eee;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s;
+}
+.related__card:hover { border-color: #888; }
+{% endblock %}
+
+{% block content %}
+<article class="post">
+  <nav class="post__breadcrumbs" aria-label="Breadcrumb">
+    <a href="/">Inicio</a> · <a href="{% url 'destino_puerto_varas_public:blog-list' %}">Blog</a>
+  </nav>
+  {% if post.cluster %}<div class="post__cluster">{{ post.get_cluster_display }}</div>{% endif %}
+  <h1 class="post__title">{{ post.title }}</h1>
+  <div class="post__meta">
+    {% if post.published_at %}{{ post.published_at|date:"j \\d\\e F, Y" }}{% endif %}
+  </div>
+
+  {% if post.hero_image %}
+    <div class="post__hero">
+      <img src="{{ post.hero_image.url|cld_transform:'f_auto,q_auto,w_1200' }}"
+           alt="{{ post.title }}"
+           fetchpriority="high"
+           loading="eager">
+    </div>
+    {% if post.hero_image_credit %}
+      <div style="font-size:.78rem;color:#999;margin:-24px 0 28px;text-align:right;">{{ post.hero_image_credit }}</div>
+    {% endif %}
+  {% endif %}
+
+  {% if post.intro %}<div class="post__intro">{{ post.intro }}</div>{% endif %}
+
+  <div class="post__body">{{ body_html|safe }}</div>
+</article>
+
+{% if related_posts %}
+<section class="related">
+  <h2 class="related__title">Posts relacionados</h2>
+  <div class="related__grid">
+    {% for r in related_posts %}
+      <a href="{% url 'destino_puerto_varas_public:blog-detail' slug=r.slug %}" class="related__card">
+        <div class="post__cluster" style="margin:0 0 6px;">{{ r.get_cluster_display }}</div>
+        <div style="font-weight:600;">{{ r.title }}</div>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

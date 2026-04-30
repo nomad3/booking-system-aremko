@@ -15,7 +15,7 @@ from django.db import models
 from django.db.models import Count
 from django.urls import reverse
 
-from .models import Circuit, Place
+from .models import BlogPost, Circuit, Place
 
 
 class DPVHomeSitemap(Sitemap):
@@ -96,3 +96,43 @@ class PlaceSitemap(Sitemap):
             "destino_puerto_varas_public:place-detail",
             kwargs={"slug": obj.slug},
         )
+
+
+class BlogPostSitemap(Sitemap):
+    """Posts del blog publicados (DPV-SEO-002 Tactic A)."""
+
+    changefreq = "weekly"
+    priority = 0.7
+
+    def items(self):
+        from django.utils import timezone
+
+        return (
+            BlogPost.objects.filter(
+                is_published=True,
+                published_at__lte=timezone.now(),
+            )
+            .order_by("-published_at")
+        )
+
+    def lastmod(self, obj: BlogPost):
+        return obj.updated_at
+
+    def location(self, obj: BlogPost):
+        return reverse(
+            "destino_puerto_varas_public:blog-detail",
+            kwargs={"slug": obj.slug},
+        )
+
+
+class BlogIndexSitemap(Sitemap):
+    """Index del blog /blog/."""
+
+    changefreq = "weekly"
+    priority = 0.7
+
+    def items(self):
+        return ["destino_puerto_varas_public:blog-list"]
+
+    def location(self, item):
+        return reverse(item)

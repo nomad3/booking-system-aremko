@@ -2,6 +2,7 @@ from django.db import models
 
 from .enums import (
     BlockType,
+    BlogCluster,
     ChannelType,
     ConversationStatus,
     InterestType,
@@ -1004,3 +1005,85 @@ class CircuitCompositionDraft(models.Model):
     def __str__(self):
         proposed_name = (self.proposed_data or {}).get("name") or "(sin nombre)"
         return f"{proposed_name} · {self.get_status_display()} · {self.created_at:%Y-%m-%d}"
+
+
+class BlogPost(models.Model):
+    """Post editorial del blog DPV (DPV-SEO-002 Tactic A).
+
+    Captura informational queries (qué hacer, mejor época, comparativas, etc.)
+    y construye topical authority sobre Pto Varas / Región de Los Lagos.
+    """
+
+    slug = models.SlugField(max_length=220, unique=True)
+    title = models.CharField(
+        max_length=200,
+        help_text="H1 del post. Claro, no clickbait. Idealmente con keyword raíz.",
+    )
+    meta_description = models.CharField(
+        max_length=160,
+        blank=True,
+        help_text="Meta description (≤160 chars). Si vacía se autogenera del intro.",
+    )
+    keyword_root = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text="Keyword principal del post (de la sesión Fase 1 keyword research).",
+    )
+    cluster = models.CharField(
+        max_length=30,
+        choices=BlogCluster.choices,
+        blank=True,
+        db_index=True,
+        help_text="Cluster editorial. Sirve para filtro UI + internal linking entre posts.",
+    )
+    intro = models.TextField(
+        blank=True,
+        help_text=(
+            "Intro 80-120 palabras (con keyword en primeras 100 palabras). "
+            "Se muestra en el listado /blog/ y en og:description."
+        ),
+    )
+    body_md = models.TextField(
+        blank=True,
+        help_text=(
+            "Cuerpo del post en Markdown. H2/H3 mapean al outline del cluster. "
+            "Se renderiza a HTML server-side (sin sanitizar — solo edita admin)."
+        ),
+    )
+    hero_image = models.ImageField(
+        upload_to="dpv/blog/",
+        blank=True,
+        null=True,
+        help_text="Imagen hero (acuarela DPV recomendado, ~1200×675).",
+    )
+    hero_image_credit = models.CharField(max_length=200, blank=True)
+    faq_schema_json = models.TextField(
+        blank=True,
+        help_text=(
+            "JSON-LD FAQPage opcional (si el post incluye sección FAQ). "
+            "Se inyecta tal cual en <script type=application/ld+json>."
+        ),
+    )
+    is_published = models.BooleanField(default=False, db_index=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-published_at", "-created_at"]
+        verbose_name = "Post de blog"
+        verbose_name_plural = "Posts de blog"
+        indexes = [
+            models.Index(fields=["is_published", "-published_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.slug})"
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+
+        return reverse(
+            "destino_puerto_varas_public:blog-detail",
+            kwargs={"slug": self.slug},
+        )

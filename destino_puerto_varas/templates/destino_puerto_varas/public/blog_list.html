@@ -1,0 +1,159 @@
+{% extends "destino_puerto_varas/public/base.html" %}
+{% load dpv_image %}
+
+{% block title %}Blog · Destino Puerto Varas{% endblock %}
+{% block og_title %}Blog · Destino Puerto Varas{% endblock %}
+{% block og_description %}Guías, itinerarios y consejos prácticos para descubrir Puerto Varas y la Región de Los Lagos.{% endblock %}
+{% block meta_description %}Guías, itinerarios y consejos prácticos para descubrir Puerto Varas y la Región de Los Lagos. Escrito por gente que conoce el sur de Chile.{% endblock %}
+
+{% block extra_css %}
+.blog-hero {
+  max-width: var(--max-content);
+  margin: 24px auto 40px;
+  padding: 0 24px;
+  text-align: center;
+}
+.blog-hero__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2rem, 5vw, 3rem);
+  margin: 0 0 12px;
+}
+.blog-hero__subtitle {
+  color: var(--color-muted, #555);
+  max-width: 640px;
+  margin: 0 auto;
+}
+.blog-filters {
+  max-width: var(--max-content);
+  margin: 0 auto 32px;
+  padding: 0 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.blog-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #d4d4d4;
+  background: #fff;
+  color: #333;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: all 0.15s;
+}
+.blog-filter:hover { border-color: #888; }
+.blog-filter--active {
+  background: var(--color-accent, #0c5160);
+  color: #fff;
+  border-color: var(--color-accent, #0c5160);
+}
+.blog-grid {
+  max-width: var(--max-content);
+  margin: 0 auto 80px;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 28px;
+}
+.blog-card {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.blog-card:hover { transform: translateY(-4px); box-shadow: 0 6px 20px rgba(0,0,0,0.10); }
+.blog-card__hero {
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, #c4d8df 0%, #8eaeb8 100%);
+  position: relative;
+  overflow: hidden;
+}
+.blog-card__hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.blog-card__body { padding: 20px; flex: 1; display: flex; flex-direction: column; }
+.blog-card__cluster {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-accent, #0c5160);
+  margin-bottom: 6px;
+}
+.blog-card__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.25rem;
+  margin: 0 0 10px;
+  line-height: 1.3;
+}
+.blog-card__intro {
+  color: #555;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+.blog-card__date {
+  color: #888;
+  font-size: 0.85rem;
+  margin-top: auto;
+}
+.blog-empty {
+  max-width: 520px;
+  margin: 60px auto 80px;
+  padding: 0 24px;
+  text-align: center;
+  color: #666;
+}
+{% endblock %}
+
+{% block content %}
+<section class="blog-hero">
+  <h1 class="blog-hero__title">Blog</h1>
+  <p class="blog-hero__subtitle">Guías, itinerarios y consejos prácticos para descubrir el sur de Chile escritos por gente que conoce el destino.</p>
+</section>
+
+{% if clusters %}
+<nav class="blog-filters" aria-label="Filtros por cluster">
+  <a href="{% url 'destino_puerto_varas_public:blog-list' %}" class="blog-filter {% if not selected_cluster %}blog-filter--active{% endif %}">Todos</a>
+  {% for c in clusters %}
+    <a href="?c={{ c.slug }}" class="blog-filter {% if c.active %}blog-filter--active{% endif %}">{{ c.icon }} {{ c.label }}</a>
+  {% endfor %}
+</nav>
+{% endif %}
+
+{% if posts %}
+<div class="blog-grid">
+  {% for post in posts %}
+    <a href="{% url 'destino_puerto_varas_public:blog-detail' slug=post.slug %}" class="blog-card">
+      <div class="blog-card__hero">
+        {% if post.hero_image %}
+          <img src="{{ post.hero_image.url|cld_transform:'f_auto,q_auto,w_800' }}" alt="{{ post.title }}" loading="lazy">
+        {% endif %}
+      </div>
+      <div class="blog-card__body">
+        {% if post.cluster %}<div class="blog-card__cluster">{{ post.get_cluster_display }}</div>{% endif %}
+        <h2 class="blog-card__title">{{ post.title }}</h2>
+        {% if post.intro %}<p class="blog-card__intro">{{ post.intro|truncatewords:24 }}</p>{% endif %}
+        {% if post.published_at %}<div class="blog-card__date">{{ post.published_at|date:"j \\d\\e F, Y" }}</div>{% endif %}
+      </div>
+    </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="blog-empty">
+  <p>Aún no publicamos posts en esta sección. Vuelve pronto: estamos preparando guías sobre Puerto Varas, Frutillar, Petrohué y el resto de la Región de Los Lagos.</p>
+</div>
+{% endif %}
+{% endblock %}

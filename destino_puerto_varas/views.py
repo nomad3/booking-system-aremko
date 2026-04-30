@@ -12,7 +12,7 @@ from django.views.generic import View
 
 from django.db.models import Count, Q
 
-from .models import Circuit, CircuitDay, CircuitPlace, DurationCase, Place
+from .models import BlogPost, Circuit, CircuitDay, CircuitPlace, DurationCase, Place
 
 
 # Mapeo de slugs de categoría → flag del modelo Circuit (filtro UI/agente).
@@ -269,3 +269,128 @@ def _day_extra_title(day) -> str:
     if normalized == f"día {day.day_number}":
         return ""
     return title
+
+
+# ─── Blog editorial DPV (DPV-SEO-002 Tactic A) ───
+
+# Mapeo de slug de cluster (URL) → choice del modelo.
+BLOG_CLUSTER_LABELS = [
+    ("guides", "GUIDES", "Guías y planificación", "📍"),
+    ("itineraries", "ITINERARIES", "Itinerarios", "🗺️"),
+    ("comparisons", "COMPARISONS", "Comparativas", "⚖️"),
+    ("howtos", "HOWTOS", "Cómo hacer", "🛠️"),
+    ("seasons", "SEASONS", "Épocas y clima", "🌦️"),
+    ("nature", "NATURE", "Naturaleza", "🏞️"),
+    ("culture", "CULTURE", "Cultura y patrimonio", "🏛️"),
+    ("gastronomy", "GASTRONOMY", "Gastronomía", "🍴"),
+    ("family", "FAMILY", "Viaje familiar", "👨‍👩‍👧"),
+    ("romance", "ROMANCE", "Escapada romántica", "💕"),
+]
+BLOG_CLUSTER_BY_SLUG = {slug: code for slug, code, _, _ in BLOG_CLUSTER_LABELS}
+
+
+class BlogPostListPublicView(View):
+    """Listado público del blog DPV.
+
+    Solo muestra is_published=True con published_at <= ahora.
+    """
+
+    template_name = "destino_puerto_varas/public/blog_list.html"
+    paginate_by = 12
+
+    def get(self, request):
+        from django.utils import timezone
+
+        posts = BlogPost.objects.filter(
+            is_published=True,
+            published_at__lte=timezone.now(),
+        ).order_by("-published_at")
+
+        # Filtro por cluster (slug-friendly): /blog/?c=romance
+        cluster_slug = request.GET.get("c")
+        cluster_code = BLOG_CLUSTER_BY_SLUG.get(cluster_slug) if cluster_slug else None
+        if cluster_code:
+            posts = posts.filter(cluster=cluster_code)
+
+        # Clusters con al menos 1 post publicado (no mostrar chips vacíos).
+        active_codes = set(
+            BlogPost.objects.filter(is_published=True)
+            .values_list("cluster", flat=True)
+            .distinct()
+        )
+        clusters = [
+            {"slug": s, "label": label, "icon": icon, "active": s == cluster_slug}
+            for s, code, label, icon in BLOG_CLUSTER_LABELS
+            if code in active_codes
+        ]
+
+        context = {
+            "posts": list(posts[:self.paginate_by]),
+            "clusters": clusters,
+            "selected_cluster": cluster_slug or "",
+            "any_filter_active": bool(cluster_code),
+        }
+        return render(request, self.template_name, context)
+
+
+class BlogPostDetailPublicView(View):
+    """Detalle de un post de blog."""
+
+    template_name = "destino_puerto_varas/public/blog_detail.html"
+
+    def get(self, request, slug: str):
+        from django.utils import timezone
+
+        post = (
+            BlogPost.objects.filter(
+                slug=slug,
+                is_published=True,
+                published_at__lte=timezone.now(),
+            )
+            .first()
+        )
+        if post is None:
+            raise Http404("Post no encontrado")
+
+        # Render del markdown a HTML.
+        body_html = _render_markdown(post.body_md or "")
+
+        # Posts relacionados del mismo cluster (max 3, excluye el actual).
+        related = []
+        if post.cluster:
+            related = list(
+                BlogPost.objects.filter(
+                    is_published=True,
+                    published_at__lte=timezone.now(),
+                    cluster=post.cluster,
+                )
+                .exclude(pk=post.pk)
+                .order_by("-published_at")[:3]
+            )
+
+        context = {
+            "post": post,
+            "body_html": body_html,
+            "related_posts": related,
+        }
+        return render(request, self.template_name, context)
+
+
+def _render_markdown(text: str) -> str:
+    """Renderiza markdown a HTML. Si no está la lib, retorna texto plano envuelto en <p>."""
+    if not text:
+        return ""
+    try:
+        import markdown as _md
+
+        return _md.markdown(
+            text,
+            extensions=["extra", "sane_lists", "toc"],
+            output_format="html5",
+        )
+    except ImportError:
+        # Fallback defensivo: si la lib no está instalada, escapa y devuelve
+        # con <br> en lugar de fallar la página.
+        from django.utils.html import escape
+
+        return "<p>" + escape(text).replace("\n\n", "</p><p>").replace("\n", "<br>") + "</p>"

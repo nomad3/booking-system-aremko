@@ -12,6 +12,8 @@ from django.urls import include, path
 from django.views.generic import TemplateView
 
 from destino_puerto_varas.sitemaps import (
+    BlogIndexSitemap,
+    BlogPostSitemap,
     CircuitSitemap,
     DPVHomeSitemap,
     PlaceSitemap,
@@ -21,10 +23,13 @@ from destino_puerto_varas.sitemaps import (
 # (HomepageSitemap, MainPagesSitemap…) cuyos reverse() fallaban en este
 # URLConf, devolviendo HTTP 500.
 # DPV-SEO-001 #8: PlaceSitemap filtra atractivos públicos SEO-ready; comercios fuera.
+# DPV-SEO-002: BlogPostSitemap + BlogIndexSitemap para la capa editorial.
 sitemaps = {
     "home": DPVHomeSitemap,
     "circuits": CircuitSitemap,
     "places": PlaceSitemap,
+    "blog_index": BlogIndexSitemap,
+    "blog_posts": BlogPostSitemap,
 }
 
 urlpatterns = [

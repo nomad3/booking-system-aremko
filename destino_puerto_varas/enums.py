@@ -84,3 +84,24 @@ class MessageSenderType(models.TextChoices):
     ASSISTANT = "ASSISTANT", "Asistente"
     AGENT = "AGENT", "Agente humano"
     SYSTEM = "SYSTEM", "Sistema"
+
+
+class BlogCluster(models.TextChoices):
+    """Clusters editoriales del blog DPV (DPV-SEO-002 Tactic A).
+
+    Agrupa posts por intent del turista. Sirve para:
+    - Filtro UI en /blog/
+    - Internal linking (post-a-post dentro del mismo cluster)
+    - Topical authority (Google asocia el dominio con el tema)
+    """
+
+    GUIDES = "GUIDES", "Guías y planificación"
+    COMPARISONS = "COMPARISONS", "Comparativas"
+    ITINERARIES = "ITINERARIES", "Itinerarios"
+    HOWTOS = "HOWTOS", "Cómo hacer"
+    SEASONS = "SEASONS", "Épocas y clima"
+    FAMILY = "FAMILY", "Viaje familiar"
+    ROMANCE = "ROMANCE", "Escapada romántica"
+    GASTRONOMY = "GASTRONOMY", "Gastronomía"
+    CULTURE = "CULTURE", "Cultura y patrimonio"
+    NATURE = "NATURE", "Naturaleza"

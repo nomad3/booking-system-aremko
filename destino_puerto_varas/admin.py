@@ -15,6 +15,7 @@ from .enums import InterestType, PartnershipLevel, PlaceType, ProfileType
 from .models import (
     AgentPromptTemplate,
     AremkoRecommendation,
+    BlogPost,
     Circuit,
     CircuitCompositionDraft,
     CircuitDay,
@@ -2110,5 +2111,67 @@ class AgentPromptTemplateAdmin(admin.ModelAdmin):
         }),
         ("Auditoría", {
             "fields": ("notes", "created_at", "updated_at"),
+        }),
+    )
+
+
+@admin.register(BlogPost)
+class BlogPostAdmin(admin.ModelAdmin):
+    """Admin del blog editorial DPV (DPV-SEO-002 Tactic A)."""
+
+    list_display = (
+        "title",
+        "slug",
+        "cluster",
+        "keyword_root",
+        "is_published",
+        "published_at",
+        "updated_at",
+    )
+    list_filter = ("is_published", "cluster")
+    search_fields = ("title", "slug", "keyword_root", "intro")
+    prepopulated_fields = {"slug": ("title",)}
+    readonly_fields = ("created_at", "updated_at")
+    date_hierarchy = "published_at"
+    fieldsets = (
+        ("Identidad", {
+            "fields": ("title", "slug", "cluster"),
+        }),
+        ("SEO", {
+            "fields": ("keyword_root", "meta_description"),
+            "description": (
+                "Meta description ≤160 chars (Google la trunca). "
+                "Si la dejas vacía, el sitio toma los primeros 160 chars del intro."
+            ),
+        }),
+        ("Contenido", {
+            "fields": ("intro", "body_md"),
+            "description": (
+                "Intro 80-120 palabras (visible en listado). "
+                "Body en Markdown — H2/H3 estructuran el outline. "
+                "Renderizado server-side; no incluir HTML crudo si no es necesario."
+            ),
+        }),
+        ("Hero", {
+            "fields": ("hero_image", "hero_image_credit"),
+        }),
+        ("Schema FAQ (opcional)", {
+            "classes": ("collapse",),
+            "fields": ("faq_schema_json",),
+            "description": (
+                "Pegar JSON-LD FAQPage si el post incluye FAQ. "
+                "Se inyecta tal cual en <script type='application/ld+json'>."
+            ),
+        }),
+        ("Publicación", {
+            "fields": ("is_published", "published_at"),
+            "description": (
+                "is_published=True + published_at ≤ ahora → aparece en /blog/ y sitemap. "
+                "Si solo seteas is_published=True sin fecha, no aparece hasta llenar published_at."
+            ),
+        }),
+        ("Auditoría", {
+            "classes": ("collapse",),
+            "fields": ("created_at", "updated_at"),
         }),
     )
