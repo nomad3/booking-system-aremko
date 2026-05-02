@@ -1,0 +1,172 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block meta %}
+<meta name="robots" content="noindex, nofollow">
+<style>
+    .gracias-container {
+        max-width: 720px;
+        margin: 50px auto;
+        padding: 50px 30px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        text-align: center;
+    }
+    .gracias-icon {
+        font-size: 4rem;
+        color: #2c5f5d;
+        margin-bottom: 20px;
+        line-height: 1;
+    }
+    .gracias-container h1 {
+        font-size: 2rem;
+        color: #2c5f5d;
+        margin: 0 0 16px 0;
+    }
+    .gracias-container .lead {
+        font-size: 1.1rem;
+        color: #555;
+        margin-bottom: 30px;
+        line-height: 1.5;
+    }
+    .review-funnel {
+        background: #fff8e6;
+        border: 1px solid #f0e6c8;
+        border-radius: 12px;
+        padding: 30px;
+        margin-top: 30px;
+    }
+    .review-funnel h3 {
+        color: #5c4a1a;
+        margin: 0 0 16px 0;
+        font-size: 1.3rem;
+    }
+    .review-funnel p {
+        color: #7a6432;
+        margin-bottom: 24px;
+    }
+    .review-buttons {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .btn-google, .btn-tripadvisor, .btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 14px 24px;
+        font-size: 1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-google {
+        background: #4285f4;
+        color: #fff;
+    }
+    .btn-tripadvisor {
+        background: #00aa6c;
+        color: #fff;
+    }
+    .btn-google:hover, .btn-tripadvisor:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        color: #fff;
+    }
+    .btn-secondary {
+        background: #f0f0f0;
+        color: #333;
+        margin-top: 30px;
+    }
+    .btn-secondary:hover {
+        background: #e0e0e0;
+        color: #333;
+    }
+    .followup-message {
+        background: #fff0f0;
+        border-left: 4px solid #b00020;
+        padding: 24px;
+        border-radius: 8px;
+        margin-top: 30px;
+        text-align: left;
+    }
+    .followup-message h3 {
+        color: #b00020;
+        margin: 0 0 12px 0;
+    }
+    .followup-message p {
+        color: #555;
+        line-height: 1.6;
+        margin-bottom: 0;
+    }
+    @media (max-width: 600px) {
+        .gracias-container {
+            margin: 0;
+            border-radius: 0;
+            padding: 30px 20px;
+        }
+        .review-buttons { flex-direction: column; }
+        .btn-google, .btn-tripadvisor { width: 100%; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="gracias-container">
+    <div class="gracias-icon">🙏</div>
+    <h1>¡Gracias por tu opinión!</h1>
+
+    {% if califica_review_publico %}
+        {# === EXPERIENCIA POSITIVA: review funnel a Google + TripAdvisor === #}
+        <p class="lead">
+            Tu feedback ya quedó registrado. Lo leemos todo, no es decoración.
+        </p>
+
+        <div class="review-funnel">
+            <h3>¿Tienes 1 minuto más?</h3>
+            <p>
+                Si tu experiencia fue buena, una reseña pública nos ayuda muchísimo.
+                Es la forma más concreta en que más personas como tú pueden encontrarnos.
+            </p>
+            <div class="review-buttons">
+                <a href="{{ google_reviews_url }}?utm_source=encuesta&utm_medium=gracias&utm_campaign=review-funnel"
+                   class="btn-google" target="_blank" rel="noopener">
+                    <i class="fab fa-google me-2"></i>&nbsp;Reseña en Google
+                </a>
+                <a href="{{ tripadvisor_url }}?utm_source=encuesta&utm_medium=gracias&utm_campaign=review-funnel"
+                   class="btn-tripadvisor" target="_blank" rel="noopener">
+                    <i class="fab fa-tripadvisor me-2"></i>&nbsp;Reseña en TripAdvisor
+                </a>
+            </div>
+        </div>
+
+    {% else %}
+        {# === EXPERIENCIA NEGATIVA O NEUTRA: NO mostrar review pública === #}
+        <p class="lead">
+            Tu opinión llegó. No te pediremos una reseña pública porque algo de tu visita
+            no fue como esperabas, y eso nos importa más resolverlo que recibir una calificación.
+        </p>
+
+        <div class="followup-message">
+            <h3>Te vamos a contactar</h3>
+            <p>
+                Jorge (dueño de Aremko) revisa personalmente las opiniones que dejan recomendaciones.
+                Si dejaste un comentario sobre algo a mejorar, te escribiremos en las próximas 48 horas
+                para entender bien y resolver lo que se pueda. <strong>Tu feedback honesto es lo que nos
+                hace crecer.</strong>
+            </p>
+        </div>
+    {% endif %}
+
+    <a href="{% url 'homepage' %}" class="btn-secondary">
+        Volver a aremko.cl
+    </a>
+</div>
+{% endblock %}

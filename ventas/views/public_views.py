@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.contrib import messages
 from ..models import Servicio, CategoriaServicio, HomepageConfig, Lead, Producto, CategoriaProducto # Relative import, ADD HomepageConfig, Lead, Producto, CategoriaProducto
 
@@ -251,6 +252,119 @@ def privacy_policy_view(request):
     Requerida para cumplimiento con proveedores de email marketing (SendGrid).
     """
     return render(request, 'ventas/privacy_policy.html')
+
+
+def encuesta_satisfaccion_view(request):
+    """
+    Formulario de encuesta de satisfacción post-visita.
+
+    Reemplaza el Google Form histórico con captura nativa a BD para
+    análisis IA semanal (Tarea 1.4 plan maestro).
+
+    URL: /encuesta-satisfaccion/?cliente=<id>
+    El email D+1 incluye el `?cliente=X` para prellenar nombre/email.
+    """
+    from ..forms_encuesta import EncuestaSatisfaccionForm
+    from ..models import Cliente, EncuestaSatisfaccion, VentaReserva
+
+    # Resolver cliente si vino el parámetro
+    cliente = None
+    cliente_id = request.GET.get('cliente') or request.POST.get('cliente_id')
+    if cliente_id:
+        try:
+            cliente = Cliente.objects.filter(id=int(cliente_id)).first()
+        except (ValueError, TypeError):
+            cliente = None
+
+    # Última reserva (para prellenar fecha_visita y servicios sugeridos)
+    ultima_reserva = None
+    if cliente:
+        ultima_reserva = (VentaReserva.objects
+                          .filter(cliente=cliente)
+                          .order_by('-fecha_reserva')
+                          .first())
+
+    if request.method == 'POST':
+        form = EncuestaSatisfaccionForm(request.POST)
+        if form.is_valid():
+            encuesta = form.save(commit=False)
+            encuesta.origen = 'formulario_web'
+            if cliente:
+                encuesta.cliente = cliente
+                # Prellenar contacto si no vino
+                if not encuesta.contacto_nombre:
+                    encuesta.contacto_nombre = cliente.nombre or ''
+                if not encuesta.contacto_email:
+                    encuesta.contacto_email = cliente.email or ''
+            if ultima_reserva:
+                encuesta.venta_reserva = ultima_reserva
+                if not encuesta.fecha_visita and ultima_reserva.fecha_reserva:
+                    encuesta.fecha_visita = ultima_reserva.fecha_reserva.date() \
+                        if hasattr(ultima_reserva.fecha_reserva, 'date') else ultima_reserva.fecha_reserva
+            # JSONField MultipleChoiceField devuelve lista, lo guardamos tal cual
+            encuesta.servicios_contratados = form.cleaned_data.get('servicios_contratados') or []
+            encuesta.save()
+
+            # Suscribir a newsletter si lo pidió
+            if encuesta.quiere_newsletter and encuesta.contacto_email:
+                from ..models import NewsletterSubscriber
+                NewsletterSubscriber.objects.get_or_create(
+                    email=encuesta.contacto_email.strip().lower(),
+                    defaults={'nombre': encuesta.contacto_nombre or ''}
+                )
+
+            return redirect(f"{reverse('encuesta_gracias')}?id={encuesta.id}")
+        # else: cae al render con form.errors
+    else:
+        # GET: prefill con datos del cliente
+        initial = {}
+        if cliente:
+            initial['contacto_nombre'] = cliente.nombre or ''
+            initial['contacto_email'] = cliente.email or ''
+        form = EncuestaSatisfaccionForm(initial=initial)
+
+    context = {
+        'form': form,
+        'cliente': cliente,
+        'cliente_id': cliente.id if cliente else '',
+        'page_title': 'Encuesta de Satisfacción - Aremko',
+        'meta_description': 'Cuéntanos cómo te fue en Aremko. Tu opinión nos ayuda a mejorar.',
+    }
+    return render(request, 'ventas/encuesta_satisfaccion.html', context)
+
+
+def encuesta_gracias_view(request):
+    """
+    Página de "Gracias" tras enviar encuesta.
+
+    Implementa "Review Funnel": muestra botones de Google Reviews + TripAdvisor
+    SOLO si la encuesta marca experiencia positiva (4-5⭐ o NPS>=7).
+    Para clientes con experiencia negativa: mensaje empático sin presionar reviews públicas.
+
+    Query param: ?id=<encuesta_id>
+    """
+    from ..models import EncuestaSatisfaccion
+    from django.conf import settings as djsettings
+
+    encuesta = None
+    encuesta_id = request.GET.get('id')
+    if encuesta_id:
+        try:
+            encuesta = EncuestaSatisfaccion.objects.filter(id=int(encuesta_id)).first()
+        except (ValueError, TypeError):
+            encuesta = None
+
+    califica_review_publico = encuesta.califica_para_review_publico if encuesta else False
+
+    context = {
+        'encuesta': encuesta,
+        'califica_review_publico': califica_review_publico,
+        'google_reviews_url': 'https://g.page/r/CbKKwbV5UmD_EBM/review',
+        'tripadvisor_url': getattr(djsettings, 'TRIPADVISOR_URL',
+                                   'https://www.tripadvisor.com.ar/Hotel_Review-g294299-d7138437-Reviews-Aremko_Aguas_Calientes_Spa-Puerto_Varas_Los_Lagos_Region.html'),
+        'page_title': 'Gracias por tu opinión - Aremko',
+    }
+    return render(request, 'ventas/encuesta_gracias.html', context)
 
 
 def tarjetas_qr_reviews_view(request):

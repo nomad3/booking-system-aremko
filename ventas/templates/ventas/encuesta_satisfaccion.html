@@ -1,0 +1,371 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block meta %}
+<meta name="description" content="{{ meta_description }}">
+<meta name="robots" content="noindex, nofollow">
+<style>
+    .encuesta-container {
+        max-width: 720px;
+        margin: 30px auto;
+        padding: 30px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+    .encuesta-hero {
+        text-align: center;
+        padding: 30px 20px;
+        background: linear-gradient(135deg, #2c5f5d 0%, #1a4040 100%);
+        color: #fff;
+        border-radius: 12px 12px 0 0;
+        margin: -30px -30px 30px;
+    }
+    .encuesta-hero h1 { font-size: 1.8rem; margin: 0 0 8px 0; }
+    .encuesta-hero p { margin: 0; opacity: 0.9; font-size: 1rem; }
+    .seccion {
+        margin-bottom: 36px;
+        padding-bottom: 28px;
+        border-bottom: 1px solid #eee;
+    }
+    .seccion:last-of-type { border-bottom: none; }
+    .seccion h2 {
+        font-size: 1.2rem;
+        color: #2c5f5d;
+        margin-bottom: 4px;
+    }
+    .seccion .subtitle {
+        color: #888;
+        font-size: 0.9rem;
+        margin-bottom: 20px;
+    }
+    .pregunta { margin-bottom: 22px; }
+    .pregunta label.principal {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #333;
+    }
+    .pregunta .help {
+        font-size: 0.85rem;
+        color: #888;
+        margin-bottom: 8px;
+    }
+    /* Estrellas 1-5 */
+    .stars {
+        display: inline-flex;
+        gap: 4px;
+        flex-direction: row-reverse;
+    }
+    .stars input[type="radio"] { display: none; }
+    .stars label {
+        cursor: pointer;
+        font-size: 2rem;
+        color: #ccc;
+        transition: color 0.15s;
+        line-height: 1;
+        margin: 0;
+    }
+    .stars label::before { content: "★"; }
+    .stars input[type="radio"]:checked ~ label,
+    .stars label:hover,
+    .stars label:hover ~ label {
+        color: #f5a623;
+    }
+    /* NPS 0-10 */
+    .nps-row {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        margin: 8px 0;
+    }
+    .nps-row label {
+        flex: 1;
+        min-width: 36px;
+        max-width: 50px;
+        padding: 10px 4px;
+        text-align: center;
+        background: #f0f0f0;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.95rem;
+        transition: all 0.15s;
+        margin: 0;
+    }
+    .nps-row input[type="radio"] { display: none; }
+    .nps-row input[type="radio"]:checked + label {
+        background: #2c5f5d;
+        color: #fff;
+        transform: scale(1.05);
+    }
+    .nps-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8rem;
+        color: #888;
+        margin-top: 4px;
+    }
+    .checkbox-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .checkbox-group label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 400;
+        cursor: pointer;
+        margin: 0;
+    }
+    .checkbox-group input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: #2c5f5d;
+    }
+    .form-control, .form-select {
+        width: 100%;
+        padding: 10px 14px;
+        font-size: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        background: #fff;
+    }
+    .form-control:focus, .form-select:focus {
+        outline: 2px solid #2c5f5d;
+        border-color: #2c5f5d;
+    }
+    .alert-error {
+        background: #fff0f0;
+        border: 1px solid #f5c2c2;
+        color: #b00020;
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        font-size: 0.9rem;
+    }
+    .field-error {
+        color: #b00020;
+        font-size: 0.85rem;
+        margin-top: 4px;
+    }
+    .btn-submit {
+        background: #2c5f5d;
+        color: #fff;
+        border: none;
+        padding: 16px 36px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 20px;
+        transition: background 0.2s;
+    }
+    .btn-submit:hover { background: #1a4040; }
+    .req-mark { color: #b00020; }
+    @media (max-width: 600px) {
+        .encuesta-container { margin: 0; border-radius: 0; padding: 20px; }
+        .encuesta-hero { margin: -20px -20px 20px; padding: 20px 15px; }
+        .stars label { font-size: 1.7rem; }
+        .nps-row label { padding: 8px 2px; font-size: 0.85rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="encuesta-container">
+    <div class="encuesta-hero">
+        <h1>¿Cómo te fue en Aremko?</h1>
+        <p>Tu opinión real nos ayuda a mejorar. Toma 3 minutos.</p>
+    </div>
+
+    {% if form.errors %}
+    <div class="alert-error">
+        Algunos campos necesitan revisión. Mira más abajo los marcados en rojo.
+    </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% if cliente_id %}<input type="hidden" name="cliente_id" value="{{ cliente_id }}">{% endif %}
+
+        {# === 1. Datos contacto === #}
+        <div class="seccion">
+            <h2>1. Tus datos</h2>
+            <div class="pregunta">
+                <label class="principal" for="id_contacto_nombre">Tu nombre <span class="req-mark">*</span></label>
+                {{ form.contacto_nombre }}
+                {% if form.contacto_nombre.errors %}<div class="field-error">{{ form.contacto_nombre.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="pregunta">
+                <label class="principal" for="id_contacto_email">Tu email <span class="req-mark">*</span></label>
+                {{ form.contacto_email }}
+                {% if form.contacto_email.errors %}<div class="field-error">{{ form.contacto_email.errors.0 }}</div>{% endif %}
+            </div>
+        </div>
+
+        {# === 2. Servicios contratados === #}
+        <div class="seccion">
+            <h2>2. ¿Qué servicios contrataste?</h2>
+            <div class="subtitle">Marca todos los que correspondan</div>
+            <div class="pregunta">
+                <div class="checkbox-group">
+                    {% for choice in form.servicios_contratados %}
+                        <label>{{ choice.tag }} {{ choice.choice_label }}</label>
+                    {% endfor %}
+                </div>
+                {% if form.servicios_contratados.errors %}<div class="field-error">{{ form.servicios_contratados.errors.0 }}</div>{% endif %}
+            </div>
+        </div>
+
+        {# === 3. Calificaciones por servicio (opcionales según servicio) === #}
+        <div class="seccion">
+            <h2>3. Calificaciones por servicio</h2>
+            <div class="subtitle">1 = muy malo · 5 = excelente. Salta las que no aplican.</div>
+
+            {% for f in form %}
+              {% if f.name == 'cal_temperatura_tina' or f.name == 'cal_transparencia_agua' or f.name == 'cal_limpieza_tinas' or f.name == 'cal_limpieza_cabana' or f.name == 'cal_temperatura_cabana' or f.name == 'cal_limpieza_sala_masajes' or f.name == 'cal_servicio_masajes' %}
+                <div class="pregunta">
+                    <label class="principal">{{ f.label }}</label>
+                    <div class="stars">
+                        {% for i in '54321'|make_list %}
+                        <input type="radio" id="id_{{ f.name }}_{{ i }}" name="{{ f.name }}" value="{{ i }}" {% if f.value|stringformat:"s" == i %}checked{% endif %}>
+                        <label for="id_{{ f.name }}_{{ i }}" title="{{ i }}"></label>
+                        {% endfor %}
+                    </div>
+                    {% if f.errors %}<div class="field-error">{{ f.errors.0 }}</div>{% endif %}
+                </div>
+              {% endif %}
+            {% endfor %}
+        </div>
+
+        {# === 4. Calificaciones comerciales === #}
+        <div class="seccion">
+            <h2>4. Calificaciones comerciales</h2>
+            {% for f in form %}
+              {% if f.name == 'cal_calidad_precio' or f.name == 'cal_atencion_ventas' or f.name == 'cal_compra_web' or f.name == 'cal_atencion_visita' %}
+                <div class="pregunta">
+                    <label class="principal">{{ f.label }}{% if f.field.required %} <span class="req-mark">*</span>{% endif %}</label>
+                    <div class="stars">
+                        {% for i in '54321'|make_list %}
+                        <input type="radio" id="id_{{ f.name }}_{{ i }}" name="{{ f.name }}" value="{{ i }}" {% if f.value|stringformat:"s" == i %}checked{% endif %}>
+                        <label for="id_{{ f.name }}_{{ i }}" title="{{ i }}"></label>
+                        {% endfor %}
+                    </div>
+                    {% if f.errors %}<div class="field-error">{{ f.errors.0 }}</div>{% endif %}
+                </div>
+              {% endif %}
+            {% endfor %}
+        </div>
+
+        {# === 5. Experiencia general + NPS === #}
+        <div class="seccion">
+            <h2>5. Lo más importante</h2>
+
+            <div class="pregunta">
+                <label class="principal">{{ form.cal_experiencia_general.label }} <span class="req-mark">*</span></label>
+                <div class="stars">
+                    {% for i in '54321'|make_list %}
+                    <input type="radio" id="id_cal_experiencia_general_{{ i }}" name="cal_experiencia_general" value="{{ i }}" {% if form.cal_experiencia_general.value|stringformat:"s" == i %}checked{% endif %}>
+                    <label for="id_cal_experiencia_general_{{ i }}" title="{{ i }}"></label>
+                    {% endfor %}
+                </div>
+                {% if form.cal_experiencia_general.errors %}<div class="field-error">{{ form.cal_experiencia_general.errors.0 }}</div>{% endif %}
+            </div>
+
+            <div class="pregunta">
+                <label class="principal">{{ form.nps_score.label }} <span class="req-mark">*</span></label>
+                <div class="help">0 = nunca · 10 = sin duda</div>
+                <div class="nps-row">
+                    <input type="radio" id="id_nps_0" name="nps_score" value="0" {% if form.nps_score.value == 0 %}checked{% endif %}><label for="id_nps_0">0</label>
+                    <input type="radio" id="id_nps_1" name="nps_score" value="1" {% if form.nps_score.value == 1 %}checked{% endif %}><label for="id_nps_1">1</label>
+                    <input type="radio" id="id_nps_2" name="nps_score" value="2" {% if form.nps_score.value == 2 %}checked{% endif %}><label for="id_nps_2">2</label>
+                    <input type="radio" id="id_nps_3" name="nps_score" value="3" {% if form.nps_score.value == 3 %}checked{% endif %}><label for="id_nps_3">3</label>
+                    <input type="radio" id="id_nps_4" name="nps_score" value="4" {% if form.nps_score.value == 4 %}checked{% endif %}><label for="id_nps_4">4</label>
+                    <input type="radio" id="id_nps_5" name="nps_score" value="5" {% if form.nps_score.value == 5 %}checked{% endif %}><label for="id_nps_5">5</label>
+                    <input type="radio" id="id_nps_6" name="nps_score" value="6" {% if form.nps_score.value == 6 %}checked{% endif %}><label for="id_nps_6">6</label>
+                    <input type="radio" id="id_nps_7" name="nps_score" value="7" {% if form.nps_score.value == 7 %}checked{% endif %}><label for="id_nps_7">7</label>
+                    <input type="radio" id="id_nps_8" name="nps_score" value="8" {% if form.nps_score.value == 8 %}checked{% endif %}><label for="id_nps_8">8</label>
+                    <input type="radio" id="id_nps_9" name="nps_score" value="9" {% if form.nps_score.value == 9 %}checked{% endif %}><label for="id_nps_9">9</label>
+                    <input type="radio" id="id_nps_10" name="nps_score" value="10" {% if form.nps_score.value == 10 %}checked{% endif %}><label for="id_nps_10">10</label>
+                </div>
+                <div class="nps-labels">
+                    <span>Nunca lo recomendaría</span>
+                    <span>Sin duda</span>
+                </div>
+                {% if form.nps_score.errors %}<div class="field-error">{{ form.nps_score.errors.0 }}</div>{% endif %}
+            </div>
+        </div>
+
+        {# === 6. Texto libre === #}
+        <div class="seccion">
+            <h2>6. Cuéntanos en tus palabras</h2>
+            <div class="subtitle">Las preguntas de texto son opcionales pero las leemos todas.</div>
+
+            <div class="pregunta">
+                <label class="principal" for="id_lo_que_mas_gusto">{{ form.lo_que_mas_gusto.label }}</label>
+                {{ form.lo_que_mas_gusto }}
+            </div>
+            <div class="pregunta">
+                <label class="principal" for="id_sugerencias">{{ form.sugerencias.label }}</label>
+                {{ form.sugerencias }}
+            </div>
+            <div class="pregunta">
+                <label class="principal" for="id_decepcion">{{ form.decepcion.label }}</label>
+                {{ form.decepcion }}
+            </div>
+        </div>
+
+        {# === 7. Comercial === #}
+        <div class="seccion">
+            <h2>7. Para conocerte mejor</h2>
+
+            <div class="pregunta">
+                <label class="principal" for="id_como_se_entero">{{ form.como_se_entero.label }} <span class="req-mark">*</span></label>
+                {{ form.como_se_entero }}
+                {% if form.como_se_entero.errors %}<div class="field-error">{{ form.como_se_entero.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="pregunta">
+                <label class="principal" for="id_como_se_entero_otro">{{ form.como_se_entero_otro.label }}</label>
+                {{ form.como_se_entero_otro }}
+                {% if form.como_se_entero_otro.errors %}<div class="field-error">{{ form.como_se_entero_otro.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="pregunta">
+                <label class="principal" for="id_ocasion_visita">{{ form.ocasion_visita.label }} <span class="req-mark">*</span></label>
+                {{ form.ocasion_visita }}
+                {% if form.ocasion_visita.errors %}<div class="field-error">{{ form.ocasion_visita.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="pregunta">
+                <label class="principal" for="id_intencion_volver">{{ form.intencion_volver.label }}</label>
+                {{ form.intencion_volver }}
+            </div>
+        </div>
+
+        {# === 8. Permisos === #}
+        <div class="seccion">
+            <h2>8. Permisos (opcionales)</h2>
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" name="permite_uso_comentarios_redes" {% if form.permite_uso_comentarios_redes.value %}checked{% endif %}>
+                    {{ form.permite_uso_comentarios_redes.label }}
+                </label>
+                <label>
+                    <input type="checkbox" name="quiere_newsletter" {% if form.quiere_newsletter.value %}checked{% endif %}>
+                    {{ form.quiere_newsletter.label }}
+                </label>
+                <label>
+                    <input type="checkbox" name="permite_seguimiento" {% if form.permite_seguimiento.value %}checked{% endif %}>
+                    {{ form.permite_seguimiento.label }}
+                </label>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-submit">Enviar mi opinión</button>
+    </form>
+</div>
+{% endblock %}

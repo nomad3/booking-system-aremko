@@ -6,7 +6,7 @@ from django.conf.urls.static import static # Import static
 # from ventas import views
 from django.contrib.auth import views as auth_views # Import auth views
 # Import the specific view functions needed for root URLs
-from ventas.views.public_views import homepage_view, empresas_view, empresas_presentacion_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view, garantia_view, tarjetas_qr_reviews_view
+from ventas.views.public_views import homepage_view, empresas_view, empresas_presentacion_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view, garantia_view, tarjetas_qr_reviews_view, encuesta_satisfaccion_view, encuesta_gracias_view
 # Removed direct import of ventas.urls
 
 from django.contrib.sitemaps.views import sitemap
@@ -41,6 +41,9 @@ urlpatterns = [
     path('garantia/', garantia_view, name='garantia'),
     # Tarjetas QR imprimibles para Google Reviews (asset operativo interno)
     path('tarjetas-qr-reviews/', tarjetas_qr_reviews_view, name='tarjetas_qr_reviews'),
+    # Encuesta de satisfacción D+1 (Tarea 1.4 plan maestro - sistema VoC nativo)
+    path('encuesta-satisfaccion/', encuesta_satisfaccion_view, name='encuesta_satisfaccion'),
+    path('encuesta-gracias/', encuesta_gracias_view, name='encuesta_gracias'),
     # Corporate landing pages (direct URLs without /ventas/ prefix)
     path('empresas/', empresas_view, name='empresas'),
     path('empresas/presentacion/', empresas_presentacion_view, name='empresas_presentacion'),
