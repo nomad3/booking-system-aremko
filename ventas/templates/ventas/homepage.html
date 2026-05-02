@@ -807,16 +807,39 @@
 </section>
 
 <!-- Cross-sell masajes + alojamientos -->
+<!-- Pack 3-en-1 (propuesta principal) -->
+<section class="pack-3en1-section py-5" style="background: linear-gradient(135deg, #2c5f5d 0%, #1a4040 100%); color: #fff;">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6 text-center text-lg-start mb-4 mb-lg-0">
+                <span style="background:rgba(255,255,255,0.15); padding:6px 14px; border-radius:20px; font-size:0.85rem; letter-spacing:1px;">EL PACK COMPLETO</span>
+                <h2 class="mt-3 mb-3" style="font-size:2.4rem; line-height:1.2;">Masaje + Tina + Cabaña en bosque nativo</h2>
+                <p class="lead mb-4">Lo que llaman "experiencia 3-en-1": llegas, te masajean en domo de madera junto al río, te bañas en tina caliente con vista al bosque, y duermes en cabaña privada. 2 días aquí equivalen a una semana de vacaciones.</p>
+                <div style="font-size:2.5rem; font-weight:700;">Desde $190.000</div>
+                <div style="opacity:0.85; margin-bottom:20px;">por 2 personas · domingo a jueves</div>
+                <a href="{% url 'alojamientos' %}" class="btn btn-light btn-lg">
+                    <i class="fas fa-calendar-check me-2"></i>Ver paquetes completos
+                </a>
+            </div>
+            <div class="col-lg-6">
+                <img src="{% static 'ventas/images/cabana-torre.jpg' %}" alt="Cabaña con tina caliente Aremko - pack experiencia 3-en-1" style="width:100%; border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,0.3);">
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Servicios sueltos (secundarios) -->
 <section class="crosssell-section">
     <div class="container">
-        <h2 class="section-title mb-5">También podemos ofrecerte</h2>
+        <h2 class="section-title mb-3">¿Prefieres servicios sueltos?</h2>
+        <p class="text-center text-muted mb-5">También puedes reservar masaje, tina o alojamiento por separado.</p>
         <div class="row">
             <div class="col-md-6">
                 <a href="{% url 'masajes' %}" class="crosssell-card"
                    style="background-image: url('https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1200&q=80');">
                     <div class="crosssell-body">
-                        <h3>Masajes</h3>
-                        <p>Complementa tu tina con un masaje relajante o terapéutico.</p>
+                        <h3>Solo masaje</h3>
+                        <p>50 min en domo de madera junto al río. Desde $40.000.</p>
                         <span class="crosssell-cta">Ver masajes <i class="fas fa-arrow-right"></i></span>
                     </div>
                 </a>
@@ -825,8 +848,8 @@
                 <a href="{% url 'alojamientos' %}" class="crosssell-card"
                    style="background-image: url('{% static 'ventas/images/cabana-torre.jpg' %}');">
                     <div class="crosssell-body">
-                        <h3>Alojamientos</h3>
-                        <p>Quédate la noche en nuestras cabañas boutique junto al río.</p>
+                        <h3>Solo cabaña</h3>
+                        <p>Cabaña con tina caliente privada. Desde $90.000/noche.</p>
                         <span class="crosssell-cta">Ver cabañas <i class="fas fa-arrow-right"></i></span>
                     </div>
                 </a>
@@ -838,27 +861,27 @@
 <!-- Diferenciales boutique -->
 <section class="boutique-diff-section" id="servicios">
     <div class="container">
-        <h2 class="section-title mb-5">Una experiencia boutique</h2>
+        <h2 class="section-title mb-5">Por qué la gente vuelve</h2>
         <div class="row">
             <div class="col-md-4">
                 <div class="boutique-diff-card">
                     <div class="boutique-diff-icon"><i class="fas fa-leaf"></i></div>
-                    <h4>Entorno natural</h4>
-                    <p>Tinas al aire libre rodeadas de bosque nativo, con el sonido del Río Pescado de fondo.</p>
+                    <h4>Bosque nativo + río</h4>
+                    <p>Tinas al aire libre rodeadas de bosque nativo y el sonido constante del Río Pescado. A 20 min del centro de Puerto Varas.</p>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="boutique-diff-card">
                     <div class="boutique-diff-icon"><i class="fas fa-user-shield"></i></div>
-                    <h4>100% privado</h4>
-                    <p>Cada tina es exclusiva para tu grupo: sin compartir, sin interrupciones, a tu ritmo.</p>
+                    <h4>Solo 5 cabañas</h4>
+                    <p>No hay multitudes. Cada tina y cabaña es exclusiva para tu grupo. Sin compartir, sin interrupciones.</p>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="boutique-diff-card">
-                    <div class="boutique-diff-icon"><i class="fas fa-concierge-bell"></i></div>
-                    <h4>Atención personalizada</h4>
-                    <p>Un equipo pequeño que cuida cada detalle para que tu escapada sea inolvidable.</p>
+                    <div class="boutique-diff-icon"><i class="fas fa-hands"></i></div>
+                    <h4>Masajistas con nombre</h4>
+                    <p>Sandra, Carolina, Diane. Equipo pequeño con técnicas específicas. Nuestros clientes las recuerdan por nombre.</p>
                 </div>
             </div>
         </div>
@@ -882,45 +905,42 @@
 <!-- Features Section -->
 <section class="features-section" id="caracteristicas">
     <div class="container">
-        <h2 class="section-title mb-5">Crea Tu Momento Perfecto</h2>
+        <h2 class="section-title mb-5">Lo que nos hace distintos</h2>
         <div class="row">
             <div class="col-lg-3 col-md-6">
                 <div class="feature-box">
                     <div class="feature-icon">
-                        <i class="fas fa-hand-sparkles"></i> {# Massage icon #}
+                        <i class="fas fa-solar-panel"></i>
                     </div>
-                    <h4 class="feature-title">Masajes que Sanan</h4>
-                    <p>Siente cómo el estrés se disuelve con cada caricia experta. Una experiencia revitalizante para
-                        cuerpo y alma.</p>
+                    <h4 class="feature-title">No usamos leña</h4>
+                    <p>48 paneles solares + aerotermia. Llevamos más de un año sin prender una hoguera. Cero combustión, cero humo.</p>
                 </div>
             </div>
             <div class="col-lg-3 col-md-6">
                 <div class="feature-box">
                     <div class="feature-icon">
-                        <i class="fas fa-hot-tub"></i> {# Hot tub icon #}
+                        <i class="fas fa-thermometer-three-quarters"></i>
                     </div>
-                    <h4 class="feature-title">Tinajas Bajo las Estrellas</h4>
-                    <p>Desconecta del mundo en la calidez burbujeante de nuestras tinajas privadas. Pura magia en Puerto
-                        Varas.</p>
+                    <h4 class="feature-title">Garantía 38°C</h4>
+                    <p>Si tu tina llega a 37°C o menos, te lo compensamos. Sensores con tope a 40°C, sin sobresaltos.</p>
                 </div>
             </div>
             <div class="col-lg-3 col-md-6">
                 <div class="feature-box">
                     <div class="feature-icon">
-                        <i class="fas fa-bed"></i> {# Accommodation icon #}
+                        <i class="fas fa-water"></i>
                     </div>
-                    <h4 class="feature-title">Descanso Reparador</h4>
-                    <p>Nuestras acogedoras habitaciones son el refugio perfecto para completar tu experiencia de
-                        bienestar.</p>
+                    <h4 class="feature-title">Río Pescado</h4>
+                    <p>El único río que suena 365 días al año en Puerto Varas. Ruido blanco natural, a metros de tu tina.</p>
                 </div>
             </div>
             <div class="col-lg-3 col-md-6">
                 <div class="feature-box">
                     <div class="feature-icon">
-                        <i class="fas fa-calendar-check"></i> {# Changed icon slightly #}
+                        <i class="fas fa-moon"></i>
                     </div>
-                    <h4 class="feature-title">Reserva Tu Bienestar</h4>
-                    <p>Asegura tu momento de paz. Reserva tu experiencia Aremko fácilmente en línea.</p>
+                    <h4 class="feature-title">Hasta medianoche</h4>
+                    <p>Tinas abiertas hasta las 12 AM. Si llegas tarde después de manejar 5 horas, la tina te espera caliente.</p>
                 </div>
             </div>
         </div>
