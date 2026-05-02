@@ -1144,6 +1144,35 @@ html {
     {% endif %}
 </section>
 
+<!-- Blog CTA — internal link al blog de Aremko (solo Tinas y Alojamientos) -->
+{% if categoria_actual.id == 1 or categoria_actual.id == 3 %}
+<section class="blog-cta-section py-5" style="background:#f7f4ee;">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-9">
+                <div class="d-flex flex-column flex-md-row align-items-center gap-4 p-4" style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+                    <div class="flex-shrink-0 text-center">
+                        <i class="fas fa-book-open" style="font-size:2.5rem;color:#1565c0;"></i>
+                    </div>
+                    <div class="flex-grow-1 text-center text-md-start">
+                        {% if categoria_actual.id == 1 %}
+                        <h3 class="h5 mb-2">Guía honesta de tinas calientes en Puerto Varas</h3>
+                        <p class="mb-3 text-muted">Cómo se calientan, hasta qué hora abrimos, por qué no usamos leña, y nuestra garantía de temperatura. La guía completa que escribimos para responder lo que la gente nos pregunta más.</p>
+                        {% else %}
+                        <h3 class="h5 mb-2">Cómo aprovechar la tina caliente de tu cabaña</h3>
+                        <p class="mb-3 text-muted">Las cabañas Aremko incluyen tina caliente privada. Lee la guía completa: temperatura ideal, cuánto rato quedarse, por qué nuestras tinas no usan leña, y la garantía 38°C.</p>
+                        {% endif %}
+                        <a href="{% url 'aremko_blog:blog-detail' slug='tinas-calientes-puerto-varas' %}?utm_source=site&utm_medium=internal&utm_campaign=category-{{ categoria_actual.nombre|lower }}" class="btn btn-primary">
+                            Leer la guía completa <i class="fas fa-arrow-right ms-2"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
 <!-- Main Content Section (Movido después de los servicios) -->
 <section class="content-section" id="descripcion-completa">
     <div class="container">

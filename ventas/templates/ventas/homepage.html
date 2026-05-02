@@ -676,10 +676,10 @@
     <div class="container">
         <div class="hero-content">
             <span class="hero-kicker">AREMKO SPA BOUTIQUE</span>
-            <h1>Aguas calientes junto al Río Pescado</h1>
-            <p class="hero-subtitle">Puerto Varas · Experiencia privada en bosque nativo</p>
-            <a href="#tinas" class="btn btn-primary btn-lg">
-                <i class="fas fa-hot-tub me-2"></i>Reservar mi tina
+            <h1>{{ hero_title }}</h1>
+            <p class="hero-subtitle">{{ hero_subtitle }}</p>
+            <a href="{{ hero_cta_link }}" class="btn btn-primary btn-lg">
+                <i class="fas fa-hot-tub me-2"></i>{{ hero_cta_text }}
             </a>
         </div>
     </div>
@@ -969,6 +969,39 @@
                         <span class="testimonial-source">Trip.com</span>
                         <span>Febrero 2026</span>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Nuevo en el blog -->
+<section class="blog-feature-section py-5" style="background:#f7f4ee;">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="text-center mb-4">
+                    <span class="badge bg-secondary mb-2" style="font-size:0.85rem;letter-spacing:1px;">NUEVO EN EL BLOG</span>
+                    <h2 class="section-title">Lo que escribimos esta semana</h2>
+                </div>
+                <div class="row align-items-center g-4 p-4" style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+                    <div class="col-md-5">
+                        <div style="aspect-ratio:4/3;background:linear-gradient(135deg,#1e3a8a 0%,#0f766e 100%);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;">
+                            <i class="fas fa-hot-tub" style="font-size:4rem;opacity:0.85;"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-7">
+                        <h3 class="h4 mb-3">Guía honesta de tinas calientes en Puerto Varas</h3>
+                        <p class="text-muted mb-3">Por qué no usamos leña, hasta qué hora abrimos, cómo se calientan a 38°C exactos, y nuestra garantía si algo sale mal. La guía completa que escribimos para responder lo que la gente nos pregunta más.</p>
+                        <a href="{% url 'aremko_blog:blog-detail' slug='tinas-calientes-puerto-varas' %}?utm_source=site&utm_medium=internal&utm_campaign=home-blog-feature" class="btn btn-primary">
+                            Leer la guía completa <i class="fas fa-arrow-right ms-2"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="text-center mt-4">
+                    <a href="{% url 'aremko_blog:blog-list' %}" class="text-muted">
+                        Ver todos los artículos del blog <i class="fas fa-chevron-right ms-1" style="font-size:0.75rem;"></i>
+                    </a>
                 </div>
             </div>
         </div>
