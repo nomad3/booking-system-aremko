@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Tarjetas QR Google Reviews — Aremko</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1cm;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+        }
+        .instrucciones {
+            background: #fff8e6;
+            border-left: 4px solid #b8860b;
+            padding: 16px 20px;
+            margin: 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .instrucciones h3 { margin: 0 0 8px 0; color: #5c4a1a; }
+        .instrucciones ul { margin: 0; padding-left: 20px; }
+        .botones-print {
+            text-align: center;
+            margin: 20px;
+        }
+        .btn-print {
+            background: #2c5f5d;
+            color: #fff;
+            border: none;
+            padding: 12px 28px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .btn-print:hover { background: #1a4040; }
+
+        .hoja {
+            width: 21cm;
+            min-height: 29.7cm;
+            background: #fff;
+            margin: 20px auto;
+            padding: 1.2cm;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            gap: 0.4cm;
+        }
+        .tarjeta {
+            border: 2px dashed #ccc;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background: #fff;
+            position: relative;
+        }
+        .tarjeta-header {
+            border-bottom: 1px solid #e8e8e8;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+        }
+        .tarjeta-marca {
+            font-size: 11px;
+            letter-spacing: 3px;
+            color: #b8860b;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .tarjeta-titulo {
+            font-size: 18px;
+            font-weight: 700;
+            color: #2c5f5d;
+            margin: 4px 0 0 0;
+        }
+        .tarjeta-mensaje {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.4;
+            margin: 6px 0;
+        }
+        .tarjeta-mensaje strong {
+            color: #2c5f5d;
+        }
+        .tarjeta-qr {
+            margin: 8px 0;
+            display: flex;
+            justify-content: center;
+        }
+        .tarjeta-qr img {
+            width: 130px;
+            height: 130px;
+            border: 1px solid #e8e8e8;
+            padding: 4px;
+            background: #fff;
+        }
+        .tarjeta-instrucciones {
+            font-size: 11px;
+            color: #888;
+            line-height: 1.3;
+            margin-top: 4px;
+        }
+        .tarjeta-footer {
+            border-top: 1px solid #e8e8e8;
+            padding-top: 6px;
+            margin-top: 6px;
+            font-size: 10px;
+            color: #999;
+        }
+        .tarjeta-url {
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            color: #666;
+            background: #f5f5f5;
+            padding: 3px 8px;
+            border-radius: 3px;
+            display: inline-block;
+            margin-top: 4px;
+        }
+        @media print {
+            body { background: #fff; }
+            .instrucciones, .botones-print { display: none; }
+            .hoja {
+                box-shadow: none;
+                margin: 0;
+                page-break-after: always;
+            }
+            .hoja:last-child { page-break-after: auto; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="instrucciones">
+    <h3>📋 Cómo imprimir las tarjetas (NO se imprime esta caja)</h3>
+    <ul>
+        <li><strong>Click "Imprimir"</strong> abajo (o Cmd+P / Ctrl+P) → escoge "Guardar como PDF" o imprime directo</li>
+        <li>Tamaño papel: <strong>A4</strong>, sin escalado, márgenes mínimos</li>
+        <li>Cada hoja contiene <strong>6 tarjetas</strong> (10 × 10 cm cada una)</li>
+        <li><strong>Recortar por las líneas punteadas</strong> con tijera o guillotina</li>
+        <li>Sugerencia: <strong>plastificar</strong> con láminas adhesivas (sobreviven líquidos en cabañas)</li>
+        <li>Distribuir 1-2 por cabaña (5 cabañas × 1-2 = 5-10 tarjetas activas + 5 reserva)</li>
+    </ul>
+</div>
+
+<div class="botones-print">
+    <button class="btn-print" onclick="window.print()">🖨️ Imprimir tarjetas</button>
+</div>
+
+<!-- HOJA: 6 tarjetas idénticas -->
+<div class="hoja">
+    {% for i in "123456" %}
+    <div class="tarjeta">
+        <div>
+            <div class="tarjeta-header">
+                <div class="tarjeta-marca">AREMKO SPA BOUTIQUE</div>
+                <h2 class="tarjeta-titulo">¿Cómo te fue?</h2>
+            </div>
+            <p class="tarjeta-mensaje">
+                Tu opinión real nos ayuda muchísimo. <strong>Una reseña en Google</strong> toma 1 minuto y a nosotros nos cambia la semana.
+            </p>
+        </div>
+        <div class="tarjeta-qr">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?data=https://g.page/r/CbKKwbV5UmD_EBM/review&size=400x400&margin=10" alt="Código QR para dejar reseña en Google">
+        </div>
+        <div>
+            <p class="tarjeta-instrucciones">Escanea con la cámara de tu celular →<br>Te lleva directo a Google Reviews.</p>
+            <div class="tarjeta-footer">
+                Río Pescado · Camino a Ensenada km 19, Puerto Varas
+                <div class="tarjeta-url">aremko.cl</div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+</body>
+</html>

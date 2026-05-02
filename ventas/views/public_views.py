@@ -253,6 +253,17 @@ def privacy_policy_view(request):
     return render(request, 'ventas/privacy_policy.html')
 
 
+def tarjetas_qr_reviews_view(request):
+    """
+    Vista interna para imprimir tarjetas QR con link de Google Reviews.
+    Diseñada para usar Cmd+P / Ctrl+P y guardar como PDF o imprimir directo.
+
+    URL: /tarjetas-qr-reviews/  (sin login porque la URL no es discoverable
+    y el contenido no es sensible — es un asset operativo).
+    """
+    return render(request, 'ventas/tarjetas_qr_reviews.html')
+
+
 def garantia_view(request):
     """
     Página dedicada a la Garantía Aremko.
