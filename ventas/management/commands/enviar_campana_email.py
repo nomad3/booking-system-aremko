@@ -53,41 +53,50 @@ class Command(BaseCommand):
             action='store_true',
             help='Ignorar restricciones de horario'
         )
+        parser.add_argument(
+            '--single-batch',
+            action='store_true',
+            help='Procesar un solo lote por campaña y salir (para uso con cron jobs)'
+        )
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS('\n🚀 INICIANDO ENVÍO DE CAMPAÑAS EMAIL'))
-        
+
         batch_size = options['batch_size']
         interval_minutes = options['interval']
         dry_run = options['dry_run']
         ignore_schedule = options['ignore_schedule']
-        
+        single_batch = options['single_batch']
+
         if dry_run:
             self.stdout.write(self.style.WARNING('⚠️ MODO DRY-RUN: No se enviarán emails reales'))
-        
+
+        if single_batch:
+            self.stdout.write(self.style.WARNING('🎯 MODO --single-batch: Procesando un lote por campaña y saliendo'))
+
         # Para modo auto, verificar horario general
         if options['auto'] and not ignore_schedule and not self.is_sending_time():
             self.stdout.write(self.style.WARNING('⏰ Fuera del horario de envío general. Saliendo.'))
             self.stdout.write('💡 Use --ignore-schedule para enviar fuera del horario')
             return
-        
+
         if options['auto']:
             # Modo automático: procesar todas las campañas listas o en proceso (resuming)
             campaigns = EmailCampaign.objects.filter(status__in=['ready', 'sending'])
             self.stdout.write(f'📊 Encontradas {campaigns.count()} campañas listas para envío')
-            
+
             for campaign in campaigns:
-                self.process_campaign(campaign, batch_size, interval_minutes, dry_run, ignore_schedule)
-        
+                self.process_campaign(campaign, batch_size, interval_minutes, dry_run, ignore_schedule, single_batch)
+
         elif options['campaign_id']:
             # Modo manual: procesar campaña específica
             try:
                 campaign = EmailCampaign.objects.get(id=options['campaign_id'])
                 if campaign.status not in ['ready', 'sending']:
                     raise CommandError(f'❌ Campaña {campaign.id} no está lista para envío (estado: {campaign.status})')
-                
-                self.process_campaign(campaign, batch_size, interval_minutes, dry_run, ignore_schedule)
-                
+
+                self.process_campaign(campaign, batch_size, interval_minutes, dry_run, ignore_schedule, single_batch)
+
             except EmailCampaign.DoesNotExist:
                 raise CommandError(f'❌ Campaña con ID {options["campaign_id"]} no encontrada')
         else:
@@ -121,8 +130,11 @@ class Command(BaseCommand):
             # Fallback a horarios por defecto si hay error
             return 8 <= chile_time.hour <= 21
 
-    def process_campaign(self, campaign, batch_size, interval_minutes, dry_run, ignore_schedule=False):
-        """Procesa una campaña específica"""
+    def process_campaign(self, campaign, batch_size, interval_minutes, dry_run, ignore_schedule=False, single_batch=False):
+        """Procesa una campaña específica.
+
+        Si single_batch=True, procesa solo un lote y sale (modo cron).
+        """
         self.stdout.write(f'\n📧 Procesando campaña: {campaign.name}')
         
         # Usar configuración de la campaña si está disponible
@@ -182,6 +194,12 @@ class Command(BaseCommand):
                         recipient.error_message = str(e)
                         recipient.save()
             
+            # Modo --single-batch: procesa solo este lote y sale
+            if single_batch:
+                self.stdout.write(self.style.SUCCESS(f'\n✅ Lote completado en modo --single-batch. {len(batch)} emails procesados. Saliendo.'))
+                self.stdout.write(f'💡 Próxima ejecución del cron procesará el siguiente lote.')
+                break
+
             # Pausa entre lotes (excepto el último)
             if i + campaign_batch_size < total_pending:
                 self.stdout.write(f'⏸️ Pausa de {campaign_interval} minutos...')
