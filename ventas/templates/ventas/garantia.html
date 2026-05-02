@@ -1,7 +1,7 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
 
-{% block title %}{{ page_title }} - Aremko Spa Boutique{% endblock %}
+{% block title %}Garantía Aremko: si tu tina llega a 37°C o menos, es gratis - Aremko Spa Boutique{% endblock %}
 
 {% block meta %}
 <meta name="description" content="{{ meta_description }}">
@@ -17,26 +17,26 @@
   "mainEntity": [
     {
       "@type": "Question",
-      "name": "¿Qué cubre la Garantía Aremko?",
+      "name": "¿Qué garantiza Aremko?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Si la temperatura del agua de tu tina llega a 37°C o menos, o si la experiencia no cumple lo prometido, te compensamos con un masaje o tina adicional sin costo. También cubre falta de agua caliente en duchas y calefacción deficiente en cabañas."
+        "text": "Las tinas Aremko están calibradas a 38°C. Si tu tina llega a 37°C o menos al momento de tu uso, no se cobra. Es gratis. Es la única garantía de temperatura de spa en Puerto Varas."
       }
     },
     {
       "@type": "Question",
-      "name": "¿Cuál es la temperatura garantizada de las tinas?",
+      "name": "¿Cuál es la temperatura objetivo de las tinas?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "38°C exactos al llegar. Sensores con tope a 40°C. Si tu tina llega a 37°C o menos, es gratis."
+        "text": "38°C. Sensores con tope a 40°C calibrados antes de cada llegada. Si llega a 37°C o menos, es gratis."
       }
     },
     {
       "@type": "Question",
-      "name": "¿Cómo activo la garantía si algo sale mal?",
+      "name": "¿Cómo se activa la garantía?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Avísale a recepción inmediatamente. Tenemos protocolo de respuesta en menos de 15 minutos. Si no logramos resolver el problema en el momento, te compensamos."
+        "text": "Avísale a recepción al momento de tu llegada o durante el uso de la tina. Verificamos la temperatura con el sensor. Si marca 37°C o menos, la tina no se cobra."
       }
     },
     {
@@ -44,7 +44,7 @@
       "name": "¿Algún otro spa de Puerto Varas tiene garantía similar?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "No. Aremko es el único spa de la zona que ofrece garantía explícita de temperatura y satisfacción. Ningún competidor (Alma Lemu, Los Notros, Pillang Likan, DreamWoods) la ofrece."
+        "text": "No. Aremko es el único spa de la zona que ofrece garantía explícita de temperatura del agua. Ningún competidor (Alma Lemu, Los Notros, Pillang Likan, DreamWoods) la ofrece."
       }
     }
   ]
@@ -126,8 +126,8 @@
 <section class="garantia-hero text-center">
     <div class="container">
         <span class="garantia-badge">GARANTÍA AREMKO</span>
-        <h1>38°C o te lo compensamos.</h1>
-        <p class="lead">Si la temperatura del agua no es la prometida o tu experiencia no cumple lo que dijimos, te compensamos. Sin discusiones, sin letra chica.</p>
+        <h1>Si tu tina llega a 37°C o menos, es gratis.</h1>
+        <p class="lead">Las tinas Aremko están calibradas a 38°C. Si llegas y el agua no está a esa temperatura (sensor marca 37°C o menos), no la cobramos. Sin discusiones, sin letra chica.</p>
     </div>
 </section>
 
@@ -137,44 +137,37 @@
         <div class="row justify-content-center">
             <div class="col-lg-9">
                 <h2 class="section-title mb-4 text-center">Por qué la creamos</h2>
-                <p class="lead">En spa de la zona pasa más seguido de lo que se cuenta: llegas con frío después de 5 horas de auto, te metes a la tina, y el agua está tibia. Las quejas se las llevan los recepcionistas, no los dueños. Y al final, te encogiste de hombros y te fuiste.</p>
-                <p>Nosotros queremos algo distinto. Por eso firmamos una garantía explícita: si Aremko no cumple lo que prometió, lo arreglamos en el momento o te lo compensamos. Es la única garantía de este tipo en Puerto Varas.</p>
+                <p class="lead">En spas de la zona pasa más seguido de lo que se cuenta: llegas con frío después de 5 horas de auto, te metes a la tina, y el agua está tibia. Las quejas se las llevan los recepcionistas, no los dueños. Y al final, te encogiste de hombros y te fuiste igual.</p>
+                <p>Nosotros queremos algo distinto. Por eso firmamos una garantía explícita y simple: las tinas Aremko están a 38°C. Si llegan a 37°C o menos, la tina es gratis. Es la única garantía de temperatura de spa en Puerto Varas.</p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Qué cubre -->
+<!-- Cómo funciona -->
 <section class="py-5" style="background:#f7f4ee;">
     <div class="container">
-        <h2 class="section-title mb-5 text-center">Qué cubre</h2>
-        <div class="row g-4">
-            <div class="col-md-6 col-lg-3">
+        <h2 class="section-title mb-5 text-center">Cómo funciona</h2>
+        <div class="row g-4 justify-content-center">
+            <div class="col-md-6 col-lg-4">
                 <div class="cubre-card">
                     <div class="icon"><i class="fas fa-thermometer-three-quarters"></i></div>
-                    <h3>Temperatura de tina</h3>
-                    <p class="mb-0">Si tu tina llega a 37°C o menos, te lo compensamos con un masaje o tina adicional. Sensores con tope a 40°C, calibrados antes de cada llegada.</p>
+                    <h3>1. Calibración previa</h3>
+                    <p class="mb-0">Antes de tu llegada, calibramos la tina a 38°C. Sensores con tope a 40°C registran la temperatura en cada momento.</p>
                 </div>
             </div>
-            <div class="col-md-6 col-lg-3">
+            <div class="col-md-6 col-lg-4">
                 <div class="cubre-card">
-                    <div class="icon"><i class="fas fa-shower"></i></div>
-                    <h3>Agua caliente en duchas</h3>
-                    <p class="mb-0">Si esperas más de 2 minutos por agua caliente en la ducha de tu cabaña, lo reportas a recepción y resolvemos en menos de 15 min.</p>
+                    <div class="icon"><i class="fas fa-eye"></i></div>
+                    <h3>2. Verificación en tu llegada</h3>
+                    <p class="mb-0">Si quieres verificarlo, le pides al equipo el dato del sensor antes de meterte. Está documentado en cada tina.</p>
                 </div>
             </div>
-            <div class="col-md-6 col-lg-3">
+            <div class="col-md-6 col-lg-4">
                 <div class="cubre-card">
-                    <div class="icon"><i class="fas fa-fire"></i></div>
-                    <h3>Calefacción de cabaña</h3>
-                    <p class="mb-0">Cabañas climatizadas a 22°C. Si llegas y está fría, lo solucionamos al toque. Si no podemos, descontamos la noche.</p>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="cubre-card">
-                    <div class="icon"><i class="fas fa-handshake"></i></div>
-                    <h3>Satisfacción general</h3>
-                    <p class="mb-0">Si algo más no cumple lo que prometimos en la web o en tu reserva, hablamos. Resolvemos en el momento o compensamos antes de que te vayas.</p>
+                    <div class="icon"><i class="fas fa-gift"></i></div>
+                    <h3>3. Si está a 37°C o menos</h3>
+                    <p class="mb-0">No la cobramos. Punto. Tu tina es gratis. Sin tener que pedirlo dos veces, sin formularios, sin "te lo descontamos al próximo viaje".</p>
                 </div>
             </div>
         </div>
@@ -187,19 +180,19 @@
         <div class="row justify-content-center">
             <div class="col-lg-9">
                 <h2 class="section-title mb-4">Qué NO cubre (somos honestos)</h2>
-                <p class="text-muted mb-4">Para que no haya confusiones, también te decimos lo que la garantía no cubre:</p>
+                <p class="text-muted mb-4">La garantía aplica exclusivamente a la temperatura de la tina al momento de tu llegada. Para que no haya confusiones, esto es lo que no cubre:</p>
 
                 <div class="no-cubre-card">
-                    <strong>Clima:</strong> no controlamos la lluvia, el viento o el frío del sur. Eso es parte del paquete.
+                    <strong>Que el agua se enfríe durante tu uso por causas externas:</strong> si dejas la tapa abierta una hora con viento helado, esa pérdida es física. La garantía aplica a la temperatura inicial.
                 </div>
                 <div class="no-cubre-card">
-                    <strong>Cambios subjetivos de gusto:</strong> "no me gustó el color de las sábanas" o "esperaba algo más lujoso" no aplica. Te describimos exactamente cómo somos antes de que reserves.
+                    <strong>Otros servicios:</strong> la garantía es solo de temperatura de tina. Masajes y cabañas tienen sus propias políticas (siempre las honramos, pero no entran en esta garantía específica).
                 </div>
                 <div class="no-cubre-card">
-                    <strong>Daños causados por el cliente:</strong> si rompes algo a propósito, no aplica.
+                    <strong>Clima:</strong> no controlamos la lluvia, el viento o el frío del sur. Eso es parte de meterse en una tina al aire libre en Puerto Varas.
                 </div>
                 <div class="no-cubre-card">
-                    <strong>Preferencias gastronómicas no informadas:</strong> si tienes restricciones alimentarias y no las informas al reservar, no podemos compensar después.
+                    <strong>Daños causados por el cliente:</strong> si rompes algo a propósito o en mal uso, no aplica.
                 </div>
             </div>
         </div>
@@ -214,28 +207,33 @@
                 <h2 class="section-title mb-4 text-center">Preguntas frecuentes</h2>
 
                 <div class="faq-item-g">
-                    <h4>¿Cómo activo la garantía si algo sale mal?</h4>
-                    <p class="mb-0">Avísale a recepción inmediatamente. Tenemos protocolo de respuesta en menos de 15 minutos. Si no logramos resolver el problema en el momento, te compensamos antes de que te vayas. Nada de "te lo solucionamos al próximo viaje".</p>
+                    <h4>¿Qué garantiza Aremko exactamente?</h4>
+                    <p class="mb-0">La temperatura del agua de la tina al momento de tu uso. Las tinas Aremko están a 38°C. Si llegas y el sensor marca 37°C o menos, la tina es gratis.</p>
                 </div>
 
                 <div class="faq-item-g">
-                    <h4>¿Cuál es la temperatura garantizada de las tinas?</h4>
-                    <p class="mb-0">38°C exactos al llegar. Sensores con tope a 40°C. Si llega a 37°C o menos, es gratis.</p>
+                    <h4>¿Cómo se activa la garantía?</h4>
+                    <p class="mb-0">Le avisas al equipo al momento de tu llegada o durante el uso. Verificamos juntos la temperatura con el sensor. Si marca 37°C o menos, no te cobramos la tina.</p>
+                </div>
+
+                <div class="faq-item-g">
+                    <h4>¿Cuál es la temperatura objetivo?</h4>
+                    <p class="mb-0">38°C. Los sensores tienen tope a 40°C como medida de seguridad. La calibración se hace antes de cada llegada.</p>
                 </div>
 
                 <div class="faq-item-g">
                     <h4>¿Algún otro spa de Puerto Varas tiene garantía similar?</h4>
-                    <p class="mb-0">No. Revisamos las webs y políticas de Alma Lemu, Los Notros, Pillang Likan y DreamWoods en abril 2026. Ninguno ofrece garantía de temperatura ni de satisfacción explícita. Aremko es el primer spa de la zona en hacerlo.</p>
-                </div>
-
-                <div class="faq-item-g">
-                    <h4>¿La compensación es en plata o en servicios?</h4>
-                    <p class="mb-0">En servicios. Si la tina no estaba caliente, compensamos con un masaje o tina extra. Si la cabaña no se calefacciona, descontamos la noche del total. La idea es que vivas la experiencia que viniste a buscar, no que te vayas con un voucher para algún día.</p>
+                    <p class="mb-0">No. Revisamos las webs y políticas de Alma Lemu, Los Notros, Pillang Likan y DreamWoods en abril 2026. Ninguno ofrece garantía de temperatura. Aremko es el primer spa de la zona en hacerlo.</p>
                 </div>
 
                 <div class="faq-item-g">
                     <h4>¿La garantía aplica también para reservas con descuento?</h4>
                     <p class="mb-0">Sí. Sea promo, gift card, convenio empresarial o tarifa regular: la garantía es la misma para todos.</p>
+                </div>
+
+                <div class="faq-item-g">
+                    <h4>¿Qué pasa si la tina llega justo a 38°C o un poquito más?</h4>
+                    <p class="mb-0">Aplica precio normal. La garantía se gatilla con 37°C o menos. Entre 37.1°C y 38°C+ es lo prometido.</p>
                 </div>
             </div>
         </div>
@@ -246,7 +244,7 @@
 <section class="cta-section text-center py-5 bg-primary text-white">
     <div class="container">
         <h2 class="mb-3">Reservar con confianza es así.</h2>
-        <p class="lead mb-4">Pack completo (masaje + tina + cabaña) desde $190.000 · Domingo a jueves $110.000 · Garantía 38°C incluida.</p>
+        <p class="lead mb-4">Pack completo (masaje + tina + cabaña) desde $190.000 · Domingo a jueves $110.000 · Garantía 37°C o menos = gratis incluida.</p>
         <a href="{% url 'alojamientos' %}" class="btn btn-light btn-lg">
             <i class="fas fa-calendar-check me-2"></i>Reservar mi escape
         </a>

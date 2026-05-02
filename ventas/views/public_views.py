@@ -266,8 +266,8 @@ def garantia_view(request):
         canonical_url = request.path
 
     context = {
-        'page_title': 'Garantía Aremko: 38°C o te lo compensamos',
-        'meta_description': 'Si la temperatura del agua no es la prometida o tu experiencia no cumple expectativas, te compensamos. La única garantía de spa en Puerto Varas.',
+        'page_title': 'Garantía Aremko: si tu tina llega a 37°C o menos, es gratis',
+        'meta_description': 'Las tinas Aremko están a 38°C. Si llegan a 37°C o menos, la tina es gratis. La única garantía de temperatura de spa en Puerto Varas.',
         'canonical_url': canonical_url,
     }
     return render(request, 'ventas/garantia.html', context)
