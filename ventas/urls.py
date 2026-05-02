@@ -172,6 +172,10 @@ urlpatterns = [
     path('api/interactions/log/', api_views.log_campaign_interaction, name='log_campaign_interaction'), # Logs incoming interactions
     # --- End Remarketing URLs ---
 
+    # === Cron endpoint para envío de campañas (cron-job.org) ===
+    # Llamar cada 8 minutos. Auth: header X-API-KEY con AUTOMATION_API_KEY.
+    path('api/cron/send-email-batch/', api_views.cron_send_email_batch, name='cron_send_email_batch'),
+
     # API para obtener comunas por región
     path('api/comunas-por-region/', api_views.comunas_por_region, name='comunas_por_region'),
     

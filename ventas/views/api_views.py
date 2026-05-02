@@ -654,3 +654,54 @@ def comunas_por_region(request):
         return JsonResponse({
             "error": f"Error al obtener comunas: {str(e)}"
         }, status=500)
+
+
+# --- Cron endpoint para envío de campañas (cron-job.org u otro) ---
+
+@csrf_exempt
+@api_view(['POST', 'GET'])
+@permission_classes([AllowAny])
+def cron_send_email_batch(request):
+    """
+    Endpoint para que un cron externo (cron-job.org) dispare el envío de un lote
+    de la campaña activa.
+
+    Equivale a ejecutar:
+      python manage.py enviar_campana_email --auto --single-batch --ignore-schedule
+
+    Auth: header X-API-KEY con valor de settings.AUTOMATION_API_KEY.
+    Schedule sugerido en cron-job.org: cada 8 minutos.
+
+    Cada invocación procesa 1 lote (50 emails por la config de la campaña 88) y
+    sale rápido (~30-60 seg). Si no hay campañas activas (status='ready' o
+    'sending'), no hace nada y responde de inmediato.
+    """
+    if not is_valid_api_key(request):
+        return Response(
+            {"error": "Authentication required. Set X-API-KEY header."},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    from io import StringIO
+    from django.core.management import call_command
+
+    output = StringIO()
+    try:
+        call_command(
+            'enviar_campana_email',
+            auto=True,
+            single_batch=True,
+            ignore_schedule=True,
+            stdout=output,
+            stderr=output,
+        )
+        return Response({
+            "success": True,
+            "output": output.getvalue()[-3000:],
+        })
+    except Exception as e:
+        return Response({
+            "success": False,
+            "error": str(e),
+            "output": output.getvalue()[-3000:],
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
