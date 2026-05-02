@@ -13,6 +13,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = os.getenv('DEBUG') == 'True'
 
+# API Key para automatizaciones (cron-job.org, n8n, etc.)
+# Usado por endpoints en /ventas/api/cron/* y /ventas/api/campaigns/*
+AUTOMATION_API_KEY = os.getenv('AUTOMATION_API_KEY', '')
+
 # Configuraciones de seguridad
 SECURE_SSL_REDIRECT = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
