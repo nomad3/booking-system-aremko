@@ -5,6 +5,7 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
 import random
 import string
@@ -5125,3 +5126,213 @@ class ServicioSlotBloqueo(models.Model):
             hora_slot=hora_slot,
             activo=True
         ).exists()
+
+
+# ============================================================================
+# ENCUESTA DE SATISFACCIÓN — Sistema VoC integrado (Tarea 1.4 plan maestro)
+# Reemplaza el Google Form externo con captura nativa a BD para análisis IA
+# ============================================================================
+
+CAL_1_5 = [MinValueValidator(1), MaxValueValidator(5)]
+NPS_0_10 = [MinValueValidator(0), MaxValueValidator(10)]
+
+
+class EncuestaSatisfaccion(models.Model):
+    """Respuesta a la encuesta de satisfacción enviada D+1 vía email.
+
+    Reemplaza el Google Form histórico (datos importados con origen='legacy_google_form').
+    Cada respuesta se vincula opcionalmente a un Cliente y a una VentaReserva específica
+    para poder cruzar con métricas operativas y comerciales.
+    """
+
+    ORIGEN_CHOICES = [
+        ('formulario_web', 'Formulario web Aremko'),
+        ('legacy_google_form', 'Google Form (legacy)'),
+        ('manual', 'Ingreso manual'),
+    ]
+
+    COMO_SE_ENTERO_CHOICES = [
+        ('soy_cliente', 'Soy cliente recurrente'),
+        ('recomendacion', 'Recomendación de conocido'),
+        ('instagram', 'Instagram'),
+        ('facebook', 'Facebook'),
+        ('google', 'Google / búsqueda'),
+        ('blog', 'Blog Aremko'),
+        ('publicidad', 'Publicidad'),
+        ('otro', 'Otro'),
+    ]
+
+    OCASION_CHOICES = [
+        ('pareja', 'Escapada en pareja'),
+        ('cumpleanos', 'Cumpleaños'),
+        ('aniversario', 'Aniversario'),
+        ('amigos', 'Amigos'),
+        ('familia', 'Familia'),
+        ('trabajo', 'Trabajo / empresa'),
+        ('solo', 'Solo / sola'),
+        ('otro', 'Otro'),
+    ]
+
+    INTENCION_VOLVER_CHOICES = [
+        ('si_6m', 'Sí, en menos de 6 meses'),
+        ('si_12m', 'Sí, en 6-12 meses'),
+        ('si_mas_1a', 'Sí, en más de 1 año'),
+        ('no_seguro', 'No estoy seguro/a'),
+        ('probablemente_no', 'Probablemente no'),
+    ]
+
+    # === Metadata ===
+    cliente = models.ForeignKey(
+        'Cliente', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='encuestas_satisfaccion'
+    )
+    venta_reserva = models.ForeignKey(
+        'VentaReserva', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='encuestas_satisfaccion',
+        help_text='Reserva específica que motivó esta encuesta'
+    )
+    fecha_respuesta = models.DateTimeField(default=timezone.now, db_index=True)
+    fecha_visita = models.DateField(null=True, blank=True, help_text='Fecha de la visita evaluada')
+    origen = models.CharField(max_length=30, choices=ORIGEN_CHOICES, default='formulario_web')
+
+    # Datos de contacto (si no hay Cliente vinculado, ej. encuestas anónimas legacy)
+    contacto_nombre = models.CharField(max_length=200, blank=True)
+    contacto_email = models.EmailField(blank=True)
+
+    # === Servicios contratados (multiselect persistido como lista) ===
+    servicios_contratados = models.JSONField(
+        default=list, blank=True,
+        help_text='Lista: tina_hidromasaje, tina_sin_hidromasaje, masaje, alojamiento'
+    )
+
+    # === Calificaciones operativas (1-5, opcionales según servicio) ===
+    cal_temperatura_tina = models.PositiveSmallIntegerField(null=True, blank=True, validators=CAL_1_5)
+    cal_transparencia_agua = models.PositiveSmallIntegerField(null=True, blank=True, validators=CAL_1_5)
+    cal_limpieza_tinas = models.PositiveSmallIntegerField(null=True, blank=True, validators=CAL_1_5)
+    cal_limpieza_cabana = models.PositiveSmallIntegerField(null=True, blank=True, validators=CAL_1_5)
+    cal_temperatura_cabana = models.PositiveSmallIntegerField(null=True, blank=True, validators=CAL_1_5)
+    cal_limpieza_sala_masajes = models.PositiveSmallIntegerField(null=True, blank=True, validators=CAL_1_5)
+    cal_servicio_masajes = models.PositiveSmallIntegerField(null=True, blank=True, validators=CAL_1_5)
+
+    # === Calificaciones comerciales (1-5) ===
+    cal_calidad_precio = models.PositiveSmallIntegerField(null=True, blank=True, validators=CAL_1_5)
+    cal_atencion_ventas = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=CAL_1_5,
+        help_text='Atención por WhatsApp/Instagram/Facebook'
+    )
+    cal_compra_web = models.PositiveSmallIntegerField(null=True, blank=True, validators=CAL_1_5)
+    cal_atencion_visita = models.PositiveSmallIntegerField(null=True, blank=True, validators=CAL_1_5)
+
+    # === Experiencia general + NPS ===
+    cal_experiencia_general = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=CAL_1_5,
+        help_text='Calificación global de la experiencia'
+    )
+    nps_score = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=NPS_0_10,
+        help_text='0-10. Promotores: 9-10. Pasivos: 7-8. Detractores: 0-6'
+    )
+
+    # === Texto libre (input para análisis IA cualitativo) ===
+    lo_que_mas_gusto = models.TextField(blank=True)
+    sugerencias = models.TextField(blank=True)
+    decepcion = models.TextField(blank=True, help_text='¿Hubo algo que te decepcionó?')
+
+    # === Comercial / segmentación ===
+    como_se_entero = models.CharField(max_length=30, choices=COMO_SE_ENTERO_CHOICES, blank=True)
+    como_se_entero_otro = models.CharField(max_length=200, blank=True)
+    ocasion_visita = models.CharField(max_length=30, choices=OCASION_CHOICES, blank=True)
+    intencion_volver = models.CharField(max_length=30, choices=INTENCION_VOLVER_CHOICES, blank=True)
+
+    # === Permisos ===
+    permite_uso_comentarios_redes = models.BooleanField(
+        null=True, blank=True,
+        help_text='¿Podemos usar tus comentarios anónimos en redes sociales?'
+    )
+    quiere_newsletter = models.BooleanField(null=True, blank=True)
+    permite_seguimiento = models.BooleanField(
+        null=True, blank=True,
+        help_text='¿Podemos contactarte si necesitamos más información?'
+    )
+
+    # === Análisis IA (cache de procesamiento semanal) ===
+    analisis_ia = models.JSONField(
+        null=True, blank=True,
+        help_text='Análisis automático: sentiment, temas, urgencia detectados'
+    )
+
+    # === Follow-up operativo ===
+    requiere_followup = models.BooleanField(
+        default=False,
+        help_text='Marcado cuando NPS<=5 o califica 1-2 en alguna dimensión crítica'
+    )
+    followup_completado = models.BooleanField(default=False)
+    followup_notas = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = 'Encuesta de satisfacción'
+        verbose_name_plural = 'Encuestas de satisfacción'
+        ordering = ['-fecha_respuesta']
+        indexes = [
+            models.Index(fields=['-fecha_respuesta']),
+            models.Index(fields=['cliente']),
+            models.Index(fields=['nps_score']),
+            models.Index(fields=['requiere_followup', 'followup_completado']),
+            models.Index(fields=['origen']),
+        ]
+
+    def __str__(self):
+        nombre = self.contacto_nombre or (self.cliente.nombre if self.cliente else 'Anónimo')
+        fecha = self.fecha_respuesta.strftime('%Y-%m-%d') if self.fecha_respuesta else '?'
+        nps = f' NPS={self.nps_score}' if self.nps_score is not None else ''
+        return f'Encuesta {fecha} · {nombre}{nps}'
+
+    @property
+    def nps_categoria(self):
+        if self.nps_score is None:
+            return None
+        if self.nps_score >= 9:
+            return 'promotor'
+        if self.nps_score >= 7:
+            return 'pasivo'
+        return 'detractor'
+
+    @property
+    def califica_para_review_publico(self):
+        """Retorna True si el cliente reportó experiencia muy positiva (4-5⭐ o NPS>=7).
+
+        Usado por la página de "Gracias" para mostrar/ocultar el funnel a Google Reviews.
+        Filosofía: solo invitamos a reseña pública a clientes contentos. Ético + estratégico.
+        """
+        if self.cal_experiencia_general is not None and self.cal_experiencia_general >= 4:
+            return True
+        if self.nps_score is not None and self.nps_score >= 7:
+            return True
+        return False
+
+    def evaluar_followup(self):
+        """Determina si esta encuesta requiere follow-up urgente.
+
+        Criterios:
+        - NPS detractor (<=6)
+        - Cualquier calificación 1-2 en dimensiones operativas críticas
+        - Texto en 'decepcion' o 'sugerencias' marcado por IA como urgente
+        """
+        if self.nps_score is not None and self.nps_score <= 6:
+            return True
+        criticas = [
+            self.cal_temperatura_tina, self.cal_atencion_visita,
+            self.cal_servicio_masajes, self.cal_experiencia_general,
+            self.cal_limpieza_tinas, self.cal_limpieza_cabana,
+        ]
+        if any(c is not None and c <= 2 for c in criticas):
+            return True
+        if self.analisis_ia and self.analisis_ia.get('urgencia') == 'alta':
+            return True
+        return False
+
+    def save(self, *args, **kwargs):
+        # Auto-marcar follow-up si aplica
+        if not self.followup_completado:
+            self.requiere_followup = self.evaluar_followup()
+        super().save(*args, **kwargs)
