@@ -253,6 +253,26 @@ def privacy_policy_view(request):
     return render(request, 'ventas/privacy_policy.html')
 
 
+def garantia_view(request):
+    """
+    Página dedicada a la Garantía Aremko.
+    Diferenciador único: ningún competidor de Puerto Varas ofrece garantía explícita.
+    Atacar la objeción #1 detectada en el reporte 7 Maletas: inconsistencia de
+    temperatura del agua.
+    """
+    try:
+        canonical_url = request.build_absolute_uri(request.path)
+    except Exception:
+        canonical_url = request.path
+
+    context = {
+        'page_title': 'Garantía Aremko: 38°C o te lo compensamos',
+        'meta_description': 'Si la temperatura del agua no es la prometida o tu experiencia no cumple expectativas, te compensamos. La única garantía de spa en Puerto Varas.',
+        'canonical_url': canonical_url,
+    }
+    return render(request, 'ventas/garantia.html', context)
+
+
 def subscribe_view(request):
     """
     Maneja la suscripción al newsletter creando un NewsletterSubscriber.

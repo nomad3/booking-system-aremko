@@ -1,0 +1,256 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }} - Aremko Spa Boutique{% endblock %}
+
+{% block meta %}
+<meta name="description" content="{{ meta_description }}">
+<meta property="og:title" content="{{ page_title }} - Aremko Spa Boutique">
+<meta property="og:description" content="{{ meta_description }}">
+<meta property="og:type" content="website">
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "¿Qué cubre la Garantía Aremko?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Si la temperatura del agua de tu tina llega a 37°C o menos, o si la experiencia no cumple lo prometido, te compensamos con un masaje o tina adicional sin costo. También cubre falta de agua caliente en duchas y calefacción deficiente en cabañas."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Cuál es la temperatura garantizada de las tinas?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "38°C exactos al llegar. Sensores con tope a 40°C. Si tu tina llega a 37°C o menos, es gratis."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Cómo activo la garantía si algo sale mal?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Avísale a recepción inmediatamente. Tenemos protocolo de respuesta en menos de 15 minutos. Si no logramos resolver el problema en el momento, te compensamos."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Algún otro spa de Puerto Varas tiene garantía similar?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Aremko es el único spa de la zona que ofrece garantía explícita de temperatura y satisfacción. Ningún competidor (Alma Lemu, Los Notros, Pillang Likan, DreamWoods) la ofrece."
+      }
+    }
+  ]
+}
+</script>
+
+<style>
+.garantia-hero {
+    background: linear-gradient(135deg, #2c5f5d 0%, #1a4040 100%);
+    color: #fff;
+    padding: 80px 0 60px;
+}
+.garantia-hero h1 {
+    font-size: 2.8rem;
+    line-height: 1.15;
+    margin-bottom: 1rem;
+}
+.garantia-hero .lead {
+    font-size: 1.25rem;
+    opacity: 0.92;
+    max-width: 750px;
+    margin: 0 auto;
+}
+.garantia-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+    margin-bottom: 1.5rem;
+}
+.cubre-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 28px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    height: 100%;
+    border-left: 4px solid #2c5f5d;
+}
+.cubre-card .icon {
+    font-size: 2.5rem;
+    color: #2c5f5d;
+    margin-bottom: 14px;
+}
+.cubre-card h3 {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+}
+.no-cubre-card {
+    background: #fff8f0;
+    border-radius: 8px;
+    padding: 18px 22px;
+    border-left: 3px solid #d97706;
+    margin-bottom: 12px;
+}
+.faq-garantia {
+    background: #f7f4ee;
+    padding: 60px 0;
+}
+.faq-item-g {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+.faq-item-g h4 {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+    color: #2c5f5d;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<section class="garantia-hero text-center">
+    <div class="container">
+        <span class="garantia-badge">GARANTÍA AREMKO</span>
+        <h1>38°C o te lo compensamos.</h1>
+        <p class="lead">Si la temperatura del agua no es la prometida o tu experiencia no cumple lo que dijimos, te compensamos. Sin discusiones, sin letra chica.</p>
+    </div>
+</section>
+
+<!-- Por qué la creamos -->
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-9">
+                <h2 class="section-title mb-4 text-center">Por qué la creamos</h2>
+                <p class="lead">En spa de la zona pasa más seguido de lo que se cuenta: llegas con frío después de 5 horas de auto, te metes a la tina, y el agua está tibia. Las quejas se las llevan los recepcionistas, no los dueños. Y al final, te encogiste de hombros y te fuiste.</p>
+                <p>Nosotros queremos algo distinto. Por eso firmamos una garantía explícita: si Aremko no cumple lo que prometió, lo arreglamos en el momento o te lo compensamos. Es la única garantía de este tipo en Puerto Varas.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Qué cubre -->
+<section class="py-5" style="background:#f7f4ee;">
+    <div class="container">
+        <h2 class="section-title mb-5 text-center">Qué cubre</h2>
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-3">
+                <div class="cubre-card">
+                    <div class="icon"><i class="fas fa-thermometer-three-quarters"></i></div>
+                    <h3>Temperatura de tina</h3>
+                    <p class="mb-0">Si tu tina llega a 37°C o menos, te lo compensamos con un masaje o tina adicional. Sensores con tope a 40°C, calibrados antes de cada llegada.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="cubre-card">
+                    <div class="icon"><i class="fas fa-shower"></i></div>
+                    <h3>Agua caliente en duchas</h3>
+                    <p class="mb-0">Si esperas más de 2 minutos por agua caliente en la ducha de tu cabaña, lo reportas a recepción y resolvemos en menos de 15 min.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="cubre-card">
+                    <div class="icon"><i class="fas fa-fire"></i></div>
+                    <h3>Calefacción de cabaña</h3>
+                    <p class="mb-0">Cabañas climatizadas a 22°C. Si llegas y está fría, lo solucionamos al toque. Si no podemos, descontamos la noche.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="cubre-card">
+                    <div class="icon"><i class="fas fa-handshake"></i></div>
+                    <h3>Satisfacción general</h3>
+                    <p class="mb-0">Si algo más no cumple lo que prometimos en la web o en tu reserva, hablamos. Resolvemos en el momento o compensamos antes de que te vayas.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Qué NO cubre (transparencia) -->
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-9">
+                <h2 class="section-title mb-4">Qué NO cubre (somos honestos)</h2>
+                <p class="text-muted mb-4">Para que no haya confusiones, también te decimos lo que la garantía no cubre:</p>
+
+                <div class="no-cubre-card">
+                    <strong>Clima:</strong> no controlamos la lluvia, el viento o el frío del sur. Eso es parte del paquete.
+                </div>
+                <div class="no-cubre-card">
+                    <strong>Cambios subjetivos de gusto:</strong> "no me gustó el color de las sábanas" o "esperaba algo más lujoso" no aplica. Te describimos exactamente cómo somos antes de que reserves.
+                </div>
+                <div class="no-cubre-card">
+                    <strong>Daños causados por el cliente:</strong> si rompes algo a propósito, no aplica.
+                </div>
+                <div class="no-cubre-card">
+                    <strong>Preferencias gastronómicas no informadas:</strong> si tienes restricciones alimentarias y no las informas al reservar, no podemos compensar después.
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ -->
+<section class="faq-garantia">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-9">
+                <h2 class="section-title mb-4 text-center">Preguntas frecuentes</h2>
+
+                <div class="faq-item-g">
+                    <h4>¿Cómo activo la garantía si algo sale mal?</h4>
+                    <p class="mb-0">Avísale a recepción inmediatamente. Tenemos protocolo de respuesta en menos de 15 minutos. Si no logramos resolver el problema en el momento, te compensamos antes de que te vayas. Nada de "te lo solucionamos al próximo viaje".</p>
+                </div>
+
+                <div class="faq-item-g">
+                    <h4>¿Cuál es la temperatura garantizada de las tinas?</h4>
+                    <p class="mb-0">38°C exactos al llegar. Sensores con tope a 40°C. Si llega a 37°C o menos, es gratis.</p>
+                </div>
+
+                <div class="faq-item-g">
+                    <h4>¿Algún otro spa de Puerto Varas tiene garantía similar?</h4>
+                    <p class="mb-0">No. Revisamos las webs y políticas de Alma Lemu, Los Notros, Pillang Likan y DreamWoods en abril 2026. Ninguno ofrece garantía de temperatura ni de satisfacción explícita. Aremko es el primer spa de la zona en hacerlo.</p>
+                </div>
+
+                <div class="faq-item-g">
+                    <h4>¿La compensación es en plata o en servicios?</h4>
+                    <p class="mb-0">En servicios. Si la tina no estaba caliente, compensamos con un masaje o tina extra. Si la cabaña no se calefacciona, descontamos la noche del total. La idea es que vivas la experiencia que viniste a buscar, no que te vayas con un voucher para algún día.</p>
+                </div>
+
+                <div class="faq-item-g">
+                    <h4>¿La garantía aplica también para reservas con descuento?</h4>
+                    <p class="mb-0">Sí. Sea promo, gift card, convenio empresarial o tarifa regular: la garantía es la misma para todos.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA final -->
+<section class="cta-section text-center py-5 bg-primary text-white">
+    <div class="container">
+        <h2 class="mb-3">Reservar con confianza es así.</h2>
+        <p class="lead mb-4">Pack completo (masaje + tina + cabaña) desde $190.000 · Domingo a jueves $110.000 · Garantía 38°C incluida.</p>
+        <a href="{% url 'alojamientos' %}" class="btn btn-light btn-lg">
+            <i class="fas fa-calendar-check me-2"></i>Reservar mi escape
+        </a>
+    </div>
+</section>
+
+{% endblock %}
