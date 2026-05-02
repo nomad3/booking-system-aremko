@@ -3,12 +3,16 @@
 
 {% block title %}Garantía Aremko: si tu tina llega a 37°C o menos, es gratis - Aremko Spa Boutique{% endblock %}
 
-{% block meta %}
-<meta name="description" content="{{ meta_description }}">
+{% block meta_description %}<meta name="description" content="{{ meta_description }}">
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}{% endblock %}
+
+{% block meta_og %}
 <meta property="og:title" content="{{ page_title }} - Aremko Spa Boutique">
 <meta property="og:description" content="{{ meta_description }}">
 <meta property="og:type" content="website">
-{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
+{% endblock %}
+
+{% block extra_style %}
 
 <script type="application/ld+json">
 {

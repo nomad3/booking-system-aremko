@@ -3,9 +3,10 @@
 
 {% block title %}{{ page_title }}{% endblock %}
 
-{% block meta %}
-<meta name="description" content="{{ meta_description }}">
-<meta name="robots" content="noindex, nofollow">
+{% block meta_description %}<meta name="description" content="{{ meta_description }}">
+<meta name="robots" content="noindex, nofollow">{% endblock %}
+
+{% block extra_style %}
 <style>
     .encuesta-container {
         max-width: 720px;
