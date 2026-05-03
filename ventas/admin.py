@@ -44,7 +44,9 @@ from .models import (
     # Sistema de Pagos a Masajistas
     PagoMasajista, DetalleServicioPago,
     # Sistema de Comandas
-    Comanda, DetalleComanda
+    Comanda, DetalleComanda,
+    # Encuesta de Satisfacción (VoC)
+    EncuestaSatisfaccion,
 )
 from django.http import HttpResponse
 import xlwt
@@ -3933,3 +3935,200 @@ class ServicioBloqueoAdminMejorado(ServicioBloqueoAdmin):
 # Re-registrar con el admin mejorado
 admin.site.unregister(ServicioBloqueo)
 admin.site.register(ServicioBloqueo, ServicioBloqueoAdminMejorado)
+
+
+# ============================================================================
+# ENCUESTA DE SATISFACCIÓN — Dashboard admin (Tarea 1.4 Fase B)
+# ============================================================================
+
+class NPSCategoriaListFilter(admin.SimpleListFilter):
+    """Filtro lateral por categoría NPS (promotor/pasivo/detractor)."""
+    title = 'Categoría NPS'
+    parameter_name = 'nps_categoria'
+
+    def lookups(self, request, model_admin):
+        return [
+            ('promotor', 'Promotores (9-10)'),
+            ('pasivo', 'Pasivos (7-8)'),
+            ('detractor', 'Detractores (0-6)'),
+            ('sin_dato', 'Sin NPS'),
+        ]
+
+    def queryset(self, request, queryset):
+        v = self.value()
+        if v == 'promotor':
+            return queryset.filter(nps_score__gte=9)
+        if v == 'pasivo':
+            return queryset.filter(nps_score__gte=7, nps_score__lte=8)
+        if v == 'detractor':
+            return queryset.filter(nps_score__lte=6)
+        if v == 'sin_dato':
+            return queryset.filter(nps_score__isnull=True)
+        return queryset
+
+
+@admin.register(EncuestaSatisfaccion)
+class EncuestaSatisfaccionAdmin(admin.ModelAdmin):
+    """Dashboard para revisar las encuestas de satisfacción.
+
+    Permite filtrar por NPS, fecha, follow-up; buscar por texto libre;
+    marcar follow-ups completados en bulk.
+    """
+
+    list_display = (
+        'fecha_respuesta_short', 'persona_display', 'nps_badge',
+        'cal_experiencia_general', 'cal_calidad_precio',
+        'requiere_followup', 'followup_completado',
+        'origen_short',
+    )
+    list_filter = (
+        NPSCategoriaListFilter,
+        'requiere_followup', 'followup_completado',
+        'origen', 'ocasion_visita', 'como_se_entero',
+    )
+    search_fields = (
+        'contacto_nombre', 'contacto_email',
+        'cliente__nombre', 'cliente__email',
+        'sugerencias', 'lo_que_mas_gusto', 'decepcion',
+    )
+    date_hierarchy = 'fecha_respuesta'
+    ordering = ('-fecha_respuesta',)
+    list_per_page = 50
+
+    readonly_fields = (
+        'fecha_respuesta', 'origen', 'cliente_link', 'venta_reserva',
+        'nps_categoria_display', 'califica_review_publico_display',
+    )
+
+    fieldsets = (
+        ('Identificación', {
+            'fields': (
+                'fecha_respuesta', 'fecha_visita', 'origen',
+                'cliente', 'cliente_link', 'venta_reserva',
+                'contacto_nombre', 'contacto_email',
+            ),
+        }),
+        ('Servicios contratados', {
+            'fields': ('servicios_contratados',),
+        }),
+        ('Calificaciones operativas (1-5)', {
+            'fields': (
+                'cal_temperatura_tina', 'cal_transparencia_agua', 'cal_limpieza_tinas',
+                'cal_limpieza_cabana', 'cal_temperatura_cabana',
+                'cal_limpieza_sala_masajes', 'cal_servicio_masajes',
+            ),
+        }),
+        ('Calificaciones comerciales (1-5)', {
+            'fields': (
+                'cal_calidad_precio', 'cal_atencion_ventas',
+                'cal_compra_web', 'cal_atencion_visita',
+            ),
+        }),
+        ('Experiencia general + NPS', {
+            'fields': (
+                'cal_experiencia_general',
+                'nps_score', 'nps_categoria_display',
+                'califica_review_publico_display',
+            ),
+        }),
+        ('Texto libre', {
+            'fields': ('lo_que_mas_gusto', 'sugerencias', 'decepcion'),
+        }),
+        ('Comercial / segmentación', {
+            'fields': (
+                'como_se_entero', 'como_se_entero_otro',
+                'ocasion_visita', 'intencion_volver',
+            ),
+        }),
+        ('Permisos', {
+            'fields': (
+                'permite_uso_comentarios_redes', 'quiere_newsletter',
+                'permite_seguimiento',
+            ),
+        }),
+        ('Follow-up operativo', {
+            'fields': (
+                'requiere_followup', 'followup_completado', 'followup_notas',
+            ),
+        }),
+        ('Análisis IA', {
+            'fields': ('analisis_ia',),
+            'classes': ('collapse',),
+        }),
+    )
+
+    actions = ['marcar_followup_completado', 'marcar_followup_pendiente']
+
+    # ===== Display helpers =====
+
+    def fecha_respuesta_short(self, obj):
+        return obj.fecha_respuesta.strftime('%Y-%m-%d %H:%M') if obj.fecha_respuesta else '—'
+    fecha_respuesta_short.short_description = 'Fecha respuesta'
+    fecha_respuesta_short.admin_order_field = 'fecha_respuesta'
+
+    def persona_display(self, obj):
+        from django.utils.html import format_html
+        if obj.cliente:
+            return format_html('<strong>{}</strong> <small>({})</small>',
+                               obj.cliente.nombre or 'Sin nombre',
+                               obj.cliente.email or '—')
+        if obj.contacto_nombre or obj.contacto_email:
+            return format_html('{} <small>({})</small>',
+                               obj.contacto_nombre or '—',
+                               obj.contacto_email or '—')
+        return '— anónimo —'
+    persona_display.short_description = 'Cliente / contacto'
+
+    def nps_badge(self, obj):
+        from django.utils.html import format_html
+        if obj.nps_score is None:
+            return format_html('<span style="color:#999;">—</span>')
+        if obj.nps_score >= 9:
+            color = '#2e7d32'
+            label = 'Promotor'
+        elif obj.nps_score >= 7:
+            color = '#f9a825'
+            label = 'Pasivo'
+        else:
+            color = '#c62828'
+            label = 'Detractor'
+        return format_html(
+            '<span style="background:{};color:#fff;padding:3px 8px;border-radius:10px;font-weight:600;">{} · {}</span>',
+            color, obj.nps_score, label,
+        )
+    nps_badge.short_description = 'NPS'
+    nps_badge.admin_order_field = 'nps_score'
+
+    def origen_short(self, obj):
+        return {'legacy_google_form': 'Legacy', 'formulario_web': 'Web', 'manual': 'Manual'}.get(obj.origen, obj.origen)
+    origen_short.short_description = 'Origen'
+    origen_short.admin_order_field = 'origen'
+
+    def cliente_link(self, obj):
+        from django.utils.html import format_html
+        from django.urls import reverse
+        if not obj.cliente:
+            return '—'
+        url = reverse('admin:ventas_cliente_change', args=[obj.cliente.pk])
+        return format_html('<a href="{}" target="_blank">Ver ficha de cliente →</a>', url)
+    cliente_link.short_description = 'Ficha cliente'
+
+    def nps_categoria_display(self, obj):
+        return obj.nps_categoria or '—'
+    nps_categoria_display.short_description = 'Categoría NPS (calculado)'
+
+    def califica_review_publico_display(self, obj):
+        return '✅ Sí' if obj.califica_para_review_publico else '❌ No'
+    califica_review_publico_display.short_description = 'Califica para review público'
+
+    # ===== Actions =====
+
+    def marcar_followup_completado(self, request, queryset):
+        n = queryset.update(followup_completado=True)
+        self.message_user(request, f'✅ {n} encuesta(s) marcadas como follow-up completado.')
+    marcar_followup_completado.short_description = '✅ Marcar follow-up como COMPLETADO'
+
+    def marcar_followup_pendiente(self, request, queryset):
+        n = queryset.update(followup_completado=False)
+        self.message_user(request, f'🔄 {n} encuesta(s) reabiertas como follow-up pendiente.')
+    marcar_followup_pendiente.short_description = '🔄 Reabrir follow-up (marcar pendiente)'
