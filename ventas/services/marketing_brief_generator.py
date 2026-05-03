@@ -18,6 +18,7 @@ import json
 import logging
 from datetime import timedelta
 from pathlib import Path
+from typing import Optional
 
 from django.conf import settings
 from django.utils import timezone
@@ -65,7 +66,7 @@ def build_user_prompt(
     recurring_tasks: str,
     frases_clientes: list,
     blog_posts_recientes: list,
-    alertas_analisis_ia: dict | None,
+    alertas_analisis_ia: Optional[dict],
 ) -> str:
     """Construye el user prompt con toda la info contextual."""
 
@@ -203,7 +204,7 @@ def get_blog_posts_recientes(limit: int = 5) -> list:
         return []
 
 
-def get_alertas_analisis_ia_anterior() -> dict | None:
+def get_alertas_analisis_ia_anterior() -> Optional[dict]:
     """Devuelve el último análisis IA de encuestas para que el brief lo considere.
 
     Por ahora retorna None (no persistimos el análisis previo en BD).
@@ -218,7 +219,7 @@ def call_llm(
     frases_clientes,
     blog_posts_recientes,
     alertas_analisis_ia,
-    model: str | None = None,
+    model: Optional[str] = None,
 ) -> dict:
     """Llama a OpenRouter con todo el contexto y devuelve el brief en dict."""
     from openai import OpenAI
