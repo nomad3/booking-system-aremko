@@ -658,6 +658,25 @@ def comunas_por_region(request):
 
 # --- Cron endpoint para envío de campañas (cron-job.org u otro) ---
 
+def _run_survey_analysis_background():
+    """Helper para correr analyze_surveys_weekly en thread, sin bloquear el response.
+
+    Capturado todo el output a logs (no a stdout para no interferir con gunicorn).
+    Cualquier excepción se loguea pero no se propaga (es fire-and-forget).
+    """
+    import logging
+    from io import StringIO
+    from django.core.management import call_command
+    log = logging.getLogger(__name__)
+
+    output = StringIO()
+    try:
+        call_command('analyze_surveys_weekly', stdout=output, stderr=output)
+        log.info('Análisis IA semanal de encuestas completado:\n%s', output.getvalue()[-3000:])
+    except Exception as e:
+        log.exception('Error en análisis IA semanal de encuestas: %s', e)
+
+
 @csrf_exempt
 @api_view(['POST', 'GET'])
 @permission_classes([AllowAny])
@@ -665,10 +684,14 @@ def cron_analyze_surveys_weekly(request):
     """
     Endpoint para que cron-job.org dispare el análisis IA semanal de encuestas.
 
-    Equivale a: python manage.py analyze_surveys_weekly
+    Diseñado para responder en <1s (devuelve inmediato) y procesar en background
+    porque cron-job.org plan free tiene timeout de 30s y el análisis IA puede
+    tardar 15-45s entre LLM + render template + envío email.
+
+    El resultado llega como email a SURVEY_ANALYSIS_RECIPIENT_EMAIL.
 
     Auth: header X-API-KEY con AUTOMATION_API_KEY.
-    Schedule sugerido en cron-job.org: lunes 09:00 hora Chile (cron 0 12 * * 1 UTC).
+    Schedule sugerido: cada lunes 09:00 hora Chile.
     """
     if not is_valid_api_key(request):
         return Response(
@@ -676,26 +699,15 @@ def cron_analyze_surveys_weekly(request):
             status=status.HTTP_401_UNAUTHORIZED
         )
 
-    from io import StringIO
-    from django.core.management import call_command
+    # Lanzar en thread fire-and-forget (no bloquea el response)
+    from threading import Thread
+    thread = Thread(target=_run_survey_analysis_background, daemon=True)
+    thread.start()
 
-    output = StringIO()
-    try:
-        call_command(
-            'analyze_surveys_weekly',
-            stdout=output,
-            stderr=output,
-        )
-        return Response({
-            "success": True,
-            "output": output.getvalue()[-3000:],
-        })
-    except Exception as e:
-        return Response({
-            "success": False,
-            "error": str(e),
-            "output": output.getvalue()[-3000:],
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response({
+        "success": True,
+        "message": "Análisis IA iniciado en background. El email con el reporte llegará en 30-60 seg.",
+    })
 
 
 @csrf_exempt
