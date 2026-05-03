@@ -22,6 +22,25 @@ Este es el plan general que guía el trabajo de marketing de Aremko. Las tareas 
 
 ---
 
+## Presupuesto operativo confirmado
+
+**Total publicidad pagada: ~$300 USD/mes** (Meta + Google combinado).
+
+Distribución sugerida (a refinar con datos):
+| Canal | Presupuesto inicial | Foco |
+|---|---|---|
+| **Meta Ads** (Tarea 4.5 + 6.6) | ~$100-150/mes | Boost de Reels orgánicos ganadores + retargeting visitantes web |
+| **Google Ads** (Tarea 6.7) | ~$150-200/mes | Branded keywords + long-tail high-intent |
+
+Otros costos fijos ya operando:
+- SendGrid Essentials 50K: $19.95/mes (email)
+- OpenRouter LLM (análisis IA semanal + futuro Agente Recepcionista): ~$30-50/mes según uso
+- cron-job.org: $0 (plan free, suficiente)
+- Cloudflare DNS: $0
+- Google Search Console / GA4 / Meta Pixel: $0
+
+**Total marketing/tech mensual estimado: $370-420 USD**
+
 ## Diagnóstico base (las 3 verdades del 7 Maletas)
 
 1. **Problema #1 del cliente:** estrés laboral + necesidad urgente de desconectar (12+ menciones en reviews)
@@ -37,17 +56,12 @@ Todo el plan respeta este diagnóstico. La frase ancla es **"2 días aquí equiv
 > *No tiene sentido traer 1.000 visitas si la primera review nueva habla de agua tibia.* Esta fase **bloquea** las siguientes.
 
 ### 1.1 Resolver inconsistencia de temperatura del agua
-- **Estado:** ⚪ pendiente
-- **Responsable:** Jorge (operaciones) + Claude (web/copy)
+- **Estado:** 🟢 terminada (2026-05-03, reportada como resuelta por Jorge)
+- **Responsable:** Jorge (operaciones)
 - **Prioridad:** ALTA · **Bloqueante:** sí
-- **Tiempo estimado:** 1-2 semanas
 - **Origen:** 7 Maletas, Maleta 6 (objeción #1)
-- **Criterio de éxito:** 0 reviews nuevas mencionando agua tibia en 30 días
-- **Sub-tareas:**
-  - [ ] 1.1.a Auditar sistema de calentamiento de tinas + duchas + cabañas
-  - [ ] 1.1.b Instalar termómetro visible en cada tina
-  - [ ] 1.1.c Definir protocolo de respuesta inmediata si cliente reporta agua tibia
-  - [ ] 1.1.d Capacitar a equipo en el protocolo
+- **Criterio de éxito:** 0 reviews nuevas mencionando agua tibia en 30 días → monitorear en próximos reportes IA semanales
+- **Validación a futuro:** que las próximas encuestas en EncuestaSatisfaccion mantengan cal_temperatura_tina >=4 promedio
 
 ### 1.2 Cambiar H1 de la home
 - **Estado:** ⚪ pendiente
@@ -120,6 +134,12 @@ Todo el plan respeta este diagnóstico. La frase ancla es **"2 días aquí equiv
   - [ ] 1.7.a Auditar copy actual de home
   - [ ] 1.7.b Reescribir hero, sección de servicios, CTAs
   - [ ] 1.7.c Mover "$190.000 desde / pack completo" como ancla de precio principal
+
+### 1.10 Pasarelas resbaladizas con humedad (alerta de seguridad detectada por IA)
+- **Estado:** 🟡 procesando (2026-05-03 — comprando malla antideslizante)
+- **Responsable:** Jorge (operaciones)
+- **Prioridad:** ALTA · **Origen:** análisis IA semanal del 2026-05-03 (alerta detectada en múltiples encuestas)
+- **Criterio de éxito:** instalación completa de malla, 0 menciones futuras a "resbaladizo" en encuestas
 
 ### 1.8 WhatsApp Business broadcast del blog (Tarea 7 blog week 1)
 - **Estado:** ⚪ pendiente
@@ -258,8 +278,13 @@ Todo el plan respeta este diagnóstico. La frase ancla es **"2 días aquí equiv
 ### 4.5 Boost orgánico con Meta Ads de Reels ganadores
 - **Estado:** ⚪ pendiente · depende de 4.1
 - **Responsable:** Claude (estrategia) + Jorge (presupuesto)
-- **Tiempo:** 1h setup
-- **Presupuesto:** $5-10 USD por Reel ganador, 3 días, lookalike audience
+- **Tiempo:** 1h setup inicial
+- **Presupuesto asignado:** dentro del bucket "$300 USD/mes Meta + Google Ads combinado". Inicialmente ~$100-150/mes a Meta para boosts de Reels ($5-10 USD por Reel × 10-30 boosts/mes según RI)
+- **Herramienta sugerida:** instalar [santmun/meta-ads-skills](https://github.com/santmun/meta-ads-skills) en Claude Code para operar campañas Meta vía CLI sin salir del entorno. Setup ~15-20 min cuando se active esta tarea.
+- **Pre-requisitos antes de instalar la skill:**
+  - 3-5 Reels publicados con datos de RI (Tarea 4.1)
+  - Business Manager + Ad Account ya creados (probablemente sí, dado que Meta Pixel `478226496113915` ya está activo en aremko.cl)
+  - Decisión final del split mensual entre Meta y Google Ads
 
 ---
 
@@ -336,10 +361,29 @@ Todo el plan respeta este diagnóstico. La frase ancla es **"2 días aquí equiv
 - **Tiempo:** 2h estrategia + 6h implementación si va
 
 ### 6.6 Meta Ads campaña de retargeting
-- **Estado:** ⚪ pendiente · depende de Pixel funcionando con eventos
+- **Estado:** ⚪ pendiente · depende de Pixel funcionando con eventos (Tarea 2.2 GA4)
 - **Responsable:** Claude (estrategia) + Jorge (presupuesto)
 - **Tiempo:** 3h
-- **Presupuesto:** $50-100 USD/mes inicial
+- **Presupuesto:** dentro del bucket Meta de $100-150 USD/mes. Para retargeting específico ~$50/mes
+- **Herramienta:** [santmun/meta-ads-skills](https://github.com/santmun/meta-ads-skills) (operación desde Claude Code)
+- **Audiencias:**
+  - Visitantes web últimos 30 días que NO reservaron
+  - Visitantes a /blog/* últimos 60 días
+  - Lookalike de clientes que sí reservaron
+
+### 6.7 Google Ads — branded + long-tail
+- **Estado:** ⚪ pendiente · evaluar después de keyword research (Tarea 2.6)
+- **Responsable:** Claude (estrategia + setup) + Jorge (presupuesto)
+- **Tiempo:** 4-6h setup inicial
+- **Presupuesto asignado:** dentro del bucket Google de $150-200 USD/mes. Distribución sugerida:
+  - **Branded keywords** (50%): "aremko spa", "aremko puerto varas" — defensivo, baratísimo, alta conversión
+  - **Long-tail intent** (35%): "tinas calientes puerto varas", "spa parejas puerto varas", "cabaña con tina puerto varas"
+  - **Performance Max** (15%): exploratorio
+- **Cuenta:** ya existe Google Ads tag `AW-1015703959` activo en el sitio (instalado de antes)
+- **Pre-requisitos:**
+  - GA4 events configurados (Tarea 2.2)
+  - Conversiones definidas y trackeadas
+  - Landing pages optimizadas (Tarea 6.2)
 
 ---
 
