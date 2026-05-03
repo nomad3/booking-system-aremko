@@ -1579,6 +1579,18 @@ html {
                 currentServicioMin = parseInt(this.dataset.servicioMin) || 1;
                 const isReadonly = this.dataset.readonly === 'true'; // Check if in readonly mode
 
+                // GA4 — disparar evento reservation_started al abrir el modal de booking
+                if (typeof window.aremkoTrack === 'function') {
+                    window.aremkoTrack('reservation_started', {
+                        servicio_id: currentServicioId,
+                        servicio_nombre: currentServicioNombre,
+                        servicio_tipo: currentServicioTipo,
+                        servicio_precio: currentServicioPrecio,
+                        page_path: window.location.pathname,
+                        categoria: '{{ categoria_actual.nombre|escapejs }}',
+                    });
+                }
+
                 // --- Regla tina-first para decoraciones (Ambientaciones) ---
                 // La Agenda Operativa del día necesita fecha+hora exactas por
                 // servicio. Las decoraciones heredan el slot de la última tina

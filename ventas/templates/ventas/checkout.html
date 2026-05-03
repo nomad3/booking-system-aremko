@@ -687,6 +687,18 @@ Email para comprobante: ventas@aremko.cl</pre>
             const successModal = new bootstrap.Modal(successModalEl);
             successModal.show();
 
+            // GA4 — disparar reservation_completed cada vez que la reserva se crea exitosamente
+            if (typeof window.aremkoTrack === 'function') {
+                window.aremkoTrack('reservation_completed', {
+                    reserva_id: data.reserva_id || '',
+                    value: data.total_reserva || 0,
+                    currency: 'CLP',
+                    tiene_masaje: !!data.tiene_masaje,
+                    tiene_tina: !!data.tiene_tina,
+                    tiene_alojamiento: !!data.tiene_alojamiento,
+                });
+            }
+
             // Google Ads: Disparar evento de conversión si la reserva contiene masajes
             if (data.tiene_masaje && typeof gtag !== 'undefined') {
                 console.log('🎯 Disparando conversión de Google Ads para masaje');

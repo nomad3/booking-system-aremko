@@ -1435,6 +1435,17 @@
 
                 console.log("Opening booking modal via listener for:", servicioId, servicioNombre, servicioPrecio, servicioTipo, `Min: ${servicioMin}`, `Max: ${servicioMax}`, `Readonly: ${isReadonly}`);
 
+                // GA4 — disparar evento reservation_started al abrir el modal de booking
+                if (typeof window.aremkoTrack === 'function') {
+                    window.aremkoTrack('reservation_started', {
+                        servicio_id: servicioId,
+                        servicio_nombre: servicioNombre,
+                        servicio_tipo: servicioTipo,
+                        servicio_precio: servicioPrecio,
+                        page_path: window.location.pathname,
+                    });
+                }
+
                 // Store current service details globally
                 currentServicioId = servicioId;
                 currentServicioNombre = servicioNombre;
