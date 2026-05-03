@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Reporte Semanal Encuestas Aremko</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; color: #333; line-height: 1.5; max-width: 720px; margin: 0 auto; padding: 24px; background: #f4f6f8; }
+  .container { background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .hero { text-align: center; padding: 18px 12px 22px; background: linear-gradient(135deg,#2c5f5d 0%,#1a4040 100%); color: #fff; border-radius: 12px 12px 0 0; margin: -28px -28px 24px; }
+  .hero h1 { font-size: 1.5rem; margin: 0 0 6px; }
+  .hero p { margin: 0; opacity: .9; font-size: .9rem; }
+  h2 { color: #2c5f5d; font-size: 1.2rem; margin-top: 32px; padding-bottom: 6px; border-bottom: 2px solid #e8e8e8; }
+  .metricas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 12px 0; }
+  .metrica { background: #f7f4ee; border-radius: 8px; padding: 12px 14px; text-align: center; }
+  .metrica .num { font-size: 1.6rem; font-weight: 700; color: #2c5f5d; line-height: 1; }
+  .metrica .label { font-size: .75rem; color: #666; text-transform: uppercase; letter-spacing: .5px; margin-top: 4px; }
+  .nps-pill { display: inline-block; padding: 4px 12px; border-radius: 12px; font-weight: 600; font-size: .85rem; }
+  .nps-good { background: #e8f5e9; color: #2e7d32; }
+  .nps-warn { background: #fff8e1; color: #f9a825; }
+  .nps-bad { background: #ffebee; color: #c62828; }
+  .resumen { background: #f7f4ee; border-left: 4px solid #2c5f5d; padding: 14px 18px; border-radius: 6px; font-size: .95rem; }
+  .item { background: #fff; border: 1px solid #e8e8e8; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
+  .item.alta { border-left: 4px solid #c62828; }
+  .item.media { border-left: 4px solid #f9a825; }
+  .item.baja { border-left: 4px solid #999; }
+  .item h3 { margin: 0 0 6px; font-size: 1rem; color: #333; }
+  .item .meta { font-size: .8rem; color: #888; margin-top: 8px; }
+  .item .accion { background: #f0f6fa; border-radius: 4px; padding: 8px 12px; margin-top: 8px; font-size: .9rem; }
+  .item .accion strong { color: #2c5f5d; }
+  .cita { font-style: italic; color: #555; padding: 8px 12px; border-left: 3px solid #d8d3c0; margin: 6px 0; background: #fafafa; border-radius: 4px; font-size: .9rem; }
+  .followup-list { margin: 12px 0; }
+  .followup-item { background: #fff0f0; border-left: 4px solid #c62828; padding: 10px 14px; margin-bottom: 8px; border-radius: 6px; font-size: .9rem; }
+  .followup-item strong { color: #c62828; }
+  .footer { text-align: center; color: #888; font-size: .8rem; padding-top: 20px; margin-top: 32px; border-top: 1px solid #e8e8e8; }
+  a { color: #2c5f5d; }
+  .empty { color: #999; font-style: italic; padding: 12px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="hero">
+    <h1>📊 Reporte Semanal Aremko</h1>
+    <p>{{ periodo_inicio|date:"d/m/Y" }} → {{ periodo_fin|date:"d/m/Y" }} · {{ encuestas_count }} encuesta{{ encuestas_count|pluralize:"s" }}</p>
+  </div>
+
+  <h2>Resumen ejecutivo</h2>
+  <div class="resumen">{{ analisis.resumen_ejecutivo }}</div>
+
+  <h2>Métricas</h2>
+  <div class="metricas">
+    <div class="metrica">
+      <div class="num">
+        {% if stats.nps_score is not None %}
+          {% if stats.nps_score >= 70 %}<span class="nps-pill nps-good">{{ stats.nps_score }}</span>
+          {% elif stats.nps_score >= 30 %}<span class="nps-pill nps-warn">{{ stats.nps_score }}</span>
+          {% else %}<span class="nps-pill nps-bad">{{ stats.nps_score }}</span>{% endif %}
+        {% else %}—{% endif %}
+      </div>
+      <div class="label">NPS Score</div>
+    </div>
+    <div class="metrica">
+      <div class="num">{{ stats.distribucion_nps.promotores }}</div>
+      <div class="label">Promotores</div>
+    </div>
+    <div class="metrica">
+      <div class="num">{{ stats.distribucion_nps.detractores }}</div>
+      <div class="label">Detractores</div>
+    </div>
+    <div class="metrica">
+      <div class="num">{{ stats.requieren_followup }}</div>
+      <div class="label">Follow-ups pendientes</div>
+    </div>
+    <div class="metrica">
+      <div class="num">{% if stats.promedios.avg_calidad_precio %}{{ stats.promedios.avg_calidad_precio|floatformat:1 }}{% else %}—{% endif %}</div>
+      <div class="label">Calidad-Precio (1-5)</div>
+    </div>
+    <div class="metrica">
+      <div class="num">{% if stats.promedios.avg_temp_tina %}{{ stats.promedios.avg_temp_tina|floatformat:1 }}{% else %}—{% endif %}</div>
+      <div class="label">Temperatura tina (1-5)</div>
+    </div>
+  </div>
+
+  <h2>🚨 Alertas operativas</h2>
+  {% if analisis.alertas_operativas %}
+    {% for a in analisis.alertas_operativas %}
+    <div class="item {{ a.prioridad }}">
+      <h3>{{ a.titulo }}</h3>
+      <div>{{ a.descripcion }}</div>
+      {% if a.evidencia_count %}<div class="meta">{{ a.evidencia_count }} mención{{ a.evidencia_count|pluralize:"es" }} · prioridad <strong>{{ a.prioridad }}</strong></div>{% endif %}
+      {% if a.accion_sugerida %}<div class="accion"><strong>Acción:</strong> {{ a.accion_sugerida }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty">Sin alertas operativas esta semana ✅</p>
+  {% endif %}
+
+  <h2>💡 Oportunidades comerciales</h2>
+  {% if analisis.oportunidades_comerciales %}
+    {% for o in analisis.oportunidades_comerciales %}
+    <div class="item">
+      <h3>{{ o.titulo }}</h3>
+      <div>{{ o.descripcion }}</div>
+      {% if o.accion_sugerida %}<div class="accion"><strong>Acción:</strong> {{ o.accion_sugerida }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty">Sin oportunidades destacadas esta semana</p>
+  {% endif %}
+
+  <h2>📣 Ideas para marketing</h2>
+  {% if analisis.ideas_marketing %}
+    {% for i in analisis.ideas_marketing %}
+    <div class="item">
+      <h3>{{ i.tipo|title }}</h3>
+      {% if i.frase_real_cliente %}<div class="cita">"{{ i.frase_real_cliente }}"</div>{% endif %}
+      {% if i.como_usarla %}<div class="accion"><strong>Cómo usarla:</strong> {{ i.como_usarla }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty">Sin ideas de marketing destacadas esta semana</p>
+  {% endif %}
+
+  <h2>📞 Follow-ups pendientes</h2>
+  {% if followups_pendientes %}
+    <div class="followup-list">
+      {% for f in followups_pendientes %}
+      <div class="followup-item">
+        <div>
+          <strong>NPS {{ f.nps_score|default:"—" }}</strong>
+          ·
+          {% if f.cliente %}{{ f.cliente.nombre|default:"Cliente sin nombre" }}{% else %}{{ f.contacto_nombre|default:"Anónimo" }}{% endif %}
+          ·
+          {{ f.fecha_respuesta|date:"d/m/Y" }}
+        </div>
+        <div style="font-size:.85rem; margin-top:4px;">
+          {% with t=f.contacto_telefono|default:f.cliente.telefono %}
+            {% if t %}📱 {{ t }} ·{% endif %}
+          {% endwith %}
+          {% with e=f.contacto_email|default:f.cliente.email %}
+            {% if e %}📧 {{ e }}{% endif %}
+          {% endwith %}
+        </div>
+        {% if f.sugerencias %}<div style="margin-top:4px; font-size:.85rem;"><em>"{{ f.sugerencias|truncatechars:200 }}"</em></div>{% endif %}
+        {% if f.decepcion %}<div style="margin-top:4px; font-size:.85rem;"><em>"{{ f.decepcion|truncatechars:200 }}"</em></div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <p style="font-size:.85rem;"><a href="https://www.aremko.cl/admin/ventas/encuestasatisfaccion/?requiere_followup__exact=1&followup_completado__exact=0" target="_blank">Ver todos en el dashboard →</a></p>
+  {% else %}
+    <p class="empty">Sin follow-ups urgentes pendientes ✅</p>
+  {% endif %}
+
+  <div class="footer">
+    Reporte generado por análisis IA semanal de Aremko · {{ encuestas_count }} encuesta{{ encuestas_count|pluralize:"s" }} analizada{{ encuestas_count|pluralize:"s" }}<br>
+    <a href="https://www.aremko.cl/admin/ventas/encuestasatisfaccion/" target="_blank">Abrir dashboard de encuestas</a>
+  </div>
+</div>
+</body>
+</html>

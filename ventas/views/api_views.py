@@ -661,6 +661,46 @@ def comunas_por_region(request):
 @csrf_exempt
 @api_view(['POST', 'GET'])
 @permission_classes([AllowAny])
+def cron_analyze_surveys_weekly(request):
+    """
+    Endpoint para que cron-job.org dispare el análisis IA semanal de encuestas.
+
+    Equivale a: python manage.py analyze_surveys_weekly
+
+    Auth: header X-API-KEY con AUTOMATION_API_KEY.
+    Schedule sugerido en cron-job.org: lunes 09:00 hora Chile (cron 0 12 * * 1 UTC).
+    """
+    if not is_valid_api_key(request):
+        return Response(
+            {"error": "Authentication required. Set X-API-KEY header."},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    from io import StringIO
+    from django.core.management import call_command
+
+    output = StringIO()
+    try:
+        call_command(
+            'analyze_surveys_weekly',
+            stdout=output,
+            stderr=output,
+        )
+        return Response({
+            "success": True,
+            "output": output.getvalue()[-3000:],
+        })
+    except Exception as e:
+        return Response({
+            "success": False,
+            "error": str(e),
+            "output": output.getvalue()[-3000:],
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@csrf_exempt
+@api_view(['POST', 'GET'])
+@permission_classes([AllowAny])
 def cron_send_email_batch(request):
     """
     Endpoint para que un cron externo (cron-job.org) dispare el envío de un lote

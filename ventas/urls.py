@@ -176,6 +176,10 @@ urlpatterns = [
     # Llamar cada 8 minutos. Auth: header X-API-KEY con AUTOMATION_API_KEY.
     path('api/cron/send-email-batch/', api_views.cron_send_email_batch, name='cron_send_email_batch'),
 
+    # === Cron endpoint para análisis IA semanal de encuestas ===
+    # Llamar cada lunes 09:00 hora Chile (12:00 UTC).
+    path('api/cron/analyze-surveys/', api_views.cron_analyze_surveys_weekly, name='cron_analyze_surveys'),
+
     # API para obtener comunas por región
     path('api/comunas-por-region/', api_views.comunas_por_region, name='comunas_por_region'),
     

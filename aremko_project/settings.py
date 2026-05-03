@@ -360,6 +360,14 @@ DPV_LLM_ENABLED = os.getenv("DPV_LLM_ENABLED", "false").lower() == "true"
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 DPV_LLM_MODEL = os.getenv("DPV_LLM_MODEL", "anthropic/claude-haiku-4.5")
+
+# Análisis IA semanal de encuestas de satisfacción (Tarea 1.4 Fase C)
+SURVEY_ANALYSIS_LLM_MODEL = os.getenv(
+    "SURVEY_ANALYSIS_LLM_MODEL", "anthropic/claude-sonnet-4.6"
+)
+SURVEY_ANALYSIS_RECIPIENT_EMAIL = os.getenv(
+    "SURVEY_ANALYSIS_RECIPIENT_EMAIL", "aremkospa@gmail.com"
+)
 DPV_LLM_MAX_TOKENS = int(os.getenv("DPV_LLM_MAX_TOKENS", "500"))
 DPV_LLM_TEMPERATURE = float(os.getenv("DPV_LLM_TEMPERATURE", "0.7"))
 DPV_LLM_TIMEOUT_SECONDS = int(os.getenv("DPV_LLM_TIMEOUT_SECONDS", "30"))
