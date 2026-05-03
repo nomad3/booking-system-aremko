@@ -127,19 +127,22 @@
       {% for f in followups_pendientes %}
       <div class="followup-item">
         <div>
-          <strong>NPS {{ f.nps_score|default:"—" }}</strong>
+          <strong>NPS {{ f.nps_score|default_if_none:"—" }}</strong>
           ·
-          {% if f.cliente %}{{ f.cliente.nombre|default:"Cliente sin nombre" }}{% else %}{{ f.contacto_nombre|default:"Anónimo" }}{% endif %}
+          {% if f.cliente and f.cliente.nombre %}{{ f.cliente.nombre }}
+          {% elif f.contacto_nombre %}{{ f.contacto_nombre }}
+          {% else %}Anónimo
+          {% endif %}
           ·
           {{ f.fecha_respuesta|date:"d/m/Y" }}
         </div>
         <div style="font-size:.85rem; margin-top:4px;">
-          {% with t=f.contacto_telefono|default:f.cliente.telefono %}
-            {% if t %}📱 {{ t }} ·{% endif %}
-          {% endwith %}
-          {% with e=f.contacto_email|default:f.cliente.email %}
-            {% if e %}📧 {{ e }}{% endif %}
-          {% endwith %}
+          {% if f.contacto_telefono %}📱 {{ f.contacto_telefono }} ·
+          {% elif f.cliente and f.cliente.telefono %}📱 {{ f.cliente.telefono }} ·
+          {% endif %}
+          {% if f.contacto_email %}📧 {{ f.contacto_email }}
+          {% elif f.cliente and f.cliente.email %}📧 {{ f.cliente.email }}
+          {% endif %}
         </div>
         {% if f.sugerencias %}<div style="margin-top:4px; font-size:.85rem;"><em>"{{ f.sugerencias|truncatechars:200 }}"</em></div>{% endif %}
         {% if f.decepcion %}<div style="margin-top:4px; font-size:.85rem;"><em>"{{ f.decepcion|truncatechars:200 }}"</em></div>{% endif %}
