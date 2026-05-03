@@ -26,6 +26,30 @@ Este es el manual operativo del marketing de Aremko. Lo lee el agente programado
 
 ---
 
+## 0.1 DM Automation policy (lo que reemplaza a ManyChat)
+
+Aremko **NO usa ManyChat** ni servicios pagos similares (Chatfuel, MobileMonkey, Customers.ai). Cuando el agente IA genere drafts o recordatorios, NUNCA mencionar ManyChat — usar las reglas de abajo.
+
+### Estrategia vigente (fase Lanzamiento + Consolidación)
+- **Respuesta MANUAL** a comentarios y DMs con palabras clave en Reels
+- Volumen actual esperado: <50 comentarios/Reel, manejable a mano
+- Beneficio extra: leer literal lo que pregunta la gente da insumo gratis para mejorar el playbook
+
+### Triggers para escalar (a futuro, no ahora)
+
+**Cuando un Reel supere 100+ comentarios consistente** → activar auto-replies nativas de Meta Business Suite (`Inbox → Automations`). Sin costo, integrado en Meta, sin migrar herramientas.
+
+**Cuando el volumen total supere 500 comentarios/mes** → migrar a n8n (que Aremko ya tiene integrado). Build propio: webhook Instagram → workflow n8n → registro como Lead/Cliente en BD. Tiempo estimado 4-6h, costo recurrente $0 (n8n self-hosted).
+
+### Reglas para el agente IA al generar drafts
+1. En CTAs de Reels usar palabra clave + "te respondo por DM" (sin mencionar herramienta)
+   - Ejemplo OK: *"Comenta GARANTÍA y te explico exactamente cómo funciona la compensación"*
+   - Ejemplo PROHIBIDO: *"Configurar respuesta automática en ManyChat para palabra GARANTÍA"*
+2. En recordatorios decir *"preparar DM template para responder palabra GARANTÍA"* (no automation)
+3. Si recomienda automatización, usar *"workflow n8n"* (nunca ManyChat ni similares)
+
+---
+
 ## 1. Brand Voice
 
 ### Tono
