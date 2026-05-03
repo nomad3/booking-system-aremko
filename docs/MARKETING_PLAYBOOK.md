@@ -6,6 +6,26 @@ Este es el manual operativo del marketing de Aremko. Lo lee el agente programado
 
 ---
 
+## 0. Datos operativos (para uso en copy y CTAs)
+
+- **WhatsApp Business**: `+56 9 5790 2525` (link directo: `https://wa.me/56957902525`)
+- **Email**: `ventas@aremko.cl`
+- **Sitio**: `https://www.aremko.cl`
+- **Blog**: `https://www.aremko.cl/blog/`
+- **Garantía dedicada**: `https://www.aremko.cl/garantia/`
+- **Encuesta de satisfacción**: `https://www.aremko.cl/encuesta-satisfaccion/`
+- **Google Reviews directo**: `https://g.page/r/CbKKwbV5UmD_EBM/review`
+- **TripAdvisor**: enlace en config (TRIPADVISOR_URL setting)
+- **Dirección**: Río Pescado, Camino a Ensenada km 19, km 4, Puerto Varas, Los Lagos, Chile
+- **Coordenadas Maps**: -41.277611, -72.768611
+- **Horario de tinas**: hasta medianoche
+- **Cuenta Instagram**: @aremkospa
+- **Cuenta GBP**: aremkospa@gmail.com (Aremko Aguas Calientes Puerto Varas)
+
+> **Importante para el agente IA**: usar SIEMPRE estos valores tal cual cuando generes copy. NO uses placeholders como "XXXXXXXXX" — siempre sustituye con el dato real de esta sección.
+
+---
+
 ## 1. Brand Voice
 
 ### Tono
