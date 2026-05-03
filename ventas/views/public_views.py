@@ -289,6 +289,19 @@ def encuesta_satisfaccion_view(request):
         if form.is_valid():
             encuesta = form.save(commit=False)
             encuesta.origen = 'formulario_web'
+
+            # Auto-match por email si no viene cliente_id en URL
+            # (cierra el gap cuando el cliente abre la URL directamente sin ?cliente=)
+            if not cliente and encuesta.contacto_email:
+                cliente = Cliente.objects.filter(
+                    email__iexact=encuesta.contacto_email.strip()
+                ).first()
+                if cliente and not ultima_reserva:
+                    ultima_reserva = (VentaReserva.objects
+                                      .filter(cliente=cliente)
+                                      .order_by('-fecha_reserva')
+                                      .first())
+
             if cliente:
                 encuesta.cliente = cliente
                 # Prellenar contacto si no vino
