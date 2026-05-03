@@ -30,7 +30,7 @@ class EncuestaSatisfaccionForm(forms.ModelForm):
         model = EncuestaSatisfaccion
         fields = [
             # Datos contacto
-            'contacto_nombre', 'contacto_email',
+            'contacto_nombre', 'contacto_email', 'contacto_telefono',
             # Servicios
             'servicios_contratados',
             # Calificaciones operativas (opcionales según servicio)
@@ -56,6 +56,10 @@ class EncuestaSatisfaccionForm(forms.ModelForm):
             'contacto_email': forms.EmailInput(attrs={
                 'class': 'form-control', 'placeholder': 'tu@email.com'
             }),
+            'contacto_telefono': forms.TextInput(attrs={
+                'class': 'form-control', 'placeholder': '+56 9 1234 5678',
+                'inputmode': 'tel', 'autocomplete': 'tel',
+            }),
             'lo_que_mas_gusto': forms.Textarea(attrs={
                 'class': 'form-control', 'rows': 3,
                 'placeholder': 'Lo que recordarás de Aremko...'
@@ -78,6 +82,7 @@ class EncuestaSatisfaccionForm(forms.ModelForm):
         labels = {
             'contacto_nombre': 'Tu nombre',
             'contacto_email': 'Tu email',
+            'contacto_telefono': 'Tu teléfono (opcional)',
             'cal_temperatura_tina': 'Temperatura del agua de la tina',
             'cal_transparencia_agua': 'Transparencia del agua de la tina',
             'cal_limpieza_tinas': 'Limpieza de las tinas y su entorno',
@@ -118,6 +123,7 @@ class EncuestaSatisfaccionForm(forms.ModelForm):
 
         # El resto, opcional explícito (algunos heredan required del modelo)
         for nombre_campo in [
+            'contacto_telefono',
             'cal_temperatura_tina', 'cal_transparencia_agua', 'cal_limpieza_tinas',
             'cal_limpieza_cabana', 'cal_temperatura_cabana',
             'cal_limpieza_sala_masajes', 'cal_servicio_masajes',

@@ -3976,7 +3976,7 @@ class EncuestaSatisfaccionAdmin(admin.ModelAdmin):
     """
 
     list_display = (
-        'fecha_respuesta_short', 'persona_display', 'nps_badge',
+        'fecha_respuesta_short', 'persona_display', 'telefono_display', 'nps_badge',
         'cal_experiencia_general', 'cal_calidad_precio',
         'requiere_followup', 'followup_completado',
         'origen_short',
@@ -3987,8 +3987,8 @@ class EncuestaSatisfaccionAdmin(admin.ModelAdmin):
         'origen', 'ocasion_visita', 'como_se_entero',
     )
     search_fields = (
-        'contacto_nombre', 'contacto_email',
-        'cliente__nombre', 'cliente__email',
+        'contacto_nombre', 'contacto_email', 'contacto_telefono',
+        'cliente__nombre', 'cliente__email', 'cliente__telefono',
         'sugerencias', 'lo_que_mas_gusto', 'decepcion',
     )
     date_hierarchy = 'fecha_respuesta'
@@ -4005,7 +4005,7 @@ class EncuestaSatisfaccionAdmin(admin.ModelAdmin):
             'fields': (
                 'fecha_respuesta', 'fecha_visita', 'origen',
                 'cliente', 'cliente_link', 'venta_reserva',
-                'contacto_nombre', 'contacto_email',
+                'contacto_nombre', 'contacto_email', 'contacto_telefono',
             ),
         }),
         ('Servicios contratados', {
@@ -4078,6 +4078,22 @@ class EncuestaSatisfaccionAdmin(admin.ModelAdmin):
                                obj.contacto_email or '—')
         return '— anónimo —'
     persona_display.short_description = 'Cliente / contacto'
+
+    def telefono_display(self, obj):
+        """Muestra teléfono priorizando contacto_telefono > Cliente.telefono."""
+        from django.utils.html import format_html
+        tel = obj.contacto_telefono or (obj.cliente.telefono if obj.cliente else '')
+        if not tel:
+            return format_html('<span style="color:#999;">—</span>')
+        # Link wa.me si parece chileno (limpia espacios y el +)
+        digits = ''.join(c for c in tel if c.isdigit())
+        if len(digits) >= 8:
+            return format_html(
+                '<a href="https://wa.me/{}" target="_blank" title="WhatsApp">{}</a>',
+                digits, tel,
+            )
+        return tel
+    telefono_display.short_description = 'Teléfono'
 
     def nps_badge(self, obj):
         from django.utils.html import format_html

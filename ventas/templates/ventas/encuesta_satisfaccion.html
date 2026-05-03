@@ -208,6 +208,12 @@
                 {{ form.contacto_email }}
                 {% if form.contacto_email.errors %}<div class="field-error">{{ form.contacto_email.errors.0 }}</div>{% endif %}
             </div>
+            <div class="pregunta">
+                <label class="principal" for="id_contacto_telefono">{{ form.contacto_telefono.label }}</label>
+                <div class="help">Si necesitamos hacer follow-up de algún comentario, te escribimos por WhatsApp.</div>
+                {{ form.contacto_telefono }}
+                {% if form.contacto_telefono.errors %}<div class="field-error">{{ form.contacto_telefono.errors.0 }}</div>{% endif %}
+            </div>
         </div>
 
         {# === 2. Servicios contratados === #}

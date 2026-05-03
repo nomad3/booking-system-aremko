@@ -296,6 +296,8 @@ def encuesta_satisfaccion_view(request):
                     encuesta.contacto_nombre = cliente.nombre or ''
                 if not encuesta.contacto_email:
                     encuesta.contacto_email = cliente.email or ''
+                if not encuesta.contacto_telefono:
+                    encuesta.contacto_telefono = cliente.telefono or ''
             if ultima_reserva:
                 encuesta.venta_reserva = ultima_reserva
                 if not encuesta.fecha_visita and ultima_reserva.fecha_reserva:
@@ -321,6 +323,7 @@ def encuesta_satisfaccion_view(request):
         if cliente:
             initial['contacto_nombre'] = cliente.nombre or ''
             initial['contacto_email'] = cliente.email or ''
+            initial['contacto_telefono'] = cliente.telefono or ''
         form = EncuestaSatisfaccionForm(initial=initial)
 
     context = {

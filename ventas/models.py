@@ -5198,6 +5198,11 @@ class EncuestaSatisfaccion(models.Model):
     # Datos de contacto (si no hay Cliente vinculado, ej. encuestas anónimas legacy)
     contacto_nombre = models.CharField(max_length=200, blank=True)
     contacto_email = models.EmailField(blank=True)
+    contacto_telefono = models.CharField(
+        max_length=30, blank=True,
+        help_text='Teléfono opcional para contacto si requiere follow-up. '
+                  'Si la encuesta viene vinculada a un Cliente, se prellena con su teléfono.'
+    )
 
     # === Servicios contratados (multiselect persistido como lista) ===
     servicios_contratados = models.JSONField(
