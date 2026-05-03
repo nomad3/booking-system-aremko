@@ -696,6 +696,7 @@ class CommunicationService:
             from django.conf import settings as djsettings
             survey_base = getattr(djsettings, 'SURVEY_PUBLIC_BASE_URL', '')
             trip_url = getattr(djsettings, 'TRIPADVISOR_URL', '')
+            google_reviews_url = getattr(djsettings, 'GOOGLE_REVIEWS_URL', '')
             survey_url = f"{survey_base}?cliente={cliente.id}"
 
             context = {
@@ -703,6 +704,8 @@ class CommunicationService:
                 'fecha_ultima_estadia': last_stay_date.strftime('%d/%m/%Y'),
                 'survey_url': survey_url,
                 'tripadvisor_url': trip_url,
+                'google_reviews_url': google_reviews_url,
+                'email': cliente.email or '',
             }
             html_content = render_to_string('emails/satisfaction_survey_email.html', context)
             subject = '¿Cómo estuvo tu experiencia en Aremko?'

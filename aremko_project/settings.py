@@ -294,8 +294,9 @@ COMMUNICATION_SMS_ENABLED = os.getenv('COMMUNICATION_SMS_ENABLED', 'true').lower
 COMMUNICATION_EMAIL_ENABLED = os.getenv('COMMUNICATION_EMAIL_ENABLED', 'true').lower() == 'true'
 
 # URLs externas para encuestas/opiniones
-SURVEY_PUBLIC_BASE_URL = os.getenv('SURVEY_PUBLIC_BASE_URL', 'https://aremko-booking-system.onrender.com/encuesta')
+SURVEY_PUBLIC_BASE_URL = os.getenv('SURVEY_PUBLIC_BASE_URL', 'https://www.aremko.cl/encuesta-satisfaccion/')
 TRIPADVISOR_URL = os.getenv('TRIPADVISOR_URL', 'https://www.tripadvisor.com/')
+GOOGLE_REVIEWS_URL = os.getenv('GOOGLE_REVIEWS_URL', 'https://g.page/r/CbKKwbV5UmD_EBM/review')
 
 # URL del sitio para generar links completos (GiftCards, etc.)
 SITE_URL = os.getenv('SITE_URL', 'https://aremko-booking-system.onrender.com')

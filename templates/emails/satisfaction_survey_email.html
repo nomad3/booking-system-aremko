@@ -66,14 +66,17 @@
       <h1 class="title">🙏 Tu opinión nos ayuda a mejorar</h1>
     </div>
     <p>Hola <strong>{{ nombre }}</strong>,</p>
-    <p>Esperamos que tu experiencia en <strong>Aremko Aguas Calientes & Spa</strong> haya sido excelente. Nos visitaste
+    <p>Esperamos que tu experiencia en <strong>Aremko Aguas Calientes &amp; Spa</strong> haya sido excelente. Nos visitaste
       el <strong>{{ fecha_ultima_estadia }}</strong> y nos encantaría conocer tu opinión.</p>
-    <p>
-      <a class="cta" href="{{ survey_url }}" target="_blank">Responder encuesta</a>
+    <p style="margin: 24px 0;">
+      <a class="cta" href="{{ survey_url }}" target="_blank">Responder encuesta (3 minutos)</a>
     </p>
-    <p>Si tuviste un momento especial, también te invitamos a compartirlo en TripAdvisor:</p>
-    <p>
-      <a class="cta" style="background:#28a745;" href="{{ tripadvisor_url }}" target="_blank">Opinar en TripAdvisor</a>
+    <p style="margin-top: 28px; font-size: 14px; color: #555;">Y si tuviste una buena experiencia y tienes un minuto extra, una reseña pública nos ayuda muchísimo:</p>
+    <p style="margin: 8px 0;">
+      <a class="cta" style="background:#4285f4; margin-right: 8px;" href="{{ google_reviews_url }}" target="_blank">⭐ Dejar reseña en Google</a>
+    </p>
+    <p style="margin: 8px 0;">
+      <a class="cta" style="background:#00aa6c;" href="{{ tripadvisor_url }}" target="_blank">💚 Opinar en TripAdvisor</a>
     </p>
     <div class="footer">
       <div class="contact-info">
