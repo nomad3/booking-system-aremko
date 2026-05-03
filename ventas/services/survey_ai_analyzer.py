@@ -242,10 +242,18 @@ def call_llm(stats: dict, encuestas_data: list, model: str = None) -> dict:
     )
 
     raw = response.choices[0].message.content or ''
+    # Strip markdown fences si el LLM las agrega (defensivo)
+    cleaned = raw.strip()
+    if cleaned.startswith('```'):
+        lines = cleaned.split('\n')
+        lines = lines[1:]
+        if lines and lines[-1].strip() == '```':
+            lines = lines[:-1]
+        cleaned = '\n'.join(lines).strip()
     try:
-        analisis = json.loads(raw)
+        analisis = json.loads(cleaned)
     except json.JSONDecodeError as e:
-        logger.error(f'LLM no devolvió JSON válido: {e}. Raw: {raw[:500]}')
+        logger.error(f'LLM no devolvió JSON válido: {e}. Raw[:500]: {raw[:500]}')
         raise ValueError(f'LLM response no es JSON válido: {e}')
 
     return analisis

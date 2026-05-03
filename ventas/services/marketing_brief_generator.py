@@ -190,7 +190,7 @@ def get_blog_posts_recientes(limit: int = 5) -> list:
     """Lista los últimos N blog posts publicados."""
     try:
         from aremko_blog.models import BlogPost
-        qs = BlogPost.objects.filter(published=True).order_by('-published_at')[:limit]
+        qs = BlogPost.objects.filter(is_published=True).order_by('-published_at')[:limit]
         return [
             {
                 'title': p.title,
@@ -202,6 +202,24 @@ def get_blog_posts_recientes(limit: int = 5) -> list:
     except Exception as exc:
         logger.warning(f'No se pudieron cargar blog posts: {exc}')
         return []
+
+
+def _strip_markdown_fences(raw: str) -> str:
+    """Quita fences ```json ... ``` si el LLM las agregó.
+
+    Algunos modelos en OpenRouter no respetan response_format=json_object al 100%
+    y devuelven el JSON envuelto en markdown. Este helper lo limpia antes de json.loads.
+    """
+    raw = raw.strip()
+    if not raw.startswith('```'):
+        return raw
+    lines = raw.split('\n')
+    # Quitar primera línea (```json o ```)
+    lines = lines[1:]
+    # Quitar última línea si es ```
+    if lines and lines[-1].strip() == '```':
+        lines = lines[:-1]
+    return '\n'.join(lines).strip()
 
 
 def get_alertas_analisis_ia_anterior() -> Optional[dict]:
@@ -263,10 +281,11 @@ def call_llm(
     )
 
     raw = response.choices[0].message.content or ''
+    cleaned = _strip_markdown_fences(raw)
     try:
-        brief = json.loads(raw)
+        brief = json.loads(cleaned)
     except json.JSONDecodeError as exc:
-        logger.error(f'LLM no devolvió JSON válido: {exc}. Raw: {raw[:500]}')
+        logger.error(f'LLM no devolvió JSON válido: {exc}. Raw[:500]: {raw[:500]} | Cleaned[:500]: {cleaned[:500]}')
         raise ValueError(f'LLM response no es JSON válido: {exc}')
 
     return brief
