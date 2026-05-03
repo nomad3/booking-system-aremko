@@ -180,6 +180,10 @@ urlpatterns = [
     # Llamar cada lunes 09:00 hora Chile (12:00 UTC).
     path('api/cron/analyze-surveys/', api_views.cron_analyze_surveys_weekly, name='cron_analyze_surveys'),
 
+    # === Cron endpoint para brief semanal de marketing ===
+    # Llamar cada lunes 10:00 hora Chile.
+    path('api/cron/marketing-brief/', api_views.cron_marketing_brief_weekly, name='cron_marketing_brief'),
+
     # API para obtener comunas por región
     path('api/comunas-por-region/', api_views.comunas_por_region, name='comunas_por_region'),
     

@@ -658,6 +658,53 @@ def comunas_por_region(request):
 
 # --- Cron endpoint para envío de campañas (cron-job.org u otro) ---
 
+def _run_marketing_brief_background():
+    """Helper para correr generate_weekly_marketing_brief en thread.
+
+    Mismo patrón que survey analysis: fire-and-forget para no bloquear el
+    response y respetar el timeout de 30s de cron-job.org plan free.
+    """
+    import logging
+    from io import StringIO
+    from django.core.management import call_command
+    log = logging.getLogger(__name__)
+
+    output = StringIO()
+    try:
+        call_command('generate_weekly_marketing_brief', stdout=output, stderr=output)
+        log.info('Brief semanal de marketing completado:\n%s', output.getvalue()[-3000:])
+    except Exception as e:
+        log.exception('Error en brief semanal de marketing: %s', e)
+
+
+@csrf_exempt
+@api_view(['POST', 'GET'])
+@permission_classes([AllowAny])
+def cron_marketing_brief_weekly(request):
+    """
+    Endpoint para que cron-job.org dispare el brief semanal de marketing.
+
+    Schedule sugerido: cada lunes 10:00 AM hora Chile.
+
+    Auth: header X-API-KEY con AUTOMATION_API_KEY.
+    Async (fire-and-forget) para evitar timeout 30s de cron-job.org plan free.
+    """
+    if not is_valid_api_key(request):
+        return Response(
+            {"error": "Authentication required. Set X-API-KEY header."},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    from threading import Thread
+    thread = Thread(target=_run_marketing_brief_background, daemon=True)
+    thread.start()
+
+    return Response({
+        "success": True,
+        "message": "Brief de marketing iniciado en background. El email llegará en 30-60 seg.",
+    })
+
+
 def _run_survey_analysis_background():
     """Helper para correr analyze_surveys_weekly en thread, sin bloquear el response.
 

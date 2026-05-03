@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Brief Semanal Marketing Aremko</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; color: #333; line-height: 1.55; max-width: 760px; margin: 0 auto; padding: 24px; background: #f4f6f8; }
+  .container { background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .hero { text-align: center; padding: 22px 12px 22px; background: linear-gradient(135deg,#2c5f5d 0%,#1a4040 100%); color: #fff; border-radius: 12px 12px 0 0; margin: -28px -28px 24px; }
+  .hero h1 { font-size: 1.5rem; margin: 0 0 6px; }
+  .hero p { margin: 0; opacity: .9; font-size: .9rem; }
+  h2 { color: #2c5f5d; font-size: 1.2rem; margin-top: 32px; padding-bottom: 6px; border-bottom: 2px solid #e8e8e8; }
+  h3 { color: #1a4040; font-size: 1.05rem; margin-top: 20px; margin-bottom: 8px; }
+  .resumen { background: #f7f4ee; border-left: 4px solid #2c5f5d; padding: 14px 18px; border-radius: 6px; font-size: .95rem; margin-bottom: 16px; }
+  .calendario { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: .9rem; }
+  .calendario th { background: #f0f6fa; text-align: left; padding: 8px 12px; color: #1a4040; }
+  .calendario td { padding: 8px 12px; border-top: 1px solid #e8e8e8; vertical-align: top; }
+  .calendario .dia { font-weight: 600; color: #2c5f5d; white-space: nowrap; }
+  .draft-box { background: #fafaf7; border: 1px solid #e8e8e8; border-radius: 8px; padding: 16px 18px; margin-bottom: 14px; }
+  .draft-box h3 { margin-top: 0; }
+  .draft-box .meta { font-size: .8rem; color: #888; margin-bottom: 8px; }
+  .copy { background: #fff; border: 1px solid #d8d3c0; border-radius: 6px; padding: 12px 14px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: .85rem; white-space: pre-wrap; line-height: 1.45; margin: 8px 0; color: #222; }
+  .pill { display: inline-block; background: #2c5f5d; color: #fff; padding: 2px 10px; border-radius: 10px; font-size: .75rem; font-weight: 600; margin-right: 4px; }
+  .pill.gancho { background: #c62828; }
+  .pill.contexto { background: #f9a825; }
+  .pill.moraleja { background: #6a1b9a; }
+  .pill.solucion { background: #2e7d32; }
+  .pill.cta { background: #1565c0; }
+  .guion-step { padding: 8px 12px; border-left: 3px solid #2c5f5d; margin-bottom: 6px; background: #fafafa; border-radius: 0 4px 4px 0; }
+  .lista-items { padding-left: 20px; margin: 6px 0; }
+  .lista-items li { margin-bottom: 4px; }
+  .hashtags { color: #1565c0; font-size: .85rem; word-spacing: 2px; }
+  .footer { text-align: center; color: #888; font-size: .8rem; padding-top: 20px; margin-top: 32px; border-top: 1px solid #e8e8e8; }
+  .empty { color: #999; font-style: italic; padding: 12px; text-align: center; }
+  .skip { background: #fff8e1; border-left: 4px solid #f9a825; padding: 12px 16px; border-radius: 6px; font-size: .9rem; }
+  a { color: #2c5f5d; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="hero">
+    <h1>📋 Brief Semanal Marketing</h1>
+    <p>{{ semana_inicio|date:"d/m" }} → {{ semana_fin|date:"d/m/Y" }} · {{ frases_count }} frases reales · {{ posts_count }} posts del blog</p>
+  </div>
+
+  <h2>Resumen de la semana</h2>
+  <div class="resumen">{{ brief.resumen_semana }}</div>
+
+  <h2>📅 Calendario</h2>
+  {% if brief.calendario %}
+  <table class="calendario">
+    <thead>
+      <tr><th style="width:90px;">Día</th><th>Publicaciones</th></tr>
+    </thead>
+    <tbody>
+    {% for d in brief.calendario %}
+      <tr>
+        <td class="dia">{{ d.dia }}<br><small style="color:#888;">{{ d.fecha }}</small></td>
+        <td>
+          {% for p in d.publicaciones %}
+            <div><span class="pill">{{ p.canal }}</span> <strong>{{ p.hora }}</strong> — {{ p.tipo }} <small style="color:#888;">({{ p.estado }})</small></div>
+          {% endfor %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">Sin calendario</p>
+  {% endif %}
+
+  {# === GBP === #}
+  {% if brief.drafts.gbp_post %}
+  <h2>🗺️ Google Business Profile</h2>
+  <div class="draft-box">
+    <h3>Post novedad</h3>
+    {% if brief.drafts.gbp_post.foto_sugerida %}<div class="meta">📸 Foto sugerida: {{ brief.drafts.gbp_post.foto_sugerida }}</div>{% endif %}
+    <div class="copy">{{ brief.drafts.gbp_post.texto }}</div>
+    {% if brief.drafts.gbp_post.url_cta %}<div class="meta"><strong>CTA URL:</strong> {{ brief.drafts.gbp_post.url_cta }}</div>{% endif %}
+  </div>
+  {% endif %}
+
+  {# === REEL MARTES === #}
+  {% if brief.drafts.reel_martes %}
+  <h2>🎬 Reel Martes</h2>
+  <div class="draft-box">
+    <h3>{{ brief.drafts.reel_martes.concepto }}</h3>
+    {% if brief.drafts.reel_martes.filtro_5_50 %}<div class="meta">✓ Filtro 5/50: {{ brief.drafts.reel_martes.filtro_5_50 }}</div>{% endif %}
+
+    {% if brief.drafts.reel_martes.guion %}
+    <h3 style="margin-top:14px;font-size:.95rem;">Guion (5 partes)</h3>
+    {% for s in brief.drafts.reel_martes.guion %}
+      <div class="guion-step">
+        <span class="pill {% if 'gancho' in s.bloque %}gancho{% elif 'contexto' in s.bloque %}contexto{% elif 'moraleja' in s.bloque %}moraleja{% elif 'solucion' in s.bloque %}solucion{% elif 'cta' in s.bloque %}cta{% endif %}">{{ s.bloque }}</span>
+        {{ s.texto }}
+      </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if brief.drafts.reel_martes.tomas_sugeridas %}
+    <h3 style="margin-top:14px;font-size:.95rem;">Tomas sugeridas</h3>
+    <ul class="lista-items">
+      {% for t in brief.drafts.reel_martes.tomas_sugeridas %}<li>{{ t }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if brief.drafts.reel_martes.hashtags %}
+    <div class="hashtags" style="margin-top:10px;">
+      {% for h in brief.drafts.reel_martes.hashtags %}{{ h }} {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# === CARRUSEL MIÉRCOLES === #}
+  {% if brief.drafts.carrusel_miercoles %}
+  <h2>🖼️ Carrusel Instagram (Miércoles)</h2>
+  <div class="draft-box">
+    <h3>{{ brief.drafts.carrusel_miercoles.concepto }}</h3>
+    {% if brief.drafts.carrusel_miercoles.slides %}
+    {% for s in brief.drafts.carrusel_miercoles.slides %}
+      <div style="border-top:1px solid #eee; padding:10px 0;">
+        <strong>Slide {{ s.numero }}</strong>
+        {% if s.imagen_sugerida %}<div class="meta">📸 {{ s.imagen_sugerida }}</div>{% endif %}
+        {% if s.texto_overlay %}<div class="copy">{{ s.texto_overlay }}</div>{% endif %}
+      </div>
+    {% endfor %}
+    {% endif %}
+    {% if brief.drafts.carrusel_miercoles.caption_completo %}
+    <h3 style="margin-top:14px;font-size:.95rem;">Caption</h3>
+    <div class="copy">{{ brief.drafts.carrusel_miercoles.caption_completo }}</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# === REEL JUEVES === #}
+  {% if brief.drafts.reel_jueves %}
+  <h2>🎬 Reel Jueves</h2>
+  <div class="draft-box">
+    <h3>{{ brief.drafts.reel_jueves.concepto }}</h3>
+
+    {% if brief.drafts.reel_jueves.guion %}
+    <h3 style="margin-top:14px;font-size:.95rem;">Guion</h3>
+    {% for s in brief.drafts.reel_jueves.guion %}
+      <div class="guion-step">
+        <span class="pill {% if 'gancho' in s.bloque %}gancho{% elif 'contexto' in s.bloque %}contexto{% elif 'moraleja' in s.bloque %}moraleja{% elif 'solucion' in s.bloque %}solucion{% elif 'cta' in s.bloque %}cta{% endif %}">{{ s.bloque }}</span>
+        {{ s.texto }}
+      </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if brief.drafts.reel_jueves.tomas_sugeridas %}
+    <h3 style="margin-top:14px;font-size:.95rem;">Tomas sugeridas</h3>
+    <ul class="lista-items">
+      {% for t in brief.drafts.reel_jueves.tomas_sugeridas %}<li>{{ t }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if brief.drafts.reel_jueves.hashtags %}
+    <div class="hashtags" style="margin-top:10px;">
+      {% for h in brief.drafts.reel_jueves.hashtags %}{{ h }} {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# === EMAIL ENGAGED === #}
+  <h2>📧 Email a engaged (miércoles)</h2>
+  {% if brief.drafts.email_engaged.necesario_esta_semana %}
+  <div class="draft-box">
+    <h3>{{ brief.drafts.email_engaged.asunto }}</h3>
+    {% if brief.drafts.email_engaged.preheader %}<div class="meta">Preheader: {{ brief.drafts.email_engaged.preheader }}</div>{% endif %}
+    {% if brief.drafts.email_engaged.cuerpo_texto_plano %}<div class="copy">{{ brief.drafts.email_engaged.cuerpo_texto_plano }}</div>{% endif %}
+  </div>
+  {% else %}
+  <div class="skip">⏭️ Esta semana no se justifica un email a engaged según el brief. Saltarlo.</div>
+  {% endif %}
+
+  {# === STORIES DIARIAS === #}
+  {% if brief.stories_diarias %}
+  <h2>📱 Stories diarias</h2>
+  <table class="calendario">
+    <thead><tr><th style="width:90px;">Día</th><th>Concepto</th><th style="width:140px;">Tipo</th></tr></thead>
+    <tbody>
+    {% for s in brief.stories_diarias %}
+      <tr>
+        <td class="dia">{{ s.dia }}</td>
+        <td>{{ s.concepto }}</td>
+        <td><small style="color:#888;">{{ s.tipo }}</small></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {# === RECORDATORIOS === #}
+  {% if brief.recordatorios %}
+  <h2>📌 Recordatorios</h2>
+  <ul class="lista-items">
+    {% for r in brief.recordatorios %}<li>{{ r }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {# === MÉTRICAS === #}
+  {% if brief.metricas_a_revisar_viernes %}
+  <h2>📊 Para revisar el viernes</h2>
+  <ul class="lista-items">
+    {% for m in brief.metricas_a_revisar_viernes %}<li>{{ m }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  <div class="footer">
+    Brief generado por agente IA · {{ frases_count }} frases reales de clientes promotores · {{ posts_count }} blog posts considerados<br>
+    <a href="https://www.aremko.cl/admin/" target="_blank">Abrir admin</a>
+  </div>
+</div>
+</body>
+</html>

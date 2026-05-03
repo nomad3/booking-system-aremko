@@ -368,6 +368,14 @@ SURVEY_ANALYSIS_LLM_MODEL = os.getenv(
 SURVEY_ANALYSIS_RECIPIENT_EMAIL = os.getenv(
     "SURVEY_ANALYSIS_RECIPIENT_EMAIL", "aremkospa@gmail.com"
 )
+
+# Brief semanal de marketing (Tarea 2.4 plan maestro)
+MARKETING_BRIEF_LLM_MODEL = os.getenv(
+    "MARKETING_BRIEF_LLM_MODEL", "anthropic/claude-sonnet-4.6"
+)
+MARKETING_BRIEF_RECIPIENT_EMAIL = os.getenv(
+    "MARKETING_BRIEF_RECIPIENT_EMAIL", "aremkospa@gmail.com"
+)
 DPV_LLM_MAX_TOKENS = int(os.getenv("DPV_LLM_MAX_TOKENS", "500"))
 DPV_LLM_TEMPERATURE = float(os.getenv("DPV_LLM_TEMPERATURE", "0.7"))
 DPV_LLM_TIMEOUT_SECONDS = int(os.getenv("DPV_LLM_TIMEOUT_SECONDS", "30"))
