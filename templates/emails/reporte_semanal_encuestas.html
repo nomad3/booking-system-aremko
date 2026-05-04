@@ -154,8 +154,16 @@
     <p class="empty">Sin follow-ups urgentes pendientes ✅</p>
   {% endif %}
 
+  {% if analisis.cruce_nps_vs_web and analisis.cruce_nps_vs_web.diagnostico %}
+  <h2>🔀 NPS de servicio vs métricas web (GA4)</h2>
+  <div class="resumen">{{ analisis.cruce_nps_vs_web.diagnostico }}</div>
+  {% if analisis.cruce_nps_vs_web.alerta_funnel %}
+  <div class="skip">⚠️ {{ analisis.cruce_nps_vs_web.alerta_funnel }}</div>
+  {% endif %}
+  {% endif %}
+
   <div class="footer">
-    Reporte generado por análisis IA semanal de Aremko · {{ encuestas_count }} encuesta{{ encuestas_count|pluralize:"s" }} analizada{{ encuestas_count|pluralize:"s" }}<br>
+    Reporte generado por análisis IA semanal de Aremko · {{ encuestas_count }} encuesta{{ encuestas_count|pluralize:"s" }} analizada{{ encuestas_count|pluralize:"s" }}{% if ga4_disponible %} · GA4 ✓{% endif %}<br>
     <a href="https://www.aremko.cl/admin/ventas/encuestasatisfaccion/" target="_blank">Abrir dashboard de encuestas</a>
   </div>
 </div>

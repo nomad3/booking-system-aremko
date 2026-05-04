@@ -67,13 +67,10 @@ def build_user_prompt(
     frases_clientes: list,
     blog_posts_recientes: list,
     alertas_analisis_ia: Optional[dict],
+    ga4_snapshot: Optional[dict] = None,
+    gsc_snapshot: Optional[dict] = None,
 ) -> str:
     """Construye el user prompt con toda la info contextual."""
-
-    eventos_locales = [
-        # Mes actual + próximas 2 semanas
-        # Esto se podría poblar con un calendario, por ahora se deja al LLM
-    ]
 
     return f"""Genera el brief de marketing para la semana del {semana_inicio.strftime('%d %b %Y')} al {semana_fin.strftime('%d %b %Y')}.
 
@@ -91,6 +88,12 @@ def build_user_prompt(
 
 === ANÁLISIS IA SEMANA PASADA (insights operativos a aprovechar) ===
 {json.dumps(alertas_analisis_ia, indent=2, ensure_ascii=False) if alertas_analisis_ia else '(no disponible)'}
+
+=== GA4 (sitio web aremko.cl) — ÚLTIMOS 7 DÍAS vs 7 ANTERIORES ===
+{json.dumps(ga4_snapshot, indent=2, ensure_ascii=False, default=str) if ga4_snapshot else '(no disponible)'}
+
+=== GOOGLE SEARCH CONSOLE (búsqueda orgánica) — ÚLTIMOS 7 DÍAS vs 7 ANTERIORES ===
+{json.dumps(gsc_snapshot, indent=2, ensure_ascii=False, default=str) if gsc_snapshot else '(no disponible)'}
 
 === TU OUTPUT (JSON estricto) ===
 
@@ -148,7 +151,19 @@ def build_user_prompt(
     {{"dia": "Martes", "concepto": "...", "tipo": "..."}}
   ],
   "recordatorios": ["Lista de cosas a no olvidar esta semana"],
-  "metricas_a_revisar_viernes": ["Lista de métricas para evaluar al cierre de semana"]
+  "metricas_a_revisar_viernes": ["Lista de métricas para evaluar al cierre de semana"],
+  "analisis_metricas_semana": {{
+    "resumen_trafico": "2-3 frases sobre GA4: sesiones, usuarios, conversiones, comparado a semana anterior. Si hay caída/subida fuerte, mencionar causa probable.",
+    "top_insights_ga4": [
+      "Insight 1: dato concreto + interpretación (ej: 'WhatsApp clicks subieron 35% pero phone_clicks cayó 50%, posible drop en visibilidad del CTA telefónico móvil')"
+    ],
+    "top_insights_gsc": [
+      "Insight 1: query/página con cambio relevante (ej: 'tina caliente puerto varas escaló de pos 8 a pos 4, urgente reforzar contenido en /tinas/')"
+    ],
+    "acciones_de_metricas": [
+      "Acción concreta sugerida basada en datos (ej: 'crear post GBP esta semana con keyword tina caliente puerto varas porque GSC muestra que es la query nº1 con CTR bajo')"
+    ]
+  }}
 }}
 
 REGLAS DE GENERACIÓN:
@@ -156,7 +171,9 @@ REGLAS DE GENERACIÓN:
 - Si hay alerta operativa pendiente del análisis IA pasado, evitar contenido que la contradiga
 - Si una frase real de cliente promotor calza con el tipo de Reel, USARLA literal (mejor que inventar)
 - Si Email engaged no se justifica esta semana (poco contenido nuevo), poner necesario_esta_semana: false
-- Mantener concretitud: nada de "publicar contenido relevante", siempre un draft con copy real"""
+- Mantener concretitud: nada de "publicar contenido relevante", siempre un draft con copy real
+- Si GA4/GSC no están disponibles, dejar analisis_metricas_semana con strings que digan "(sin datos esta semana)"
+- Las acciones de métricas deben ser específicas: nombrar la página, query o evento concreto"""
 
 
 def get_frases_clientes_promotores(days: int = 30) -> list:
@@ -231,12 +248,43 @@ def get_alertas_analisis_ia_anterior() -> Optional[dict]:
     return None
 
 
+def get_ga4_snapshot_safe() -> Optional[dict]:
+    """Trae snapshot GA4 si está configurado, devuelve None si falla todo."""
+    try:
+        from .ga4_reporter import get_full_snapshot
+        snap = get_full_snapshot()
+        # Si todas las secciones fallaron, devolver None
+        if snap.get('errors') and not snap.get('overview'):
+            logger.warning(f'GA4 snapshot vacío. Errores: {snap["errors"]}')
+            return None
+        return snap
+    except Exception as exc:
+        logger.warning(f'GA4 snapshot no disponible: {exc}')
+        return None
+
+
+def get_gsc_snapshot_safe() -> Optional[dict]:
+    """Trae snapshot GSC si está configurado, devuelve None si falla todo."""
+    try:
+        from .gsc_reporter import get_full_snapshot
+        snap = get_full_snapshot()
+        if snap.get('errors') and not snap.get('overview'):
+            logger.warning(f'GSC snapshot vacío. Errores: {snap["errors"]}')
+            return None
+        return snap
+    except Exception as exc:
+        logger.warning(f'GSC snapshot no disponible: {exc}')
+        return None
+
+
 def call_llm(
     semana_inicio,
     semana_fin,
     frases_clientes,
     blog_posts_recientes,
     alertas_analisis_ia,
+    ga4_snapshot: Optional[dict] = None,
+    gsc_snapshot: Optional[dict] = None,
     model: Optional[str] = None,
 ) -> dict:
     """Llama a OpenRouter con todo el contexto y devuelve el brief en dict."""
@@ -263,6 +311,8 @@ def call_llm(
         frases_clientes=frases_clientes,
         blog_posts_recientes=blog_posts_recientes,
         alertas_analisis_ia=alertas_analisis_ia,
+        ga4_snapshot=ga4_snapshot,
+        gsc_snapshot=gsc_snapshot,
     )
 
     client = OpenAI(api_key=api_key, base_url=base_url)
@@ -308,6 +358,8 @@ def generate_brief() -> dict:
     frases = get_frases_clientes_promotores(days=30)
     posts = get_blog_posts_recientes(limit=5)
     alertas = get_alertas_analisis_ia_anterior()
+    ga4_snapshot = get_ga4_snapshot_safe()
+    gsc_snapshot = get_gsc_snapshot_safe()
 
     brief = call_llm(
         semana_inicio=semana_inicio,
@@ -315,6 +367,8 @@ def generate_brief() -> dict:
         frases_clientes=frases,
         blog_posts_recientes=posts,
         alertas_analisis_ia=alertas,
+        ga4_snapshot=ga4_snapshot,
+        gsc_snapshot=gsc_snapshot,
     )
 
     return {
@@ -323,4 +377,7 @@ def generate_brief() -> dict:
         'brief': brief,
         'frases_clientes_count': len(frases),
         'blog_posts_count': len(posts),
+        'ga4_snapshot': ga4_snapshot,
+        'gsc_snapshot': gsc_snapshot,
+        'metricas_disponibles': bool(ga4_snapshot or gsc_snapshot),
     }

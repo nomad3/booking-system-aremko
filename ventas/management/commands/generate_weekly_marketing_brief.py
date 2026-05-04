@@ -52,6 +52,7 @@ class Command(BaseCommand):
         self.stdout.write(f'📅 Semana: {result["semana_inicio"]} → {result["semana_fin"]}')
         self.stdout.write(f'💬 Frases de clientes promotores cargadas: {result["frases_clientes_count"]}')
         self.stdout.write(f'📝 Blog posts recientes cargados: {result["blog_posts_count"]}')
+        self.stdout.write(f'📈 GA4: {"✓" if result.get("ga4_snapshot") else "✗"} · GSC: {"✓" if result.get("gsc_snapshot") else "✗"}')
 
         if opts['dry_run']:
             import json
@@ -73,6 +74,8 @@ class Command(BaseCommand):
             'semana_fin': result['semana_fin'],
             'frases_count': result['frases_clientes_count'],
             'posts_count': result['blog_posts_count'],
+            'ga4_disponible': bool(result.get('ga4_snapshot')),
+            'gsc_disponible': bool(result.get('gsc_snapshot')),
         }
         html_body = render_to_string('emails/brief_marketing_semanal.html', context)
 

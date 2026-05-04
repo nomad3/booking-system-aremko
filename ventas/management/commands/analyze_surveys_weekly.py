@@ -91,6 +91,7 @@ class Command(BaseCommand):
             'periodo_fin': result['periodo_fin'],
             'encuestas_count': result['encuestas_qs_count'],
             'followups_pendientes': followups,
+            'ga4_disponible': bool(result.get('ga4_snapshot')),
         }
         html_body = render_to_string('emails/reporte_semanal_encuestas.html', context)
 

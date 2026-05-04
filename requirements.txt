@@ -32,6 +32,7 @@ dj-database-url>=2.2.0
 whitenoise>=6.8.2  # Static files serving
 django-cors-headers>=4.6.0  # CORS headers
 google-cloud-storage>=2.18.0  # Google Cloud Storage (mantener por compatibilidad)
+google-analytics-data>=0.18.0  # GA4 Reporting API (Tarea 2.3 plan maestro)
 django-storages>=1.14.4  # Django storage backends
 
 # Cloudinary

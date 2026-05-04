@@ -46,8 +46,8 @@ Sé específico, cita comentarios textuales cuando sea relevante, y prioriza \
 acciones concretas sobre observaciones genéricas."""
 
 
-def build_user_prompt(stats: dict, encuestas_data: list) -> str:
-    """Construye el prompt user con stats agregados + texto de las encuestas."""
+def build_user_prompt(stats: dict, encuestas_data: list, ga4_snapshot: dict = None) -> str:
+    """Construye el prompt user con stats agregados + texto de las encuestas + métricas GA4."""
 
     # Limitar texto libre a 800 chars por encuesta para no inflar tokens
     encuestas_serializadas = []
@@ -81,6 +81,11 @@ def build_user_prompt(stats: dict, encuestas_data: list) -> str:
 
 === ENCUESTAS (anonimizadas para análisis) ===
 {json.dumps(encuestas_serializadas, indent=2, ensure_ascii=False, default=str)}
+
+=== GA4 (sitio web, últimos 7 días vs 7 anteriores) ===
+{json.dumps(ga4_snapshot, indent=2, ensure_ascii=False, default=str) if ga4_snapshot else '(no disponible)'}
+
+Si GA4 está disponible, cruza la información: por ejemplo, si la conversion rate cayó pero el NPS está alto, eso sugiere problema de funnel digital, no de servicio.
 
 === TU OUTPUT (JSON estricto, sin markdown, sin código fences) ===
 
@@ -117,6 +122,10 @@ Devuelve EXACTAMENTE este formato:
     "promedio_temperatura_tina": <float|null>,
     "promedio_atencion": <float|null>,
     "cliente_recurrente_pct": <float, % que dijeron 'soy_cliente' en cómo_se_enteró>
+  }},
+  "cruce_nps_vs_web": {{
+    "diagnostico": "1-2 frases cruzando NPS de servicio con métricas GA4 (conversion, sesiones, eventos). Ej: 'NPS alto (62) pero conversion rate cayó 30% — problema en el funnel web, no en la experiencia.' Si GA4 no está disponible, devolver string vacía.",
+    "alerta_funnel": "Si hay desalineación clara (NPS alto + web malo, o NPS bajo + web bueno), describir la alerta concreta. Si todo está alineado o sin GA4, devolver string vacía."
   }}
 }}
 
@@ -211,7 +220,22 @@ def serialize_encuestas(encuestas_qs):
     return data
 
 
-def call_llm(stats: dict, encuestas_data: list, model: str = None) -> dict:
+def get_ga4_snapshot_safe():
+    """Trae snapshot GA4 si está configurado. Devuelve None si falla."""
+    try:
+        from .ga4_reporter import get_full_snapshot
+        snap = get_full_snapshot()
+        if snap.get('errors') and not snap.get('overview'):
+            logger.warning(f'GA4 snapshot vacío. Errores: {snap["errors"]}')
+            return None
+        return snap
+    except Exception as exc:
+        logger.warning(f'GA4 snapshot no disponible: {exc}')
+        return None
+
+
+def call_llm(stats: dict, encuestas_data: list, model: str = None,
+             ga4_snapshot: dict = None) -> dict:
     """Llama a OpenRouter con el prompt estructurado.
 
     Retorna dict con el análisis. Levanta excepción si falla.
@@ -226,7 +250,7 @@ def call_llm(stats: dict, encuestas_data: list, model: str = None) -> dict:
     model = model or getattr(settings, 'SURVEY_ANALYSIS_LLM_MODEL', 'anthropic/claude-sonnet-4.6')
 
     client = OpenAI(api_key=api_key, base_url=base_url)
-    user_prompt = build_user_prompt(stats, encuestas_data)
+    user_prompt = build_user_prompt(stats, encuestas_data, ga4_snapshot=ga4_snapshot)
 
     logger.info(f'Llamando a {model} para análisis semanal de encuestas')
 
@@ -292,7 +316,8 @@ def analyze_week(days: int = 7, end_date=None) -> dict:
 
     stats = aggregate_stats(encuestas_qs)
     encuestas_data = serialize_encuestas(encuestas_qs)
-    analisis = call_llm(stats, encuestas_data)
+    ga4_snapshot = get_ga4_snapshot_safe()
+    analisis = call_llm(stats, encuestas_data, ga4_snapshot=ga4_snapshot)
 
     return {
         'periodo_inicio': start_date,
@@ -301,6 +326,7 @@ def analyze_week(days: int = 7, end_date=None) -> dict:
         'encuestas_qs_count': total,
         'stats': stats,
         'analisis': analisis,
+        'ga4_snapshot': ga4_snapshot,
     }
 
 

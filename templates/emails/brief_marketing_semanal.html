@@ -210,6 +210,44 @@
   </ul>
   {% endif %}
 
+  {# === ANÁLISIS GA4 + GSC === #}
+  {% if brief.analisis_metricas_semana %}
+  <h2>📈 Métricas semana (GA4 + Search Console)</h2>
+  {% if brief.analisis_metricas_semana.resumen_trafico %}
+  <div class="resumen">{{ brief.analisis_metricas_semana.resumen_trafico }}</div>
+  {% endif %}
+
+  {% if brief.analisis_metricas_semana.top_insights_ga4 %}
+  <h3>Insights GA4 (sitio web)</h3>
+  <ul class="lista-items">
+    {% for i in brief.analisis_metricas_semana.top_insights_ga4 %}<li>{{ i }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if brief.analisis_metricas_semana.top_insights_gsc %}
+  <h3>Insights Search Console (búsqueda Google)</h3>
+  <ul class="lista-items">
+    {% for i in brief.analisis_metricas_semana.top_insights_gsc %}<li>{{ i }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if brief.analisis_metricas_semana.acciones_de_metricas %}
+  <h3>Acciones sugeridas en base a datos</h3>
+  <ul class="lista-items">
+    {% for a in brief.analisis_metricas_semana.acciones_de_metricas %}<li>{{ a }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if ga4_disponible or gsc_disponible %}
+  <div class="meta" style="margin-top:8px;">
+    Fuentes: {% if ga4_disponible %}GA4 ✓{% else %}GA4 ✗{% endif %} · {% if gsc_disponible %}Search Console ✓{% else %}Search Console ✗{% endif %}
+  </div>
+  {% endif %}
+  {% elif not ga4_disponible and not gsc_disponible %}
+  <h2>📈 Métricas semana</h2>
+  <div class="skip">⏭️ GA4 + Search Console aún no conectados. Configura el service account en Render para activar esta sección.</div>
+  {% endif %}
+
   <div class="footer">
     Brief generado por agente IA · {{ frases_count }} frases reales de clientes promotores · {{ posts_count }} blog posts considerados<br>
     <a href="https://www.aremko.cl/admin/" target="_blank">Abrir admin</a>

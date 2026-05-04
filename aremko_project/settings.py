@@ -376,6 +376,15 @@ MARKETING_BRIEF_LLM_MODEL = os.getenv(
 MARKETING_BRIEF_RECIPIENT_EMAIL = os.getenv(
     "MARKETING_BRIEF_RECIPIENT_EMAIL", "aremkospa@gmail.com"
 )
+
+# GA4 + GSC API integration (Tarea 2.3 plan maestro)
+# Service account JSON puede venir como path al archivo o como JSON inline
+GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")  # JSON completo como string
+GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "")  # Path al archivo (alternativa)
+# GA4 Property ID (no Measurement ID). Está en Admin > Property settings, formato numérico
+GA4_PROPERTY_ID = os.getenv("GA4_PROPERTY_ID", "535461209")  # Propiedad aremko.cl
+# GSC site URL (con barra al final si es Domain property: "sc-domain:aremko.cl")
+GSC_SITE_URL = os.getenv("GSC_SITE_URL", "sc-domain:aremko.cl")
 DPV_LLM_MAX_TOKENS = int(os.getenv("DPV_LLM_MAX_TOKENS", "500"))
 DPV_LLM_TEMPERATURE = float(os.getenv("DPV_LLM_TEMPERATURE", "0.7"))
 DPV_LLM_TIMEOUT_SECONDS = int(os.getenv("DPV_LLM_TIMEOUT_SECONDS", "30"))
