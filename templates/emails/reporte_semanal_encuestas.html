@@ -162,6 +162,66 @@
   {% endif %}
   {% endif %}
 
+  {% if reviews_snapshot %}
+  <h2>⭐ Reviews externas (Google + TripAdvisor)</h2>
+  <table class="calendario">
+    <thead>
+      <tr>
+        <th>Plataforma</th>
+        <th>Rating</th>
+        <th>Total reviews</th>
+        <th>Δ vs anterior</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if reviews_snapshot.google %}
+      <tr>
+        <td class="dia">Google</td>
+        <td>{{ reviews_snapshot.google.rating|default:"—" }} ★</td>
+        <td>{{ reviews_snapshot.google.total|default:"—" }}</td>
+        <td>
+          {% if reviews_snapshot.google.rating_delta is not None %}
+            {% if reviews_snapshot.google.rating_delta > 0 %}🔺{% elif reviews_snapshot.google.rating_delta < 0 %}🔻{% else %}→{% endif %}
+            {{ reviews_snapshot.google.rating_delta|floatformat:2 }}★
+            {% if reviews_snapshot.google.total_delta %} / +{{ reviews_snapshot.google.total_delta|floatformat:0 }} reviews{% endif %}
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endif %}
+      {% if reviews_snapshot.tripadvisor %}
+      <tr>
+        <td class="dia">TripAdvisor</td>
+        <td>{{ reviews_snapshot.tripadvisor.rating|default:"—" }} ★</td>
+        <td>{{ reviews_snapshot.tripadvisor.total|default:"—" }}</td>
+        <td>
+          {% if reviews_snapshot.tripadvisor.rating_delta is not None %}
+            {% if reviews_snapshot.tripadvisor.rating_delta > 0 %}🔺{% elif reviews_snapshot.tripadvisor.rating_delta < 0 %}🔻{% else %}→{% endif %}
+            {{ reviews_snapshot.tripadvisor.rating_delta|floatformat:2 }}★
+            {% if reviews_snapshot.tripadvisor.total_delta %} / +{{ reviews_snapshot.tripadvisor.total_delta|floatformat:0 }} reviews{% endif %}
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+  <div class="meta" style="margin-top:6px;">
+    Snapshot del {{ reviews_snapshot.fecha_snapshot }}{% if reviews_snapshot.fecha_anterior %} comparado con {{ reviews_snapshot.fecha_anterior }}{% endif %}
+  </div>
+  {% if reviews_snapshot.notas %}
+  <div class="meta" style="margin-top:6px;"><em>Nota: {{ reviews_snapshot.notas }}</em></div>
+  {% endif %}
+
+  {% if analisis.cruce_nps_vs_reviews and analisis.cruce_nps_vs_reviews.diagnostico %}
+  <div class="resumen" style="margin-top:12px;">{{ analisis.cruce_nps_vs_reviews.diagnostico }}</div>
+  {% if analisis.cruce_nps_vs_reviews.accion_sugerida %}
+  <div class="skip">👉 {{ analisis.cruce_nps_vs_reviews.accion_sugerida }}</div>
+  {% endif %}
+  {% endif %}
+  {% else %}
+  <h2>⭐ Reviews externas</h2>
+  <div class="skip">⏭️ Aún no hay snapshot de reviews para esta semana. <a href="https://www.aremko.cl/admin/ventas/reviewsnapshot/add/" target="_blank">Crear snapshot ahora →</a> (toma 2 minutos: copiar 4 números de Google y TripAdvisor).</div>
+  {% endif %}
+
   <div class="footer">
     Reporte generado por análisis IA semanal de Aremko · {{ encuestas_count }} encuesta{{ encuestas_count|pluralize:"s" }} analizada{{ encuestas_count|pluralize:"s" }}{% if ga4_disponible %} · GA4 ✓{% endif %}<br>
     <a href="https://www.aremko.cl/admin/ventas/encuestasatisfaccion/" target="_blank">Abrir dashboard de encuestas</a>

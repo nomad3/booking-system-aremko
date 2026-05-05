@@ -5341,3 +5341,101 @@ class EncuestaSatisfaccion(models.Model):
         if not self.followup_completado:
             self.requiere_followup = self.evaluar_followup()
         super().save(*args, **kwargs)
+
+
+class ReviewSnapshot(models.Model):
+    """Snapshot semanal manual de reviews externas (Google + TripAdvisor).
+
+    Cada lunes Jorge entra al admin e ingresa 4 números (rating + total de cada plataforma).
+    El servicio de análisis IA cruza esto con NPS interno para detectar gaps:
+    p.ej. NPS interno alto pero rating Google bajando → revisar review reciente negativa.
+
+    Tarea 2.8 plan maestro.
+    """
+    fecha = models.DateField(
+        unique=True, db_index=True, default=timezone.localdate,
+        help_text='Lunes de la semana del snapshot. Solo 1 por fecha.'
+    )
+
+    # Google Reviews
+    google_rating = models.DecimalField(
+        max_digits=3, decimal_places=2, null=True, blank=True,
+        help_text='Rating promedio Google (1.00 - 5.00)'
+    )
+    google_total = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Total de reviews acumuladas en Google'
+    )
+    google_url = models.URLField(
+        max_length=500, blank=True,
+        help_text='URL del perfil de Google Maps (autocompletada desde el último snapshot)'
+    )
+
+    # TripAdvisor
+    tripadvisor_rating = models.DecimalField(
+        max_digits=3, decimal_places=2, null=True, blank=True,
+        help_text='Rating promedio TripAdvisor (1.00 - 5.00)'
+    )
+    tripadvisor_total = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Total de reviews acumuladas en TripAdvisor'
+    )
+    tripadvisor_url = models.URLField(
+        max_length=500, blank=True,
+        help_text='URL del perfil de TripAdvisor (autocompletada desde el último snapshot)'
+    )
+
+    # Notas operativas (opcional)
+    notas = models.TextField(
+        blank=True,
+        help_text='Cualquier observación relevante: review reciente notable, '
+                  'cambio de rating, comentarios destacados...'
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Snapshot de reviews externas'
+        verbose_name_plural = 'Snapshots de reviews externas'
+        ordering = ['-fecha']
+
+    def __str__(self):
+        partes = [f'Reviews {self.fecha.strftime("%d/%m/%Y")}']
+        if self.google_rating is not None:
+            partes.append(f'Google {self.google_rating}★ ({self.google_total or 0})')
+        if self.tripadvisor_rating is not None:
+            partes.append(f'TA {self.tripadvisor_rating}★ ({self.tripadvisor_total or 0})')
+        return ' · '.join(partes)
+
+    def get_previous(self):
+        """Snapshot anterior (por fecha), para calcular deltas."""
+        return ReviewSnapshot.objects.filter(fecha__lt=self.fecha).order_by('-fecha').first()
+
+    def deltas(self):
+        """Diferencias vs snapshot anterior. None si es el primero."""
+        prev = self.get_previous()
+        if not prev:
+            return None
+        def _diff(curr, prev):
+            if curr is None or prev is None:
+                return None
+            return float(curr) - float(prev)
+        return {
+            'google_rating_delta': _diff(self.google_rating, prev.google_rating),
+            'google_total_delta': _diff(self.google_total, prev.google_total),
+            'tripadvisor_rating_delta': _diff(self.tripadvisor_rating, prev.tripadvisor_rating),
+            'tripadvisor_total_delta': _diff(self.tripadvisor_total, prev.tripadvisor_total),
+            'fecha_anterior': prev.fecha,
+        }
+
+    def save(self, *args, **kwargs):
+        # Heredar URLs del snapshot más reciente si quedaron vacías
+        if not self.google_url or not self.tripadvisor_url:
+            latest = ReviewSnapshot.objects.exclude(pk=self.pk).order_by('-fecha').first()
+            if latest:
+                if not self.google_url:
+                    self.google_url = latest.google_url
+                if not self.tripadvisor_url:
+                    self.tripadvisor_url = latest.tripadvisor_url
+        super().save(*args, **kwargs)

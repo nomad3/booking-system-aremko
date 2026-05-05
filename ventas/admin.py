@@ -47,6 +47,8 @@ from .models import (
     Comanda, DetalleComanda,
     # Encuesta de Satisfacción (VoC)
     EncuestaSatisfaccion,
+    # Reviews externas (Google + TripAdvisor)
+    ReviewSnapshot,
 )
 from django.http import HttpResponse
 import xlwt
@@ -4148,3 +4150,122 @@ class EncuestaSatisfaccionAdmin(admin.ModelAdmin):
         n = queryset.update(followup_completado=False)
         self.message_user(request, f'🔄 {n} encuesta(s) reabiertas como follow-up pendiente.')
     marcar_followup_pendiente.short_description = '🔄 Reabrir follow-up (marcar pendiente)'
+
+
+@admin.register(ReviewSnapshot)
+class ReviewSnapshotAdmin(admin.ModelAdmin):
+    """Dashboard simple para registrar el snapshot semanal de Google + TripAdvisor.
+
+    Cada lunes Jorge entra acá, abre los 2 perfiles externos y copia 4 datos:
+    rating + total de cada plataforma. El análisis IA del lunes lee el snapshot
+    más reciente y compara contra el anterior.
+    """
+
+    list_display = (
+        'fecha', 'google_display', 'google_delta_display',
+        'tripadvisor_display', 'tripadvisor_delta_display', 'updated_at',
+    )
+    ordering = ('-fecha',)
+    readonly_fields = ('created_at', 'updated_at', 'google_link', 'tripadvisor_link', 'deltas_display')
+
+    fieldsets = (
+        ('Fecha del snapshot', {
+            'fields': ('fecha',),
+            'description': '🗓️ Usa el lunes de cada semana (1 snapshot por fecha).',
+        }),
+        ('Google Reviews', {
+            'fields': ('google_url', 'google_link', 'google_rating', 'google_total'),
+            'description': '⭐ Abre el perfil con el botón "Abrir Google", copia el rating (ej. 4.7) y el total de reviews.',
+        }),
+        ('TripAdvisor', {
+            'fields': ('tripadvisor_url', 'tripadvisor_link', 'tripadvisor_rating', 'tripadvisor_total'),
+            'description': '⭐ Abre el perfil con el botón "Abrir TripAdvisor", copia el rating (ej. 4.5) y el total de reviews.',
+        }),
+        ('Delta vs snapshot anterior', {
+            'fields': ('deltas_display',),
+            'classes': ('collapse',),
+        }),
+        ('Notas (opcional)', {
+            'fields': ('notas',),
+            'classes': ('collapse',),
+        }),
+        ('Auditoría', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def google_display(self, obj):
+        if obj.google_rating is None:
+            return '—'
+        return f'{obj.google_rating}★ ({obj.google_total or 0})'
+    google_display.short_description = 'Google'
+
+    def tripadvisor_display(self, obj):
+        if obj.tripadvisor_rating is None:
+            return '—'
+        return f'{obj.tripadvisor_rating}★ ({obj.tripadvisor_total or 0})'
+    tripadvisor_display.short_description = 'TripAdvisor'
+
+    def google_delta_display(self, obj):
+        d = obj.deltas()
+        if not d or d['google_rating_delta'] is None:
+            return '—'
+        from django.utils.html import format_html
+        rd = d['google_rating_delta']
+        td = d['google_total_delta'] or 0
+        arrow = '🔺' if rd > 0 else ('🔻' if rd < 0 else '→')
+        return format_html('{} {:+.2f}★ / {:+.0f}', arrow, rd, td)
+    google_delta_display.short_description = 'Δ Google'
+
+    def tripadvisor_delta_display(self, obj):
+        d = obj.deltas()
+        if not d or d['tripadvisor_rating_delta'] is None:
+            return '—'
+        from django.utils.html import format_html
+        rd = d['tripadvisor_rating_delta']
+        td = d['tripadvisor_total_delta'] or 0
+        arrow = '🔺' if rd > 0 else ('🔻' if rd < 0 else '→')
+        return format_html('{} {:+.2f}★ / {:+.0f}', arrow, rd, td)
+    tripadvisor_delta_display.short_description = 'Δ TripAdvisor'
+
+    def google_link(self, obj):
+        if not obj.google_url:
+            return '(guarda primero la URL para ver el botón)'
+        from django.utils.html import format_html
+        return format_html(
+            '<a href="{}" target="_blank" class="button" '
+            'style="background:#4285F4;color:#fff;padding:6px 12px;'
+            'border-radius:4px;text-decoration:none;">🌐 Abrir Google</a>',
+            obj.google_url,
+        )
+    google_link.short_description = 'Acción'
+
+    def tripadvisor_link(self, obj):
+        if not obj.tripadvisor_url:
+            return '(guarda primero la URL para ver el botón)'
+        from django.utils.html import format_html
+        return format_html(
+            '<a href="{}" target="_blank" class="button" '
+            'style="background:#00AF87;color:#fff;padding:6px 12px;'
+            'border-radius:4px;text-decoration:none;">🌐 Abrir TripAdvisor</a>',
+            obj.tripadvisor_url,
+        )
+    tripadvisor_link.short_description = 'Acción'
+
+    def deltas_display(self, obj):
+        d = obj.deltas()
+        if not d:
+            return 'Es el primer snapshot — no hay con qué comparar.'
+        from django.utils.html import format_html
+        return format_html(
+            '<strong>Comparando con {}</strong><br>'
+            'Google: rating {} ({:+.2f}) · total {} ({:+.0f})<br>'
+            'TripAdvisor: rating {} ({:+.2f}) · total {} ({:+.0f})',
+            d['fecha_anterior'].strftime('%d/%m/%Y'),
+            obj.google_rating or '—', d['google_rating_delta'] or 0,
+            obj.google_total or 0, d['google_total_delta'] or 0,
+            obj.tripadvisor_rating or '—', d['tripadvisor_rating_delta'] or 0,
+            obj.tripadvisor_total or 0, d['tripadvisor_total_delta'] or 0,
+        )
+    deltas_display.short_description = 'Comparación'

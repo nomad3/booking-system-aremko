@@ -46,8 +46,9 @@ Sé específico, cita comentarios textuales cuando sea relevante, y prioriza \
 acciones concretas sobre observaciones genéricas."""
 
 
-def build_user_prompt(stats: dict, encuestas_data: list, ga4_snapshot: dict = None) -> str:
-    """Construye el prompt user con stats agregados + texto de las encuestas + métricas GA4."""
+def build_user_prompt(stats: dict, encuestas_data: list, ga4_snapshot: dict = None,
+                      reviews_snapshot: dict = None) -> str:
+    """Construye el prompt user con stats agregados + texto de las encuestas + métricas GA4 + reviews externas."""
 
     # Limitar texto libre a 800 chars por encuesta para no inflar tokens
     encuestas_serializadas = []
@@ -86,6 +87,14 @@ def build_user_prompt(stats: dict, encuestas_data: list, ga4_snapshot: dict = No
 {json.dumps(ga4_snapshot, indent=2, ensure_ascii=False, default=str) if ga4_snapshot else '(no disponible)'}
 
 Si GA4 está disponible, cruza la información: por ejemplo, si la conversion rate cayó pero el NPS está alto, eso sugiere problema de funnel digital, no de servicio.
+
+=== REVIEWS EXTERNAS (Google + TripAdvisor, snapshot manual semanal) ===
+{json.dumps(reviews_snapshot, indent=2, ensure_ascii=False, default=str) if reviews_snapshot else '(no disponible — Jorge aún no registró el snapshot semanal)'}
+
+Si hay snapshot, cruza con el NPS interno:
+- NPS interno alto + rating Google bajando → review reciente negativa, revisar comentarios públicos
+- Rating estable + NPS bajando → mejora estructural reciente que aún no se refleja externo
+- Total Google subiendo > total TripAdvisor → bias de canal (incluir en oportunidades_comerciales si aplica)
 
 === TU OUTPUT (JSON estricto, sin markdown, sin código fences) ===
 
@@ -126,6 +135,10 @@ Devuelve EXACTAMENTE este formato:
   "cruce_nps_vs_web": {{
     "diagnostico": "1-2 frases cruzando NPS de servicio con métricas GA4 (conversion, sesiones, eventos). Ej: 'NPS alto (62) pero conversion rate cayó 30% — problema en el funnel web, no en la experiencia.' Si GA4 no está disponible, devolver string vacía.",
     "alerta_funnel": "Si hay desalineación clara (NPS alto + web malo, o NPS bajo + web bueno), describir la alerta concreta. Si todo está alineado o sin GA4, devolver string vacía."
+  }},
+  "cruce_nps_vs_reviews": {{
+    "diagnostico": "1-2 frases cruzando NPS interno con rating Google/TripAdvisor y sus deltas. Ej: 'NPS 80 pero Google bajó de 4.8 a 4.6 con 3 reviews nuevas — revisar reviews recientes.' Si no hay snapshot, string vacía.",
+    "accion_sugerida": "Si hay desalineación o caída en rating, qué hacer concretamente esta semana (ej. 'leer las 3 reviews nuevas de Google y responder a las negativas'). Si todo está alineado, string vacía."
   }}
 }}
 
@@ -234,8 +247,18 @@ def get_ga4_snapshot_safe():
         return None
 
 
+def get_reviews_snapshot_safe():
+    """Trae el resumen del último ReviewSnapshot. None si aún no hay datos."""
+    try:
+        from .review_snapshot_service import get_snapshot_summary
+        return get_snapshot_summary()
+    except Exception as exc:
+        logger.warning(f'Reviews snapshot no disponible: {exc}')
+        return None
+
+
 def call_llm(stats: dict, encuestas_data: list, model: str = None,
-             ga4_snapshot: dict = None) -> dict:
+             ga4_snapshot: dict = None, reviews_snapshot: dict = None) -> dict:
     """Llama a OpenRouter con el prompt estructurado.
 
     Retorna dict con el análisis. Levanta excepción si falla.
@@ -250,7 +273,8 @@ def call_llm(stats: dict, encuestas_data: list, model: str = None,
     model = model or getattr(settings, 'SURVEY_ANALYSIS_LLM_MODEL', 'anthropic/claude-sonnet-4.6')
 
     client = OpenAI(api_key=api_key, base_url=base_url)
-    user_prompt = build_user_prompt(stats, encuestas_data, ga4_snapshot=ga4_snapshot)
+    user_prompt = build_user_prompt(stats, encuestas_data, ga4_snapshot=ga4_snapshot,
+                                    reviews_snapshot=reviews_snapshot)
 
     logger.info(f'Llamando a {model} para análisis semanal de encuestas')
 
@@ -317,7 +341,9 @@ def analyze_week(days: int = 7, end_date=None) -> dict:
     stats = aggregate_stats(encuestas_qs)
     encuestas_data = serialize_encuestas(encuestas_qs)
     ga4_snapshot = get_ga4_snapshot_safe()
-    analisis = call_llm(stats, encuestas_data, ga4_snapshot=ga4_snapshot)
+    reviews_snapshot = get_reviews_snapshot_safe()
+    analisis = call_llm(stats, encuestas_data, ga4_snapshot=ga4_snapshot,
+                        reviews_snapshot=reviews_snapshot)
 
     return {
         'periodo_inicio': start_date,
@@ -327,6 +353,7 @@ def analyze_week(days: int = 7, end_date=None) -> dict:
         'stats': stats,
         'analisis': analisis,
         'ga4_snapshot': ga4_snapshot,
+        'reviews_snapshot': reviews_snapshot,
     }
 
 
