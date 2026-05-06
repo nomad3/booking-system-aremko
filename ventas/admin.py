@@ -1,6 +1,9 @@
+import logging
 from django.contrib import admin, messages
 from solo.admin import SingletonModelAdmin
 from django import forms
+
+logger = logging.getLogger(__name__)
 from django.db import models
 from .forms import PagoInlineForm, PagoInlineFormSet, VentaReservaAdminForm
 from django.forms import DateTimeInput
@@ -49,6 +52,7 @@ from .models import (
     EncuestaSatisfaccion,
     # Reviews externas (Google + TripAdvisor)
     ReviewSnapshot,
+    Review,
 )
 from django.http import HttpResponse
 import xlwt
@@ -4269,3 +4273,238 @@ class ReviewSnapshotAdmin(admin.ModelAdmin):
             obj.tripadvisor_total or 0, d['tripadvisor_total_delta'] or 0,
         )
     deltas_display.short_description = 'Comparación'
+
+
+@admin.register(Review)
+class ReviewAdmin(admin.ModelAdmin):
+    """Admin de reviews individuales con extracción IA + generación de respuesta.
+
+    Workflow:
+    1. Crear nuevo Review → seleccionar fuente + subir screenshot → Guardar
+    2. Click "🤖 Extraer datos del screenshot con IA" → autocompleta campos
+    3. Revisar/corregir si la IA se equivocó
+    4. Click "💬 Generar respuesta sugerida" → propone respuesta lista
+    5. Copiar respuesta, publicar en Google/TripAdvisor
+    6. Marcar "Respuesta publicada" + Guardar
+    """
+
+    list_display = (
+        'fecha_review', 'fuente', 'rating_badge', 'autor', 'texto_preview',
+        'sentimiento', 'respuesta_publicada', 'updated_at',
+    )
+    list_filter = ('fuente', 'sentimiento', 'respuesta_publicada', 'extraccion_completada', 'idioma')
+    search_fields = ('autor', 'texto', 'respuesta_sugerida', 'notas_internas')
+    date_hierarchy = 'fecha_review'
+    ordering = ('-fecha_review', '-created_at')
+    list_per_page = 50
+
+    readonly_fields = (
+        'created_at', 'updated_at', 'screenshot_preview',
+        'acciones_ia', 'respuesta_copiable',
+    )
+
+    fieldsets = (
+        ('Origen', {
+            'fields': ('fuente', 'screenshot', 'screenshot_preview', 'acciones_ia'),
+            'description': '📸 Sube el screenshot de la review y luego usa los botones de IA.',
+        }),
+        ('Datos del review (editables si la IA se equivocó)', {
+            'fields': ('autor', 'fecha_review', 'rating', 'idioma', 'texto', 'extraccion_completada'),
+        }),
+        ('Respuesta de Aremko', {
+            'fields': ('respuesta_sugerida', 'respuesta_copiable', 'respuesta_publicada', 'respuesta_publicada_at'),
+            'description': '💬 Después de generar la respuesta, cópiala desde el bloque verde y pégala en Google/TripAdvisor. Después marca como "publicada".',
+        }),
+        ('Análisis (opcional)', {
+            'fields': ('sentimiento', 'temas_detectados', 'notas_internas'),
+            'classes': ('collapse',),
+        }),
+        ('Auditoría', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        custom = [
+            path('<int:pk>/extract-ia/', self.admin_site.admin_view(self.extract_view),
+                 name='ventas_review_extract'),
+            path('<int:pk>/generate-response-ia/', self.admin_site.admin_view(self.respond_view),
+                 name='ventas_review_respond'),
+            path('<int:pk>/mark-published/', self.admin_site.admin_view(self.mark_published_view),
+                 name='ventas_review_mark_published'),
+        ]
+        return custom + urls
+
+    def extract_view(self, request, pk):
+        from django.contrib import messages
+        from django.shortcuts import redirect
+        from django.utils.dateparse import parse_date
+
+        obj = Review.objects.filter(pk=pk).first()
+        if not obj:
+            messages.error(request, 'Review no encontrado.')
+            return redirect('admin:ventas_review_changelist')
+        if not obj.screenshot:
+            messages.error(request, '❌ Falta subir el screenshot antes de extraer.')
+            return redirect('admin:ventas_review_change', pk)
+
+        try:
+            from .services.review_ai_service import extract_from_screenshot
+            data = extract_from_screenshot(obj.screenshot, obj.fuente)
+
+            if data.get('error'):
+                messages.error(request, f"❌ La IA no detectó un review en la imagen: {data['error']}")
+                return redirect('admin:ventas_review_change', pk)
+
+            obj.autor = (data.get('autor') or obj.autor or '').strip()
+            fecha_str = data.get('fecha_review')
+            if fecha_str:
+                parsed = parse_date(fecha_str)
+                if parsed:
+                    obj.fecha_review = parsed
+            rating = data.get('rating')
+            if isinstance(rating, int) and 1 <= rating <= 5:
+                obj.rating = rating
+            obj.texto = data.get('texto') or obj.texto or ''
+            idioma = data.get('idioma')
+            if idioma in ('es', 'en', 'pt', 'otro'):
+                obj.idioma = idioma
+            obj.extraccion_completada = True
+            obj.save()
+            messages.success(request, '✅ Datos extraídos del screenshot. Revisa que estén correctos antes de generar la respuesta.')
+        except Exception as exc:
+            logger.exception('Error extrayendo review con IA')
+            messages.error(request, f'❌ Error de IA: {type(exc).__name__}: {exc}')
+        return redirect('admin:ventas_review_change', pk)
+
+    def respond_view(self, request, pk):
+        from django.contrib import messages
+        from django.shortcuts import redirect
+
+        obj = Review.objects.filter(pk=pk).first()
+        if not obj:
+            messages.error(request, 'Review no encontrado.')
+            return redirect('admin:ventas_review_changelist')
+        if obj.rating is None:
+            messages.error(request, '❌ Falta el rating. Extrae los datos del screenshot primero o ingresa el rating manualmente.')
+            return redirect('admin:ventas_review_change', pk)
+
+        try:
+            from .services.review_ai_service import generate_response
+            respuesta = generate_response(
+                rating=obj.rating,
+                texto=obj.texto or '',
+                idioma=obj.idioma or 'es',
+                autor=obj.autor or '',
+            )
+            obj.respuesta_sugerida = respuesta
+            obj.save()
+            messages.success(request, '✅ Respuesta generada. Cópiala desde el bloque verde abajo y pégala en la plataforma.')
+        except Exception as exc:
+            logger.exception('Error generando respuesta de review con IA')
+            messages.error(request, f'❌ Error de IA: {type(exc).__name__}: {exc}')
+        return redirect('admin:ventas_review_change', pk)
+
+    def mark_published_view(self, request, pk):
+        from django.contrib import messages
+        from django.shortcuts import redirect
+        from django.utils import timezone as djtz
+
+        obj = Review.objects.filter(pk=pk).first()
+        if not obj:
+            messages.error(request, 'Review no encontrado.')
+            return redirect('admin:ventas_review_changelist')
+        obj.respuesta_publicada = True
+        obj.respuesta_publicada_at = djtz.now()
+        obj.save()
+        messages.success(request, '✅ Marcado como respuesta publicada.')
+        return redirect('admin:ventas_review_change', pk)
+
+    # ---------- Display methods ----------
+
+    def rating_badge(self, obj):
+        if obj.rating is None:
+            return '—'
+        from django.utils.html import format_html
+        color = '#2E7D32' if obj.rating >= 4 else ('#F9A825' if obj.rating == 3 else '#C62828')
+        stars = '★' * obj.rating + '☆' * (5 - obj.rating)
+        return format_html('<span style="color:{};font-weight:600;">{}</span>', color, stars)
+    rating_badge.short_description = 'Rating'
+
+    def texto_preview(self, obj):
+        if not obj.texto:
+            return '(solo estrellas)'
+        t = obj.texto.strip().replace('\n', ' ')
+        return (t[:80] + '…') if len(t) > 80 else t
+    texto_preview.short_description = 'Texto'
+
+    def screenshot_preview(self, obj):
+        if not obj.screenshot:
+            return '(sube un screenshot para procesarlo con IA)'
+        from django.utils.html import format_html
+        return format_html(
+            '<a href="{}" target="_blank">'
+            '<img src="{}" style="max-width:300px;max-height:500px;border:1px solid #ddd;border-radius:6px;" />'
+            '</a>',
+            obj.screenshot.url, obj.screenshot.url,
+        )
+    screenshot_preview.short_description = 'Vista previa'
+
+    def acciones_ia(self, obj):
+        if not obj.pk:
+            return '🆕 Guarda primero (con fuente + screenshot) para activar las acciones de IA.'
+        from django.urls import reverse
+        from django.utils.html import format_html
+
+        ready_extract = bool(obj.screenshot)
+        ready_respond = obj.rating is not None
+
+        extract_btn = format_html(
+            '<a href="{}" class="button" style="background:{};color:#fff;padding:8px 14px;'
+            'border-radius:4px;text-decoration:none;display:inline-block;margin-right:8px;">'
+            '🤖 Extraer datos con IA</a>',
+            reverse('admin:ventas_review_extract', args=[obj.pk]),
+            '#1565C0' if ready_extract else '#999',
+        )
+        respond_btn = format_html(
+            '<a href="{}" class="button" style="background:{};color:#fff;padding:8px 14px;'
+            'border-radius:4px;text-decoration:none;display:inline-block;margin-right:8px;">'
+            '💬 Generar respuesta</a>',
+            reverse('admin:ventas_review_respond', args=[obj.pk]),
+            '#2E7D32' if ready_respond else '#999',
+        )
+        publish_btn = ''
+        if obj.respuesta_sugerida and not obj.respuesta_publicada:
+            publish_btn = format_html(
+                '<a href="{}" class="button" style="background:#6A1B9A;color:#fff;padding:8px 14px;'
+                'border-radius:4px;text-decoration:none;display:inline-block;">'
+                '✓ Marcar respuesta publicada</a>',
+                reverse('admin:ventas_review_mark_published', args=[obj.pk]),
+            )
+
+        hint = ''
+        if not ready_extract:
+            hint = '<div style="color:#888;font-size:12px;margin-top:6px;">Sube un screenshot para activar "Extraer datos".</div>'
+        elif not ready_respond:
+            hint = '<div style="color:#888;font-size:12px;margin-top:6px;">Después de extraer (o ingresar manualmente el rating), se activa "Generar respuesta".</div>'
+
+        return format_html('{}{}{}{}', extract_btn, respond_btn, publish_btn, hint)
+    acciones_ia.short_description = '🛠️ Acciones IA'
+
+    def respuesta_copiable(self, obj):
+        if not obj.respuesta_sugerida:
+            return '(genera primero la respuesta con el botón verde de arriba)'
+        from django.utils.html import format_html, escape
+        chars = len(obj.respuesta_sugerida)
+        return format_html(
+            '<div style="background:#E8F5E9;border:1px solid #66BB6A;border-radius:6px;'
+            'padding:14px;font-family:Georgia,serif;font-size:14px;line-height:1.5;'
+            'white-space:pre-wrap;color:#1B5E20;">{}</div>'
+            '<div style="color:#666;font-size:12px;margin-top:6px;">'
+            'Largo: {} caracteres · Selecciona el texto y cópialo (Cmd+C / Ctrl+C)</div>',
+            obj.respuesta_sugerida, chars,
+        )
+    respuesta_copiable.short_description = 'Respuesta sugerida (copiable)'

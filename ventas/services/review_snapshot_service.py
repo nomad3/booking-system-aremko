@@ -81,3 +81,34 @@ def needs_snapshot_for_this_week() -> bool:
     today = timezone.localdate()
     monday = today - timedelta(days=today.weekday())
     return not ReviewSnapshot.objects.filter(fecha__gte=monday).exists()
+
+
+def get_reviews_recientes(days: int = 14, limit: int = 30) -> list:
+    """Lista de Review individuales (texto completo) de los últimos N días.
+
+    Pensado para inyectar al prompt del análisis IA semanal: el LLM lee
+    el texto real de cada review nueva y lo cruza con NPS interno.
+    """
+    from datetime import timedelta
+    from django.utils import timezone
+    try:
+        from ventas.models import Review
+    except ImportError:
+        return []
+
+    cutoff = timezone.localdate() - timedelta(days=days)
+    qs = Review.objects.filter(fecha_review__gte=cutoff).order_by('-fecha_review')[:limit]
+
+    out = []
+    for r in qs:
+        out.append({
+            'fuente': r.fuente,
+            'fecha': r.fecha_review.isoformat() if r.fecha_review else None,
+            'autor': r.autor or None,
+            'rating': r.rating,
+            'idioma': r.idioma,
+            'texto': (r.texto or '').strip()[:600],
+            'sentimiento': r.sentimiento or r.auto_sentimiento(),
+            'respuesta_publicada': bool(r.respuesta_publicada),
+        })
+    return out

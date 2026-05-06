@@ -47,7 +47,7 @@ acciones concretas sobre observaciones genéricas."""
 
 
 def build_user_prompt(stats: dict, encuestas_data: list, ga4_snapshot: dict = None,
-                      reviews_snapshot: dict = None) -> str:
+                      reviews_snapshot: dict = None, reviews_recientes: list = None) -> str:
     """Construye el prompt user con stats agregados + texto de las encuestas + métricas GA4 + reviews externas."""
 
     # Limitar texto libre a 800 chars por encuesta para no inflar tokens
@@ -88,13 +88,22 @@ def build_user_prompt(stats: dict, encuestas_data: list, ga4_snapshot: dict = No
 
 Si GA4 está disponible, cruza la información: por ejemplo, si la conversion rate cayó pero el NPS está alto, eso sugiere problema de funnel digital, no de servicio.
 
-=== REVIEWS EXTERNAS (Google + TripAdvisor, snapshot manual semanal) ===
+=== REVIEWS EXTERNAS — AGREGADOS (Google + TripAdvisor, snapshot manual semanal) ===
 {json.dumps(reviews_snapshot, indent=2, ensure_ascii=False, default=str) if reviews_snapshot else '(no disponible — Jorge aún no registró el snapshot semanal)'}
 
 Si hay snapshot, cruza con el NPS interno:
 - NPS interno alto + rating Google bajando → review reciente negativa, revisar comentarios públicos
 - Rating estable + NPS bajando → mejora estructural reciente que aún no se refleja externo
 - Total Google subiendo > total TripAdvisor → bias de canal (incluir en oportunidades_comerciales si aplica)
+
+=== REVIEWS INDIVIDUALES TEXTO COMPLETO (últimos 14 días, capturados por Jorge) ===
+{json.dumps(reviews_recientes or [], indent=2, ensure_ascii=False, default=str) if reviews_recientes else '(sin reviews individuales registrados — usar solo agregados)'}
+
+Si hay reviews individuales, úsalos:
+- Detectar temas recurrentes en el texto (p.ej. 3 reviews esta semana mencionan "temperatura tina")
+- Comparar con menciones en encuestas internas para validar patrones
+- Citar texto literal del review en ideas_marketing si encaja
+- Si hay reviews negativos sin respuesta_publicada, incluirlos en alertas_operativas
 
 === TU OUTPUT (JSON estricto, sin markdown, sin código fences) ===
 
@@ -258,7 +267,8 @@ def get_reviews_snapshot_safe():
 
 
 def call_llm(stats: dict, encuestas_data: list, model: str = None,
-             ga4_snapshot: dict = None, reviews_snapshot: dict = None) -> dict:
+             ga4_snapshot: dict = None, reviews_snapshot: dict = None,
+             reviews_recientes: list = None) -> dict:
     """Llama a OpenRouter con el prompt estructurado.
 
     Retorna dict con el análisis. Levanta excepción si falla.
@@ -274,7 +284,8 @@ def call_llm(stats: dict, encuestas_data: list, model: str = None,
 
     client = OpenAI(api_key=api_key, base_url=base_url)
     user_prompt = build_user_prompt(stats, encuestas_data, ga4_snapshot=ga4_snapshot,
-                                    reviews_snapshot=reviews_snapshot)
+                                    reviews_snapshot=reviews_snapshot,
+                                    reviews_recientes=reviews_recientes)
 
     logger.info(f'Llamando a {model} para análisis semanal de encuestas')
 
@@ -342,8 +353,16 @@ def analyze_week(days: int = 7, end_date=None) -> dict:
     encuestas_data = serialize_encuestas(encuestas_qs)
     ga4_snapshot = get_ga4_snapshot_safe()
     reviews_snapshot = get_reviews_snapshot_safe()
+    reviews_recientes = []
+    try:
+        from .review_snapshot_service import get_reviews_recientes
+        reviews_recientes = get_reviews_recientes(days=14, limit=30)
+    except Exception as exc:
+        logger.warning(f'Reviews individuales no disponibles: {exc}')
+
     analisis = call_llm(stats, encuestas_data, ga4_snapshot=ga4_snapshot,
-                        reviews_snapshot=reviews_snapshot)
+                        reviews_snapshot=reviews_snapshot,
+                        reviews_recientes=reviews_recientes)
 
     return {
         'periodo_inicio': start_date,
@@ -354,6 +373,7 @@ def analyze_week(days: int = 7, end_date=None) -> dict:
         'analisis': analisis,
         'ga4_snapshot': ga4_snapshot,
         'reviews_snapshot': reviews_snapshot,
+        'reviews_recientes_count': len(reviews_recientes),
     }
 
 

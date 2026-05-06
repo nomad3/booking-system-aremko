@@ -5439,3 +5439,113 @@ class ReviewSnapshot(models.Model):
                 if not self.tripadvisor_url:
                     self.tripadvisor_url = latest.tripadvisor_url
         super().save(*args, **kwargs)
+
+
+class Review(models.Model):
+    """Review individual de Google Maps o TripAdvisor capturado vía screenshot.
+
+    Workflow:
+    1. Jorge sube el screenshot + selecciona la fuente
+    2. Click "Extraer con IA" → autocompleta autor, fecha, rating, texto, idioma
+    3. Click "Generar respuesta" → propone respuesta lista para copiar/pegar
+    4. Jorge edita si hace falta, copia, publica en la plataforma externa
+    5. Marca como "respondida" en el admin
+
+    El análisis IA semanal lee texto completo de cada review nueva para
+    cruzar con NPS interno y detectar temas recurrentes.
+    """
+
+    FUENTE_CHOICES = [
+        ('google', 'Google Maps'),
+        ('tripadvisor', 'TripAdvisor'),
+    ]
+    IDIOMA_CHOICES = [
+        ('es', 'Español'),
+        ('en', 'Inglés'),
+        ('pt', 'Portugués'),
+        ('otro', 'Otro'),
+    ]
+    SENTIMIENTO_CHOICES = [
+        ('positivo', 'Positivo'),
+        ('neutro', 'Neutro'),
+        ('negativo', 'Negativo'),
+    ]
+
+    # Origen
+    fuente = models.CharField(max_length=20, choices=FUENTE_CHOICES, db_index=True)
+    screenshot = models.ImageField(
+        upload_to='reviews/%Y/%m/', blank=True, null=True,
+        help_text='Captura de pantalla del review para extracción con IA',
+    )
+
+    # Datos extraídos (editables por Jorge si la IA se equivocó)
+    fecha_review = models.DateField(null=True, blank=True, db_index=True)
+    autor = models.CharField(max_length=200, blank=True)
+    rating = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        help_text='1-5 estrellas',
+    )
+    texto = models.TextField(
+        blank=True,
+        help_text='Vacío si el cliente solo dejó estrellas sin comentario',
+    )
+    idioma = models.CharField(max_length=10, choices=IDIOMA_CHOICES, default='es')
+
+    # Procesamiento IA
+    extraccion_completada = models.BooleanField(
+        default=False,
+        help_text='True cuando la IA ya procesó el screenshot',
+    )
+
+    # Respuesta de Aremko
+    respuesta_sugerida = models.TextField(
+        blank=True,
+        help_text='Respuesta generada por IA, lista para copiar/pegar',
+    )
+    respuesta_publicada = models.BooleanField(default=False)
+    respuesta_publicada_at = models.DateTimeField(null=True, blank=True)
+
+    # Análisis (auto-poblado en futuro)
+    sentimiento = models.CharField(
+        max_length=15, choices=SENTIMIENTO_CHOICES, blank=True,
+        help_text='Auto-derivado del rating (1-3 negativo, 4 neutro, 5 positivo)',
+    )
+    temas_detectados = models.JSONField(
+        default=list, blank=True,
+        help_text='Lista de temas mencionados (ej. ["temperatura_tina", "limpieza"])',
+    )
+
+    # Metadata
+    notas_internas = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Review externo'
+        verbose_name_plural = 'Reviews externos'
+        ordering = ['-fecha_review', '-created_at']
+
+    def __str__(self):
+        partes = [self.get_fuente_display()]
+        if self.fecha_review:
+            partes.append(self.fecha_review.strftime('%d/%m/%Y'))
+        if self.rating:
+            partes.append(f'{self.rating}★')
+        if self.autor:
+            partes.append(self.autor[:30])
+        return ' · '.join(partes)
+
+    def auto_sentimiento(self):
+        """Deriva sentimiento del rating si no está seteado manualmente."""
+        if self.rating is None:
+            return ''
+        if self.rating <= 3:
+            return 'negativo'
+        if self.rating == 4:
+            return 'neutro'
+        return 'positivo'
+
+    def save(self, *args, **kwargs):
+        if self.rating is not None and not self.sentimiento:
+            self.sentimiento = self.auto_sentimiento()
+        super().save(*args, **kwargs)
