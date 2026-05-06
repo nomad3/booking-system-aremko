@@ -143,11 +143,11 @@ def get_overview_last_7d_vs_prev() -> dict:
     ranges = _date_ranges_last_7_and_prev()
     out = {'last_7d': {}, 'prev_7d': {}}
     for r in ranges:
-        res = _run_report(metrics=metrics, dimensions=['dateRange'], date_ranges=[r])
+        res = _run_report(metrics=metrics, dimensions=None, date_ranges=[r])
         if res['totals']:
             out[r['name']] = res['totals'][0]
         elif res['rows']:
-            out[r['name']] = {k: v for k, v in res['rows'][0].items() if k != 'dateRange'}
+            out[r['name']] = res['rows'][0]
     return out
 
 
