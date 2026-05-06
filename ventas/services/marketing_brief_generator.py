@@ -326,7 +326,7 @@ def call_llm(
             {'role': 'user', 'content': user_prompt},
         ],
         temperature=0.6,  # algo de creatividad para los drafts
-        max_tokens=6000,
+        max_tokens=16000,  # mas alto desde que se agregaron metricas GA4/GSC + reviews al contexto
         response_format={'type': 'json_object'},
     )
 
