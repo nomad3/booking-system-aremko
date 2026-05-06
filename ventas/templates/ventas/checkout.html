@@ -165,35 +165,34 @@
                                        id="checkoutTelefono"
                                        name="telefono"
                                        required
-                                       placeholder="+56912345678 o 9 1234 5678">
+                                       autocomplete="tel"
+                                       placeholder="+569 1234 5678">
                                 <div id="phoneValidationMessage" class="form-text"></div>
                                 <div id="phoneErrorMessage" class="invalid-feedback"></div>
                             </div>
                             <div class="mb-3">
-                                <label for="checkoutNombre" class="form-label">Nombre Completo</label>
-                                <input type="text" class="form-control" id="checkoutNombre" name="nombre" required>
+                                <label for="checkoutNombre" class="form-label">Nombre Completo *</label>
+                                <input type="text" class="form-control" id="checkoutNombre" name="nombre" required autocomplete="name">
                             </div>
                             <div class="mb-3">
-                                <label for="checkoutEmail" class="form-label">Email</label>
-                                <input type="email" class="form-control" id="checkoutEmail" name="email" required>
+                                <label for="checkoutEmail" class="form-label">Email *</label>
+                                <input type="email" class="form-control" id="checkoutEmail" name="email" required autocomplete="email">
                             </div>
                             <div class="mb-3">
-                                <label for="checkoutDocumento" class="form-label">ID/DNI/Passport/RUT (opcional)</label>
-                                <input type="text" class="form-control" id="checkoutDocumento" name="documento_identidad">
+                                <label for="checkoutDocumento" class="form-label">RUT o pasaporte (opcional)</label>
+                                <input type="text" class="form-control" id="checkoutDocumento" name="documento_identidad" autocomplete="off">
                             </div>
                             <div class="mb-3">
-                                <label for="checkoutRegion" class="form-label">Región *</label>
-                                <select class="form-select" id="checkoutRegion" name="region" required>
+                                <label for="checkoutRegion" class="form-label">Región (opcional, para enviarte ofertas locales)</label>
+                                <select class="form-select" id="checkoutRegion" name="region">
                                     <option value="">Seleccione una región</option>
                                 </select>
-                                <div class="invalid-feedback">Por favor seleccione una región.</div>
                             </div>
                             <div class="mb-3">
-                                <label for="checkoutComuna" class="form-label">Comuna *</label>
-                                <select class="form-select" id="checkoutComuna" name="comuna" required disabled>
+                                <label for="checkoutComuna" class="form-label">Comuna (opcional)</label>
+                                <select class="form-select" id="checkoutComuna" name="comuna" disabled>
                                     <option value="">Primero seleccione una región</option>
                                 </select>
-                                <div class="invalid-feedback">Por favor seleccione una comuna.</div>
                             </div>
                         </form>
                     </div>
@@ -225,7 +224,7 @@
                         <div class="cart-actions">
                             <a href="{% url 'ventas:cart' %}" class="btn btn-outline-secondary">Volver al Carrito</a>
                             <button class="btn btn-primary" id="completeCheckoutBtn">
-                                Completar Reserva
+                                <i class="fas fa-lock me-1"></i> Pagar y reservar
                             </button>
                         </div>
                     </div>
@@ -294,26 +293,22 @@
                                            name="paymentMethod"
                                            id="payment_{{ value }}"
                                            value="{{ value }}"
-                                           {% if value == 'transferencia' %}checked{% endif %}
-                                           {% if value == 'flow' %}disabled{% endif %}
+                                           {% if value == 'mercadopago_link' %}checked{% endif %}
                                            >
                                     <label class="form-check-label" for="payment_{{ value }}">
                                         {{ name }}
-                                        {% if value == 'flow' %}
-                                            <span class="badge bg-secondary">Próximamente</span>
-                                        {% endif %}
                                         {% if value == 'mercadopago_link' %}
-                                            <span class="badge bg-primary">Recomendado</span>
+                                            <span class="badge bg-success">⚡ Pago inmediato</span>
                                         {% endif %}
                                     </label>
                                     {% if value == 'transferencia' %}
                                         <div class="form-text mt-1">
-                                            Selecciona esta opción para ver los detalles de la cuenta. Tu reserva quedará pendiente hasta confirmar el pago.
+                                            Tu reserva quedará pendiente hasta que recibamos el comprobante por correo.
                                         </div>
                                     {% endif %}
                                     {% if value == 'mercadopago_link' %}
                                         <div class="form-text mt-1">
-                                            Paga de forma segura con tarjeta de crédito, débito o transferencia bancaria. Aprobación inmediata.
+                                            Paga con tarjeta de crédito, débito o transferencia. Aprobación al instante y reserva confirmada de inmediato.
                                         </div>
                                     {% endif %}
                                 </div>
@@ -617,7 +612,7 @@ Email para comprobante: ventas@aremko.cl</pre>
     function hideProcessing(overlay, button) {
         if (button) {
             button.disabled = false;
-            button.innerHTML = 'Completar Reserva';
+            button.innerHTML = '<i class="fas fa-lock me-1"></i> Pagar y reservar';
         }
         if (overlay) overlay.style.display = 'none';
         isProcessingCheckout = false;
@@ -890,9 +885,9 @@ Email para comprobante: ventas@aremko.cl</pre>
                 const comuna = document.getElementById('checkoutComuna').value;
                 const paymentMethodInput = document.querySelector('input[name="paymentMethod"]:checked');
 
-                if (!nombre || !email || !telefono || !region || !comuna) {
-                    alert('Por favor completa todos los campos requeridos de contacto (incluyendo región y comuna).');
-                    hideProcessing(null, completeCheckoutBtn); // Reset button, keep overlay hidden
+                if (!nombre || !email || !telefono) {
+                    alert('Por favor completa nombre, email y teléfono.');
+                    hideProcessing(null, completeCheckoutBtn);
                     return;
                 }
                 if (!paymentMethodInput) {
@@ -901,13 +896,6 @@ Email para comprobante: ventas@aremko.cl</pre>
                     return;
                 }
                 const paymentMethod = paymentMethodInput.value;
-
-                // Check if Flow is selected but disabled
-                 if (paymentMethod === 'flow' && paymentMethodInput.disabled) {
-                    alert('El pago con Flow no está habilitado en este momento.');
-                    hideProcessing(null, completeCheckoutBtn);
-                    return;
-                 }
 
 
                 const csrfToken = getCookie('csrftoken');
