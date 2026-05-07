@@ -306,11 +306,22 @@ def flow_return(request):
             params['s'] = generate_flow_signature(params)
 
             # --- Call Flow getStatus API ---
-            print(f"Calling Flow getStatus for return page with params: {params}")
-            response = requests.get(FLOW_STATUS_API_URL, params=params)
-            response.raise_for_status()
+            print(f"[flow_return] Calling getStatus URL={FLOW_STATUS_API_URL} params={params}")
+            response = requests.get(FLOW_STATUS_API_URL, params=params, timeout=30)
+            print(f"[flow_return] HTTP {response.status_code} body={response.text[:500]}")
+
+            if response.status_code != 200:
+                # Capturar mensaje de Flow para diagnostico
+                try:
+                    err = response.json()
+                    error_message = f"Flow getStatus error {response.status_code}: {err.get('message') or err}"
+                except Exception:
+                    error_message = f"Flow getStatus error {response.status_code}: {response.text[:200]}"
+                # Caer al render con error
+                raise requests.exceptions.HTTPError(error_message)
+
             status_data = response.json()
-            print(f"Flow getStatus Response for return: {status_data}")
+            print(f"[flow_return] getStatus parsed: {status_data}")
 
             flow_status_code = status_data.get('status')
             commerce_order = status_data.get('commerceOrder')
