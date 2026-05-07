@@ -828,21 +828,10 @@
                 });
         }
 
-        // Attach event listener after DOM is loaded
-        document.addEventListener('DOMContentLoaded', function () {
-            const completeCheckoutBtn = document.getElementById('legacyCompleteCheckoutBtn');
-            if (completeCheckoutBtn) {
-                completeCheckoutBtn.addEventListener('click', completeCheckout);
-                console.log("Event listener added for #legacyCompleteCheckoutBtn click");
-            } else {
-                console.error("Complete checkout button not found");
-            }
-
-            // --- Phone Lookup ELIMINADO ---
-            // NOTA: La validación de teléfonos y búsqueda de clientes ahora se maneja
-            // completamente en checkout.html con el sistema robusto de normalización.
-            // Este listener duplicado se eliminó para evitar conflictos y race conditions.
-        });
+        // Listener legacy ELIMINADO: el modal #checkoutModal no tiene trigger
+        // desde ningun boton del sitio. La logica activa de checkout esta en
+        // checkout.html con switch para Flow/Transferencia. Si en el futuro se
+        // reactiva el modal global, agregar listener al boton id="legacyCompleteCheckoutBtn".
     </script>
     {# Page specific script goes here, outside the main script tag #}
     {% block extra_script %}{% endblock %}
