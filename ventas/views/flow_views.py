@@ -65,16 +65,18 @@ def create_flow_payment(request):
             return JsonResponse({'error': 'Reservation not found'}, status=404)
 
         # --- Construct Flow Payload ---
+        # Flow API espera 'subject' (no 'concept') segun /api/payment/create.
+        # El error "Missing service params: subject" se diagnostico con un test
+        # real que devolvio flow_code 104.
         payload = {
             'apiKey': FLOW_API_KEY,
             'amount': amount,
-            'concept': concept,
+            'subject': concept,
             'currency': 'CLP',
             'email': email,
-            # Include reserva_id in confirmation/return URLs for tracking
             'urlConfirmation': f"{FLOW_CONFIRMATION_URL}?reserva_id={reserva_id}",
             'urlReturn': f"{FLOW_RETURN_URL}?reserva_id={reserva_id}",
-            'commerceOrder': str(reserva_id) # Use reserva_id as the commerce order identifier
+            'commerceOrder': str(reserva_id),
         }
 
         # --- Generate Flow Signature ---
