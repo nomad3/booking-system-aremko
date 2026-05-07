@@ -762,44 +762,42 @@ Email para comprobante: ventas@aremko.cl</pre>
     async function handleFlowCheckout(formData, overlay, button) {
         const csrfToken = getCookie('csrftoken');
         try {
-            // 1. Create Reservation (Pending)
-            console.log("Creating reservation before Flow payment...");
+            // 1. Crear PendingReservation (no crea VentaReserva todavia)
+            console.log("Creating pending reservation before Flow payment...");
             const checkoutResponse = await fetch('{% url "ventas:complete_checkout" %}', {
                 method: 'POST',
                 body: formData,
                 headers: { 'X-CSRFToken': csrfToken }
             });
-            const checkoutData = await handleApiResponse(checkoutResponse); // Handles ok check and JSON parsing
-            if (!checkoutData.success || !checkoutData.reserva_id) {
-                throw new Error(checkoutData.error || 'Error al crear la reserva antes del pago con Flow.');
+            const checkoutData = await handleApiResponse(checkoutResponse);
+            if (!checkoutData.success || !checkoutData.pending_id) {
+                throw new Error(checkoutData.error || 'Error al iniciar el pago con Flow.');
             }
-            const reservaId = checkoutData.reserva_id;
-            console.log("Reservation created for Flow, ID:", reservaId);
+            const pendingId = checkoutData.pending_id;
+            console.log("Pending reservation created for Flow, ID:", pendingId);
 
-            // 2. Initiate Flow Payment
-            console.log("Initiating Flow payment for reserva_id:", reservaId);
+            // 2. Iniciar pago Flow usando pending_id
+            console.log("Initiating Flow payment for pending_id:", pendingId);
             const flowResponse = await fetch('{% url "ventas:create_flow_payment" %}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrfToken
                 },
-                body: JSON.stringify({ reserva_id: reservaId })
+                body: JSON.stringify({ pending_id: pendingId })
             });
-            const flowData = await handleApiResponse(flowResponse); // Handles ok check and JSON parsing
+            const flowData = await handleApiResponse(flowResponse);
 
-            // 3. Redirect to Flow
+            // 3. Redirigir a Flow
             if (flowData.url) {
                 console.log("Redirecting to Flow:", flowData.url);
                 window.location.href = flowData.url;
-                // Don't hide processing here, redirection handles it.
             } else {
                 throw new Error(flowData.error || 'No se recibió URL de Flow.');
             }
         } catch (error) {
-            handleCheckoutError(error, overlay, button); // Show error and reset button/overlay
+            handleCheckoutError(error, overlay, button);
         }
-        // No finally block needed here as redirection or error handling covers state reset.
     }
 
     async function handleMercadoPagoCheckout(formData, overlay, button) {

@@ -53,6 +53,8 @@ from .models import (
     # Reviews externas (Google + TripAdvisor)
     ReviewSnapshot,
     Review,
+    # Reservas tentativas pre-pago Flow
+    PendingReservation,
 )
 from django.http import HttpResponse
 import xlwt
@@ -4508,3 +4510,26 @@ class ReviewAdmin(admin.ModelAdmin):
             obj.respuesta_sugerida, chars,
         )
     respuesta_copiable.short_description = 'Respuesta sugerida (copiable)'
+
+
+@admin.register(PendingReservation)
+class PendingReservationAdmin(admin.ModelAdmin):
+    list_display = ('id', 'cliente', 'monto', 'estado', 'metodo_pago', 'created_at', 'expires_at', 'venta_reserva')
+    list_filter = ('estado', 'metodo_pago', 'created_at')
+    search_fields = ('cliente__nombre', 'cliente__telefono', 'cliente__email', 'flow_token')
+    readonly_fields = (
+        'cliente', 'cart_data', 'metodo_pago', 'monto',
+        'flow_token', 'flow_url',
+        'venta_reserva', 'created_at', 'updated_at', 'expires_at',
+    )
+    fields = (
+        'cliente', 'estado', 'metodo_pago', 'monto',
+        'flow_token', 'flow_url',
+        'venta_reserva',
+        'cart_data', 'notas',
+        'created_at', 'updated_at', 'expires_at',
+    )
+    ordering = ('-created_at',)
+
+    def has_add_permission(self, request):
+        return False

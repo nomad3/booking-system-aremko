@@ -5549,3 +5549,62 @@ class Review(models.Model):
         if self.rating is not None and not self.sentimiento:
             self.sentimiento = self.auto_sentimiento()
         super().save(*args, **kwargs)
+
+
+class PendingReservation(models.Model):
+    """Reserva tentativa antes de confirmacion de pago Flow.
+
+    Se crea cuando el cliente envia el checkout con metodo_pago='flow'.
+    No genera VentaReserva ni ReservaServicio hasta que Flow confirme el pago
+    via webhook. Si el cliente abandona, queda como 'iniciado' y un cleanup
+    periodico la marca 'expirado'.
+    """
+    ESTADO_CHOICES = [
+        ('iniciado', 'Iniciado (esperando pago Flow)'),
+        ('confirmado', 'Confirmado (VentaReserva creada)'),
+        ('rechazado', 'Rechazado por Flow'),
+        ('cancelado', 'Cancelado por usuario'),
+        ('expirado', 'Expirado por timeout'),
+        ('slot_perdido', 'Slot tomado mientras se pagaba (requiere reembolso manual)'),
+    ]
+
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='pending_reservations')
+    cart_data = models.JSONField(help_text='Snapshot del carrito: servicios, giftcards, totales, descuentos')
+    metodo_pago = models.CharField(max_length=20, default='flow')
+    monto = models.IntegerField(help_text='Total en CLP al momento del checkout')
+
+    flow_token = models.CharField(max_length=100, blank=True, db_index=True)
+    flow_url = models.URLField(max_length=500, blank=True)
+
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='iniciado', db_index=True)
+    venta_reserva = models.OneToOneField(
+        'VentaReserva', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='pending_origin'
+    )
+
+    notas = models.TextField(blank=True, help_text='Mensajes de error o notas operativas')
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    expires_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        verbose_name = 'Reserva pendiente (pre-pago Flow)'
+        verbose_name_plural = 'Reservas pendientes (pre-pago Flow)'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Pending #{self.id} {self.cliente.nombre} ${self.monto:,} [{self.estado}]'
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    def marcar_confirmado(self, venta_reserva):
+        self.estado = 'confirmado'
+        self.venta_reserva = venta_reserva
+        self.save(update_fields=['estado', 'venta_reserva', 'updated_at'])
+
+    def marcar_slot_perdido(self, detalle=''):
+        self.estado = 'slot_perdido'
+        self.notas = (self.notas + '\n' + detalle).strip()
+        self.save(update_fields=['estado', 'notas', 'updated_at'])
