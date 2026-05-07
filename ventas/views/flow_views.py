@@ -12,13 +12,14 @@ from django.db import transaction
 from ..models import VentaReserva, Pago # Relative import from ventas/views/
 
 # --- Flow Integration Constants ---
-FLOW_API_KEY = os.environ.get('FLOW_API_KEY', 'YOUR_DEFAULT_API_KEY') # Replace with default or raise error if needed
-FLOW_SECRET_KEY = os.environ.get('FLOW_SECRET_KEY', 'YOUR_DEFAULT_SECRET_KEY')
-FLOW_CREATE_API_URL = os.environ.get('FLOW_CREATE_API_URL', 'https://sandbox.flow.cl/api/payment/create') # Default to sandbox
-FLOW_STATUS_API_URL = os.environ.get('FLOW_STATUS_API_URL', 'https://sandbox.flow.cl/api/payment/getStatus') # Added Status URL
-# Consider using Django's reverse() with request.build_absolute_uri() for dynamic URLs
-FLOW_CONFIRMATION_URL = os.environ.get('FLOW_CONFIRMATION_URL', 'http://localhost:8002/payment/confirmation/') # Example using default dev port
-FLOW_RETURN_URL = os.environ.get('FLOW_RETURN_URL', 'http://localhost:8002/payment/return/') # Example using default dev port
+# .strip() defensivo: las env vars de Render pueden venir con \n al final
+# si fueron pegadas con un salto de linea (bug detectado en produccion).
+FLOW_API_KEY = os.environ.get('FLOW_API_KEY', 'YOUR_DEFAULT_API_KEY').strip()
+FLOW_SECRET_KEY = os.environ.get('FLOW_SECRET_KEY', 'YOUR_DEFAULT_SECRET_KEY').strip()
+FLOW_CREATE_API_URL = os.environ.get('FLOW_CREATE_API_URL', 'https://sandbox.flow.cl/api/payment/create').strip()
+FLOW_STATUS_API_URL = os.environ.get('FLOW_STATUS_API_URL', 'https://sandbox.flow.cl/api/payment/getStatus').strip()
+FLOW_CONFIRMATION_URL = os.environ.get('FLOW_CONFIRMATION_URL', 'http://localhost:8002/payment/confirmation/').strip()
+FLOW_RETURN_URL = os.environ.get('FLOW_RETURN_URL', 'http://localhost:8002/payment/return/').strip()
 
 # --- Helper function to generate Flow signature ---
 def generate_flow_signature(params):
