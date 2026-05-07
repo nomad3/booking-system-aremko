@@ -280,10 +280,16 @@ def flow_confirmation(request):
 
 
 # --- Flow Return View (User Redirect) ---
+@csrf_exempt  # Flow envia POST con el token al redirigir al usuario
 def flow_return(request):
-    """Handles the user returning from the Flow payment page."""
-    token = request.GET.get('token')
-    reserva_id = request.GET.get('reserva_id') # Get reserva_id passed back
+    """Handles the user returning from the Flow payment page.
+
+    Flow envia POST con 'token' en el body cuando redirige al usuario
+    despues de un pago. El reserva_id viene en query string.
+    Tambien aceptamos GET por defensividad.
+    """
+    token = request.POST.get('token') or request.GET.get('token')
+    reserva_id = request.GET.get('reserva_id') or request.POST.get('reserva_id')
     payment_status = 'pendiente' # Default status
     error_message = None
     venta = None
