@@ -223,7 +223,7 @@
                         </div>
                         <div class="cart-actions">
                             <a href="{% url 'ventas:cart' %}" class="btn btn-outline-secondary">Volver al Carrito</a>
-                            <button class="btn btn-primary" id="completeCheckoutBtn">
+                            <button type="button" class="btn btn-primary" id="completeCheckoutBtn">
                                 <i class="fas fa-lock me-1"></i> Pagar y reservar
                             </button>
                         </div>
@@ -293,11 +293,11 @@
                                            name="paymentMethod"
                                            id="payment_{{ value }}"
                                            value="{{ value }}"
-                                           {% if value == 'mercadopago_link' %}checked{% endif %}
+                                           {% if value == 'flow' %}checked{% endif %}
                                            >
                                     <label class="form-check-label" for="payment_{{ value }}">
                                         {{ name }}
-                                        {% if value == 'mercadopago_link' %}
+                                        {% if value == 'flow' %}
                                             <span class="badge bg-success">⚡ Pago inmediato</span>
                                         {% endif %}
                                     </label>
@@ -306,9 +306,9 @@
                                             Tu reserva quedará pendiente hasta que recibamos el comprobante por correo.
                                         </div>
                                     {% endif %}
-                                    {% if value == 'mercadopago_link' %}
+                                    {% if value == 'flow' %}
                                         <div class="form-text mt-1">
-                                            Paga con tarjeta de crédito, débito o transferencia. Aprobación al instante y reserva confirmada de inmediato.
+                                            Paga con tarjeta de crédito, débito o WebPay. Aprobación al instante y reserva confirmada de inmediato.
                                         </div>
                                     {% endif %}
                                 </div>

@@ -385,6 +385,16 @@ GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "")  # Pa
 GA4_PROPERTY_ID = os.getenv("GA4_PROPERTY_ID", "535461209")  # Propiedad aremko.cl
 # GSC site URL (con barra al final si es Domain property: "sc-domain:aremko.cl")
 GSC_SITE_URL = os.getenv("GSC_SITE_URL", "sc-domain:aremko.cl")
+
+# Flow.cl pasarela de pago (cuenta Datamatic, recibe fondos de Aremko)
+# Las views leen de os.environ directo pero las definimos acá tambien para
+# garantizar carga al boot (regla del proyecto: env vars requieren linea explicita)
+FLOW_API_KEY = os.getenv("FLOW_API_KEY", "")
+FLOW_SECRET_KEY = os.getenv("FLOW_SECRET_KEY", "")
+FLOW_CREATE_API_URL = os.getenv("FLOW_CREATE_API_URL", "https://www.flow.cl/api/payment/create")
+FLOW_STATUS_API_URL = os.getenv("FLOW_STATUS_API_URL", "https://www.flow.cl/api/payment/getStatus")
+FLOW_CONFIRMATION_URL = os.getenv("FLOW_CONFIRMATION_URL", "https://www.aremko.cl/payment/confirmation/")
+FLOW_RETURN_URL = os.getenv("FLOW_RETURN_URL", "https://www.aremko.cl/payment/return/")
 DPV_LLM_MAX_TOKENS = int(os.getenv("DPV_LLM_MAX_TOKENS", "500"))
 DPV_LLM_TEMPERATURE = float(os.getenv("DPV_LLM_TEMPERATURE", "0.7"))
 DPV_LLM_TIMEOUT_SECONDS = int(os.getenv("DPV_LLM_TIMEOUT_SECONDS", "30"))

@@ -332,11 +332,11 @@ def checkout_view(request):
     request.session.modified = True
 
     # Get relevant payment methods for checkout
-    # Filter Pago.METODOS_PAGO to only include public-facing options
-    # Flow.cl excluido hasta que se configure (mostrar opcion deshabilitada deteriora confianza)
+    # Orden importa: el primero aparece arriba en el listado.
+    # Flow primero (default), Transferencia segundo (alternativa para evitar 3% fee).
     public_payment_methods = [
         choice for choice in Pago.METODOS_PAGO
-        if choice[0] in ['mercadopago_link', 'transferencia']
+        if choice[0] in ['flow', 'transferencia']
     ]
 
     context = {
