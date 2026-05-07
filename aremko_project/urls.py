@@ -7,6 +7,7 @@ from django.conf.urls.static import static # Import static
 from django.contrib.auth import views as auth_views # Import auth views
 # Import the specific view functions needed for root URLs
 from ventas.views.public_views import homepage_view, empresas_view, empresas_presentacion_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view, garantia_view, tarjetas_qr_reviews_view, encuesta_satisfaccion_view, encuesta_gracias_view
+from ventas.views import flow_views
 # Removed direct import of ventas.urls
 
 from django.contrib.sitemaps.views import sitemap
@@ -48,6 +49,11 @@ urlpatterns = [
     path('empresas/', empresas_view, name='empresas'),
     path('empresas/presentacion/', empresas_presentacion_view, name='empresas_presentacion'),
     path('empresas/solicitar-cotizacion/', solicitar_cotizacion_empresa, name='solicitar_cotizacion_empresa'),
+    # Flow.cl payment callbacks at root (sin prefix /ventas/)
+    # Las settings FLOW_CONFIRMATION_URL y FLOW_RETURN_URL apuntan a estas
+    # rutas root, asi que Flow llama a aremko.cl/payment/* directamente.
+    path('payment/confirmation/', flow_views.flow_confirmation, name='flow_confirmation_root'),
+    path('payment/return/', flow_views.flow_return, name='flow_return_root'),
     # Include all URLs from the ventas app under the /ventas/ prefix
     path('ventas/', include('ventas.urls')), # Rely on app_name in ventas.urls
     # Include Control de Gestión URLs
