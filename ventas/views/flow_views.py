@@ -83,29 +83,41 @@ def create_flow_payment(request):
         print(f"Flow Create Payload: {payload}") # Debugging
 
         # --- Make Request to Flow ---
-        response = requests.post(FLOW_CREATE_API_URL, data=payload) # Use specific create URL
-        response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
-        result = response.json()
+        # NO usar raise_for_status: queremos capturar el body del error 4xx
+        # que Flow devuelve con detalles especificos (codigo, mensaje).
+        response = requests.post(FLOW_CREATE_API_URL, data=payload, timeout=30)
+        print(f"Flow HTTP {response.status_code} - Body: {response.text[:1000]}")  # Debug
 
-        print(f"Flow Response: {result}") # Debugging
+        try:
+            result = response.json()
+        except ValueError:
+            return JsonResponse({
+                'error': 'Flow respondio con formato invalido',
+                'http_status': response.status_code,
+                'body_preview': response.text[:500],
+            }, status=502)
 
-        # --- Process Flow Response ---
-        if 'url' in result and 'token' in result:
-            # Construct the full redirect URL
+        # Flow devuelve 200 + url+token en exito, o 4xx/5xx con error
+        if response.status_code == 200 and 'url' in result and 'token' in result:
             redirect_url = f"{result['url']}?token={result['token']}"
-            # Optionally: Store the flow token associated with the VentaReserva
-            # venta.flow_token = result['token'] # Add a field to VentaReserva model if needed
-            # venta.save()
             return JsonResponse({'url': redirect_url, 'token': result['token']})
-        else:
-            error_detail = result.get('message', 'Unknown error from Flow')
-            return JsonResponse({'error': 'Error creating Flow payment', 'details': error_detail}, status=400)
+
+        # Caso de error: Flow incluye 'code' y 'message' en el body
+        flow_code = result.get('code')
+        flow_message = result.get('message') or result.get('error') or 'Unknown error'
+        print(f"Flow API error - code={flow_code} message={flow_message} full={result}")
+        return JsonResponse({
+            'error': f'Flow API error: {flow_message}',
+            'flow_code': flow_code,
+            'flow_message': flow_message,
+            'http_status': response.status_code,
+        }, status=400)
 
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON body'}, status=400)
     except requests.exceptions.RequestException as e:
         print(f"Flow API request error: {e}")
-        return JsonResponse({'error': f'Flow API request failed: {e}'}, status=502) # Bad Gateway
+        return JsonResponse({'error': f'Flow API request failed: {e}'}, status=502)
     except Exception as e:
         print(f"Error in create_flow_payment: {e}")
         traceback.print_exc()
