@@ -614,7 +614,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" id="completeCheckoutBtn">Completar Reserva</button>
+                    <button type="button" class="btn btn-primary" id="legacyCompleteCheckoutBtn">Completar Reserva</button>
                 </div>
             </div>
         </div>
@@ -830,10 +830,10 @@
 
         // Attach event listener after DOM is loaded
         document.addEventListener('DOMContentLoaded', function () {
-            const completeCheckoutBtn = document.getElementById('completeCheckoutBtn');
+            const completeCheckoutBtn = document.getElementById('legacyCompleteCheckoutBtn');
             if (completeCheckoutBtn) {
                 completeCheckoutBtn.addEventListener('click', completeCheckout);
-                console.log("Event listener added for #completeCheckoutBtn click");
+                console.log("Event listener added for #legacyCompleteCheckoutBtn click");
             } else {
                 console.error("Complete checkout button not found");
             }
