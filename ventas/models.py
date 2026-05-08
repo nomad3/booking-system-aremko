@@ -5608,3 +5608,80 @@ class PendingReservation(models.Model):
         self.estado = 'slot_perdido'
         self.notas = (self.notas + '\n' + detalle).strip()
         self.save(update_fields=['estado', 'notas', 'updated_at'])
+
+
+class MetaSnapshot(models.Model):
+    """Snapshot consolidado de Meta (Facebook + Instagram + Ads).
+
+    Cada snapshot es una foto en el tiempo de las metricas organicas y de
+    paid ads de Aremko. Se generan:
+    - Manualmente desde el admin Django (botones de diagnostico)
+    - Automaticamente cada lunes 10am (integrado al brief semanal)
+
+    El campo `datos` guarda el JSON completo devuelto por meta_reporter.py
+    (ver `get_full_snapshot()`). El analisis IA opcional se cachea en
+    `analisis_ia` para no re-llamar al LLM.
+    """
+    TIPO_CHOICES = [
+        ('full', 'Completo (FB + IG + Ads)'),
+        ('facebook', 'Solo Facebook'),
+        ('instagram', 'Solo Instagram'),
+        ('ads', 'Solo Ads (paid)'),
+    ]
+    GENERADO_POR_CHOICES = [
+        ('admin_manual', 'Admin Django (manual)'),
+        ('cron_weekly', 'Cron semanal (lunes)'),
+        ('management_command', 'Comando manual desde shell'),
+        ('api', 'API endpoint'),
+    ]
+
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='full', db_index=True)
+    period_days = models.PositiveIntegerField(
+        default=28,
+        help_text='Ventana de dias del snapshot (28 default para tendencia mensual)',
+    )
+    datos = models.JSONField(help_text='JSON completo devuelto por meta_reporter')
+    analisis_ia = models.TextField(
+        blank=True,
+        help_text='Analisis IA del snapshot (cache, opcional)',
+    )
+    generado_por = models.CharField(
+        max_length=30, choices=GENERADO_POR_CHOICES, default='admin_manual', db_index=True,
+    )
+    error = models.TextField(blank=True, help_text='Mensajes de error si la captura fue parcial')
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Snapshot Meta (FB + IG + Ads)'
+        verbose_name_plural = 'Snapshots Meta'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at']),
+            models.Index(fields=['tipo', '-created_at']),
+        ]
+
+    def __str__(self):
+        fecha = self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else '?'
+        return f'Meta snapshot {self.tipo} {fecha} ({self.period_days}d)'
+
+    @property
+    def fb_fan_count(self) -> int:
+        try:
+            return self.datos.get('facebook', {}).get('overview', {}).get('fan_count') or 0
+        except (AttributeError, TypeError):
+            return 0
+
+    @property
+    def ig_followers(self) -> int:
+        try:
+            return self.datos.get('instagram', {}).get('overview', {}).get('followers_count') or 0
+        except (AttributeError, TypeError):
+            return 0
+
+    @property
+    def ads_spend_period(self) -> float:
+        try:
+            return float(self.datos.get('ads_principal', {}).get('insights', {}).get('spend') or 0)
+        except (AttributeError, TypeError, ValueError):
+            return 0.0

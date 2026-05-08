@@ -69,6 +69,7 @@ def build_user_prompt(
     alertas_analisis_ia: Optional[dict],
     ga4_snapshot: Optional[dict] = None,
     gsc_snapshot: Optional[dict] = None,
+    meta_snapshot: Optional[dict] = None,
 ) -> str:
     """Construye el user prompt con toda la info contextual."""
 
@@ -94,6 +95,9 @@ def build_user_prompt(
 
 === GOOGLE SEARCH CONSOLE (búsqueda orgánica) — ÚLTIMOS 7 DÍAS vs 7 ANTERIORES ===
 {json.dumps(gsc_snapshot, indent=2, ensure_ascii=False, default=str) if gsc_snapshot else '(no disponible)'}
+
+=== META: FACEBOOK + INSTAGRAM ORGÁNICO + ADS HISTORY (últimos 28 días) ===
+{json.dumps(meta_snapshot, indent=2, ensure_ascii=False, default=str)[:6000] if meta_snapshot else '(no disponible — token Meta no configurado o falló la captura)'}
 
 === TU OUTPUT (JSON estricto) ===
 
@@ -162,6 +166,15 @@ def build_user_prompt(
     ],
     "acciones_de_metricas": [
       "Acción concreta sugerida basada en datos (ej: 'crear post GBP esta semana con keyword tina caliente puerto varas porque GSC muestra que es la query nº1 con CTR bajo')"
+    ],
+    "insights_meta_organico": [
+      "Insight sobre Facebook orgánico (alcance/engagement de la página, top posts del periodo) si meta_snapshot está disponible"
+    ],
+    "insights_meta_instagram": [
+      "Insight sobre Instagram orgánico (followers, alcance, top media) si meta_snapshot está disponible"
+    ],
+    "insights_meta_ads": [
+      "Insight del histórico de campañas paid (39 campañas Aremko) si meta_snapshot está disponible. Si actualmente no hay campañas activas, mencionarlo y sugerir si conviene reactivar."
     ]
   }}
 }}
@@ -277,6 +290,43 @@ def get_gsc_snapshot_safe() -> Optional[dict]:
         return None
 
 
+def get_meta_snapshot_safe(persist: bool = True) -> Optional[dict]:
+    """Trae snapshot Meta (FB + IG + Ads) y opcionalmente lo persiste en BD.
+
+    Args:
+        persist: si True, guarda un MetaSnapshot con generado_por='cron_weekly'.
+
+    Devuelve None si falla todo.
+    """
+    try:
+        from .meta_reporter import get_snapshot_safe
+        snap = get_snapshot_safe(days=28)
+        if snap is None:
+            logger.warning('Meta snapshot no disponible (token o conectividad)')
+            return None
+
+        if persist:
+            try:
+                from ..models import MetaSnapshot
+                error_msg = ''
+                if snap.get('errors'):
+                    error_msg = '; '.join(f'{k}: {v}' for k, v in snap['errors'].items())
+                MetaSnapshot.objects.create(
+                    tipo='full',
+                    period_days=28,
+                    datos=snap,
+                    generado_por='cron_weekly',
+                    error=error_msg,
+                )
+            except Exception as exc:
+                logger.warning(f'No se pudo persistir MetaSnapshot: {exc}')
+
+        return snap
+    except Exception as exc:
+        logger.warning(f'Meta snapshot no disponible: {exc}')
+        return None
+
+
 def call_llm(
     semana_inicio,
     semana_fin,
@@ -285,6 +335,7 @@ def call_llm(
     alertas_analisis_ia,
     ga4_snapshot: Optional[dict] = None,
     gsc_snapshot: Optional[dict] = None,
+    meta_snapshot: Optional[dict] = None,
     model: Optional[str] = None,
 ) -> dict:
     """Llama a OpenRouter con todo el contexto y devuelve el brief en dict."""
@@ -313,6 +364,7 @@ def call_llm(
         alertas_analisis_ia=alertas_analisis_ia,
         ga4_snapshot=ga4_snapshot,
         gsc_snapshot=gsc_snapshot,
+        meta_snapshot=meta_snapshot,
     )
 
     client = OpenAI(api_key=api_key, base_url=base_url)
@@ -360,6 +412,7 @@ def generate_brief() -> dict:
     alertas = get_alertas_analisis_ia_anterior()
     ga4_snapshot = get_ga4_snapshot_safe()
     gsc_snapshot = get_gsc_snapshot_safe()
+    meta_snapshot = get_meta_snapshot_safe(persist=True)
 
     brief = call_llm(
         semana_inicio=semana_inicio,
@@ -369,6 +422,7 @@ def generate_brief() -> dict:
         alertas_analisis_ia=alertas,
         ga4_snapshot=ga4_snapshot,
         gsc_snapshot=gsc_snapshot,
+        meta_snapshot=meta_snapshot,
     )
 
     return {
@@ -379,5 +433,6 @@ def generate_brief() -> dict:
         'blog_posts_count': len(posts),
         'ga4_snapshot': ga4_snapshot,
         'gsc_snapshot': gsc_snapshot,
-        'metricas_disponibles': bool(ga4_snapshot or gsc_snapshot),
+        'meta_snapshot': meta_snapshot,
+        'metricas_disponibles': bool(ga4_snapshot or gsc_snapshot or meta_snapshot),
     }

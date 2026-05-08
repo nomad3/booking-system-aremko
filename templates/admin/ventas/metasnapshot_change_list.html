@@ -1,0 +1,47 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content_title %}
+  <h1>Snapshots Meta (Facebook + Instagram + Ads)</h1>
+{% endblock %}
+
+{% block object-tools-items %}
+  {{ block.super }}
+{% endblock %}
+
+{% block content %}
+<div style="background: #f0f8ff; border: 1px solid #b0d4f1; border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+  <h2 style="margin-top: 0;">📊 Diagnóstico bajo demanda</h2>
+  <p style="margin-bottom: 14px;">
+    Capturá un snapshot ahora mismo para ver el estado actual de las redes y campañas. Cada captura llama a Meta Graph API en vivo y queda guardada.
+  </p>
+  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <a href="{% url 'admin:ventas_metasnapshot_capturar' tipo='full' %}"
+       class="button"
+       style="background:#4267B2;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">
+      🌐 Snapshot Completo (FB + IG + Ads)
+    </a>
+    <a href="{% url 'admin:ventas_metasnapshot_capturar' tipo='facebook' %}"
+       class="button"
+       style="background:#1877F2;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">
+      📘 Solo Facebook
+    </a>
+    <a href="{% url 'admin:ventas_metasnapshot_capturar' tipo='instagram' %}"
+       class="button"
+       style="background:#E4405F;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">
+      📷 Solo Instagram
+    </a>
+    <a href="{% url 'admin:ventas_metasnapshot_capturar' tipo='ads' %}"
+       class="button"
+       style="background:#5C6BC0;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">
+      💰 Solo Ads (paid)
+    </a>
+  </div>
+  <p style="margin-top: 14px; color: #666; font-size: 13px;">
+    Ventana de tiempo default: últimos 28 días. Para cambiarla, agregá <code>?days=N</code> a cualquier botón (ej. <code>?days=7</code> o <code>?days=90</code>).<br>
+    El snapshot tarda 5-15 segundos según la cantidad de datos. Después de capturar te lleva al detalle del snapshot.
+  </p>
+</div>
+
+{{ block.super }}
+{% endblock %}

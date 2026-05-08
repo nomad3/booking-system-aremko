@@ -55,6 +55,8 @@ from .models import (
     Review,
     # Reservas tentativas pre-pago Flow
     PendingReservation,
+    # Snapshots Meta (FB + IG + Ads)
+    MetaSnapshot,
 )
 from django.http import HttpResponse
 import xlwt
@@ -4562,3 +4564,144 @@ class PendingReservationAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(MetaSnapshot)
+class MetaSnapshotAdmin(admin.ModelAdmin):
+    """Snapshots Meta con botones de captura on-demand.
+
+    Vista de listado tiene 4 botones arriba para generar snapshots ad-hoc:
+    - Snapshot completo (FB + IG + Ads)
+    - Solo Facebook
+    - Solo Instagram
+    - Solo Ads (paid history)
+    """
+    list_display = (
+        'id', 'tipo', 'period_days',
+        'fb_fan_count_display', 'ig_followers_display', 'ads_spend_display',
+        'generado_por', 'created_at', 'tiene_error',
+    )
+    list_filter = ('tipo', 'generado_por', 'created_at')
+    readonly_fields = (
+        'tipo', 'period_days', 'datos_pretty', 'analisis_ia',
+        'generado_por', 'error', 'created_at',
+    )
+    fields = (
+        'tipo', 'period_days', 'generado_por', 'created_at',
+        'analisis_ia', 'error', 'datos_pretty',
+    )
+    ordering = ('-created_at',)
+    change_list_template = 'admin/ventas/metasnapshot_change_list.html'
+
+    def fb_fan_count_display(self, obj):
+        return f'{obj.fb_fan_count:,}' if obj.fb_fan_count else '—'
+    fb_fan_count_display.short_description = 'FB fans'
+
+    def ig_followers_display(self, obj):
+        return f'{obj.ig_followers:,}' if obj.ig_followers else '—'
+    ig_followers_display.short_description = 'IG followers'
+
+    def ads_spend_display(self, obj):
+        if obj.ads_spend_period:
+            return f'${obj.ads_spend_period:,.0f}'
+        return '—'
+    ads_spend_display.short_description = 'Ads spend'
+
+    def tiene_error(self, obj):
+        return bool(obj.error)
+    tiene_error.boolean = True
+    tiene_error.short_description = 'Error?'
+
+    def datos_pretty(self, obj):
+        from django.utils.html import format_html
+        import json
+        try:
+            pretty = json.dumps(obj.datos, indent=2, ensure_ascii=False)
+        except Exception:
+            pretty = str(obj.datos)
+        return format_html(
+            '<pre style="max-height:600px;overflow:auto;font-size:11px;'
+            'background:#f5f5f5;padding:10px;border-radius:4px;">{}</pre>',
+            pretty,
+        )
+    datos_pretty.short_description = 'Datos JSON'
+
+    def has_add_permission(self, request):
+        return False  # Se crean via los botones / cron, no manualmente
+
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        custom = [
+            path(
+                'capturar/<str:tipo>/',
+                self.admin_site.admin_view(self.capturar_view),
+                name='ventas_metasnapshot_capturar',
+            ),
+        ]
+        return custom + urls
+
+    def capturar_view(self, request, tipo: str):
+        """Endpoint para los botones de captura. Crea un MetaSnapshot."""
+        from django.contrib import messages as dj_messages
+        from django.shortcuts import redirect
+        from django.urls import reverse
+        from ventas.services import meta_reporter
+
+        period_days = int(request.GET.get('days', 28))
+
+        try:
+            if tipo == 'full':
+                datos = meta_reporter.get_full_snapshot(days=period_days)
+                tipo_db = 'full'
+            elif tipo == 'facebook':
+                datos = {
+                    'facebook': {
+                        'overview': meta_reporter.get_facebook_page_overview(),
+                        'insights': meta_reporter.get_facebook_page_insights(days=period_days),
+                        'top_posts': meta_reporter.get_facebook_top_posts(limit=10, days=period_days),
+                    },
+                }
+                tipo_db = 'facebook'
+            elif tipo == 'instagram':
+                datos = {
+                    'instagram': {
+                        'overview': meta_reporter.get_instagram_overview(),
+                        'insights': meta_reporter.get_instagram_insights(days=period_days),
+                        'top_media': meta_reporter.get_instagram_top_media(limit=10, days=period_days),
+                    },
+                }
+                tipo_db = 'instagram'
+            elif tipo == 'ads':
+                datos = {
+                    'ads_principal': {
+                        'account': meta_reporter.get_ad_account_summary(),
+                        'insights': meta_reporter.get_ad_account_insights(days=period_days),
+                        'campaigns': meta_reporter.get_campaigns_summary(limit=50),
+                    },
+                }
+                tipo_db = 'ads'
+            else:
+                dj_messages.error(request, f'Tipo desconocido: {tipo}')
+                return redirect(reverse('admin:ventas_metasnapshot_changelist'))
+
+            error_msg = ''
+            if isinstance(datos, dict) and datos.get('errors'):
+                error_msg = '; '.join(f'{k}: {v}' for k, v in datos['errors'].items())
+
+            snap = MetaSnapshot.objects.create(
+                tipo=tipo_db,
+                period_days=period_days,
+                datos=datos,
+                generado_por='admin_manual',
+                error=error_msg,
+            )
+            if error_msg:
+                dj_messages.warning(request, f'Snapshot #{snap.id} creado con avisos: {error_msg[:200]}')
+            else:
+                dj_messages.success(request, f'Snapshot #{snap.id} creado ({tipo_db}, {period_days}d)')
+            return redirect(reverse('admin:ventas_metasnapshot_change', args=[snap.id]))
+
+        except Exception as e:
+            dj_messages.error(request, f'Error capturando snapshot: {e}')
+            return redirect(reverse('admin:ventas_metasnapshot_changelist'))
