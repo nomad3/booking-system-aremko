@@ -3975,6 +3975,34 @@ class NPSCategoriaListFilter(admin.SimpleListFilter):
         return queryset
 
 
+class ContactabilidadListFilter(admin.SimpleListFilter):
+    """Filtro por si la encuesta tiene datos de contacto utilizables."""
+    title = 'Contactabilidad'
+    parameter_name = 'contactabilidad'
+
+    def lookups(self, request, model_admin):
+        return [
+            ('contactable', 'Contactable (tiene tel o email)'),
+            ('sin_contacto', 'Sin datos de contacto (legacy)'),
+        ]
+
+    def queryset(self, request, queryset):
+        from django.db.models import Q
+        v = self.value()
+        # "Tiene contacto" = al menos uno de los 4 campos no esta vacio/null
+        tiene_contacto = (
+            (~Q(cliente__telefono='') & Q(cliente__telefono__isnull=False)) |
+            (~Q(cliente__email='') & Q(cliente__email__isnull=False)) |
+            (~Q(contacto_telefono='')) |
+            (~Q(contacto_email=''))
+        )
+        if v == 'contactable':
+            return queryset.filter(tiene_contacto)
+        if v == 'sin_contacto':
+            return queryset.exclude(tiene_contacto)
+        return queryset
+
+
 @admin.register(EncuestaSatisfaccion)
 class EncuestaSatisfaccionAdmin(admin.ModelAdmin):
     """Dashboard para revisar las encuestas de satisfacción.
@@ -3991,6 +4019,7 @@ class EncuestaSatisfaccionAdmin(admin.ModelAdmin):
     )
     list_filter = (
         NPSCategoriaListFilter,
+        ContactabilidadListFilter,
         'requiere_followup', 'followup_completado',
         'origen', 'ocasion_visita', 'como_se_entero',
     )
