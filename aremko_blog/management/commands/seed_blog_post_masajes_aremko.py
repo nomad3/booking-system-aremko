@@ -28,33 +28,57 @@ from aremko_blog.models import BlogCluster, BlogPost
 
 
 SLUG = "masajes-puerto-varas"
-TITLE = "Masajes en Puerto Varas: cuál pedir según cómo llegaste el viernes"
+TITLE = "Masajes en Puerto Varas entre semana: el plan after-work que te corta el lunes a jueves"
 KEYWORD_ROOT = "masajes puerto varas"
 META_DESCRIPTION = (
-    "Guía honesta de masajes en Puerto Varas: descontracturante, "
-    "relajación, piedras calientes, deportivo, tui-na, drenaje linfático. "
-    "50 min, en domos de madera nativa, junto al río Pescado."
+    "Masajes en Puerto Varas de lunes a viernes (martes cerrado): "
+    "after-work + tina caliente al lado del río Pescado. Descontracturante, "
+    "relajación, piedras calientes, deportivo, tui-na, drenaje linfático."
 )
 CLUSTER = BlogCluster.MASAJES
-CTA_TEXT = "Reserva tu masaje en Aremko"
+CTA_TEXT = "Reserva tu masaje after-work"
 CTA_URL = "/masajes/"
 
 INTRO = (
-    "Si llegaste a esta página buscando \"masajes en Puerto Varas\" hay "
-    "buenas posibilidades de que tu cuello esté pegado al hombro o tu "
-    "lumbar te esté cobrando los últimos tres meses de teletrabajo. "
-    "Tranquilo: esto no es la guía corporativa donde te explican que el "
-    "masaje relaja (sí, también te explican que el agua moja). Es la guía "
-    "donde el dueño del spa te ayuda a elegir QUÉ masaje pedir según cómo "
-    "llegaste, porque pedir un masaje genérico es como pedir \"comida\" en "
-    "un restaurante: técnicamente funciona, pero te perdiste de algo."
+    "La idea de masaje en Chile sigue ligada al fin de semana, como si el "
+    "lumbar entendiera de calendario. La verdad es la opuesta: el masaje "
+    "rinde más en mitad de la semana, cuando el lunes ya cobró factura y "
+    "el viernes todavía no llegó. En Aremko abrimos lunes, miércoles, "
+    "jueves y viernes (martes cerramos para mantención) y la mejor franja "
+    "horaria es la **after-work**: salís de la pega, manejás 20 minutos "
+    "desde el centro de Puerto Varas, te recibe el sonido del río Pescado "
+    "y entrás al masaje con el cuerpo todavía caliente del día. Esta es la "
+    "guía honesta de cuál pedir."
 )
 
 BODY_MD = """\
+## Por qué entre semana es mejor que el sábado
+
+Dos razones operativas, una experiencial:
+
+1. **Disponibilidad real**: el sábado se llena con anticipación, hay que
+   reservar con días. Lunes, miércoles, jueves y viernes podés agendar el
+   mismo día casi siempre. Si te decidís en la oficina a las 17:00,
+   alcanzás a entrar a una sesión de las 18:30 o 19:30.
+2. **Tu cuerpo lo necesita más el miércoles que el sábado**: el sábado ya
+   cortaste, el cuerpo viene bajando solo. El miércoles es cuando el
+   cortisol está alto, los hombros pegados a las orejas y la noche se
+   complica. Ahí el masaje rinde el doble.
+3. **El recinto está más vacío y suena solo el río Pescado.** Esto es
+   nuestro diferencial real: estamos a metros del único río de Puerto
+   Varas que suena los 365 días del año, sin pausa. Entre semana no hay
+   grupos, no hay despedidas de soltera, no hay ruido humano: el masaje
+   sucede con la frecuencia constante del agua corriendo como única banda
+   sonora. Es la diferencia entre "spa con música ambiente" y spa real.
+
+> Días de atención: **lunes, miércoles, jueves, viernes y fin de semana**.
+> Martes cerrado por mantención de tinas y descanso del equipo. Si tenías
+> agendado un martes, ese día no operamos.
+
 ## Diagnóstico rápido: qué pedir según cómo llegaste
 
 Antes de irte al detalle de cada tipo, un atajo. Buscá la línea que mejor
-te describa este viernes:
+te describa este miércoles a las 18:00:
 
 - **"Llegué con un nudo en el cuello que me duele al girar la cabeza"** →
   pedí **descontracturante**. Es masaje terapéutico, presión profunda en
@@ -178,28 +202,71 @@ con autorización médica.
 **Aviso honesto:** si lo que querés es "que me masajeen fuerte", este
 NO es. Pedí descontracturante. El drenaje es otro objetivo.
 
-## Domos de madera nativa: por qué no hacemos masajes en sala
+## Domos de madera nativa, al lado del río Pescado
 
 Los masajes en Aremko se hacen en **domos** — estructuras circulares de
 madera nativa metidas en el bosque. No es una sala con paredes pintadas
-y aroma artificial: es un domo donde escuchás el río Pescado a metros, el
-sonido del bosque, y la luz se filtra por la cubierta.
+y aroma artificial: es un domo a metros del **río Pescado**, donde escuchás
+el agua corriendo y nada más.
 
-¿Por qué importa? Porque el contexto sensorial **es parte del masaje**.
-Tu sistema nervioso baja distinto cuando lo único que escuchás es agua
-corriendo y viento, comparado con música ambiente de spa por parlante.
-La frecuencia constante del río es **ruido blanco natural**: baja
-cortisol, ayuda a desconectar y le pone freno al loop mental antes de
-que el masajista te toque.
+¿Por qué importa? Porque el contexto sensorial **es parte del masaje**. Tu
+sistema nervioso baja distinto cuando lo único que escuchás es un río real
+corriendo, comparado con música ambiente de spa por parlante. La frecuencia
+constante del río Pescado es **ruido blanco natural**: baja cortisol, ayuda
+a desconectar y le pone freno al loop mental antes de que el masajista te
+toque.
 
-Es la razón por la que no hacemos masajes en cabaña. La cabaña es para
-después: dormir, tomar vino, cenar. El masaje pertenece al domo.
+Importa el detalle del río porque **es nuestro diferencial real**. Hay
+muchos spas en la zona; ninguno está al lado de un río que suena 365 días
+al año. Otros usan parlantes con sonido de río pregrabado. Acá el río es el
+que está afuera del domo, sin loop, sin pausa, sin volumen ajustable.
+Quien viene una vez lo recuerda como "ese spa donde se oye el río".
 
-## El orden importa: combo masaje + tina + cabaña
+Por eso no hacemos masajes en cabaña: la cabaña queda para descansar
+después. El masaje pertenece al domo, donde el sonido del río Pescado
+trabaja contigo desde antes de subirte a la camilla.
 
-El **3-en-1 de Aremko** (masaje + tina + cabaña) es nuestra propuesta
-principal. Pero hay un detalle que casi nadie te dice: **el orden
-correcto es masaje primero, tina después, cabaña al final.**
+## El plan after-work: masaje + tina al cierre del día
+
+Acá está el caso de uso que pocos descubrieron: **martes cerrado, pero
+lunes/miércoles/jueves/viernes podés salir de la pega y armar el siguiente
+plan en una tarde**, sin reservar cabaña, sin pedir el día libre.
+
+**Secuencia recomendada de día de semana** (~2 horas total, 18:00 a 20:00):
+
+1. **18:00 — Salís de la oficina** en Puerto Varas, Puerto Montt o
+   alrededores. Manejás 20 minutos hasta Aremko.
+2. **18:30 — Masaje 50 minutos** en domo. Mientras dura, escuchás el río
+   Pescado afuera. Tu jefe ya no existe.
+3. **19:30 — Tina caliente 1 hora** (con tu pareja o solo). El agua a
+   38-40°C cierra el trabajo del masaje, el río sigue sonando, y al
+   atardecer el bosque cambia de color.
+4. **20:30 — Cena en Puerto Varas** o vuelta a casa. Tu cuerpo recibió un
+   reset que no te da una noche de pésimo dormir.
+
+¿Con quién funciona este plan?
+
+- **Pareja en burnout**: ambos salen de trabajar, se encuentran en
+  Aremko, masaje uno al lado del otro o por separado, tina juntos. Sin
+  programar fin de semana, sin pedir guagua a abuela. Mitad de la semana
+  ya cortó.
+- **Persona sola post-pega**: si vivís el ciclo gym-trabajo-cama, romper
+  con un masaje + tina entre semana hace lo que el sábado no puede hacer
+  (porque el sábado ya está saturado de pendientes domésticos).
+- **Empresa que cierra trato**: cliente importante de visita, en lugar de
+  llevarlo a un restaurant más, lo invitás a una experiencia de 2 horas.
+  La conversación que cierra negocios pasa antes en una tina escuchando
+  el río Pescado.
+
+Total estimado: $40-45.000 (masaje) + $25-30.000 (tina por persona). El
+plan after-work es el mejor relación valor/tiempo del calendario Aremko.
+
+## Si querés quedarte: combo masaje + tina + cabaña
+
+Cuando podés agregarle alojamiento, el **3-en-1 de Aremko** (masaje + tina +
+cabaña) es nuestra propuesta principal. Hay un detalle que casi nadie te
+dice: **el orden correcto es masaje primero, tina después, cabaña al
+final.**
 
 ¿Por qué?
 
@@ -208,13 +275,14 @@ correcto es masaje primero, tina después, cabaña al final.**
   responde, no con uno ya entibiado por el agua caliente.
 - **Tina después** sella el trabajo del masaje. El calor mantiene el
   músculo suelto, hidrata, profundiza la relajación. Es el cierre
-  físico del masaje.
+  físico del masaje. Y como las cabañas miran al bosque, se sigue
+  escuchando el río Pescado de fondo desde la tina.
 - **Cabaña al final** es para dormir. No para ir a relajarse — ya estás
   relajado. Es para tener dónde caer.
 
-Hacer la secuencia al revés (tina primero, masaje después) **no
-arruina la experiencia, pero la deja más floja**. Es la diferencia entre
-una cena bien armada y un buffet aleatorio.
+Hacer la secuencia al revés (tina primero, masaje después) **no arruina la
+experiencia, pero la deja más floja**. Es la diferencia entre una cena
+bien armada y un buffet aleatorio.
 
 ## Tus masajistas tienen nombre: Sandra, Carolina, Diana y Paul
 
@@ -255,11 +323,26 @@ acostarte, conversar lo justo con el masajista para que entienda qué
 necesitás) y 5 min después para incorporarte sin saltar de golpe.
 Reservá 1 hora total por seguridad.
 
+### ¿Qué días atienden?
+
+**Lunes, miércoles, jueves, viernes, sábado y domingo.** Martes cerrado
+por mantención de tinas y descanso del equipo. Lo más fácil para
+agendar es entre semana (lunes/miércoles/jueves/viernes); el sábado se
+llena con anticipación.
+
+### ¿Cuál es el mejor horario para venir?
+
+Si venís entre semana, la franja **after-work entre 18:00 y 20:30** es
+la más rica: el recinto está vacío, el río Pescado se escucha más fuerte
+y el atardecer en el bosque vale por sí mismo. Si venís fin de semana,
+mediodía o primera tarde funciona mejor para combinar masaje + tina sin
+apuro.
+
 ### ¿Tengo que reservar con anticipación?
 
-Sí, **al menos 24 horas antes**. Los sábados y feriados se llenan rápido,
-sobre todo si querés masajista específico u horario premium (mediodía o
-tarde). La reserva la hacés en
+**Entre semana podés agendar el mismo día casi siempre** (lunes,
+miércoles, jueves o viernes). Para sábados conviene reservar con 24-48
+horas de anticipación. La reserva la hacés en
 [aremko.cl/masajes/](https://www.aremko.cl/masajes/) o por WhatsApp.
 
 ### ¿Puedo elegir masajista?
@@ -346,11 +429,27 @@ FAQ_ITEMS = [
         ),
     },
     {
+        "question": "¿Qué días atienden masajes en Aremko?",
+        "answer": (
+            "Lunes, miércoles, jueves, viernes, sábado y domingo. "
+            "Martes cerrado por mantención de tinas y descanso del equipo."
+        ),
+    },
+    {
+        "question": "¿Cuál es el mejor horario para venir entre semana?",
+        "answer": (
+            "La franja after-work entre 18:00 y 20:30 es la más rica: "
+            "recinto vacío, el río Pescado se escucha más fuerte y el "
+            "atardecer en el bosque vale por sí mismo. Lunes, miércoles, "
+            "jueves y viernes."
+        ),
+    },
+    {
         "question": "¿Tengo que reservar con anticipación?",
         "answer": (
-            "Sí, al menos 24 horas antes. Sábados y feriados se llenan "
-            "rápido, sobre todo si querés masajista específico u horario "
-            "premium."
+            "Entre semana (lun/mié/jue/vie) podés agendar el mismo día "
+            "casi siempre. Para sábados conviene reservar con 24-48 "
+            "horas de anticipación."
         ),
     },
     {
