@@ -61,3 +61,6 @@ django-anymail[sendgrid]>=10.3  # SendGrid integration
 
 # Blog (DPV-SEO-002)
 markdown>=3.6  # Markdown → HTML render para BlogPost.body_md
+
+# Reporting (operational reports as .docx attachments)
+python-docx>=1.1.0  # Reportes operativos en Word (follow-ups, etc)
