@@ -85,10 +85,14 @@ def resolve_token() -> str:
 # ============================================================================
 
 
-def _get(path: str, params: Optional[dict] = None) -> dict:
-    """GET a Graph API. Lanza si error HTTP o si Meta devuelve {error: ...}."""
+def _get(path: str, params: Optional[dict] = None, token: Optional[str] = None) -> dict:
+    """GET a Graph API. Lanza si error HTTP o si Meta devuelve {error: ...}.
+
+    Si token=None usa el system user token. Para endpoints de Page que
+    requieran Page Access Token, pasar el token explicitamente.
+    """
     params = dict(params or {})
-    params["access_token"] = resolve_token()
+    params["access_token"] = token or resolve_token()
     url = f"{GRAPH_API_BASE}{path if path.startswith('/') else '/' + path}"
 
     response = requests.get(url, params=params, timeout=30)
@@ -105,6 +109,32 @@ def _get(path: str, params: Optional[dict] = None) -> dict:
         )
 
     return data
+
+
+# Cache para Page Access Token (vive por proceso, se renueva al reiniciar)
+_PAGE_TOKEN_CACHE: dict = {}
+
+
+def get_page_access_token(page_id: str = PAGE_ID_FB) -> str:
+    """Obtiene el Page Access Token para llamadas a /posts e insights.
+
+    Las APIs de FB Page requieren Page Access Token (no system user token).
+    Se cachea por proceso. Si el system user esta vinculado a la pagina con
+    los permisos adecuados, el token se hereda.
+    """
+    if page_id in _PAGE_TOKEN_CACHE:
+        return _PAGE_TOKEN_CACHE[page_id]
+
+    data = _get(f"/{page_id}", {"fields": "access_token"})
+    token = data.get("access_token", "")
+    if not token:
+        raise RuntimeError(
+            f"No se pudo obtener Page Access Token para {page_id}. "
+            f"Verificar que el system user tenga acceso a la pagina con "
+            f"permisos suficientes (Estadisticas, Contenido, Anuncios)."
+        )
+    _PAGE_TOKEN_CACHE[page_id] = token
+    return token
 
 
 # ============================================================================
@@ -140,15 +170,19 @@ def get_facebook_page_insights(days: int = 28) -> dict:
     Devuelve totales y promedios de reacciones, comentarios, shares,
     cantidad de posts publicados, top post del periodo, frecuencia de
     publicacion (posts/dia).
+
+    El endpoint /posts requiere Page Access Token (no system user token),
+    que obtenemos automaticamente via get_page_access_token().
     """
     until = date.today()
     since = until - timedelta(days=days)
+    page_token = get_page_access_token()
 
     data = _get(f"/{PAGE_ID_FB}/posts", {
         "fields": "id,created_time,message,reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares",
         "since": since.isoformat(),
         "limit": 100,
-    })
+    }, token=page_token)
 
     posts = data.get("data", [])
     total_reactions = 0
@@ -203,11 +237,12 @@ def get_facebook_page_insights(days: int = 28) -> dict:
 def get_facebook_top_posts(limit: int = 10, days: int = 28) -> list:
     """Top posts de la pagina FB del periodo, ordenados por engagement."""
     since = date.today() - timedelta(days=days)
+    page_token = get_page_access_token()
     data = _get(f"/{PAGE_ID_FB}/posts", {
         "fields": "id,message,created_time,permalink_url,reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares",
         "since": since.isoformat(),
         "limit": 50,
-    })
+    }, token=page_token)
 
     posts = []
     for p in data.get("data", []):
