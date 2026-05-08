@@ -31,9 +31,9 @@ SLUG = "masajes-puerto-varas"
 TITLE = "Masajes en Puerto Varas entre semana: el plan after-work que te corta el lunes a jueves"
 KEYWORD_ROOT = "masajes puerto varas"
 META_DESCRIPTION = (
-    "Masajes en Puerto Varas de lunes a viernes (martes cerrado): "
-    "after-work + tina caliente al lado del río Pescado. Descontracturante, "
-    "relajación, piedras calientes, deportivo, tui-na, drenaje linfático."
+    "Masajes en Puerto Varas after-work (lun/mié/jue/vie): "
+    "descontracturante, relajación, piedras calientes y más. 50 min "
+    "en domos junto al río Pescado."
 )
 CLUSTER = BlogCluster.MASAJES
 CTA_TEXT = "Reserva tu masaje after-work"
