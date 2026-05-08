@@ -129,40 +129,75 @@ def get_facebook_page_overview() -> dict:
 
 
 def get_facebook_page_insights(days: int = 28) -> dict:
-    """Insights de la pagina FB en el periodo dado.
+    """Resumen de engagement de la pagina FB calculado desde los posts.
 
-    Metricas validas para Pages Insights API v21.0:
-    - page_impressions: total de impresiones (incluye ads)
-    - page_impressions_unique: alcance unico
-    - page_post_engagements: engagements en posts organicos
-    - page_fan_adds: nuevos fans en el periodo
+    Meta deprecó la mayoria de Page Insights API en v21.0+ (errores
+    persistentes "The value must be a valid insights metric"). En vez de
+    pelearnos con metricas legacy, calculamos engagement a partir de los
+    posts mismos (endpoint /posts con reactions.summary) — eso si funciona
+    consistentemente y da insights mas accionables.
+
+    Devuelve totales y promedios de reacciones, comentarios, shares,
+    cantidad de posts publicados, top post del periodo, frecuencia de
+    publicacion (posts/dia).
     """
     until = date.today()
     since = until - timedelta(days=days)
 
-    data = _get(f"/{PAGE_ID_FB}/insights", {
-        "metric": "page_impressions,page_impressions_unique,page_post_engagements,page_fan_adds",
-        "period": "day",
+    data = _get(f"/{PAGE_ID_FB}/posts", {
+        "fields": "id,created_time,message,reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares",
         "since": since.isoformat(),
-        "until": until.isoformat(),
+        "limit": 100,
     })
 
-    summary = {
+    posts = data.get("data", [])
+    total_reactions = 0
+    total_comments = 0
+    total_shares = 0
+    top_post = None
+    top_engagement = -1
+
+    for p in posts:
+        r = (p.get("reactions") or {}).get("summary", {}).get("total_count", 0) or 0
+        c = (p.get("comments") or {}).get("summary", {}).get("total_count", 0) or 0
+        s = (p.get("shares") or {}).get("count", 0) or 0
+        total_reactions += r
+        total_comments += c
+        total_shares += s
+        eng = r + c + s
+        if eng > top_engagement:
+            top_engagement = eng
+            top_post = {
+                "id": p.get("id"),
+                "created_time": p.get("created_time"),
+                "message_excerpt": (p.get("message") or "")[:160],
+                "reactions": r,
+                "comments": c,
+                "shares": s,
+                "engagement": eng,
+            }
+
+    posts_count = len(posts)
+    total_engagement = total_reactions + total_comments + total_shares
+
+    return {
         "period_days": days,
         "since": since.isoformat(),
         "until": until.isoformat(),
-        "metrics": {},
+        "posts_publicados": posts_count,
+        "frecuencia_posts_por_dia": round(posts_count / days, 2) if days else 0,
+        "total_reactions": total_reactions,
+        "total_comments": total_comments,
+        "total_shares": total_shares,
+        "total_engagement": total_engagement,
+        "engagement_por_post_promedio": round(total_engagement / posts_count, 2) if posts_count else 0,
+        "top_post_periodo": top_post,
+        "_nota": (
+            "Calculado desde /posts (Page Insights API v21+ deprecada). "
+            "No incluye alcance/impresiones porque esos endpoints requieren "
+            "metricas que ya no estan disponibles publicamente."
+        ),
     }
-    for entry in data.get("data", []):
-        metric_name = entry.get("name")
-        values = entry.get("values", [])
-        total = sum((v.get("value") or 0) for v in values if isinstance(v.get("value"), (int, float)))
-        summary["metrics"][metric_name] = {
-            "total": total,
-            "daily_avg": (total / days) if days else 0,
-            "data_points": len(values),
-        }
-    return summary
 
 
 def get_facebook_top_posts(limit: int = 10, days: int = 28) -> list:
