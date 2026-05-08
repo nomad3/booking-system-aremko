@@ -237,7 +237,7 @@ class CommunicationService:
 
             # Crear lista de BCC sin duplicados
             ventas_email = getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
-            bcc_emails = ['aremkospa@gmail.com']
+            bcc_emails = ['aremkospa@gmail.com', 'abonosaremko@gmail.com', 'atoloza1970@gmail.com']
             if ventas_email not in bcc_emails:
                 bcc_emails.append(ventas_email)
 
@@ -362,7 +362,7 @@ class CommunicationService:
 
             # Crear lista de BCC sin duplicados
             ventas_email = getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
-            bcc_emails = ['aremkospa@gmail.com']
+            bcc_emails = ['aremkospa@gmail.com', 'abonosaremko@gmail.com', 'atoloza1970@gmail.com']
             if ventas_email not in bcc_emails:
                 bcc_emails.append(ventas_email)
 
@@ -507,7 +507,7 @@ class CommunicationService:
 
             # Crear lista de BCC sin duplicados
             ventas_email = getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
-            bcc_emails = ['aremkospa@gmail.com']
+            bcc_emails = ['aremkospa@gmail.com', 'abonosaremko@gmail.com', 'atoloza1970@gmail.com']
             if ventas_email not in bcc_emails:
                 bcc_emails.append(ventas_email)
 
