@@ -119,82 +119,108 @@ def generar_sugerencia_ia(encuesta):
         return f'(Error IA: {exc})'
 
 
-def render_markdown(encuestas, sugerencias):
-    """Construye el reporte markdown."""
+def _datos_contacto(encuesta):
+    """Devuelve (nombre, telefono, email) priorizando cliente vinculado."""
+    nombre = (encuesta.cliente.nombre if encuesta.cliente else encuesta.contacto_nombre) or 'Anónimo'
+    telefono = (encuesta.cliente.telefono if encuesta.cliente else encuesta.contacto_telefono) or ''
+    email = (encuesta.cliente.email if encuesta.cliente else encuesta.contacto_email) or ''
+    return nombre, telefono, email
+
+
+def es_contactable(encuesta):
+    """True si tiene al menos telefono o email."""
+    _, telefono, email = _datos_contacto(encuesta)
+    return bool(telefono or email)
+
+
+def _render_caso_contactable(idx, encuesta, sugerencias, lines):
+    nombre, telefono, email = _datos_contacto(encuesta)
+    fecha_visita = encuesta.fecha_visita.strftime('%d-%m-%Y') if encuesta.fecha_visita else '?'
+    fecha_resp = encuesta.fecha_respuesta.strftime('%d-%m-%Y') if encuesta.fecha_respuesta else '?'
+
+    lines.append(f'## {idx}. {nombre}')
+    lines.append('')
+    lines.append(f'- Encuesta ID: `{encuesta.id}`')
+    lines.append(f'- Teléfono: `{telefono or "(sin teléfono)"}`')
+    lines.append(f'- Email: `{email or "(sin email)"}`')
+    lines.append(f'- Fecha visita: {fecha_visita}')
+    lines.append(f'- Fecha respuesta encuesta: {fecha_resp}')
+    if encuesta.nps_score is not None:
+        etiqueta = 'detractor' if encuesta.nps_score <= 6 else ('pasivo' if encuesta.nps_score <= 8 else 'promotor')
+        lines.append(f'- NPS: **{encuesta.nps_score}/10** ({etiqueta})')
+
+    califs_bajas = []
+    for label, val in [
+        ('Temperatura tina', encuesta.cal_temperatura_tina),
+        ('Limpieza tinas', encuesta.cal_limpieza_tinas),
+        ('Limpieza cabaña', encuesta.cal_limpieza_cabana),
+        ('Servicio masajes', encuesta.cal_servicio_masajes),
+        ('Atención visita', encuesta.cal_atencion_visita),
+        ('Experiencia general', encuesta.cal_experiencia_general),
+        ('Calidad-precio', encuesta.cal_calidad_precio),
+    ]:
+        if val is not None and val <= 3:
+            califs_bajas.append(f'{label}: {val}/5')
+    if califs_bajas:
+        lines.append(f'- Calificaciones bajas: {"; ".join(califs_bajas)}')
+
+    if encuesta.decepcion:
+        lines.append(f'- **Lo decepcionó:** "{encuesta.decepcion}"')
+    if encuesta.sugerencias:
+        lines.append(f'- **Sugerencia:** "{encuesta.sugerencias}"')
+    if encuesta.lo_que_mas_gusto:
+        lines.append(f'- **Sí le gustó:** "{encuesta.lo_que_mas_gusto}"')
+
+    lines.append('')
+    lines.append('### Mensaje WhatsApp sugerido')
+    lines.append('')
+    sugerencia = sugerencias.get(encuesta.id, '(sin sugerencia)')
+    lines.append('```')
+    lines.append(sugerencia)
+    lines.append('```')
+    lines.append('')
+    lines.append(f'[Marcar como completado en admin](https://aremko.cl/admin/ventas/encuestasatisfaccion/{encuesta.id}/change/)')
+    lines.append('')
+    lines.append('---')
+    lines.append('')
+
+
+def render_markdown(contactables, no_contactables, sugerencias):
+    """Construye el reporte markdown con dos secciones."""
     fecha = timezone.localdate().isoformat()
+    total = len(contactables) + len(no_contactables)
+
     lines = [
         f'# Follow-ups Pendientes — Reporte {fecha}',
         '',
-        f'Total casos pendientes: **{len(encuestas)}**',
+        f'Total pendientes: **{total}** ({len(contactables)} contactables + {len(no_contactables)} sin datos de contacto)',
         '',
-        'Cada caso incluye datos de contacto, lo que reportó el cliente y un mensaje '
-        'WhatsApp sugerido por IA. Revisa, ajusta el mensaje si quieres, copia y envía '
-        'directamente desde WhatsApp Web. Después marca el caso como completado en el '
-        'admin Django (`/admin/ventas/encuestasatisfaccion/`).',
+        'Cada caso contactable incluye datos, lo que reportó el cliente y un mensaje '
+        'WhatsApp sugerido por IA. Revisa, ajusta si quieres, copia y envía desde '
+        'WhatsApp Web. Después marca el caso como completado en el admin Django.',
         '',
         '---',
         '',
+        f'# Casos contactables ({len(contactables)})',
+        '',
     ]
 
-    for idx, encuesta in enumerate(encuestas, 1):
-        cliente_nombre = (
-            encuesta.cliente.nombre if encuesta.cliente else encuesta.contacto_nombre
-        ) or 'Anónimo'
-        telefono = (
-            encuesta.cliente.telefono if encuesta.cliente else encuesta.contacto_telefono
-        ) or '(sin teléfono)'
-        email = (
-            encuesta.cliente.email if encuesta.cliente else encuesta.contacto_email
-        ) or '(sin email)'
+    for idx, encuesta in enumerate(contactables, 1):
+        _render_caso_contactable(idx, encuesta, sugerencias, lines)
 
-        fecha_visita = encuesta.fecha_visita.strftime('%d-%m-%Y') if encuesta.fecha_visita else '?'
-        fecha_resp = encuesta.fecha_respuesta.strftime('%d-%m-%Y') if encuesta.fecha_respuesta else '?'
-
-        lines.append(f'## {idx}. {cliente_nombre}')
+    if no_contactables:
         lines.append('')
-        lines.append(f'- Encuesta ID: `{encuesta.id}`')
-        lines.append(f'- Teléfono: `{telefono}`')
-        lines.append(f'- Email: `{email}`')
-        lines.append(f'- Fecha visita: {fecha_visita}')
-        lines.append(f'- Fecha respuesta encuesta: {fecha_resp}')
-        if encuesta.nps_score is not None:
-            etiqueta = 'detractor' if encuesta.nps_score <= 6 else ('pasivo' if encuesta.nps_score <= 8 else 'promotor')
-            lines.append(f'- NPS: **{encuesta.nps_score}/10** ({etiqueta})')
-
-        califs_bajas = []
-        for label, val in [
-            ('Temperatura tina', encuesta.cal_temperatura_tina),
-            ('Limpieza tinas', encuesta.cal_limpieza_tinas),
-            ('Limpieza cabaña', encuesta.cal_limpieza_cabana),
-            ('Servicio masajes', encuesta.cal_servicio_masajes),
-            ('Atención visita', encuesta.cal_atencion_visita),
-            ('Experiencia general', encuesta.cal_experiencia_general),
-            ('Calidad-precio', encuesta.cal_calidad_precio),
-        ]:
-            if val is not None and val <= 3:
-                califs_bajas.append(f'{label}: {val}/5')
-        if califs_bajas:
-            lines.append(f'- Calificaciones bajas: {"; ".join(califs_bajas)}')
-
-        if encuesta.decepcion:
-            lines.append(f'- **Lo decepcionó:** "{encuesta.decepcion}"')
-        if encuesta.sugerencias:
-            lines.append(f'- **Sugerencia:** "{encuesta.sugerencias}"')
-        if encuesta.lo_que_mas_gusto:
-            lines.append(f'- **Sí le gustó:** "{encuesta.lo_que_mas_gusto}"')
-
+        lines.append(f'# Casos sin datos de contacto ({len(no_contactables)})')
         lines.append('')
-        lines.append('### Mensaje WhatsApp sugerido')
+        lines.append('Estos casos no tienen teléfono ni email registrado (legacy del Google Form '
+                     'antiguo, mayoría). No se pueden contactar — recomendamos marcarlos como '
+                     'completados en bulk para limpiar la cola operativa.')
         lines.append('')
-        sugerencia = sugerencias.get(encuesta.id, '(sin sugerencia)')
-        lines.append('```')
-        lines.append(sugerencia)
-        lines.append('```')
-        lines.append('')
-        lines.append(f'[Marcar como completado en admin](https://aremko.cl/admin/ventas/encuestasatisfaccion/{encuesta.id}/change/)')
-        lines.append('')
-        lines.append('---')
-        lines.append('')
+        for encuesta in no_contactables:
+            nombre, _, _ = _datos_contacto(encuesta)
+            fecha_visita = encuesta.fecha_visita.strftime('%d-%m-%Y') if encuesta.fecha_visita else '?'
+            nps_str = f' · NPS {encuesta.nps_score}' if encuesta.nps_score is not None else ''
+            lines.append(f'- [#{encuesta.id}](https://aremko.cl/admin/ventas/encuestasatisfaccion/{encuesta.id}/change/) — {nombre} · visita {fecha_visita}{nps_str}')
 
     return '\n'.join(lines)
 
@@ -261,13 +287,20 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS('No hay follow-ups pendientes. Limpio.'))
             return
 
-        self.stdout.write(f'{total} follow-ups pendientes encontrados.')
+        contactables = [e for e in encuestas if es_contactable(e)]
+        no_contactables = [e for e in encuestas if not es_contactable(e)]
+
+        self.stdout.write(
+            f'{total} pendientes: {len(contactables)} contactables, '
+            f'{len(no_contactables)} sin datos de contacto.'
+        )
 
         sugerencias = {}
         if not options['no_ai']:
-            self.stdout.write('Generando sugerencias IA (Claude Sonnet via OpenRouter)...')
-            for i, encuesta in enumerate(encuestas, 1):
-                self.stdout.write(f'  [{i}/{total}] caso #{encuesta.id}...', ending='\r')
+            n = len(contactables)
+            self.stdout.write(f'Generando sugerencias IA solo para los {n} contactables...')
+            for i, encuesta in enumerate(contactables, 1):
+                self.stdout.write(f'  [{i}/{n}] caso #{encuesta.id}...', ending='\r')
                 self.stdout.flush()
                 sugerencias[encuesta.id] = generar_sugerencia_ia(encuesta)
             self.stdout.write('')
@@ -275,7 +308,7 @@ class Command(BaseCommand):
         else:
             self.stdout.write('Saltando IA (--no-ai).')
 
-        markdown = render_markdown(encuestas, sugerencias)
+        markdown = render_markdown(contactables, no_contactables, sugerencias)
 
         if options['output']:
             Path(options['output']).write_text(markdown, encoding='utf-8')
@@ -286,13 +319,15 @@ class Command(BaseCommand):
             return
 
         fecha_iso = timezone.localdate().isoformat()
-        subject = f'Follow-ups Pendientes Aremko — {fecha_iso} ({total} casos)'
+        subject = (
+            f'Follow-ups Pendientes Aremko — {fecha_iso} '
+            f'({len(contactables)} contactables / {len(no_contactables)} sin datos)'
+        )
         body = (
-            f'Reporte de los {total} clientes que dejaron feedback negativo y '
-            'esperan ser contactados.\n\n'
-            'Cada caso trae: datos del cliente, lo que reportó, mensaje WhatsApp sugerido por IA.\n\n'
-            'Adjunto va en .docx (más fácil de leer en celular). Después de contactar a un cliente, '
-            'marca el caso como completado en el admin Django.\n'
+            f'Reporte de follow-ups pendientes.\n\n'
+            f'- Contactables: {len(contactables)} (con teléfono o email — accionables vía WhatsApp)\n'
+            f'- Sin datos de contacto: {len(no_contactables)} (legacy, marcar completados en bulk)\n\n'
+            'Adjunto en .docx con sugerencia WhatsApp IA por cada contactable.\n'
         )
 
         email_msg = EmailMessage(
