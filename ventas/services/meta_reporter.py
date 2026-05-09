@@ -40,8 +40,9 @@ GRAPH_API_BASE = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 # IDs Aremko (constantes operativas, no son secretos)
 PAGE_ID_FB = "555157687911449"
 INSTAGRAM_BUSINESS_ACCOUNT_ID = "17841400756478364"
-AD_ACCOUNT_PRINCIPAL = "act_455070225054110"  # CLP, 39 campañas historicas
-AD_ACCOUNT_SECUNDARIA = "act_43311853"  # USD
+AD_ACCOUNT_PRINCIPAL = "act_455070225054110"  # CLP, 39 campañas historicas (Aremko BM)
+AD_ACCOUNT_SECUNDARIA = "act_43311853"  # USD (legacy)
+AD_ACCOUNT_BOOSTED_IG = "act_323860814935576"  # CLP, owner Daniela, donde corren boosts IG
 BUSINESS_OWNER_ID = "2135035316743281"
 
 
@@ -476,8 +477,21 @@ def get_campaign_detail(campaign_id: str, days: int = 30) -> dict:
 # ============================================================================
 
 
+def list_accessible_ad_accounts() -> list:
+    """Devuelve TODAS las cuentas publicitarias accesibles al system user.
+
+    Robusto: si en el futuro se agregan nuevas cuentas al portfolio o se
+    asignan al system user, aparecen automaticamente sin tocar codigo.
+    """
+    data = _get("/me/adaccounts", {
+        "fields": "id,name,account_status,currency,owner",
+        "limit": 50,
+    })
+    return data.get("data", [])
+
+
 def get_full_snapshot(days: int = 28) -> dict:
-    """Snapshot consolidado de Facebook + Instagram + Ads."""
+    """Snapshot consolidado de Facebook + Instagram + Ads (TODAS las cuentas)."""
     snapshot = {"period_days": days, "errors": {}}
 
     try:
@@ -500,15 +514,32 @@ def get_full_snapshot(days: int = 28) -> dict:
         snapshot["errors"]["instagram"] = str(e)
         logger.exception("Error en instagram snapshot")
 
+    # Itera TODAS las cuentas publicitarias accesibles
+    snapshot["ads_accounts"] = []
     try:
-        snapshot["ads_principal"] = {
-            "account": get_ad_account_summary(AD_ACCOUNT_PRINCIPAL),
-            "insights": get_ad_account_insights(AD_ACCOUNT_PRINCIPAL, days=days),
-            "campaigns": get_campaigns_summary(AD_ACCOUNT_PRINCIPAL, limit=50),
-        }
+        accounts = list_accessible_ad_accounts()
+        for acct in accounts:
+            acct_id = acct.get("id")
+            try:
+                snapshot["ads_accounts"].append({
+                    "id": acct_id,
+                    "name": acct.get("name"),
+                    "currency": acct.get("currency"),
+                    "owner": acct.get("owner"),
+                    "summary": get_ad_account_summary(acct_id),
+                    "insights_period": get_ad_account_insights(acct_id, days=days),
+                    "campaigns": get_campaigns_summary(acct_id, limit=50),
+                })
+            except Exception as e:
+                snapshot["ads_accounts"].append({
+                    "id": acct_id,
+                    "name": acct.get("name"),
+                    "_error": str(e),
+                })
+                logger.warning(f"Error capturando cuenta {acct_id}: {e}")
     except Exception as e:
-        snapshot["errors"]["ads_principal"] = str(e)
-        logger.exception("Error en ads principal snapshot")
+        snapshot["errors"]["ads_accounts"] = str(e)
+        logger.exception("Error listando cuentas publicitarias")
 
     return snapshot
 

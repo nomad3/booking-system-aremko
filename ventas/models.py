@@ -5681,7 +5681,18 @@ class MetaSnapshot(models.Model):
 
     @property
     def ads_spend_period(self) -> float:
+        """Suma del gasto del periodo en TODAS las cuentas publicitarias accesibles."""
         try:
-            return float(self.datos.get('ads_principal', {}).get('insights', {}).get('spend') or 0)
+            total = 0.0
+            # Formato nuevo: lista ads_accounts con multiples cuentas
+            for acct in (self.datos.get('ads_accounts') or []):
+                try:
+                    total += float(acct.get('insights_period', {}).get('spend') or 0)
+                except (TypeError, ValueError):
+                    pass
+            # Compat con formato antiguo (snapshots anteriores con ads_principal)
+            if not self.datos.get('ads_accounts'):
+                total = float(self.datos.get('ads_principal', {}).get('insights', {}).get('spend') or 0)
+            return total
         except (AttributeError, TypeError, ValueError):
             return 0.0

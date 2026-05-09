@@ -4673,13 +4673,30 @@ class MetaSnapshotAdmin(admin.ModelAdmin):
                 }
                 tipo_db = 'instagram'
             elif tipo == 'ads':
-                datos = {
-                    'ads_principal': {
-                        'account': meta_reporter.get_ad_account_summary(),
-                        'insights': meta_reporter.get_ad_account_insights(days=period_days),
-                        'campaigns': meta_reporter.get_campaigns_summary(limit=50),
-                    },
-                }
+                # Iterar todas las cuentas publicitarias accesibles
+                ads_accounts = []
+                try:
+                    accounts = meta_reporter.list_accessible_ad_accounts()
+                    for acct in accounts:
+                        acct_id = acct.get('id')
+                        try:
+                            ads_accounts.append({
+                                'id': acct_id,
+                                'name': acct.get('name'),
+                                'currency': acct.get('currency'),
+                                'owner': acct.get('owner'),
+                                'summary': meta_reporter.get_ad_account_summary(acct_id),
+                                'insights_period': meta_reporter.get_ad_account_insights(acct_id, days=period_days),
+                                'campaigns': meta_reporter.get_campaigns_summary(acct_id, limit=50),
+                            })
+                        except Exception as inner_e:
+                            ads_accounts.append({
+                                'id': acct_id, 'name': acct.get('name'),
+                                '_error': str(inner_e),
+                            })
+                except Exception as e:
+                    pass
+                datos = {'ads_accounts': ads_accounts}
                 tipo_db = 'ads'
             else:
                 dj_messages.error(request, f'Tipo desconocido: {tipo}')
