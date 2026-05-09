@@ -4642,13 +4642,19 @@ class MetaSnapshotAdmin(admin.ModelAdmin):
         return custom + urls
 
     def capturar_view(self, request, tipo: str):
-        """Endpoint para los botones de captura. Crea un MetaSnapshot."""
+        """Endpoint para los botones de captura. Crea un MetaSnapshot.
+
+        Soporta query param `?email=1` (solo en tipo='full') que ademas
+        llama al analizador IA, genera un .docx y lo envia a los 3 emails
+        internos de Aremko.
+        """
         from django.contrib import messages as dj_messages
         from django.shortcuts import redirect
         from django.urls import reverse
         from ventas.services import meta_reporter
 
         period_days = int(request.GET.get('days', 28))
+        with_email = request.GET.get('email') == '1'
 
         try:
             if tipo == 'full':
@@ -4713,10 +4719,39 @@ class MetaSnapshotAdmin(admin.ModelAdmin):
                 generado_por='admin_manual',
                 error=error_msg,
             )
-            if error_msg:
+
+            # Si se pidio email + analisis IA (solo aplica en tipo='full')
+            if with_email and tipo == 'full':
+                try:
+                    from ventas.services import meta_analyzer
+                    analysis = meta_analyzer.analyze_snapshot(datos)
+                    # Cachear analisis en el snapshot para que el brief lo reuse
+                    import json as _json
+                    snap.analisis_ia = _json.dumps(analysis, ensure_ascii=False, indent=2)
+                    snap.save(update_fields=['analisis_ia'])
+
+                    sent = meta_analyzer.send_analysis_by_email(analysis, datos)
+                    if sent:
+                        dj_messages.success(
+                            request,
+                            f'Snapshot #{snap.id} creado + analisis IA + email enviado a 3 destinatarios'
+                        )
+                    else:
+                        dj_messages.warning(
+                            request,
+                            f'Snapshot #{snap.id} creado y analisis IA OK, pero el email FALLO. '
+                            f'Revisa logs.'
+                        )
+                except Exception as e:
+                    dj_messages.warning(
+                        request,
+                        f'Snapshot #{snap.id} creado pero analisis IA fallo: {e}'
+                    )
+            elif error_msg:
                 dj_messages.warning(request, f'Snapshot #{snap.id} creado con avisos: {error_msg[:200]}')
             else:
                 dj_messages.success(request, f'Snapshot #{snap.id} creado ({tipo_db}, {period_days}d)')
+
             return redirect(reverse('admin:ventas_metasnapshot_change', args=[snap.id]))
 
         except Exception as e:

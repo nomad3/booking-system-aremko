@@ -70,6 +70,7 @@ def build_user_prompt(
     ga4_snapshot: Optional[dict] = None,
     gsc_snapshot: Optional[dict] = None,
     meta_snapshot: Optional[dict] = None,
+    meta_analysis: Optional[dict] = None,
 ) -> str:
     """Construye el user prompt con toda la info contextual."""
 
@@ -98,6 +99,9 @@ def build_user_prompt(
 
 === META: FACEBOOK + INSTAGRAM ORGÁNICO + ADS HISTORY (últimos 28 días) ===
 {json.dumps(meta_snapshot, indent=2, ensure_ascii=False, default=str)[:6000] if meta_snapshot else '(no disponible — token Meta no configurado o falló la captura)'}
+
+=== ANÁLISIS IA META PRE-PROCESADO (resumen ejecutivo, alertas, oportunidades, acciones) ===
+{json.dumps(meta_analysis, indent=2, ensure_ascii=False, default=str)[:6000] if meta_analysis else '(no disponible — el análisis IA del snapshot Meta no se pudo generar)'}
 
 === TU OUTPUT (JSON estricto) ===
 
@@ -290,13 +294,16 @@ def get_gsc_snapshot_safe() -> Optional[dict]:
         return None
 
 
-def get_meta_snapshot_safe(persist: bool = True) -> Optional[dict]:
-    """Trae snapshot Meta (FB + IG + Ads) y opcionalmente lo persiste en BD.
+def get_meta_snapshot_safe(persist: bool = True, with_analysis: bool = True) -> Optional[dict]:
+    """Trae snapshot Meta (FB + IG + Ads), genera analisis IA y persiste en BD.
 
     Args:
         persist: si True, guarda un MetaSnapshot con generado_por='cron_weekly'.
+        with_analysis: si True, llama meta_analyzer para analisis IA y lo
+            cachea en MetaSnapshot.analisis_ia.
 
-    Devuelve None si falla todo.
+    Devuelve dict con keys 'snapshot' y 'analysis' (ambos opcionalmente None
+    si falla parcial). Devuelve None si falla todo.
     """
     try:
         from .meta_reporter import get_snapshot_safe
@@ -305,23 +312,37 @@ def get_meta_snapshot_safe(persist: bool = True) -> Optional[dict]:
             logger.warning('Meta snapshot no disponible (token o conectividad)')
             return None
 
+        analysis = None
+        if with_analysis:
+            try:
+                from .meta_analyzer import analyze_snapshot
+                analysis = analyze_snapshot(snap)
+                logger.info('Meta analysis IA generado correctamente para brief semanal')
+            except Exception as exc:
+                logger.warning(f'Meta analysis IA fallo (snapshot OK igual): {exc}')
+
         if persist:
             try:
                 from ..models import MetaSnapshot
+                import json
                 error_msg = ''
                 if snap.get('errors'):
                     error_msg = '; '.join(f'{k}: {v}' for k, v in snap['errors'].items())
+                analisis_str = ''
+                if analysis:
+                    analisis_str = json.dumps(analysis, ensure_ascii=False, indent=2)
                 MetaSnapshot.objects.create(
                     tipo='full',
                     period_days=28,
                     datos=snap,
+                    analisis_ia=analisis_str,
                     generado_por='cron_weekly',
                     error=error_msg,
                 )
             except Exception as exc:
                 logger.warning(f'No se pudo persistir MetaSnapshot: {exc}')
 
-        return snap
+        return {'snapshot': snap, 'analysis': analysis}
     except Exception as exc:
         logger.warning(f'Meta snapshot no disponible: {exc}')
         return None
@@ -336,6 +357,7 @@ def call_llm(
     ga4_snapshot: Optional[dict] = None,
     gsc_snapshot: Optional[dict] = None,
     meta_snapshot: Optional[dict] = None,
+    meta_analysis: Optional[dict] = None,
     model: Optional[str] = None,
 ) -> dict:
     """Llama a OpenRouter con todo el contexto y devuelve el brief en dict."""
@@ -365,6 +387,7 @@ def call_llm(
         ga4_snapshot=ga4_snapshot,
         gsc_snapshot=gsc_snapshot,
         meta_snapshot=meta_snapshot,
+        meta_analysis=meta_analysis,
     )
 
     client = OpenAI(api_key=api_key, base_url=base_url)
@@ -412,7 +435,9 @@ def generate_brief() -> dict:
     alertas = get_alertas_analisis_ia_anterior()
     ga4_snapshot = get_ga4_snapshot_safe()
     gsc_snapshot = get_gsc_snapshot_safe()
-    meta_snapshot = get_meta_snapshot_safe(persist=True)
+    meta_bundle = get_meta_snapshot_safe(persist=True, with_analysis=True)
+    meta_snapshot = meta_bundle.get('snapshot') if meta_bundle else None
+    meta_analysis = meta_bundle.get('analysis') if meta_bundle else None
 
     brief = call_llm(
         semana_inicio=semana_inicio,
@@ -423,6 +448,7 @@ def generate_brief() -> dict:
         ga4_snapshot=ga4_snapshot,
         gsc_snapshot=gsc_snapshot,
         meta_snapshot=meta_snapshot,
+        meta_analysis=meta_analysis,
     )
 
     return {
@@ -434,5 +460,6 @@ def generate_brief() -> dict:
         'ga4_snapshot': ga4_snapshot,
         'gsc_snapshot': gsc_snapshot,
         'meta_snapshot': meta_snapshot,
+        'meta_analysis': meta_analysis,
         'metricas_disponibles': bool(ga4_snapshot or gsc_snapshot or meta_snapshot),
     }
