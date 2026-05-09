@@ -451,10 +451,10 @@ def get_reviews_resumen_safe() -> Optional[dict]:
         result = {}
 
         # Ultimo snapshot manual
-        last_snap = ReviewSnapshot.objects.order_by('-fecha_snapshot').first()
+        last_snap = ReviewSnapshot.objects.order_by('-fecha').first()
         if last_snap:
             result['snapshot'] = {
-                'fecha': last_snap.fecha_snapshot.isoformat(),
+                'fecha': last_snap.fecha.isoformat() if last_snap.fecha else None,
                 'google_rating': float(last_snap.google_rating) if last_snap.google_rating else None,
                 'google_total': last_snap.google_total,
                 'google_url': last_snap.google_url,
