@@ -490,8 +490,40 @@ def list_accessible_ad_accounts() -> list:
     return data.get("data", [])
 
 
+def _filter_relevant_campaigns(campaigns: list, days: int = 90) -> list:
+    """Filtra campañas relevantes para analisis: las creadas en ultimos `days`
+    O con status efectivo ACTIVE/PAUSED reciente. Excluye zombies de >90 dias
+    sin actividad. Esto evita inflar el JSON con campañas viejas vencidas
+    que no aportan al analisis.
+    """
+    from datetime import datetime, timedelta, timezone as dt_tz
+    cutoff = datetime.now(dt_tz.utc) - timedelta(days=days)
+    relevant = []
+    for c in campaigns:
+        try:
+            created = c.get("created_time", "")
+            if created:
+                # Parse ISO 8601 con offset timezone
+                created_dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                if created_dt >= cutoff:
+                    relevant.append(c)
+                    continue
+            # Si tiene spend > 0 en el periodo, igual incluir (campaña vieja activa)
+            if float(c.get("spend") or 0) > 0:
+                relevant.append(c)
+        except (ValueError, TypeError):
+            relevant.append(c)  # incluir si no pudimos parsear
+    return relevant
+
+
 def get_full_snapshot(days: int = 28) -> dict:
-    """Snapshot consolidado de Facebook + Instagram + Ads (TODAS las cuentas)."""
+    """Snapshot consolidado de Facebook + Instagram + Ads (TODAS las cuentas).
+
+    Las cuentas se ordenan por spend en el periodo descendente, asi las
+    cuentas con actividad real aparecen primero (importante para el analyzer
+    IA que trunca el JSON a N chars). Las campañas se filtran a las creadas
+    en los ultimos 90 dias o con spend > 0.
+    """
     snapshot = {"period_days": days, "errors": {}}
 
     try:
@@ -521,6 +553,9 @@ def get_full_snapshot(days: int = 28) -> dict:
         for acct in accounts:
             acct_id = acct.get("id")
             try:
+                campaigns = get_campaigns_summary(acct_id, limit=50)
+                # Filtrar campañas zombi de >90 dias sin actividad
+                relevant_campaigns = _filter_relevant_campaigns(campaigns, days=90)
                 snapshot["ads_accounts"].append({
                     "id": acct_id,
                     "name": acct.get("name"),
@@ -528,7 +563,9 @@ def get_full_snapshot(days: int = 28) -> dict:
                     "owner": acct.get("owner"),
                     "summary": get_ad_account_summary(acct_id),
                     "insights_period": get_ad_account_insights(acct_id, days=days),
-                    "campaigns": get_campaigns_summary(acct_id, limit=50),
+                    "campaigns": relevant_campaigns,
+                    "campaigns_total_count": len(campaigns),
+                    "campaigns_filtered_count": len(relevant_campaigns),
                 })
             except Exception as e:
                 snapshot["ads_accounts"].append({
@@ -537,6 +574,14 @@ def get_full_snapshot(days: int = 28) -> dict:
                     "_error": str(e),
                 })
                 logger.warning(f"Error capturando cuenta {acct_id}: {e}")
+
+        # Ordenar cuentas por spend del periodo descendente — las activas primero
+        def _spend_key(a: dict) -> float:
+            try:
+                return float(a.get("insights_period", {}).get("spend") or 0)
+            except (TypeError, ValueError):
+                return 0.0
+        snapshot["ads_accounts"].sort(key=_spend_key, reverse=True)
     except Exception as e:
         snapshot["errors"]["ads_accounts"] = str(e)
         logger.exception("Error listando cuentas publicitarias")

@@ -132,10 +132,12 @@ def analyze_snapshot(snapshot: dict, model: Optional[str] = None) -> dict:
 
     fecha_actual = date.today().isoformat()
 
+    # 30k chars cubre snapshots con multiples cuentas + filtro de campanas
+    # zombies activado (ver meta_reporter._filter_relevant_campaigns).
     user_prompt = (
         f"Fecha actual: {fecha_actual}\n\n"
         f"Snapshot de los ultimos {snapshot.get('period_days', 28)} dias:\n\n"
-        f"{json.dumps(snapshot, indent=2, ensure_ascii=False, default=str)[:18000]}"
+        f"{json.dumps(snapshot, indent=2, ensure_ascii=False, default=str)[:30000]}"
     )
 
     client = OpenAI(api_key=api_key, base_url=base_url)
