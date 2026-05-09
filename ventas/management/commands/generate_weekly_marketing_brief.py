@@ -86,6 +86,26 @@ class Command(BaseCommand):
             f'💰 Pipeline: {"✓" if result.get("pipeline_reservas") else "✗"}'
         )
 
+        # Diagnostico explicito del pipeline interno
+        pipe = result.get('pipeline_reservas') or {}
+        if pipe.get('_errores'):
+            self.stdout.write(self.style.WARNING('\n⚠️  Pipeline con errores parciales:'))
+            for err in pipe['_errores']:
+                self.stdout.write(f'   - {err}')
+        if pipe.get('_falla_total'):
+            self.stdout.write(self.style.ERROR('   ❌ FALLA TOTAL — ningún bloque produjo datos'))
+        if pipe and not pipe.get('_errores') and not pipe.get('_falla_total'):
+            us = pipe.get('ultima_semana', {})
+            um = pipe.get('ultimo_mes', {})
+            self.stdout.write(
+                f'   📊 Última semana: {us.get("creadas", 0)} creadas, {us.get("pagadas", 0)} pagadas, '
+                f'${int(us.get("total_facturado", 0)):,} CLP'
+            )
+            self.stdout.write(
+                f'   📊 Último mes: {um.get("creadas", 0)} creadas, {um.get("pagadas", 0)} pagadas, '
+                f'${int(um.get("total_facturado", 0)):,} CLP'
+            )
+
         brief = result['brief']
         markdown = render_brief_to_markdown(brief, result['semana_inicio'], result['semana_fin'])
 

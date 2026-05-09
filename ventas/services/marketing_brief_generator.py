@@ -127,6 +127,8 @@ INSTRUCCIONES PARA ANALIZAR:
 - anticipacion_reserva.promedio_dias dice con cuántos días de antelación reservan en promedio. Si baja a 1-2 días → la gente decide en el momento (priorizar paid de inmediatez); si sube a 7+ → planifican (priorizar contenido educativo + email).
 - disponibilidad_proxima_semana: reservas YA agendadas para los próximos 7 días. Si los servicios top están saturados, comunicar como "última disponibilidad". Si están vacíos, paid + descuento.
 - Si reservation_started en GA4 es muy superior a reservas_pagadas en pipeline (ej: 232 GA4 vs 55 BD), eso indica que la mayoría de las conversiones cierran fuera del web (WhatsApp, llamada). Mencionarlo como insight.
+- IMPORTANTE: si en los DATOS aparece la clave "_errores", MENCIONA EXPLICITAMENTE en una alerta operativa de la sección comercial: "Errores parciales del pipeline: <lista>". No inventes ni infiera datos faltantes; di "sin datos por error técnico" y ESCRIBE EL ERROR para que Jorge lo vea.
+- Si aparece "_falla_total: true", reporta como alerta crítica que el pipeline interno completo falló y NO uses datos derivados.
 
 DATOS:
 {json.dumps(pipeline_reservas, indent=2, ensure_ascii=False, default=str) if pipeline_reservas else '(no disponible)'}
@@ -603,41 +605,46 @@ def _detectar_packs(VentaReserva, ReservaServicio, since, until) -> dict:
 def get_pipeline_reservas_safe(days: int = 7) -> Optional[dict]:
     """Resumen comercial completo del pipeline Aremko.
 
-    Incluye:
-    - Última semana (7d) y último mes (30d) por separado
-    - Comparación 7d actual vs 7d anterior (tendencia)
-    - Análisis por familia de servicios (Tinas, Masajes, Alojamientos, Productos)
-    - Análisis de packs (2+ servicios) vs reservas simples
-    - Pack premium 3-en-1 (tina + masaje + alojamiento)
-    - Métodos de pago con detección de cambios (canales nuevos, ej: Flow recién aparece)
-    - Comportamiento cliente (recurrencia + top recurrentes)
-    - Anticipación promedio entre fecha_reserva y fecha_agendamiento
-    - Disponibilidad próximos 7 días (reservas confirmadas)
+    Cada bloque tiene su propio try/except para que un fallo aislado no
+    deje al brief sin TODOS los datos. Los errores parciales se exponen
+    en la clave '_errores' del output (visible en el brief).
     """
+    from datetime import timedelta
     try:
-        from datetime import timedelta
-        from django.db.models import Count, Sum, Avg, Q, F, ExpressionWrapper, DurationField
+        from django.db.models import Count, Sum, Avg
         from django.utils import timezone as dj_tz
-        from ..models import VentaReserva, Pago, PendingReservation, ReservaServicio, Cliente
+        from ..models import VentaReserva, Pago, PendingReservation, ReservaServicio
+    except Exception as exc:
+        logger.warning(f'No se pudo importar modelos para pipeline: {exc}', exc_info=True)
+        return {'_errores': [f'Imports fallaron: {exc}']}
 
-        ahora = dj_tz.now()
-        sem1_inicio = ahora - timedelta(days=7)        # ultima semana
-        sem2_inicio = ahora - timedelta(days=14)       # semana anterior
-        sem4_inicio = ahora - timedelta(days=30)       # ultimo mes
-        prox_semana = ahora + timedelta(days=7)
+    ahora = dj_tz.now()
+    sem1_inicio = ahora - timedelta(days=7)
+    sem2_inicio = ahora - timedelta(days=14)
+    sem4_inicio = ahora - timedelta(days=30)
+    prox_semana = ahora + timedelta(days=7)
 
-        # === Periodos ===
+    errores = []
+    out = {
+        'periodo_dias_default': 7,
+        'fecha_corte': ahora.isoformat(),
+    }
+
+    # === Bloque A: periodos agregados ===
+    try:
         ultima_semana = _agg_periodo(VentaReserva, Pago, ReservaServicio, sem1_inicio, ahora)
         semana_anterior = _agg_periodo(VentaReserva, Pago, ReservaServicio, sem2_inicio, sem1_inicio)
         ultimo_mes = _agg_periodo(VentaReserva, Pago, ReservaServicio, sem4_inicio, ahora)
+        sem3_atras = _agg_periodo(VentaReserva, Pago, ReservaServicio, sem4_inicio, sem1_inicio)
 
-        # === Tendencia 7d vs 7d anterior ===
         def _pct_change(actual, anterior):
             if not anterior:
                 return None
             return round((actual - anterior) / anterior * 100, 1)
 
-        tendencia = {
+        out['ultima_semana'] = ultima_semana
+        out['ultimo_mes'] = ultimo_mes
+        out['tendencia_7d_vs_anterior'] = {
             'reservas_creadas_pct': _pct_change(ultima_semana['creadas'], semana_anterior['creadas']),
             'reservas_pagadas_pct': _pct_change(ultima_semana['pagadas'], semana_anterior['pagadas']),
             'facturado_pct': _pct_change(ultima_semana['total_facturado'], semana_anterior['total_facturado']),
@@ -650,34 +657,53 @@ def get_pipeline_reservas_safe(days: int = 7) -> Optional[dict]:
             },
         }
 
-        # === Packs (última semana) ===
-        packs = _detectar_packs(VentaReserva, ReservaServicio, sem1_inicio, ahora)
-
-        # === Métodos de pago: detección de cambios de tendencia ===
+        # Métodos de pago con detección de cambios
         metodos_actual = ultima_semana['metodos_pago_count']
-        metodos_mes = ultimo_mes['metodos_pago_count']
-        # Detectar canales nuevos (presentes esta semana, ausentes en las 3 semanas previas)
-        sem3_atras = _agg_periodo(VentaReserva, Pago, ReservaServicio, sem4_inicio, sem1_inicio)
         metodos_3sem_previas = sem3_atras['metodos_pago_count']
         cambios_canales = []
         for metodo in metodos_actual:
-            count_actual = metodos_actual.get(metodo, 0)
-            count_previo = metodos_3sem_previas.get(metodo, 0)
-            if count_actual > 0 and count_previo == 0:
+            if metodos_actual.get(metodo, 0) > 0 and metodos_3sem_previas.get(metodo, 0) == 0:
                 cambios_canales.append(
-                    f"{metodo}: aparece esta semana ({count_actual} pagos), 0 las 3 semanas previas — CANAL NUEVO"
+                    f"{metodo}: aparece esta semana ({metodos_actual[metodo]} pagos), 0 las 3 semanas previas — CANAL NUEVO"
                 )
-        # Detectar canales que desaparecieron
         for metodo in metodos_3sem_previas:
             count_previo = metodos_3sem_previas.get(metodo, 0)
-            count_actual = metodos_actual.get(metodo, 0)
-            if count_actual == 0 and count_previo >= 3:
+            if metodos_actual.get(metodo, 0) == 0 and count_previo >= 3:
                 cambios_canales.append(
                     f"{metodo}: desaparece esta semana, tenia {count_previo} pagos las 3 semanas previas"
                 )
+        out['metodos_pago_analisis'] = {
+            'ultima_semana': metodos_actual,
+            'ultimo_mes': ultimo_mes['metodos_pago_count'],
+            'tres_semanas_previas': metodos_3sem_previas,
+            'cambios_detectados': cambios_canales,
+        }
+    except Exception as exc:
+        errores.append(f'periodos_agregados: {type(exc).__name__}: {exc}')
+        logger.warning(f'Pipeline bloque periodos fallo: {exc}', exc_info=True)
 
-        # === Comportamiento cliente ===
-        # Tasa recurrencia: % de reservas pagadas última semana cuyo cliente ya tenía 1+ reserva pagada antes
+    # === Bloque B: top servicios última semana ===
+    try:
+        out.setdefault('ultima_semana', {})['top_servicios'] = list(
+            ReservaServicio.objects
+            .filter(venta_reserva__fecha_reserva__gte=sem1_inicio, venta_reserva__estado_pago='pagado')
+            .values('servicio__nombre', 'servicio__categoria__nombre')
+            .annotate(c=Count('id'))
+            .order_by('-c')[:10]
+        )
+    except Exception as exc:
+        errores.append(f'top_servicios: {type(exc).__name__}: {exc}')
+        logger.warning(f'Pipeline bloque top_servicios fallo: {exc}', exc_info=True)
+
+    # === Bloque C: packs ===
+    try:
+        out['packs_ultima_semana'] = _detectar_packs(VentaReserva, ReservaServicio, sem1_inicio, ahora)
+    except Exception as exc:
+        errores.append(f'packs: {type(exc).__name__}: {exc}')
+        logger.warning(f'Pipeline bloque packs fallo: {exc}', exc_info=True)
+
+    # === Bloque D: comportamiento cliente (recurrencia + top recurrentes) ===
+    try:
         ventas_sem = VentaReserva.objects.filter(
             fecha_reserva__gte=sem1_inicio, fecha_reserva__lt=ahora,
             estado_pago='pagado',
@@ -693,8 +719,6 @@ def get_pipeline_reservas_safe(days: int = 7) -> Optional[dict]:
             if previas >= 1:
                 recurrentes_count += 1
         tasa_recurrencia = round(recurrentes_count / total_sem * 100, 1) if total_sem else 0
-
-        # Top clientes recurrentes últimos 30 días
         top_recurrentes = list(
             VentaReserva.objects
             .filter(fecha_reserva__gte=sem4_inicio, estado_pago='pagado', cliente__isnull=False)
@@ -703,9 +727,18 @@ def get_pipeline_reservas_safe(days: int = 7) -> Optional[dict]:
             .filter(reservas__gte=2)
             .order_by('-reservas', '-gasto')[:10]
         )
+        out['clientes'] = {
+            'tasa_recurrencia_ultima_semana_pct': tasa_recurrencia,
+            'recurrentes_ultima_semana': recurrentes_count,
+            'total_pagadas_ultima_semana': total_sem,
+            'top_recurrentes_ultimos_30d': top_recurrentes,
+        }
+    except Exception as exc:
+        errores.append(f'comportamiento_cliente: {type(exc).__name__}: {exc}')
+        logger.warning(f'Pipeline bloque clientes fallo: {exc}', exc_info=True)
 
-        # === Anticipación de reserva ===
-        # Diferencia entre fecha_reserva (cuando se creó la reserva) y fecha_agendamiento (cuando es el servicio)
+    # === Bloque E: anticipación de reserva ===
+    try:
         anticipacion_data = []
         for rs in ReservaServicio.objects.filter(
             venta_reserva__fecha_reserva__gte=sem1_inicio,
@@ -713,24 +746,27 @@ def get_pipeline_reservas_safe(days: int = 7) -> Optional[dict]:
         ).select_related('venta_reserva')[:200]:
             try:
                 fecha_creacion = rs.venta_reserva.fecha_reserva.date()
-                fecha_servicio = rs.fecha_agendamiento
-                diff = (fecha_servicio - fecha_creacion).days
+                diff = (rs.fecha_agendamiento - fecha_creacion).days
                 if diff >= 0:
                     anticipacion_data.append(diff)
             except Exception:
                 continue
-        anticipacion = {}
         if anticipacion_data:
-            anticipacion = {
+            out['anticipacion_reserva'] = {
                 'promedio_dias': round(sum(anticipacion_data) / len(anticipacion_data), 1),
                 'min_dias': min(anticipacion_data),
                 'max_dias': max(anticipacion_data),
                 'mediana_dias': sorted(anticipacion_data)[len(anticipacion_data) // 2],
                 'samples': len(anticipacion_data),
             }
+        else:
+            out['anticipacion_reserva'] = {}
+    except Exception as exc:
+        errores.append(f'anticipacion: {type(exc).__name__}: {exc}')
+        logger.warning(f'Pipeline bloque anticipacion fallo: {exc}', exc_info=True)
 
-        # === Disponibilidad próximos 7 días ===
-        # Reservas YA confirmadas para servicios entre hoy y hoy+7
+    # === Bloque F: disponibilidad próxima semana ===
+    try:
         reservas_proxima_semana = ReservaServicio.objects.filter(
             fecha_agendamiento__gte=ahora.date(),
             fecha_agendamiento__lte=prox_semana.date(),
@@ -747,69 +783,40 @@ def get_pipeline_reservas_safe(days: int = 7) -> Optional[dict]:
             .annotate(reservas=Count('id'))
             .order_by('-reservas')[:10]
         )
-
-        # === PendingReservation (abandonos Flow) ===
-        pending_qs = PendingReservation.objects.filter(created_at__gte=sem1_inicio)
-        pending_total = pending_qs.count()
-        pending_iniciados = pending_qs.filter(estado='iniciado').count()
-        pending_expirados = pending_qs.filter(estado='expirado').count()
-        pending_confirmados = pending_qs.filter(estado='confirmado').count()
-        pending_rechazados = pending_qs.filter(estado='rechazado').count()
-
-        # === Top servicios última semana ===
-        top_servicios = list(
-            ReservaServicio.objects
-            .filter(venta_reserva__fecha_reserva__gte=sem1_inicio, venta_reserva__estado_pago='pagado')
-            .values('servicio__nombre', 'servicio__categoria__nombre')
-            .annotate(c=Count('id'))
-            .order_by('-c')[:10]
-        )
-
-        return {
-            'periodo_dias_default': 7,
-            'fecha_corte': ahora.isoformat(),
-
-            'ultima_semana': {
-                **ultima_semana,
-                'top_servicios': top_servicios,
-            },
-            'ultimo_mes': ultimo_mes,
-            'tendencia_7d_vs_anterior': tendencia,
-
-            'packs_ultima_semana': packs,
-
-            'metodos_pago_analisis': {
-                'ultima_semana': metodos_actual,
-                'ultimo_mes': metodos_mes,
-                'tres_semanas_previas': metodos_3sem_previas,
-                'cambios_detectados': cambios_canales,
-            },
-
-            'clientes': {
-                'tasa_recurrencia_ultima_semana_pct': tasa_recurrencia,
-                'recurrentes_ultima_semana': recurrentes_count,
-                'total_pagadas_ultima_semana': total_sem,
-                'top_recurrentes_ultimos_30d': top_recurrentes,
-            },
-
-            'anticipacion_reserva': anticipacion,
-
-            'disponibilidad_proxima_semana': {
-                'reservas_confirmadas': reservas_proxima_semana,
-                'top_servicios_agendados': servicios_top_proxima_semana,
-            },
-
-            'flow_abandonos_ultima_semana': {
-                'pending_total': pending_total,
-                'iniciados_aun_no_pagados': pending_iniciados,
-                'expirados_sin_pago': pending_expirados,
-                'confirmados_pago_exitoso': pending_confirmados,
-                'rechazados': pending_rechazados,
-            },
+        out['disponibilidad_proxima_semana'] = {
+            'reservas_confirmadas': reservas_proxima_semana,
+            'top_servicios_agendados': servicios_top_proxima_semana,
         }
     except Exception as exc:
-        logger.warning(f'No se pudo obtener pipeline reservas: {exc}', exc_info=True)
-        return None
+        errores.append(f'disponibilidad: {type(exc).__name__}: {exc}')
+        logger.warning(f'Pipeline bloque disponibilidad fallo: {exc}', exc_info=True)
+
+    # === Bloque G: PendingReservation (abandonos Flow) ===
+    try:
+        pending_qs = PendingReservation.objects.filter(created_at__gte=sem1_inicio)
+        out['flow_abandonos_ultima_semana'] = {
+            'pending_total': pending_qs.count(),
+            'iniciados_aun_no_pagados': pending_qs.filter(estado='iniciado').count(),
+            'expirados_sin_pago': pending_qs.filter(estado='expirado').count(),
+            'confirmados_pago_exitoso': pending_qs.filter(estado='confirmado').count(),
+            'rechazados': pending_qs.filter(estado='rechazado').count(),
+        }
+    except Exception as exc:
+        errores.append(f'pending_flow: {type(exc).__name__}: {exc}')
+        logger.warning(f'Pipeline bloque pending_flow fallo: {exc}', exc_info=True)
+
+    if errores:
+        out['_errores'] = errores
+
+    # Si NINGUN bloque produjo datos, marcar como falla total
+    bloques_con_datos = [
+        k for k in out.keys()
+        if k not in ('_errores', 'periodo_dias_default', 'fecha_corte') and out.get(k)
+    ]
+    if not bloques_con_datos:
+        out['_falla_total'] = True
+
+    return out
 
 
 def get_ga4_snapshot_safe() -> Optional[dict]:
@@ -997,6 +1004,10 @@ def generate_brief() -> dict:
     reviews_resumen = get_reviews_resumen_safe()
     calendario_chile = get_calendario_chile_safe()
     pipeline_reservas = get_pipeline_reservas_safe(days=7)
+    if pipeline_reservas and pipeline_reservas.get('_errores'):
+        logger.warning(f'Pipeline interno con errores parciales: {pipeline_reservas["_errores"]}')
+    if pipeline_reservas and pipeline_reservas.get('_falla_total'):
+        logger.error(f'Pipeline interno FALLO TOTAL — todos los bloques erroneados')
 
     brief = call_llm(
         semana_inicio=semana_inicio,
