@@ -524,7 +524,9 @@ def _agg_periodo(VentaReserva, Pago, ReservaServicio, since, until) -> dict:
     creadas = ventas.count()
     pagadas_qs = ventas.filter(estado_pago='pagado')
     pagadas = pagadas_qs.count()
-    agg = pagadas_qs.aggregate(total=Sum('total'), avg=Avg('total'))
+    # Nota: usar alias distintos al nombre del campo para evitar
+    # FieldError "Cannot compute Avg('total'): 'total' is an aggregate"
+    agg = pagadas_qs.aggregate(suma_total=Sum('total'), promedio_total=Avg('total'))
 
     # Por categoria de servicio
     categorias = list(
@@ -544,8 +546,8 @@ def _agg_periodo(VentaReserva, Pago, ReservaServicio, since, until) -> dict:
         'creadas': creadas,
         'pagadas': pagadas,
         'tasa_conversion_pct': round(pagadas / creadas * 100, 1) if creadas else 0,
-        'total_facturado': float(agg['total'] or 0),
-        'ticket_promedio': float(agg['avg'] or 0),
+        'total_facturado': float(agg['suma_total'] or 0),
+        'ticket_promedio': float(agg['promedio_total'] or 0),
         'por_categoria': categorias,
         'metodos_pago_count': metodos,
         'metodos_pago_total_transacciones': metodos_total,
