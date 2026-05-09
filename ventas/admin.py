@@ -57,6 +57,9 @@ from .models import (
     PendingReservation,
     # Snapshots Meta (FB + IG + Ads)
     MetaSnapshot,
+    # Brief semanal: cache analisis encuestas + objetivo de la semana
+    WeeklySurveyAnalysis,
+    WeeklyObjective,
 )
 from django.http import HttpResponse
 import xlwt
@@ -4757,3 +4760,63 @@ class MetaSnapshotAdmin(admin.ModelAdmin):
         except Exception as e:
             dj_messages.error(request, f'Error capturando snapshot: {e}')
             return redirect(reverse('admin:ventas_metasnapshot_changelist'))
+
+
+@admin.register(WeeklySurveyAnalysis)
+class WeeklySurveyAnalysisAdmin(admin.ModelAdmin):
+    """Cache del analisis IA semanal de encuestas. Read-only — se persiste
+    automaticamente cuando corre `analyze_surveys_weekly` los lunes 9 AM."""
+    list_display = ('id', 'semana_inicio', 'semana_fin', 'encuestas_count', 'nps_promedio', 'created_at')
+    list_filter = ('semana_inicio',)
+    readonly_fields = (
+        'semana_inicio', 'semana_fin', 'encuestas_count', 'nps_promedio',
+        'datos_pretty', 'created_at',
+    )
+    fields = (
+        'semana_inicio', 'semana_fin', 'encuestas_count', 'nps_promedio',
+        'created_at', 'datos_pretty',
+    )
+    ordering = ('-created_at',)
+
+    def datos_pretty(self, obj):
+        from django.utils.html import format_html
+        import json
+        try:
+            pretty = json.dumps(obj.datos, indent=2, ensure_ascii=False)
+        except Exception:
+            pretty = str(obj.datos)
+        return format_html(
+            '<pre style="max-height:600px;overflow:auto;font-size:11px;'
+            'background:#f5f5f5;padding:10px;border-radius:4px;">{}</pre>',
+            pretty,
+        )
+    datos_pretty.short_description = 'Datos JSON (analisis IA)'
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(WeeklyObjective)
+class WeeklyObjectiveAdmin(admin.ModelAdmin):
+    """Objetivo de la semana editable. Jorge crea/actualiza un registro
+    cada domingo (o lunes muy temprano antes del cron de las 10 AM).
+
+    El brief semanal lee el ultimo objetivo de la semana en curso y lo
+    usa como input central para el LLM.
+    """
+    list_display = ('semana_inicio', 'objetivo_excerpt', 'updated_at')
+    list_filter = ('semana_inicio',)
+    readonly_fields = ('created_at', 'updated_at')
+    fields = ('semana_inicio', 'objetivo', 'created_at', 'updated_at')
+    ordering = ('-semana_inicio',)
+
+    def objetivo_excerpt(self, obj):
+        return (obj.objetivo or '')[:120] + ('...' if len(obj.objetivo or '') > 120 else '')
+    objetivo_excerpt.short_description = 'Objetivo (extracto)'
+
+    def get_changeform_initial_data(self, request):
+        """Pre-rellena semana_inicio con el lunes de la semana actual."""
+        from datetime import date, timedelta
+        hoy = date.today()
+        lunes = hoy - timedelta(days=hoy.weekday())
+        return {'semana_inicio': lunes}

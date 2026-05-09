@@ -18,6 +18,7 @@ import json
 import logging
 from datetime import timedelta
 from collections import Counter
+from typing import Optional
 
 from django.conf import settings
 from django.utils import timezone
@@ -364,6 +365,32 @@ def analyze_week(days: int = 7, end_date=None) -> dict:
                         reviews_snapshot=reviews_snapshot,
                         reviews_recientes=reviews_recientes)
 
+    # Persistir resultado para que el brief semanal lo pueda leer
+    # (resuelve gap: get_alertas_analisis_ia_anterior() en el brief antes
+    # retornaba None y se perdia toda la inteligencia cualitativa).
+    try:
+        from ventas.models import WeeklySurveyAnalysis
+        # Calcular semana_inicio = lunes de la semana del end_date
+        end_date_only = end_date.date() if hasattr(end_date, 'date') else end_date
+        semana_fin = end_date_only
+        semana_inicio = semana_fin - timedelta(days=semana_fin.weekday())
+
+        WeeklySurveyAnalysis.objects.create(
+            semana_inicio=semana_inicio,
+            semana_fin=semana_inicio + timedelta(days=6),
+            encuestas_count=total,
+            nps_promedio=stats.get('nps_promedio') if isinstance(stats, dict) else None,
+            datos={
+                'stats': stats,
+                'analisis': analisis,
+                'reviews_snapshot': reviews_snapshot,
+                'reviews_recientes_count': len(reviews_recientes),
+            },
+        )
+        logger.info(f'WeeklySurveyAnalysis persistido para semana {semana_inicio}')
+    except Exception as exc:
+        logger.warning(f'No se pudo persistir WeeklySurveyAnalysis: {exc}')
+
     return {
         'periodo_inicio': start_date,
         'periodo_fin': end_date,
@@ -375,6 +402,30 @@ def analyze_week(days: int = 7, end_date=None) -> dict:
         'reviews_snapshot': reviews_snapshot,
         'reviews_recientes_count': len(reviews_recientes),
     }
+
+
+def get_latest_analysis() -> Optional[dict]:
+    """Devuelve el ultimo analisis semanal de encuestas persistido.
+
+    Usado por el brief semanal (lunes 10 AM) para leer el analisis del
+    mismo lunes 9 AM.
+    """
+    try:
+        from ventas.models import WeeklySurveyAnalysis
+        latest = WeeklySurveyAnalysis.objects.order_by('-created_at').first()
+        if not latest:
+            return None
+        return {
+            'semana_inicio': latest.semana_inicio.isoformat(),
+            'semana_fin': latest.semana_fin.isoformat(),
+            'encuestas_count': latest.encuestas_count,
+            'nps_promedio': latest.nps_promedio,
+            'datos': latest.datos,
+            'edad_horas': (timezone.now() - latest.created_at).total_seconds() / 3600,
+        }
+    except Exception as exc:
+        logger.warning(f'No se pudo leer ultimo WeeklySurveyAnalysis: {exc}')
+        return None
 
 
 def get_followups_pendientes(days: int = 7):

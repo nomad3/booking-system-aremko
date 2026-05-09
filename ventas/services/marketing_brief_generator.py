@@ -39,24 +39,38 @@ def _read_doc(rel_path: str) -> str:
         return ''
 
 
-SYSTEM_PROMPT = """Eres el director de marketing de Aremko Spa Boutique \
-(Puerto Varas, Chile). Cada lunes generas un brief operativo con drafts \
-listos para que Jorge solo copie/pegue y publique durante la semana.
+SYSTEM_PROMPT = """Eres el director de marketing y planificación comercial de Aremko Spa Boutique (Puerto Varas, Chile). Cada lunes 10 AM generas el brief semanal — el documento maestro que ordena el trabajo de toda la semana para Jorge (dueño), Daniela (manager de redes) y el equipo.
 
-CONTEXTO MAESTRO: el playbook que se incluye en el user prompt es la única \
-fuente de verdad sobre voz de marca, buyer personas, cadencia, frases ancla, \
-hooks de Víctor Eras y palabras prohibidas. Respétalo siempre.
+NATURALEZA DEL BRIEF: el brief NO es un calendario simple. Es un análisis ejecutivo + diagnóstico cruzado de TODAS las fuentes de datos del negocio (web, redes, paid, encuestas, reviews, pipeline comercial) + planificación operativa concreta + drafts listos para copiar/pegar. Su rol: que cualquier persona del equipo Aremko que lo abra el lunes en la mañana entienda el estado del negocio y sepa exactamente qué tiene que hacer cada día.
+
+ESTRUCTURA OBLIGATORIA: el output debe empezar siempre con un RESUMEN EJECUTIVO de máximo 6-8 frases que cualquiera pueda leer en 60 segundos. Después, secciones extensas y detalladas. La regla es: corto arriba para que el dueño tome decisiones rápido, largo abajo para que el equipo operativo no necesite preguntar nada.
+
+CONTEXTO MAESTRO:
+- Playbook (incluido abajo): voz de marca, 3 buyer personas, 8 diferenciales priorizados, frases ancla, hooks Víctor Eras, palabras prohibidas. Es la fuente de verdad inviolable.
+- Calendario Chile: feriados, fechas comerciales, temporadas turísticas. Usar para anticipar.
+- Objetivo de la semana (si Jorge lo escribió): es la PRIORIDAD #1, todo el contenido de la semana debe servir a ese objetivo.
 
 REGLAS DE PRODUCCIÓN DE COPY:
 - Voz Aremko: honesta, específica, sin marketing inflado
+- Español latinoamericano (NUNCA voseo argentino: usar "tú", "puedes", "quieres", no "vos podés")
 - NUNCA usar "experiencia única", "magia", "momentos inolvidables" en mayúscula
 - Frases ancla a usar cuando aplique: "2 días aquí equivalen a una semana de vacaciones", "no usamos leña", "37°C o menos = gratis", "a metros del río Pescado"
 - Para Reels: estructura 5 partes (gancho 4-7s · contexto · moraleja · solución · CTA con palabra clave)
 - Citar texto real del cliente cuando esté disponible (mejor que copy inventado)
 - UTMs siempre en links: el playbook tiene la convención
+- Cada draft debe tener estimación de tiempo de producción (ej: "30 min Daniela") y responsable
 
-FORMATO DE OUTPUT: JSON estricto sin markdown ni texto adicional. \
-Estructura especificada en el user prompt."""
+ANÁLISIS CRUZADO REQUERIDO:
+- Cruzar siempre Voz del Cliente (encuestas + reviews) con datos de tráfico web (GA4) y redes (Meta) para identificar gaps específicos
+- Si una keyword sube en GSC pero no convierte → revisar contenido de la página de aterrizaje
+- Si los reviews mencionan algo positivo recurrente → convertir en hook de contenido
+- Si los reviews mencionan algo negativo → alerta operativa Y oportunidad de mostrar mejora pública
+- Si hay paid corriendo con costo por interacción alto → proponer cambio específico (objective, segmentación, creativo)
+- Si el pipeline de reservas muestra disponibilidad concreta → vincularla a contenido de la semana
+
+EXTENSIÓN DEL OUTPUT: NO hay límite de longitud. El brief debe ser todo lo extenso que sea necesario. Si una sección requiere 1000 palabras, son 1000 palabras. Lo único que está prohibido es relleno vacío (frases que no agregan información).
+
+FORMATO DE OUTPUT: JSON estricto sin markdown ni texto adicional. Estructura completa especificada en el user prompt."""
 
 
 def build_user_prompt(
@@ -71,25 +85,41 @@ def build_user_prompt(
     gsc_snapshot: Optional[dict] = None,
     meta_snapshot: Optional[dict] = None,
     meta_analysis: Optional[dict] = None,
+    objetivo_semana: Optional[dict] = None,
+    reviews_resumen: Optional[dict] = None,
+    calendario_chile: Optional[str] = None,
+    pipeline_reservas: Optional[dict] = None,
 ) -> str:
     """Construye el user prompt con toda la info contextual."""
 
     return f"""Genera el brief de marketing para la semana del {semana_inicio.strftime('%d %b %Y')} al {semana_fin.strftime('%d %b %Y')}.
 
-=== PLAYBOOK MAESTRO (tu fuente de verdad) ===
-{playbook[:8000]}
+=== OBJETIVO DEFINIDO POR JORGE PARA ESTA SEMANA ===
+{(f"Semana del {objetivo_semana['semana_inicio']} (vigencia: {'semana actual' if objetivo_semana.get('es_de_semana_actual') else 'semana anterior — Jorge no lo actualizó'}):" + chr(10) + chr(10) + objetivo_semana['objetivo']) if objetivo_semana else '(Jorge NO definió objetivo para esta semana — usar diagnóstico cruzado para inferir prioridades, mencionar la falta del objetivo en la sección de recordatorios)'}
+
+=== PLAYBOOK MAESTRO (tu fuente de verdad inviolable) ===
+{playbook[:10000]}
 
 === CADENCIA OPERATIVA (qué se publica cada día) ===
-{recurring_tasks[:3000]}
+{recurring_tasks[:3500]}
 
-=== FRASES REALES DE CLIENTES PROMOTORES (últimos 30 días) ===
-{json.dumps(frases_clientes[:15], indent=2, ensure_ascii=False)}
+=== CALENDARIO CHILE (feriados + fechas comerciales + temporadas) ===
+{(calendario_chile[:6000]) if calendario_chile else '(no disponible — usar conocimiento general de feriados Chile y temporadas turísticas Puerto Varas)'}
+
+=== FRASES REALES DE CLIENTES PROMOTORES (NPS>=9, últimos 30 días) ===
+{json.dumps(frases_clientes[:20], indent=2, ensure_ascii=False)}
+
+=== ANÁLISIS IA ENCUESTAS (resumen del último análisis del lunes 9 AM) ===
+{json.dumps(alertas_analisis_ia, indent=2, ensure_ascii=False, default=str)[:6000] if alertas_analisis_ia else '(no disponible — el análisis IA semanal de encuestas no corrió esta semana o no se persistió)'}
+
+=== REVIEWS EXTERNAS (TripAdvisor + Google Reviews) ===
+{json.dumps(reviews_resumen, indent=2, ensure_ascii=False, default=str)[:5000] if reviews_resumen else '(no disponible)'}
+
+=== PIPELINE COMERCIAL (últimos 7 días: reservas, pagos, abandonos, top servicios) ===
+{json.dumps(pipeline_reservas, indent=2, ensure_ascii=False, default=str) if pipeline_reservas else '(no disponible)'}
 
 === BLOG POSTS RECIENTES (no repetir temas, sí reciclar conceptos) ===
 {json.dumps(blog_posts_recientes, indent=2, ensure_ascii=False, default=str)}
-
-=== ANÁLISIS IA SEMANA PASADA (insights operativos a aprovechar) ===
-{json.dumps(alertas_analisis_ia, indent=2, ensure_ascii=False) if alertas_analisis_ia else '(no disponible)'}
 
 === GA4 (sitio web aremko.cl) — ÚLTIMOS 7 DÍAS vs 7 ANTERIORES ===
 {json.dumps(ga4_snapshot, indent=2, ensure_ascii=False, default=str) if ga4_snapshot else '(no disponible)'}
@@ -97,100 +127,203 @@ def build_user_prompt(
 === GOOGLE SEARCH CONSOLE (búsqueda orgánica) — ÚLTIMOS 7 DÍAS vs 7 ANTERIORES ===
 {json.dumps(gsc_snapshot, indent=2, ensure_ascii=False, default=str) if gsc_snapshot else '(no disponible)'}
 
-=== META: FACEBOOK + INSTAGRAM ORGÁNICO + ADS HISTORY (últimos 28 días) ===
-{json.dumps(meta_snapshot, indent=2, ensure_ascii=False, default=str)[:6000] if meta_snapshot else '(no disponible — token Meta no configurado o falló la captura)'}
+=== META: FACEBOOK + INSTAGRAM ORGÁNICO + ADS (últimos 28 días, todas las cuentas) ===
+{json.dumps(meta_snapshot, indent=2, ensure_ascii=False, default=str)[:8000] if meta_snapshot else '(no disponible)'}
 
-=== ANÁLISIS IA META PRE-PROCESADO (resumen ejecutivo, alertas, oportunidades, acciones) ===
-{json.dumps(meta_analysis, indent=2, ensure_ascii=False, default=str)[:6000] if meta_analysis else '(no disponible — el análisis IA del snapshot Meta no se pudo generar)'}
+=== ANÁLISIS IA META PRE-PROCESADO (alertas + oportunidades + acciones) ===
+{json.dumps(meta_analysis, indent=2, ensure_ascii=False, default=str)[:6000] if meta_analysis else '(no disponible)'}
 
-=== TU OUTPUT (JSON estricto) ===
+=== TU OUTPUT (JSON estricto, sin markdown) ===
 
 {{
-  "resumen_semana": "2-3 frases sobre el foco de la semana, qué amplificar, qué evitar",
-  "calendario": [
-    {{"dia": "Lunes", "fecha": "DD/MM", "publicaciones": [
-      {{"canal": "GBP", "hora": "10:30", "tipo": "post novedad", "estado": "draft listo abajo"}}
-    ]}},
-    {{"dia": "Martes", "fecha": "DD/MM", "publicaciones": [
-      {{"canal": "Instagram", "hora": "18:00", "tipo": "Reel", "estado": "guion abajo"}}
-    ]}}
+  "resumen_ejecutivo": {{
+    "semana_referencia": "DD-mm-YYYY al DD-mm-YYYY",
+    "headline": "1 frase: el dato/decisión más importante de esta semana, lo que hay que entender en 5 segundos",
+    "puntos_clave": [
+      "4-6 bullets críticos que cualquiera del equipo debe saber: estado del negocio + lo que hay que hacer + por qué importa. Cada bullet 1-2 frases máximo. Concretos, con números reales del snapshot."
+    ],
+    "objetivo_de_la_semana": "Texto del objetivo definido por Jorge (literal). Si no hay, escribir '(no definido — recordar a Jorge que lo escriba en /admin/ventas/weeklyobjective/add/)'",
+    "alerta_critica_si_existe": "Solo si hay algo URGENTE que requiere acción inmediata (caída de tráfico, review negativo grave, campaña paid con costo descontrolado). Si no hay, omitir este campo o poner null."
+  }},
+
+  "fechas_clave_proximas_4_semanas": [
+    {{"fecha": "DD-mm-YYYY", "evento": "...", "implicancia_marketing": "qué hay que hacer al respecto"}}
   ],
-  "drafts": {{
+
+  "diagnostico_extenso": {{
+    "voz_del_cliente": {{
+      "sentimiento_general": "Análisis del NPS, encuestas y reviews de la semana. Cita textual de 2-3 clientes.",
+      "alertas_operativas": [
+        {{"alerta": "...", "fuente": "encuesta|review|llamada", "frecuencia": "cuántas veces apareció", "accion_sugerida": "..."}}
+      ],
+      "oportunidades_de_contenido": [
+        "Cosas positivas que mencionan clientes y se pueden convertir en hooks de Reels/posts"
+      ],
+      "follow_ups_urgentes_count": "Número de encuestas con NPS bajo pendientes de contacto"
+    }},
+
+    "redes_sociales": {{
+      "facebook_diagnostico": "Análisis extenso de FB: cantidad de posts, engagement total, top post del periodo, comparación con semana anterior si hay datos. Mínimo 4-5 frases. Identificar qué funcionó y qué no.",
+      "instagram_diagnostico": "Análisis extenso de IG: alcance, ratio alcance/followers, follower growth, top media del periodo, frecuencia de publicación. Mínimo 4-5 frases.",
+      "paid_ads_diagnostico": "Análisis extenso de paid ads: cuántas campañas activas en TODAS las cuentas, inversión total CLP del periodo, costo por interacción, conversiones. Si hay objetivo desalineado (ej: LINK_CLICKS hacia WhatsApp), MENCIONARLO. Mínimo 5-6 frases.",
+      "comparacion_organico_vs_paid": "Cuánto del engagement total viene de paid vs orgánico. Si paid genera 95% del engagement, mencionarlo explícitamente con números.",
+      "top_3_aprendizajes_de_contenido": [
+        "Insight 1 sobre qué tipo de contenido rinde mejor con datos concretos",
+        "Insight 2",
+        "Insight 3"
+      ]
+    }},
+
+    "web_y_seo": {{
+      "trafico_resumen": "Análisis extenso de GA4 últimos 7 días vs anteriores. Mínimo 4 frases con números. Mencionar fuentes de tráfico, top páginas, eventos custom (whatsapp_click, reservation_started, reservation_completed).",
+      "embudo_reservas": "Tasa de reservation_started → reservation_completed. Si hay caída, alerta. Si subió, celebrar.",
+      "seo_resumen": "Análisis extenso de GSC. Top queries, posiciones, CTR. Identificar queries con CTR bajo en buena posición (oportunidad rápida) y queries en posición 11-20 (oportunidad de subir a top 10).",
+      "top_3_acciones_seo_esta_semana": [
+        "Acción específica 1 — qué página, qué keyword, qué cambio",
+        "Acción 2",
+        "Acción 3"
+      ]
+    }},
+
+    "comercial_y_pipeline": {{
+      "reservas_resumen": "Cuántas reservas se crearon, cuántas pagaron, ticket promedio CLP, top servicios. Mínimo 4 frases con números reales.",
+      "tasa_conversion_pago": "% reservas pagadas vs creadas, comparar con histórico si se infiere",
+      "abandonos_flow": "Cuántos PendingReservation expiraron sin pago, qué dice eso del checkout",
+      "servicios_top": "Lista 3-5 servicios más reservados de la semana con cantidad",
+      "implicancia_comunicacional": "Si tinas se vendieron más que masajes esta semana, comunicar tinas. Si hay disponibilidad puntual de cabaña X para próximo fin de semana, comunicarla."
+    }}
+  }},
+
+  "calendario_semanal": [
+    {{"dia": "Lunes", "fecha": "DD/MM", "publicaciones": [
+      {{"canal": "GBP|Facebook|Instagram|Stories|Email|WhatsApp Broadcast", "hora": "10:30", "tipo": "post|reel|carrusel|story|email", "concepto_corto": "qué se publica", "estado": "draft listo en sección drafts"}}
+    ]}},
+    {{"dia": "Martes", "fecha": "DD/MM", "publicaciones": []}},
+    {{"dia": "Miércoles", "fecha": "DD/MM", "publicaciones": []}},
+    {{"dia": "Jueves", "fecha": "DD/MM", "publicaciones": []}},
+    {{"dia": "Viernes", "fecha": "DD/MM", "publicaciones": []}},
+    {{"dia": "Sábado", "fecha": "DD/MM", "publicaciones": []}},
+    {{"dia": "Domingo", "fecha": "DD/MM", "publicaciones": []}}
+  ],
+
+  "drafts_completos": {{
     "gbp_post": {{
-      "texto": "Copy listo para pegar (max 1500 chars)",
-      "url_cta": "URL con UTM aplicado",
-      "foto_sugerida": "Descripción de la foto a usar"
+      "necesario_esta_semana": true,
+      "responsable": "Daniela",
+      "tiempo_estimado": "20 min",
+      "texto": "Copy listo para pegar en Google Business Profile (max 1500 chars)",
+      "url_cta": "URL con UTM completo",
+      "foto_sugerida": "Descripción detallada de la foto a usar y de dónde sacarla (galería propia, foto del día, etc.)"
     }},
     "reel_martes": {{
+      "necesario_esta_semana": true,
+      "responsable": "Daniela",
+      "tiempo_estimado": "1.5 horas (grabación + edición + caption)",
       "concepto": "Idea ganadora en 1 frase",
-      "filtro_5_50": "explicar por qué pasa el filtro Víctor Eras (simple para 5 años + atrae a 50/100)",
+      "filtro_5_50": "Por qué pasa el filtro Víctor Eras (simple para 5 años + atrae a 50)",
+      "duracion_objetivo_segundos": 30,
       "guion": [
-        {{"bloque": "gancho_5s", "texto": "Frase exacta a decir o mostrar"}},
+        {{"bloque": "gancho_5s", "texto": "Frase exacta a decir o mostrar — debe ser hookcable"}},
         {{"bloque": "contexto_15s", "texto": "..."}},
         {{"bloque": "moraleja_10s", "texto": "..."}},
         {{"bloque": "solucion_5s", "texto": "..."}},
         {{"bloque": "cta_palabra_clave", "texto": "Comenta TINAS y te paso..."}}
       ],
-      "tomas_sugeridas": ["Toma 1: ...", "Toma 2: ..."],
-      "hashtags": ["#hashtag1", "#hashtag2", "..."]
+      "tomas_sugeridas": [
+        "Toma 1: descripción específica con encuadre",
+        "Toma 2: ...",
+        "Toma 3: ..."
+      ],
+      "audio_sugerido": "Sonido del río Pescado real | música de tendencia | voz en off",
+      "caption_completo": "Caption listo para pegar (max 2200 chars)",
+      "hashtags": ["#hashtag1", "#hashtag2", "#PuertoVaras", "#sur de Chile"]
     }},
     "carrusel_miercoles": {{
+      "necesario_esta_semana": true,
+      "responsable": "Daniela",
+      "tiempo_estimado": "2 horas",
       "concepto": "...",
+      "numero_de_slides": 6,
       "slides": [
-        {{"numero": 1, "imagen_sugerida": "...", "texto_overlay": "...", "caption_solo_si_aplica": ""}}
+        {{"numero": 1, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "hook"}},
+        {{"numero": 2, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "desarrollo"}}
       ],
-      "caption_completo": "Caption del post completo"
+      "caption_completo": "Caption del post completo (max 2200 chars)"
     }},
     "reel_jueves": {{
-      "concepto": "Variación del Reel del martes si pasa RI 50%, o idea nueva",
+      "necesario_esta_semana": true,
+      "responsable": "Daniela",
+      "tiempo_estimado": "1.5 horas",
+      "concepto": "Variación del Reel del martes si pasó RI 50%, o idea nueva",
       "guion": [],
       "tomas_sugeridas": [],
+      "audio_sugerido": "",
+      "caption_completo": "",
       "hashtags": []
     }},
+    "stories_diarias": [
+      {{"dia": "Lunes", "concepto": "...", "tipo": "detrás de escena|datos del día|naturaleza|cliente real|recordatorio práctico|encuesta", "texto_sugerido": "..."}},
+      {{"dia": "Martes", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
+      {{"dia": "Miércoles", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
+      {{"dia": "Jueves", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
+      {{"dia": "Viernes", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
+      {{"dia": "Sábado", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
+      {{"dia": "Domingo", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}}
+    ],
     "email_engaged": {{
       "necesario_esta_semana": true,
+      "responsable": "Jorge",
+      "tiempo_estimado": "30 min",
       "asunto": "...",
       "preheader": "...",
-      "cuerpo_texto_plano": "..."
+      "cuerpo_html_resumen": "Estructura del email (no HTML completo, sino qué bloques: hero, párrafo intro, CTA, bloque secundario, footer)",
+      "cuerpo_texto_plano_completo": "Versión texto plano del email completo",
+      "segmento_destinatario": "Engaged (clic+open en últimos 90 días)|Toda la lista|Recientes 30d"
+    }},
+    "post_blog_si_aplica": {{
+      "necesario_esta_semana": false,
+      "responsable": "Jorge con skill /blog-aremko",
+      "tema_sugerido": "Si aplica, qué post del blog escribir esta semana basado en GSC top queries y huecos editoriales"
     }}
   }},
-  "stories_diarias": [
-    {{"dia": "Lunes", "concepto": "...", "tipo": "detrás de escena|datos del día|naturaleza|cliente real|recordatorio práctico"}},
-    {{"dia": "Martes", "concepto": "...", "tipo": "..."}}
+
+  "ideas_contenido_proximas_2_semanas": [
+    {{"semana": "siguiente", "tema": "...", "tipo": "Reel|Carrusel|Post blog|Email", "razon": "Por qué este tema"}}
   ],
-  "recordatorios": ["Lista de cosas a no olvidar esta semana"],
-  "metricas_a_revisar_viernes": ["Lista de métricas para evaluar al cierre de semana"],
-  "analisis_metricas_semana": {{
-    "resumen_trafico": "2-3 frases sobre GA4: sesiones, usuarios, conversiones, comparado a semana anterior. Si hay caída/subida fuerte, mencionar causa probable.",
-    "top_insights_ga4": [
-      "Insight 1: dato concreto + interpretación (ej: 'WhatsApp clicks subieron 35% pero phone_clicks cayó 50%, posible drop en visibilidad del CTA telefónico móvil')"
-    ],
-    "top_insights_gsc": [
-      "Insight 1: query/página con cambio relevante (ej: 'tina caliente puerto varas escaló de pos 8 a pos 4, urgente reforzar contenido en /tinas/')"
-    ],
-    "acciones_de_metricas": [
-      "Acción concreta sugerida basada en datos (ej: 'crear post GBP esta semana con keyword tina caliente puerto varas porque GSC muestra que es la query nº1 con CTR bajo')"
-    ],
-    "insights_meta_organico": [
-      "Insight sobre Facebook orgánico (alcance/engagement de la página, top posts del periodo) si meta_snapshot está disponible"
-    ],
-    "insights_meta_instagram": [
-      "Insight sobre Instagram orgánico (followers, alcance, top media) si meta_snapshot está disponible"
-    ],
-    "insights_meta_ads": [
-      "Insight del histórico de campañas paid (39 campañas Aremko) si meta_snapshot está disponible. Si actualmente no hay campañas activas, mencionarlo y sugerir si conviene reactivar."
-    ]
-  }}
+
+  "acciones_paid_ads_recomendadas": [
+    {{"accion": "Pausar campaña X|Crear nueva con objective Y|Cambiar segmentación de Z", "responsable": "Jorge|Daniela", "esfuerzo": "bajo|medio|alto", "razon": "Datos concretos del snapshot Meta", "metrica_a_mover": "..."}}
+  ],
+
+  "alertas_operativas_no_marketing": [
+    "Cosas que detectamos en encuestas/reviews que NO son marketing pero importan (temperatura tina, limpieza, atención). Si Jorge no las resuelve operativamente, el marketing no funciona."
+  ],
+
+  "metricas_a_revisar_viernes": [
+    "Lista específica de métricas para evaluar al cierre de la semana. Cada una con valor objetivo si aplica."
+  ],
+
+  "preguntas_abiertas_para_jorge": [
+    "Cosas que el LLM detectó pero necesita decisión humana. Ej: '¿Querés que pausemos la campaña X que tiene CPC alto, o le damos 1 semana más?'"
+  ],
+
+  "recordatorios": [
+    "Cosas operativas a no olvidar (renovar token Meta si aplica, actualizar objetivo de la semana en admin, etc.)"
+  ]
 }}
 
 REGLAS DE GENERACIÓN:
-- Si la frase ancla 2-días-equivalen no se usó la semana anterior, incluirla en algún draft
-- Si hay alerta operativa pendiente del análisis IA pasado, evitar contenido que la contradiga
-- Si una frase real de cliente promotor calza con el tipo de Reel, USARLA literal (mejor que inventar)
-- Si Email engaged no se justifica esta semana (poco contenido nuevo), poner necesario_esta_semana: false
-- Mantener concretitud: nada de "publicar contenido relevante", siempre un draft con copy real
-- Si GA4/GSC no están disponibles, dejar analisis_metricas_semana con strings que digan "(sin datos esta semana)"
-- Las acciones de métricas deben ser específicas: nombrar la página, query o evento concreto"""
+- El RESUMEN EJECUTIVO debe ser corto. El resto puede ser todo lo extenso necesario.
+- Si Jorge definió objetivo de la semana, todo el contenido y las acciones DEBEN servir a ese objetivo. Es prioridad #1.
+- Si la frase ancla "2 días equivalen a una semana de vacaciones" no se usó la semana anterior, incluirla en algún draft.
+- Si una frase real de cliente promotor calza con el tipo de Reel, USARLA literal.
+- Si Email engaged no se justifica esta semana, poner necesario_esta_semana: false con explicación breve.
+- Si un canal/dato no está disponible, poner "(sin datos)" en el campo y NO inventar.
+- Las acciones de métricas deben ser específicas: nombrar página/query/evento concreto.
+- En español latinoamericano. NO voseo argentino bajo ninguna circunstancia.
+- Si hay paid corriendo con objective desalineado al embudo (ej: LINK_CLICKS hacia WhatsApp), MENCIONARLO en alertas y proponer cambio en acciones_paid_ads_recomendadas.
+- Cruzar datos: si GSC dice que "tinas calientes puerto varas" subió de pos 8 a pos 4 Y reviews mencionan "el sonido del río", hacer un Reel sobre tinas con audio del río — datos cruzados generan acciones específicas.
+"""
 
 
 def get_frases_clientes_promotores(days: int = 30) -> list:
@@ -259,10 +392,182 @@ def _strip_markdown_fences(raw: str) -> str:
 def get_alertas_analisis_ia_anterior() -> Optional[dict]:
     """Devuelve el último análisis IA de encuestas para que el brief lo considere.
 
-    Por ahora retorna None (no persistimos el análisis previo en BD).
-    Si en futuro se persiste, devolver dict con resumen + alertas + ideas.
+    Lee WeeklySurveyAnalysis (persistido por survey_ai_analyzer cada lunes 9 AM).
     """
-    return None
+    try:
+        from .survey_ai_analyzer import get_latest_analysis
+        return get_latest_analysis()
+    except Exception as exc:
+        logger.warning(f'No se pudo obtener analisis IA encuestas anterior: {exc}')
+        return None
+
+
+def get_objetivo_semana_safe() -> Optional[dict]:
+    """Devuelve el objetivo definido por Jorge para la semana actual.
+
+    Lee WeeklyObjective. Si no hay objetivo para la semana en curso, intenta
+    el de la semana anterior (puede que Jorge se haya olvidado de actualizarlo).
+    """
+    try:
+        from datetime import date, timedelta
+        from ..models import WeeklyObjective
+
+        hoy = date.today()
+        lunes_actual = hoy - timedelta(days=hoy.weekday())
+        lunes_anterior = lunes_actual - timedelta(days=7)
+
+        # Primero buscar objetivo de la semana actual
+        obj = WeeklyObjective.objects.filter(semana_inicio=lunes_actual).first()
+        if not obj:
+            # Fallback: semana anterior (puede aplicar todavia)
+            obj = WeeklyObjective.objects.filter(semana_inicio=lunes_anterior).first()
+
+        if not obj:
+            return None
+
+        return {
+            'semana_inicio': obj.semana_inicio.isoformat(),
+            'objetivo': obj.objetivo,
+            'es_de_semana_actual': obj.semana_inicio == lunes_actual,
+            'updated_at': obj.updated_at.isoformat() if obj.updated_at else None,
+        }
+    except Exception as exc:
+        logger.warning(f'No se pudo obtener objetivo de la semana: {exc}')
+        return None
+
+
+def get_reviews_resumen_safe() -> Optional[dict]:
+    """Resumen de reviews externas (TripAdvisor + Google Reviews) para el brief.
+
+    Combina:
+    - Ultimo ReviewSnapshot (semanal manual: rating + total + deltas)
+    - Reviews individuales (Review model) de los ultimos 14 dias
+    """
+    try:
+        from datetime import timedelta
+        from django.utils import timezone as dj_tz
+        from ..models import ReviewSnapshot, Review
+
+        result = {}
+
+        # Ultimo snapshot manual
+        last_snap = ReviewSnapshot.objects.order_by('-fecha_snapshot').first()
+        if last_snap:
+            result['snapshot'] = {
+                'fecha': last_snap.fecha_snapshot.isoformat(),
+                'google_rating': float(last_snap.google_rating) if last_snap.google_rating else None,
+                'google_total': last_snap.google_total,
+                'google_url': last_snap.google_url,
+                'tripadvisor_rating': float(last_snap.tripadvisor_rating) if last_snap.tripadvisor_rating else None,
+                'tripadvisor_total': last_snap.tripadvisor_total,
+                'tripadvisor_url': last_snap.tripadvisor_url,
+                'notas': last_snap.notas,
+            }
+
+        # Reviews individuales recientes (extraidas con IA, con texto completo)
+        cutoff = dj_tz.now().date() - timedelta(days=14)
+        reviews = Review.objects.filter(
+            fecha_review__gte=cutoff,
+        ).order_by('-fecha_review')[:30]
+
+        result['reviews_recientes'] = [
+            {
+                'fuente': r.fuente,
+                'fecha': r.fecha_review.isoformat() if r.fecha_review else None,
+                'autor': r.autor,
+                'rating': r.rating,
+                'texto': r.texto[:500] if r.texto else '',
+                'sentimiento': r.sentimiento,
+                'temas': r.temas_detectados,
+                'idioma': r.idioma,
+                'respuesta_publicada': r.respuesta_publicada,
+            }
+            for r in reviews
+        ]
+        result['reviews_recientes_count'] = len(result['reviews_recientes'])
+
+        return result if result else None
+    except Exception as exc:
+        logger.warning(f'No se pudo obtener resumen de reviews: {exc}')
+        return None
+
+
+def get_calendario_chile_safe() -> str:
+    """Lee docs/AREMKO_CALENDARIO_CHILE.md y lo devuelve como string."""
+    return _read_doc('docs/AREMKO_CALENDARIO_CHILE.md')
+
+
+def get_pipeline_reservas_safe(days: int = 7) -> Optional[dict]:
+    """Resumen del pipeline comercial de la semana: reservas creadas, pagadas,
+    abandonadas, ticket promedio, servicios mas reservados.
+
+    Datos duros de VentaReserva + Pago + PendingReservation.
+    """
+    try:
+        from datetime import timedelta
+        from django.db.models import Count, Sum, Avg
+        from django.utils import timezone as dj_tz
+        from ..models import VentaReserva, Pago, PendingReservation, ReservaServicio
+
+        cutoff = dj_tz.now() - timedelta(days=days)
+
+        # Reservas creadas
+        ventas = VentaReserva.objects.filter(fecha_reserva__gte=cutoff)
+        ventas_count = ventas.count()
+        ventas_pagadas = ventas.filter(estado_pago='pagado').count()
+        ventas_pendientes = ventas.filter(estado_pago='pendiente').count()
+
+        # Total facturado y ticket promedio (solo pagadas)
+        agg = ventas.filter(estado_pago='pagado').aggregate(
+            total_facturado=Sum('total'),
+            ticket_promedio=Avg('total'),
+        )
+
+        # Pagos por metodo
+        pagos = Pago.objects.filter(fecha_pago__gte=cutoff)
+        metodos_pago = list(pagos.values('metodo_pago').annotate(c=Count('id')))
+
+        # PendingReservation: abandonados Flow
+        pending_total = PendingReservation.objects.filter(created_at__gte=cutoff).count()
+        pending_iniciados = PendingReservation.objects.filter(
+            created_at__gte=cutoff, estado='iniciado',
+        ).count()
+        pending_expirados = PendingReservation.objects.filter(
+            created_at__gte=cutoff, estado='expirado',
+        ).count()
+        pending_confirmados = PendingReservation.objects.filter(
+            created_at__gte=cutoff, estado='confirmado',
+        ).count()
+
+        # Top servicios reservados
+        top_servicios = list(
+            ReservaServicio.objects
+            .filter(venta_reserva__fecha_reserva__gte=cutoff)
+            .values('servicio__nombre', 'servicio__categoria__nombre')
+            .annotate(c=Count('id'))
+            .order_by('-c')[:10]
+        )
+
+        return {
+            'periodo_dias': days,
+            'reservas_creadas': ventas_count,
+            'reservas_pagadas': ventas_pagadas,
+            'reservas_pendientes': ventas_pendientes,
+            'tasa_conversion_pagado': round(ventas_pagadas / ventas_count * 100, 1) if ventas_count else 0,
+            'total_facturado_pagado': float(agg['total_facturado'] or 0),
+            'ticket_promedio_pagado': float(agg['ticket_promedio'] or 0),
+            'metodos_pago': metodos_pago,
+            'flow_abandonos': {
+                'pending_total': pending_total,
+                'iniciados_aun_no_pagados': pending_iniciados,
+                'expirados_sin_pago': pending_expirados,
+                'confirmados_pago_exitoso': pending_confirmados,
+            },
+            'top_servicios': top_servicios,
+        }
+    except Exception as exc:
+        logger.warning(f'No se pudo obtener pipeline reservas: {exc}')
+        return None
 
 
 def get_ga4_snapshot_safe() -> Optional[dict]:
@@ -358,6 +663,10 @@ def call_llm(
     gsc_snapshot: Optional[dict] = None,
     meta_snapshot: Optional[dict] = None,
     meta_analysis: Optional[dict] = None,
+    objetivo_semana: Optional[dict] = None,
+    reviews_resumen: Optional[dict] = None,
+    calendario_chile: Optional[str] = None,
+    pipeline_reservas: Optional[dict] = None,
     model: Optional[str] = None,
 ) -> dict:
     """Llama a OpenRouter con todo el contexto y devuelve el brief en dict."""
@@ -388,6 +697,10 @@ def call_llm(
         gsc_snapshot=gsc_snapshot,
         meta_snapshot=meta_snapshot,
         meta_analysis=meta_analysis,
+        objetivo_semana=objetivo_semana,
+        reviews_resumen=reviews_resumen,
+        calendario_chile=calendario_chile,
+        pipeline_reservas=pipeline_reservas,
     )
 
     client = OpenAI(api_key=api_key, base_url=base_url)
@@ -401,7 +714,7 @@ def call_llm(
             {'role': 'user', 'content': user_prompt},
         ],
         temperature=0.6,  # algo de creatividad para los drafts
-        max_tokens=16000,  # mas alto desde que se agregaron metricas GA4/GSC + reviews al contexto
+        max_tokens=32000,  # brief extenso con resumen ejecutivo + diagnostico + drafts + acciones
         response_format={'type': 'json_object'},
     )
 
@@ -438,6 +751,10 @@ def generate_brief() -> dict:
     meta_bundle = get_meta_snapshot_safe(persist=True, with_analysis=True)
     meta_snapshot = meta_bundle.get('snapshot') if meta_bundle else None
     meta_analysis = meta_bundle.get('analysis') if meta_bundle else None
+    objetivo_semana = get_objetivo_semana_safe()
+    reviews_resumen = get_reviews_resumen_safe()
+    calendario_chile = get_calendario_chile_safe()
+    pipeline_reservas = get_pipeline_reservas_safe(days=7)
 
     brief = call_llm(
         semana_inicio=semana_inicio,
@@ -449,6 +766,10 @@ def generate_brief() -> dict:
         gsc_snapshot=gsc_snapshot,
         meta_snapshot=meta_snapshot,
         meta_analysis=meta_analysis,
+        objetivo_semana=objetivo_semana,
+        reviews_resumen=reviews_resumen,
+        calendario_chile=calendario_chile,
+        pipeline_reservas=pipeline_reservas,
     )
 
     return {
@@ -461,5 +782,8 @@ def generate_brief() -> dict:
         'gsc_snapshot': gsc_snapshot,
         'meta_snapshot': meta_snapshot,
         'meta_analysis': meta_analysis,
+        'objetivo_semana': objetivo_semana,
+        'reviews_resumen': reviews_resumen,
+        'pipeline_reservas': pipeline_reservas,
         'metricas_disponibles': bool(ga4_snapshot or gsc_snapshot or meta_snapshot),
     }

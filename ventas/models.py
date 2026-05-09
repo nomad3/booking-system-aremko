@@ -5696,3 +5696,71 @@ class MetaSnapshot(models.Model):
             return total
         except (AttributeError, TypeError, ValueError):
             return 0.0
+
+
+class WeeklySurveyAnalysis(models.Model):
+    """Cache del analisis IA semanal de encuestas de satisfaccion.
+
+    Se persiste cada lunes 9 AM cuando corre `analyze_surveys_weekly`.
+    El brief semanal de las 10 AM lee el ultimo registro para incluir
+    insights operativos de encuestas en el contexto del LLM.
+
+    Resuelve gap del brief: antes get_alertas_analisis_ia_anterior() retornaba
+    None y el brief perdia informacion cualitativa critica.
+    """
+    semana_inicio = models.DateField(
+        db_index=True,
+        help_text='Lunes de la semana que se analizo',
+    )
+    semana_fin = models.DateField(help_text='Domingo de la semana que se analizo')
+    encuestas_count = models.PositiveIntegerField(default=0)
+    nps_promedio = models.FloatField(null=True, blank=True)
+    datos = models.JSONField(
+        help_text='Output completo del LLM: resumen, alertas, oportunidades, ideas marketing, follow-ups urgentes',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Analisis IA encuestas semanal'
+        verbose_name_plural = 'Analisis IA encuestas semanales'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at']),
+            models.Index(fields=['-semana_inicio']),
+        ]
+
+    def __str__(self):
+        return f'Analisis encuestas semana {self.semana_inicio} ({self.encuestas_count} encuestas)'
+
+
+class WeeklyObjective(models.Model):
+    """Objetivo de marketing/comercial para una semana especifica.
+
+    Jorge edita este registro cada domingo (o el lunes muy temprano antes
+    del cron de las 10 AM) para indicar que quiere priorizar esa semana.
+    Ejemplos:
+    - "Esta semana foco en empresarial — viene grupo de Datamatic miercoles"
+    - "Vender 5 cabañas para Dia del Padre, todavia hay disponibilidad"
+    - "Bajar engagement caro: pausar boost del Reel descontracturante y crear uno nuevo"
+
+    El brief lee el objetivo de la semana actual (o del fin de semana anterior si
+    todavia no se actualizo) y lo usa como input central para guiar al LLM.
+    """
+    semana_inicio = models.DateField(
+        unique=True, db_index=True,
+        help_text='Lunes de la semana a la que aplica este objetivo',
+    )
+    objetivo = models.TextField(
+        help_text='Texto libre. 2-3 parrafos. Que se quiere priorizar esta semana, '
+                  'que evitar, que metricas mover, fechas clave del periodo.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Objetivo semanal'
+        verbose_name_plural = 'Objetivos semanales'
+        ordering = ['-semana_inicio']
+
+    def __str__(self):
+        return f'Objetivo semana {self.semana_inicio.strftime("%d-%m-%Y")}'
