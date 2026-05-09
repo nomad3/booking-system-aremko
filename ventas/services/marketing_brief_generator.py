@@ -115,7 +115,20 @@ def build_user_prompt(
 === REVIEWS EXTERNAS (TripAdvisor + Google Reviews) ===
 {json.dumps(reviews_resumen, indent=2, ensure_ascii=False, default=str)[:5000] if reviews_resumen else '(no disponible)'}
 
-=== PIPELINE COMERCIAL (últimos 7 días: reservas, pagos, abandonos, top servicios) ===
+=== PIPELINE COMERCIAL INTERNO (Aremko BD Django) ===
+INSTRUCCIONES PARA ANALIZAR:
+- Compara ultima_semana vs semana_anterior usando los % en tendencia_7d_vs_anterior. Si cae >20% en algún indicador clave, mencionarlo en alerta crítica.
+- Mira por_categoria del último mes para entender la mezcla del negocio (% Tinas vs Masajes vs Alojamientos vs Productos).
+- Si en metodos_pago_analisis.cambios_detectados hay un canal NUEVO (ej: "Flow aparece esta semana, 0 en las 3 previas"), MENCIONARLO explícitamente como hallazgo importante. Es información operativa de transición.
+- packs_ultima_semana muestra cuántas reservas son de 1 solo servicio vs 2+. El pack premium 3-en-1 (tina + masaje + alojamiento) es el producto estrella del playbook — si hay 0 esta semana, es alerta. Si crece, comunicarlo.
+- combinaciones_top revela qué packs están comprando los clientes naturalmente (ej: "Tinas + Productos: 12 reservas"). Esto debe guiar el contenido de la semana.
+- tasa_recurrencia_ultima_semana_pct: si >30% es retención sólida; si <10% el negocio depende de adquisición.
+- top_recurrentes son los clientes más leales de los últimos 30 días — útiles para email engaged personalizado o campañas WhatsApp directas.
+- anticipacion_reserva.promedio_dias dice con cuántos días de antelación reservan en promedio. Si baja a 1-2 días → la gente decide en el momento (priorizar paid de inmediatez); si sube a 7+ → planifican (priorizar contenido educativo + email).
+- disponibilidad_proxima_semana: reservas YA agendadas para los próximos 7 días. Si los servicios top están saturados, comunicar como "última disponibilidad". Si están vacíos, paid + descuento.
+- Si reservation_started en GA4 es muy superior a reservas_pagadas en pipeline (ej: 232 GA4 vs 55 BD), eso indica que la mayoría de las conversiones cierran fuera del web (WhatsApp, llamada). Mencionarlo como insight.
+
+DATOS:
 {json.dumps(pipeline_reservas, indent=2, ensure_ascii=False, default=str) if pipeline_reservas else '(no disponible)'}
 
 === BLOG POSTS RECIENTES (no repetir temas, sí reciclar conceptos) ===
@@ -186,11 +199,16 @@ def build_user_prompt(
     }},
 
     "comercial_y_pipeline": {{
-      "reservas_resumen": "Cuántas reservas se crearon, cuántas pagaron, ticket promedio CLP, top servicios. Mínimo 4 frases con números reales.",
-      "tasa_conversion_pago": "% reservas pagadas vs creadas, comparar con histórico si se infiere",
-      "abandonos_flow": "Cuántos PendingReservation expiraron sin pago, qué dice eso del checkout",
-      "servicios_top": "Lista 3-5 servicios más reservados de la semana con cantidad",
-      "implicancia_comunicacional": "Si tinas se vendieron más que masajes esta semana, comunicar tinas. Si hay disponibilidad puntual de cabaña X para próximo fin de semana, comunicarla."
+      "reservas_resumen": "Cuántas reservas se crearon ESTA semana, cuántas pagaron, ticket promedio CLP, total facturado. Mínimo 4 frases con números reales del campo ultima_semana.",
+      "tendencia_vs_semana_anterior": "% cambio reservas pagadas y facturado vs semana anterior (campos tendencia_7d_vs_anterior). Si subió o bajó fuerte (>20%), proponer hipótesis de causa y acción.",
+      "comparacion_mes": "Resumen de últimos 30 días: total reservas pagadas, facturado total, ticket promedio. Sirve para dar contexto mensual del negocio.",
+      "mezcla_por_categoria": "Distribución por familia de servicios (Tinas, Masajes, Alojamientos, Productos) en última semana y último mes. % de cada uno. Detectar si la mezcla cambió.",
+      "analisis_packs_vs_simples": "Cuántas reservas pack (2+ servicios) vs simples (1 servicio). Ticket promedio de cada uno. Si packs son raros, oportunidad de upsell. Pack 3-en-1 (tina+masaje+alojamiento): cuántas vendió esta semana. Combinaciones más vendidas (ej: tinas + productos).",
+      "canales_pago_y_cambios": "Distribución última semana (Flow, MercadoPago, Tarjeta, Transferencia, GiftCard, etc.). Si hay canales NUEVOS aparecidos esta semana (cambios_detectados), MENCIONARLO como hallazgo. Comparar con últimos 30 días.",
+      "comportamiento_cliente": "Tasa de recurrencia (% reservas de la semana de clientes que ya habían venido), top clientes recurrentes últimos 30d, anticipación promedio (días entre fecha_reserva y fecha_agendamiento).",
+      "disponibilidad_proxima_semana": "Cuántas reservas ya hay confirmadas para los próximos 7 días. Servicios saturados (comunicar 'última disponibilidad') vs servicios con huecos (priorizar paid).",
+      "abandonos_flow": "Cuántos PendingReservation iniciados/expirados/confirmados, qué dice del checkout y de la nueva pasarela Flow.",
+      "implicancia_comunicacional": "Recomendaciones de contenido específicas basadas en TODO lo anterior. Ej: 'Como esta semana se vendieron más Tinas que Masajes y la categoría Alojamientos cayó 30%, proponer Reel del Reel del 27-abr enfocado en cabaña con tina'."
     }}
   }},
 
@@ -497,76 +515,300 @@ def get_calendario_chile_safe() -> str:
     return _read_doc('docs/AREMKO_CALENDARIO_CHILE.md')
 
 
-def get_pipeline_reservas_safe(days: int = 7) -> Optional[dict]:
-    """Resumen del pipeline comercial de la semana: reservas creadas, pagadas,
-    abandonadas, ticket promedio, servicios mas reservados.
+def _agg_periodo(VentaReserva, Pago, ReservaServicio, since, until) -> dict:
+    """Agregados de un periodo (since, until) — helper interno para get_pipeline_reservas_safe."""
+    from django.db.models import Count, Sum, Avg, Q
+    ventas = VentaReserva.objects.filter(fecha_reserva__gte=since, fecha_reserva__lt=until)
+    creadas = ventas.count()
+    pagadas_qs = ventas.filter(estado_pago='pagado')
+    pagadas = pagadas_qs.count()
+    agg = pagadas_qs.aggregate(total=Sum('total'), avg=Avg('total'))
 
-    Datos duros de VentaReserva + Pago + PendingReservation.
+    # Por categoria de servicio
+    categorias = list(
+        ReservaServicio.objects
+        .filter(venta_reserva__in=pagadas_qs)
+        .values('servicio__categoria__nombre')
+        .annotate(reservas=Count('id'), ingresos=Sum('servicio__precio_base'))
+        .order_by('-ingresos')
+    )
+
+    # Por metodo de pago (Pagos del periodo)
+    pagos_periodo = Pago.objects.filter(fecha_pago__gte=since, fecha_pago__lt=until)
+    metodos = {p['metodo_pago']: p['c'] for p in pagos_periodo.values('metodo_pago').annotate(c=Count('id'))}
+    metodos_total = sum(metodos.values())
+
+    return {
+        'creadas': creadas,
+        'pagadas': pagadas,
+        'tasa_conversion_pct': round(pagadas / creadas * 100, 1) if creadas else 0,
+        'total_facturado': float(agg['total'] or 0),
+        'ticket_promedio': float(agg['avg'] or 0),
+        'por_categoria': categorias,
+        'metodos_pago_count': metodos,
+        'metodos_pago_total_transacciones': metodos_total,
+    }
+
+
+def _detectar_packs(VentaReserva, ReservaServicio, since, until) -> dict:
+    """Identifica reservas pack (2+ servicios) vs simples (1 servicio).
+    Detecta combinaciones más vendidas y el pack 3-en-1 completo.
+    """
+    from django.db.models import Count, Avg
+    from collections import Counter
+
+    ventas_periodo = VentaReserva.objects.filter(
+        fecha_reserva__gte=since,
+        fecha_reserva__lt=until,
+        estado_pago='pagado',
+    ).annotate(n_servicios=Count('reservaservicios'))
+
+    # Reservas con 2+ servicios
+    pack_qs = ventas_periodo.filter(n_servicios__gte=2)
+    simple_qs = ventas_periodo.filter(n_servicios=1)
+    pack_count = pack_qs.count()
+    simple_count = simple_qs.count()
+
+    pack_avg = pack_qs.aggregate(avg=Avg('total'))['avg'] or 0
+    simple_avg = simple_qs.aggregate(avg=Avg('total'))['avg'] or 0
+
+    # Combinaciones más vendidas (categorías por venta)
+    combo_counter = Counter()
+    pack_3en1 = 0
+    for v in pack_qs.prefetch_related('reservaservicios__servicio__categoria'):
+        cats = sorted({
+            (r.servicio.categoria.nombre if r.servicio and r.servicio.categoria else 'Sin categoría')
+            for r in v.reservaservicios.all()
+        })
+        combo_str = ' + '.join(cats)
+        combo_counter[combo_str] += 1
+        # Pack 3-en-1: tinas + masajes + alojamientos
+        cats_lower = {c.lower() for c in cats}
+        if any('tina' in c for c in cats_lower) and any('masaje' in c for c in cats_lower) and any('aloj' in c or 'cabaña' in c or 'cabana' in c for c in cats_lower):
+            pack_3en1 += 1
+
+    return {
+        'reservas_pack_2plus': pack_count,
+        'reservas_simples_1': simple_count,
+        'ticket_promedio_pack': float(pack_avg),
+        'ticket_promedio_simple': float(simple_avg),
+        'pack_premium_3en1': pack_3en1,
+        'combinaciones_top': [
+            {'combo': combo, 'count': c}
+            for combo, c in combo_counter.most_common(8)
+        ],
+    }
+
+
+def get_pipeline_reservas_safe(days: int = 7) -> Optional[dict]:
+    """Resumen comercial completo del pipeline Aremko.
+
+    Incluye:
+    - Última semana (7d) y último mes (30d) por separado
+    - Comparación 7d actual vs 7d anterior (tendencia)
+    - Análisis por familia de servicios (Tinas, Masajes, Alojamientos, Productos)
+    - Análisis de packs (2+ servicios) vs reservas simples
+    - Pack premium 3-en-1 (tina + masaje + alojamiento)
+    - Métodos de pago con detección de cambios (canales nuevos, ej: Flow recién aparece)
+    - Comportamiento cliente (recurrencia + top recurrentes)
+    - Anticipación promedio entre fecha_reserva y fecha_agendamiento
+    - Disponibilidad próximos 7 días (reservas confirmadas)
     """
     try:
         from datetime import timedelta
-        from django.db.models import Count, Sum, Avg
+        from django.db.models import Count, Sum, Avg, Q, F, ExpressionWrapper, DurationField
         from django.utils import timezone as dj_tz
-        from ..models import VentaReserva, Pago, PendingReservation, ReservaServicio
+        from ..models import VentaReserva, Pago, PendingReservation, ReservaServicio, Cliente
 
-        cutoff = dj_tz.now() - timedelta(days=days)
+        ahora = dj_tz.now()
+        sem1_inicio = ahora - timedelta(days=7)        # ultima semana
+        sem2_inicio = ahora - timedelta(days=14)       # semana anterior
+        sem4_inicio = ahora - timedelta(days=30)       # ultimo mes
+        prox_semana = ahora + timedelta(days=7)
 
-        # Reservas creadas
-        ventas = VentaReserva.objects.filter(fecha_reserva__gte=cutoff)
-        ventas_count = ventas.count()
-        ventas_pagadas = ventas.filter(estado_pago='pagado').count()
-        ventas_pendientes = ventas.filter(estado_pago='pendiente').count()
+        # === Periodos ===
+        ultima_semana = _agg_periodo(VentaReserva, Pago, ReservaServicio, sem1_inicio, ahora)
+        semana_anterior = _agg_periodo(VentaReserva, Pago, ReservaServicio, sem2_inicio, sem1_inicio)
+        ultimo_mes = _agg_periodo(VentaReserva, Pago, ReservaServicio, sem4_inicio, ahora)
 
-        # Total facturado y ticket promedio (solo pagadas)
-        agg = ventas.filter(estado_pago='pagado').aggregate(
-            total_facturado=Sum('total'),
-            ticket_promedio=Avg('total'),
+        # === Tendencia 7d vs 7d anterior ===
+        def _pct_change(actual, anterior):
+            if not anterior:
+                return None
+            return round((actual - anterior) / anterior * 100, 1)
+
+        tendencia = {
+            'reservas_creadas_pct': _pct_change(ultima_semana['creadas'], semana_anterior['creadas']),
+            'reservas_pagadas_pct': _pct_change(ultima_semana['pagadas'], semana_anterior['pagadas']),
+            'facturado_pct': _pct_change(ultima_semana['total_facturado'], semana_anterior['total_facturado']),
+            'ticket_promedio_pct': _pct_change(ultima_semana['ticket_promedio'], semana_anterior['ticket_promedio']),
+            'datos_anterior': {
+                'creadas': semana_anterior['creadas'],
+                'pagadas': semana_anterior['pagadas'],
+                'facturado': semana_anterior['total_facturado'],
+                'ticket': semana_anterior['ticket_promedio'],
+            },
+        }
+
+        # === Packs (última semana) ===
+        packs = _detectar_packs(VentaReserva, ReservaServicio, sem1_inicio, ahora)
+
+        # === Métodos de pago: detección de cambios de tendencia ===
+        metodos_actual = ultima_semana['metodos_pago_count']
+        metodos_mes = ultimo_mes['metodos_pago_count']
+        # Detectar canales nuevos (presentes esta semana, ausentes en las 3 semanas previas)
+        sem3_atras = _agg_periodo(VentaReserva, Pago, ReservaServicio, sem4_inicio, sem1_inicio)
+        metodos_3sem_previas = sem3_atras['metodos_pago_count']
+        cambios_canales = []
+        for metodo in metodos_actual:
+            count_actual = metodos_actual.get(metodo, 0)
+            count_previo = metodos_3sem_previas.get(metodo, 0)
+            if count_actual > 0 and count_previo == 0:
+                cambios_canales.append(
+                    f"{metodo}: aparece esta semana ({count_actual} pagos), 0 las 3 semanas previas — CANAL NUEVO"
+                )
+        # Detectar canales que desaparecieron
+        for metodo in metodos_3sem_previas:
+            count_previo = metodos_3sem_previas.get(metodo, 0)
+            count_actual = metodos_actual.get(metodo, 0)
+            if count_actual == 0 and count_previo >= 3:
+                cambios_canales.append(
+                    f"{metodo}: desaparece esta semana, tenia {count_previo} pagos las 3 semanas previas"
+                )
+
+        # === Comportamiento cliente ===
+        # Tasa recurrencia: % de reservas pagadas última semana cuyo cliente ya tenía 1+ reserva pagada antes
+        ventas_sem = VentaReserva.objects.filter(
+            fecha_reserva__gte=sem1_inicio, fecha_reserva__lt=ahora,
+            estado_pago='pagado',
+        ).select_related('cliente')
+        total_sem = ventas_sem.count()
+        recurrentes_count = 0
+        for v in ventas_sem:
+            if not v.cliente:
+                continue
+            previas = VentaReserva.objects.filter(
+                cliente=v.cliente, estado_pago='pagado', fecha_reserva__lt=v.fecha_reserva,
+            ).count()
+            if previas >= 1:
+                recurrentes_count += 1
+        tasa_recurrencia = round(recurrentes_count / total_sem * 100, 1) if total_sem else 0
+
+        # Top clientes recurrentes últimos 30 días
+        top_recurrentes = list(
+            VentaReserva.objects
+            .filter(fecha_reserva__gte=sem4_inicio, estado_pago='pagado', cliente__isnull=False)
+            .values('cliente__id', 'cliente__nombre', 'cliente__telefono')
+            .annotate(reservas=Count('id'), gasto=Sum('total'))
+            .filter(reservas__gte=2)
+            .order_by('-reservas', '-gasto')[:10]
         )
 
-        # Pagos por metodo
-        pagos = Pago.objects.filter(fecha_pago__gte=cutoff)
-        metodos_pago = list(pagos.values('metodo_pago').annotate(c=Count('id')))
+        # === Anticipación de reserva ===
+        # Diferencia entre fecha_reserva (cuando se creó la reserva) y fecha_agendamiento (cuando es el servicio)
+        anticipacion_data = []
+        for rs in ReservaServicio.objects.filter(
+            venta_reserva__fecha_reserva__gte=sem1_inicio,
+            venta_reserva__estado_pago='pagado',
+        ).select_related('venta_reserva')[:200]:
+            try:
+                fecha_creacion = rs.venta_reserva.fecha_reserva.date()
+                fecha_servicio = rs.fecha_agendamiento
+                diff = (fecha_servicio - fecha_creacion).days
+                if diff >= 0:
+                    anticipacion_data.append(diff)
+            except Exception:
+                continue
+        anticipacion = {}
+        if anticipacion_data:
+            anticipacion = {
+                'promedio_dias': round(sum(anticipacion_data) / len(anticipacion_data), 1),
+                'min_dias': min(anticipacion_data),
+                'max_dias': max(anticipacion_data),
+                'mediana_dias': sorted(anticipacion_data)[len(anticipacion_data) // 2],
+                'samples': len(anticipacion_data),
+            }
 
-        # PendingReservation: abandonados Flow
-        pending_total = PendingReservation.objects.filter(created_at__gte=cutoff).count()
-        pending_iniciados = PendingReservation.objects.filter(
-            created_at__gte=cutoff, estado='iniciado',
+        # === Disponibilidad próximos 7 días ===
+        # Reservas YA confirmadas para servicios entre hoy y hoy+7
+        reservas_proxima_semana = ReservaServicio.objects.filter(
+            fecha_agendamiento__gte=ahora.date(),
+            fecha_agendamiento__lte=prox_semana.date(),
+            venta_reserva__estado_pago='pagado',
         ).count()
-        pending_expirados = PendingReservation.objects.filter(
-            created_at__gte=cutoff, estado='expirado',
-        ).count()
-        pending_confirmados = PendingReservation.objects.filter(
-            created_at__gte=cutoff, estado='confirmado',
-        ).count()
+        servicios_top_proxima_semana = list(
+            ReservaServicio.objects
+            .filter(
+                fecha_agendamiento__gte=ahora.date(),
+                fecha_agendamiento__lte=prox_semana.date(),
+                venta_reserva__estado_pago='pagado',
+            )
+            .values('servicio__nombre', 'servicio__categoria__nombre')
+            .annotate(reservas=Count('id'))
+            .order_by('-reservas')[:10]
+        )
 
-        # Top servicios reservados
+        # === PendingReservation (abandonos Flow) ===
+        pending_qs = PendingReservation.objects.filter(created_at__gte=sem1_inicio)
+        pending_total = pending_qs.count()
+        pending_iniciados = pending_qs.filter(estado='iniciado').count()
+        pending_expirados = pending_qs.filter(estado='expirado').count()
+        pending_confirmados = pending_qs.filter(estado='confirmado').count()
+        pending_rechazados = pending_qs.filter(estado='rechazado').count()
+
+        # === Top servicios última semana ===
         top_servicios = list(
             ReservaServicio.objects
-            .filter(venta_reserva__fecha_reserva__gte=cutoff)
+            .filter(venta_reserva__fecha_reserva__gte=sem1_inicio, venta_reserva__estado_pago='pagado')
             .values('servicio__nombre', 'servicio__categoria__nombre')
             .annotate(c=Count('id'))
             .order_by('-c')[:10]
         )
 
         return {
-            'periodo_dias': days,
-            'reservas_creadas': ventas_count,
-            'reservas_pagadas': ventas_pagadas,
-            'reservas_pendientes': ventas_pendientes,
-            'tasa_conversion_pagado': round(ventas_pagadas / ventas_count * 100, 1) if ventas_count else 0,
-            'total_facturado_pagado': float(agg['total_facturado'] or 0),
-            'ticket_promedio_pagado': float(agg['ticket_promedio'] or 0),
-            'metodos_pago': metodos_pago,
-            'flow_abandonos': {
+            'periodo_dias_default': 7,
+            'fecha_corte': ahora.isoformat(),
+
+            'ultima_semana': {
+                **ultima_semana,
+                'top_servicios': top_servicios,
+            },
+            'ultimo_mes': ultimo_mes,
+            'tendencia_7d_vs_anterior': tendencia,
+
+            'packs_ultima_semana': packs,
+
+            'metodos_pago_analisis': {
+                'ultima_semana': metodos_actual,
+                'ultimo_mes': metodos_mes,
+                'tres_semanas_previas': metodos_3sem_previas,
+                'cambios_detectados': cambios_canales,
+            },
+
+            'clientes': {
+                'tasa_recurrencia_ultima_semana_pct': tasa_recurrencia,
+                'recurrentes_ultima_semana': recurrentes_count,
+                'total_pagadas_ultima_semana': total_sem,
+                'top_recurrentes_ultimos_30d': top_recurrentes,
+            },
+
+            'anticipacion_reserva': anticipacion,
+
+            'disponibilidad_proxima_semana': {
+                'reservas_confirmadas': reservas_proxima_semana,
+                'top_servicios_agendados': servicios_top_proxima_semana,
+            },
+
+            'flow_abandonos_ultima_semana': {
                 'pending_total': pending_total,
                 'iniciados_aun_no_pagados': pending_iniciados,
                 'expirados_sin_pago': pending_expirados,
                 'confirmados_pago_exitoso': pending_confirmados,
+                'rechazados': pending_rechazados,
             },
-            'top_servicios': top_servicios,
         }
     except Exception as exc:
-        logger.warning(f'No se pudo obtener pipeline reservas: {exc}')
+        logger.warning(f'No se pudo obtener pipeline reservas: {exc}', exc_info=True)
         return None
 
 

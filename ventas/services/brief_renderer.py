@@ -127,20 +127,28 @@ def render_brief_to_markdown(brief: dict, semana_inicio: date, semana_fin: date)
         if com:
             lines.append('### 💰 Comercial y pipeline')
             lines.append('')
-            if com.get('reservas_resumen'):
-                lines.append(f'**Reservas**: {com["reservas_resumen"]}')
-                lines.append('')
-            if com.get('tasa_conversion_pago'):
+            # Nuevos campos extendidos
+            for label, key in [
+                ('Reservas última semana', 'reservas_resumen'),
+                ('Tendencia vs semana anterior', 'tendencia_vs_semana_anterior'),
+                ('Resumen mensual', 'comparacion_mes'),
+                ('Mezcla por categoría', 'mezcla_por_categoria'),
+                ('Packs vs reservas simples', 'analisis_packs_vs_simples'),
+                ('Canales de pago y cambios', 'canales_pago_y_cambios'),
+                ('Comportamiento cliente', 'comportamiento_cliente'),
+                ('Disponibilidad próxima semana', 'disponibilidad_proxima_semana'),
+                ('Abandonos Flow', 'abandonos_flow'),
+                ('Implicancia comunicacional', 'implicancia_comunicacional'),
+            ]:
+                if com.get(key):
+                    lines.append(f'**{label}**: {com[key]}')
+                    lines.append('')
+            # Compat con formato antiguo (mantener por si)
+            if com.get('tasa_conversion_pago') and not com.get('tendencia_vs_semana_anterior'):
                 lines.append(f'**Tasa conversión a pago**: {com["tasa_conversion_pago"]}')
                 lines.append('')
-            if com.get('abandonos_flow'):
-                lines.append(f'**Abandonos Flow**: {com["abandonos_flow"]}')
-                lines.append('')
-            if com.get('servicios_top'):
+            if com.get('servicios_top') and not com.get('mezcla_por_categoria'):
                 lines.append(f'**Top servicios**: {com["servicios_top"]}')
-                lines.append('')
-            if com.get('implicancia_comunicacional'):
-                lines.append(f'**Implicancia comunicacional**: {com["implicancia_comunicacional"]}')
                 lines.append('')
 
     # === Calendario semanal ===
