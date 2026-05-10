@@ -126,7 +126,7 @@ INSTRUCCIONES PARA ANALIZAR:
 - top_recurrentes son los clientes más leales de los últimos 30 días — útiles para email engaged personalizado o campañas WhatsApp directas.
 - anticipacion_reserva.promedio_dias dice con cuántos días de antelación reservan en promedio. Si baja a 1-2 días → la gente decide en el momento (priorizar paid de inmediatez); si sube a 7+ → planifican (priorizar contenido educativo + email).
 - disponibilidad_proxima_semana: reservas YA agendadas para los próximos 7 días. Si los servicios top están saturados, comunicar como "última disponibilidad". Si están vacíos, paid + descuento.
-- comparativa_mensual_misma_fecha: COMPARA el mismo rango del mes en curso (ej: 1-9 mayo) vs el mes anterior (ej: 1-9 abril) DESGLOSADO POR FAMILIA: tinas, masajes, cabañas, productos_otros. Esta es la comparativa de estacionalidad mes a mes. Para cada familia, indica reservas_pct_cambio e ingresos_pct_cambio. Si una familia cae >20% intermensual, es alerta. Si crece >30%, oportunidad de capitalizar (ej: "Tinas crecieron 45% vs abril → empujar contenido de tinas con baja temperatura"). Reportar también el total general (todas las familias agregadas).
+- comparativa_mensual_misma_fecha: COMPARA el mismo rango del mes en curso (ej: 1-9 mayo) vs el mes anterior (ej: 1-9 abril) DESGLOSADO POR FAMILIA: tinas, masajes, cabañas, productos_otros. Esta es la comparativa de estacionalidad mes a mes. Para cada familia, indica reservas_pct_cambio e ingresos_pct_cambio. Si una familia cae >20% intermensual, es alerta. Si crece >30%, oportunidad de capitalizar (ej: "Tinas crecieron 45% vs abril → empujar contenido de tinas con baja temperatura"). Reportar también el total general (todas las familias agregadas). El valor del % puede ser un número, "NUEVO" (categoría recién activada, anterior era 0) o "sin movimiento" (ambos meses sin ventas en esa familia) — interpretarlo correctamente en el copy.
 - Si reservation_started en GA4 es muy superior a reservas_pagadas en pipeline (ej: 232 GA4 vs 55 BD), eso indica que la mayoría de las conversiones cierran fuera del web (WhatsApp, llamada). Mencionarlo como insight.
 - IMPORTANTE: si en los DATOS aparece la clave "_errores", MENCIONA EXPLICITAMENTE en una alerta operativa de la sección comercial: "Errores parciales del pipeline: <lista>". No inventes ni infiera datos faltantes; di "sin datos por error técnico" y ESCRIBE EL ERROR para que Jorge lo vea.
 - Si aparece "_falla_total: true", reporta como alerta crítica que el pipeline interno completo falló y NO uses datos derivados.
@@ -613,11 +613,12 @@ def _ventas_por_familia_rango(VentaReserva, ReservaServicio, since_date, until_d
     Devuelve dict con conteo de reservas y suma de ingresos por familia.
     """
     from django.db.models import Count, Sum
+    from django.utils import timezone as dj_tz
     from datetime import datetime, time
 
-    # Convertir dates a datetimes para comparar contra fecha_reserva (datetime)
-    since_dt = datetime.combine(since_date, time.min)
-    until_dt = datetime.combine(until_date, time.max)
+    # Convertir dates a datetimes aware (timezone) para evitar RuntimeWarning
+    since_dt = dj_tz.make_aware(datetime.combine(since_date, time.min))
+    until_dt = dj_tz.make_aware(datetime.combine(until_date, time.max))
 
     rs_qs = ReservaServicio.objects.filter(
         venta_reserva__fecha_reserva__gte=since_dt,
@@ -700,8 +701,13 @@ def _comparativa_mensual_misma_fecha(VentaReserva, ReservaServicio) -> dict:
     anterior = _ventas_por_familia_rango(VentaReserva, ReservaServicio, inicio_anterior, fin_anterior)
 
     # Calcular % de cambio por familia
+    # Si anterior es 0: si actual > 0 → "NUEVO" (categoria recien activada); si ambos 0 → "sin movimiento"
     def _pct(a, b):
-        if not b:
+        if b == 0 and a == 0:
+            return 'sin movimiento'
+        if b == 0 and a > 0:
+            return 'NUEVO'
+        if b == 0 and a < 0:
             return None
         return round((a - b) / b * 100, 1)
 

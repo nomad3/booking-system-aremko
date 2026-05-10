@@ -108,15 +108,20 @@ class Command(BaseCommand):
             # Comparativa mensual misma fecha por familia
             comp = pipe.get('comparativa_mensual_misma_fecha') or {}
             if comp:
+                def _fmt_pct(v):
+                    if isinstance(v, (int, float)):
+                        return f'{v:+.1f}%'
+                    return str(v) if v else 'n/a'
+
                 self.stdout.write(
                     f'   📅 Comparativa: {comp.get("rango_actual")} vs {comp.get("rango_anterior")}'
                 )
                 tot = comp.get('totales', {})
                 self.stdout.write(
                     f'      Total: {tot.get("reservas_actual", 0)} vs {tot.get("reservas_anterior", 0)} reservas '
-                    f'({tot.get("reservas_pct_cambio")}%) · '
+                    f'({_fmt_pct(tot.get("reservas_pct_cambio"))}) · '
                     f'${int(tot.get("facturado_actual", 0) or 0):,} vs ${int(tot.get("facturado_anterior", 0) or 0):,} CLP '
-                    f'({tot.get("facturado_pct_cambio")}%)'
+                    f'({_fmt_pct(tot.get("facturado_pct_cambio"))})'
                 )
                 for fam_key, fam_label in [
                     ('tinas', 'Tinas'), ('masajes', 'Masajes'),
@@ -125,9 +130,9 @@ class Command(BaseCommand):
                     f = comp.get('por_familia', {}).get(fam_key, {})
                     self.stdout.write(
                         f'      {fam_label}: {f.get("reservas_actual", 0)} vs {f.get("reservas_anterior", 0)} reservas '
-                        f'({f.get("reservas_pct_cambio")}%) · '
+                        f'({_fmt_pct(f.get("reservas_pct_cambio"))}) · '
                         f'${int(f.get("ingresos_actual", 0) or 0):,} vs ${int(f.get("ingresos_anterior", 0) or 0):,} '
-                        f'({f.get("ingresos_pct_cambio")}%)'
+                        f'({_fmt_pct(f.get("ingresos_pct_cambio"))})'
                     )
 
         brief = result['brief']
