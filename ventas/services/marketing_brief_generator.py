@@ -126,6 +126,7 @@ INSTRUCCIONES PARA ANALIZAR:
 - top_recurrentes son los clientes más leales de los últimos 30 días — útiles para email engaged personalizado o campañas WhatsApp directas.
 - anticipacion_reserva.promedio_dias dice con cuántos días de antelación reservan en promedio. Si baja a 1-2 días → la gente decide en el momento (priorizar paid de inmediatez); si sube a 7+ → planifican (priorizar contenido educativo + email).
 - disponibilidad_proxima_semana: reservas YA agendadas para los próximos 7 días. Si los servicios top están saturados, comunicar como "última disponibilidad". Si están vacíos, paid + descuento.
+- comparativa_mensual_misma_fecha: COMPARA el mismo rango del mes en curso (ej: 1-9 mayo) vs el mes anterior (ej: 1-9 abril) DESGLOSADO POR FAMILIA: tinas, masajes, cabañas, productos_otros. Esta es la comparativa de estacionalidad mes a mes. Para cada familia, indica reservas_pct_cambio e ingresos_pct_cambio. Si una familia cae >20% intermensual, es alerta. Si crece >30%, oportunidad de capitalizar (ej: "Tinas crecieron 45% vs abril → empujar contenido de tinas con baja temperatura"). Reportar también el total general (todas las familias agregadas).
 - Si reservation_started en GA4 es muy superior a reservas_pagadas en pipeline (ej: 232 GA4 vs 55 BD), eso indica que la mayoría de las conversiones cierran fuera del web (WhatsApp, llamada). Mencionarlo como insight.
 - IMPORTANTE: si en los DATOS aparece la clave "_errores", MENCIONA EXPLICITAMENTE en una alerta operativa de la sección comercial: "Errores parciales del pipeline: <lista>". No inventes ni infiera datos faltantes; di "sin datos por error técnico" y ESCRIBE EL ERROR para que Jorge lo vea.
 - Si aparece "_falla_total: true", reporta como alerta crítica que el pipeline interno completo falló y NO uses datos derivados.
@@ -209,6 +210,7 @@ DATOS:
       "canales_pago_y_cambios": "Distribución última semana (Flow, MercadoPago, Tarjeta, Transferencia, GiftCard, etc.). Si hay canales NUEVOS aparecidos esta semana (cambios_detectados), MENCIONARLO como hallazgo. Comparar con últimos 30 días.",
       "comportamiento_cliente": "Tasa de recurrencia (% reservas de la semana de clientes que ya habían venido), top clientes recurrentes últimos 30d, anticipación promedio (días entre fecha_reserva y fecha_agendamiento).",
       "disponibilidad_proxima_semana": "Cuántas reservas ya hay confirmadas para los próximos 7 días. Servicios saturados (comunicar 'última disponibilidad') vs servicios con huecos (priorizar paid).",
+      "comparativa_mensual_misma_fecha": "TABLA comparativa por FAMILIA del rango (1-N mes actual) vs (1-N mes anterior), donde N=día actual. Para CADA familia (Tinas, Masajes, Cabañas, Productos): N° reservas mes actual vs anterior + % cambio, e ingresos mes actual vs anterior + % cambio. Indicar también el total. Esta comparativa muestra estacionalidad mes a mes y si Día de la Madre/feriados movieron una familia más que otra. Si una familia cae >20%, alerta operativa. Si crece >30%, oportunidad para empujar más esa familia.",
       "abandonos_flow": "Cuántos PendingReservation iniciados/expirados/confirmados, qué dice del checkout y de la nueva pasarela Flow.",
       "implicancia_comunicacional": "Recomendaciones de contenido específicas basadas en TODO lo anterior. Ej: 'Como esta semana se vendieron más Tinas que Masajes y la categoría Alojamientos cayó 30%, proponer Reel del Reel del 27-abr enfocado en cabaña con tina'."
     }}
@@ -604,6 +606,133 @@ def _detectar_packs(VentaReserva, ReservaServicio, since, until) -> dict:
     }
 
 
+def _ventas_por_familia_rango(VentaReserva, ReservaServicio, since_date, until_date) -> dict:
+    """Agrega ventas pagadas en (since_date, until_date] por familia de servicio.
+
+    Familias detectadas (por nombre de categoria): Cabañas/Alojamientos, Masajes, Tinas.
+    Devuelve dict con conteo de reservas y suma de ingresos por familia.
+    """
+    from django.db.models import Count, Sum
+    from datetime import datetime, time
+
+    # Convertir dates a datetimes para comparar contra fecha_reserva (datetime)
+    since_dt = datetime.combine(since_date, time.min)
+    until_dt = datetime.combine(until_date, time.max)
+
+    rs_qs = ReservaServicio.objects.filter(
+        venta_reserva__fecha_reserva__gte=since_dt,
+        venta_reserva__fecha_reserva__lte=until_dt,
+        venta_reserva__estado_pago='pagado',
+    ).select_related('servicio', 'servicio__categoria', 'venta_reserva')
+
+    familia_data = {
+        'tinas': {'reservas': 0, 'ingresos': 0.0, 'ventas_unicas': set()},
+        'masajes': {'reservas': 0, 'ingresos': 0.0, 'ventas_unicas': set()},
+        'cabanas': {'reservas': 0, 'ingresos': 0.0, 'ventas_unicas': set()},
+        'productos_otros': {'reservas': 0, 'ingresos': 0.0, 'ventas_unicas': set()},
+    }
+    for rs in rs_qs:
+        cat = (rs.servicio.categoria.nombre if rs.servicio and rs.servicio.categoria else '').lower()
+        if 'tina' in cat:
+            key = 'tinas'
+        elif 'masaje' in cat:
+            key = 'masajes'
+        elif 'aloj' in cat or 'cabaña' in cat or 'cabana' in cat:
+            key = 'cabanas'
+        else:
+            key = 'productos_otros'
+        familia_data[key]['reservas'] += 1
+        # Precio por servicio: precio_unitario_venta si existe, sino precio_base × cantidad
+        try:
+            precio_u = float(rs.precio_unitario_venta) if rs.precio_unitario_venta else float(rs.servicio.precio_base)
+        except Exception:
+            precio_u = 0.0
+        familia_data[key]['ingresos'] += precio_u * (rs.cantidad_personas or 1)
+        familia_data[key]['ventas_unicas'].add(rs.venta_reserva_id)
+
+    # Convertir sets a counts
+    for k in familia_data:
+        familia_data[k]['ventas_unicas'] = len(familia_data[k]['ventas_unicas'])
+
+    # Total reservas pagadas en el rango (para % de mezcla)
+    total_ventas_pagadas = VentaReserva.objects.filter(
+        fecha_reserva__gte=since_dt,
+        fecha_reserva__lte=until_dt,
+        estado_pago='pagado',
+    ).aggregate(c=Count('id'), s=Sum('total'))
+
+    return {
+        'desde': since_date.isoformat(),
+        'hasta': until_date.isoformat(),
+        'total_reservas_pagadas': total_ventas_pagadas['c'] or 0,
+        'total_facturado': float(total_ventas_pagadas['s'] or 0),
+        'familias': familia_data,
+    }
+
+
+def _comparativa_mensual_misma_fecha(VentaReserva, ReservaServicio) -> dict:
+    """Compara ventas por familia del rango (dia 1 al dia actual) del mes
+    en curso vs el mismo rango del mes anterior.
+
+    Por ejemplo, si hoy es 9 de mayo, compara 1-9 mayo vs 1-9 abril.
+    """
+    from datetime import date, timedelta
+    import calendar
+
+    hoy = date.today()
+    inicio_actual = hoy.replace(day=1)
+    fin_actual = hoy
+
+    # Mes anterior
+    if inicio_actual.month == 1:
+        mes_ant_year = inicio_actual.year - 1
+        mes_ant_month = 12
+    else:
+        mes_ant_year = inicio_actual.year
+        mes_ant_month = inicio_actual.month - 1
+    inicio_anterior = date(mes_ant_year, mes_ant_month, 1)
+    # Limitar dia: si el mes anterior tiene menos dias que hoy.day, ajustar
+    ultimo_dia_mes_ant = calendar.monthrange(mes_ant_year, mes_ant_month)[1]
+    dia_fin = min(hoy.day, ultimo_dia_mes_ant)
+    fin_anterior = date(mes_ant_year, mes_ant_month, dia_fin)
+
+    actual = _ventas_por_familia_rango(VentaReserva, ReservaServicio, inicio_actual, fin_actual)
+    anterior = _ventas_por_familia_rango(VentaReserva, ReservaServicio, inicio_anterior, fin_anterior)
+
+    # Calcular % de cambio por familia
+    def _pct(a, b):
+        if not b:
+            return None
+        return round((a - b) / b * 100, 1)
+
+    cambios_por_familia = {}
+    for fam in ['tinas', 'masajes', 'cabanas', 'productos_otros']:
+        act = actual['familias'][fam]
+        ant = anterior['familias'][fam]
+        cambios_por_familia[fam] = {
+            'reservas_actual': act['reservas'],
+            'reservas_anterior': ant['reservas'],
+            'reservas_pct_cambio': _pct(act['reservas'], ant['reservas']),
+            'ingresos_actual': round(act['ingresos']),
+            'ingresos_anterior': round(ant['ingresos']),
+            'ingresos_pct_cambio': _pct(act['ingresos'], ant['ingresos']),
+        }
+
+    return {
+        'rango_actual': f"{inicio_actual.isoformat()} a {fin_actual.isoformat()}",
+        'rango_anterior': f"{inicio_anterior.isoformat()} a {fin_anterior.isoformat()}",
+        'totales': {
+            'reservas_actual': actual['total_reservas_pagadas'],
+            'reservas_anterior': anterior['total_reservas_pagadas'],
+            'reservas_pct_cambio': _pct(actual['total_reservas_pagadas'], anterior['total_reservas_pagadas']),
+            'facturado_actual': round(actual['total_facturado']),
+            'facturado_anterior': round(anterior['total_facturado']),
+            'facturado_pct_cambio': _pct(actual['total_facturado'], anterior['total_facturado']),
+        },
+        'por_familia': cambios_por_familia,
+    }
+
+
 def get_pipeline_reservas_safe(days: int = 7) -> Optional[dict]:
     """Resumen comercial completo del pipeline Aremko.
 
@@ -806,6 +935,13 @@ def get_pipeline_reservas_safe(days: int = 7) -> Optional[dict]:
     except Exception as exc:
         errores.append(f'pending_flow: {type(exc).__name__}: {exc}')
         logger.warning(f'Pipeline bloque pending_flow fallo: {exc}', exc_info=True)
+
+    # === Bloque H: comparativa mensual misma fecha (1-N mes actual vs 1-N mes anterior) ===
+    try:
+        out['comparativa_mensual_misma_fecha'] = _comparativa_mensual_misma_fecha(VentaReserva, ReservaServicio)
+    except Exception as exc:
+        errores.append(f'comparativa_mensual: {type(exc).__name__}: {exc}')
+        logger.warning(f'Pipeline bloque comparativa_mensual fallo: {exc}', exc_info=True)
 
     if errores:
         out['_errores'] = errores

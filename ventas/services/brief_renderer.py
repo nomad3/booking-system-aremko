@@ -137,6 +137,7 @@ def render_brief_to_markdown(brief: dict, semana_inicio: date, semana_fin: date)
                 ('Canales de pago y cambios', 'canales_pago_y_cambios'),
                 ('Comportamiento cliente', 'comportamiento_cliente'),
                 ('Disponibilidad próxima semana', 'disponibilidad_proxima_semana'),
+                ('Comparativa mensual misma fecha (mes actual vs anterior)', 'comparativa_mensual_misma_fecha'),
                 ('Abandonos Flow', 'abandonos_flow'),
                 ('Implicancia comunicacional', 'implicancia_comunicacional'),
             ]:

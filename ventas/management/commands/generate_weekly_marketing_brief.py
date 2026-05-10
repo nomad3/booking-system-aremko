@@ -105,6 +105,30 @@ class Command(BaseCommand):
                 f'   📊 Último mes: {um.get("creadas", 0)} creadas, {um.get("pagadas", 0)} pagadas, '
                 f'${int(um.get("total_facturado", 0)):,} CLP'
             )
+            # Comparativa mensual misma fecha por familia
+            comp = pipe.get('comparativa_mensual_misma_fecha') or {}
+            if comp:
+                self.stdout.write(
+                    f'   📅 Comparativa: {comp.get("rango_actual")} vs {comp.get("rango_anterior")}'
+                )
+                tot = comp.get('totales', {})
+                self.stdout.write(
+                    f'      Total: {tot.get("reservas_actual", 0)} vs {tot.get("reservas_anterior", 0)} reservas '
+                    f'({tot.get("reservas_pct_cambio")}%) · '
+                    f'${int(tot.get("facturado_actual", 0) or 0):,} vs ${int(tot.get("facturado_anterior", 0) or 0):,} CLP '
+                    f'({tot.get("facturado_pct_cambio")}%)'
+                )
+                for fam_key, fam_label in [
+                    ('tinas', 'Tinas'), ('masajes', 'Masajes'),
+                    ('cabanas', 'Cabañas'), ('productos_otros', 'Otros'),
+                ]:
+                    f = comp.get('por_familia', {}).get(fam_key, {})
+                    self.stdout.write(
+                        f'      {fam_label}: {f.get("reservas_actual", 0)} vs {f.get("reservas_anterior", 0)} reservas '
+                        f'({f.get("reservas_pct_cambio")}%) · '
+                        f'${int(f.get("ingresos_actual", 0) or 0):,} vs ${int(f.get("ingresos_anterior", 0) or 0):,} '
+                        f'({f.get("ingresos_pct_cambio")}%)'
+                    )
 
         brief = result['brief']
         markdown = render_brief_to_markdown(brief, result['semana_inicio'], result['semana_fin'])
