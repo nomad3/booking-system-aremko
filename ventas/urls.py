@@ -8,6 +8,7 @@ from .views import (
 )
 from . import api # Keep api module import as is
 from . import views_comandas_cliente # Import comandas de clientes views
+from . import api_aremko_cli # Import aremko-cli API endpoints
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
 
 app_name = 'ventas'  # Define the app namespace
@@ -316,6 +317,13 @@ urlpatterns = [
     path('c/<str:token>/confirm/', views_comandas_cliente.comanda_cliente_pago_confirmacion, name='comanda_cliente_pago_confirmacion_short'),
     path('c/<str:token>/return/', views_comandas_cliente.comanda_cliente_pago_retorno, name='comanda_cliente_pago_retorno_short'),
     # === END COMANDAS DE CLIENTES ===
+
+    # === AREMKO-CLI API (Read-only endpoints for aremko-cli dashboard) ===
+    path('api/aremko-cli/health/', api_aremko_cli.health_check, name='aremko_cli_health'),
+    path('api/aremko-cli/bookings/stats/', api_aremko_cli.bookings_stats, name='aremko_cli_bookings_stats'),
+    path('api/aremko-cli/bookings/daily/', api_aremko_cli.bookings_daily, name='aremko_cli_bookings_daily'),
+    path('api/aremko-cli/clients/stats/', api_aremko_cli.clients_stats, name='aremko_cli_clients_stats'),
+    # === END AREMKO-CLI API ===
 
     # API Router (Keep this last if possible, or ensure specific paths come first)
     path('', include(router.urls)),
