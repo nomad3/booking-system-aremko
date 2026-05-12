@@ -9,7 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Sum, Avg, Count, Q
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import VentaReserva, Cliente, ReservaServicio
+from .models import VentaReserva, Cliente, ReservaServicio, Pago
 import logging
 
 logger = logging.getLogger(__name__)
@@ -381,6 +381,179 @@ def bookings_by_family(request):
 
     except Exception as e:
         logger.error(f"Error in bookings_by_family: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def bookings_by_payment_method(request):
+    """
+    Estadísticas de pagos agrupadas por método de pago con comparativas
+
+    Query params:
+        date_start: Fecha inicio (YYYY-MM-DD)
+        date_stop: Fecha fin (YYYY-MM-DD)
+
+    Returns:
+        {
+            "success": true,
+            "data": [
+                {
+                    "payment_method": "Transferencia",
+                    "current_count": 32,
+                    "current_revenue": 1280000.0,
+                    "previous_month_count": 28,
+                    "previous_month_revenue": 1100000.0,
+                    "previous_year_count": 25,
+                    "previous_year_revenue": 950000.0
+                },
+                ...
+            ]
+        }
+    """
+    try:
+        # Obtener parámetros de fecha
+        date_start_str = request.GET.get('date_start')
+        date_stop_str = request.GET.get('date_stop')
+
+        # Si no hay fechas, usar desde día 1 hasta hoy del mes actual
+        if not date_start_str or not date_stop_str:
+            today = timezone.now().date()
+            date_start = today.replace(day=1)
+            date_stop = today
+        else:
+            date_start = parse_date(date_start_str)
+            date_stop = parse_date(date_stop_str)
+
+            if not date_start or not date_stop:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Formato de fecha inválido. Usa YYYY-MM-DD'
+                }, status=400)
+
+        # Calcular día del mes para comparativas (usar mismo día)
+        day_of_month = date_stop.day
+
+        # Mes anterior
+        if date_start.month == 1:
+            prev_month_start = date_start.replace(year=date_start.year - 1, month=12)
+            try:
+                prev_month_stop = prev_month_start.replace(day=day_of_month)
+            except ValueError:
+                import calendar
+                last_day = calendar.monthrange(prev_month_start.year, prev_month_start.month)[1]
+                prev_month_stop = prev_month_start.replace(day=last_day)
+        else:
+            prev_month_start = date_start.replace(month=date_start.month - 1)
+            try:
+                prev_month_stop = prev_month_start.replace(day=day_of_month)
+            except ValueError:
+                import calendar
+                last_day = calendar.monthrange(prev_month_start.year, prev_month_start.month)[1]
+                prev_month_stop = prev_month_start.replace(day=last_day)
+
+        # Año anterior
+        prev_year_start = date_start.replace(year=date_start.year - 1)
+        try:
+            prev_year_stop = date_stop.replace(year=date_stop.year - 1)
+        except ValueError:
+            prev_year_stop = prev_year_start.replace(day=28)
+
+        # Mapeo de métodos de pago a nombres simplificados
+        payment_method_map = {
+            'tarjeta': 'Tarjeta',
+            'efectivo': 'Efectivo',
+            'transferencia': 'Transferencia',
+            'webpay': 'WebPay',
+            'flow': 'Flow',
+            'mercadopago': 'Mercado Pago',
+            'mercadopago_link': 'Mercado Pago',
+            'giftcard': 'Gift Card',
+            'descuento': 'Descuento',
+            'scotiabank': 'Transferencia',
+            'bancoestado': 'Transferencia',
+            'cuentarut': 'Transferencia',
+            'machjorge': 'Mach',
+            'machalda': 'Mach',
+            'bicegoalda': 'Transferencia',
+            'bcialda': 'Transferencia',
+            'andesalda': 'Transferencia',
+            'mercadopagoaremko': 'Mercado Pago',
+            'scotiabankalda': 'Transferencia',
+            'copecjorge': 'Copec',
+            'copecalda': 'Copec',
+            'booking': 'Booking',
+        }
+
+        def get_payment_stats(start_date, end_date):
+            """Helper para obtener stats de pagos en un período"""
+            stats = Pago.objects.filter(
+                fecha_pago__date__gte=start_date,
+                fecha_pago__date__lte=end_date,
+                venta_reserva__estado_pago__in=['pagado', 'parcial']
+            ).values(
+                'metodo_pago'
+            ).annotate(
+                count=Count('id'),
+                revenue=Sum('monto')
+            )
+
+            # Agrupar por método simplificado
+            result = {}
+            for stat in stats:
+                metodo_original = stat['metodo_pago']
+                metodo_simplificado = payment_method_map.get(metodo_original, metodo_original.capitalize())
+
+                if metodo_simplificado not in result:
+                    result[metodo_simplificado] = {
+                        'count': 0,
+                        'revenue': 0
+                    }
+
+                result[metodo_simplificado]['count'] += stat['count']
+                result[metodo_simplificado]['revenue'] += float(stat['revenue'] or 0)
+
+            return result
+
+        # Obtener stats para cada período
+        current_stats = get_payment_stats(date_start, date_stop)
+        prev_month_stats = get_payment_stats(prev_month_start, prev_month_stop)
+        prev_year_stats = get_payment_stats(prev_year_start, prev_year_stop)
+
+        # Combinar todos los métodos
+        all_methods = set(current_stats.keys()) | set(prev_month_stats.keys()) | set(prev_year_stats.keys())
+
+        # Formatear respuesta
+        payment_stats = []
+        for method in all_methods:
+            current = current_stats.get(method, {'count': 0, 'revenue': 0})
+            prev_month = prev_month_stats.get(method, {'count': 0, 'revenue': 0})
+            prev_year = prev_year_stats.get(method, {'count': 0, 'revenue': 0})
+
+            payment_stats.append({
+                'payment_method': method,
+                'current_count': current['count'],
+                'current_revenue': current['revenue'],
+                'previous_month_count': prev_month['count'],
+                'previous_month_revenue': prev_month['revenue'],
+                'previous_year_count': prev_year['count'],
+                'previous_year_revenue': prev_year['revenue']
+            })
+
+        # Ordenar por current_revenue descendente
+        payment_stats.sort(key=lambda x: x['current_revenue'], reverse=True)
+
+        logger.info(f"aremko-cli: Payment method stats requested for {date_start} to {date_stop}")
+        return JsonResponse({
+            'success': True,
+            'data': payment_stats
+        })
+
+    except Exception as e:
+        logger.error(f"Error in bookings_by_payment_method: {str(e)}")
         return JsonResponse({
             'success': False,
             'error': str(e)
