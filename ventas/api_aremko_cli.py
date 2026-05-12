@@ -242,7 +242,7 @@ def clients_stats(request):
 @require_http_methods(["GET"])
 def bookings_by_family(request):
     """
-    Estadísticas de reservas agrupadas por familia de servicio
+    Estadísticas de reservas agrupadas por familia de servicio con comparativas
 
     Query params:
         date_start: Fecha inicio (YYYY-MM-DD)
@@ -254,8 +254,9 @@ def bookings_by_family(request):
             "data": [
                 {
                     "family": "Masajes",
-                    "count": 32,
-                    "revenue": 1280000.0
+                    "current_count": 32,
+                    "previous_month_count": 28,
+                    "previous_year_count": 25
                 },
                 ...
             ]
@@ -266,10 +267,11 @@ def bookings_by_family(request):
         date_start_str = request.GET.get('date_start')
         date_stop_str = request.GET.get('date_stop')
 
-        # Si no hay fechas, usar última semana
+        # Si no hay fechas, usar primeros 11 días del mes actual
         if not date_start_str or not date_stop_str:
-            date_stop = timezone.now().date()
-            date_start = date_stop - timedelta(days=7)
+            today = timezone.now().date()
+            date_start = today.replace(day=1)
+            date_stop = today.replace(day=11)
         else:
             date_start = parse_date(date_start_str)
             date_stop = parse_date(date_stop_str)
@@ -280,6 +282,19 @@ def bookings_by_family(request):
                     'error': 'Formato de fecha inválido. Usa YYYY-MM-DD'
                 }, status=400)
 
+        # Calcular rangos comparativos
+        # Mes anterior: mismos días pero del mes anterior
+        if date_start.month == 1:
+            prev_month_start = date_start.replace(year=date_start.year - 1, month=12)
+            prev_month_stop = date_stop.replace(year=date_stop.year - 1, month=12)
+        else:
+            prev_month_start = date_start.replace(month=date_start.month - 1)
+            prev_month_stop = date_stop.replace(month=date_stop.month - 1)
+
+        # Año anterior: mismo mes y días pero del año anterior
+        prev_year_start = date_start.replace(year=date_start.year - 1)
+        prev_year_stop = date_stop.replace(year=date_stop.year - 1)
+
         # Mapeo de tipos de servicio a nombres de familia
         family_names = {
             'masaje': 'Masajes',
@@ -288,30 +303,47 @@ def bookings_by_family(request):
             'otro': 'Otros'
         }
 
-        # Consultar reservas de servicios agrupadas por tipo
-        reservas_servicios = ReservaServicio.objects.filter(
-            venta_reserva__fecha_creacion__date__gte=date_start,
-            venta_reserva__fecha_creacion__date__lte=date_stop
-        ).exclude(
-            venta_reserva__estado_pago='cancelado'
-        ).values(
-            'servicio__tipo_servicio'
-        ).annotate(
-            count=Count('id'),
-            revenue=Sum('precio_unitario_venta')
-        ).order_by('-revenue')
+        def get_family_stats(start_date, end_date):
+            """Helper para obtener stats de un período"""
+            stats = ReservaServicio.objects.filter(
+                venta_reserva__fecha_creacion__date__gte=start_date,
+                venta_reserva__fecha_creacion__date__lte=end_date
+            ).exclude(
+                venta_reserva__estado_pago='cancelado'
+            ).values(
+                'servicio__tipo_servicio'
+            ).annotate(
+                count=Count('id')
+            )
 
-        # Formatear respuesta con nombres de familia legibles
+            # Convertir a dict para fácil acceso
+            result = {}
+            for stat in stats:
+                tipo = stat['servicio__tipo_servicio']
+                result[tipo] = stat['count']
+            return result
+
+        # Obtener stats para cada período
+        current_stats = get_family_stats(date_start, date_stop)
+        prev_month_stats = get_family_stats(prev_month_start, prev_month_stop)
+        prev_year_stats = get_family_stats(prev_year_start, prev_year_stop)
+
+        # Combinar todas las familias (todas las que aparecen en cualquier período)
+        all_families = set(current_stats.keys()) | set(prev_month_stats.keys()) | set(prev_year_stats.keys())
+
+        # Formatear respuesta
         family_stats = []
-        for stat in reservas_servicios:
-            tipo = stat['servicio__tipo_servicio']
+        for tipo in all_families:
             family_name = family_names.get(tipo, tipo.capitalize())
-
             family_stats.append({
                 'family': family_name,
-                'count': stat['count'],
-                'revenue': float(stat['revenue'] or 0)
+                'current_count': current_stats.get(tipo, 0),
+                'previous_month_count': prev_month_stats.get(tipo, 0),
+                'previous_year_count': prev_year_stats.get(tipo, 0)
             })
+
+        # Ordenar por current_count descendente
+        family_stats.sort(key=lambda x: x['current_count'], reverse=True)
 
         logger.info(f"aremko-cli: Family stats requested for {date_start} to {date_stop}")
         return JsonResponse({
