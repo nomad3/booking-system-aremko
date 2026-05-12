@@ -267,11 +267,11 @@ def bookings_by_family(request):
         date_start_str = request.GET.get('date_start')
         date_stop_str = request.GET.get('date_stop')
 
-        # Si no hay fechas, usar primeros 11 días del mes actual
+        # Si no hay fechas, usar desde día 1 hasta hoy del mes actual
         if not date_start_str or not date_stop_str:
             today = timezone.now().date()
             date_start = today.replace(day=1)
-            date_stop = today.replace(day=11)
+            date_stop = today
         else:
             date_start = parse_date(date_start_str)
             date_stop = parse_date(date_stop_str)
@@ -282,18 +282,35 @@ def bookings_by_family(request):
                     'error': 'Formato de fecha inválido. Usa YYYY-MM-DD'
                 }, status=400)
 
-        # Calcular rangos comparativos
-        # Mes anterior: mismos días pero del mes anterior
+        # Calcular día del mes para comparativas (usar mismo día)
+        day_of_month = date_stop.day
+
+        # Mes anterior: mismo día del mes anterior
         if date_start.month == 1:
             prev_month_start = date_start.replace(year=date_start.year - 1, month=12)
-            prev_month_stop = date_stop.replace(year=date_stop.year - 1, month=12)
+            try:
+                prev_month_stop = prev_month_start.replace(day=day_of_month)
+            except ValueError:
+                # Si el día no existe en el mes anterior (ej: 31 en feb), usar último día
+                import calendar
+                last_day = calendar.monthrange(prev_month_start.year, prev_month_start.month)[1]
+                prev_month_stop = prev_month_start.replace(day=last_day)
         else:
             prev_month_start = date_start.replace(month=date_start.month - 1)
-            prev_month_stop = date_stop.replace(month=date_stop.month - 1)
+            try:
+                prev_month_stop = prev_month_start.replace(day=day_of_month)
+            except ValueError:
+                import calendar
+                last_day = calendar.monthrange(prev_month_start.year, prev_month_start.month)[1]
+                prev_month_stop = prev_month_start.replace(day=last_day)
 
-        # Año anterior: mismo mes y días pero del año anterior
+        # Año anterior: mismo mes y día pero del año anterior
         prev_year_start = date_start.replace(year=date_start.year - 1)
-        prev_year_stop = date_stop.replace(year=date_stop.year - 1)
+        try:
+            prev_year_stop = date_stop.replace(year=date_stop.year - 1)
+        except ValueError:
+            # Caso 29 feb en año no bisiesto
+            prev_year_stop = prev_year_start.replace(day=28)
 
         # Mapeo de tipos de servicio a nombres de familia
         family_names = {
