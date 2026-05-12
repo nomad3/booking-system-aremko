@@ -290,15 +290,15 @@ def bookings_by_family(request):
 
         # Consultar reservas de servicios agrupadas por tipo
         reservas_servicios = ReservaServicio.objects.filter(
-            reserva__fecha_creacion__date__gte=date_start,
-            reserva__fecha_creacion__date__lte=date_stop
+            venta_reserva__fecha_creacion__date__gte=date_start,
+            venta_reserva__fecha_creacion__date__lte=date_stop
         ).exclude(
-            reserva__estado_pago='cancelado'
+            venta_reserva__estado_pago='cancelado'
         ).values(
             'servicio__tipo_servicio'
         ).annotate(
             count=Count('id'),
-            revenue=Sum('precio_total')
+            revenue=Sum('precio_unitario_venta')
         ).order_by('-revenue')
 
         # Formatear respuesta con nombres de familia legibles
