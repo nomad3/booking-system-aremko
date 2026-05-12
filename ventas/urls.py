@@ -322,6 +322,7 @@ urlpatterns = [
     path('api/aremko-cli/health/', api_aremko_cli.health_check, name='aremko_cli_health'),
     path('api/aremko-cli/bookings/stats/', api_aremko_cli.bookings_stats, name='aremko_cli_bookings_stats'),
     path('api/aremko-cli/bookings/daily/', api_aremko_cli.bookings_daily, name='aremko_cli_bookings_daily'),
+    path('api/aremko-cli/bookings/by-family/', api_aremko_cli.bookings_by_family, name='aremko_cli_bookings_by_family'),
     path('api/aremko-cli/clients/stats/', api_aremko_cli.clients_stats, name='aremko_cli_clients_stats'),
     # === END AREMKO-CLI API ===
 

@@ -240,6 +240,95 @@ def clients_stats(request):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+def bookings_by_family(request):
+    """
+    Estadísticas de reservas agrupadas por familia de servicio
+
+    Query params:
+        date_start: Fecha inicio (YYYY-MM-DD)
+        date_stop: Fecha fin (YYYY-MM-DD)
+
+    Returns:
+        {
+            "success": true,
+            "data": [
+                {
+                    "family": "Masajes",
+                    "count": 32,
+                    "revenue": 1280000.0
+                },
+                ...
+            ]
+        }
+    """
+    try:
+        # Obtener parámetros de fecha
+        date_start_str = request.GET.get('date_start')
+        date_stop_str = request.GET.get('date_stop')
+
+        # Si no hay fechas, usar última semana
+        if not date_start_str or not date_stop_str:
+            date_stop = timezone.now().date()
+            date_start = date_stop - timedelta(days=7)
+        else:
+            date_start = parse_date(date_start_str)
+            date_stop = parse_date(date_stop_str)
+
+            if not date_start or not date_stop:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Formato de fecha inválido. Usa YYYY-MM-DD'
+                }, status=400)
+
+        # Mapeo de tipos de servicio a nombres de familia
+        family_names = {
+            'masaje': 'Masajes',
+            'tina': 'Tinas',
+            'cabana': 'Cabañas',
+            'otro': 'Otros'
+        }
+
+        # Consultar reservas de servicios agrupadas por tipo
+        reservas_servicios = ReservaServicio.objects.filter(
+            reserva__fecha_creacion__date__gte=date_start,
+            reserva__fecha_creacion__date__lte=date_stop
+        ).exclude(
+            reserva__estado_pago='cancelado'
+        ).values(
+            'servicio__tipo_servicio'
+        ).annotate(
+            count=Count('id'),
+            revenue=Sum('precio_total')
+        ).order_by('-revenue')
+
+        # Formatear respuesta con nombres de familia legibles
+        family_stats = []
+        for stat in reservas_servicios:
+            tipo = stat['servicio__tipo_servicio']
+            family_name = family_names.get(tipo, tipo.capitalize())
+
+            family_stats.append({
+                'family': family_name,
+                'count': stat['count'],
+                'revenue': float(stat['revenue'] or 0)
+            })
+
+        logger.info(f"aremko-cli: Family stats requested for {date_start} to {date_stop}")
+        return JsonResponse({
+            'success': True,
+            'data': family_stats
+        })
+
+    except Exception as e:
+        logger.error(f"Error in bookings_by_family: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
 def health_check(request):
     """
     Health check para verificar que la API está funcionando
