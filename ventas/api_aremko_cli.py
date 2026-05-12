@@ -313,14 +313,18 @@ def bookings_by_family(request):
             ).values(
                 'servicio__tipo_servicio'
             ).annotate(
-                count=Count('id')
+                count=Count('id'),
+                revenue=Sum('precio_unitario_venta')
             )
 
             # Convertir a dict para fácil acceso
             result = {}
             for stat in stats:
                 tipo = stat['servicio__tipo_servicio']
-                result[tipo] = stat['count']
+                result[tipo] = {
+                    'count': stat['count'],
+                    'revenue': float(stat['revenue'] or 0)
+                }
             return result
 
         # Obtener stats para cada período
@@ -335,15 +339,22 @@ def bookings_by_family(request):
         family_stats = []
         for tipo in all_families:
             family_name = family_names.get(tipo, tipo.capitalize())
+            current = current_stats.get(tipo, {'count': 0, 'revenue': 0})
+            prev_month = prev_month_stats.get(tipo, {'count': 0, 'revenue': 0})
+            prev_year = prev_year_stats.get(tipo, {'count': 0, 'revenue': 0})
+
             family_stats.append({
                 'family': family_name,
-                'current_count': current_stats.get(tipo, 0),
-                'previous_month_count': prev_month_stats.get(tipo, 0),
-                'previous_year_count': prev_year_stats.get(tipo, 0)
+                'current_count': current['count'],
+                'current_revenue': current['revenue'],
+                'previous_month_count': prev_month['count'],
+                'previous_month_revenue': prev_month['revenue'],
+                'previous_year_count': prev_year['count'],
+                'previous_year_revenue': prev_year['revenue']
             })
 
-        # Ordenar por current_count descendente
-        family_stats.sort(key=lambda x: x['current_count'], reverse=True)
+        # Ordenar por current_revenue descendente
+        family_stats.sort(key=lambda x: x['current_revenue'], reverse=True)
 
         logger.info(f"aremko-cli: Family stats requested for {date_start} to {date_stop}")
         return JsonResponse({
