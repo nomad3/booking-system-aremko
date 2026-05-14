@@ -829,8 +829,9 @@ def reviews_summary(request):
     from decimal import Decimal
     from ventas.models import EncuestaSatisfaccion, ReviewSnapshot, Review
 
-    # Fecha hace 4 semanas
-    fecha_inicio = timezone.now() - timedelta(weeks=4)
+    try:
+        # Fecha hace 4 semanas
+        fecha_inicio = timezone.now() - timedelta(weeks=4)
 
     # === 1. ENCUESTAS DE SATISFACCIÓN ===
     encuestas = EncuestaSatisfaccion.objects.filter(
@@ -930,24 +931,31 @@ def reviews_summary(request):
             'respuesta_publicada_at': review.respuesta_publicada_at.strftime('%Y-%m-%d %H:%M') if review.respuesta_publicada_at else None,
         })
 
-    # === RESPUESTA FINAL ===
-    return Response({
-        'success': True,
-        'periodo': {
-            'fecha_inicio': fecha_inicio.strftime('%Y-%m-%d'),
-            'fecha_fin': timezone.now().strftime('%Y-%m-%d'),
-        },
-        'encuestas_satisfaccion': {
-            'total': total_encuestas,
-            'nps': {
-                'score': nps_score,
-                'promotores': promotores,
-                'pasivos': pasivos,
-                'detractores': detractores,
+        # === RESPUESTA FINAL ===
+        return Response({
+            'success': True,
+            'periodo': {
+                'fecha_inicio': fecha_inicio.strftime('%Y-%m-%d'),
+                'fecha_fin': timezone.now().strftime('%Y-%m-%d'),
             },
-            'calificaciones_promedio': calificaciones_promedio,
-            'reviews_destacadas': reviews_destacadas,
-        },
-        'snapshots': snapshot_data,
-        'reviews_recientes': reviews_list,
-    })
+            'encuestas_satisfaccion': {
+                'total': total_encuestas,
+                'nps': {
+                    'score': nps_score,
+                    'promotores': promotores,
+                    'pasivos': pasivos,
+                    'detractores': detractores,
+                },
+                'calificaciones_promedio': calificaciones_promedio,
+                'reviews_destacadas': reviews_destacadas,
+            },
+            'snapshots': snapshot_data,
+            'reviews_recientes': reviews_list,
+        })
+    except Exception as e:
+        import traceback
+        return Response({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+        }, status=500)
