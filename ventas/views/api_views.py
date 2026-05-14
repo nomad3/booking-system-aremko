@@ -9,7 +9,8 @@ from django.db import transaction
 from django.utils import timezone
 from ..models import ( # Relative imports
     Proveedor, CategoriaProducto, Producto, VentaReserva, Cliente, Pago,
-    Servicio, ReservaProducto, ReservaServicio, CategoriaServicio, Region, Comuna
+    Servicio, ReservaProducto, ReservaServicio, CategoriaServicio, Region, Comuna,
+    EncuestaSatisfaccion, ReviewSnapshot, Review
 )
 # Import Cliente and Servicio models directly for the new views
 from ..models import Cliente, Servicio, Proveedor
@@ -804,3 +805,148 @@ def cron_send_email_batch(request):
             "error": str(e),
             "output": output.getvalue()[-3000:],
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def reviews_summary(request):
+    """
+    Endpoint para obtener resumen de opiniones y reviews para el brief semanal.
+
+    Retorna:
+    - Encuestas de satisfacción (últimas 4 semanas): NPS, calificaciones promedio
+    - Review snapshots (Google/TripAdvisor): ratings actuales y deltas
+    - Reviews individuales recientes (últimas 10)
+
+    Auth: header X-API-KEY con AUTOMATION_API_KEY (opcional, público por defecto).
+
+    Ejemplo de uso desde backend Go:
+    GET https://www.aremko.cl/api/reviews-summary/
+    """
+    from datetime import datetime, timedelta
+    from django.db.models import Avg, Count, Q
+    from decimal import Decimal
+
+    # Fecha hace 4 semanas
+    fecha_inicio = timezone.now() - timedelta(weeks=4)
+
+    # === 1. ENCUESTAS DE SATISFACCIÓN ===
+    encuestas = EncuestaSatisfaccion.objects.filter(
+        fecha_respuesta__gte=fecha_inicio
+    )
+
+    total_encuestas = encuestas.count()
+
+    # NPS: promotores (9-10), pasivos (7-8), detractores (0-6)
+    promotores = encuestas.filter(nps_score__gte=9).count()
+    pasivos = encuestas.filter(nps_score__in=[7, 8]).count()
+    detractores = encuestas.filter(nps_score__lte=6).count()
+
+    # NPS score: % promotores - % detractores
+    nps_score = None
+    if total_encuestas > 0:
+        nps_score = int(((promotores - detractores) / total_encuestas) * 100)
+
+    # Promedios de calificaciones (1-5 estrellas)
+    calificaciones_promedio = encuestas.aggregate(
+        temperatura_tina=Avg('cal_temperatura_tina'),
+        transparencia_agua=Avg('cal_transparencia_agua'),
+        limpieza_tinas=Avg('cal_limpieza_tinas'),
+        limpieza_cabana=Avg('cal_limpieza_cabana'),
+        temperatura_cabana=Avg('cal_temperatura_cabana'),
+        limpieza_sala_masajes=Avg('cal_limpieza_sala_masajes'),
+        servicio_masajes=Avg('cal_servicio_masajes'),
+        calidad_precio=Avg('cal_calidad_precio'),
+        atencion_ventas=Avg('cal_atencion_ventas'),
+        compra_web=Avg('cal_compra_web'),
+        atencion_visita=Avg('cal_atencion_visita'),
+        experiencia_general=Avg('cal_experiencia_general'),
+    )
+
+    # Convertir Decimal a float para JSON
+    for key in calificaciones_promedio:
+        if calificaciones_promedio[key] is not None:
+            calificaciones_promedio[key] = float(calificaciones_promedio[key])
+
+    # Reviews destacadas (alto NPS con comentarios)
+    encuestas_destacadas = encuestas.filter(
+        nps_score__gte=9
+    ).exclude(
+        Q(lo_que_mas_gusto='') | Q(lo_que_mas_gusto__isnull=True)
+    ).order_by('-fecha_respuesta')[:5]
+
+    reviews_destacadas = []
+    for enc in encuestas_destacadas:
+        reviews_destacadas.append({
+            'fecha': enc.fecha_respuesta.strftime('%Y-%m-%d'),
+            'nps_score': enc.nps_score,
+            'experiencia_general': enc.cal_experiencia_general,
+            'comentario': enc.lo_que_mas_gusto[:200],  # Primeros 200 caracteres
+            'autor': enc.contacto_nombre or 'Anónimo',
+        })
+
+    # === 2. REVIEW SNAPSHOTS (Google/TripAdvisor) ===
+    ultimo_snapshot = ReviewSnapshot.objects.order_by('-fecha').first()
+
+    snapshot_data = None
+    if ultimo_snapshot:
+        deltas = ultimo_snapshot.deltas() or {}
+        snapshot_data = {
+            'fecha': ultimo_snapshot.fecha.strftime('%Y-%m-%d'),
+            'google': {
+                'rating': float(ultimo_snapshot.google_rating),
+                'total': ultimo_snapshot.google_total,
+                'rating_delta': float(deltas.get('google_rating_delta', 0)),
+                'total_delta': deltas.get('google_total_delta', 0),
+                'url': ultimo_snapshot.google_url,
+            },
+            'tripadvisor': {
+                'rating': float(ultimo_snapshot.tripadvisor_rating),
+                'total': ultimo_snapshot.tripadvisor_total,
+                'rating_delta': float(deltas.get('tripadvisor_rating_delta', 0)),
+                'total_delta': deltas.get('tripadvisor_total_delta', 0),
+                'url': ultimo_snapshot.tripadvisor_url,
+            },
+            'notas': ultimo_snapshot.notas,
+        }
+
+    # === 3. REVIEWS INDIVIDUALES RECIENTES ===
+    reviews_recientes = Review.objects.order_by('-fecha_review')[:10]
+
+    reviews_list = []
+    for review in reviews_recientes:
+        reviews_list.append({
+            'id': review.id,
+            'fuente': review.fuente,
+            'fecha': review.fecha_review.strftime('%Y-%m-%d'),
+            'autor': review.autor,
+            'rating': review.rating,
+            'texto': review.texto[:300] if review.texto else '',  # Primeros 300 caracteres
+            'idioma': review.idioma,
+            'sentimiento': review.sentimiento,
+            'respuesta_publicada': review.respuesta_publicada,
+            'respuesta_publicada_at': review.respuesta_publicada_at.strftime('%Y-%m-%d %H:%M') if review.respuesta_publicada_at else None,
+        })
+
+    # === RESPUESTA FINAL ===
+    return Response({
+        'success': True,
+        'periodo': {
+            'fecha_inicio': fecha_inicio.strftime('%Y-%m-%d'),
+            'fecha_fin': timezone.now().strftime('%Y-%m-%d'),
+        },
+        'encuestas_satisfaccion': {
+            'total': total_encuestas,
+            'nps': {
+                'score': nps_score,
+                'promotores': promotores,
+                'pasivos': pasivos,
+                'detractores': detractores,
+            },
+            'calificaciones_promedio': calificaciones_promedio,
+            'reviews_destacadas': reviews_destacadas,
+        },
+        'snapshots': snapshot_data,
+        'reviews_recientes': reviews_list,
+    })

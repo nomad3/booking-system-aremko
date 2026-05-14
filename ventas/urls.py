@@ -185,6 +185,10 @@ urlpatterns = [
     # Llamar cada lunes 10:00 hora Chile.
     path('api/cron/marketing-brief/', api_views.cron_marketing_brief_weekly, name='cron_marketing_brief'),
 
+    # === API público de resumen de reviews para brief semanal ===
+    # Usado por aremko-cli (backend Go) para obtener métricas de opiniones
+    path('api/reviews-summary/', api_views.reviews_summary, name='reviews_summary'),
+
     # API para obtener comunas por región
     path('api/comunas-por-region/', api_views.comunas_por_region, name='comunas_por_region'),
     
