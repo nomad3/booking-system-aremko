@@ -827,6 +827,7 @@ def reviews_summary(request):
     from datetime import datetime, timedelta
     from django.db.models import Avg, Count, Q
     from decimal import Decimal
+    from ventas.models import EncuestaSatisfaccion, ReviewSnapshot, Review
 
     # Fecha hace 4 semanas
     fecha_inicio = timezone.now() - timedelta(weeks=4)
