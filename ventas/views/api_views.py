@@ -921,7 +921,7 @@ def reviews_summary(request):
             reviews_list.append({
                 'id': review.id,
                 'fuente': review.fuente,
-                'fecha': review.fecha_review.strftime('%Y-%m-%d'),
+                'fecha': review.fecha_review.strftime('%Y-%m-%d') if review.fecha_review else None,
                 'autor': review.autor,
                 'rating': review.rating,
                 'texto': review.texto[:300] if review.texto else '',  # Primeros 300 caracteres
@@ -930,9 +930,9 @@ def reviews_summary(request):
                 'respuesta_publicada': review.respuesta_publicada,
                 'respuesta_publicada_at': review.respuesta_publicada_at.strftime('%Y-%m-%d %H:%M') if review.respuesta_publicada_at else None,
             })
-    
-            # === RESPUESTA FINAL ===
-            return Response({
+
+        # === RESPUESTA FINAL ===
+        return Response({
                 'success': True,
                 'periodo': {
                     'fecha_inicio': fecha_inicio.strftime('%Y-%m-%d'),
