@@ -60,6 +60,8 @@ from .models import (
     # Brief semanal: cache analisis encuestas + objetivo de la semana
     WeeklySurveyAnalysis,
     WeeklyObjective,
+    # Competitor Analysis
+    Competitor, CompetitorSnapshot, CompetitorSocialMedia,
 )
 from django.http import HttpResponse
 import xlwt
@@ -4820,3 +4822,111 @@ class WeeklyObjectiveAdmin(admin.ModelAdmin):
         hoy = date.today()
         lunes = hoy - timedelta(days=hoy.weekday())
         return {'semana_inicio': lunes}
+
+
+# ============================================================================
+# COMPETITOR ANALYSIS ADMIN
+# ============================================================================
+
+@admin.register(Competitor)
+class CompetitorAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'website', 'activo', 'created_at')
+    list_filter = ('activo',)
+    search_fields = ('nombre', 'website')
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('nombre', 'website', 'activo', 'notas')
+        }),
+        ('Redes Sociales', {
+            'fields': ('facebook_url', 'instagram_url')
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at')
+        }),
+    )
+
+
+class CompetitorSnapshotInline(admin.TabularInline):
+    model = CompetitorSnapshot
+    extra = 0
+    readonly_fields = ('fecha_captura', 'scraping_exitoso')
+    fields = ('fecha_captura', 'precio_entrada_adulto', 'precio_entrada_nino', 'scraping_exitoso')
+    can_delete = False
+    max_num = 5
+    ordering = ('-fecha_captura',)
+
+
+@admin.register(CompetitorSnapshot)
+class CompetitorSnapshotAdmin(admin.ModelAdmin):
+    list_display = (
+        'competitor',
+        'fecha_captura',
+        'precio_entrada_adulto',
+        'tiene_piscinas_termales',
+        'tiene_masajes',
+        'scraping_exitoso'
+    )
+    list_filter = ('scraping_exitoso', 'tiene_piscinas_termales', 'tiene_masajes', 'competitor')
+    search_fields = ('competitor__nombre', 'promociones', 'meta_description')
+    readonly_fields = ('fecha_captura',)
+    date_hierarchy = 'fecha_captura'
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('competitor', 'fecha_captura', 'scraping_exitoso', 'error_mensaje')
+        }),
+        ('Precios', {
+            'fields': ('precio_entrada_adulto', 'precio_entrada_nino')
+        }),
+        ('Servicios', {
+            'fields': (
+                'tiene_piscinas_termales',
+                'tiene_masajes',
+                'tiene_restaurant',
+                'tiene_alojamiento'
+            )
+        }),
+        ('Otros Datos', {
+            'fields': ('horario_texto', 'promociones', 'meta_description')
+        }),
+        ('Datos Raw (Debug)', {
+            'fields': ('datos_raw',),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(CompetitorSocialMedia)
+class CompetitorSocialMediaAdmin(admin.ModelAdmin):
+    list_display = (
+        'competitor',
+        'fecha_captura',
+        'facebook_seguidores',
+        'instagram_seguidores',
+        'engagement_rate',
+        'posts_ultima_semana'
+    )
+    list_filter = ('competitor',)
+    search_fields = ('competitor__nombre', 'notas')
+    readonly_fields = ('fecha_captura',)
+    date_hierarchy = 'fecha_captura'
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('competitor', 'fecha_captura')
+        }),
+        ('Facebook', {
+            'fields': ('facebook_seguidores', 'facebook_me_gusta')
+        }),
+        ('Instagram', {
+            'fields': ('instagram_seguidores', 'instagram_publicaciones_count')
+        }),
+        ('Engagement', {
+            'fields': ('engagement_rate', 'posts_ultima_semana', 'notas')
+        }),
+        ('Datos Raw (Debug)', {
+            'fields': ('datos_raw',),
+            'classes': ('collapse',)
+        }),
+    )

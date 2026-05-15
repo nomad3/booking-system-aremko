@@ -5764,3 +5764,168 @@ class WeeklyObjective(models.Model):
 
     def __str__(self):
         return f'Objetivo semana {self.semana_inicio.strftime("%d-%m-%Y")}'
+
+
+# ============================================================================
+# COMPETITOR ANALYSIS MODELS
+# ============================================================================
+
+class Competitor(models.Model):
+    """Registro maestro de cada competidor a monitorear."""
+    
+    nombre = models.CharField(max_length=200, unique=True, db_index=True)
+    website = models.URLField(help_text='URL principal del sitio web')
+    activo = models.BooleanField(
+        default=True,
+        help_text='Si está activo para scraping automático'
+    )
+    
+    # Redes sociales
+    facebook_url = models.URLField(blank=True, null=True)
+    instagram_url = models.URLField(blank=True, null=True)
+    
+    # Metadata
+    notas = models.TextField(blank=True, help_text='Notas internas sobre el competidor')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Competidor'
+        verbose_name_plural = 'Competidores'
+        ordering = ['nombre']
+    
+    def __str__(self):
+        return self.nombre
+
+
+class CompetitorSnapshot(models.Model):
+    """Snapshot periódico de datos scrapeados del sitio web del competidor."""
+    
+    competitor = models.ForeignKey(
+        Competitor,
+        on_delete=models.CASCADE,
+        related_name='snapshots'
+    )
+    fecha_captura = models.DateTimeField(auto_now_add=True, db_index=True)
+    
+    # Datos extraídos del sitio
+    precio_entrada_adulto = models.DecimalField(
+        max_digits=10,
+        decimal_places=0,
+        null=True,
+        blank=True,
+        help_text='Precio de entrada general adulto en CLP'
+    )
+    precio_entrada_nino = models.DecimalField(
+        max_digits=10,
+        decimal_places=0,
+        null=True,
+        blank=True,
+        help_text='Precio entrada niño en CLP'
+    )
+    
+    # Servicios detectados (checkboxes básicos)
+    tiene_piscinas_termales = models.BooleanField(default=False)
+    tiene_masajes = models.BooleanField(default=False)
+    tiene_restaurant = models.BooleanField(default=False)
+    tiene_alojamiento = models.BooleanField(default=False)
+    
+    # Horarios
+    horario_texto = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text='Horario de atención extraído del sitio'
+    )
+    
+    # Promociones activas
+    promociones = models.TextField(
+        blank=True,
+        help_text='Texto de promociones activas encontradas'
+    )
+    
+    # Meta tags
+    meta_description = models.TextField(
+        blank=True,
+        help_text='Meta description del sitio (propuesta de valor)'
+    )
+    
+    # Datos raw para debugging
+    datos_raw = models.JSONField(
+        null=True,
+        blank=True,
+        help_text='Datos crudos extraídos del scraping para debugging'
+    )
+    
+    # Estado del scraping
+    scraping_exitoso = models.BooleanField(default=True)
+    error_mensaje = models.TextField(blank=True, help_text='Mensaje de error si el scraping falló')
+    
+    class Meta:
+        verbose_name = 'Snapshot de competidor'
+        verbose_name_plural = 'Snapshots de competidores'
+        ordering = ['-fecha_captura']
+        indexes = [
+            models.Index(fields=['competitor', '-fecha_captura']),
+        ]
+    
+    def __str__(self):
+        return f'{self.competitor.nombre} - {self.fecha_captura.strftime("%Y-%m-%d %H:%M")}'
+
+
+class CompetitorSocialMedia(models.Model):
+    """Métricas de redes sociales del competidor."""
+    
+    competitor = models.ForeignKey(
+        Competitor,
+        on_delete=models.CASCADE,
+        related_name='social_media_metrics'
+    )
+    fecha_captura = models.DateTimeField(auto_now_add=True, db_index=True)
+    
+    # Facebook
+    facebook_seguidores = models.IntegerField(null=True, blank=True)
+    facebook_me_gusta = models.IntegerField(null=True, blank=True)
+    
+    # Instagram
+    instagram_seguidores = models.IntegerField(null=True, blank=True)
+    instagram_publicaciones_count = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Cantidad de posts totales'
+    )
+    
+    # Engagement estimado (likes+comments de últimos posts)
+    engagement_rate = models.FloatField(
+        null=True,
+        blank=True,
+        help_text='(likes+comments)/followers promedio últimos posts'
+    )
+    
+    # Frecuencia de publicación
+    posts_ultima_semana = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Cantidad de posts en los últimos 7 días'
+    )
+    
+    # Metadata
+    notas = models.TextField(
+        blank=True,
+        help_text='Observaciones sobre la estrategia de contenido'
+    )
+    datos_raw = models.JSONField(
+        null=True,
+        blank=True,
+        help_text='Datos crudos para análisis posterior'
+    )
+    
+    class Meta:
+        verbose_name = 'Métricas de redes sociales de competidor'
+        verbose_name_plural = 'Métricas de redes sociales de competidores'
+        ordering = ['-fecha_captura']
+        indexes = [
+            models.Index(fields=['competitor', '-fecha_captura']),
+        ]
+    
+    def __str__(self):
+        return f'{self.competitor.nombre} - Social Media - {self.fecha_captura.strftime("%Y-%m-%d")}'

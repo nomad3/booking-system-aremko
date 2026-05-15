@@ -959,3 +959,102 @@ def reviews_summary(request):
             'error': str(e),
             'traceback': traceback.format_exc(),
         }, status=500)
+
+
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def competitors_summary(request):
+    """
+    Endpoint para obtener resumen de análisis de competencia.
+    
+    Retorna:
+    - Lista de competidores activos
+    - Último snapshot de cada competidor con precios y servicios
+    - Últimas métricas de redes sociales
+    - Comparación de precios con Aremko
+    """
+    from ventas.models import Competitor, CompetitorSnapshot, CompetitorSocialMedia
+    from datetime import timedelta
+    
+    try:
+        # Obtener todos los competidores activos
+        competitors = Competitor.objects.filter(activo=True).order_by('nombre')
+        
+        result_data = []
+        
+        for competitor in competitors:
+            # Último snapshot web
+            ultimo_snapshot = CompetitorSnapshot.objects.filter(
+                competitor=competitor,
+                scraping_exitoso=True
+            ).order_by('-fecha_captura').first()
+            
+            # Últimas métricas de redes sociales
+            ultima_social = CompetitorSocialMedia.objects.filter(
+                competitor=competitor
+            ).order_by('-fecha_captura').first()
+            
+            competitor_data = {
+                'id': competitor.id,
+                'nombre': competitor.nombre,
+                'website': competitor.website,
+                'snapshot': None,
+                'social_media': None,
+            }
+            
+            # Datos del último snapshot web
+            if ultimo_snapshot:
+                competitor_data['snapshot'] = {
+                    'fecha_captura': ultimo_snapshot.fecha_captura.strftime('%Y-%m-%d %H:%M'),
+                    'precio_entrada_adulto': float(ultimo_snapshot.precio_entrada_adulto) if ultimo_snapshot.precio_entrada_adulto else None,
+                    'precio_entrada_nino': float(ultimo_snapshot.precio_entrada_nino) if ultimo_snapshot.precio_entrada_nino else None,
+                    'servicios': {
+                        'piscinas_termales': ultimo_snapshot.tiene_piscinas_termales,
+                        'masajes': ultimo_snapshot.tiene_masajes,
+                        'restaurant': ultimo_snapshot.tiene_restaurant,
+                        'alojamiento': ultimo_snapshot.tiene_alojamiento,
+                    },
+                    'horario': ultimo_snapshot.horario_texto,
+                    'promociones': ultimo_snapshot.promociones,
+                    'meta_description': ultimo_snapshot.meta_description,
+                }
+            
+            # Datos de redes sociales
+            if ultima_social:
+                competitor_data['social_media'] = {
+                    'fecha_captura': ultima_social.fecha_captura.strftime('%Y-%m-%d'),
+                    'facebook_seguidores': ultima_social.facebook_seguidores,
+                    'instagram_seguidores': ultima_social.instagram_seguidores,
+                    'instagram_posts': ultima_social.instagram_publicaciones_count,
+                    'engagement_rate': float(ultima_social.engagement_rate) if ultima_social.engagement_rate else None,
+                    'posts_ultima_semana': ultima_social.posts_ultima_semana,
+                }
+            
+            result_data.append(competitor_data)
+        
+        # Agregar precio de Aremko para comparación
+        # Buscar precio de entrada general de Aremko (suponiendo que existe un servicio "Entrada Termas")
+        from ventas.models import Servicio
+        entrada_aremko = Servicio.objects.filter(
+            nombre__icontains='entrada'
+        ).order_by('precio').first()
+        
+        precio_aremko_adulto = float(entrada_aremko.precio) if entrada_aremko else None
+        
+        return Response({
+            'success': True,
+            'competitors': result_data,
+            'aremko_precio_referencia': {
+                'precio_entrada_adulto': precio_aremko_adulto,
+            },
+            'generated_at': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+        })
+        
+    except Exception as e:
+        import traceback
+        return Response({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+        }, status=500)

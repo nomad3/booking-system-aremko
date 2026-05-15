@@ -189,6 +189,10 @@ urlpatterns = [
     # Usado por aremko-cli (backend Go) para obtener métricas de opiniones
     path('api/reviews-summary/', api_views.reviews_summary, name='reviews_summary'),
 
+    # === API público de análisis de competencia ===
+    # Usado por aremko-cli (backend Go) para obtener datos de competidores
+    path('api/competitors-summary/', api_views.competitors_summary, name='competitors_summary'),
+
     # API para obtener comunas por región
     path('api/comunas-por-region/', api_views.comunas_por_region, name='comunas_por_region'),
     
