@@ -576,11 +576,25 @@ def agenda_operativa(request):
         }
 
     # --- Comandas pendientes de clientes (para sección destacada) ---
+    # Filtro: solo mostrar comandas cuyos servicios asociados son HOY,
+    # para que cocina no prepare pedidos de reservas que llegan en días siguientes.
+    # Regla:
+    #   - Si fecha_entrega_objetivo está definida → debe caer en HOY.
+    #   - Si fecha_entrega_objetivo es NULL → al menos un ReservaServicio
+    #     de la venta_reserva debe tener fecha_agendamiento = HOY.
     comandas_pendientes = (
         Comanda.objects.filter(
             estado__in=['pendiente', 'procesando'],
             creada_por_cliente=True,
         )
+        .filter(
+            Q(fecha_entrega_objetivo__date=hoy)
+            | (
+                Q(fecha_entrega_objetivo__isnull=True)
+                & Q(venta_reserva__reservaservicios__fecha_agendamiento=hoy)
+            )
+        )
+        .distinct()
         .select_related('venta_reserva__cliente', 'usuario_procesa')
         .prefetch_related('detalles__producto')
         .order_by('fecha_solicitud')
@@ -635,12 +649,26 @@ def agenda_operativa(request):
 @staff_required
 @require_http_methods(["GET"])
 def comandas_pendientes_api(request):
-    """Devuelve comandas pendientes/procesando de clientes (para polling)."""
+    """Devuelve comandas pendientes/procesando de clientes (para polling).
+
+    Filtra para mostrar solo comandas cuyos servicios asociados son HOY,
+    consistente con la vista agenda_operativa.
+    """
+    hoy = timezone.localtime(timezone.now()).date()
+
     comandas = (
         Comanda.objects.filter(
             estado__in=['pendiente', 'procesando'],
             creada_por_cliente=True,
         )
+        .filter(
+            Q(fecha_entrega_objetivo__date=hoy)
+            | (
+                Q(fecha_entrega_objetivo__isnull=True)
+                & Q(venta_reserva__reservaservicios__fecha_agendamiento=hoy)
+            )
+        )
+        .distinct()
         .select_related('venta_reserva__cliente', 'usuario_procesa')
         .prefetch_related('detalles__producto')
         .order_by('fecha_solicitud')
