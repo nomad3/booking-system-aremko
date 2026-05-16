@@ -1038,9 +1038,9 @@ def competitors_summary(request):
         from ventas.models import Servicio
         entrada_aremko = Servicio.objects.filter(
             nombre__icontains='entrada'
-        ).order_by('precio').first()
+        ).order_by('precio_base').first()
         
-        precio_aremko_adulto = float(entrada_aremko.precio) if entrada_aremko else None
+        precio_aremko_adulto = float(entrada_aremko.precio_base) if entrada_aremko else None
         
         return Response({
             'success': True,
