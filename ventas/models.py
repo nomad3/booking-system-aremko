@@ -5929,3 +5929,98 @@ class CompetitorSocialMedia(models.Model):
     
     def __str__(self):
         return f'{self.competitor.nombre} - Social Media - {self.fecha_captura.strftime("%Y-%m-%d")}'
+
+
+class GA4Snapshot(models.Model):
+    """Snapshot semanal de Google Analytics 4 para series historicas.
+
+    El brief semanal hoy consulta GA4 en vivo y pierde el dato. Este modelo
+    congela el estado cada lunes para permitir comparaciones semana-vs-semana
+    y mes-vs-mes a futuro (8-12 semanas para tener series utiles).
+
+    `datos` guarda el dict completo de ga4_reporter.get_full_snapshot(). Los
+    campos planos del overview last_7d se materializan para queries rapidas
+    sin parsear el JSON.
+    """
+    GENERADO_POR_CHOICES = [
+        ('cron_weekly', 'Cron semanal (lunes)'),
+        ('management_command', 'Comando manual desde shell'),
+        ('admin_manual', 'Admin Django (manual)'),
+    ]
+
+    fecha_snapshot = models.DateField(
+        db_index=True,
+        help_text='Fecha del snapshot (tipicamente lunes de la semana)',
+    )
+    datos = models.JSONField(help_text='JSON completo de ga4_reporter.get_full_snapshot()')
+
+    # Overview last_7d — materializado para queries y tendencias
+    sessions = models.PositiveIntegerField(default=0)
+    total_users = models.PositiveIntegerField(default=0)
+    new_users = models.PositiveIntegerField(default=0)
+    engaged_sessions = models.PositiveIntegerField(default=0)
+    avg_session_duration = models.FloatField(default=0, help_text='Segundos promedio por sesion')
+    screen_page_views = models.PositiveIntegerField(default=0)
+    conversions = models.PositiveIntegerField(default=0)
+
+    # Eventos custom Aremko (Tarea 2.2)
+    whatsapp_clicks = models.PositiveIntegerField(default=0)
+    phone_clicks = models.PositiveIntegerField(default=0)
+    cta_blog_clicks = models.PositiveIntegerField(default=0)
+    reservation_started = models.PositiveIntegerField(default=0)
+    reservation_completed = models.PositiveIntegerField(default=0)
+
+    generado_por = models.CharField(
+        max_length=30, choices=GENERADO_POR_CHOICES, default='cron_weekly', db_index=True,
+    )
+    error = models.TextField(blank=True, help_text='Errores parciales si los hubo')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Snapshot GA4 (semanal)'
+        verbose_name_plural = 'Snapshots GA4 (semanales)'
+        ordering = ['-fecha_snapshot', '-created_at']
+        indexes = [
+            models.Index(fields=['-fecha_snapshot']),
+        ]
+
+    def __str__(self):
+        return f'GA4 snapshot {self.fecha_snapshot} ({self.sessions} sesiones)'
+
+
+class SearchConsoleSnapshot(models.Model):
+    """Snapshot semanal de Google Search Console para series historicas.
+
+    Mismo patron que GA4Snapshot. Permite ver evolucion de visibilidad SEO
+    (impresiones, clicks, CTR, posicion) semana a semana.
+    """
+    GENERADO_POR_CHOICES = GA4Snapshot.GENERADO_POR_CHOICES
+
+    fecha_snapshot = models.DateField(
+        db_index=True,
+        help_text='Fecha del snapshot (tipicamente lunes de la semana)',
+    )
+    datos = models.JSONField(help_text='JSON completo de gsc_reporter.get_full_snapshot()')
+
+    # Overview last_7d — materializado
+    clicks = models.PositiveIntegerField(default=0)
+    impressions = models.PositiveIntegerField(default=0)
+    ctr = models.FloatField(default=0, help_text='Click-through rate %, 0-100')
+    position = models.FloatField(default=0, help_text='Posicion promedio ponderada por impresiones')
+
+    generado_por = models.CharField(
+        max_length=30, choices=GENERADO_POR_CHOICES, default='cron_weekly', db_index=True,
+    )
+    error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Snapshot Search Console (semanal)'
+        verbose_name_plural = 'Snapshots Search Console (semanales)'
+        ordering = ['-fecha_snapshot', '-created_at']
+        indexes = [
+            models.Index(fields=['-fecha_snapshot']),
+        ]
+
+    def __str__(self):
+        return f'GSC snapshot {self.fecha_snapshot} ({self.clicks} clicks, pos {self.position:.1f})'
