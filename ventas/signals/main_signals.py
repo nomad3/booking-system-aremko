@@ -707,3 +707,60 @@ def sync_newsletter_subscriber(sender, instance, created, **kwargs):
             )
     except Exception as e:
         logger.error(f"Error creando/actualizando suscriptor {current_email}: {e}")
+
+
+# --- Meta CAPI Purchase (cubre ventas Flow + transferencia + admin + WhatsApp) ---
+# Dispara cuando una VentaReserva pasa a estado_pago='pagado', sin importar
+# el metodo de pago ni el canal de creacion. El event_id determinístico
+# (purchase_<venta_id>) garantiza que Meta deduplique si el webhook de Flow
+# ya envió el evento previamente — no hay riesgo de doble conteo.
+
+@receiver(pre_save, sender=VentaReserva)
+def _track_estado_pago_anterior(sender, instance, raw, using, update_fields, **kwargs):
+    """Guarda el estado_pago previo para que post_save pueda detectar la transición."""
+    if raw:
+        return
+    if instance.pk:
+        try:
+            instance._estado_pago_anterior = (
+                VentaReserva.objects.only('estado_pago').get(pk=instance.pk).estado_pago
+            )
+        except VentaReserva.DoesNotExist:
+            instance._estado_pago_anterior = None
+    else:
+        instance._estado_pago_anterior = None
+
+
+@receiver(post_save, sender=VentaReserva)
+def disparar_meta_capi_purchase_on_pago(sender, instance, created, raw, using, update_fields, **kwargs):
+    """Envía evento Purchase a Meta CAPI cuando una venta transita a 'pagado'.
+
+    Cubre los canales que NO pasan por flow_confirmation:
+    - Ventas creadas desde el admin de Django (ej: ventas por WhatsApp por Deborah)
+    - Ventas con transferencia confirmadas manualmente
+    - Ajustes que cambian una venta de pendiente/parcial a pagado
+
+    Para ventas Flow el webhook ya envió el evento; este signal lo reintenta
+    pero Meta deduplica via event_id=purchase_<venta_id>.
+    """
+    if raw or not instance.cliente:
+        return
+    if instance.estado_pago != 'pagado':
+        return
+    estado_anterior = getattr(instance, '_estado_pago_anterior', None)
+    if estado_anterior == 'pagado':
+        # Ya estaba pagada, no es transición — evita disparos repetidos.
+        return
+    try:
+        from ..services.meta_capi_service import send_purchase_event
+        send_purchase_event(
+            venta_id=instance.id,
+            amount=float(instance.pagado or instance.total or 0),
+            email=instance.cliente.email,
+            phone=instance.cliente.telefono,
+            nombre_completo=instance.cliente.nombre,
+        )
+    except Exception as exc:
+        logger.warning(
+            f"Meta CAPI Purchase signal fallo (no critico) venta_id={instance.id}: {exc}"
+        )
