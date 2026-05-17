@@ -46,6 +46,33 @@ def _es_precio_plano_por_unidad(servicio):
     return _es_tina_precio_plano(servicio)
 
 
+# Desayuno: el cliente agrega "Desayuno" (servicio generico publicado en web),
+# pero operativamente cada cabaña tiene su desayuno con nombre propio (para
+# que recepcion sepa a que cabaña corresponde). Mapeo por keyword en el nombre
+# de la cabaña → nombre exacto del servicio especifico en BD.
+DESAYUNO_GENERICO_NOMBRE = 'Desayuno'
+DESAYUNO_POR_CABANA_KEYWORD = (
+    ('torre', 'Desayuno Torre'),
+    ('laurel', 'Desayuno Laurel'),
+    ('arrayan', 'Desayuno Arrayan'),
+    ('arrayán', 'Desayuno Arrayan'),
+    ('tepa', 'Desayuno Tepa'),
+    ('acantilado', 'Desayuno Acantilado'),
+)
+
+
+def _resolver_desayuno_para_cabana(nombre_cabana):
+    """Dado el nombre de una cabaña, devuelve el Servicio del desayuno especifico (o None)."""
+    nombre_lower = (nombre_cabana or '').lower()
+    for keyword, desayuno_nombre in DESAYUNO_POR_CABANA_KEYWORD:
+        if keyword in nombre_lower:
+            try:
+                return Servicio.objects.get(nombre__iexact=desayuno_nombre)
+            except Servicio.DoesNotExist:
+                return None
+    return None
+
+
 def cart_view(request):
     """
     Vista que renderiza la página del carrito de compras
@@ -109,6 +136,45 @@ def add_to_cart(request):
 
         try:
             servicio = Servicio.objects.get(id=servicio_id)
+
+            # --- Desayuno: mapear genérico a desayuno especifico de la cabaña ---
+            # El cliente agrega "Desayuno" (servicio publicado en web). Operativamente
+            # necesitamos que quede registrado como "Desayuno Torre", "Desayuno Tepa",
+            # etc. segun la cabaña reservada para que recepcion sepa a donde llevarlo.
+            # Distribucion ciclica: 1er desayuno → 1a cabaña, 2do → 2a, 3ro → 1a otra vez.
+            if servicio.nombre.strip().lower() == DESAYUNO_GENERICO_NOMBRE.lower():
+                cart_preview = request.session.get('cart', {'servicios': [], 'total': 0})
+                cabanas_en_cart = [
+                    s for s in cart_preview.get('servicios', [])
+                    if s.get('tipo_servicio') == 'cabana'
+                ]
+                if not cabanas_en_cart:
+                    messages.error(
+                        request,
+                        "Primero agrega una cabaña al carrito. El desayuno se asigna a una cabaña reservada."
+                    )
+                    referer_url = request.META.get('HTTP_REFERER', reverse('ventas:homepage'))
+                    return redirect(referer_url)
+
+                desayunos_previos = sum(
+                    1 for s in cart_preview.get('servicios', [])
+                    if 'desayuno' in (s.get('nombre') or '').lower()
+                )
+                cabana_target = cabanas_en_cart[desayunos_previos % len(cabanas_en_cart)]
+                desayuno_especifico = _resolver_desayuno_para_cabana(cabana_target.get('nombre'))
+                if desayuno_especifico:
+                    print(
+                        f"[DESAYUNO] '{servicio.nombre}' -> '{desayuno_especifico.nombre}' "
+                        f"(cabaña destino: {cabana_target.get('nombre')}, "
+                        f"desayunos previos: {desayunos_previos})"
+                    )
+                    servicio = desayuno_especifico
+                    servicio_id = str(servicio.id)
+                else:
+                    print(
+                        f"[DESAYUNO] No se encontro servicio especifico para cabaña "
+                        f"'{cabana_target.get('nombre')}'. Se mantiene generico."
+                    )
 
             # --- AR-014: Server-side override para servicios de precio plano ---
             # Cabañas y tinas flat se cobran SIEMPRE por capacidad_maxima
