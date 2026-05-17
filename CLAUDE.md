@@ -222,9 +222,25 @@ SMS_MONTHLY_LIMIT_PER_CLIENT=8
 EMAIL_WEEKLY_LIMIT_PER_CLIENT=1
 EMAIL_MONTHLY_LIMIT_PER_CLIENT=4
 
+# Meta (Facebook) Pixel + Conversions API (server-side)
+META_PIXEL_ID=478226496113915  # Pixel ID actual de Aremko
+META_CAPI_ACCESS_TOKEN=your-capi-token  # Events Manager → Settings → Generate Access Token
+META_CAPI_TEST_EVENT_CODE=  # solo durante testing (Events Manager → Test Events). Vaciar en prod.
+META_CAPI_API_VERSION=v21.0
+
 # Automation endpoints (n8n, campaign targets) — required header X-API-KEY
 AUTOMATION_API_KEY=your-key
 ```
+
+### Meta Pixel + CAPI (deduplicación)
+Pixel client-side y CAPI server-side se complementan: si el cliente cierra el
+navegador antes de volver de Flow.cl, el Pixel se pierde pero CAPI garantiza el
+evento. Para que Meta no los cuente dos veces se usa `event_id` determinístico:
+- `Purchase`: `purchase_<venta_id>` (Pixel en `flow_return.html` + CAPI en `flow_confirmation`)
+- `Lead`: `lead_<pending_id>` (Pixel en `checkout.html` + CAPI en `complete_checkout`)
+
+Test manual: `python manage.py test_meta_capi --event purchase`
+PII (email/teléfono/nombre) se hashea SHA-256 antes de salir del servidor.
 
 ### Scheduled Tasks (cron)
 `python manage.py send_communication_triggers` is the central cron entry point. It dispatches: 24h reminders, post-visit surveys (D+1), 90-day reactivation campaigns, birthday greetings, and segmented newsletters. Run from host cron or Render cron job.

@@ -65,12 +65,16 @@
                 <p>Recibirás un correo electrónico con los detalles completos.</p>
             </div>
             <script>
+                // event_id deterministico: el webhook CAPI server-side envia el mismo,
+                // Meta deduplica automaticamente. NO cambiar el formato.
                 if (typeof fbq !== 'undefined') {
                     fbq('track', 'Purchase', {
                         value: {{ venta.pagado|default:0 }},
                         currency: 'CLP',
                         content_ids: ['{{ venta.id }}'],
                         content_type: 'product'
+                    }, {
+                        eventID: 'purchase_{{ venta.id }}'
                     });
                 }
             </script>

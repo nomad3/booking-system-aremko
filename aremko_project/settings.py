@@ -124,6 +124,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',  # Necesario
                 'ventas.context_processors.categorias_processor', # Add category processor
                 'ventas.context_processors.social_proof_processor', # AR-028: TA + Google badges
+                'ventas.context_processors.meta_pixel_processor', # Meta Pixel ID parametrizable
             ],
         },
     },
@@ -395,6 +396,16 @@ FLOW_CREATE_API_URL = os.getenv("FLOW_CREATE_API_URL", "https://www.flow.cl/api/
 FLOW_STATUS_API_URL = os.getenv("FLOW_STATUS_API_URL", "https://www.flow.cl/api/payment/getStatus")
 FLOW_CONFIRMATION_URL = os.getenv("FLOW_CONFIRMATION_URL", "https://www.aremko.cl/payment/confirmation/")
 FLOW_RETURN_URL = os.getenv("FLOW_RETURN_URL", "https://www.aremko.cl/payment/return/")
+
+# ──────────────── Meta (Facebook) Pixel + Conversions API ────────────────
+# Pixel ID: se inyecta en templates via context processor (meta_pixel_processor).
+# CAPI token: se genera en Meta Business → Events Manager → Settings → Generate Access Token.
+# Test event code: usar durante pruebas, vaciar en produccion para que los eventos cuenten.
+META_PIXEL_ID = os.getenv("META_PIXEL_ID", "478226496113915")
+META_CAPI_ACCESS_TOKEN = os.getenv("META_CAPI_ACCESS_TOKEN", "")
+META_CAPI_TEST_EVENT_CODE = os.getenv("META_CAPI_TEST_EVENT_CODE", "")
+META_CAPI_API_VERSION = os.getenv("META_CAPI_API_VERSION", "v21.0")
+
 DPV_LLM_MAX_TOKENS = int(os.getenv("DPV_LLM_MAX_TOKENS", "500"))
 DPV_LLM_TEMPERATURE = float(os.getenv("DPV_LLM_TEMPERATURE", "0.7"))
 DPV_LLM_TIMEOUT_SECONDS = int(os.getenv("DPV_LLM_TIMEOUT_SECONDS", "30"))

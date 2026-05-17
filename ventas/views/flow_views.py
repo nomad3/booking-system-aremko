@@ -256,6 +256,23 @@ def flow_confirmation(request):
                 if materializada is None:
                     return HttpResponse("Slot lost - manual refund required", status=200)
 
+                # Meta CAPI: Purchase server-side (garantiza tracking aunque el cliente
+                # no vuelva a flow_return.html). event_id deterministico permite que
+                # Meta deduplique con el evento Pixel client-side.
+                try:
+                    from ..services.meta_capi_service import send_purchase_event
+                    cliente = materializada.cliente
+                    send_purchase_event(
+                        venta_id=materializada.id,
+                        amount=float(amount or materializada.pagado or 0),
+                        email=cliente.email,
+                        phone=cliente.telefono,
+                        nombre_completo=cliente.nombre,
+                    )
+                except Exception as capi_err:
+                    # Nunca fallar el webhook por error de CAPI.
+                    print(f"Meta CAPI Purchase fallo (no critico): {capi_err}")
+
                 # Enviar GiftCards si las hay (solo si la materializacion fue exitosa)
                 from ..models import GiftCard, GiftCardExperiencia
                 from ..services.giftcard_pdf_service import GiftCardPDFService
@@ -308,6 +325,7 @@ def flow_confirmation(request):
 
         # --- Flujo legacy: VentaReserva ya existente (compat con pagos en vuelo) ---
         if flow_status == 2:
+            recien_pagada = False
             with transaction.atomic():
                 if venta.estado_pago != 'pagado':
                     print(f"Processing legacy successful payment for VentaReserva {venta.id}")
@@ -318,8 +336,21 @@ def flow_confirmation(request):
                         fecha_pago=timezone.now(),
                     )
                     venta.refresh_from_db()
+                    recien_pagada = True
                 else:
                     print(f"VentaReserva {venta.id} already paid (legacy path)")
+            if recien_pagada:
+                try:
+                    from ..services.meta_capi_service import send_purchase_event
+                    send_purchase_event(
+                        venta_id=venta.id,
+                        amount=float(amount or venta.pagado or 0),
+                        email=venta.cliente.email,
+                        phone=venta.cliente.telefono,
+                        nombre_completo=venta.cliente.nombre,
+                    )
+                except Exception as capi_err:
+                    print(f"Meta CAPI Purchase legacy fallo (no critico): {capi_err}")
             return HttpResponse("Payment Confirmed", status=200)
         elif flow_status in (3, 4):
             print(f"Flow legacy rejected/cancelled for VentaReserva {venta.id}. Status: {flow_status}")

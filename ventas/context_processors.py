@@ -36,3 +36,9 @@ _SOCIAL_PROOF = {
 def social_proof_processor(request):
     """Inyecta cifras de reseñas externas para la franja AR-028."""
     return {'social_proof': _SOCIAL_PROOF}
+
+
+def meta_pixel_processor(request):
+    """Inyecta META_PIXEL_ID en el contexto para base_public.html y descendientes."""
+    from django.conf import settings
+    return {'META_PIXEL_ID': getattr(settings, 'META_PIXEL_ID', '')}

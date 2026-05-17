@@ -445,6 +445,25 @@ def complete_checkout(request):
             request.session.modified = True
             print(f"PendingReservation #{pending.id} creada para {cliente.nombre} (${cart['total']:,.0f})")
 
+            try:
+                from ..services.meta_capi_service import send_lead_event
+                client_ip = (request.META.get('HTTP_X_FORWARDED_FOR') or '').split(',')[0].strip() \
+                    or request.META.get('REMOTE_ADDR')
+                send_lead_event(
+                    pending_id=pending.id,
+                    amount=float(cart['total']),
+                    email=cliente.email,
+                    phone=cliente.telefono,
+                    nombre_completo=cliente.nombre,
+                    client_ip=client_ip,
+                    user_agent=request.META.get('HTTP_USER_AGENT'),
+                    fbp=request.COOKIES.get('_fbp'),
+                    fbc=request.COOKIES.get('_fbc'),
+                    event_source_url=request.build_absolute_uri('/checkout/'),
+                )
+            except Exception as capi_err:
+                print(f"Meta CAPI Lead fallo (no critico): {capi_err}")
+
             return JsonResponse({
                 'success': True,
                 'message': 'Reserva tentativa creada — pendiente de pago Flow',

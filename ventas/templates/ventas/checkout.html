@@ -705,13 +705,23 @@ Email para comprobante: ventas@aremko.cl</pre>
                 });
             }
 
-            // Meta Pixel: Lead cuando la reserva se creó exitosamente (aún no pagada)
+            // Meta Pixel: Lead cuando la reserva se creó exitosamente (aún no pagada).
+            // event_id deterministico para deduplicar con CAPI server-side.
+            // Para metodo='flow' viene data.pending_id; para metodos directos viene data.reserva_id.
             if (typeof fbq !== 'undefined') {
-                fbq('track', 'Lead', {
+                var leadIdSource = data.pending_id ? ('lead_' + data.pending_id)
+                                   : (data.reserva_id ? ('lead_v_' + data.reserva_id) : null);
+                var leadPayload = {
                     value: data.total_reserva || 0,
                     currency: 'CLP',
-                    content_ids: data.reserva_id ? [String(data.reserva_id)] : []
-                });
+                    content_ids: data.pending_id ? [String(data.pending_id)]
+                                 : (data.reserva_id ? [String(data.reserva_id)] : [])
+                };
+                if (leadIdSource) {
+                    fbq('track', 'Lead', leadPayload, { eventID: leadIdSource });
+                } else {
+                    fbq('track', 'Lead', leadPayload);
+                }
             }
         } else {
             console.error("Success modal element not found");

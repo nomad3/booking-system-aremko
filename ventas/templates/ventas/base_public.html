@@ -57,6 +57,7 @@
     <script src="{% static 'ventas/js/aremko-events.js' %}" defer></script>
 
     <!-- Meta Pixel Code -->
+    {% if META_PIXEL_ID %}
     <script>
         !function (f, b, e, v, n, t, s) {
             if (f.fbq) return; n = f.fbq = function () {
@@ -69,11 +70,12 @@
             s.parentNode.insertBefore(t, s)
         }(window, document, 'script',
             'https://connect.facebook.net/en_US/fbevents.js');
-        fbq('init', '478226496113915');
+        fbq('init', '{{ META_PIXEL_ID }}');
         fbq('track', 'PageView');
     </script>
     <noscript><img height="1" width="1" style="display:none"
-        src="https://www.facebook.com/tr?id=478226496113915&ev=PageView&noscript=1" /></noscript>
+        src="https://www.facebook.com/tr?id={{ META_PIXEL_ID }}&ev=PageView&noscript=1" /></noscript>
+    {% endif %}
     <!-- End Meta Pixel Code -->
 
     <!-- Bootstrap 5 CSS -->
