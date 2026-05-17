@@ -706,6 +706,59 @@ def cron_marketing_brief_weekly(request):
     })
 
 
+def _run_snapshot_weekly_traffic_background():
+    """Helper para correr snapshot_weekly_traffic en thread.
+
+    Mismo patrón que el brief: fire-and-forget para no bloquear el response
+    y respetar el timeout de 30s de cron-job.org plan free.
+    """
+    import logging
+    from io import StringIO
+    from django.core.management import call_command
+    log = logging.getLogger(__name__)
+
+    output = StringIO()
+    try:
+        call_command(
+            'snapshot_weekly_traffic',
+            '--generado-por', 'cron_weekly',
+            stdout=output, stderr=output,
+        )
+        log.info('Snapshot semanal GA4+GSC completado:\n%s', output.getvalue()[-3000:])
+    except Exception as e:
+        log.exception('Error en snapshot semanal GA4+GSC: %s', e)
+
+
+@csrf_exempt
+@api_view(['POST', 'GET'])
+@permission_classes([AllowAny])
+def cron_snapshot_weekly_traffic(request):
+    """
+    Endpoint para que cron-job.org dispare el snapshot semanal de tráfico
+    (GA4 + Search Console).
+
+    Schedule sugerido: cada lunes 09:00 hora Chile (1 hora antes del brief
+    de las 10:00 para que el brief pueda usar el snapshot recién tomado).
+
+    Auth: header X-API-KEY con AUTOMATION_API_KEY.
+    Async (fire-and-forget) para evitar timeout 30s de cron-job.org plan free.
+    """
+    if not is_valid_api_key(request):
+        return Response(
+            {"error": "Authentication required. Set X-API-KEY header."},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    from threading import Thread
+    thread = Thread(target=_run_snapshot_weekly_traffic_background, daemon=True)
+    thread.start()
+
+    return Response({
+        "success": True,
+        "message": "Snapshot semanal GA4+GSC iniciado en background.",
+    })
+
+
 def _run_survey_analysis_background():
     """Helper para correr analyze_surveys_weekly en thread, sin bloquear el response.
 

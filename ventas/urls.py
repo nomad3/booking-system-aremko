@@ -185,6 +185,10 @@ urlpatterns = [
     # Llamar cada lunes 10:00 hora Chile.
     path('api/cron/marketing-brief/', api_views.cron_marketing_brief_weekly, name='cron_marketing_brief'),
 
+    # === Cron endpoint para snapshot semanal GA4 + Search Console ===
+    # Llamar cada lunes 09:00 hora Chile (1h antes del brief).
+    path('api/cron/snapshot-weekly-traffic/', api_views.cron_snapshot_weekly_traffic, name='cron_snapshot_weekly_traffic'),
+
     # === API público de resumen de reviews para brief semanal ===
     # Usado por aremko-cli (backend Go) para obtener métricas de opiniones
     path('api/reviews-summary/', api_views.reviews_summary, name='reviews_summary'),
