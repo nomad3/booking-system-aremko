@@ -2,12 +2,77 @@
 Comando para scrapear sitios web de competidores y crear snapshots.
 Uso: python manage.py scrape_competitors
 """
+import json
+import re
+from decimal import Decimal
+
 from django.core.management.base import BaseCommand
 from ventas.models import Competitor, CompetitorSnapshot
 import requests
 from bs4 import BeautifulSoup
-import re
-from decimal import Decimal
+
+# Umbral para detectar respuestas vacias / anti-bot.
+MIN_HTML_BYTES = 500
+
+# Rango razonable de precios para una "entrada general" en CLP.
+PRECIO_MIN = 5000
+PRECIO_MAX = 80000
+
+# Patrones de precio (en orden de especificidad).
+# Capturan: $24.000, $ 24000, CLP 24.000, 24000 CLP, 24.000 CLP, $24.000.-, etc.
+PRECIO_PATTERNS = [
+    r'\$\s*(\d{1,3}(?:[\.,]\d{3})+|\d{4,6})',          # $24.000 / $24,000 / $24000
+    r'\bCLP\s*\$?\s*(\d{1,3}(?:[\.,]\d{3})+|\d{4,6})', # CLP 24.000 / CLP $24.000
+    r'(\d{1,3}(?:[\.,]\d{3})+|\d{4,6})\s*CLP\b',      # 24.000 CLP / 24000 CLP
+    r'(\d{1,3}(?:[\.,]\d{3})+|\d{4,6})\s*pesos?\b',   # 24.000 pesos
+]
+
+
+def _parse_precio(precio_str):
+    """Limpia y convierte un string a int. None si no es un precio razonable."""
+    try:
+        limpio = precio_str.replace('.', '').replace(',', '').strip()
+        precio = int(limpio)
+        if PRECIO_MIN <= precio <= PRECIO_MAX:
+            return precio
+    except (ValueError, TypeError):
+        pass
+    return None
+
+
+def _extraer_precios_jsonld(soup):
+    """Lee bloques <script type=application/ld+json> y extrae fields 'price'.
+
+    Muchas webs (especialmente WordPress + plugins SEO) declaran precios via
+    schema.org en JSON-LD. Es el formato mas estable para scrapear.
+    """
+    precios = []
+    for script in soup.find_all('script', type='application/ld+json'):
+        try:
+            data = json.loads(script.string or '')
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+        nodos = data if isinstance(data, list) else [data]
+        for nodo in nodos:
+            _walk_jsonld(nodo, precios)
+    return precios
+
+
+def _walk_jsonld(obj, precios):
+    """Recorre recursivamente buscando claves 'price' / 'lowPrice' / 'priceSpecification'."""
+    if isinstance(obj, dict):
+        for key in ('price', 'lowPrice', 'highPrice'):
+            val = obj.get(key)
+            if val is not None:
+                p = _parse_precio(str(val))
+                if p:
+                    precios.append(p)
+        for v in obj.values():
+            _walk_jsonld(v, precios)
+    elif isinstance(obj, list):
+        for item in obj:
+            _walk_jsonld(item, precios)
 
 
 class Command(BaseCommand):
@@ -65,14 +130,32 @@ class Command(BaseCommand):
         snapshot = CompetitorSnapshot(competitor=competitor)
 
         try:
-            # Hacer request con timeout y user agent
+            # User agent realista (algunos sitios devuelven 403 con UAs default).
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                'User-Agent': (
+                    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+                    'AppleWebKit/537.36 (KHTML, like Gecko) '
+                    'Chrome/120.0.0.0 Safari/537.36'
+                ),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8',
             }
-            response = requests.get(competitor.website, headers=headers, timeout=15)
+            response = requests.get(competitor.website, headers=headers, timeout=15, allow_redirects=True)
             response.raise_for_status()
 
             html_content = response.text
+
+            # Detectar respuestas vacias / shells JS: si el HTML es muy chico
+            # probablemente es un sitio JS-heavy o detras de anti-bot.
+            if len(html_content) < MIN_HTML_BYTES:
+                snapshot.scraping_exitoso = False
+                snapshot.error_mensaje = (
+                    f'Respuesta vacia o muy pequeña ({len(html_content)} bytes). '
+                    f'HTTP {response.status_code}, URL final: {response.url}. '
+                    'Probable sitio JS-heavy o anti-bot — requiere Playwright/JS rendering.'
+                )
+                return snapshot
+
             soup = BeautifulSoup(html_content, 'html.parser')
 
             # Extraer meta description
@@ -89,26 +172,22 @@ class Command(BaseCommand):
             snapshot.tiene_restaurant = 'restaurant' in page_text or 'cafetería' in page_text or 'gastronomía' in page_text
             snapshot.tiene_alojamiento = 'alojamiento' in page_text or 'hospedaje' in page_text or 'cabañas' in page_text or 'hotel' in page_text
 
-            # Extraer precios - buscar patrones como $XX.XXX o $XXXXX
-            precio_pattern = r'\$\s*(\d{1,2}[\.,]?\d{3})'
-            precios_encontrados = re.findall(precio_pattern, html_content)
+            # Extraer precios: priorizar JSON-LD (schema.org), luego regex en HTML.
+            precios_jsonld = _extraer_precios_jsonld(soup)
+            precios_html = []
+            for pattern in PRECIO_PATTERNS:
+                for match in re.findall(pattern, html_content, flags=re.IGNORECASE):
+                    p = _parse_precio(match)
+                    if p:
+                        precios_html.append(p)
 
-            if precios_encontrados:
-                # Limpiar y convertir precios
-                precios = []
-                for precio_str in precios_encontrados:
-                    try:
-                        precio_limpio = precio_str.replace('.', '').replace(',', '')
-                        precio = int(precio_limpio)
-                        # Filtrar precios razonables para entrada (entre 5.000 y 50.000)
-                        if 5000 <= precio <= 50000:
-                            precios.append(precio)
-                    except:
-                        continue
+            # JSON-LD es mas confiable porque no tiene falsos positivos. Si hay, usar eso.
+            precios = precios_jsonld or precios_html
 
-                if precios:
-                    # Usar el precio más bajo como referencia para entrada adulto
-                    snapshot.precio_entrada_adulto = Decimal(min(precios))
+            if precios:
+                # Usar el precio mas bajo como referencia para entrada adulto.
+                # (Asumimos que el mas barato suele ser la entrada general adulto.)
+                snapshot.precio_entrada_adulto = Decimal(min(precios))
 
             # Buscar horarios
             horario_keywords = ['horario', 'hora', 'abierto', 'atención']

@@ -1,4 +1,5 @@
 import decimal # Import decimal for PagoViewSet validation
+import os  # Read env var fallback (AREMKO_SERVICIO_REFERENCIA_ID)
 from django.http import JsonResponse # Add JsonResponse
 from django.shortcuts import get_object_or_404 # Add get_object_or_404
 from django.views.decorators.http import require_GET # To ensure only GET requests
@@ -1037,29 +1038,47 @@ def competitors_summary(request):
         result_data = []
         
         for competitor in competitors:
-            # Último snapshot web
-            ultimo_snapshot = CompetitorSnapshot.objects.filter(
+            # Último snapshot exitoso (para datos comparables)
+            ultimo_exitoso = CompetitorSnapshot.objects.filter(
                 competitor=competitor,
                 scraping_exitoso=True
             ).order_by('-fecha_captura').first()
-            
+
+            # Último snapshot CUALQUIERA (para exponer error si falló)
+            ultimo_cualquiera = CompetitorSnapshot.objects.filter(
+                competitor=competitor
+            ).order_by('-fecha_captura').first()
+
+            # Snapshot a mostrar: el último exitoso si existe; si no, fallback al último fallido para tener fecha + error
+            ultimo_snapshot = ultimo_exitoso or ultimo_cualquiera
+
             # Últimas métricas de redes sociales
             ultima_social = CompetitorSocialMedia.objects.filter(
                 competitor=competitor
             ).order_by('-fecha_captura').first()
-            
+
+            # Error a exponer: si el último intento (sea cual sea) fue fallido, mostrarlo
+            last_scrape_error = None
+            if ultimo_cualquiera and not ultimo_cualquiera.scraping_exitoso:
+                last_scrape_error = {
+                    'fecha_captura': ultimo_cualquiera.fecha_captura.strftime('%Y-%m-%d %H:%M'),
+                    'error_mensaje': ultimo_cualquiera.error_mensaje or 'Sin detalle',
+                }
+
             competitor_data = {
                 'id': competitor.id,
                 'nombre': competitor.nombre,
                 'website': competitor.website,
                 'snapshot': None,
                 'social_media': None,
+                'last_scrape_error': last_scrape_error,
             }
-            
+
             # Datos del último snapshot web
             if ultimo_snapshot:
                 competitor_data['snapshot'] = {
                     'fecha_captura': ultimo_snapshot.fecha_captura.strftime('%Y-%m-%d %H:%M'),
+                    'scraping_exitoso': ultimo_snapshot.scraping_exitoso,
                     'precio_entrada_adulto': float(ultimo_snapshot.precio_entrada_adulto) if ultimo_snapshot.precio_entrada_adulto else None,
                     'precio_entrada_nino': float(ultimo_snapshot.precio_entrada_nino) if ultimo_snapshot.precio_entrada_nino else None,
                     'servicios': {
@@ -1086,20 +1105,44 @@ def competitors_summary(request):
             
             result_data.append(competitor_data)
         
-        # Agregar precio de Aremko para comparación
-        # Buscar precio de entrada general de Aremko (suponiendo que existe un servicio "Entrada Termas")
+        # Precio Aremko para comparacion con competidores.
+        # Aremko no vende "entrada" como las termas — vende experiencias completas (tinas, etc).
+        # Resolucion en orden:
+        #   1) Servicio.id fijo via settings.AREMKO_SERVICIO_REFERENCIA_ID (configurable sin deploy)
+        #   2) Promedio de tinas activas con precio (categoria__nombre=Tinas / tipo_servicio=tina)
         from ventas.models import Servicio
-        entrada_aremko = Servicio.objects.filter(
-            nombre__icontains='entrada'
-        ).order_by('precio_base').first()
-        
-        precio_aremko_adulto = float(entrada_aremko.precio_base) if entrada_aremko else None
-        
+        from django.conf import settings as dj_settings
+
+        precio_aremko_adulto = None
+        referencia_label = None
+
+        servicio_id_ref = getattr(dj_settings, 'AREMKO_SERVICIO_REFERENCIA_ID', None) or os.getenv('AREMKO_SERVICIO_REFERENCIA_ID')
+        if servicio_id_ref:
+            try:
+                ref = Servicio.objects.filter(id=int(servicio_id_ref)).first()
+                if ref and ref.precio_base:
+                    precio_aremko_adulto = float(ref.precio_base)
+                    referencia_label = ref.nombre
+            except (ValueError, TypeError):
+                pass
+
+        if precio_aremko_adulto is None:
+            tinas_qs = Servicio.objects.filter(
+                tipo_servicio='tina', precio_base__gt=0, publicado_web=True,
+            )
+            if not tinas_qs.exists():
+                tinas_qs = Servicio.objects.filter(tipo_servicio='tina', precio_base__gt=0)
+            precios = list(tinas_qs.values_list('precio_base', flat=True))
+            if precios:
+                precio_aremko_adulto = float(sum(precios) / len(precios))
+                referencia_label = f'Promedio de {len(precios)} tinas activas'
+
         return Response({
             'success': True,
             'competitors': result_data,
             'aremko_precio_referencia': {
                 'precio_entrada_adulto': precio_aremko_adulto,
+                'fuente': referencia_label,
             },
             'generated_at': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
         })
