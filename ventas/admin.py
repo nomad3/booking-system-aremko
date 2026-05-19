@@ -42,6 +42,8 @@ from .models import (
     SEOContent,
     # Resumen de Reserva
     ConfiguracionResumen,
+    # Cotizaciones para empresas
+    CotizacionEmpresa, CotizacionItem,
     # Tips Post-Pago
     ConfiguracionTips,
     # Sistema de Pagos a Masajistas
@@ -4930,3 +4932,148 @@ class CompetitorSocialMediaAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+# ────────────── Cotizaciones para empresas ──────────────
+
+class CotizacionItemInline(admin.TabularInline):
+    model = CotizacionItem
+    extra = 1
+    fields = ('orden', 'servicio', 'producto', 'descripcion_custom', 'cantidad', 'precio_unitario', 'subtotal_display')
+    readonly_fields = ('subtotal_display',)
+    autocomplete_fields = ('servicio', 'producto')
+
+    def subtotal_display(self, obj):
+        if obj.pk and obj.precio_unitario:
+            from django.contrib.humanize.templatetags.humanize import intcomma
+            return f'${intcomma(int(obj.subtotal))}'
+        return '—'
+    subtotal_display.short_description = 'Subtotal'
+
+
+@admin.register(CotizacionEmpresa)
+class CotizacionEmpresaAdmin(admin.ModelAdmin):
+    list_display = (
+        'numero_display', 'empresa_razon_social', 'contacto_nombre',
+        'total_display', 'estado_badge', 'fecha_emision', 'fecha_validez_display',
+        'documento_link',
+    )
+    list_filter = ('estado', 'fecha_emision')
+    search_fields = ('empresa_razon_social', 'empresa_rut', 'contacto_nombre', 'contacto_email')
+    readonly_fields = (
+        'numero_display', 'fecha_emision', 'fecha_envio', 'fecha_aceptacion',
+        'created_at', 'updated_at', 'created_by', 'total_display', 'documento_link',
+    )
+    inlines = [CotizacionItemInline]
+    actions = ['marcar_enviada', 'marcar_aceptada', 'marcar_rechazada']
+
+    fieldsets = (
+        ('Documento', {
+            'fields': (
+                'numero_display', 'documento_link', 'estado', 'fecha_emision',
+                'validez_dias', 'total_display',
+            )
+        }),
+        ('Empresa receptora', {
+            'fields': ('empresa_razon_social', 'empresa_rut', 'empresa_giro',
+                       'contacto_nombre', 'contacto_email', 'contacto_telefono'),
+        }),
+        ('Personalización', {
+            'fields': ('frase_beneficios', 'notas'),
+            'description': (
+                'La frase de beneficios solo es necesaria si querés personalizarla '
+                'para esta cotización en particular. Si la dejás vacía se usa la '
+                'frase global desde Configuración de Resumen.'
+            ),
+        }),
+        ('Tracking de estados', {
+            'fields': ('fecha_envio', 'fecha_aceptacion', 'motivo_rechazo'),
+            'classes': ('collapse',),
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at', 'created_by'),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def numero_display(self, obj):
+        return obj.numero if obj.pk else '(se asigna al guardar)'
+    numero_display.short_description = 'N° Cotización'
+
+    def total_display(self, obj):
+        if not obj.pk:
+            return '—'
+        from django.contrib.humanize.templatetags.humanize import intcomma
+        return f'${intcomma(int(obj.total))}'
+    total_display.short_description = 'Total'
+
+    def fecha_validez_display(self, obj):
+        return obj.fecha_validez.strftime('%d-%m-%Y') if obj.fecha_validez else '—'
+    fecha_validez_display.short_description = 'Válida hasta'
+
+    def estado_badge(self, obj):
+        from django.utils.html import format_html
+        colors = {
+            'borrador':  ('#eee', '#555'),
+            'enviada':   ('#d9eafd', '#1a558a'),
+            'aceptada':  ('#d3f0d3', '#1c6a1c'),
+            'rechazada': ('#f8d2d2', '#8a1a1a'),
+            'expirada':  ('#f0e0c0', '#7a5500'),
+        }
+        bg, fg = colors.get(obj.estado, ('#eee', '#555'))
+        return format_html(
+            '<span style="background:{};color:{};padding:2px 8px;border-radius:3px;'
+            'font-size:11px;text-transform:uppercase;">{}</span>',
+            bg, fg, obj.get_estado_display(),
+        )
+    estado_badge.short_description = 'Estado'
+
+    def documento_link(self, obj):
+        from django.urls import reverse
+        from django.utils.html import format_html
+        if not obj.pk:
+            return '(guardá primero)'
+        url = reverse('ventas:cotizacion_formal', kwargs={'numero': obj.numero})
+        return format_html(
+            '<a class="button" href="{}" target="_blank" '
+            'style="background:#b78b5b;color:#fff;padding:6px 12px;'
+            'border-radius:4px;text-decoration:none;">📄 Ver documento</a>',
+            url,
+        )
+    documento_link.short_description = 'Documento formal'
+
+    def save_model(self, request, obj, form, change):
+        if not obj.pk and not obj.created_by:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+    def save_formset(self, request, form, formset, change):
+        """Auto-completar precio_unitario desde el servicio/producto si quedó vacío."""
+        instances = formset.save(commit=False)
+        for inst in instances:
+            if inst.precio_unitario in (None, 0):
+                if inst.servicio_id and inst.servicio.precio_base:
+                    inst.precio_unitario = inst.servicio.precio_base
+                elif inst.producto_id and getattr(inst.producto, 'precio_base', None):
+                    inst.precio_unitario = inst.producto.precio_base
+            inst.save()
+        for obj in formset.deleted_objects:
+            obj.delete()
+        formset.save_m2m()
+
+    @admin.action(description='Marcar como ENVIADA')
+    def marcar_enviada(self, request, queryset):
+        from django.utils import timezone
+        n = queryset.update(estado='enviada', fecha_envio=timezone.now())
+        self.message_user(request, f'{n} cotización(es) marcada(s) como enviada(s).')
+
+    @admin.action(description='Marcar como ACEPTADA')
+    def marcar_aceptada(self, request, queryset):
+        from django.utils import timezone
+        n = queryset.update(estado='aceptada', fecha_aceptacion=timezone.now())
+        self.message_user(request, f'{n} cotización(es) marcada(s) como aceptada(s).')
+
+    @admin.action(description='Marcar como RECHAZADA')
+    def marcar_rechazada(self, request, queryset):
+        n = queryset.update(estado='rechazada')
+        self.message_user(request, f'{n} cotización(es) marcada(s) como rechazada(s).')

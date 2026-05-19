@@ -1,4 +1,5 @@
 from datetime import timedelta, datetime
+from typing import Optional
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.signals import post_save, post_delete
@@ -4049,12 +4050,43 @@ Gracias por elegir Aremko Spa para tu relax.""",
         help_text="Texto de despedida al final del resumen"
     )
 
+    # Cotizaciones para empresas (defaults globales editables)
+    cotizacion_frase_beneficios = models.TextField(
+        blank=True,
+        verbose_name="Cotización: frase de beneficios para el grupo",
+        help_text=(
+            "Frase formal sobre beneficios para el equipo/grupo. Aparece debajo de la tabla "
+            "de servicios en el documento de cotización. Si se deja vacío, se usa el default "
+            "del código. Cada cotización puede sobrescribir esta frase individualmente."
+        ),
+    )
+    cotizacion_terminos = models.TextField(
+        blank=True,
+        verbose_name="Cotización: términos y condiciones",
+        help_text="Términos legales/operativos. Validez, forma de pago, etc.",
+    )
+    cotizacion_cierre = models.TextField(
+        blank=True,
+        verbose_name="Cotización: cierre formal",
+        help_text="Firma de cierre del documento (ej: 'Cordialmente, Equipo Aremko...').",
+    )
+
     class Meta:
         verbose_name = "Configuración de Resumen de Reserva"
         verbose_name_plural = "Configuración de Resumen de Reserva"
 
     def __str__(self):
         return "Configuración de Resumen de Reserva"
+
+    # Getters con fallback al default del código para que el modelo no quede vacío en ningún momento.
+    def get_cotizacion_frase_beneficios(self) -> str:
+        return self.cotizacion_frase_beneficios.strip() or COTIZACION_FRASE_BENEFICIOS_DEFAULT
+
+    def get_cotizacion_terminos(self) -> str:
+        return self.cotizacion_terminos.strip() or COTIZACION_TERMINOS_DEFAULT
+
+    def get_cotizacion_cierre(self) -> str:
+        return self.cotizacion_cierre.strip() or COTIZACION_CIERRE_DEFAULT
 
 
 class ConfiguracionTips(SingletonModel):
@@ -6024,3 +6056,171 @@ class SearchConsoleSnapshot(models.Model):
 
     def __str__(self):
         return f'GSC snapshot {self.fecha_snapshot} ({self.clicks} clicks, pos {self.position:.1f})'
+
+
+# ────────────── Cotizaciones para empresas ──────────────
+
+COTIZACION_FRASE_BENEFICIOS_DEFAULT = (
+    "Invertir en el bienestar del equipo es una de las mejores decisiones que una "
+    "organización puede tomar. En Aremko Spa, su grupo encontrará un espacio único de "
+    "desconexión junto al río Pescado, rodeado de bosque nativo: tinas calientes, masajes "
+    "restauradores y la calma del sur de Chile. Una experiencia privada, cálida y memorable "
+    "que fortalece vínculos, reduce el estrés acumulado y deja a cada persona con energía "
+    "renovada para volver al trabajo."
+)
+
+COTIZACION_TERMINOS_DEFAULT = (
+    "Términos y condiciones:\n"
+    "• Esta cotización tiene una validez de 30 días desde la fecha de emisión.\n"
+    "• Los precios incluyen IVA y están expresados en pesos chilenos (CLP).\n"
+    "• La reserva se confirma con el 100% del pago anticipado mediante transferencia a:\n"
+    "    Aremko Hotel Spa · RUT 76.485.192-7\n"
+    "    Mercado Pago Cuenta Vista 1016006859\n"
+    "    Enviar comprobante a ventas@aremko.cl indicando N° de cotización.\n"
+    "• Coordinación de fechas y horarios se realiza una vez confirmada la aceptación de la cotización."
+)
+
+COTIZACION_CIERRE_DEFAULT = (
+    "Cordialmente,\n"
+    "Equipo Aremko Spa\n"
+    "ventas@aremko.cl  ·  +56 9 7666 8080  ·  Puerto Varas, Chile"
+)
+
+
+class CotizacionEmpresa(models.Model):
+    """Cotización formal para empresas (grupos corporativos).
+
+    No es una reserva: no tiene fechas de servicio. Solo lista servicios + productos
+    con cantidades y precios, para enviar como documento formal y eventualmente
+    convertirse en reserva manual cuando la empresa acepte.
+
+    Numeración del documento empieza en 321 (calculado como id + 320).
+    """
+
+    ESTADO_CHOICES = [
+        ('borrador', 'Borrador'),
+        ('enviada', 'Enviada'),
+        ('aceptada', 'Aceptada'),
+        ('rechazada', 'Rechazada'),
+        ('expirada', 'Expirada'),
+    ]
+
+    estado = models.CharField(
+        max_length=20, choices=ESTADO_CHOICES, default='borrador', db_index=True,
+    )
+    fecha_emision = models.DateField(auto_now_add=True, db_index=True)
+    validez_dias = models.PositiveIntegerField(
+        default=30,
+        help_text='Días de validez de la cotización desde la emisión',
+    )
+
+    # Datos de la empresa receptora
+    empresa_razon_social = models.CharField(max_length=200)
+    empresa_rut = models.CharField(max_length=20, blank=True)
+    empresa_giro = models.CharField(max_length=200, blank=True, help_text='Giro comercial (opcional)')
+    contacto_nombre = models.CharField(max_length=120)
+    contacto_email = models.EmailField(blank=True)
+    contacto_telefono = models.CharField(max_length=20, blank=True)
+
+    # Personalización del documento (si está vacío usa los defaults de ConfiguracionResumen)
+    frase_beneficios = models.TextField(
+        blank=True,
+        help_text='Si vacío, usa la frase global desde ConfiguracionResumen.cotizacion_frase_beneficios.',
+    )
+
+    # Notas internas (no se muestran en el documento al cliente)
+    notas = models.TextField(blank=True, help_text='Notas internas, no visibles para el cliente.')
+
+    # Tracking de estados
+    fecha_envio = models.DateTimeField(null=True, blank=True)
+    fecha_aceptacion = models.DateTimeField(null=True, blank=True)
+    motivo_rechazo = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='cotizaciones_creadas',
+    )
+
+    class Meta:
+        verbose_name = 'Cotización Empresa'
+        verbose_name_plural = 'Cotizaciones Empresa'
+        ordering = ['-fecha_emision', '-id']
+        indexes = [
+            models.Index(fields=['-fecha_emision']),
+            models.Index(fields=['estado', '-fecha_emision']),
+        ]
+
+    @property
+    def numero(self) -> Optional[int]:
+        """Número del documento. Empieza en 321 (id + 320)."""
+        return (self.id + 320) if self.id else None
+
+    @property
+    def fecha_validez(self):
+        if not self.fecha_emision:
+            return None
+        return self.fecha_emision + timedelta(days=self.validez_dias)
+
+    @property
+    def esta_vencida(self) -> bool:
+        if self.estado in ('aceptada', 'rechazada'):
+            return False
+        if not self.fecha_validez:
+            return False
+        return timezone.now().date() > self.fecha_validez
+
+    @property
+    def total(self):
+        from decimal import Decimal
+        return sum((item.subtotal for item in self.items.all()), Decimal(0))
+
+    def __str__(self):
+        return f'Cotización N° {self.numero or "?"} — {self.empresa_razon_social}'
+
+
+class CotizacionItem(models.Model):
+    """Línea individual de una cotización (servicio, producto, o item custom)."""
+
+    cotizacion = models.ForeignKey(
+        CotizacionEmpresa, related_name='items', on_delete=models.CASCADE,
+    )
+    servicio = models.ForeignKey(
+        Servicio, on_delete=models.SET_NULL, null=True, blank=True,
+        help_text='Si es un servicio del catálogo.',
+    )
+    producto = models.ForeignKey(
+        Producto, on_delete=models.SET_NULL, null=True, blank=True,
+        help_text='Si es un producto del catálogo.',
+    )
+    descripcion_custom = models.CharField(
+        max_length=200, blank=True,
+        help_text='Para items que no están en el catálogo (servicio/producto a medida).',
+    )
+    cantidad = models.PositiveIntegerField(default=1)
+    precio_unitario = models.DecimalField(
+        max_digits=10, decimal_places=0,
+        help_text='Snapshot del precio al momento de cotizar (CLP, sin decimales).',
+    )
+    orden = models.PositiveIntegerField(default=0, help_text='Orden de aparición en el documento')
+
+    class Meta:
+        verbose_name = 'Ítem de cotización'
+        verbose_name_plural = 'Ítems de cotización'
+        ordering = ['orden', 'id']
+
+    @property
+    def descripcion(self) -> str:
+        if self.servicio_id:
+            return self.servicio.nombre
+        if self.producto_id:
+            return self.producto.nombre
+        return self.descripcion_custom or '(sin descripción)'
+
+    @property
+    def subtotal(self):
+        from decimal import Decimal
+        return Decimal(self.cantidad) * (self.precio_unitario or Decimal(0))
+
+    def __str__(self):
+        return f'{self.descripcion} × {self.cantidad}'

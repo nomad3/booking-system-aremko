@@ -1,0 +1,308 @@
+{% load humanize %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Cotización N° {{ cotizacion.numero }} — Aremko Spa</title>
+  <style>
+    /* Reset básico */
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f5f1ea;
+      color: #2a2a2a;
+      line-height: 1.5;
+    }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      background: #2c2c2c;
+      color: #fff;
+      padding: 10px 20px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      z-index: 100;
+    }
+    .toolbar button, .toolbar a.btn {
+      background: #b78b5b;
+      color: #fff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .toolbar button:hover, .toolbar a.btn:hover { background: #9d7448; }
+    .toolbar .toolbar-info {
+      margin-left: auto;
+      font-size: 13px;
+      opacity: 0.85;
+    }
+    .documento {
+      max-width: 820px;
+      margin: 30px auto;
+      background: #fff;
+      padding: 50px 60px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.08);
+      border-top: 6px solid #b78b5b;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #b78b5b;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 1px;
+      color: #2a2a2a;
+    }
+    .brand .tag {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #888;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .doc-number {
+      text-align: right;
+      font-size: 14px;
+    }
+    .doc-number .label {
+      color: #888;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-size: 11px;
+    }
+    .doc-number .numero {
+      font-size: 26px;
+      font-weight: bold;
+      color: #b78b5b;
+      margin: 4px 0;
+    }
+    .estado-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: bold;
+    }
+    .estado-borrador  { background: #eee;     color: #555; }
+    .estado-enviada   { background: #d9eafd;  color: #1a558a; }
+    .estado-aceptada  { background: #d3f0d3;  color: #1c6a1c; }
+    .estado-rechazada { background: #f8d2d2;  color: #8a1a1a; }
+    .estado-expirada  { background: #f0e0c0;  color: #7a5500; }
+
+    .destinatario {
+      background: #faf6ee;
+      padding: 18px 22px;
+      border-left: 3px solid #b78b5b;
+      margin-bottom: 30px;
+    }
+    .destinatario .label { color: #888; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+    .destinatario .razon { font-size: 18px; font-weight: 600; margin-top: 4px; color: #2a2a2a; }
+    .destinatario dl { margin: 12px 0 0; font-size: 14px; }
+    .destinatario dt { display: inline-block; width: 90px; color: #777; }
+    .destinatario dd { display: inline; margin: 0; }
+    .destinatario dd + dt::before { content: '\A'; white-space: pre; }
+
+    h2.section { font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #888; margin: 0 0 12px; }
+
+    table.items {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+    }
+    table.items th {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 2px solid #b78b5b;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #666;
+    }
+    table.items th.num, table.items td.num { text-align: right; }
+    table.items td {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+      vertical-align: top;
+    }
+    table.items tr:last-child td { border-bottom: none; }
+    .total-row {
+      background: #faf6ee;
+    }
+    .total-row td {
+      font-weight: bold;
+      font-size: 16px;
+      padding-top: 14px;
+      padding-bottom: 14px;
+    }
+    .total-row .label { letter-spacing: 1px; text-transform: uppercase; font-size: 13px; color: #b78b5b; }
+
+    .frase-beneficios {
+      background: #faf6ee;
+      padding: 20px 25px;
+      border-left: 3px solid #b78b5b;
+      font-style: italic;
+      font-size: 15px;
+      line-height: 1.7;
+      margin: 30px 0;
+      color: #3a3a3a;
+    }
+
+    .terminos {
+      font-size: 13px;
+      color: #555;
+      white-space: pre-wrap;
+      line-height: 1.7;
+      margin-bottom: 30px;
+    }
+
+    .cierre {
+      margin-top: 40px;
+      white-space: pre-wrap;
+      font-size: 14px;
+      color: #444;
+      border-top: 1px solid #ddd;
+      padding-top: 20px;
+    }
+
+    /* Versión texto plano (oculta visualmente pero copiable) */
+    .texto-plano {
+      position: absolute;
+      left: -9999px;
+      width: 1px;
+      height: 1px;
+    }
+
+    @media print {
+      body { background: #fff; }
+      .toolbar { display: none; }
+      .documento {
+        margin: 0;
+        box-shadow: none;
+        border-top: 4px solid #b78b5b;
+        padding: 30px 40px;
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button onclick="copiarTexto()" title="Copia el texto plano al portapapeles, listo para pegar en WhatsApp o email">
+    📋 Copiar como texto
+  </button>
+  <button onclick="window.print()" title="Imprimir o guardar como PDF desde el navegador">
+    🖨️ Imprimir / Guardar PDF
+  </button>
+  <span class="toolbar-info">Cotización N° {{ cotizacion.numero }} · {{ cotizacion.empresa_razon_social }}</span>
+</div>
+
+<article class="documento">
+  <header class="header">
+    <div class="brand">
+      <h1>AREMKO SPA</h1>
+      <div class="tag">Hotel Boutique · Puerto Varas · Chile</div>
+    </div>
+    <div class="doc-number">
+      <div class="label">Cotización N°</div>
+      <div class="numero">{{ cotizacion.numero }}</div>
+      <div>
+        <span class="estado-badge estado-{{ cotizacion.estado }}">
+          {{ cotizacion.get_estado_display }}
+        </span>
+      </div>
+      <div style="margin-top:8px; color:#555;">
+        Emitida: {{ cotizacion.fecha_emision|date:"d-m-Y" }}<br>
+        {% if cotizacion.fecha_validez %}
+          Válida hasta: <strong>{{ cotizacion.fecha_validez|date:"d-m-Y" }}</strong>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <section class="destinatario">
+    <div class="label">Para</div>
+    <div class="razon">{{ cotizacion.empresa_razon_social }}</div>
+    <dl>
+      {% if cotizacion.empresa_rut %}<dt>RUT:</dt><dd>{{ cotizacion.empresa_rut }}</dd>{% endif %}
+      {% if cotizacion.empresa_giro %}<dt>Giro:</dt><dd>{{ cotizacion.empresa_giro }}</dd>{% endif %}
+      <dt>Contacto:</dt><dd>{{ cotizacion.contacto_nombre }}</dd>
+      {% if cotizacion.contacto_email %}<dt>Email:</dt><dd>{{ cotizacion.contacto_email }}</dd>{% endif %}
+      {% if cotizacion.contacto_telefono %}<dt>Teléfono:</dt><dd>{{ cotizacion.contacto_telefono }}</dd>{% endif %}
+    </dl>
+  </section>
+
+  <h2 class="section">Detalle de la cotización</h2>
+  <table class="items">
+    <thead>
+      <tr>
+        <th>Ítem</th>
+        <th class="num" style="width:80px;">Cantidad</th>
+        <th class="num" style="width:130px;">Precio unitario</th>
+        <th class="num" style="width:140px;">Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td>{{ item.descripcion }}</td>
+        <td class="num">{{ item.cantidad }}</td>
+        <td class="num">${{ item.precio_unitario|floatformat:0|intcomma }}</td>
+        <td class="num">${{ item.subtotal|floatformat:0|intcomma }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" style="text-align:center; color:#999; padding:30px;">(sin ítems)</td></tr>
+      {% endfor %}
+      <tr class="total-row">
+        <td class="label" colspan="3">Total</td>
+        <td class="num">${{ cotizacion.total|floatformat:0|intcomma }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="frase-beneficios">{{ frase_beneficios|linebreaksbr }}</div>
+
+  <div class="terminos">{{ terminos }}</div>
+
+  <div class="cierre">{{ cierre }}</div>
+</article>
+
+<textarea class="texto-plano" id="textoPlano" readonly>{{ texto_plano }}</textarea>
+
+<script>
+function copiarTexto() {
+  var ta = document.getElementById('textoPlano');
+  ta.select();
+  ta.setSelectionRange(0, 99999);
+  try {
+    document.execCommand('copy');
+    alert('Texto copiado al portapapeles. Listo para pegar en WhatsApp o email.');
+  } catch (e) {
+    // Fallback API moderna
+    navigator.clipboard.writeText(ta.value).then(function() {
+      alert('Texto copiado al portapapeles.');
+    }, function() {
+      alert('No se pudo copiar automáticamente. Selecciona el texto manualmente.');
+    });
+  }
+  window.getSelection().removeAllRanges();
+}
+</script>
+
+</body>
+</html>

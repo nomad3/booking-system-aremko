@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, cotizacion_reserva_view, eliminar_reservas_no_pagadas_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple, inventario_view, agenda_operativa_view, luna_api_views
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, cotizacion_reserva_view, cotizacion_view, eliminar_reservas_no_pagadas_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple, inventario_view, agenda_operativa_view, luna_api_views
 )
 from . import api # Keep api module import as is
 from . import views_comandas_cliente # Import comandas de clientes views
@@ -336,6 +336,9 @@ urlpatterns = [
     path('api/aremko-cli/bookings/daily/', api_aremko_cli.bookings_daily, name='aremko_cli_bookings_daily'),
     path('api/aremko-cli/bookings/by-family/', api_aremko_cli.bookings_by_family, name='aremko_cli_bookings_by_family'),
     path('api/aremko-cli/bookings/by-family-mtd/', api_aremko_cli.bookings_by_family_mtd, name='aremko_cli_bookings_by_family_mtd'),
+
+    # === Cotización formal para empresas (documento HTML imprimible) ===
+    path('cotizacion/<int:numero>/', cotizacion_view.cotizacion_formal_view, name='cotizacion_formal'),
     path('api/aremko-cli/bookings/by-payment-method/', api_aremko_cli.bookings_by_payment_method, name='aremko_cli_bookings_by_payment_method'),
     path('api/aremko-cli/bookings/weekly-breakdown/', api_aremko_cli.bookings_weekly_breakdown, name='aremko_cli_bookings_weekly_breakdown'),
     path('api/aremko-cli/clients/stats/', api_aremko_cli.clients_stats, name='aremko_cli_clients_stats'),
