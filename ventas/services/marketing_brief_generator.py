@@ -89,6 +89,7 @@ def build_user_prompt(
     reviews_resumen: Optional[dict] = None,
     calendario_chile: Optional[str] = None,
     pipeline_reservas: Optional[dict] = None,
+    trends: Optional[dict] = None,
 ) -> str:
     """Construye el user prompt con toda la info contextual."""
 
@@ -142,6 +143,20 @@ DATOS:
 
 === GOOGLE SEARCH CONSOLE (búsqueda orgánica) — ÚLTIMOS 7 DÍAS vs 7 ANTERIORES ===
 {json.dumps(gsc_snapshot, indent=2, ensure_ascii=False, default=str) if gsc_snapshot else '(no disponible)'}
+
+=== TENDENCIAS HISTÓRICAS (series semanales acumuladas en BD) ===
+INSTRUCCIONES PARA USAR ESTE BLOQUE:
+- Cada métrica tiene: current (último snapshot), previous (W-1), delta_vs_w1_pct (% cambio), avg_last_4w, avg_prev_4w, delta_4w_vs_prev_4w_pct, trend (mejora/mantiene/empeora/sin_datos), history (serie cronológica).
+- Usar `delta_vs_w1_pct` para hablar de la SEMANA. Usar `delta_4w_vs_prev_4w_pct` para hablar de TENDENCIA DE MES (más estable, suaviza ruido semanal).
+- Si trend = "empeora" en métricas críticas (reservation_started, conversions, ig_followers, nps_promedio), genera alerta accionable con HIPÓTESIS de causa y propuesta concreta.
+- Si trend = "mejora" sostenida (>3 semanas subiendo), proponer DOBLAR la apuesta en ese canal/familia.
+- Si trend = "mantiene" pero el negocio necesita crecer, sugerir experimento.
+- Si trend = "sin_datos", ignorar esa métrica o mencionar "datos insuficientes (snapshots recién empezamos a acumular)".
+- Correlacionar señales entre fuentes. Ejemplo: si ig_followers cae Y reservation_started cae Y ads_spend bajó → hipótesis: menor inversión paid afecta tope del embudo. Otro: si nps_promedio sube pero reviews externas (no en este bloque) no, puede ser sesgo de muestra interna.
+- `_meta.X_snapshots` te dice cuántas semanas de historia hay. Si son pocas (1-2), no fuerces conclusiones de tendencia — describí estado actual y avisá que en N semanas habrá serie útil.
+
+DATOS:
+{json.dumps(trends, indent=2, ensure_ascii=False, default=str)[:6000] if trends else '(no disponible — snapshots aún no acumulan suficiente historia)'}
 
 === META: FACEBOOK + INSTAGRAM ORGÁNICO + ADS (últimos 28 días, todas las cuentas) ===
 {json.dumps(meta_snapshot, indent=2, ensure_ascii=False, default=str)[:8000] if meta_snapshot else '(no disponible)'}
@@ -1046,6 +1061,168 @@ def get_meta_snapshot_safe(persist: bool = True, with_analysis: bool = True) -> 
         return None
 
 
+def _tendencia_serie(valores: list) -> dict:
+    """Dada una lista de valores en orden cronológico (más antiguo → más nuevo),
+    calcula deltas y dirección de tendencia.
+
+    Tolera listas cortas: si hay <2 valores no compara, si hay 2-3 solo W-1,
+    si hay 4-7 agrega promedio 4w, si hay 8+ compara 4w-vs-4w.
+    """
+    # Filtrar Nones manteniendo orden cronológico.
+    serie = [float(v) for v in valores if v is not None]
+    n = len(serie)
+    out = {
+        'current': serie[-1] if n >= 1 else None,
+        'previous': serie[-2] if n >= 2 else None,
+        'delta_vs_w1_pct': None,
+        'avg_last_4w': None,
+        'avg_prev_4w': None,
+        'delta_4w_vs_prev_4w_pct': None,
+        'trend': 'sin_datos' if n < 2 else 'mantiene',
+        'history': serie,
+    }
+    if n < 2:
+        return out
+
+    prev = out['previous']
+    cur = out['current']
+    if prev not in (None, 0):
+        delta = (cur - prev) / prev * 100
+        out['delta_vs_w1_pct'] = round(delta, 1)
+    elif prev == 0 and cur > 0:
+        out['delta_vs_w1_pct'] = 100.0  # "infinito" → 100% como proxy
+
+    if n >= 4:
+        out['avg_last_4w'] = round(sum(serie[-4:]) / 4, 2)
+    if n >= 8:
+        last4 = serie[-4:]
+        prev4 = serie[-8:-4]
+        out['avg_prev_4w'] = round(sum(prev4) / 4, 2)
+        avg_prev = sum(prev4) / 4
+        avg_last = sum(last4) / 4
+        if avg_prev > 0:
+            out['delta_4w_vs_prev_4w_pct'] = round((avg_last - avg_prev) / avg_prev * 100, 1)
+
+    # Trend basado en delta_vs_w1 (umbral 5%).
+    delta = out.get('delta_vs_w1_pct')
+    if delta is None:
+        out['trend'] = 'sin_datos'
+    elif delta > 5:
+        out['trend'] = 'mejora'
+    elif delta < -5:
+        out['trend'] = 'empeora'
+    else:
+        out['trend'] = 'mantiene'
+
+    return out
+
+
+def get_trends_safe(max_weeks: int = 8) -> Optional[dict]:
+    """Lee los últimos max_weeks snapshots persistidos y calcula tendencias.
+
+    Devuelve dict con tendencias por fuente (ga4, gsc, meta, voc). Tolera
+    fuentes sin datos suficientes — devuelve estructura "sin_datos" en su lugar.
+
+    Args:
+        max_weeks: cuántos snapshots históricos leer por fuente (default 8).
+
+    Returns:
+        dict con shape:
+        {
+          "ga4": {"sessions": {<tendencia>}, "reservation_started": {<tendencia>}, ...},
+          "gsc": {"clicks": {<tendencia>}, ...},
+          "meta": {"ig_followers": {<tendencia>}, "fb_fan_count": {...}, "ads_spend": {...}},
+          "voc": {"nps_promedio": {...}, "encuestas_count": {...}},
+          "_meta": {"snapshots_disponibles": {...}}
+        }
+        None si nada funciona.
+    """
+    try:
+        from ..models import (
+            GA4Snapshot, SearchConsoleSnapshot, MetaSnapshot, WeeklySurveyAnalysis,
+        )
+    except Exception as exc:
+        logger.warning(f'No se pudieron importar modelos para trends: {exc}')
+        return None
+
+    out = {'ga4': {}, 'gsc': {}, 'meta': {}, 'voc': {}, '_meta': {}}
+
+    # --- GA4 ---
+    try:
+        ga4_snaps = list(GA4Snapshot.objects.order_by('-fecha_snapshot')[:max_weeks])
+        ga4_snaps.reverse()  # ordenar cronológicamente
+        out['_meta']['ga4_snapshots'] = len(ga4_snaps)
+        if ga4_snaps:
+            metricas_ga4 = [
+                'sessions', 'total_users', 'new_users',
+                'conversions', 'reservation_started', 'reservation_completed',
+                'whatsapp_clicks', 'phone_clicks',
+            ]
+            for metric in metricas_ga4:
+                valores = [getattr(s, metric, None) for s in ga4_snaps]
+                out['ga4'][metric] = _tendencia_serie(valores)
+    except Exception as exc:
+        logger.warning(f'Trends GA4 fallo: {exc}')
+        out['ga4']['_error'] = str(exc)
+
+    # --- Search Console ---
+    try:
+        gsc_snaps = list(SearchConsoleSnapshot.objects.order_by('-fecha_snapshot')[:max_weeks])
+        gsc_snaps.reverse()
+        # Filtrar snapshots vacios (resultado del bug Google que rellena con 0s).
+        gsc_validos = [s for s in gsc_snaps if (s.clicks or 0) > 0 or (s.impressions or 0) > 0]
+        out['_meta']['gsc_snapshots'] = len(gsc_snaps)
+        out['_meta']['gsc_snapshots_validos'] = len(gsc_validos)
+        if gsc_validos:
+            for metric in ['clicks', 'impressions', 'ctr', 'position']:
+                valores = [getattr(s, metric, None) for s in gsc_validos]
+                out['gsc'][metric] = _tendencia_serie(valores)
+        else:
+            out['gsc']['_nota'] = 'Sin snapshots GSC con datos (permisos pendientes en Google).'
+    except Exception as exc:
+        logger.warning(f'Trends GSC fallo: {exc}')
+        out['gsc']['_error'] = str(exc)
+
+    # --- Meta (FB + IG + Ads) ---
+    try:
+        meta_snaps = list(
+            MetaSnapshot.objects.filter(tipo='full').order_by('-created_at')[:max_weeks]
+        )
+        meta_snaps.reverse()
+        out['_meta']['meta_snapshots'] = len(meta_snaps)
+        if meta_snaps:
+            out['meta']['fb_fan_count'] = _tendencia_serie([s.fb_fan_count for s in meta_snaps])
+            out['meta']['ig_followers'] = _tendencia_serie([s.ig_followers for s in meta_snaps])
+            out['meta']['ads_spend_period'] = _tendencia_serie([s.ads_spend_period for s in meta_snaps])
+    except Exception as exc:
+        logger.warning(f'Trends Meta fallo: {exc}')
+        out['meta']['_error'] = str(exc)
+
+    # --- VoC (encuestas) ---
+    try:
+        voc_snaps = list(
+            WeeklySurveyAnalysis.objects.order_by('-semana_inicio')[:max_weeks]
+        )
+        voc_snaps.reverse()
+        out['_meta']['voc_snapshots'] = len(voc_snaps)
+        if voc_snaps:
+            out['voc']['nps_promedio'] = _tendencia_serie([s.nps_promedio for s in voc_snaps])
+            out['voc']['encuestas_count'] = _tendencia_serie([s.encuestas_count for s in voc_snaps])
+    except Exception as exc:
+        logger.warning(f'Trends VoC fallo: {exc}')
+        out['voc']['_error'] = str(exc)
+
+    # Si TODO está vacío, devolver None.
+    fuentes_con_datos = sum(
+        1 for k in ('ga4', 'gsc', 'meta', 'voc')
+        if any(isinstance(v, dict) and v.get('trend') for v in out[k].values())
+    )
+    if fuentes_con_datos == 0:
+        logger.info('get_trends_safe: ninguna fuente con datos suficientes todavía')
+        return None
+    return out
+
+
 def call_llm(
     semana_inicio,
     semana_fin,
@@ -1060,6 +1237,7 @@ def call_llm(
     reviews_resumen: Optional[dict] = None,
     calendario_chile: Optional[str] = None,
     pipeline_reservas: Optional[dict] = None,
+    trends: Optional[dict] = None,
     model: Optional[str] = None,
 ) -> dict:
     """Llama a OpenRouter con todo el contexto y devuelve el brief en dict."""
@@ -1094,6 +1272,7 @@ def call_llm(
         reviews_resumen=reviews_resumen,
         calendario_chile=calendario_chile,
         pipeline_reservas=pipeline_reservas,
+        trends=trends,
     )
 
     client = OpenAI(api_key=api_key, base_url=base_url)
@@ -1153,6 +1332,16 @@ def generate_brief() -> dict:
     if pipeline_reservas and pipeline_reservas.get('_falla_total'):
         logger.error(f'Pipeline interno FALLO TOTAL — todos los bloques erroneados')
 
+    # Sub-fase 2C: tendencias semana-vs-semana usando snapshots persistidos.
+    trends = get_trends_safe(max_weeks=8)
+    if trends:
+        logger.info(
+            f'Trends cargadas: ga4={trends["_meta"].get("ga4_snapshots", 0)} '
+            f'gsc={trends["_meta"].get("gsc_snapshots_validos", 0)} '
+            f'meta={trends["_meta"].get("meta_snapshots", 0)} '
+            f'voc={trends["_meta"].get("voc_snapshots", 0)}'
+        )
+
     brief = call_llm(
         semana_inicio=semana_inicio,
         semana_fin=semana_fin,
@@ -1167,6 +1356,7 @@ def generate_brief() -> dict:
         reviews_resumen=reviews_resumen,
         calendario_chile=calendario_chile,
         pipeline_reservas=pipeline_reservas,
+        trends=trends,
     )
 
     return {
@@ -1182,5 +1372,6 @@ def generate_brief() -> dict:
         'objetivo_semana': objetivo_semana,
         'reviews_resumen': reviews_resumen,
         'pipeline_reservas': pipeline_reservas,
+        'trends': trends,
         'metricas_disponibles': bool(ga4_snapshot or gsc_snapshot or meta_snapshot),
     }
