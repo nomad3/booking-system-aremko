@@ -6062,7 +6062,7 @@ class SearchConsoleSnapshot(models.Model):
 
 COTIZACION_FRASE_BENEFICIOS_DEFAULT = (
     "Invertir en el bienestar del equipo es una de las mejores decisiones que una "
-    "organización puede tomar. En Aremko Spa, su grupo encontrará un espacio único de "
+    "organización puede tomar. En Aremko Spa Boutique, su grupo encontrará un espacio único de "
     "desconexión junto al río Pescado, rodeado de bosque nativo: tinas calientes, masajes "
     "restauradores y la calma del sur de Chile. Una experiencia privada, cálida y memorable "
     "que fortalece vínculos, reduce el estrés acumulado y deja a cada persona con energía "
@@ -6082,7 +6082,7 @@ COTIZACION_TERMINOS_DEFAULT = (
 
 COTIZACION_CIERRE_DEFAULT = (
     "Cordialmente,\n"
-    "Equipo Aremko Spa\n"
+    "Equipo Aremko Spa Boutique\n"
     "ventas@aremko.cl  ·  +56 9 7666 8080  ·  Puerto Varas, Chile"
 )
 
