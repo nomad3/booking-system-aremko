@@ -226,11 +226,12 @@ def _generar_texto_resumen(reserva, config):
     # Despedida
     lineas.append(config.despedida)
 
-    lineas.append("")
-    lineas.append("")
-
-    # Datos de pago
-    lineas.append(config.datos_transferencia)
+    # Datos de pago: solo si la reserva NO esta pagada.
+    # Si esta 'pagado', no tiene sentido pedirle al cliente que abone de nuevo.
+    if reserva.estado_pago != 'pagado':
+        lineas.append("")
+        lineas.append("")
+        lineas.append(config.datos_transferencia)
 
     # NOTA: Link de Mercado Pago removido por solicitud del usuario (28-dic-2025)
     # lineas.append("")
