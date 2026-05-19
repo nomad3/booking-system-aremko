@@ -18,8 +18,7 @@ def _construir_texto_plano(cotizacion: CotizacionFormal, frase_beneficios: str, 
     """Versión texto plano del documento, lista para copiar a WhatsApp/email."""
     lineas = []
     lineas.append('═══════════════════════════════════════════')
-    lineas.append('  AREMKO HOTEL SPA')
-    lineas.append('  Puerto Varas · Chile')
+    lineas.append('  Aremko Spa Boutique')
     lineas.append('═══════════════════════════════════════════')
     lineas.append('')
     lineas.append(f'COTIZACIÓN N° {cotizacion.numero}')
