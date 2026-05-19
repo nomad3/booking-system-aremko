@@ -6,11 +6,20 @@ Endpoints de solo lectura para consultar estadísticas de reservas
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Sum, Avg, Count, Q
+from django.db.models import Sum, Avg, Count, Q, Min
 from django.utils import timezone
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as _date_cls
 from .models import VentaReserva, Cliente, ReservaServicio, Pago
 import logging
+
+# Mapeo unico de tipos de servicio a nombres de familia.
+# Reusado por bookings_by_family y bookings_weekly_breakdown.
+FAMILY_NAMES = {
+    'masaje': 'Masajes',
+    'tina': 'Tinas',
+    'cabana': 'Cabañas',
+    'otro': 'Otros',
+}
 
 logger = logging.getLogger(__name__)
 
@@ -184,38 +193,66 @@ def bookings_daily(request):
 @require_http_methods(["GET"])
 def clients_stats(request):
     """
-    Estadísticas de clientes
+    Estadísticas de clientes en el periodo dado.
+
+    Query params:
+        date_start (YYYY-MM-DD, opcional): inicio del periodo. Default = hoy - 7 dias.
+        date_stop  (YYYY-MM-DD, opcional): fin del periodo. Default = hoy.
+
+    Definiciones:
+        - unique_clients_week: clientes con al menos una VentaReserva no cancelada
+          cuya fecha_creacion cae dentro de [date_start, date_stop].
+        - new_clients_week: clientes cuya PRIMERA VentaReserva (historica, no
+          cancelada) cae dentro del periodo.
+        - returning_clients_week: clientes con venta en el periodo Y otra venta
+          (no cancelada) ANTES de date_start. Equivale a unique - new.
 
     Returns:
         {
-            "success": true,
-            "data": {
-                "total_clients": 1250,
-                "new_clients_week": 15,
-                "returning_clients_week": 10
-            }
+          "success": true,
+          "data": {
+            "total_clients": 1250,
+            "new_clients_week": 15,
+            "returning_clients_week": 10,
+            "unique_clients_week": 25,
+            "period": {"start": "...", "end": "..."}
+          }
         }
     """
     try:
-        date_stop = timezone.now().date()
-        date_start = date_stop - timedelta(days=7)
+        # Periodo: query params con fallback a ultimos 7 dias.
+        date_start_str = request.GET.get('date_start')
+        date_stop_str = request.GET.get('date_stop')
+        if date_start_str and date_stop_str:
+            date_start = parse_date(date_start_str)
+            date_stop = parse_date(date_stop_str)
+            if not date_start or not date_stop:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Formato de fecha inválido. Usa YYYY-MM-DD'
+                }, status=400)
+        else:
+            date_stop = timezone.now().date()
+            date_start = date_stop - timedelta(days=7)
 
-        # Total de clientes
         total_clients = Cliente.objects.count()
 
-        # Clientes nuevos esta semana
-        new_clients = Cliente.objects.filter(
-            created_at__date__gte=date_start,
-            created_at__date__lte=date_stop
-        ).count()
-
-        # Clientes que regresaron esta semana
-        returning_clients = VentaReserva.objects.filter(
+        # Clientes unicos con venta en el periodo (excluyendo canceladas).
+        clientes_en_periodo_qs = VentaReserva.objects.filter(
             fecha_creacion__date__gte=date_start,
-            fecha_creacion__date__lte=date_stop
-        ).values('cliente').annotate(
-            bookings_count=Count('id')
-        ).filter(bookings_count__gt=1).count()
+            fecha_creacion__date__lte=date_stop,
+        ).exclude(estado_pago='cancelado').values_list('cliente_id', flat=True).distinct()
+        clientes_en_periodo = set(clientes_en_periodo_qs)
+        unique_clients = len(clientes_en_periodo)
+
+        # Recurrentes: clientes del periodo que YA tenian una venta antes de date_start.
+        returning_clients = VentaReserva.objects.filter(
+            cliente_id__in=clientes_en_periodo,
+            fecha_creacion__date__lt=date_start,
+        ).exclude(estado_pago='cancelado').values('cliente_id').distinct().count()
+
+        # Nuevos: los del periodo que no son recurrentes (su primera venta cae aqui).
+        new_clients = unique_clients - returning_clients
 
         return JsonResponse({
             'success': True,
@@ -223,6 +260,7 @@ def clients_stats(request):
                 'total_clients': total_clients,
                 'new_clients_week': new_clients,
                 'returning_clients_week': returning_clients,
+                'unique_clients_week': unique_clients,
                 'period': {
                     'start': date_start.strftime('%Y-%m-%d'),
                     'end': date_stop.strftime('%Y-%m-%d')
@@ -312,13 +350,8 @@ def bookings_by_family(request):
             # Caso 29 feb en año no bisiesto
             prev_year_stop = prev_year_start.replace(day=28)
 
-        # Mapeo de tipos de servicio a nombres de familia
-        family_names = {
-            'masaje': 'Masajes',
-            'tina': 'Tinas',
-            'cabana': 'Cabañas',
-            'otro': 'Otros'
-        }
+        # Mapeo unificado (ver FAMILY_NAMES al inicio del modulo).
+        family_names = FAMILY_NAMES
 
         def get_family_stats(start_date, end_date):
             """Helper para obtener stats de un período"""
@@ -554,6 +587,252 @@ def bookings_by_payment_method(request):
 
     except Exception as e:
         logger.error(f"Error in bookings_by_payment_method: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+def _iso_weeks_range(weeks_count, today=None):
+    """Devuelve una lista de (week_start, week_stop, iso_year, iso_week) de las
+    ultimas `weeks_count` semanas ISO, ordenada de mas antigua a mas reciente.
+
+    - Semana 0 (la actual): lunes de esta semana → hoy (puede ser miércoles).
+    - Semana 1: lunes a domingo completos de la semana anterior.
+    - ...
+
+    weekday() devuelve 0 para lunes y 6 para domingo.
+    """
+    if today is None:
+        today = timezone.now().date()
+    monday_current = today - timedelta(days=today.weekday())
+
+    weeks = []
+    for i in range(weeks_count):
+        if i == 0:
+            start = monday_current
+            stop = today
+        else:
+            start = monday_current - timedelta(weeks=i)
+            stop = start + timedelta(days=6)
+        iso_year, iso_week, _ = start.isocalendar()
+        weeks.append((start, stop, iso_year, iso_week))
+
+    weeks.reverse()  # más antigua primero, más reciente al final
+    return weeks
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def bookings_weekly_breakdown(request):
+    """
+    Matriz semanal de reservas: por semana ISO devuelve familia × clientes
+    (nuevos / recurrentes / únicos) + revenue y conteo.
+
+    Query params:
+        weeks (int, default 12, max 52): cantidad de semanas hacia atras.
+
+    Semana actual termina hoy (aunque sea miércoles). Semanas pasadas son lunes-domingo
+    completas. Orden del array: mas antigua → mas reciente (para graficar L→R).
+
+    Definiciones por semana W:
+        - new_clients(W)       = clientes cuya PRIMERA venta historica cae en W.
+        - returning_clients(W) = clientes con venta en W Y otra venta anterior a inicio de W.
+        - unique_clients(W)    = new_clients(W) + returning_clients(W).
+
+    Excluye ventas con estado_pago='cancelado'.
+    """
+    try:
+        try:
+            weeks_count = int(request.GET.get('weeks', '12'))
+        except (TypeError, ValueError):
+            weeks_count = 12
+        weeks_count = max(1, min(52, weeks_count))
+
+        today = timezone.now().date()
+        weeks = _iso_weeks_range(weeks_count, today=today)
+        periodo_start = weeks[0][0]
+        periodo_stop = weeks[-1][1]
+
+        # --- 1) Conteo / revenue por (familia, semana) ---
+        # Una sola query trae todas las ReservaServicio del periodo con fecha y tipo.
+        servicios_qs = ReservaServicio.objects.filter(
+            venta_reserva__fecha_creacion__date__gte=periodo_start,
+            venta_reserva__fecha_creacion__date__lte=periodo_stop,
+        ).exclude(
+            venta_reserva__estado_pago='cancelado'
+        ).values(
+            'venta_reserva__fecha_creacion',
+            'servicio__tipo_servicio',
+            'precio_unitario_venta',
+        )
+
+        # Inicializar buckets por semana.
+        family_buckets = {}  # (week_index) -> {tipo: {'count': N, 'revenue': X}}
+        for i in range(len(weeks)):
+            family_buckets[i] = {tipo: {'count': 0, 'revenue': 0.0} for tipo in FAMILY_NAMES.keys()}
+
+        def _week_index(d):
+            """Devuelve el indice de la semana en `weeks` (o None si fuera de rango)."""
+            for idx, (s, e, _y, _w) in enumerate(weeks):
+                if s <= d <= e:
+                    return idx
+            return None
+
+        for row in servicios_qs:
+            fc = row['venta_reserva__fecha_creacion']
+            d = fc.date() if hasattr(fc, 'date') else fc
+            idx = _week_index(d)
+            if idx is None:
+                continue
+            tipo = row['servicio__tipo_servicio'] or 'otro'
+            if tipo not in family_buckets[idx]:
+                family_buckets[idx][tipo] = {'count': 0, 'revenue': 0.0}
+            family_buckets[idx][tipo]['count'] += 1
+            family_buckets[idx][tipo]['revenue'] += float(row['precio_unitario_venta'] or 0)
+
+        # --- 2) Clientes por semana (unicos + nuevos + recurrentes) ---
+        # Una query: todas las ventas no canceladas del periodo (cliente_id + fecha).
+        ventas_periodo = list(
+            VentaReserva.objects.filter(
+                fecha_creacion__date__gte=periodo_start,
+                fecha_creacion__date__lte=periodo_stop,
+            ).exclude(estado_pago='cancelado').values('cliente_id', 'fecha_creacion')
+        )
+
+        # Para los clientes que aparecen, calcular su PRIMERA venta historica.
+        cliente_ids_periodo = {v['cliente_id'] for v in ventas_periodo if v['cliente_id']}
+        primera_venta_por_cliente = {}
+        if cliente_ids_periodo:
+            qs_primeras = VentaReserva.objects.filter(
+                cliente_id__in=cliente_ids_periodo,
+            ).exclude(estado_pago='cancelado').values('cliente_id').annotate(
+                primera=Min('fecha_creacion__date')
+            )
+            primera_venta_por_cliente = {p['cliente_id']: p['primera'] for p in qs_primeras}
+
+        # Por cada semana, agrupar clientes.
+        clientes_por_semana = [set() for _ in weeks]
+        for v in ventas_periodo:
+            d = v['fecha_creacion'].date() if hasattr(v['fecha_creacion'], 'date') else v['fecha_creacion']
+            idx = _week_index(d)
+            if idx is None or not v['cliente_id']:
+                continue
+            clientes_por_semana[idx].add(v['cliente_id'])
+
+        # --- 3) Armar response ---
+        weeks_data = []
+        totals = {
+            'total_count': 0,
+            'total_revenue': 0.0,
+            'new_clients_period': 0,
+            'returning_clients_period': 0,
+        }
+        new_per_week = []
+        returning_per_week = []
+
+        for idx, (start, stop, iso_year, iso_week) in enumerate(weeks):
+            by_family_raw = family_buckets[idx]
+            by_family = {}
+            week_count = 0
+            week_revenue = 0.0
+            for tipo, name in FAMILY_NAMES.items():
+                stats = by_family_raw.get(tipo, {'count': 0, 'revenue': 0.0})
+                by_family[name] = {
+                    'count': stats['count'],
+                    'revenue': round(stats['revenue'], 2),
+                }
+                week_count += stats['count']
+                week_revenue += stats['revenue']
+
+            clientes_semana = clientes_por_semana[idx]
+            unique_count = len(clientes_semana)
+            new_count = 0
+            for cid in clientes_semana:
+                primera = primera_venta_por_cliente.get(cid)
+                if primera is not None and start <= primera <= stop:
+                    new_count += 1
+            returning_count = unique_count - new_count
+
+            weeks_data.append({
+                'week_label': f'Sem {iso_week:02d} ({start.isoformat()} al {stop.isoformat()})',
+                'iso_year': iso_year,
+                'iso_week': iso_week,
+                'date_start': start.isoformat(),
+                'date_stop': stop.isoformat(),
+                'by_family': by_family,
+                'total_count': week_count,
+                'total_revenue': round(week_revenue, 2),
+                'unique_clients': unique_count,
+                'new_clients': new_count,
+                'returning_clients': returning_count,
+            })
+
+            totals['total_count'] += week_count
+            totals['total_revenue'] += week_revenue
+            totals['new_clients_period'] += new_count
+            totals['returning_clients_period'] += returning_count
+            new_per_week.append(new_count)
+            returning_per_week.append(returning_count)
+
+        # Unique clients en TODO el periodo (sin doble conteo).
+        totals['unique_clients_period'] = len(cliente_ids_periodo)
+        totals['total_revenue'] = round(totals['total_revenue'], 2)
+
+        # Promedios por semana.
+        n = len(weeks)
+        averages = {
+            'total_count': round(totals['total_count'] / n, 1) if n else 0,
+            'total_revenue': round(totals['total_revenue'] / n, 2) if n else 0,
+            'unique_clients': round(totals['unique_clients_period'] / n, 1) if n else 0,
+            'new_clients': round(totals['new_clients_period'] / n, 1) if n else 0,
+            'returning_clients': round(totals['returning_clients_period'] / n, 1) if n else 0,
+        }
+
+        # Trend: primeras 4 semanas vs ultimas 4 (si hay >= 8 semanas).
+        if n >= 8:
+            first4_new = sum(new_per_week[:4]) / 4
+            last4_new = sum(new_per_week[-4:]) / 4
+            first4_ret = sum(returning_per_week[:4]) / 4
+            last4_ret = sum(returning_per_week[-4:]) / 4
+        elif n >= 2:
+            half = max(1, n // 2)
+            first4_new = sum(new_per_week[:half]) / half
+            last4_new = sum(new_per_week[-half:]) / half
+            first4_ret = sum(returning_per_week[:half]) / half
+            last4_ret = sum(returning_per_week[-half:]) / half
+        else:
+            first4_new = last4_new = first4_ret = last4_ret = 0
+
+        trend = {
+            'new_clients_first_4w_avg': round(first4_new, 1),
+            'new_clients_last_4w_avg': round(last4_new, 1),
+            'returning_clients_first_4w_avg': round(first4_ret, 1),
+            'returning_clients_last_4w_avg': round(last4_ret, 1),
+        }
+
+        summary = {
+            'weeks_count': n,
+            'first_week_start': weeks[0][0].isoformat() if weeks else None,
+            'last_week_stop': weeks[-1][1].isoformat() if weeks else None,
+            'totals': totals,
+            'averages_per_week': averages,
+            'trend': trend,
+        }
+
+        logger.info(
+            f"aremko-cli: weekly_breakdown weeks={n} clientes_periodo={totals['unique_clients_period']}"
+        )
+        return JsonResponse({
+            'success': True,
+            'data': {
+                'weeks': weeks_data,
+                'summary': summary,
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Error in bookings_weekly_breakdown: {str(e)}", exc_info=True)
         return JsonResponse({
             'success': False,
             'error': str(e)
