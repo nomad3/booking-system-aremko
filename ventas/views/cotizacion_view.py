@@ -4,10 +4,16 @@ Renderiza un HTML con look corporativo (imprimible / convertible a PDF
 desde el browser) + versión texto plano embedded para copiar y enviar
 por WhatsApp/email.
 """
+import logging
+import re
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
+from django.template.loader import render_to_string
 
 from ..models import CotizacionFormal, ConfiguracionResumen
+
+logger = logging.getLogger(__name__)
 
 
 def _staff_required(view_func):
@@ -99,3 +105,60 @@ def cotizacion_formal_view(request, numero):
         'cierre': cierre,
         'texto_plano': texto_plano,
     })
+
+
+def _slugify_empresa(nombre: str) -> str:
+    """Convierte 'Empresa de Prueba SpA' → 'Empresa_de_Prueba_SpA' para nombre de archivo."""
+    limpio = re.sub(r'[^\w\s-]', '', nombre or 'empresa', flags=re.UNICODE)
+    return re.sub(r'\s+', '_', limpio.strip())[:50] or 'empresa'
+
+
+@_staff_required
+def cotizacion_pdf_view(request, numero):
+    """Genera el PDF de la cotización y lo devuelve como descarga directa.
+
+    Reusa el mismo HTML template (sin la toolbar) y lo convierte con WeasyPrint.
+    El navegador descarga el archivo a la carpeta de Descargas por default.
+    """
+    try:
+        cotizacion_id = int(numero) - 320
+    except (TypeError, ValueError):
+        cotizacion_id = -1
+
+    cotizacion = get_object_or_404(
+        CotizacionFormal.objects.prefetch_related('items__servicio', 'items__producto'),
+        pk=cotizacion_id,
+    )
+
+    config = ConfiguracionResumen.get_solo()
+    frase_beneficios = (cotizacion.frase_beneficios.strip()
+                        or config.get_cotizacion_frase_beneficios())
+    terminos = config.get_cotizacion_terminos()
+    cierre = config.get_cotizacion_cierre()
+
+    html_str = render_to_string('ventas/cotizacion_formal.html', {
+        'cotizacion': cotizacion,
+        'items': cotizacion.items.all(),
+        'frase_beneficios': frase_beneficios,
+        'terminos': terminos,
+        'cierre': cierre,
+        'texto_plano': '',  # no se usa en PDF
+        'pdf_mode': True,   # bandera para que el template oculte toolbar
+    })
+
+    try:
+        from weasyprint import HTML, CSS
+        pdf_bytes = HTML(string=html_str, base_url=request.build_absolute_uri('/')).write_pdf(
+            stylesheets=[CSS(string='@page { size: A4; margin: 1.5cm 2cm; }')],
+        )
+    except Exception as exc:
+        logger.error(f'Error generando PDF de cotización {numero}: {exc}', exc_info=True)
+        return HttpResponse(
+            f'Error generando PDF: {exc}. Usa "Imprimir / Guardar PDF" del navegador como alternativa.',
+            status=500,
+        )
+
+    filename = f'Cotizacion_{cotizacion.numero}_{_slugify_empresa(cotizacion.empresa_razon_social)}.pdf'
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response

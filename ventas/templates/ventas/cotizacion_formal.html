@@ -202,15 +202,21 @@
 </head>
 <body>
 
+{% if not pdf_mode %}
 <div class="toolbar">
   <button onclick="copiarTexto()" title="Copia el texto plano al portapapeles, listo para pegar en WhatsApp o email">
     📋 Copiar como texto
   </button>
+  <a class="btn" href="{% url 'ventas:cotizacion_pdf' numero=cotizacion.numero %}"
+     title="Descargar el documento como PDF (queda en tu carpeta Descargas)">
+    📥 Descargar PDF
+  </a>
   <button onclick="window.print()" title="Imprimir o guardar como PDF desde el navegador">
-    🖨️ Imprimir / Guardar PDF
+    🖨️ Imprimir
   </button>
   <span class="toolbar-info">Cotización N° {{ cotizacion.numero }} · {{ cotizacion.empresa_razon_social }}</span>
 </div>
+{% endif %}
 
 <article class="documento">
   <header class="header">
@@ -281,6 +287,7 @@
   <div class="cierre">{{ cierre }}</div>
 </article>
 
+{% if not pdf_mode %}
 <textarea class="texto-plano" id="textoPlano" readonly>{{ texto_plano }}</textarea>
 
 <script>
@@ -302,6 +309,7 @@ function copiarTexto() {
   window.getSelection().removeAllRanges();
 }
 </script>
+{% endif %}
 
 </body>
 </html>
