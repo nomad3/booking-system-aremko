@@ -7,14 +7,14 @@ por WhatsApp/email.
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import get_object_or_404, render
 
-from ..models import CotizacionEmpresa, ConfiguracionResumen
+from ..models import CotizacionFormal, ConfiguracionResumen
 
 
 def _staff_required(view_func):
     return login_required(user_passes_test(lambda u: u.is_staff)(view_func))
 
 
-def _construir_texto_plano(cotizacion: CotizacionEmpresa, frase_beneficios: str, terminos: str, cierre: str) -> str:
+def _construir_texto_plano(cotizacion: CotizacionFormal, frase_beneficios: str, terminos: str, cierre: str) -> str:
     """Versión texto plano del documento, lista para copiar a WhatsApp/email."""
     lineas = []
     lineas.append('═══════════════════════════════════════════')
@@ -80,7 +80,7 @@ def cotizacion_formal_view(request, numero):
         cotizacion_id = -1
 
     cotizacion = get_object_or_404(
-        CotizacionEmpresa.objects.prefetch_related('items__servicio', 'items__producto'),
+        CotizacionFormal.objects.prefetch_related('items__servicio', 'items__producto'),
         pk=cotizacion_id,
     )
 

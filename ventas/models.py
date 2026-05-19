@@ -6087,14 +6087,15 @@ COTIZACION_CIERRE_DEFAULT = (
 )
 
 
-class CotizacionEmpresa(models.Model):
-    """Cotización formal para empresas (grupos corporativos).
+class CotizacionFormal(models.Model):
+    """Cotización formal para empresas (documento numerado desde 321).
 
     No es una reserva: no tiene fechas de servicio. Solo lista servicios + productos
     con cantidades y precios, para enviar como documento formal y eventualmente
     convertirse en reserva manual cuando la empresa acepte.
 
-    Numeración del documento empieza en 321 (calculado como id + 320).
+    NO confundir con CotizacionEmpresa (existente), que es el formulario de
+    solicitudes desde el landing /empresas/.
     """
 
     ESTADO_CHOICES = [
@@ -6143,8 +6144,8 @@ class CotizacionEmpresa(models.Model):
     )
 
     class Meta:
-        verbose_name = 'Cotización Empresa'
-        verbose_name_plural = 'Cotizaciones Empresa'
+        verbose_name = 'Cotización Formal (documento)'
+        verbose_name_plural = 'Cotizaciones Formales (documentos)'
         ordering = ['-fecha_emision', '-id']
         indexes = [
             models.Index(fields=['-fecha_emision']),
@@ -6183,7 +6184,7 @@ class CotizacionItem(models.Model):
     """Línea individual de una cotización (servicio, producto, o item custom)."""
 
     cotizacion = models.ForeignKey(
-        CotizacionEmpresa, related_name='items', on_delete=models.CASCADE,
+        CotizacionFormal, related_name='items', on_delete=models.CASCADE,
     )
     servicio = models.ForeignKey(
         Servicio, on_delete=models.SET_NULL, null=True, blank=True,

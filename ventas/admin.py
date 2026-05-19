@@ -42,8 +42,8 @@ from .models import (
     SEOContent,
     # Resumen de Reserva
     ConfiguracionResumen,
-    # Cotizaciones para empresas
-    CotizacionEmpresa, CotizacionItem,
+    # Cotizaciones formales (documentos numerados)
+    CotizacionFormal, CotizacionItem,
     # Tips Post-Pago
     ConfiguracionTips,
     # Sistema de Pagos a Masajistas
@@ -4951,8 +4951,8 @@ class CotizacionItemInline(admin.TabularInline):
     subtotal_display.short_description = 'Subtotal'
 
 
-@admin.register(CotizacionEmpresa)
-class CotizacionEmpresaAdmin(admin.ModelAdmin):
+@admin.register(CotizacionFormal)
+class CotizacionFormalAdmin(admin.ModelAdmin):
     list_display = (
         'numero_display', 'empresa_razon_social', 'contacto_nombre',
         'total_display', 'estado_badge', 'fecha_emision', 'fecha_validez_display',

@@ -1,4 +1,4 @@
-"""Modelos CotizacionEmpresa + CotizacionItem + extensión ConfiguracionResumen.
+"""Modelos CotizacionFormal + CotizacionItem + extensión ConfiguracionResumen.
 
 Permite generar cotizaciones formales numeradas (desde 321) para empresas
 sin tener que crear una VentaReserva. La cotización lista servicios y
@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='CotizacionEmpresa',
+            name='CotizacionFormal',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('estado', models.CharField(
@@ -63,12 +63,12 @@ class Migration(migrations.Migration):
                 )),
             ],
             options={
-                'verbose_name': 'Cotización Empresa',
-                'verbose_name_plural': 'Cotizaciones Empresa',
+                'verbose_name': 'Cotización Formal (documento)',
+                'verbose_name_plural': 'Cotizaciones Formales (documentos)',
                 'ordering': ['-fecha_emision', '-id'],
                 'indexes': [
-                    models.Index(fields=['-fecha_emision'], name='ventas_cote_fecha_e_idx'),
-                    models.Index(fields=['estado', '-fecha_emision'], name='ventas_cote_estado_idx'),
+                    models.Index(fields=['-fecha_emision'], name='ventas_cotform_femis_idx'),
+                    models.Index(fields=['estado', '-fecha_emision'], name='ventas_cotform_est_idx'),
                 ],
             },
         ),
@@ -90,7 +90,7 @@ class Migration(migrations.Migration):
                 ('cotizacion', models.ForeignKey(
                     on_delete=django.db.models.deletion.CASCADE,
                     related_name='items',
-                    to='ventas.cotizacionempresa',
+                    to='ventas.cotizacionformal',
                 )),
                 ('producto', models.ForeignKey(
                     blank=True, null=True,
