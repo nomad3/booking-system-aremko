@@ -6,7 +6,8 @@ Endpoints de solo lectura para consultar estadísticas de reservas
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Sum, Avg, Count, Q, Min
+from django.db.models import Sum, Avg, Count, Q, Min, F
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from datetime import datetime, timedelta, date as _date_cls
 from .models import VentaReserva, Cliente, ReservaServicio, Pago
@@ -354,7 +355,12 @@ def bookings_by_family(request):
         family_names = FAMILY_NAMES
 
         def get_family_stats(start_date, end_date):
-            """Helper para obtener stats de un período"""
+            """Helper para obtener stats de un período.
+
+            Revenue calculado como precio_unitario × cantidad_personas (con fallback
+            a servicio.precio_base si precio_unitario es null). Mismo criterio que el
+            dashboard interno (analytics_views.py).
+            """
             stats = ReservaServicio.objects.filter(
                 venta_reserva__fecha_creacion__date__gte=start_date,
                 venta_reserva__fecha_creacion__date__lte=end_date
@@ -364,7 +370,10 @@ def bookings_by_family(request):
                 'servicio__tipo_servicio'
             ).annotate(
                 count=Count('id'),
-                revenue=Sum('precio_unitario_venta')
+                revenue=Sum(
+                    Coalesce(F('precio_unitario_venta'), F('servicio__precio_base'))
+                    * F('cantidad_personas')
+                ),
             )
 
             # Convertir a dict para fácil acceso
@@ -417,6 +426,160 @@ def bookings_by_family(request):
         return JsonResponse({
             'success': False,
             'error': str(e)
+        }, status=500)
+
+
+def _get_family_stats_range(start_date, end_date):
+    """Helper compartido: stats por familia entre dos fechas.
+
+    Excluye ventas canceladas. Revenue = precio_unitario × cantidad_personas
+    con fallback a servicio.precio_base.
+    """
+    stats = ReservaServicio.objects.filter(
+        venta_reserva__fecha_creacion__date__gte=start_date,
+        venta_reserva__fecha_creacion__date__lte=end_date,
+    ).exclude(
+        venta_reserva__estado_pago='cancelado',
+    ).values('servicio__tipo_servicio').annotate(
+        count=Count('id'),
+        revenue=Sum(
+            Coalesce(F('precio_unitario_venta'), F('servicio__precio_base'))
+            * F('cantidad_personas')
+        ),
+    )
+    result = {}
+    for stat in stats:
+        tipo = stat['servicio__tipo_servicio']
+        result[tipo] = {
+            'count': stat['count'],
+            'revenue': float(stat['revenue'] or 0),
+        }
+    return result
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def bookings_by_family_mtd(request):
+    """
+    Ventas por familia — Month To Date (1ro del mes a hoy/ayer) + comparativas
+    mismo rango mes anterior y año anterior.
+
+    Query params:
+        date_stop (YYYY-MM-DD, opcional): fin del rango actual.
+            Default = ayer (timezone Chile).
+
+    Lógica de rangos (ejemplo si date_stop = 2026-05-18):
+        - Actual:        2026-05-01 → 2026-05-18
+        - Mes anterior:  2026-04-01 → 2026-04-18 (mismo día del mes anterior)
+        - Año anterior:  2025-05-01 → 2025-05-18
+
+    Si el día del mes no existe en el mes anterior (ej: 31 → feb), se ajusta
+    al último día del mes. Mismo criterio para año bisiesto.
+
+    Response:
+        {
+          "success": true,
+          "data": {
+            "period": {"current_start": "...", "current_stop": "...", ...},
+            "families": [{"family": "...", "current_count": N, "current_revenue": X,
+                          "previous_month_count": ..., "previous_month_revenue": ...,
+                          "previous_year_count": ..., "previous_year_revenue": ...}, ...]
+          }
+        }
+    """
+    import calendar
+
+    try:
+        date_stop_str = request.GET.get('date_stop')
+        if date_stop_str:
+            date_stop = parse_date(date_stop_str)
+            if not date_stop:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Formato de fecha inválido. Usa YYYY-MM-DD',
+                }, status=400)
+        else:
+            date_stop = timezone.now().date() - timedelta(days=1)
+
+        # Inicio del mes actual.
+        current_start = date_stop.replace(day=1)
+        day_of_month = date_stop.day
+
+        # Mes anterior: mismo dia del mes anterior.
+        if current_start.month == 1:
+            prev_month_start = current_start.replace(year=current_start.year - 1, month=12)
+        else:
+            prev_month_start = current_start.replace(month=current_start.month - 1)
+
+        last_day_prev_month = calendar.monthrange(prev_month_start.year, prev_month_start.month)[1]
+        prev_month_stop = prev_month_start.replace(
+            day=min(day_of_month, last_day_prev_month)
+        )
+
+        # Año anterior: mismo mes + dia, año - 1.
+        prev_year_start = current_start.replace(year=current_start.year - 1)
+        try:
+            prev_year_stop = date_stop.replace(year=date_stop.year - 1)
+        except ValueError:
+            # 29-feb en año no bisiesto → 28-feb.
+            prev_year_stop = prev_year_start.replace(
+                day=calendar.monthrange(prev_year_start.year, prev_year_start.month)[1]
+            )
+
+        # Stats por familia para cada periodo.
+        current_stats = _get_family_stats_range(current_start, date_stop)
+        prev_month_stats = _get_family_stats_range(prev_month_start, prev_month_stop)
+        prev_year_stats = _get_family_stats_range(prev_year_start, prev_year_stop)
+
+        all_families = (
+            set(current_stats.keys())
+            | set(prev_month_stats.keys())
+            | set(prev_year_stats.keys())
+        )
+
+        families_data = []
+        for tipo in all_families:
+            family_name = FAMILY_NAMES.get(tipo, (tipo or 'otro').capitalize())
+            cur = current_stats.get(tipo, {'count': 0, 'revenue': 0})
+            pm = prev_month_stats.get(tipo, {'count': 0, 'revenue': 0})
+            py = prev_year_stats.get(tipo, {'count': 0, 'revenue': 0})
+            families_data.append({
+                'family': family_name,
+                'current_count': cur['count'],
+                'current_revenue': cur['revenue'],
+                'previous_month_count': pm['count'],
+                'previous_month_revenue': pm['revenue'],
+                'previous_year_count': py['count'],
+                'previous_year_revenue': py['revenue'],
+            })
+
+        families_data.sort(key=lambda x: x['current_revenue'], reverse=True)
+
+        logger.info(
+            f"aremko-cli: by_family_mtd current={current_start}→{date_stop} "
+            f"prev_month={prev_month_start}→{prev_month_stop} "
+            f"prev_year={prev_year_start}→{prev_year_stop}"
+        )
+        return JsonResponse({
+            'success': True,
+            'data': {
+                'period': {
+                    'current_start': current_start.strftime('%Y-%m-%d'),
+                    'current_stop': date_stop.strftime('%Y-%m-%d'),
+                    'prev_month_start': prev_month_start.strftime('%Y-%m-%d'),
+                    'prev_month_stop': prev_month_stop.strftime('%Y-%m-%d'),
+                    'prev_year_start': prev_year_start.strftime('%Y-%m-%d'),
+                    'prev_year_stop': prev_year_stop.strftime('%Y-%m-%d'),
+                },
+                'families': families_data,
+            },
+        })
+
+    except Exception as e:
+        logger.error(f"Error in bookings_by_family_mtd: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
         }, status=500)
 
 
@@ -655,7 +818,8 @@ def bookings_weekly_breakdown(request):
         periodo_stop = weeks[-1][1]
 
         # --- 1) Conteo / revenue por (familia, semana) ---
-        # Una sola query trae todas las ReservaServicio del periodo con fecha y tipo.
+        # Una sola query trae todas las ReservaServicio del periodo con fecha, tipo,
+        # precio (con fallback a servicio.precio_base) y cantidad_personas.
         servicios_qs = ReservaServicio.objects.filter(
             venta_reserva__fecha_creacion__date__gte=periodo_start,
             venta_reserva__fecha_creacion__date__lte=periodo_stop,
@@ -665,6 +829,8 @@ def bookings_weekly_breakdown(request):
             'venta_reserva__fecha_creacion',
             'servicio__tipo_servicio',
             'precio_unitario_venta',
+            'servicio__precio_base',
+            'cantidad_personas',
         )
 
         # Inicializar buckets por semana.
@@ -688,8 +854,14 @@ def bookings_weekly_breakdown(request):
             tipo = row['servicio__tipo_servicio'] or 'otro'
             if tipo not in family_buckets[idx]:
                 family_buckets[idx][tipo] = {'count': 0, 'revenue': 0.0}
+            # Coalesce manual + multiplicacion por cantidad_personas (servicios
+            # por persona como tinas y masajes pueden tener cantidad>1).
+            precio_unit = row['precio_unitario_venta']
+            if precio_unit is None:
+                precio_unit = row['servicio__precio_base'] or 0
+            cantidad = row['cantidad_personas'] or 1
             family_buckets[idx][tipo]['count'] += 1
-            family_buckets[idx][tipo]['revenue'] += float(row['precio_unitario_venta'] or 0)
+            family_buckets[idx][tipo]['revenue'] += float(precio_unit) * cantidad
 
         # --- 2) Clientes por semana (unicos + nuevos + recurrentes) ---
         # Una query: todas las ventas no canceladas del periodo (cliente_id + fecha).
