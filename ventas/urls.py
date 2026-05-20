@@ -342,6 +342,9 @@ urlpatterns = [
     # === Cotización formal para empresas (documento HTML imprimible) ===
     path('cotizacion/<int:numero>/', cotizacion_view.cotizacion_formal_view, name='cotizacion_formal'),
     path('cotizacion/<int:numero>/pdf/', cotizacion_view.cotizacion_pdf_view, name='cotizacion_pdf'),
+
+    # === Documento maestro del Sistema (PDF on-demand para venta/referencia) ===
+    path('docs/sistema-completo/pdf/', cotizacion_view.sistema_documento_pdf_view, name='sistema_documento_pdf'),
     path('api/aremko-cli/bookings/by-payment-method/', api_aremko_cli.bookings_by_payment_method, name='aremko_cli_bookings_by_payment_method'),
     path('api/aremko-cli/bookings/weekly-breakdown/', api_aremko_cli.bookings_weekly_breakdown, name='aremko_cli_bookings_weekly_breakdown'),
     path('api/aremko-cli/clients/stats/', api_aremko_cli.clients_stats, name='aremko_cli_clients_stats'),
