@@ -583,6 +583,185 @@ def bookings_by_family_mtd(request):
         }, status=500)
 
 
+# Mapeo inverso: familia (frontend / NL) → tipo_servicio en BD.
+FAMILIA_TO_TIPO = {
+    'tinas': 'tina',
+    'masajes': 'masaje',
+    'cabanas': 'cabana',
+    'cabañas': 'cabana',
+    'alojamiento': 'cabana',
+    'otros': 'otro',
+}
+
+DETALLE_HARD_LIMIT = 500
+DETALLE_MAX_DAYS = 92
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def bookings_detalle(request):
+    """
+    Detalle fila-por-fila de servicios reservados en un rango de fechas.
+    Pensado para consumirse desde una consulta NL en aremko-cli.
+
+    Query params:
+        fecha_desde (YYYY-MM-DD, requerido)
+        fecha_hasta (YYYY-MM-DD, requerido)
+        familia      (opcional: tinas/masajes/cabanas/otros)
+        servicio     (opcional: match parcial icontains contra nombre del servicio)
+        limit        (opcional, default 500, máx 500 hardcoded)
+
+    Filtra por `ReservaServicio.fecha_agendamiento` (fecha del servicio, no de la venta).
+    Excluye estado_pago='cancelado'.
+    Orden: fecha_agendamiento DESC, hora_inicio DESC.
+    """
+    from django.db import connection, transaction
+
+    # Validar fechas
+    fecha_desde_str = request.GET.get('fecha_desde')
+    fecha_hasta_str = request.GET.get('fecha_hasta')
+    if not fecha_desde_str or not fecha_hasta_str:
+        return JsonResponse({
+            'error': 'fecha_desde y fecha_hasta son requeridos (YYYY-MM-DD)',
+        }, status=400)
+
+    fecha_desde = parse_date(fecha_desde_str)
+    fecha_hasta = parse_date(fecha_hasta_str)
+    if not fecha_desde or not fecha_hasta:
+        return JsonResponse({'error': 'Formato de fecha inválido. Usa YYYY-MM-DD'}, status=400)
+
+    if fecha_desde > fecha_hasta:
+        return JsonResponse({'error': 'fecha_desde no puede ser mayor que fecha_hasta'}, status=400)
+
+    if (fecha_hasta - fecha_desde).days > DETALLE_MAX_DAYS:
+        return JsonResponse({'error': f'rango máximo {DETALLE_MAX_DAYS} días (~3 meses)'}, status=400)
+
+    # Familia (opcional)
+    familia_str = (request.GET.get('familia') or '').strip().lower()
+    tipo_servicio_filtro = None
+    if familia_str:
+        if familia_str not in FAMILIA_TO_TIPO:
+            return JsonResponse({
+                'error': f'familia inválida. Opciones: {", ".join(sorted(set(FAMILIA_TO_TIPO.keys())))}',
+            }, status=400)
+        tipo_servicio_filtro = FAMILIA_TO_TIPO[familia_str]
+
+    # Servicio (opcional, match parcial)
+    servicio_filtro = (request.GET.get('servicio') or '').strip()
+
+    # Límite (hard cap 500)
+    try:
+        limit = int(request.GET.get('limit', DETALLE_HARD_LIMIT))
+    except (TypeError, ValueError):
+        limit = DETALLE_HARD_LIMIT
+    limit = max(1, min(DETALLE_HARD_LIMIT, limit))
+
+    # Mapeo tipo_servicio → nombre de familia para el response.
+    tipo_a_familia = {tipo: name for tipo, name in FAMILY_NAMES.items()}
+
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                # statement_timeout local: protege la BD si la query degrada.
+                try:
+                    cursor.execute("SET LOCAL statement_timeout = '8s'")
+                except Exception:
+                    pass  # SQLite en tests no soporta esto.
+
+            qs = ReservaServicio.objects.select_related(
+                'servicio', 'venta_reserva', 'venta_reserva__cliente',
+            ).filter(
+                fecha_agendamiento__gte=fecha_desde,
+                fecha_agendamiento__lte=fecha_hasta,
+            ).exclude(
+                venta_reserva__estado_pago='cancelado',
+            )
+
+            if tipo_servicio_filtro:
+                qs = qs.filter(servicio__tipo_servicio=tipo_servicio_filtro)
+
+            if servicio_filtro:
+                qs = qs.filter(servicio__nombre__icontains=servicio_filtro)
+
+            qs = qs.order_by('-fecha_agendamiento', '-hora_inicio')
+
+            # Pedimos limit + 1 para detectar truncated.
+            rows_qs = list(qs[:limit + 1])
+            truncated = len(rows_qs) > limit
+            rows_qs = rows_qs[:limit]
+
+            # Pre-cargar metodos de pago de las ventas involucradas (1 query).
+            venta_ids = {r.venta_reserva_id for r in rows_qs}
+            metodos_por_venta = {}
+            if venta_ids:
+                pagos_qs = Pago.objects.filter(
+                    venta_reserva_id__in=venta_ids,
+                ).order_by('venta_reserva_id', '-fecha_pago').values(
+                    'venta_reserva_id', 'metodo_pago',
+                )
+                for p in pagos_qs:
+                    metodos_por_venta.setdefault(p['venta_reserva_id'], p['metodo_pago'])
+
+            rows = []
+            total_revenue = 0
+            for r in rows_qs:
+                servicio = r.servicio
+                venta = r.venta_reserva
+                cliente = venta.cliente if venta else None
+
+                # Precio efectivo (con fallback a precio_base).
+                precio_unit = r.precio_unitario_venta
+                if precio_unit is None and servicio:
+                    precio_unit = servicio.precio_base
+                precio_unit = int(precio_unit or 0)
+
+                cantidad = r.cantidad_personas or 1
+                total = precio_unit * cantidad
+                total_revenue += total
+
+                tipo = getattr(servicio, 'tipo_servicio', None) or 'otro'
+                familia_nombre = tipo_a_familia.get(tipo, 'Otros')
+
+                rows.append({
+                    'reserva_id': venta.id if venta else None,
+                    'fecha': r.fecha_agendamiento.isoformat() if r.fecha_agendamiento else None,
+                    'hora': r.hora_inicio,
+                    'cliente_id': cliente.id if cliente else None,
+                    'cliente_nombre': cliente.nombre if cliente else None,
+                    'cliente_rut': (cliente.documento_identidad or None) if cliente else None,
+                    'cliente_email': (cliente.email or None) if cliente else None,
+                    'servicio_id': servicio.id if servicio else None,
+                    'servicio_nombre': servicio.nombre if servicio else None,
+                    'familia': familia_nombre,
+                    'cantidad_personas': cantidad,
+                    'precio_unitario': precio_unit,
+                    'total': total,
+                    'metodo_pago': metodos_por_venta.get(venta.id) if venta else None,
+                    'estado': venta.estado_pago if venta else None,
+                    'nota': (venta.comentarios or None) if venta else None,
+                })
+
+        logger.info(
+            f"aremko-cli: bookings_detalle {fecha_desde}→{fecha_hasta} "
+            f"familia={familia_str or '-'} servicio={servicio_filtro or '-'} "
+            f"filas={len(rows)} truncated={truncated}"
+        )
+        return JsonResponse({
+            'fecha_desde': fecha_desde.isoformat(),
+            'fecha_hasta': fecha_hasta.isoformat(),
+            'familia': familia_str or None,
+            'servicio': servicio_filtro or None,
+            'total_filas': len(rows),
+            'total_revenue': total_revenue,
+            'truncated': truncated,
+            'rows': rows,
+        })
+
+    except Exception as e:
+        logger.error(f"Error in bookings_detalle: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
 @csrf_exempt
 @require_http_methods(["GET"])
 def bookings_by_payment_method(request):

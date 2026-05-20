@@ -336,6 +336,7 @@ urlpatterns = [
     path('api/aremko-cli/bookings/daily/', api_aremko_cli.bookings_daily, name='aremko_cli_bookings_daily'),
     path('api/aremko-cli/bookings/by-family/', api_aremko_cli.bookings_by_family, name='aremko_cli_bookings_by_family'),
     path('api/aremko-cli/bookings/by-family-mtd/', api_aremko_cli.bookings_by_family_mtd, name='aremko_cli_bookings_by_family_mtd'),
+    path('api/aremko-cli/bookings/detalle/', api_aremko_cli.bookings_detalle, name='aremko_cli_bookings_detalle'),
 
     # === Cotización formal para empresas (documento HTML imprimible) ===
     path('cotizacion/<int:numero>/', cotizacion_view.cotizacion_formal_view, name='cotizacion_formal'),
