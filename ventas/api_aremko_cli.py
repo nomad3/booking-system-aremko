@@ -605,11 +605,14 @@ def bookings_detalle(request):
     Pensado para consumirse desde una consulta NL en aremko-cli.
 
     Query params:
-        fecha_desde (YYYY-MM-DD, requerido)
-        fecha_hasta (YYYY-MM-DD, requerido)
+        fecha_desde (YYYY-MM-DD, requerido si no hay cliente)
+        fecha_hasta (YYYY-MM-DD, requerido si no hay cliente)
         familia      (opcional: tinas/masajes/cabanas/otros)
         servicio     (opcional: match parcial icontains contra nombre del servicio)
         proveedor    (opcional: match icontains contra proveedor_asignado.nombre — masajista)
+        cliente      (opcional: match icontains contra nombre/telefono/email/documento_identidad).
+                     Cuando se usa: las fechas son opcionales (default desde 2000) y NO aplica
+                     el cap de 92 días — se trae historial completo del cliente.
         limit        (opcional, default 500, máx 500 hardcoded)
 
     Filtra por `ReservaServicio.fecha_agendamiento` (fecha del servicio, no de la venta).
@@ -617,25 +620,52 @@ def bookings_detalle(request):
     Orden: fecha_agendamiento DESC, hora_inicio DESC.
     """
     from django.db import connection, transaction
+    from django.db.models import Q
+    from datetime import date
 
-    # Validar fechas
+    # Filtros base
+    cliente_filtro = (request.GET.get('cliente') or '').strip()
     fecha_desde_str = request.GET.get('fecha_desde')
     fecha_hasta_str = request.GET.get('fecha_hasta')
-    if not fecha_desde_str or not fecha_hasta_str:
-        return JsonResponse({
-            'error': 'fecha_desde y fecha_hasta son requeridos (YYYY-MM-DD)',
-        }, status=400)
 
-    fecha_desde = parse_date(fecha_desde_str)
-    fecha_hasta = parse_date(fecha_hasta_str)
-    if not fecha_desde or not fecha_hasta:
-        return JsonResponse({'error': 'Formato de fecha inválido. Usa YYYY-MM-DD'}, status=400)
+    # Si hay filtro de cliente, las fechas son opcionales (historial completo).
+    # Si NO hay cliente, las fechas son obligatorias y el rango se limita a 92 días.
+    if cliente_filtro:
+        if fecha_desde_str:
+            fecha_desde = parse_date(fecha_desde_str)
+            if not fecha_desde:
+                return JsonResponse({'error': 'Formato de fecha_desde inválido. Usa YYYY-MM-DD'}, status=400)
+        else:
+            fecha_desde = date(2000, 1, 1)
 
-    if fecha_desde > fecha_hasta:
-        return JsonResponse({'error': 'fecha_desde no puede ser mayor que fecha_hasta'}, status=400)
+        if fecha_hasta_str:
+            fecha_hasta = parse_date(fecha_hasta_str)
+            if not fecha_hasta:
+                return JsonResponse({'error': 'Formato de fecha_hasta inválido. Usa YYYY-MM-DD'}, status=400)
+        else:
+            fecha_hasta = timezone.now().date()
 
-    if (fecha_hasta - fecha_desde).days > DETALLE_MAX_DAYS:
-        return JsonResponse({'error': f'rango máximo {DETALLE_MAX_DAYS} días (~3 meses)'}, status=400)
+        if fecha_desde > fecha_hasta:
+            return JsonResponse({'error': 'fecha_desde no puede ser mayor que fecha_hasta'}, status=400)
+        # Sin cap de 92 días: el filtro de cliente acota el resultado naturalmente.
+    else:
+        if not fecha_desde_str or not fecha_hasta_str:
+            return JsonResponse({
+                'error': 'fecha_desde y fecha_hasta son requeridos (YYYY-MM-DD) cuando no se filtra por cliente',
+            }, status=400)
+
+        fecha_desde = parse_date(fecha_desde_str)
+        fecha_hasta = parse_date(fecha_hasta_str)
+        if not fecha_desde or not fecha_hasta:
+            return JsonResponse({'error': 'Formato de fecha inválido. Usa YYYY-MM-DD'}, status=400)
+
+        if fecha_desde > fecha_hasta:
+            return JsonResponse({'error': 'fecha_desde no puede ser mayor que fecha_hasta'}, status=400)
+
+        if (fecha_hasta - fecha_desde).days > DETALLE_MAX_DAYS:
+            return JsonResponse({
+                'error': f'rango máximo {DETALLE_MAX_DAYS} días (~3 meses) cuando no se filtra por cliente',
+            }, status=400)
 
     # Familia (opcional)
     familia_str = (request.GET.get('familia') or '').strip().lower()
@@ -689,6 +719,16 @@ def bookings_detalle(request):
 
             if proveedor_filtro:
                 qs = qs.filter(proveedor_asignado__nombre__icontains=proveedor_filtro)
+
+            if cliente_filtro:
+                # Match parcial sobre 4 campos del cliente. icontains soporta
+                # substrings (ej: '958655810' matchea teléfono '+56958655810').
+                qs = qs.filter(
+                    Q(venta_reserva__cliente__nombre__icontains=cliente_filtro) |
+                    Q(venta_reserva__cliente__telefono__icontains=cliente_filtro) |
+                    Q(venta_reserva__cliente__email__icontains=cliente_filtro) |
+                    Q(venta_reserva__cliente__documento_identidad__icontains=cliente_filtro)
+                )
 
             qs = qs.order_by('-fecha_agendamiento', '-hora_inicio', '-id').distinct()
 
