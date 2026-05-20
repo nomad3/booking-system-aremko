@@ -44,6 +44,8 @@ from .models import (
     ConfiguracionResumen,
     # Cotizaciones formales (documentos numerados)
     CotizacionFormal, CotizacionItem,
+    # Contexto Operativo (para inyectar en analisis IA)
+    ContextoOperativo,
     # Tips Post-Pago
     ConfiguracionTips,
     # Sistema de Pagos a Masajistas
@@ -5077,3 +5079,81 @@ class CotizacionFormalAdmin(admin.ModelAdmin):
     def marcar_rechazada(self, request, queryset):
         n = queryset.update(estado='rechazada')
         self.message_user(request, f'{n} cotización(es) marcada(s) como rechazada(s).')
+
+
+# ────────────── Contexto Operativo (para análisis IA) ──────────────
+
+@admin.register(ContextoOperativo)
+class ContextoOperativoAdmin(SingletonModelAdmin):
+    """Singleton editable. Permite regenerar la sección automática on-demand."""
+    change_form_template = 'admin/ventas/contextooperativo_change_form.html'
+    readonly_fields = (
+        'seccion_automatica_actualizada_en', 'seccion_automatica_cache_preview',
+        'longitud_total_preview',
+    )
+    fieldsets = (
+        ('Sección manual (editable por equipo)', {
+            'fields': ('seccion_manual',),
+            'description': (
+                'Markdown editable. Información que NO está en código pero el LLM debería saber: '
+                'campañas externas, alianzas vigentes, decisiones de management, iniciativas, etc. '
+                'Se concatena DESPUÉS de la sección automática.'
+            ),
+        }),
+        ('Sección automática (caché — solo lectura)', {
+            'fields': (
+                'seccion_automatica_actualizada_en',
+                'longitud_total_preview',
+                'seccion_automatica_cache_preview',
+            ),
+            'description': (
+                'Generada automáticamente desde el código y la BD. Se regenera cada vez que el '
+                'endpoint /api/aremko-cli/operating-context/ detecta que pasó más de 1 hora. '
+                'Usa el botón abajo si quieres regenerar ahora mismo.'
+            ),
+        }),
+    )
+
+    def seccion_automatica_cache_preview(self, obj):
+        from django.utils.html import format_html
+        if not obj.seccion_automatica_cache:
+            return '(vacío — aún no se ha generado)'
+        return format_html(
+            '<pre style="background:#fafafa;border:1px solid #ddd;padding:12px;'
+            'max-height:500px;overflow:auto;white-space:pre-wrap;font-size:12px;">{}</pre>',
+            obj.seccion_automatica_cache,
+        )
+    seccion_automatica_cache_preview.short_description = 'Vista previa'
+
+    def longitud_total_preview(self, obj):
+        auto_len = len(obj.seccion_automatica_cache or '')
+        manual_len = len(obj.seccion_manual or '')
+        total = auto_len + manual_len
+        return f'{auto_len} (auto) + {manual_len} (manual) = {total} caracteres totales'
+    longitud_total_preview.short_description = 'Longitud'
+
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        custom = [
+            path(
+                'regenerar/',
+                self.admin_site.admin_view(self.regenerar_view),
+                name='ventas_contextooperativo_regenerar',
+            ),
+        ]
+        return custom + urls
+
+    def regenerar_view(self, request):
+        from django.contrib import messages
+        from django.shortcuts import redirect
+        from .contexto_operativo import regenerar_y_guardar
+        try:
+            contenido = regenerar_y_guardar()
+            messages.success(
+                request,
+                f'Sección automática regenerada ({len(contenido)} caracteres).',
+            )
+        except Exception as exc:
+            messages.error(request, f'Error al regenerar: {exc}')
+        return redirect('admin:ventas_contextooperativo_changelist')

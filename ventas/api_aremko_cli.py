@@ -1297,6 +1297,56 @@ def bookings_weekly_breakdown(request):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+def operating_context(request):
+    """
+    Devuelve el Contexto Operativo de Aremko en markdown, para inyectar al
+    system prompt de análisis IA en aremko-cli.
+
+    Concatena:
+    - Sección automática (auto-descubierta del código + BD, cacheada 1h).
+    - Sección manual (editable por Jorge desde admin Django).
+
+    Si el caché está vacío o tiene > 1h, se regenera antes de devolver.
+    """
+    from datetime import timedelta
+    from .models import ContextoOperativo
+    from .contexto_operativo import regenerar_y_guardar
+
+    try:
+        obj = ContextoOperativo.get_solo()
+        regenerar = False
+        if not obj.seccion_automatica_cache:
+            regenerar = True
+        elif obj.seccion_automatica_actualizada_en:
+            if timezone.now() - obj.seccion_automatica_actualizada_en > timedelta(hours=1):
+                regenerar = True
+        else:
+            regenerar = True
+
+        if regenerar:
+            regenerar_y_guardar()
+            obj.refresh_from_db()
+
+        partes = []
+        if obj.seccion_automatica_cache:
+            partes.append(obj.seccion_automatica_cache.strip())
+        if obj.seccion_manual:
+            partes.append('# Notas Adicionales (sección manual editada por el equipo)\n\n' + obj.seccion_manual.strip())
+
+        contexto = '\n\n'.join(partes).strip()
+
+        return JsonResponse({
+            'contexto_markdown': contexto,
+            'actualizado_en': obj.seccion_automatica_actualizada_en.isoformat() if obj.seccion_automatica_actualizada_en else None,
+            'longitud_caracteres': len(contexto),
+        })
+    except Exception as e:
+        logger.error(f"Error in operating_context: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
 def health_check(request):
     """
     Health check para verificar que la API está funcionando
