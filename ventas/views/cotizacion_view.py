@@ -170,64 +170,18 @@ def cotizacion_pdf_view(request, numero):
 def sistema_documento_pdf_view(request):
     """Genera y descarga el PDF del documento maestro del Sistema Aremko.
 
-    Lee docs/SISTEMA_AREMKO_COMPLETO.md desde el repositorio, lo convierte a HTML
-    con estilos corporativos y lo entrega como PDF tamaño Letter via WeasyPrint.
+    Combina:
+    - Narrativa cacheada (de DocumentoSistemaCache, regenerada desde admin).
+    - Introspección live del código (modelos, endpoints, commands, métricas).
     """
-    import os
-    from django.conf import settings as dj_settings
-
     try:
-        import markdown
-        from weasyprint import HTML, CSS
-    except ImportError as exc:
+        from ..services.sistema_documento_service import generar_pdf
+        pdf_bytes = generar_pdf()
+    except Exception as exc:
         return HttpResponse(
-            f'Falta dependencia para generar PDF: {exc}. '
-            f'WeasyPrint y markdown deben estar instalados.',
+            f'Error generando PDF: {exc}. Verifica que WeasyPrint y markdown estén instalados.',
             status=500,
         )
-
-    md_path = os.path.join(
-        getattr(dj_settings, 'BASE_DIR', os.getcwd()),
-        'docs',
-        'SISTEMA_AREMKO_COMPLETO.md',
-    )
-    if not os.path.exists(md_path):
-        return HttpResponse(
-            f'Documento maestro no encontrado en {md_path}. '
-            f'Verifica que el archivo esté en docs/ del repositorio.',
-            status=404,
-        )
-
-    with open(md_path, 'r', encoding='utf-8') as f:
-        md_text = f.read()
-
-    html_body = markdown.markdown(
-        md_text,
-        extensions=['extra', 'tables', 'toc', 'sane_lists'],
-    )
-
-    css_styles = '''
-        @page { size: Letter; margin: 1.5cm 2cm; }
-        body { font-family: Helvetica, Arial, sans-serif; line-height: 1.5; color: #2a2a2a; }
-        h1 { color: #2a2a2a; border-bottom: 3px solid #b78b5b; padding-bottom: 8px; margin-top: 40px; }
-        h1:first-of-type { margin-top: 0; }
-        h2 { color: #2a2a2a; border-bottom: 1px solid #b78b5b; padding-bottom: 4px; margin-top: 28px; }
-        h3 { color: #b78b5b; margin-top: 22px; }
-        h4 { color: #555; margin-top: 18px; }
-        p, li { font-size: 12px; }
-        table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 11px; }
-        th { background: #faf6ee; color: #b78b5b; text-align: left; padding: 6px 8px; border-bottom: 2px solid #b78b5b; }
-        td { padding: 6px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
-        code { background: #f5f5f5; padding: 1px 4px; border-radius: 3px; font-size: 10px; }
-        pre { background: #fafafa; border-left: 3px solid #b78b5b; padding: 10px; font-size: 10px; line-height: 1.4; }
-        hr { border: none; border-top: 1px solid #ddd; margin: 30px 0; }
-        h1, h2, h3 { page-break-after: avoid; }
-        table { page-break-inside: avoid; }
-    '''
-
-    html_str = f'<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Sistema Aremko</title></head><body>{html_body}</body></html>'
-
-    pdf_bytes = HTML(string=html_str).write_pdf(stylesheets=[CSS(string=css_styles)])
 
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="Aremko_Sistema_Completo.pdf"'

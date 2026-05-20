@@ -1,0 +1,20 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block object-tools-items %}
+  {{ block.super }}
+  <li>
+    <a href="{% url 'admin:ventas_documentosistemacache_pdf' %}"
+       style="background:#b78b5b;color:#fff;border-radius:4px;"
+       title="Descarga el PDF combinando la narrativa cacheada con introspección live del código">
+      📥 Descargar PDF completo
+    </a>
+  </li>
+  <li>
+    <a href="{% url 'admin:ventas_documentosistemacache_regenerar' %}"
+       style="background:#4a7c59;color:#fff;border-radius:4px;"
+       onclick="return confirm('Regenerar la narrativa del documento con LLM?\n\nEsto va a llamar a Claude Sonnet (~$0.20-0.50 USD aprox) y tardará 30-60 segundos.\n\nLa narrativa anterior queda reemplazada. Continuar?');">
+      🔄 Regenerar narrativa con IA
+    </a>
+  </li>
+{% endblock %}

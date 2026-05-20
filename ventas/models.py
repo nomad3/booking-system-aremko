@@ -6266,3 +6266,44 @@ class ContextoOperativo(SingletonModel):
 
     def __str__(self):
         return "Contexto Operativo Aremko"
+
+
+class DocumentoSistemaCache(SingletonModel):
+    """Cache de la narrativa generada por LLM del Documento Maestro del Sistema.
+
+    El documento maestro combina:
+    - Narrativa (resumen ejecutivo, descripciones de dominio, valor diferenciador)
+      generada por Claude Sonnet vía OpenRouter. Se cachea aquí.
+    - Inventarios técnicos (modelos, endpoints, commands, etc.) introspectados en
+      vivo al momento de descargar el PDF. NO se cachean acá.
+
+    El usuario regenera la narrativa explícitamente desde el botón en admin cuando
+    haga cambios significativos al sistema.
+    """
+    narrativa_md = models.TextField(
+        blank=True,
+        verbose_name="Narrativa cacheada (markdown)",
+        help_text="Cuerpo narrativo del documento maestro, generado por LLM. Se combina con inventarios live al descargar el PDF.",
+    )
+    actualizado_en = models.DateTimeField(null=True, blank=True, editable=False)
+    generado_por_modelo = models.CharField(
+        max_length=100, blank=True, editable=False,
+        verbose_name="Modelo LLM usado",
+    )
+    tokens_input = models.IntegerField(default=0, editable=False)
+    tokens_output = models.IntegerField(default=0, editable=False)
+    costo_usd_aprox = models.DecimalField(
+        max_digits=8, decimal_places=4, default=0, editable=False,
+        verbose_name="Costo estimado USD",
+    )
+    introspect_snapshot = models.JSONField(
+        default=dict, blank=True, editable=False,
+        help_text="Snapshot del estado del sistema al momento de generar (modelos, endpoints, etc.)",
+    )
+
+    class Meta:
+        verbose_name = "Documento del Sistema (cache)"
+        verbose_name_plural = "Documento del Sistema (cache)"
+
+    def __str__(self):
+        return f"Documento Sistema (actualizado: {self.actualizado_en or '(nunca)'})"

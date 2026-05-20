@@ -46,6 +46,8 @@ from .models import (
     CotizacionFormal, CotizacionItem,
     # Contexto Operativo (para inyectar en analisis IA)
     ContextoOperativo,
+    # Cache del documento maestro del sistema
+    DocumentoSistemaCache,
     # Tips Post-Pago
     ConfiguracionTips,
     # Sistema de Pagos a Masajistas
@@ -5157,3 +5159,96 @@ class ContextoOperativoAdmin(SingletonModelAdmin):
         except Exception as exc:
             messages.error(request, f'Error al regenerar: {exc}')
         return redirect('admin:ventas_contextooperativo_changelist')
+
+
+# ────────────── Documento Maestro del Sistema (narrativa cacheada + PDF live) ──────────────
+
+@admin.register(DocumentoSistemaCache)
+class DocumentoSistemaCacheAdmin(SingletonModelAdmin):
+    change_form_template = 'admin/ventas/documentosistemacache_change_form.html'
+    readonly_fields = (
+        'actualizado_en', 'generado_por_modelo', 'tokens_input', 'tokens_output',
+        'costo_usd_aprox', 'introspect_snapshot', 'narrativa_preview',
+    )
+    fieldsets = (
+        ('Estado del documento', {
+            'fields': (
+                'actualizado_en', 'generado_por_modelo',
+                'tokens_input', 'tokens_output', 'costo_usd_aprox',
+            ),
+            'description': (
+                'El cuerpo narrativo del documento maestro se genera con IA (Claude Sonnet). '
+                'Cuando agregues funcionalidades nuevas al sistema, usa el botón "Regenerar narrativa" '
+                'para actualizar el contenido. La descarga del PDF combina la narrativa cacheada '
+                'con introspección live del código (modelos, endpoints, métricas).'
+            ),
+        }),
+        ('Vista previa de la narrativa', {
+            'fields': ('narrativa_preview',),
+            'classes': ('collapse',),
+        }),
+        ('Snapshot del sistema al momento de generar', {
+            'fields': ('introspect_snapshot',),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def narrativa_preview(self, obj):
+        from django.utils.html import format_html
+        if not obj.narrativa_md:
+            return '(narrativa aún no generada — usa el botón Regenerar arriba)'
+        return format_html(
+            '<pre style="background:#fafafa;border:1px solid #ddd;padding:12px;'
+            'max-height:600px;overflow:auto;white-space:pre-wrap;font-size:12px;">{}</pre>',
+            obj.narrativa_md,
+        )
+    narrativa_preview.short_description = 'Markdown cacheado'
+
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        custom = [
+            path(
+                'regenerar-narrativa/',
+                self.admin_site.admin_view(self.regenerar_narrativa_view),
+                name='ventas_documentosistemacache_regenerar',
+            ),
+            path(
+                'descargar-pdf/',
+                self.admin_site.admin_view(self.descargar_pdf_view),
+                name='ventas_documentosistemacache_pdf',
+            ),
+        ]
+        return custom + urls
+
+    def regenerar_narrativa_view(self, request):
+        from django.contrib import messages
+        from django.shortcuts import redirect
+        try:
+            from .services.sistema_documento_service import regenerar_narrativa
+            narrativa, meta = regenerar_narrativa()
+            messages.success(
+                request,
+                f'Narrativa regenerada: {len(narrativa):,} caracteres, '
+                f'{meta["tokens_input"] + meta["tokens_output"]:,} tokens '
+                f'(~${meta["costo_usd_aprox"]:.4f} USD con {meta["modelo"]}).'
+            )
+        except Exception as exc:
+            messages.error(request, f'Error al regenerar narrativa: {exc}')
+        return redirect('admin:ventas_documentosistemacache_changelist')
+
+    def descargar_pdf_view(self, request):
+        from django.http import HttpResponse
+        try:
+            from .services.sistema_documento_service import generar_pdf
+            pdf_bytes = generar_pdf()
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = (
+                'attachment; filename="Aremko_Sistema_Completo.pdf"'
+            )
+            return response
+        except Exception as exc:
+            from django.contrib import messages
+            from django.shortcuts import redirect
+            messages.error(request, f'Error al generar PDF: {exc}')
+            return redirect('admin:ventas_documentosistemacache_changelist')
