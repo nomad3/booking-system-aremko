@@ -280,12 +280,21 @@ def regenerar_narrativa() -> tuple[str, dict]:
         raise ValueError('OPENROUTER_API_KEY no configurada')
 
     model = getattr(settings, 'SISTEMA_DOC_LLM_MODEL', 'anthropic/claude-sonnet-4.6')
+    max_tokens = int(getattr(settings, 'SISTEMA_DOC_LLM_MAX_TOKENS', 16000))
 
+    logger.info('Sistema doc: introspectando sistema...')
     introspect = introspect_sistema()
-    user_prompt = _construir_user_prompt(introspect)
+    logger.info(
+        f'Sistema doc: introspect OK. '
+        f'{len(introspect.get("modelos", []))} modelos, '
+        f'{len(introspect.get("endpoints", []))} endpoints, '
+        f'{len(introspect.get("management_commands", []))} commands'
+    )
 
-    client = OpenAI(api_key=api_key, base_url=base_url)
-    logger.info(f'Sistema doc: llamando a {model} para regenerar narrativa')
+    user_prompt = _construir_user_prompt(introspect)
+    logger.info(f'Sistema doc: prompt construido ({len(user_prompt):,} chars). Llamando a {model}...')
+
+    client = OpenAI(api_key=api_key, base_url=base_url, timeout=300.0)
 
     response = client.chat.completions.create(
         model=model,
@@ -294,8 +303,9 @@ def regenerar_narrativa() -> tuple[str, dict]:
             {'role': 'user', 'content': user_prompt},
         ],
         temperature=0.4,
-        max_tokens=24000,
+        max_tokens=max_tokens,
     )
+    logger.info('Sistema doc: LLM respondió. Procesando y persistiendo...')
 
     narrativa = response.choices[0].message.content or ''
     usage = response.usage

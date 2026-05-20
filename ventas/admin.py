@@ -5222,19 +5222,39 @@ class DocumentoSistemaCacheAdmin(SingletonModelAdmin):
         return custom + urls
 
     def regenerar_narrativa_view(self, request):
+        """Dispara regeneración en background thread (fire-and-forget).
+
+        El LLM tarda 60-120s y excede el timeout de Gunicorn (120s default).
+        Usamos el mismo patrón que el brief semanal.
+        """
+        from threading import Thread
         from django.contrib import messages
         from django.shortcuts import redirect
-        try:
-            from .services.sistema_documento_service import regenerar_narrativa
-            narrativa, meta = regenerar_narrativa()
-            messages.success(
-                request,
-                f'Narrativa regenerada: {len(narrativa):,} caracteres, '
-                f'{meta["tokens_input"] + meta["tokens_output"]:,} tokens '
-                f'(~${meta["costo_usd_aprox"]:.4f} USD con {meta["modelo"]}).'
-            )
-        except Exception as exc:
-            messages.error(request, f'Error al regenerar narrativa: {exc}')
+        import logging
+        log = logging.getLogger(__name__)
+
+        def _run_in_background():
+            try:
+                from .services.sistema_documento_service import regenerar_narrativa
+                narrativa, meta = regenerar_narrativa()
+                log.info(
+                    f'Sistema doc: narrativa regenerada OK. '
+                    f'{len(narrativa):,} caracteres, '
+                    f'{meta["tokens_input"] + meta["tokens_output"]:,} tokens '
+                    f'(~${meta["costo_usd_aprox"]:.4f} USD)'
+                )
+            except Exception as exc:
+                log.exception(f'Sistema doc: error al regenerar narrativa: {exc}')
+
+        thread = Thread(target=_run_in_background, daemon=True)
+        thread.start()
+
+        messages.info(
+            request,
+            '⏳ Regeneración iniciada en segundo plano. '
+            'Tardará 1-2 minutos. Refresca esta página después para ver la narrativa actualizada. '
+            'Si quieres ver el progreso, revisa los logs de Render filtrando "Sistema doc".'
+        )
         return redirect('admin:ventas_documentosistemacache_changelist')
 
     def descargar_pdf_view(self, request):
