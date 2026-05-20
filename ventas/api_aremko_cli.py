@@ -683,12 +683,23 @@ def bookings_detalle(request):
             if servicio_filtro:
                 qs = qs.filter(servicio__nombre__icontains=servicio_filtro)
 
-            qs = qs.order_by('-fecha_agendamiento', '-hora_inicio')
+            qs = qs.order_by('-fecha_agendamiento', '-hora_inicio', '-id').distinct()
 
             # Pedimos limit + 1 para detectar truncated.
             rows_qs = list(qs[:limit + 1])
             truncated = len(rows_qs) > limit
             rows_qs = rows_qs[:limit]
+
+            # Deduplicación defensiva por ReservaServicio.id (por si select_related
+            # genera filas repetidas por algún JOIN inesperado).
+            seen_ids = set()
+            unique_rows = []
+            for r in rows_qs:
+                if r.id in seen_ids:
+                    continue
+                seen_ids.add(r.id)
+                unique_rows.append(r)
+            rows_qs = unique_rows
 
             # Pre-cargar metodos de pago de las ventas involucradas (1 query).
             venta_ids = {r.venta_reserva_id for r in rows_qs}
@@ -723,6 +734,7 @@ def bookings_detalle(request):
                 familia_nombre = tipo_a_familia.get(tipo, 'Otros')
 
                 rows.append({
+                    'linea_id': r.id,  # ReservaServicio.id, unico por linea
                     'reserva_id': venta.id if venta else None,
                     'fecha': r.fecha_agendamiento.isoformat() if r.fecha_agendamiento else None,
                     'hora': r.hora_inicio,
