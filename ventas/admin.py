@@ -5234,17 +5234,28 @@ class DocumentoSistemaCacheAdmin(SingletonModelAdmin):
         log = logging.getLogger(__name__)
 
         def _run_in_background():
+            from django.db import connections
+            log.info('Sistema doc: thread arrancó, iniciando regeneración...')
             try:
                 from .services.sistema_documento_service import regenerar_narrativa
                 narrativa, meta = regenerar_narrativa()
                 log.info(
-                    f'Sistema doc: narrativa regenerada OK. '
+                    f'Sistema doc: ✅ narrativa regenerada OK. '
                     f'{len(narrativa):,} caracteres, '
                     f'{meta["tokens_input"] + meta["tokens_output"]:,} tokens '
                     f'(~${meta["costo_usd_aprox"]:.4f} USD)'
                 )
-            except Exception as exc:
-                log.exception(f'Sistema doc: error al regenerar narrativa: {exc}')
+            except BaseException as exc:
+                # BaseException para capturar también SystemExit/KeyboardInterrupt.
+                log.exception(f'Sistema doc: ❌ ERROR en thread regenerar_narrativa: {exc!r}')
+            finally:
+                # Cerrar conexiones DB del thread (Django no lo hace automáticamente
+                # en threads creados manualmente).
+                try:
+                    connections.close_all()
+                except Exception:
+                    pass
+                log.info('Sistema doc: thread finalizó.')
 
         thread = Thread(target=_run_in_background, daemon=True)
         thread.start()

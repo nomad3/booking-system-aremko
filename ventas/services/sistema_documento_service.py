@@ -277,13 +277,18 @@ def regenerar_narrativa() -> tuple[str, dict]:
     api_key = getattr(settings, 'OPENROUTER_API_KEY', '')
     base_url = getattr(settings, 'OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
     if not api_key:
-        raise ValueError('OPENROUTER_API_KEY no configurada')
+        raise ValueError('OPENROUTER_API_KEY no configurada en settings/env')
+    logger.info(f'Sistema doc: OPENROUTER_API_KEY presente ({len(api_key)} chars)')
 
     model = getattr(settings, 'SISTEMA_DOC_LLM_MODEL', 'anthropic/claude-sonnet-4.6')
     max_tokens = int(getattr(settings, 'SISTEMA_DOC_LLM_MAX_TOKENS', 16000))
 
     logger.info('Sistema doc: introspectando sistema...')
-    introspect = introspect_sistema()
+    try:
+        introspect = introspect_sistema()
+    except Exception as exc:
+        logger.exception(f'Sistema doc: introspect_sistema falló: {exc!r}')
+        raise
     logger.info(
         f'Sistema doc: introspect OK. '
         f'{len(introspect.get("modelos", []))} modelos, '
@@ -291,20 +296,28 @@ def regenerar_narrativa() -> tuple[str, dict]:
         f'{len(introspect.get("management_commands", []))} commands'
     )
 
-    user_prompt = _construir_user_prompt(introspect)
-    logger.info(f'Sistema doc: prompt construido ({len(user_prompt):,} chars). Llamando a {model}...')
+    try:
+        user_prompt = _construir_user_prompt(introspect)
+    except Exception as exc:
+        logger.exception(f'Sistema doc: _construir_user_prompt falló: {exc!r}')
+        raise
+    logger.info(f'Sistema doc: prompt construido ({len(user_prompt):,} chars). Llamando a {model} (timeout 300s)...')
 
     client = OpenAI(api_key=api_key, base_url=base_url, timeout=300.0)
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {'role': 'system', 'content': PROMPT_EDITORIAL},
-            {'role': 'user', 'content': user_prompt},
-        ],
-        temperature=0.4,
-        max_tokens=max_tokens,
-    )
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {'role': 'system', 'content': PROMPT_EDITORIAL},
+                {'role': 'user', 'content': user_prompt},
+            ],
+            temperature=0.4,
+            max_tokens=max_tokens,
+        )
+    except Exception as exc:
+        logger.exception(f'Sistema doc: llamada al LLM falló: {exc!r}')
+        raise
     logger.info('Sistema doc: LLM respondió. Procesando y persistiendo...')
 
     narrativa = response.choices[0].message.content or ''
