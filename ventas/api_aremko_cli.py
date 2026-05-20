@@ -609,6 +609,7 @@ def bookings_detalle(request):
         fecha_hasta (YYYY-MM-DD, requerido)
         familia      (opcional: tinas/masajes/cabanas/otros)
         servicio     (opcional: match parcial icontains contra nombre del servicio)
+        proveedor    (opcional: match icontains contra proveedor_asignado.nombre — masajista)
         limit        (opcional, default 500, máx 500 hardcoded)
 
     Filtra por `ReservaServicio.fecha_agendamiento` (fecha del servicio, no de la venta).
@@ -649,6 +650,9 @@ def bookings_detalle(request):
     # Servicio (opcional, match parcial)
     servicio_filtro = (request.GET.get('servicio') or '').strip()
 
+    # Proveedor/masajista (opcional, match parcial)
+    proveedor_filtro = (request.GET.get('proveedor') or '').strip()
+
     # Límite (hard cap 500)
     try:
         limit = int(request.GET.get('limit', DETALLE_HARD_LIMIT))
@@ -669,7 +673,7 @@ def bookings_detalle(request):
                     pass  # SQLite en tests no soporta esto.
 
             qs = ReservaServicio.objects.select_related(
-                'servicio', 'venta_reserva', 'venta_reserva__cliente',
+                'servicio', 'venta_reserva', 'venta_reserva__cliente', 'proveedor_asignado',
             ).filter(
                 fecha_agendamiento__gte=fecha_desde,
                 fecha_agendamiento__lte=fecha_hasta,
@@ -682,6 +686,9 @@ def bookings_detalle(request):
 
             if servicio_filtro:
                 qs = qs.filter(servicio__nombre__icontains=servicio_filtro)
+
+            if proveedor_filtro:
+                qs = qs.filter(proveedor_asignado__nombre__icontains=proveedor_filtro)
 
             qs = qs.order_by('-fecha_agendamiento', '-hora_inicio', '-id').distinct()
 
@@ -731,12 +738,16 @@ def bookings_detalle(request):
                     precio_unit = servicio.precio_base
                 precio_unit = int(precio_unit or 0)
 
+                # Incluimos proveedor_asignado_id en la clave: dos masajes con
+                # mismo servicio/hora pero distintos masajistas son atenciones
+                # legítimamente separadas (no se deben agrupar).
                 key = (
                     venta.id,
                     servicio.id,
                     r.fecha_agendamiento,
                     r.hora_inicio,
                     precio_unit,
+                    r.proveedor_asignado_id,
                 )
 
                 if key in grupos:
@@ -749,6 +760,7 @@ def bookings_detalle(request):
                         'venta': venta,
                         'servicio': servicio,
                         'cliente': venta.cliente if venta else None,
+                        'proveedor': r.proveedor_asignado,
                         'fecha_agendamiento': r.fecha_agendamiento,
                         'hora_inicio': r.hora_inicio,
                         'cantidad_personas': r.cantidad_personas or 1,
@@ -763,6 +775,7 @@ def bookings_detalle(request):
                 servicio = g['servicio']
                 venta = g['venta']
                 cliente = g['cliente']
+                proveedor = g['proveedor']
                 cantidad = g['cantidad_personas']
                 precio_unit = g['precio_unitario']
                 total = precio_unit * cantidad
@@ -786,6 +799,8 @@ def bookings_detalle(request):
                     'cantidad_personas': cantidad,
                     'precio_unitario': precio_unit,
                     'total': total,
+                    'proveedor_id': proveedor.id if proveedor else None,
+                    'proveedor_nombre': proveedor.nombre if proveedor else None,
                     'metodo_pago': metodos_por_venta.get(venta.id),
                     'estado': venta.estado_pago,
                     'nota': venta.comentarios or None,
