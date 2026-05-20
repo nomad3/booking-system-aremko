@@ -713,20 +713,58 @@ def bookings_detalle(request):
                 for p in pagos_qs:
                     metodos_por_venta.setdefault(p['venta_reserva_id'], p['metodo_pago'])
 
-            rows = []
-            total_revenue = 0
+            # Agrupar líneas equivalentes de la misma reserva. Caso típico:
+            # una pareja reserva 2 masajes del mismo servicio para el mismo
+            # horario — el sistema crea 2 ReservaServicio (una por persona/
+            # proveedor). Para el reporte queremos verlo como UNA línea con
+            # cantidad_personas=2, no como 2 líneas duplicadas.
+            grupos = {}  # key: (venta_id, servicio_id, fecha, hora, precio) → dict
+            orden_grupos = []
             for r in rows_qs:
                 servicio = r.servicio
                 venta = r.venta_reserva
-                cliente = venta.cliente if venta else None
+                if not venta or not servicio:
+                    continue
 
-                # Precio efectivo (con fallback a precio_base).
                 precio_unit = r.precio_unitario_venta
-                if precio_unit is None and servicio:
+                if precio_unit is None:
                     precio_unit = servicio.precio_base
                 precio_unit = int(precio_unit or 0)
 
-                cantidad = r.cantidad_personas or 1
+                key = (
+                    venta.id,
+                    servicio.id,
+                    r.fecha_agendamiento,
+                    r.hora_inicio,
+                    precio_unit,
+                )
+
+                if key in grupos:
+                    grupo = grupos[key]
+                    grupo['cantidad_personas'] += (r.cantidad_personas or 1)
+                    grupo['_linea_ids'].append(r.id)
+                else:
+                    grupos[key] = {
+                        '_linea_ids': [r.id],
+                        'venta': venta,
+                        'servicio': servicio,
+                        'cliente': venta.cliente if venta else None,
+                        'fecha_agendamiento': r.fecha_agendamiento,
+                        'hora_inicio': r.hora_inicio,
+                        'cantidad_personas': r.cantidad_personas or 1,
+                        'precio_unitario': precio_unit,
+                    }
+                    orden_grupos.append(key)
+
+            rows = []
+            total_revenue = 0
+            for key in orden_grupos:
+                g = grupos[key]
+                servicio = g['servicio']
+                venta = g['venta']
+                cliente = g['cliente']
+                cantidad = g['cantidad_personas']
+                precio_unit = g['precio_unitario']
                 total = precio_unit * cantidad
                 total_revenue += total
 
@@ -734,23 +772,23 @@ def bookings_detalle(request):
                 familia_nombre = tipo_a_familia.get(tipo, 'Otros')
 
                 rows.append({
-                    'linea_id': r.id,  # ReservaServicio.id, unico por linea
-                    'reserva_id': venta.id if venta else None,
-                    'fecha': r.fecha_agendamiento.isoformat() if r.fecha_agendamiento else None,
-                    'hora': r.hora_inicio,
+                    'linea_ids': g['_linea_ids'],  # lista de ReservaServicio.id agrupados
+                    'reserva_id': venta.id,
+                    'fecha': g['fecha_agendamiento'].isoformat() if g['fecha_agendamiento'] else None,
+                    'hora': g['hora_inicio'],
                     'cliente_id': cliente.id if cliente else None,
                     'cliente_nombre': cliente.nombre if cliente else None,
                     'cliente_rut': (cliente.documento_identidad or None) if cliente else None,
                     'cliente_email': (cliente.email or None) if cliente else None,
-                    'servicio_id': servicio.id if servicio else None,
-                    'servicio_nombre': servicio.nombre if servicio else None,
+                    'servicio_id': servicio.id,
+                    'servicio_nombre': servicio.nombre,
                     'familia': familia_nombre,
                     'cantidad_personas': cantidad,
                     'precio_unitario': precio_unit,
                     'total': total,
-                    'metodo_pago': metodos_por_venta.get(venta.id) if venta else None,
-                    'estado': venta.estado_pago if venta else None,
-                    'nota': (venta.comentarios or None) if venta else None,
+                    'metodo_pago': metodos_por_venta.get(venta.id),
+                    'estado': venta.estado_pago,
+                    'nota': venta.comentarios or None,
                 })
 
         logger.info(
