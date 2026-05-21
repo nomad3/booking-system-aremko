@@ -71,6 +71,15 @@
             color: white;
             font-weight: bold;
         }
+        .parcial {
+            background-color: #fd7e14;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .parcial:hover {
+            background-color: #e76b00;
+        }
         .no-aplica {
             background-color: #e0e0e0;
             color: #999;
@@ -179,6 +188,12 @@
                 color: #721c24;
             }
 
+            .slot-item.parcial {
+                background-color: #ffe5d0;
+                border-left-color: #fd7e14;
+                color: #7a3e00;
+            }
+
             .slot-item.no-aplica {
                 background-color: #f8f9fa;
                 border-left-color: #e0e0e0;
@@ -279,6 +294,11 @@
                                         <small>{{ celda.cliente|default:"" }}</small>
                                     </td>
                                 {% endif %}
+                            {% elif celda.estado == 'parcial' %}
+                                <td class="parcial" title="{{ celda.reservas_existentes }} de {{ celda.max_servicios_simultaneos }} ocupado — todavía hay cupo">
+                                    {{ celda.reservas_existentes }} de {{ celda.max_servicios_simultaneos }}<br>
+                                    <small>{{ celda.cliente|default:"" }}</small>
+                                </td>
                             {% elif celda.estado == 'bloqueado' %}
                                 <td class="bloqueado" title="Bloqueado: {{ celda.motivo_bloqueo|default:'Mantenimiento' }} ({{ celda.fecha_inicio_bloqueo }} al {{ celda.fecha_fin_bloqueo }})">
                                     🚫 Fuera de servicio<br>
@@ -344,6 +364,14 @@
                                 <div class="slot-hora">{{ slot.hora }}</div>
                                 <div class="slot-estado">No aplica</div>
                             </div>
+                        {% elif slot.estado == 'parcial' %}
+                            <div class="slot-item parcial">
+                                <div class="slot-hora">{{ slot.hora }}</div>
+                                <div class="slot-estado">
+                                    <strong>{{ slot.reservas_existentes }} de {{ slot.max_servicios_simultaneos }}</strong>
+                                    <div class="slot-cliente">{{ slot.cliente|default:"" }} — todavía hay cupo</div>
+                                </div>
+                            </div>
                         {% else %}
                             <div class="slot-item disponible">
                                 <div class="slot-hora">{{ slot.hora }}</div>
@@ -360,7 +388,8 @@
             <h3>Resumen de Ocupación</h3>
             <ul>
                 <li>Total de slots: {{ resumen.total_slots }}</li>
-                <li>Ocupados: {{ resumen.ocupados }}</li>
+                <li>Ocupados (llenos): {{ resumen.ocupados }}</li>
+                <li>Parcialmente ocupados (con cupo): {{ resumen.parciales|default:0 }}</li>
                 <li>Disponibles: {{ resumen.disponibles }}</li>
                 <li>Porcentaje de ocupación: {{ resumen.porcentaje_ocupacion }}%</li>
             </ul>
