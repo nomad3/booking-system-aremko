@@ -345,6 +345,12 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
     _diag_log.info(f'CalMatriz: slots generados ({len(slots)}): {slots!r}')
     _diag_log.info(f'CalMatriz: recursos ({len(recursos)}): {recursos!r}')
     _diag_log.info(f'CalMatriz: contador_reservas={dict(contador_reservas)!r}')
+    # Log capacidades por recurso
+    for _r in servicios:
+        _diag_log.info(
+            f'CalMatriz capacidad: "{_r.nombre}" max_servicios_simultaneos={_r.max_servicios_simultaneos} '
+            f'visible_en_matriz={_r.visible_en_matriz}'
+        )
 
     # Inicializar matriz
     matriz = {}
