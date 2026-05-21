@@ -341,6 +341,11 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
                 recurso_nombre = reserva.servicio.nombre
                 contador_reservas[hora_normalizada][recurso_nombre] += 1
 
+    # Logging diagnóstico (remover cuando confirmemos fix)
+    _diag_log.info(f'CalMatriz: slots generados ({len(slots)}): {slots!r}')
+    _diag_log.info(f'CalMatriz: recursos ({len(recursos)}): {recursos!r}')
+    _diag_log.info(f'CalMatriz: contador_reservas={dict(contador_reservas)!r}')
+
     # Inicializar matriz
     matriz = {}
     for slot in slots:
