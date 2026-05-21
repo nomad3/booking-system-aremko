@@ -221,21 +221,6 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         venta_reserva__estado_pago='cancelado',
     ).select_related('servicio', 'venta_reserva', 'venta_reserva__cliente')
 
-    # Logging diagnóstico (mantener solo unos días, después remover).
-    import logging
-    _diag_log = logging.getLogger(__name__)
-    _diag_log.info(
-        f'CalMatriz: fecha={fecha} categoria={categoria.nombre if categoria else "?"} '
-        f'reservas_query_count={reservas.count()}'
-    )
-    for _r in reservas:
-        _diag_log.info(
-            f'CalMatriz  reserva: VR#{_r.venta_reserva_id} servicio="{_r.servicio.nombre if _r.servicio else "?"}" '
-            f'fecha_agendamiento={_r.fecha_agendamiento} hora_inicio={_r.hora_inicio!r} '
-            f'estado_pago={_r.venta_reserva.estado_pago if _r.venta_reserva else "?"} '
-            f'visible_en_matriz={_r.servicio.visible_en_matriz if _r.servicio else "?"}'
-        )
-
     # Usar los servicios visibles como recursos (columnas)
     recursos = [s.nombre for s in servicios]
 
@@ -340,17 +325,6 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
                 hora_normalizada = f"{hora:02d}:{minuto:02d}"
                 recurso_nombre = reserva.servicio.nombre
                 contador_reservas[hora_normalizada][recurso_nombre] += 1
-
-    # Logging diagnóstico (remover cuando confirmemos fix)
-    _diag_log.info(f'CalMatriz: slots generados ({len(slots)}): {slots!r}')
-    _diag_log.info(f'CalMatriz: recursos ({len(recursos)}): {recursos!r}')
-    _diag_log.info(f'CalMatriz: contador_reservas={dict(contador_reservas)!r}')
-    # Log capacidades por recurso
-    for _r in servicios:
-        _diag_log.info(
-            f'CalMatriz capacidad: "{_r.nombre}" max_servicios_simultaneos={_r.max_servicios_simultaneos} '
-            f'visible_en_matriz={_r.visible_en_matriz}'
-        )
 
     # Inicializar matriz
     matriz = {}
