@@ -414,13 +414,15 @@ class VentaReservaAdmin(admin.ModelAdmin):
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
         'productos_y_cantidades', 'servicios_y_cantidades',
         'total_productos', 'total_servicios', 'agregar_comanda_button',
-        'link_comanda_whatsapp_detalle'
+        'link_comanda_whatsapp_detalle',
+        'cliente_ficha_360_display',
     )
     fieldsets = (
         (None, {
             'fields': (
                 'numero_documento_fiscal',
                 'cliente',
+                'cliente_ficha_360_display',
                 'fecha_reserva',
                 'total',
                 'pagado',
@@ -537,28 +539,35 @@ class VentaReservaAdmin(admin.ModelAdmin):
         return queryset
 
     def cliente_info(self, obj):
+        """Versión simple para el listado de reservas: nombre + teléfono."""
+        if not obj.cliente:
+            return '-'
+        return f"{obj.cliente.nombre} - {obj.cliente.telefono}"
+    cliente_info.short_description = 'Cliente'
+    cliente_info.admin_order_field = 'cliente__nombre'
+
+    def cliente_ficha_360_display(self, obj):
         """Mini-ficha del cliente con valor histórico + desglose por familia.
 
-        Combina VentaReserva (sistema actual) + ServiceHistory (CSV importado).
-        Cache 5min para no recalcular en cada hit del list_display.
+        Se muestra como campo readonly en el change_form del detalle de la reserva
+        (NO en el listado). Combina VentaReserva + ServiceHistory. Cache 5min.
         """
         from django.utils.html import format_html, format_html_join
         from django.contrib.humanize.templatetags.humanize import intcomma
 
-        cliente = obj.cliente
-        if not cliente:
+        if not obj or not obj.cliente:
             return '-'
 
-        nombre_tel = format_html(
-            '<strong>{}</strong><br><small style="color:#666;">{}</small>',
-            cliente.nombre, cliente.telefono or '',
-        )
+        cliente = obj.cliente
 
-        # Ficha 360 con cache. Si falla, mostrar solo nombre + tel.
+        # Ficha 360 con cache. Si falla, mostrar solo placeholder.
         try:
             ficha = cliente.ficha_360()
-        except Exception:
-            return nombre_tel
+        except Exception as exc:
+            return format_html(
+                '<span style="color:#888;">No se pudo calcular ficha del cliente: {}</span>',
+                str(exc)[:120],
+            )
 
         # Badge nivel
         nivel_colors = {
@@ -570,8 +579,8 @@ class VentaReservaAdmin(admin.ModelAdmin):
         }
         fg, bg, label = nivel_colors.get(ficha['nivel'], ('#555', '#eee', ficha['nivel'].upper()))
         nivel_badge = format_html(
-            '<span style="background:{};color:{};padding:1px 6px;border-radius:3px;'
-            'font-size:10px;font-weight:bold;letter-spacing:0.3px;">{}</span>',
+            '<span style="background:{};color:{};padding:3px 10px;border-radius:4px;'
+            'font-size:12px;font-weight:bold;letter-spacing:0.5px;">{}</span>',
             bg, fg, label,
         )
 
@@ -584,15 +593,15 @@ class VentaReservaAdmin(admin.ModelAdmin):
         elif recency == 1:
             recency_str = 'ayer'
         elif recency < 30:
-            recency_str = f'hace {recency}d'
+            recency_str = f'hace {recency} días'
         elif recency < 365:
-            recency_str = f'hace {recency // 30}m'
+            recency_str = f'hace {recency // 30} meses'
         else:
-            recency_str = f'hace {recency // 365}a'
+            recency_str = f'hace {recency // 365} años'
 
         stats_line = format_html(
-            '<span style="font-size:11px;color:#555;">'
-            'Tramo <strong>{}</strong> · {} visitas · {}'
+            '<span style="font-size:13px;color:#555;margin-left:12px;">'
+            'Tramo <strong>{}</strong> · <strong>{}</strong> visitas · última visita {}'
             '</span>',
             ficha['tramo_actual'], ficha['numero_visitas'], recency_str,
         )
@@ -600,31 +609,40 @@ class VentaReservaAdmin(admin.ModelAdmin):
         # Total acumulado destacado
         total_str = f'${intcomma(int(ficha["total"]))}'
         total_line = format_html(
-            '<span style="font-size:12px;font-weight:bold;color:#b78b5b;">💰 {} acumulado</span>',
+            '<div style="margin-top:10px;font-size:16px;font-weight:bold;color:#b78b5b;">'
+            '💰 {} acumulado en Aremko'
+            '</div>',
             total_str,
         )
 
-        # Desglose por familia (solo familias con monto > 0, max 4 visibles)
+        # Desglose por familia (solo familias con monto > 0)
         por_familia = ficha['por_familia']
         familias_con_monto = [
             (nombre, monto) for nombre, monto in por_familia.items()
             if monto > 0
         ]
-        # Ordenar por monto desc
         familias_con_monto.sort(key=lambda x: -x[1])
 
         if familias_con_monto and ficha['total'] > 0:
-            desglose_html = format_html_join(
-                ' · ',
-                '<span style="white-space:nowrap;">{}: <strong>${}</strong> ({}%)</span>',
+            # Tabla compacta con todas las familias activas
+            filas_html = format_html_join(
+                '',
+                '<tr><td style="padding:3px 12px 3px 0;font-size:13px;">{}</td>'
+                '<td style="padding:3px 12px 3px 0;font-size:13px;font-weight:bold;text-align:right;">${}</td>'
+                '<td style="padding:3px 0;font-size:12px;color:#666;text-align:right;">{}%</td></tr>',
                 (
                     (nombre, intcomma(int(monto)), int(monto / ficha['total'] * 100))
-                    for nombre, monto in familias_con_monto[:5]
+                    for nombre, monto in familias_con_monto
                 ),
             )
             desglose_line = format_html(
-                '<div style="font-size:10px;color:#444;margin-top:2px;">{}</div>',
-                desglose_html,
+                '<div style="margin-top:8px;">'
+                '<div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">'
+                'Desglose por familia'
+                '</div>'
+                '<table style="border-collapse:collapse;">{}</table>'
+                '</div>',
+                filas_html,
             )
         else:
             desglose_line = ''
@@ -633,29 +651,34 @@ class VentaReservaAdmin(admin.ModelAdmin):
         if ficha['nunca_compro']:
             nunca = ', '.join(ficha['nunca_compro'])
             cross_sell = format_html(
-                '<div style="font-size:10px;color:#8a1a1a;margin-top:2px;">'
-                '⚠ Nunca compró: {}'
+                '<div style="margin-top:10px;padding:8px 12px;background:#fff3f3;'
+                'border-left:3px solid #c44;font-size:13px;color:#8a1a1a;">'
+                '⚠ <strong>Oportunidad cross-sell:</strong> nunca compró {}'
                 '</div>',
                 nunca,
             )
         else:
-            cross_sell = ''
+            cross_sell = format_html(
+                '<div style="margin-top:10px;padding:8px 12px;background:#f3fff3;'
+                'border-left:3px solid #4a4;font-size:13px;color:#1c6a1c;">'
+                '✅ Ha probado todas las familias principales'
+                '</div>',
+            )
 
         return format_html(
-            '{nombre_tel}<br>'
-            '<div style="margin-top:3px;">{nivel} {stats}</div>'
-            '<div>{total}</div>'
+            '<div style="padding:4px 0;">'
+            '<div>{nivel}{stats}</div>'
+            '{total}'
             '{desglose}'
-            '{cross_sell}',
-            nombre_tel=nombre_tel,
+            '{cross_sell}'
+            '</div>',
             nivel=nivel_badge,
             stats=stats_line,
             total=total_line,
             desglose=desglose_line,
             cross_sell=cross_sell,
         )
-    cliente_info.short_description = 'Cliente'
-    cliente_info.admin_order_field = 'cliente__nombre'
+    cliente_ficha_360_display.short_description = 'Ficha del cliente'
 
     def fecha_reserva_corta(self, obj):
         if obj.fecha_reserva:
