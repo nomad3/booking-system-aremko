@@ -132,6 +132,20 @@ def calendario_matriz_view(request):
     return render(request, 'ventas/calendario_matriz_simple.html', context)
 
 
+def _calcular_estado_slot(reservas_count: int, capacidad_max: int) -> str:
+    """Determina el estado visual del slot según ocupación.
+
+    - 'disponible': 0 reservas, capacidad completa libre.
+    - 'parcial': hay 1+ reservas pero aún queda capacidad (típico masajes 1 de 2).
+    - 'ocupado': capacidad totalmente llena.
+    """
+    if reservas_count <= 0:
+        return 'disponible'
+    if reservas_count < capacidad_max:
+        return 'parcial'
+    return 'ocupado'
+
+
 def extraer_slots_para_fecha(slots_disponibles, fecha):
     """
     Extrae los slots disponibles para una fecha específica.
@@ -323,19 +337,11 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
             if categoria and 'tina' in categoria.nombre.lower() and 'slots_por_servicio' in locals():
                 # Verificar si este slot es válido para este recurso
                 if recurso in slots_por_servicio and slot in slots_por_servicio[recurso]:
-                    # Verificar si aún hay capacidad disponible
-                    if reservas_count < capacidad_max:
-                        estado = 'disponible'
-                    else:
-                        estado = 'ocupado'
+                    estado = _calcular_estado_slot(reservas_count, capacidad_max)
                 else:
                     estado = 'no_aplica'  # Este slot no existe para esta tina
             else:
-                # Verificar si aún hay capacidad disponible
-                if reservas_count < capacidad_max:
-                    estado = 'disponible'
-                else:
-                    estado = 'ocupado'
+                estado = _calcular_estado_slot(reservas_count, capacidad_max)
 
             matriz[slot][recurso] = {
                 'estado': estado,
@@ -370,13 +376,8 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
                     capacidad_max = celda_actual.get('max_servicios_simultaneos', 1)
                     reservas_count = len(lista_reservas)
 
-                    # Determinar estado real basado en capacidad
-                    # Solo marcar como 'ocupado' si está COMPLETAMENTE lleno
-                    if reservas_count >= capacidad_max:
-                        nuevo_estado = 'ocupado'
-                    else:
-                        # Aún hay espacio, mantener como 'disponible'
-                        nuevo_estado = celda_actual.get('estado', 'disponible')
+                    # Estado según ocupación real (parcial si 0 < count < max)
+                    nuevo_estado = _calcular_estado_slot(reservas_count, capacidad_max)
 
                     # Agregar información de la primera reserva para mostrar
                     primera_reserva = lista_reservas[0] if lista_reservas else None
@@ -466,12 +467,21 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         for recurso_data in slot.values()
         if recurso_data['estado'] == 'ocupado'
     )
+    parciales = sum(
+        1 for slot in matriz.values()
+        for recurso_data in slot.values()
+        if recurso_data['estado'] == 'parcial'
+    )
+
+    # Nota: ocupación parcial cuenta a medias (ej: 1 de 2 ocupado = 0.5)
+    ocupacion_ponderada = ocupados + (parciales * 0.5)
 
     resumen = {
         'total_slots': slots_validos,
         'ocupados': ocupados,
-        'disponibles': slots_validos - ocupados,
-        'porcentaje_ocupacion': round((ocupados / slots_validos * 100) if slots_validos > 0 else 0, 1)
+        'parciales': parciales,
+        'disponibles': slots_validos - ocupados,  # incluye parciales (aún reservables)
+        'porcentaje_ocupacion': round((ocupacion_ponderada / slots_validos * 100) if slots_validos > 0 else 0, 1)
     }
 
     return {

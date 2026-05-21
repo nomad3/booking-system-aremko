@@ -177,6 +177,12 @@
     .slot-parcial {
         background-color: #fff3cd;
         color: #856404;
+        cursor: pointer;
+        border-left: 3px solid #ffc107;
+    }
+
+    .slot-parcial:hover {
+        background-color: #ffe69c;
     }
 
     .slot-mantenimiento {
@@ -431,7 +437,7 @@
                     <td class="slot-{{ celda.estado }}"
                         data-slot="{{ slot }}"
                         data-recurso="{{ recurso }}"
-                        {% if celda.estado == 'disponible' %}
+                        {% if celda.estado == 'disponible' or celda.estado == 'parcial' %}
                         onclick="abrirReservaRapida('{{ slot }}', '{{ recurso }}')"
                         {% endif %}>
                         <div class="slot-content">
@@ -453,8 +459,34 @@
                                        Ver #{{ celda.reserva_id }}
                                     </a>
                                 </div>
+                            {% elif celda.estado == 'parcial' %}
+                                <div class="slot-estado">{{ celda.reservas_existentes }} de {{ celda.max_servicios_simultaneos }}</div>
+                                <div class="slot-cliente">{{ celda.cliente }}</div>
+                                <div class="slot-info">{{ celda.personas }} persona(s)</div>
+                                {% if celda.estado_pago == 'pagado' %}
+                                    <span class="badge-pago badge-pagado">Pagado</span>
+                                {% elif celda.estado_pago == 'parcial' %}
+                                    <span class="badge-pago badge-parcial">Parcial</span>
+                                {% else %}
+                                    <span class="badge-pago badge-pendiente">Pendiente</span>
+                                {% endif %}
+                                <div class="slot-info" style="margin-top:4px;">
+                                    <a href="/admin/ventas/ventareserva/{{ celda.reserva_id }}/change/"
+                                       target="_blank"
+                                       style="font-size: 11px;">
+                                       Ver #{{ celda.reserva_id }}
+                                    </a>
+                                </div>
+                                <div class="slot-info" style="margin-top:4px;font-size:11px;color:#1c6a1c;font-weight:bold;">
+                                    + Click para reservar 1 más
+                                </div>
                             {% else %}
                                 <div class="slot-estado">DISPONIBLE</div>
+                                {% if celda.max_servicios_simultaneos > 1 %}
+                                    <div class="slot-info" style="font-size:11px;color:#666;">
+                                        {{ celda.max_servicios_simultaneos }} cupos
+                                    </div>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </td>
