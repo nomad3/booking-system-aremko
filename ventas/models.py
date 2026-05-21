@@ -802,7 +802,7 @@ class Cliente(models.Model):
         gasto_actual = self.ventareserva_set.filter(
             estado_pago__in=['pagado', 'parcial']
         ).aggregate(total_gastado=Sum('total'))['total_gastado'] or 0
-        
+
         # Gasto histórico (servicios importados)
         try:
             from ventas.models import ServiceHistory
@@ -813,8 +813,196 @@ class Cliente(models.Model):
         except Exception:
             # Si la tabla no existe o hay error, solo usar gasto actual
             gasto_historico = 0
-        
+
         return float(gasto_actual) + float(gasto_historico)
+
+    # ───────────── Ficha de Cliente 360 (Fase 1 fidelización) ─────────────
+    # Properties que combinan VentaReserva + ServiceHistory para mostrar valor real
+    # del cliente al equipo de Aremko. Cache Django con TTL 5min para no recalcular
+    # en cada hit del admin.
+
+    # Familias normalizadas para el desglose. Orden importa para visualización.
+    FAMILIAS_FICHA = ('Tinas', 'Masajes', 'Cabañas', 'Ambientaciones', 'Otros', 'Productos')
+
+    def _ficha_cache_key(self) -> str:
+        return f'cliente_ficha_v1:{self.pk}'
+
+    def ficha_360(self, force_refresh: bool = False) -> dict:
+        """Devuelve la ficha 360 del cliente con desglose por familia.
+
+        Estructura:
+        {
+            'total': float,
+            'por_familia': {'Tinas': X, 'Masajes': Y, ...},
+            'numero_visitas': int,
+            'dias_desde_ultima_visita': int | None,
+            'tramo_actual': int,
+            'nivel': 'nuevo' | 'regular' | 'vip' | 'champion',
+            'nunca_compro': ['Ambientaciones', ...],
+        }
+        """
+        from django.core.cache import cache
+        if not force_refresh:
+            cached = cache.get(self._ficha_cache_key())
+            if cached is not None:
+                return cached
+
+        ficha = self._calcular_ficha_360()
+        cache.set(self._ficha_cache_key(), ficha, 300)  # 5min
+        return ficha
+
+    def _calcular_ficha_360(self) -> dict:
+        from datetime import date
+        from decimal import Decimal
+
+        # Inicializar desglose
+        por_familia = {f: Decimal(0) for f in self.FAMILIAS_FICHA}
+
+        # 1) Ventas actuales (VentaReserva → ReservaServicio + ReservaProducto)
+        ventas_pagadas = self.ventareserva_set.filter(
+            estado_pago__in=['pagado', 'parcial']
+        )
+
+        # Servicios actuales: agrupar por categoria (más confiable que tipo_servicio
+        # porque Ambientaciones tienen categoria propia pero tipo='otro').
+        for rs in ReservaServicio.objects.filter(
+            venta_reserva__in=ventas_pagadas,
+        ).select_related('servicio__categoria'):
+            servicio = rs.servicio
+            if not servicio:
+                continue
+            precio_unit = rs.precio_unitario_venta or servicio.precio_base or 0
+            subtotal = Decimal(precio_unit) * (rs.cantidad_personas or 1)
+            familia = self._mapear_categoria_a_familia(
+                getattr(servicio.categoria, 'nombre', '') if servicio.categoria else '',
+                servicio.tipo_servicio or '',
+            )
+            por_familia[familia] += subtotal
+
+        # Productos actuales (ReservaProducto)
+        for rp in ReservaProducto.objects.filter(
+            venta_reserva__in=ventas_pagadas,
+        ).select_related('producto'):
+            producto = rp.producto
+            if not producto:
+                continue
+            precio_unit = rp.precio_unitario or producto.precio_base or 0
+            subtotal = Decimal(precio_unit) * (rp.cantidad or 1)
+            por_familia['Productos'] += subtotal
+
+        # 2) Histórico CSV (ServiceHistory.service_type)
+        try:
+            from ventas.models import ServiceHistory
+            for sh in ServiceHistory.objects.filter(
+                cliente=self,
+                service_date__gt='2021-01-01',
+            ):
+                familia = self._mapear_categoria_a_familia(sh.service_type or '', '')
+                por_familia[familia] += Decimal(sh.price_paid or 0)
+        except Exception:
+            pass
+
+        total = sum(por_familia.values(), Decimal(0))
+
+        # 3) Recency (días desde la última visita pagada)
+        ultima = ventas_pagadas.order_by('-fecha_reserva').values_list('fecha_reserva', flat=True).first()
+        if ultima:
+            dias_desde_ultima = (date.today() - (ultima.date() if hasattr(ultima, 'date') else ultima)).days
+        else:
+            # Si no hay venta actual, mirar ServiceHistory más reciente
+            try:
+                from ventas.models import ServiceHistory
+                ult_csv = ServiceHistory.objects.filter(
+                    cliente=self,
+                    service_date__gt='2021-01-01',
+                ).order_by('-service_date').values_list('service_date', flat=True).first()
+                dias_desde_ultima = (date.today() - ult_csv).days if ult_csv else None
+            except Exception:
+                dias_desde_ultima = None
+
+        # 4) Frequency (número de visitas)
+        numero_visitas_actuales = ventas_pagadas.count()
+        try:
+            numero_visitas_csv = ServiceHistory.objects.filter(
+                cliente=self,
+                service_date__gt='2021-01-01',
+            ).count()
+        except Exception:
+            numero_visitas_csv = 0
+        numero_visitas = numero_visitas_actuales + numero_visitas_csv
+
+        # 5) Tramo actual (TramoService)
+        try:
+            from ventas.services.tramo_service import TramoService
+            tramo_actual = TramoService.calcular_tramo(float(total))
+        except Exception:
+            tramo_actual = 0
+
+        # 6) Nivel del cliente (heurística R+F+M)
+        nivel = self._calcular_nivel(numero_visitas, tramo_actual, dias_desde_ultima)
+
+        # 7) Cross-sell: familias que el cliente nunca compró (excl. Productos)
+        nunca_compro = [
+            f for f in ('Tinas', 'Masajes', 'Cabañas', 'Ambientaciones')
+            if por_familia[f] == 0
+        ]
+
+        return {
+            'total': float(total),
+            'por_familia': {f: float(v) for f, v in por_familia.items()},
+            'numero_visitas': numero_visitas,
+            'dias_desde_ultima_visita': dias_desde_ultima,
+            'tramo_actual': tramo_actual,
+            'nivel': nivel,
+            'nunca_compro': nunca_compro,
+        }
+
+    @staticmethod
+    def _mapear_categoria_a_familia(categoria_nombre: str, tipo_servicio: str = '') -> str:
+        """Normaliza categoria.nombre o tipo_servicio a una de las 6 familias.
+
+        Acepta texto de ServiceHistory (libre) y de CategoriaServicio.nombre.
+        """
+        c = (categoria_nombre or '').lower().strip()
+        t = (tipo_servicio or '').lower().strip()
+
+        # Prioridad: categoría (más específica) > tipo_servicio (fallback)
+        if 'ambientac' in c or 'decora' in c:
+            return 'Ambientaciones'
+        if 'tina' in c or t == 'tina':
+            return 'Tinas'
+        if 'masaje' in c or t == 'masaje':
+            return 'Masajes'
+        if 'caba' in c or 'alojamient' in c or t == 'cabana':
+            return 'Cabañas'
+        return 'Otros'
+
+    @staticmethod
+    def _calcular_nivel(visitas: int, tramo: int, dias_desde_ultima) -> str:
+        """Heurística R+F+M para clasificar al cliente.
+
+        - champion: tramo>=5 (gasto>=$250K) Y visitas>=5 Y recency<180d
+        - vip: tramo>=5 O visitas>=5 (pero menos recency)
+        - regular: 2-4 visitas Y recency<365d
+        - inactivo: alguna vez compró pero recency>=365d
+        - nuevo: 0-1 visitas
+        """
+        if visitas == 0:
+            return 'nuevo'
+        if dias_desde_ultima is not None and dias_desde_ultima >= 365 and visitas >= 1:
+            return 'inactivo'
+        if tramo >= 5 and visitas >= 5 and (dias_desde_ultima is None or dias_desde_ultima < 180):
+            return 'champion'
+        if tramo >= 5 or visitas >= 5:
+            return 'vip'
+        if visitas >= 2:
+            return 'regular'
+        return 'nuevo'
+
+    def invalidar_ficha_cache(self):
+        """Invalida el cache de la ficha cliente (llamar después de nueva venta pagada)."""
+        from django.core.cache import cache
+        cache.delete(self._ficha_cache_key())
 
 
 class VentaReserva(models.Model):

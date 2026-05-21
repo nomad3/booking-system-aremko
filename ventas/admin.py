@@ -537,7 +537,123 @@ class VentaReservaAdmin(admin.ModelAdmin):
         return queryset
 
     def cliente_info(self, obj):
-        return f"{obj.cliente.nombre} - {obj.cliente.telefono}"
+        """Mini-ficha del cliente con valor histórico + desglose por familia.
+
+        Combina VentaReserva (sistema actual) + ServiceHistory (CSV importado).
+        Cache 5min para no recalcular en cada hit del list_display.
+        """
+        from django.utils.html import format_html, format_html_join
+        from django.contrib.humanize.templatetags.humanize import intcomma
+
+        cliente = obj.cliente
+        if not cliente:
+            return '-'
+
+        nombre_tel = format_html(
+            '<strong>{}</strong><br><small style="color:#666;">{}</small>',
+            cliente.nombre, cliente.telefono or '',
+        )
+
+        # Ficha 360 con cache. Si falla, mostrar solo nombre + tel.
+        try:
+            ficha = cliente.ficha_360()
+        except Exception:
+            return nombre_tel
+
+        # Badge nivel
+        nivel_colors = {
+            'champion': ('#1c6a1c', '#d3f0d3', '⭐ CHAMPION'),
+            'vip': ('#7a5500', '#fbe7c0', '🌟 VIP'),
+            'regular': ('#1a558a', '#d9eafd', 'REGULAR'),
+            'inactivo': ('#8a1a1a', '#f8d2d2', '⚠ INACTIVO'),
+            'nuevo': ('#555', '#eee', 'NUEVO'),
+        }
+        fg, bg, label = nivel_colors.get(ficha['nivel'], ('#555', '#eee', ficha['nivel'].upper()))
+        nivel_badge = format_html(
+            '<span style="background:{};color:{};padding:1px 6px;border-radius:3px;'
+            'font-size:10px;font-weight:bold;letter-spacing:0.3px;">{}</span>',
+            bg, fg, label,
+        )
+
+        # Línea de stats: tramo · visitas · recency
+        recency = ficha['dias_desde_ultima_visita']
+        if recency is None:
+            recency_str = 'sin visitas previas'
+        elif recency == 0:
+            recency_str = 'hoy'
+        elif recency == 1:
+            recency_str = 'ayer'
+        elif recency < 30:
+            recency_str = f'hace {recency}d'
+        elif recency < 365:
+            recency_str = f'hace {recency // 30}m'
+        else:
+            recency_str = f'hace {recency // 365}a'
+
+        stats_line = format_html(
+            '<span style="font-size:11px;color:#555;">'
+            'Tramo <strong>{}</strong> · {} visitas · {}'
+            '</span>',
+            ficha['tramo_actual'], ficha['numero_visitas'], recency_str,
+        )
+
+        # Total acumulado destacado
+        total_str = f'${intcomma(int(ficha["total"]))}'
+        total_line = format_html(
+            '<span style="font-size:12px;font-weight:bold;color:#b78b5b;">💰 {} acumulado</span>',
+            total_str,
+        )
+
+        # Desglose por familia (solo familias con monto > 0, max 4 visibles)
+        por_familia = ficha['por_familia']
+        familias_con_monto = [
+            (nombre, monto) for nombre, monto in por_familia.items()
+            if monto > 0
+        ]
+        # Ordenar por monto desc
+        familias_con_monto.sort(key=lambda x: -x[1])
+
+        if familias_con_monto and ficha['total'] > 0:
+            desglose_html = format_html_join(
+                ' · ',
+                '<span style="white-space:nowrap;">{}: <strong>${}</strong> ({}%)</span>',
+                (
+                    (nombre, intcomma(int(monto)), int(monto / ficha['total'] * 100))
+                    for nombre, monto in familias_con_monto[:5]
+                ),
+            )
+            desglose_line = format_html(
+                '<div style="font-size:10px;color:#444;margin-top:2px;">{}</div>',
+                desglose_html,
+            )
+        else:
+            desglose_line = ''
+
+        # Alerta cross-sell: familias que nunca compró
+        if ficha['nunca_compro']:
+            nunca = ', '.join(ficha['nunca_compro'])
+            cross_sell = format_html(
+                '<div style="font-size:10px;color:#8a1a1a;margin-top:2px;">'
+                '⚠ Nunca compró: {}'
+                '</div>',
+                nunca,
+            )
+        else:
+            cross_sell = ''
+
+        return format_html(
+            '{nombre_tel}<br>'
+            '<div style="margin-top:3px;">{nivel} {stats}</div>'
+            '<div>{total}</div>'
+            '{desglose}'
+            '{cross_sell}',
+            nombre_tel=nombre_tel,
+            nivel=nivel_badge,
+            stats=stats_line,
+            total=total_line,
+            desglose=desglose_line,
+            cross_sell=cross_sell,
+        )
     cliente_info.short_description = 'Cliente'
     cliente_info.admin_order_field = 'cliente__nombre'
 

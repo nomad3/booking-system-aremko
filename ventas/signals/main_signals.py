@@ -764,3 +764,11 @@ def disparar_meta_capi_purchase_on_pago(sender, instance, created, raw, using, u
         logger.warning(
             f"Meta CAPI Purchase signal fallo (no critico) venta_id={instance.id}: {exc}"
         )
+
+    # Invalidar cache de ficha 360 del cliente (fidelización Fase 1).
+    # El cache vive 5min en Django cache; al confirmar pago hay que refrescar
+    # para que el admin muestre el nuevo total + recency = "hoy".
+    try:
+        instance.cliente.invalidar_ficha_cache()
+    except Exception as exc:
+        logger.warning(f"Ficha 360 cache invalidate fallo (no critico): {exc}")

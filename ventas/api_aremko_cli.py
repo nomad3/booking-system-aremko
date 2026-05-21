@@ -1297,6 +1297,56 @@ def bookings_weekly_breakdown(request):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+def cliente_ficha(request, cliente_id):
+    """
+    Ficha 360 de un cliente para aremko-cli (dashboards de comercial / recepción).
+
+    Combina VentaReserva (sistema actual) + ServiceHistory (CSV histórico) y
+    desglosa el gasto por familia (Tinas/Masajes/Cabañas/Ambientaciones/Otros/Productos).
+
+    Returns:
+        {
+            "success": true,
+            "data": {
+                "cliente": {"id": N, "nombre": "...", "telefono": "...", "email": "..."},
+                "ficha": {
+                    "total": 420000.0,
+                    "por_familia": {"Tinas": 180000, "Masajes": 90000, ...},
+                    "numero_visitas": 12,
+                    "dias_desde_ultima_visita": 23,
+                    "tramo_actual": 8,
+                    "nivel": "champion",
+                    "nunca_compro": ["Ambientaciones"]
+                }
+            }
+        }
+    """
+    try:
+        cliente = Cliente.objects.filter(pk=cliente_id).first()
+        if not cliente:
+            return JsonResponse({'success': False, 'error': 'Cliente no encontrado'}, status=404)
+
+        ficha = cliente.ficha_360()
+        return JsonResponse({
+            'success': True,
+            'data': {
+                'cliente': {
+                    'id': cliente.id,
+                    'nombre': cliente.nombre,
+                    'telefono': cliente.telefono or '',
+                    'email': cliente.email or '',
+                    'documento_identidad': cliente.documento_identidad or '',
+                },
+                'ficha': ficha,
+            },
+        })
+    except Exception as e:
+        logger.error(f'Error in cliente_ficha: {e}', exc_info=True)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
 def operating_context(request):
     """
     Devuelve el Contexto Operativo de Aremko en markdown, para inyectar al
