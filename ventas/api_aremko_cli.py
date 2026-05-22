@@ -1518,6 +1518,284 @@ def bookings_monthly_by_family(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+# Combinaciones explícitas para bookings_family_combinations.
+# Cada reserva cae en EXACTAMENTE UNA por su set único de familias core.
+# 'otros' agrupa reservas sin familia core (set vacío o sólo 'otros').
+COMBO_KEYS_FAMILY = [
+    'solo_tinas',
+    'solo_masajes',
+    'solo_cabanas',
+    'tinas_masajes',
+    'cabanas_tinas',
+    'cabanas_masajes',
+    'cabanas_tinas_masajes',
+    'otros',
+]
+
+
+def _classify_family_combo(familias_core):
+    """Clasifica un set de familias ('tinas'/'masajes'/'cabanas') en una combo key.
+
+    familias_core es un set frozen con SOLO las familias core (sin 'otros').
+    """
+    if familias_core == {'tinas'}:
+        return 'solo_tinas'
+    if familias_core == {'masajes'}:
+        return 'solo_masajes'
+    if familias_core == {'cabanas'}:
+        return 'solo_cabanas'
+    if familias_core == {'tinas', 'masajes'}:
+        return 'tinas_masajes'
+    if familias_core == {'cabanas', 'tinas'}:
+        return 'cabanas_tinas'
+    if familias_core == {'cabanas', 'masajes'}:
+        return 'cabanas_masajes'
+    if familias_core == {'cabanas', 'tinas', 'masajes'}:
+        return 'cabanas_tinas_masajes'
+    # set vacío (reservas solo con servicios 'otros' o sin familia core)
+    return 'otros'
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def bookings_family_combinations(request):
+    """
+    Reservas agrupadas por combinación única de familias (mes a mes, descendente).
+
+    Para medir efectividad de bundling/cross-sell: ¿cuántas reservas son solo
+    tinas vs el pack completo cabaña+tina+masaje? Cada VentaReserva cae en
+    EXACTAMENTE UNA combinación (set único de familias core, ignorando 'otros').
+
+    Query params:
+        months (int, default 24, min 1, max 36): meses hacia atrás incluyendo
+            el actual. Si excede, retorna 400.
+
+    Diferencias con monthly-by-family:
+        - Agrupa por RESERVA (no por servicio).
+        - Orden DESCENDENTE (mes más reciente primero).
+        - Revenue por mes incluye todos los servicios de las reservas (incluso
+          'otros') para que el total cuadre con lo cobrado.
+
+    Response shape (HTTP 200):
+        {
+          "months": 24,
+          "first_month": "2024-06",      # mes más antiguo del rango
+          "last_month":  "2026-05",      # mes más reciente del rango
+          "order": "desc",
+          "data": [                       # descendente: data[0] = mes actual
+            {
+              "month": "2026-05",
+              "month_label": "may 2026",
+              "combinations": {
+                "solo_tinas":            {"count_reservas": N, "revenue": X},
+                "solo_masajes":          {...}, "solo_cabanas": {...},
+                "tinas_masajes":         {...}, "cabanas_tinas": {...},
+                "cabanas_masajes":       {...},
+                "cabanas_tinas_masajes": {...}, "otros": {...}
+              },
+              "total": {"count_reservas": N, "revenue": X}
+            },
+            ...
+          ],
+          "summary": {
+            "total_reservas": N,
+            "total_revenue":  X,
+            "share_by_combination": {
+              "solo_tinas": {"pct_reservas": 38.5, "pct_revenue": 35.2}, ...
+            },
+            "trend_slope_pct_by_combination": {
+              "solo_tinas": 12.5, ...   # % cambio último cuarto vs primer cuarto
+            }
+          }
+        }
+    """
+    try:
+        # --- 1) Parsear/validar 'months' ---
+        try:
+            months_count = int(request.GET.get('months', '24'))
+        except (TypeError, ValueError):
+            months_count = 24
+        if months_count > 36:
+            return JsonResponse({'error': 'máximo 36 meses'}, status=400)
+        if months_count < 1:
+            months_count = 1
+
+        from calendar import monthrange
+        from django.db import connection, transaction
+
+        # --- 2) Lista de meses (la armamos ascendente y luego invertimos al
+        #        serializar; así las operaciones cronológicas son naturales) ---
+        today = timezone.now().date()
+        last_y, last_m = today.year, today.month
+        months_list_asc = []
+        for offset in range(months_count - 1, -1, -1):
+            total = (last_y * 12 + (last_m - 1)) - offset
+            y = total // 12
+            m = (total % 12) + 1
+            first_day = _date_cls(y, m, 1)
+            last_day = _date_cls(y, m, monthrange(y, m)[1])
+            months_list_asc.append((y, m, first_day, last_day))
+
+        periodo_start = months_list_asc[0][2]
+        periodo_stop = months_list_asc[-1][3]
+
+        # --- 3) Una sola query: traer todos los ReservaServicio del rango con
+        #        venta_reserva_id + fecha + tipo + precio para clasificar en Python ---
+        reservas_data = {}  # vid -> {'y_m': (y,m), 'familias': set, 'revenue': float}
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                try:
+                    cursor.execute("SET LOCAL statement_timeout = '8s'")
+                except Exception:
+                    pass  # SQLite en tests no soporta esto.
+
+            servicios_qs = ReservaServicio.objects.filter(
+                venta_reserva__fecha_creacion__date__gte=periodo_start,
+                venta_reserva__fecha_creacion__date__lte=periodo_stop,
+            ).exclude(
+                venta_reserva__estado_pago='cancelado',
+            ).values(
+                'venta_reserva_id',
+                'venta_reserva__fecha_creacion',
+                'servicio__tipo_servicio',
+                'precio_unitario_venta',
+                'servicio__precio_base',
+                'cantidad_personas',
+            )
+
+            for row in servicios_qs:
+                vid = row['venta_reserva_id']
+                fc = row['venta_reserva__fecha_creacion']
+                if fc is None:
+                    continue
+                fc_date = fc.date() if hasattr(fc, 'date') else fc
+                y_m = (fc_date.year, fc_date.month)
+
+                tipo = row['servicio__tipo_servicio'] or 'otro'
+                if tipo not in FAMILY_KEYS_OUTPUT_MONTHLY:
+                    tipo = 'otro'
+                fam_plural = FAMILY_KEYS_OUTPUT_MONTHLY[tipo]  # tinas/masajes/cabanas/otros
+
+                # Coalesce manual + cantidad_personas (mismo criterio que by-family).
+                precio_unit = row['precio_unitario_venta']
+                if precio_unit is None:
+                    precio_unit = row['servicio__precio_base'] or 0
+                cantidad = row['cantidad_personas'] or 1
+                rev = float(precio_unit) * cantidad
+
+                if vid not in reservas_data:
+                    reservas_data[vid] = {
+                        'y_m': y_m,
+                        'familias': set(),
+                        'revenue': 0.0,
+                    }
+                # Sólo familias core entran al set de clasificación.
+                if fam_plural in ('tinas', 'masajes', 'cabanas'):
+                    reservas_data[vid]['familias'].add(fam_plural)
+                # Revenue suma TODOS los servicios (incluso 'otros') para que
+                # el total cuadre con lo cobrado.
+                reservas_data[vid]['revenue'] += rev
+
+        # --- 4) Clasificar cada reserva en una combo y bucketear por mes ---
+        # buckets[(y, m, combo_key)] = {'count_reservas': N, 'revenue': X}
+        buckets = {}
+        for vid, d in reservas_data.items():
+            y, m = d['y_m']
+            combo = _classify_family_combo(d['familias'])
+            key = (y, m, combo)
+            prev = buckets.get(key, {'count_reservas': 0, 'revenue': 0.0})
+            buckets[key] = {
+                'count_reservas': prev['count_reservas'] + 1,
+                'revenue': prev['revenue'] + d['revenue'],
+            }
+
+        # --- 5) Armar 'data' DESCENDENTE (mes actual primero) con todas las combos ---
+        months_list_desc = list(reversed(months_list_asc))
+        data = []
+        for (y, m, _fd, _ld) in months_list_desc:
+            combos_block = {}
+            total_count = 0
+            total_revenue = 0.0
+            for combo_key in COMBO_KEYS_FAMILY:
+                stat = buckets.get((y, m, combo_key), {'count_reservas': 0, 'revenue': 0.0})
+                combos_block[combo_key] = {
+                    'count_reservas': stat['count_reservas'],
+                    'revenue': round(stat['revenue'], 2),
+                }
+                total_count += stat['count_reservas']
+                total_revenue += stat['revenue']
+            data.append({
+                'month': f'{y:04d}-{m:02d}',
+                'month_label': f'{MES_LABELS_ES[m - 1]} {y}',
+                'combinations': combos_block,
+                'total': {
+                    'count_reservas': total_count,
+                    'revenue': round(total_revenue, 2),
+                },
+            })
+
+        # --- 6) summary: totales, share, trend_slope_pct por combinación ---
+        n = len(data)
+        quarter = max(1, n // 4)
+
+        total_reservas = sum(d['total']['count_reservas'] for d in data)
+        total_revenue = sum(d['total']['revenue'] for d in data)
+
+        share_by_combination = {}
+        trend_by_combination = {}
+        for combo_key in COMBO_KEYS_FAMILY:
+            # Series por mes (en orden descendente igual que data).
+            counts_desc = [d['combinations'][combo_key]['count_reservas'] for d in data]
+            revs_desc = [d['combinations'][combo_key]['revenue'] for d in data]
+
+            sum_count = sum(counts_desc)
+            sum_revenue = sum(revs_desc)
+            share_by_combination[combo_key] = {
+                'pct_reservas': round((sum_count / total_reservas) * 100, 1) if total_reservas else 0.0,
+                'pct_revenue': round((sum_revenue / total_revenue) * 100, 1) if total_revenue else 0.0,
+            }
+
+            # Trend: primer cuarto (más viejo) = revs_desc[-quarter:]
+            #        último cuarto (más nuevo) = revs_desc[:quarter]
+            avg_first_q = sum(revs_desc[-quarter:]) / quarter
+            avg_last_q = sum(revs_desc[:quarter]) / quarter
+            if avg_first_q == 0:
+                trend_by_combination[combo_key] = None
+            else:
+                trend_by_combination[combo_key] = round(
+                    ((avg_last_q - avg_first_q) / avg_first_q) * 100, 1
+                )
+
+        # first_month / last_month: rango cronológico (más viejo → más nuevo),
+        # independiente del orden de 'data'.
+        oldest_y, oldest_m = months_list_asc[0][0], months_list_asc[0][1]
+        newest_y, newest_m = months_list_asc[-1][0], months_list_asc[-1][1]
+
+        response = {
+            'months': months_count,
+            'first_month': f'{oldest_y:04d}-{oldest_m:02d}',
+            'last_month': f'{newest_y:04d}-{newest_m:02d}',
+            'order': 'desc',
+            'data': data,
+            'summary': {
+                'total_reservas': total_reservas,
+                'total_revenue': round(total_revenue, 2),
+                'share_by_combination': share_by_combination,
+                'trend_slope_pct_by_combination': trend_by_combination,
+            },
+        }
+
+        logger.info(
+            f"aremko-cli: family_combinations months={months_count} "
+            f"reservas_total={total_reservas}"
+        )
+        return JsonResponse(response)
+
+    except Exception as e:
+        logger.error(f"Error in bookings_family_combinations: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
 @csrf_exempt
 @require_http_methods(["GET"])
 def cliente_ficha(request, cliente_id):
