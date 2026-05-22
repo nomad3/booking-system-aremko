@@ -1295,6 +1295,229 @@ def bookings_weekly_breakdown(request):
         }, status=500)
 
 
+# Mapeo tipo_servicio (lowercase singular) → key de salida (lowercase plural sin acento)
+# Usado por bookings_monthly_by_family para serializar a un shape estable para gráficos.
+FAMILY_KEYS_OUTPUT_MONTHLY = {
+    'tina': 'tinas',
+    'masaje': 'masajes',
+    'cabana': 'cabanas',
+    'otro': 'otros',
+}
+
+# Labels cortos en español para etiquetas tipo "ene 2025".
+# Hard-coded para no depender de locale del sistema.
+MES_LABELS_ES = [
+    'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+    'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+]
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def bookings_monthly_by_family(request):
+    """
+    Tendencias mensuales por familia (6-36 meses hacia atrás).
+
+    Query params:
+        months (int, default 24, min 1, max 36): número de meses hacia atrás,
+            incluyendo el mes en curso. Si months > 36 devuelve 400.
+
+    Response shape (HTTP 200):
+        {
+          "months": 24,
+          "first_month": "2024-06",
+          "last_month": "2026-05",
+          "data": [
+            {
+              "month": "2024-06",
+              "month_label": "jun 2024",
+              "families": {
+                "tinas":   {"count": 88, "revenue": 6000000.0},
+                "masajes": {"count": 70, "revenue": 2800000.0},
+                "cabanas": {"count": 22, "revenue": 1980000.0},
+                "otros":   {"count": 5,  "revenue": 200000.0}
+              },
+              "total": {"count": 185, "revenue": 10980000.0}
+            },
+            ...
+          ],
+          "summary_by_family": {
+            "tinas":   {total_count, total_revenue, avg_monthly_revenue,
+                        best_month, worst_month, trend_slope_pct},
+            "masajes": {...}, "cabanas": {...}, "otros": {...}
+          }
+        }
+
+    Reglas:
+    - Revenue = Sum(Coalesce(precio_unitario_venta, servicio__precio_base) * cantidad_personas).
+    - Excluye ventas canceladas (estado_pago='cancelado').
+    - Meses sin datos se devuelven con count=0 y revenue=0 (continuidad en gráfico).
+    - Orden ascendente (mes más viejo primero) — gráfico se dibuja L→R.
+    - trend_slope_pct = ((avg_revenue_ultimo_cuarto - avg_revenue_primer_cuarto) /
+        avg_revenue_primer_cuarto) * 100, redondeado a 1 decimal. El "cuarto"
+        es max(1, N//4) meses. Si el primer cuarto suma 0, devuelve null.
+    - statement_timeout local 8000ms.
+    """
+    try:
+        # --- 1) Parsear y validar 'months' ---
+        try:
+            months_count = int(request.GET.get('months', '24'))
+        except (TypeError, ValueError):
+            months_count = 24
+        if months_count > 36:
+            return JsonResponse({'error': 'máximo 36 meses'}, status=400)
+        if months_count < 1:
+            months_count = 1
+
+        # Imports locales (consistente con otros endpoints de este módulo).
+        from calendar import monthrange
+        from django.db.models.functions import TruncMonth
+        from django.db import connection, transaction
+
+        # --- 2) Construir la lista de meses ascendente ---
+        # Último mes = mes en curso. Primer mes = (months_count - 1) meses antes.
+        today = timezone.now().date()
+        last_y, last_m = today.year, today.month
+        months_list = []
+        for offset in range(months_count - 1, -1, -1):
+            # Aritmética de meses en base 12 para evitar bugs en bordes de año.
+            total = (last_y * 12 + (last_m - 1)) - offset
+            y = total // 12
+            m = (total % 12) + 1
+            first_day = _date_cls(y, m, 1)
+            last_day = _date_cls(y, m, monthrange(y, m)[1])
+            months_list.append((y, m, first_day, last_day))
+
+        periodo_start = months_list[0][2]
+        periodo_stop = months_list[-1][3]
+
+        # --- 3) Query agrupada por (mes, tipo_servicio) ---
+        stats_by_month_tipo = {}
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                # Protección contra queries largas (rango de 36 meses).
+                try:
+                    cursor.execute("SET LOCAL statement_timeout = '8s'")
+                except Exception:
+                    pass  # SQLite en tests no soporta esto.
+
+            servicios_qs = ReservaServicio.objects.filter(
+                venta_reserva__fecha_creacion__date__gte=periodo_start,
+                venta_reserva__fecha_creacion__date__lte=periodo_stop,
+            ).exclude(
+                venta_reserva__estado_pago='cancelado',
+            ).annotate(
+                mes=TruncMonth('venta_reserva__fecha_creacion'),
+            ).values('mes', 'servicio__tipo_servicio').annotate(
+                count=Count('id'),
+                revenue=Sum(
+                    Coalesce(F('precio_unitario_venta'), F('servicio__precio_base'))
+                    * F('cantidad_personas')
+                ),
+            )
+
+            for row in servicios_qs:
+                mes_val = row['mes']
+                if hasattr(mes_val, 'date'):
+                    mes_val = mes_val.date()
+                if mes_val is None:
+                    continue
+                y_, m_ = mes_val.year, mes_val.month
+                tipo = row['servicio__tipo_servicio'] or 'otro'
+                # Cualquier tipo no mapeado cae en 'otro'.
+                if tipo not in FAMILY_KEYS_OUTPUT_MONTHLY:
+                    tipo = 'otro'
+                key = (y_, m_, tipo)
+                prev = stats_by_month_tipo.get(key, {'count': 0, 'revenue': 0.0})
+                stats_by_month_tipo[key] = {
+                    'count': prev['count'] + (row['count'] or 0),
+                    'revenue': prev['revenue'] + float(row['revenue'] or 0),
+                }
+
+        # --- 4) Armar 'data' ascendente con TODOS los meses (rellena ceros) ---
+        data = []
+        for (y, m, _fd, _ld) in months_list:
+            families_block = {}
+            total_count = 0
+            total_revenue = 0.0
+            for tipo_key, out_key in FAMILY_KEYS_OUTPUT_MONTHLY.items():
+                stat = stats_by_month_tipo.get((y, m, tipo_key), {'count': 0, 'revenue': 0.0})
+                count_f = stat['count']
+                rev_f = stat['revenue']
+                families_block[out_key] = {
+                    'count': count_f,
+                    'revenue': round(rev_f, 2),
+                }
+                total_count += count_f
+                total_revenue += rev_f
+            data.append({
+                'month': f'{y:04d}-{m:02d}',
+                'month_label': f'{MES_LABELS_ES[m - 1]} {y}',
+                'families': families_block,
+                'total': {
+                    'count': total_count,
+                    'revenue': round(total_revenue, 2),
+                },
+            })
+
+        # --- 5) summary_by_family con best/worst/trend ---
+        n = len(data)
+        quarter = max(1, n // 4)
+        summary_by_family = {}
+        for tipo_key, out_key in FAMILY_KEYS_OUTPUT_MONTHLY.items():
+            revenues = [d['families'][out_key]['revenue'] for d in data]
+            counts = [d['families'][out_key]['count'] for d in data]
+
+            total_count_fam = sum(counts)
+            total_revenue_fam = sum(revenues)
+            avg_monthly_revenue = total_revenue_fam / n if n else 0
+
+            # best/worst month por revenue (en caso de empate gana el más antiguo).
+            best_idx = max(range(n), key=lambda i: revenues[i]) if n else 0
+            worst_idx = min(range(n), key=lambda i: revenues[i]) if n else 0
+
+            # trend_slope_pct: primer cuarto vs último cuarto.
+            avg_first_q = sum(revenues[:quarter]) / quarter
+            avg_last_q = sum(revenues[-quarter:]) / quarter
+            if avg_first_q == 0:
+                trend_slope_pct = None
+            else:
+                trend_slope_pct = round(((avg_last_q - avg_first_q) / avg_first_q) * 100, 1)
+
+            summary_by_family[out_key] = {
+                'total_count': total_count_fam,
+                'total_revenue': round(total_revenue_fam, 2),
+                'avg_monthly_revenue': round(avg_monthly_revenue, 2),
+                'best_month': {
+                    'month': data[best_idx]['month'],
+                    'revenue': revenues[best_idx],
+                },
+                'worst_month': {
+                    'month': data[worst_idx]['month'],
+                    'revenue': revenues[worst_idx],
+                },
+                'trend_slope_pct': trend_slope_pct,
+            }
+
+        response = {
+            'months': months_count,
+            'first_month': data[0]['month'],
+            'last_month': data[-1]['month'],
+            'data': data,
+            'summary_by_family': summary_by_family,
+        }
+
+        logger.info(
+            f"aremko-cli: monthly_by_family months={months_count} "
+            f"first={response['first_month']} last={response['last_month']}"
+        )
+        return JsonResponse(response)
+
+    except Exception as e:
+        logger.error(f"Error in bookings_monthly_by_family: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
 @csrf_exempt
 @require_http_methods(["GET"])
 def cliente_ficha(request, cliente_id):

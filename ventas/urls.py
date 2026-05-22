@@ -336,6 +336,7 @@ urlpatterns = [
     path('api/aremko-cli/bookings/daily/', api_aremko_cli.bookings_daily, name='aremko_cli_bookings_daily'),
     path('api/aremko-cli/bookings/by-family/', api_aremko_cli.bookings_by_family, name='aremko_cli_bookings_by_family'),
     path('api/aremko-cli/bookings/by-family-mtd/', api_aremko_cli.bookings_by_family_mtd, name='aremko_cli_bookings_by_family_mtd'),
+    path('api/aremko-cli/bookings/monthly-by-family/', api_aremko_cli.bookings_monthly_by_family, name='aremko_cli_bookings_monthly_by_family'),
     path('api/aremko-cli/bookings/detalle/', api_aremko_cli.bookings_detalle, name='aremko_cli_bookings_detalle'),
     path('api/aremko-cli/operating-context/', api_aremko_cli.operating_context, name='aremko_cli_operating_context'),
 
