@@ -494,7 +494,16 @@ class Command(BaseCommand):
             precio_unit = row['precio_unitario_venta']
             if precio_unit is None:
                 precio_unit = row['servicio__precio_base'] or 0
-            cant = row['cantidad_personas'] or 1
+            # Sanity clamp: cantidad_personas debe estar en [1, 20] para un
+            # spa boutique. Valores fuera de ese rango son data legacy corrupta
+            # (probablemente precios mal guardados en este campo en imports
+            # antiguos: 50000, 20000, 1080000 son valores observados en BD).
+            # Tratar como 1 (default) para no contaminar avg/gasto.
+            cant_raw = row['cantidad_personas']
+            if cant_raw is None or cant_raw <= 0 or cant_raw > 20:
+                cant = 1
+            else:
+                cant = cant_raw
             rev = float(precio_unit) * cant
             agg['gasto_familia'][fam] += rev
 
