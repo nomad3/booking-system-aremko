@@ -463,7 +463,11 @@ class Command(BaseCommand):
             'gasto_familia': defaultdict(float),   # familia → revenue
             'servicios_distintos': set(),
             'proveedores_distintos': set(),
-            'cantidad_personas_lista': [],         # lista de cantidad_personas
+            # v4: MAX de cantidad_personas POR VENTA (no por ReservaServicio).
+            # Captura "con cuánta gente vino el cliente esa vez" en vez de
+            # promediar todos los servicios — una pareja que reserva tina
+            # compartida + 2 masajes individuales tiene max=2 (no 1.33).
+            'max_cantidad_por_venta': {},          # vid → max(cantidad_personas)
             'fechas_agendamiento': [],             # lista de fecha_agendamiento (date)
             'venta_familias': defaultdict(set),    # venta_id → set de familias core
         })
@@ -497,7 +501,11 @@ class Command(BaseCommand):
             agg['servicios_distintos'].add(row['servicio_id'])
             if row['proveedor_asignado_id']:
                 agg['proveedores_distintos'].add(row['proveedor_asignado_id'])
-            agg['cantidad_personas_lista'].append(cant)
+            # Quedarnos con el MAX por venta (vid). Refleja "con cuánta gente
+            # vino esa visita" sin diluirse por servicios individuales.
+            prev_max = agg['max_cantidad_por_venta'].get(vid, 0)
+            if cant > prev_max:
+                agg['max_cantidad_por_venta'][vid] = cant
 
             fa = row['fecha_agendamiento']
             if fa is not None:
@@ -567,7 +575,10 @@ class Command(BaseCommand):
                 pct_bundle = round(bundle / visitas * 100, 1) if visitas else 0.0
 
                 # Compañía
-                cant_list = agg['cantidad_personas_lista']
+                # v4: usar MAX por venta. Una pareja con tina compartida +
+                # masaje individual tiene max=2 (no 1.33). Lista tiene 1
+                # entrada por VentaReserva, no por ReservaServicio.
+                cant_list = list(agg['max_cantidad_por_venta'].values())
                 if cant_list:
                     avg_cant = round(sum(cant_list) / len(cant_list), 2)
                     total_c = len(cant_list)
