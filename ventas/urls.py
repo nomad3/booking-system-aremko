@@ -9,6 +9,7 @@ from .views import (
 from . import api # Keep api module import as is
 from . import views_comandas_cliente # Import comandas de clientes views
 from . import api_aremko_cli # Import aremko-cli API endpoints
+from .views import bandeja_whatsapp_views as ovc_views  # Operación Vuelta a Casa (Etapa 4)
 # from .admin import ServicioAdmin # This import seems unused here, commenting out
 
 app_name = 'ventas'  # Define the app namespace
@@ -353,6 +354,46 @@ urlpatterns = [
     path('api/aremko-cli/clientes/<int:cliente_id>/ficha/', api_aremko_cli.cliente_ficha, name='aremko_cli_cliente_ficha'),
     path('api/aremko-cli/clientes/taxonomia/segments/', api_aremko_cli.clientes_taxonomia_segments, name='aremko_cli_clientes_taxonomia_segments'),
     path('api/aremko-cli/clientes/taxonomia/cohort/', api_aremko_cli.clientes_taxonomia_cohort, name='aremko_cli_clientes_taxonomia_cohort'),
+
+    # === Operación Vuelta a Casa (Etapa 4 — Asistente Deborah) ===
+    # Todos require X-API-KEY header con AUTOMATION_API_KEY (auth en view).
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/siguiente/',
+        ovc_views.siguiente, name='ovc_bandeja_siguiente',
+    ),
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/<int:contacto_id>/marcar-enviado/',
+        ovc_views.marcar_enviado, name='ovc_marcar_enviado',
+    ),
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/<int:contacto_id>/marcar-omitido/',
+        ovc_views.marcar_omitido, name='ovc_marcar_omitido',
+    ),
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/<int:contacto_id>/marcar-no-aplica/',
+        ovc_views.marcar_no_aplica, name='ovc_marcar_no_aplica',
+    ),
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/<int:contacto_id>/registrar-respuesta/',
+        ovc_views.registrar_respuesta, name='ovc_registrar_respuesta',
+    ),
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/explicacion/<int:contacto_id>/',
+        ovc_views.explicacion, name='ovc_explicacion',
+    ),
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/resumen-dia/',
+        ovc_views.resumen_dia, name='ovc_resumen_dia',
+    ),
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/movimientos/',
+        ovc_views.movimientos, name='ovc_movimientos',
+    ),
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/scripts-estadisticas/',
+        ovc_views.scripts_estadisticas, name='ovc_scripts_estadisticas',
+    ),
+    # === END Operación Vuelta a Casa ===
     # === END AREMKO-CLI API ===
 
     # API Router (Keep this last if possible, or ensure specific paths come first)
