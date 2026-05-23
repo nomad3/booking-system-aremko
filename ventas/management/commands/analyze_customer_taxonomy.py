@@ -58,11 +58,16 @@ TIPO_TO_FAMILIA = {
 FAMILIAS_CORE = ('tinas', 'masajes', 'cabanas')
 
 # Ejes — ordenados para reportes deterministas.
-# v2: agregamos categoría 'Pre-sistema' (clientes solo en ServiceHistory)
-# para que no contaminen el resto de las distribuciones.
+# v3:
+# - Quitamos 'Perdido' del eje Valor: con el filtro de N meses,
+#   dias_desde_ultima ≤ N*30 ≈ 720, así que >730 nunca aplica. Dormido
+#   absorbe esa cola (definimos Dormido = dias > 365 sin tope).
+# - Agregamos 'Visitante Solo/Pareja/Grupal' al eje Contexto para capturar
+#   la señal de los 1-time/2-time buyers (avg_cantidad_personas), que en v2
+#   caían a 'Sin clasificar' por carecer de patrón temporal medible.
 EJE_VALOR_ORDEN = [
     'Campeón', 'Leal', 'Gran Gastador Ocasional', 'Regular',
-    'En Prueba', 'En Riesgo', 'Dormido', 'Perdido', 'Pre-sistema',
+    'En Prueba', 'En Riesgo', 'Dormido', 'Pre-sistema',
 ]
 EJE_ESTILO_ORDEN = [
     'Devoto del Masaje', 'Amante de las Tinas', 'Experiencia Completa',
@@ -70,7 +75,9 @@ EJE_ESTILO_ORDEN = [
 ]
 EJE_CONTEXTO_ORDEN = [
     'Pareja Romántica', 'Auto-cuidado Solo', 'Grupo', 'Familiar',
-    'Turista Estacional', 'Local Frecuente', 'Sin clasificar', 'N/A (pre-sistema)',
+    'Turista Estacional', 'Local Frecuente',
+    'Visitante Solo', 'Visitante Pareja', 'Visitante Grupal',
+    'Sin clasificar', 'N/A (pre-sistema)',
 ]
 
 # Combinaciones de interés para el reporte. Cada tupla: (valor, eje_axis, label).
@@ -149,12 +156,12 @@ def _classify_eje_valor(f: dict) -> str:
         return 'En Prueba'
     if visitas >= 2 and 180 < dias <= 365:
         return 'En Riesgo'
-    if 365 < dias <= 730:
+    # v3: Dormido absorbe lo que antes era Perdido (con el filtro de N meses,
+    # dias_desde_ultima ≤ N*30 ≈ 720, así que >730 nunca aplica).
+    if dias > 365:
         return 'Dormido'
-    if dias > 730:
-        return 'Perdido'
-    # Fallback razonable.
-    return 'En Riesgo' if visitas >= 1 else 'Perdido'
+    # Fallback (clientes con 1 visita en zona 90-180d sin gasto suficiente).
+    return 'En Riesgo' if visitas >= 1 else 'Pre-sistema'
 
 
 def _classify_eje_estilo(f: dict) -> str:
@@ -186,16 +193,28 @@ def _classify_eje_estilo(f: dict) -> str:
 
 
 def _classify_eje_contexto(f: dict) -> str:
-    """Clasifica patrón de compañía + timing (v2).
+    """Clasifica patrón de compañía + timing (v3).
 
-    Cambios v2:
-    - N/A (pre-sistema): separar SH-only del 'Sin clasificar' real.
-    - Turista Estacional: ahora requiere ≥3 visitas + ≥70% en una temporada,
-      para evitar el artefacto de clientes con 1 visita única.
-    - Familiar: banda ampliada [2.3, 2.9] (era [2.3, 2.7]).
-    - Local Frecuente: meses_relacion ≥ 6 (era 12) — era inalcanzable con
-      75% de clientes de 1 visita única.
-    - Grupo: ahora exige avg ≥ 2.9 (era 2.7) para no solaparse con Familiar.
+    Diseño v3 — distinguir PATRONES CONFIRMADOS (≥3 visitas, estadística real)
+    de SEÑALES ÚNICAS (1-2 visitas, capturamos solo cantidad_personas):
+
+    PATRONES CONFIRMADOS (requieren ≥3 visitas):
+    - Pareja Romántica: avg [1.8, 2.2] + pct_finde ≥ 50.
+    - Auto-cuidado Solo: avg ≤ 1.3 + pct_semana ≥ 40.
+    - Grupo: avg ≥ 2.9.
+    - Familiar: avg ∈ [2.3, 2.9).
+    - Local Frecuente: max_temp ≤ 50 + meses_rel ≥ 6.
+
+    TURISTA: ahora exige ≥2 visitas + ≥70% en una temporada (antes 3, era
+    demasiado estricto y solo capturaba 11 clientes).
+
+    VISITANTES (1-2 visitas, señal única por cantidad_personas):
+    - Visitante Solo: avg ≤ 1.3.
+    - Visitante Pareja: avg ∈ [1.8, 2.2].
+    - Visitante Grupal: avg ≥ 2.3.
+
+    Esto absorbe los ~1,937 'Sin clasificar' de v2 en cohortes accionables
+    sin afirmar patrones que no podemos medir con 1 sola visita.
     """
     # Sin sistema actual: no clasificamos.
     if f['total_visitas'] == 0:
@@ -212,23 +231,35 @@ def _classify_eje_contexto(f: dict) -> str:
     pct_otono = f['pct_otono']
     pct_invierno = f['pct_invierno']
     pct_primavera = f['pct_primavera']
+    max_temp = max(pct_verano, pct_otono, pct_invierno, pct_primavera)
     meses_rel = f['meses_relacion_actual']
 
-    if 1.8 <= avg <= 2.2 and pct_finde >= 50:
-        return 'Pareja Romántica'
-    if avg <= 1.3 and pct_semana >= 40:
-        return 'Auto-cuidado Solo'
-    if avg >= 2.9:
-        return 'Grupo'
-    if 2.3 <= avg < 2.9:
-        return 'Familiar'
-    # Turista Estacional: requiere señal real (3+ visitas) + concentración.
-    max_temp = max(pct_verano, pct_otono, pct_invierno, pct_primavera)
-    if visitas >= 3 and max_temp >= 70:
+    # 1) Patrones confirmados (≥3 visitas)
+    if visitas >= 3:
+        if 1.8 <= avg <= 2.2 and pct_finde >= 50:
+            return 'Pareja Romántica'
+        if avg <= 1.3 and pct_semana >= 40:
+            return 'Auto-cuidado Solo'
+        if avg >= 2.9:
+            return 'Grupo'
+        if 2.3 <= avg < 2.9:
+            return 'Familiar'
+        if max_temp <= 50 and meses_rel >= 6:
+            return 'Local Frecuente'
+
+    # 2) Turista Estacional: ≥2 visitas concentradas en una temporada
+    if visitas >= 2 and max_temp >= 70:
         return 'Turista Estacional'
-    # Local Frecuente: ninguna temporada >50% AND meses_relacion ≥ 6.
-    if max_temp <= 50 and meses_rel >= 6:
-        return 'Local Frecuente'
+
+    # 3) Visitantes por cantidad_personas (1-2 visitas, o ≥3 sin patrón anterior)
+    if avg <= 1.3:
+        return 'Visitante Solo'
+    if 1.8 <= avg <= 2.2:
+        return 'Visitante Pareja'
+    if avg >= 2.3:
+        return 'Visitante Grupal'
+
+    # 4) Residual (avg en 1.3-1.8 — zona intermedia rara)
     return 'Sin clasificar'
 
 
@@ -711,21 +742,36 @@ class Command(BaseCommand):
         estilo_counter = Counter(f['eje_estilo'] for f in features.values())
         contexto_counter = Counter(f['eje_contexto'] for f in features.values())
 
+        # Cohorte sistema actual = total - clientes Pre-sistema/N/A.
+        # Sirve para reportar "% sobre sistema actual" en cada tabla y facilitar
+        # la lectura de proporciones reales de la cohorte activa.
+        n_pre_sistema = valor_counter.get('Pre-sistema', 0)
+        n_sistema_actual = total - n_pre_sistema
+
+        # Categorías que pertenecen a la cohorte Pre-sistema (denominador
+        # distinto: % se calcula sobre el total, no sobre sistema actual).
+        PRE_SISTEMA_LABELS = {'Pre-sistema', 'N/A (pre-sistema)'}
+
         def _seccion_distribucion(title: str, counter: Counter, orden: List[str]):
             ap(f"## {title}")
             ap("")
-            ap("| Categoría | Clientes | % |")
-            ap("|---|---:|---:|")
+            ap("| Categoría | Clientes | % total | % sistema actual |")
+            ap("|---|---:|---:|---:|")
             for k in orden:
                 n = counter.get(k, 0)
-                pct = (n / total * 100) if total else 0
-                ap(f"| {k} | {n:,} | {pct:.1f}% |")
-            # cualquier categoría inesperada
+                pct_total = (n / total * 100) if total else 0
+                if k in PRE_SISTEMA_LABELS:
+                    pct_sa = '—'  # No aplica al cohorte sistema actual
+                else:
+                    pct_sa = f"{(n / n_sistema_actual * 100):.1f}%" if n_sistema_actual else '—'
+                ap(f"| {k} | {n:,} | {pct_total:.1f}% | {pct_sa} |")
+            # Categorías inesperadas (no debería haber, pero defensivo)
             otras = set(counter.keys()) - set(orden)
             for k in sorted(otras):
                 n = counter[k]
-                pct = (n / total * 100) if total else 0
-                ap(f"| _{k}_ | {n:,} | {pct:.1f}% |")
+                pct_total = (n / total * 100) if total else 0
+                pct_sa = f"{(n / n_sistema_actual * 100):.1f}%" if n_sistema_actual else '—'
+                ap(f"| _{k}_ | {n:,} | {pct_total:.1f}% | {pct_sa} |")
             ap("")
 
         _seccion_distribucion('Eje Valor', valor_counter, EJE_VALOR_ORDEN)
@@ -837,31 +883,55 @@ class Command(BaseCommand):
         ap("")
 
         # ----- Alertas automáticas -----
+        # v3: las alertas se calculan sobre el cohorte SISTEMA ACTUAL (no
+        # sobre el total), porque la categoría 'Pre-sistema' siempre va a
+        # disparar la alerta de ">50% gruesa" y no es información útil.
+        # Además filtramos las combinaciones imposibles por diseño:
+        #     - Pre-sistema × <cualquier estilo distinto de N/A> → siempre 0
+        #     - <cualquier valor distinto de Pre-sistema> × N/A → siempre 0
         ap("## Alertas automáticas")
+        ap("> Calculadas sobre el cohorte sistema actual "
+           f"({n_sistema_actual:,} clientes), no sobre el total.")
         ap("")
         alertas: List[str] = []
 
         def _check_distrib(counter: Counter, eje: str):
             for cat, n in counter.items():
-                pct = (n / total * 100) if total else 0
+                # No alertamos sobre las categorías de la cohorte pre-sistema.
+                if cat in PRE_SISTEMA_LABELS:
+                    continue
+                denom = n_sistema_actual
+                if not denom:
+                    continue
+                pct = (n / denom * 100)
                 if pct > 50:
                     alertas.append(
-                        f"⚠️ **{eje} → {cat}** representa {pct:.1f}% (>50%): "
-                        f"categoría muy gruesa, considerar subdividir."
+                        f"⚠️ **{eje} → {cat}** representa {pct:.1f}% del sistema actual "
+                        f"(>50%): categoría muy gruesa, considerar subdividir."
                     )
                 if 0 < pct < 1:
                     alertas.append(
-                        f"⚠️ **{eje} → {cat}** representa {pct:.2f}% (<1%): "
-                        f"categoría muy fina, considerar fusionar."
+                        f"⚠️ **{eje} → {cat}** representa {pct:.2f}% del sistema actual "
+                        f"(<1%): categoría muy fina, considerar fusionar."
                     )
 
         _check_distrib(valor_counter, 'Eje Valor')
         _check_distrib(estilo_counter, 'Eje Estilo')
         _check_distrib(contexto_counter, 'Eje Contexto')
 
-        # Celdas vacías en Valor × Estilo
+        # Celdas vacías en Valor × Estilo (filtrando combinaciones imposibles)
+        def _combo_es_relevante(v: str, e: str) -> bool:
+            # Pre-sistema sólo se cruza con N/A (pre-sistema) y viceversa.
+            if v == 'Pre-sistema' and e != 'N/A (pre-sistema)':
+                return False
+            if e == 'N/A (pre-sistema)' and v != 'Pre-sistema':
+                return False
+            return True
+
         for v in EJE_VALOR_ORDEN:
             for e in EJE_ESTILO_ORDEN:
+                if not _combo_es_relevante(v, e):
+                    continue
                 if matriz_vs.get((v, e), 0) == 0:
                     alertas.append(
                         f"⚠️ Combinación **{v} × {e}** vacía: revisar definición."
