@@ -351,6 +351,8 @@ urlpatterns = [
     path('api/aremko-cli/bookings/weekly-breakdown/', api_aremko_cli.bookings_weekly_breakdown, name='aremko_cli_bookings_weekly_breakdown'),
     path('api/aremko-cli/clients/stats/', api_aremko_cli.clients_stats, name='aremko_cli_clients_stats'),
     path('api/aremko-cli/clientes/<int:cliente_id>/ficha/', api_aremko_cli.cliente_ficha, name='aremko_cli_cliente_ficha'),
+    path('api/aremko-cli/clientes/taxonomia/segments/', api_aremko_cli.clientes_taxonomia_segments, name='aremko_cli_clientes_taxonomia_segments'),
+    path('api/aremko-cli/clientes/taxonomia/cohort/', api_aremko_cli.clientes_taxonomia_cohort, name='aremko_cli_clientes_taxonomia_cohort'),
     # === END AREMKO-CLI API ===
 
     # API Router (Keep this last if possible, or ensure specific paths come first)

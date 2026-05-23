@@ -1896,6 +1896,362 @@ def operating_context(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+# ============================================================================
+# TAXONOMÍA DE CLIENTES (3 ejes: Valor + Estilo + Contexto)
+#
+# Consume la tabla ventas_clientetaxonomia poblada por el comando
+# recalcular_taxonomia_clientes (cron nocturno). Dos endpoints:
+#   - /clientes/taxonomia/segments/ → distribución agregada + matrices cruzadas
+#   - /clientes/taxonomia/cohort/   → drill-down por filtros, lista de IDs
+# ============================================================================
+
+# Orden canónico para reportes deterministas (idéntico al comando exploratorio).
+TAXO_EJE_VALOR_ORDEN = [
+    'Campeón', 'Leal', 'Gran Gastador Ocasional', 'Regular',
+    'En Prueba', 'En Riesgo', 'Dormido', 'Pre-sistema',
+]
+TAXO_EJE_ESTILO_ORDEN = [
+    'Devoto del Masaje', 'Amante de las Tinas', 'Experiencia Completa',
+    'Buscador de Alojamiento', 'Probador Esporádico', 'N/A (pre-sistema)',
+]
+TAXO_EJE_CONTEXTO_ORDEN = [
+    'Pareja Romántica', 'Auto-cuidado Solo', 'Grupo', 'Familiar',
+    'Turista Estacional', 'Local Frecuente',
+    'Visitante Solo', 'Visitante Pareja', 'Visitante Grupal',
+    'Sin clasificar', 'N/A (pre-sistema)',
+]
+TAXO_PRE_SISTEMA_LABELS = {'Pre-sistema', 'N/A (pre-sistema)'}
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def clientes_taxonomia_segments(request):
+    """
+    Distribución agregada de la taxonomía multidimensional.
+
+    Devuelve totales por categoría en cada uno de los 3 ejes + matrices
+    cruzadas (Valor × Estilo y Estilo × Contexto) para visualización en
+    dashboards. No expone PII — solo conteos.
+
+    Response shape (HTTP 200):
+        {
+          "total_clientes": 14228,
+          "n_sistema_actual": 3897,
+          "n_pre_sistema": 10331,
+          "ultima_actualizacion": "2026-05-23T03:18:24+00:00",
+          "meses_ventana": 24,
+          "eje_valor": [
+            {"label": "Campeón", "count": 17,
+             "pct_total": 0.1, "pct_sistema_actual": 0.4},
+            ...
+          ],
+          "eje_estilo":   [...],
+          "eje_contexto": [...],
+          "matriz_valor_x_estilo": [
+            {"valor": "Campeón", "estilo": "Devoto del Masaje", "count": 5},
+            ...   # solo celdas con count > 0
+          ],
+          "matriz_estilo_x_contexto": [
+            {"estilo": "Amante de las Tinas", "contexto": "Visitante Pareja", "count": 1065},
+            ...
+          ]
+        }
+    """
+    from .models import ClienteTaxonomia
+    from django.db.models import Max
+    try:
+        from django.db import connection, transaction
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                try:
+                    cursor.execute("SET LOCAL statement_timeout = '8s'")
+                except Exception:
+                    pass
+
+            # Totales
+            total = ClienteTaxonomia.objects.count()
+            n_pre = ClienteTaxonomia.objects.filter(eje_valor='Pre-sistema').count()
+            n_sa = total - n_pre
+
+            # Última actualización
+            ultima = ClienteTaxonomia.objects.aggregate(m=Max('calculado_en'))['m']
+            ultima_iso = ultima.isoformat() if ultima else None
+
+            # meses_ventana (asumimos un solo valor, tomamos el más común)
+            meses_ventana = (
+                ClienteTaxonomia.objects.values_list('meses_ventana', flat=True)
+                .first() or 24
+            )
+
+            def _build_distribucion(field: str, orden: list) -> list:
+                rows = (
+                    ClienteTaxonomia.objects.values(field)
+                    .annotate(count=Count('id'))
+                )
+                count_by_label = {r[field]: r['count'] for r in rows}
+                result = []
+                # En orden canónico
+                for label in orden:
+                    n = count_by_label.get(label, 0)
+                    pct_total = round(n / total * 100, 1) if total else 0.0
+                    if label in TAXO_PRE_SISTEMA_LABELS:
+                        pct_sa = None  # no aplica
+                    else:
+                        pct_sa = round(n / n_sa * 100, 1) if n_sa else 0.0
+                    result.append({
+                        'label': label,
+                        'count': n,
+                        'pct_total': pct_total,
+                        'pct_sistema_actual': pct_sa,
+                    })
+                # Categorías inesperadas (defensivo)
+                for label in set(count_by_label) - set(orden):
+                    n = count_by_label[label]
+                    pct_total = round(n / total * 100, 1) if total else 0.0
+                    pct_sa = round(n / n_sa * 100, 1) if n_sa else 0.0
+                    result.append({
+                        'label': label,
+                        'count': n,
+                        'pct_total': pct_total,
+                        'pct_sistema_actual': pct_sa,
+                    })
+                return result
+
+            eje_valor = _build_distribucion('eje_valor', TAXO_EJE_VALOR_ORDEN)
+            eje_estilo = _build_distribucion('eje_estilo', TAXO_EJE_ESTILO_ORDEN)
+            eje_contexto = _build_distribucion('eje_contexto', TAXO_EJE_CONTEXTO_ORDEN)
+
+            # Matriz Valor × Estilo
+            matriz_vs_rows = (
+                ClienteTaxonomia.objects.values('eje_valor', 'eje_estilo')
+                .annotate(count=Count('id'))
+                .order_by('eje_valor', 'eje_estilo')
+            )
+            matriz_vs = [
+                {'valor': r['eje_valor'], 'estilo': r['eje_estilo'], 'count': r['count']}
+                for r in matriz_vs_rows if r['count'] > 0
+            ]
+
+            # Matriz Estilo × Contexto
+            matriz_ec_rows = (
+                ClienteTaxonomia.objects.values('eje_estilo', 'eje_contexto')
+                .annotate(count=Count('id'))
+                .order_by('eje_estilo', 'eje_contexto')
+            )
+            matriz_ec = [
+                {'estilo': r['eje_estilo'], 'contexto': r['eje_contexto'], 'count': r['count']}
+                for r in matriz_ec_rows if r['count'] > 0
+            ]
+
+        logger.info(
+            f"aremko-cli: taxonomia_segments total={total} sistema_actual={n_sa}"
+        )
+        return JsonResponse({
+            'total_clientes': total,
+            'n_sistema_actual': n_sa,
+            'n_pre_sistema': n_pre,
+            'ultima_actualizacion': ultima_iso,
+            'meses_ventana': meses_ventana,
+            'eje_valor': eje_valor,
+            'eje_estilo': eje_estilo,
+            'eje_contexto': eje_contexto,
+            'matriz_valor_x_estilo': matriz_vs,
+            'matriz_estilo_x_contexto': matriz_ec,
+        })
+
+    except Exception as e:
+        logger.error(f"Error in clientes_taxonomia_segments: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def clientes_taxonomia_cohort(request):
+    """
+    Drill-down a una cohorte específica filtrando por uno o más ejes.
+
+    Query params (al menos UNO obligatorio):
+        eje_valor    (ej: 'Campeón')
+        eje_estilo   (ej: 'Devoto del Masaje')
+        eje_contexto (ej: 'Visitante Pareja')
+        limit        (default 100, max 500)
+        order_by     (default 'gasto_total_desc'). Opciones:
+                     'gasto_total_desc', 'gasto_total_asc',
+                     'visitas_desc', 'antiguedad_desc', 'recency_asc'
+
+    Si no se pasa ningún filtro de eje, retorna 400.
+
+    Response shape (HTTP 200):
+        {
+          "filtros": {"eje_valor": "Campeón", "eje_estilo": "Devoto del Masaje"},
+          "count_total": 5,
+          "limit": 100,
+          "stats": {
+            "gasto_total_sum": 3570000,
+            "gasto_total_avg": 714000,
+            "total_visitas_avg": 14.6,
+            "ticket_promedio_avg": 71000,
+            "antiguedad_meses_avg": 30
+          },
+          "clientes": [
+            {
+              "cliente_id": 4,
+              "eje_valor": "Campeón",
+              "eje_estilo": "Devoto del Masaje",
+              "eje_contexto": "Visitante Pareja",
+              "total_visitas": 48,
+              "gasto_total": 1920000,
+              "ticket_promedio": 40000,
+              "ultima_visita": "2026-05-15",
+              "dias_desde_ultima_visita": 8,
+              "antiguedad_meses": 66,
+              "tiene_historial_pre_sistema": true,
+              "avg_cantidad_personas": 1.0,
+              "pct_finde": 35.4,
+              "pct_reservas_bundle": 12.5
+            },
+            ...
+          ]
+        }
+
+    No expone PII (nombre/teléfono/email). Solo cliente_id + features.
+    Para acciones sobre los clientes (campañas SMS, etc.) usar el admin
+    Django con el ID retornado.
+    """
+    from .models import ClienteTaxonomia
+    from django.db.models import Avg, Sum
+    try:
+        eje_valor = (request.GET.get('eje_valor') or '').strip() or None
+        eje_estilo = (request.GET.get('eje_estilo') or '').strip() or None
+        eje_contexto = (request.GET.get('eje_contexto') or '').strip() or None
+
+        # Validación: al menos un filtro debe venir
+        if not any([eje_valor, eje_estilo, eje_contexto]):
+            return JsonResponse({
+                'error': 'Debes pasar al menos uno de: eje_valor, eje_estilo, eje_contexto'
+            }, status=400)
+
+        # Validar valores contra el orden canónico (defensivo)
+        if eje_valor and eje_valor not in TAXO_EJE_VALOR_ORDEN:
+            return JsonResponse({
+                'error': f"eje_valor '{eje_valor}' no es válido. "
+                         f"Opciones: {TAXO_EJE_VALOR_ORDEN}"
+            }, status=400)
+        if eje_estilo and eje_estilo not in TAXO_EJE_ESTILO_ORDEN:
+            return JsonResponse({
+                'error': f"eje_estilo '{eje_estilo}' no es válido. "
+                         f"Opciones: {TAXO_EJE_ESTILO_ORDEN}"
+            }, status=400)
+        if eje_contexto and eje_contexto not in TAXO_EJE_CONTEXTO_ORDEN:
+            return JsonResponse({
+                'error': f"eje_contexto '{eje_contexto}' no es válido. "
+                         f"Opciones: {TAXO_EJE_CONTEXTO_ORDEN}"
+            }, status=400)
+
+        # Límite
+        try:
+            limit = int(request.GET.get('limit', '100'))
+        except (TypeError, ValueError):
+            limit = 100
+        limit = max(1, min(500, limit))
+
+        # Orden
+        order_by_param = (request.GET.get('order_by') or 'gasto_total_desc').strip()
+        ORDER_MAP = {
+            'gasto_total_desc': '-gasto_total',
+            'gasto_total_asc': 'gasto_total',
+            'visitas_desc': '-total_visitas',
+            'antiguedad_desc': '-antiguedad_meses',
+            'recency_asc': 'dias_desde_ultima_visita',  # más reciente primero
+        }
+        order_field = ORDER_MAP.get(order_by_param, '-gasto_total')
+
+        # Filtros
+        filtros_dict = {}
+        qs = ClienteTaxonomia.objects.all()
+        if eje_valor:
+            qs = qs.filter(eje_valor=eje_valor)
+            filtros_dict['eje_valor'] = eje_valor
+        if eje_estilo:
+            qs = qs.filter(eje_estilo=eje_estilo)
+            filtros_dict['eje_estilo'] = eje_estilo
+        if eje_contexto:
+            qs = qs.filter(eje_contexto=eje_contexto)
+            filtros_dict['eje_contexto'] = eje_contexto
+
+        from django.db import connection, transaction
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                try:
+                    cursor.execute("SET LOCAL statement_timeout = '8s'")
+                except Exception:
+                    pass
+
+            count_total = qs.count()
+
+            # Stats agregados
+            agg = qs.aggregate(
+                gasto_total_sum=Sum('gasto_total'),
+                gasto_total_avg=Avg('gasto_total'),
+                visitas_avg=Avg('total_visitas'),
+                ticket_avg=Avg('ticket_promedio'),
+                antiguedad_avg=Avg('antiguedad_meses'),
+            )
+            stats = {
+                'gasto_total_sum': int(agg['gasto_total_sum'] or 0),
+                'gasto_total_avg': round(agg['gasto_total_avg'] or 0, 0),
+                'total_visitas_avg': round(agg['visitas_avg'] or 0, 1),
+                'ticket_promedio_avg': round(agg['ticket_avg'] or 0, 0),
+                'antiguedad_meses_avg': round(agg['antiguedad_avg'] or 0, 1),
+            }
+
+            # Lista limitada
+            rows = list(qs.order_by(order_field).values(
+                'cliente_id',
+                'eje_valor', 'eje_estilo', 'eje_contexto',
+                'total_visitas', 'gasto_total', 'ticket_promedio',
+                'ultima_visita', 'dias_desde_ultima_visita',
+                'antiguedad_meses', 'tiene_historial_pre_sistema',
+                'avg_cantidad_personas', 'pct_finde', 'pct_reservas_bundle',
+            )[:limit])
+
+            clientes = []
+            for r in rows:
+                clientes.append({
+                    'cliente_id': r['cliente_id'],
+                    'eje_valor': r['eje_valor'],
+                    'eje_estilo': r['eje_estilo'],
+                    'eje_contexto': r['eje_contexto'],
+                    'total_visitas': r['total_visitas'],
+                    'gasto_total': r['gasto_total'],
+                    'ticket_promedio': r['ticket_promedio'],
+                    'ultima_visita': r['ultima_visita'].isoformat() if r['ultima_visita'] else None,
+                    'dias_desde_ultima_visita': r['dias_desde_ultima_visita'],
+                    'antiguedad_meses': r['antiguedad_meses'],
+                    'tiene_historial_pre_sistema': r['tiene_historial_pre_sistema'],
+                    'avg_cantidad_personas': r['avg_cantidad_personas'],
+                    'pct_finde': r['pct_finde'],
+                    'pct_reservas_bundle': r['pct_reservas_bundle'],
+                })
+
+        logger.info(
+            f"aremko-cli: taxonomia_cohort filtros={filtros_dict} "
+            f"count={count_total} returned={len(clientes)}"
+        )
+        return JsonResponse({
+            'filtros': filtros_dict,
+            'count_total': count_total,
+            'limit': limit,
+            'order_by': order_by_param,
+            'stats': stats,
+            'clientes': clientes,
+        })
+
+    except Exception as e:
+        logger.error(f"Error in clientes_taxonomia_cohort: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
 @csrf_exempt
 @require_http_methods(["GET"])
 def health_check(request):
