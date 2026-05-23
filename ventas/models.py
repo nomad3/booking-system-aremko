@@ -2743,6 +2743,135 @@ class ServiceHistory(models.Model):
 
 
 # ============================================================================
+# TAXONOMÍA MULTIDIMENSIONAL DE CLIENTES
+# ============================================================================
+
+class ClienteTaxonomia(models.Model):
+    """
+    Etiquetas multidimensionales + snapshot de features por cliente.
+
+    Las 3 etiquetas (Valor + Estilo + Contexto) clasifican al cliente en una
+    matriz multidimensional usada por dashboards, mini-ficha admin y campañas
+    de marketing dirigidas. El snapshot evita recalcular en cada consulta.
+
+    Se llena/refresca con el management command `recalcular_taxonomia_clientes`
+    (Paso 2). Un cron nocturno (Paso 5) recalcula los clientes que tuvieron
+    cambios en las últimas 24h.
+
+    Diseño:
+    - OneToOne con Cliente: 1 cliente = máximo 1 fila.
+    - Las labels se guardan en español (mismo formato que el comando
+      exploratorio v4) para compatibilidad directa con el CSV/MD.
+    - meses_ventana = 24 hard-coded por ahora (futura ampliación: snapshots
+      paralelos a 12m si se necesita).
+    """
+
+    # ----- Etiquetas (las 3 dimensiones) -----
+    EJE_VALOR_CHOICES = [
+        ('Campeón', 'Campeón'),
+        ('Leal', 'Leal'),
+        ('Gran Gastador Ocasional', 'Gran Gastador Ocasional'),
+        ('Regular', 'Regular'),
+        ('En Prueba', 'En Prueba'),
+        ('En Riesgo', 'En Riesgo'),
+        ('Dormido', 'Dormido'),
+        ('Pre-sistema', 'Pre-sistema'),
+    ]
+    EJE_ESTILO_CHOICES = [
+        ('Devoto del Masaje', 'Devoto del Masaje'),
+        ('Amante de las Tinas', 'Amante de las Tinas'),
+        ('Experiencia Completa', 'Experiencia Completa'),
+        ('Buscador de Alojamiento', 'Buscador de Alojamiento'),
+        ('Probador Esporádico', 'Probador Esporádico'),
+        ('N/A (pre-sistema)', 'N/A (pre-sistema)'),
+    ]
+    EJE_CONTEXTO_CHOICES = [
+        ('Pareja Romántica', 'Pareja Romántica'),
+        ('Auto-cuidado Solo', 'Auto-cuidado Solo'),
+        ('Grupo', 'Grupo'),
+        ('Familiar', 'Familiar'),
+        ('Turista Estacional', 'Turista Estacional'),
+        ('Local Frecuente', 'Local Frecuente'),
+        ('Visitante Solo', 'Visitante Solo'),
+        ('Visitante Pareja', 'Visitante Pareja'),
+        ('Visitante Grupal', 'Visitante Grupal'),
+        ('Sin clasificar', 'Sin clasificar'),
+        ('N/A (pre-sistema)', 'N/A (pre-sistema)'),
+    ]
+
+    cliente = models.OneToOneField(
+        Cliente,
+        on_delete=models.CASCADE,
+        related_name='taxonomia',
+        primary_key=False,
+    )
+    eje_valor = models.CharField(max_length=40, choices=EJE_VALOR_CHOICES, db_index=True)
+    eje_estilo = models.CharField(max_length=40, choices=EJE_ESTILO_CHOICES, db_index=True)
+    eje_contexto = models.CharField(max_length=40, choices=EJE_CONTEXTO_CHOICES, db_index=True)
+
+    # ----- Metadatos del cálculo -----
+    meses_ventana = models.PositiveSmallIntegerField(
+        default=24,
+        help_text="Horizonte (en meses) usado para computar este snapshot."
+    )
+    calculado_en = models.DateTimeField(
+        auto_now=True, db_index=True,
+        help_text="Última vez que se recalculó este snapshot."
+    )
+
+    # ----- Snapshot sistema actual -----
+    total_visitas = models.IntegerField(default=0)
+    gasto_total = models.IntegerField(default=0, help_text="CLP")
+    ticket_promedio = models.IntegerField(default=0, help_text="CLP")
+    primera_visita_actual = models.DateField(null=True, blank=True)
+    ultima_visita = models.DateField(null=True, blank=True)
+    dias_desde_ultima_visita = models.IntegerField(null=True, blank=True)
+    dias_entre_visitas_avg = models.FloatField(null=True, blank=True)
+    meses_relacion_actual = models.FloatField(default=0)
+
+    # ----- Mix de servicios -----
+    pct_tinas = models.FloatField(default=0)
+    pct_masajes = models.FloatField(default=0)
+    pct_cabanas = models.FloatField(default=0)
+    pct_otros = models.FloatField(default=0)
+    gasto_tinas = models.IntegerField(default=0, help_text="CLP")
+    gasto_masajes = models.IntegerField(default=0, help_text="CLP")
+    gasto_cabanas = models.IntegerField(default=0, help_text="CLP")
+    gasto_otros = models.IntegerField(default=0, help_text="CLP")
+
+    # ----- Patrón compañía -----
+    avg_cantidad_personas = models.FloatField(null=True, blank=True)
+    pct_reservas_bundle = models.FloatField(default=0)
+    count_reservas_bundle = models.IntegerField(default=0)
+
+    # ----- Patrón temporal -----
+    pct_finde = models.FloatField(default=0)
+    pct_verano = models.FloatField(default=0)
+    pct_otono = models.FloatField(default=0)
+    pct_invierno = models.FloatField(default=0)
+    pct_primavera = models.FloatField(default=0)
+
+    # ----- Historial pre-sistema -----
+    tiene_historial_pre_sistema = models.BooleanField(default=False)
+    visitas_history_count = models.IntegerField(default=0)
+    primera_visita_global = models.DateField(null=True, blank=True)
+    antiguedad_meses = models.IntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Taxonomía de Cliente"
+        verbose_name_plural = "Taxonomías de Clientes"
+        indexes = [
+            # Cruces frecuentes para filtrado de cohortes
+            models.Index(fields=['eje_valor', 'eje_estilo'], name='idx_taxo_val_est'),
+            models.Index(fields=['eje_valor', 'eje_contexto'], name='idx_taxo_val_ctx'),
+            models.Index(fields=['eje_estilo', 'eje_contexto'], name='idx_taxo_est_ctx'),
+        ]
+
+    def __str__(self):
+        return f"Taxonomía de {self.cliente_id}: {self.eje_valor} × {self.eje_estilo} × {self.eje_contexto}"
+
+
+# ============================================================================
 # MODELOS CRM - ASUNTOS DE EMAIL VARIABLES
 # ============================================================================
 
