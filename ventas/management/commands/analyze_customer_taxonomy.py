@@ -58,29 +58,34 @@ TIPO_TO_FAMILIA = {
 FAMILIAS_CORE = ('tinas', 'masajes', 'cabanas')
 
 # Ejes — ordenados para reportes deterministas.
+# v2: agregamos categoría 'Pre-sistema' (clientes solo en ServiceHistory)
+# para que no contaminen el resto de las distribuciones.
 EJE_VALOR_ORDEN = [
     'Campeón', 'Leal', 'Gran Gastador Ocasional', 'Regular',
-    'En Prueba', 'En Riesgo', 'Dormido', 'Perdido',
+    'En Prueba', 'En Riesgo', 'Dormido', 'Perdido', 'Pre-sistema',
 ]
 EJE_ESTILO_ORDEN = [
     'Devoto del Masaje', 'Amante de las Tinas', 'Experiencia Completa',
-    'Buscador de Alojamiento', 'Probador Esporádico',
+    'Buscador de Alojamiento', 'Probador Esporádico', 'N/A (pre-sistema)',
 ]
 EJE_CONTEXTO_ORDEN = [
     'Pareja Romántica', 'Auto-cuidado Solo', 'Grupo', 'Familiar',
-    'Turista Estacional', 'Local Frecuente', 'Sin clasificar',
+    'Turista Estacional', 'Local Frecuente', 'Sin clasificar', 'N/A (pre-sistema)',
 ]
 
-# Combinaciones de interés para el reporte (Valor × Estilo / Valor × Contexto).
+# Combinaciones de interés para el reporte. Cada tupla: (valor, eje_axis, label).
+# eje_axis indica si label es de Estilo o Contexto.
+# Fix bug v1: antes todas se comparaban contra eje_estilo, lo que hacía vacías
+# las combinaciones que en realidad eran Valor × Contexto.
 TOP_COMBOS_INTERES = [
-    ('Campeón', 'Devoto del Masaje'),
-    ('Campeón', 'Amante de las Tinas'),
-    ('Campeón', 'Experiencia Completa'),
-    ('Gran Gastador Ocasional', 'Experiencia Completa'),
-    ('Leal', 'Pareja Romántica'),
-    ('Regular', 'Devoto del Masaje'),
-    ('En Riesgo', 'Amante de las Tinas'),
-    ('Dormido', 'Pareja Romántica'),
+    ('Campeón', 'estilo', 'Devoto del Masaje'),
+    ('Campeón', 'estilo', 'Amante de las Tinas'),
+    ('Campeón', 'estilo', 'Experiencia Completa'),
+    ('Gran Gastador Ocasional', 'estilo', 'Experiencia Completa'),
+    ('Leal', 'contexto', 'Pareja Romántica'),
+    ('Regular', 'estilo', 'Devoto del Masaje'),
+    ('En Riesgo', 'estilo', 'Amante de las Tinas'),
+    ('Dormido', 'contexto', 'Pareja Romántica'),
 ]
 
 
@@ -114,36 +119,56 @@ def _season_for_month(m: int) -> str:
 
 
 def _classify_eje_valor(f: dict) -> str:
-    """Aplica las reglas de RFM tentativas del brief."""
+    """Aplica las reglas RFM (v2). Umbrales relajados tras la primera corrida
+    porque el 75% de los clientes activos visitan 1 sola vez en 24 meses.
+
+    Cambios v2:
+    - Pre-sistema (nuevo): clientes solo en ServiceHistory (sin sistema actual).
+    - Campeón: visitas≥5 (era 8), gasto≥300K (era 500K).
+    - Leal: visitas≥4 (era 6), dias≤180 (era 120).
+    - Regular: visitas≥2 (era 3).
+    """
     visitas = f['total_visitas']
     dias = f['dias_desde_ultima_visita']
     gasto = f['gasto_total']
 
-    # Cliente sin reservas en sistema actual → Perdido por definición.
+    # NUEVO: cliente sin reservas en sistema actual → Pre-sistema
+    # (no entra en la lógica RFM porque no tenemos señal homogénea).
     if visitas == 0 or dias is None:
-        return 'Perdido'
+        return 'Pre-sistema'
 
-    if visitas >= 8 and dias <= 90 and gasto >= 500_000:
+    if visitas >= 5 and dias <= 90 and gasto >= 300_000:
         return 'Campeón'
-    if visitas >= 6 and dias <= 120:
+    if visitas >= 4 and dias <= 180:
         return 'Leal'
     if gasto >= 500_000 and visitas <= 4:
         return 'Gran Gastador Ocasional'
-    if visitas >= 3 and dias <= 180:
+    if visitas >= 2 and dias <= 180:
         return 'Regular'
     if visitas <= 2 and dias <= 90:
         return 'En Prueba'
-    if visitas >= 3 and 180 < dias <= 365:
+    if visitas >= 2 and 180 < dias <= 365:
         return 'En Riesgo'
     if 365 < dias <= 730:
         return 'Dormido'
     if dias > 730:
         return 'Perdido'
-    # Fallback razonable (gente con 1-2 visitas hace 90-365 días).
+    # Fallback razonable.
     return 'En Riesgo' if visitas >= 1 else 'Perdido'
 
 
 def _classify_eje_estilo(f: dict) -> str:
+    """Clasifica el patrón de preferencia (v2).
+
+    Cambios v2:
+    - N/A (pre-sistema): clientes sin sistema actual no tienen señal.
+    - Buscador de Alojamiento: pct_cabanas ≥ 30 (era 40) — la categoría era
+      muy fina (0.4%) en la primera corrida.
+    """
+    # Sin sistema actual: no clasificamos en estilo.
+    if f['total_visitas'] == 0:
+        return 'N/A (pre-sistema)'
+
     pct_masajes = f['pct_masajes']
     pct_tinas = f['pct_tinas']
     pct_cabanas = f['pct_cabanas']
@@ -155,13 +180,32 @@ def _classify_eje_estilo(f: dict) -> str:
         return 'Amante de las Tinas'
     if pct_bundle >= 50:
         return 'Experiencia Completa'
-    if pct_cabanas >= 40:
+    if pct_cabanas >= 30:
         return 'Buscador de Alojamiento'
     return 'Probador Esporádico'
 
 
 def _classify_eje_contexto(f: dict) -> str:
+    """Clasifica patrón de compañía + timing (v2).
+
+    Cambios v2:
+    - N/A (pre-sistema): separar SH-only del 'Sin clasificar' real.
+    - Turista Estacional: ahora requiere ≥3 visitas + ≥70% en una temporada,
+      para evitar el artefacto de clientes con 1 visita única.
+    - Familiar: banda ampliada [2.3, 2.9] (era [2.3, 2.7]).
+    - Local Frecuente: meses_relacion ≥ 6 (era 12) — era inalcanzable con
+      75% de clientes de 1 visita única.
+    - Grupo: ahora exige avg ≥ 2.9 (era 2.7) para no solaparse con Familiar.
+    """
+    # Sin sistema actual: no clasificamos.
+    if f['total_visitas'] == 0:
+        return 'N/A (pre-sistema)'
+
     avg = f['avg_cantidad_personas']
+    if avg is None:
+        return 'Sin clasificar'
+
+    visitas = f['total_visitas']
     pct_finde = f['pct_finde']
     pct_semana = f['pct_semana']
     pct_verano = f['pct_verano']
@@ -170,24 +214,20 @@ def _classify_eje_contexto(f: dict) -> str:
     pct_primavera = f['pct_primavera']
     meses_rel = f['meses_relacion_actual']
 
-    # 'Sin clasificar' por defecto si no hay señal (cliente sin sistema actual).
-    if f['total_visitas'] == 0 or avg is None:
-        return 'Sin clasificar'
-
     if 1.8 <= avg <= 2.2 and pct_finde >= 50:
         return 'Pareja Romántica'
     if avg <= 1.3 and pct_semana >= 40:
         return 'Auto-cuidado Solo'
-    if avg >= 2.7:
+    if avg >= 2.9:
         return 'Grupo'
-    if 2.3 <= avg <= 2.7:
+    if 2.3 <= avg < 2.9:
         return 'Familiar'
-    # Turista Estacional: alguna temporada concentra ≥70%.
+    # Turista Estacional: requiere señal real (3+ visitas) + concentración.
     max_temp = max(pct_verano, pct_otono, pct_invierno, pct_primavera)
-    if max_temp >= 70:
+    if visitas >= 3 and max_temp >= 70:
         return 'Turista Estacional'
-    # Local Frecuente: ninguna temporada >50% AND meses_relacion ≥ 12.
-    if max_temp <= 50 and meses_rel >= 12:
+    # Local Frecuente: ninguna temporada >50% AND meses_relacion ≥ 6.
+    if max_temp <= 50 and meses_rel >= 6:
         return 'Local Frecuente'
     return 'Sin clasificar'
 
@@ -724,18 +764,22 @@ class Command(BaseCommand):
         ap("")
         ap("> Se muestran solo combinaciones con al menos 1 cliente. ID interno (sin PII).")
         ap("")
-        for (valor_label, estilo_label) in TOP_COMBOS_INTERES:
+        for (valor_label, eje_axis, other_label) in TOP_COMBOS_INTERES:
+            # eje_axis indica si other_label es de Estilo o Contexto.
+            # Fix v2: antes siempre se comparaba contra eje_estilo, lo que
+            # hacía vacías a las combinaciones Valor × Contexto.
+            field = f'eje_{eje_axis}'  # 'eje_estilo' o 'eje_contexto'
             subset = [
                 f for f in features.values()
-                if f['eje_valor'] == valor_label and f['eje_estilo'] == estilo_label
+                if f['eje_valor'] == valor_label and f[field] == other_label
             ]
             if not subset:
-                ap(f"### {valor_label} × {estilo_label}: _sin clientes en esta combinación_")
+                ap(f"### {valor_label} × {other_label}: _sin clientes en esta combinación_")
                 ap("")
                 continue
             subset.sort(key=lambda f: f['gasto_total'], reverse=True)
             top5 = subset[:5]
-            ap(f"### {valor_label} × {estilo_label} (n={len(subset):,})")
+            ap(f"### {valor_label} × {other_label} (n={len(subset):,})")
             ap("")
             ap("| cliente_id | gasto_total | visitas | antigüedad (meses) |")
             ap("|---:|---:|---:|---:|")
