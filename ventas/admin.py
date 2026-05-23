@@ -68,6 +68,8 @@ from .models import (
     WeeklyObjective,
     # Competitor Analysis
     Competitor, CompetitorSnapshot, CompetitorSocialMedia,
+    # Taxonomía multidimensional de clientes
+    ClienteTaxonomia,
 )
 from django.http import HttpResponse
 import xlwt
@@ -606,6 +608,47 @@ class VentaReservaAdmin(admin.ModelAdmin):
             ficha['tramo_actual'], ficha['numero_visitas'], recency_str,
         )
 
+        # Taxonomía multidimensional (3 ejes: Valor + Estilo + Contexto).
+        # Si el cliente no tiene fila en ClienteTaxonomia (cliente nuevo o cron
+        # aún no corrió), mostramos un placeholder discreto.
+        valor_colors = {
+            'Campeón': ('#d3f0d3', '#1c6a1c'),
+            'Leal': ('#d3f0d3', '#1c6a1c'),
+            'Gran Gastador Ocasional': ('#fbe7c0', '#7a5500'),
+            'Regular': ('#d9eafd', '#1a558a'),
+            'En Prueba': ('#eee', '#555'),
+            'En Riesgo': ('#fcdfc6', '#8a4a1a'),
+            'Dormido': ('#f8d2d2', '#8a1a1a'),
+            'Pre-sistema': ('#e8e8e8', '#666'),
+        }
+        try:
+            taxo = cliente.taxonomia  # OneToOne related_name
+            v_bg, v_fg = valor_colors.get(taxo.eje_valor, ('#eee', '#555'))
+            badge_tpl = (
+                '<span style="background:{};color:{};padding:2px 8px;border-radius:3px;'
+                'font-size:11px;font-weight:600;letter-spacing:0.3px;margin-right:5px;">{}</span>'
+            )
+            valor_badge = format_html(badge_tpl, v_bg, v_fg, taxo.eje_valor)
+            estilo_badge = format_html(badge_tpl, '#e8dff5', '#5a2a85', taxo.eje_estilo)
+            contexto_badge = format_html(badge_tpl, '#f5e8d8', '#7a4a1a', taxo.eje_contexto)
+            taxonomia_line = format_html(
+                '<div style="margin-top:6px;">'
+                '<span style="font-size:11px;color:#888;text-transform:uppercase;'
+                'letter-spacing:0.5px;margin-right:6px;">🎯 Perfil</span>'
+                '{}{}{}'
+                '</div>',
+                valor_badge, estilo_badge, contexto_badge,
+            )
+        except ClienteTaxonomia.DoesNotExist:
+            taxonomia_line = format_html(
+                '<div style="margin-top:6px;font-size:11px;color:#aaa;font-style:italic;">'
+                '🎯 Perfil aún no calculado'
+                '</div>'
+            )
+        except Exception:
+            # Tabla no existe aún (migración 0095 no aplicada) — fail silent.
+            taxonomia_line = ''
+
         # Total acumulado destacado
         total_str = f'${intcomma(int(ficha["total"]))}'
         total_line = format_html(
@@ -668,12 +711,14 @@ class VentaReservaAdmin(admin.ModelAdmin):
         return format_html(
             '<div style="padding:4px 0;">'
             '<div>{nivel}{stats}</div>'
+            '{taxonomia}'
             '{total}'
             '{desglose}'
             '{cross_sell}'
             '</div>',
             nivel=nivel_badge,
             stats=stats_line,
+            taxonomia=taxonomia_line,
             total=total_line,
             desglose=desglose_line,
             cross_sell=cross_sell,
