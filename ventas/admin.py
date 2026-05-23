@@ -5483,3 +5483,137 @@ class DocumentoSistemaCacheAdmin(SingletonModelAdmin):
             from django.shortcuts import redirect
             messages.error(request, f'Error al generar PDF: {exc}')
             return redirect('admin:ventas_documentosistemacache_changelist')
+
+
+# ============================================================================
+# TAXONOMÍA DE CLIENTES — admin solo-lectura + botón para recalcular
+# ============================================================================
+
+@admin.register(ClienteTaxonomia)
+class ClienteTaxonomiaAdmin(admin.ModelAdmin):
+    """
+    Vista solo-lectura de la taxonomía multidimensional de clientes.
+
+    Permite:
+    - Listar y filtrar las ~14K filas por cualquier combinación de los 3 ejes.
+    - Buscar por nombre/teléfono/email del cliente.
+    - Disparar la recalculación con un botón (full o incremental 24h).
+
+    No permite crear/editar/borrar a mano (la tabla se mantiene por el comando
+    recalcular_taxonomia_clientes).
+    """
+    change_list_template = 'admin/ventas/clientetaxonomia_change_list.html'
+
+    list_display = (
+        'cliente_link',
+        'eje_valor', 'eje_estilo', 'eje_contexto',
+        'gasto_total_fmt', 'total_visitas',
+        'dias_desde_ultima_visita', 'antiguedad_meses',
+        'calculado_en_short',
+    )
+    list_filter = ('eje_valor', 'eje_estilo', 'eje_contexto', 'tiene_historial_pre_sistema')
+    search_fields = (
+        'cliente__nombre', 'cliente__telefono', 'cliente__email',
+        'cliente__documento_identidad',
+    )
+    list_per_page = 50
+    ordering = ('-gasto_total',)
+
+    def get_readonly_fields(self, request, obj=None):
+        # Todos los campos son readonly (la tabla se rellena por comando).
+        return [f.name for f in self.model._meta.get_fields() if not f.many_to_many]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        # Permitimos ver el detalle (que es readonly por get_readonly_fields).
+        return True
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    # ---------- Columnas custom ----------
+    def cliente_link(self, obj):
+        from django.urls import reverse
+        from django.utils.html import format_html
+        if not obj.cliente_id:
+            return '-'
+        url = reverse('admin:ventas_cliente_change', args=[obj.cliente_id])
+        nombre = obj.cliente.nombre if obj.cliente else f'Cliente #{obj.cliente_id}'
+        return format_html('<a href="{}">{}</a>', url, nombre)
+    cliente_link.short_description = 'Cliente'
+    cliente_link.admin_order_field = 'cliente__nombre'
+
+    def gasto_total_fmt(self, obj):
+        from django.contrib.humanize.templatetags.humanize import intcomma
+        return f'${intcomma(obj.gasto_total)}'
+    gasto_total_fmt.short_description = 'Gasto total'
+    gasto_total_fmt.admin_order_field = 'gasto_total'
+
+    def calculado_en_short(self, obj):
+        if not obj.calculado_en:
+            return '-'
+        return obj.calculado_en.strftime('%Y-%m-%d %H:%M')
+    calculado_en_short.short_description = 'Calculado'
+    calculado_en_short.admin_order_field = 'calculado_en'
+
+    # ---------- URL custom para el botón "Recalcular" ----------
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                'recalcular/',
+                self.admin_site.admin_view(self.recalcular_view),
+                name='recalcular_taxonomia_clientes',
+            ),
+        ]
+        # Las custom URLs van primero para que tengan prioridad sobre las default.
+        return custom_urls + urls
+
+    def recalcular_view(self, request):
+        """Ejecuta el comando recalcular_taxonomia_clientes sincrónicamente.
+
+        Tarda ~5s (modo incremental) o ~20s (full). Gunicorn timeout 120s
+        deja margen. Reportamos el resumen al usuario via messages.
+        """
+        from django.core.management import call_command
+        from django.contrib import messages
+        from django.shortcuts import redirect
+        from io import StringIO
+
+        if request.method != 'POST':
+            return redirect('admin:ventas_clientetaxonomia_changelist')
+
+        incremental = request.GET.get('incremental')
+
+        kwargs = {}
+        modo = 'full'
+        if incremental:
+            kwargs['solo_modificados_desde'] = incremental
+            modo = f'incremental ({incremental})'
+
+        out = StringIO()
+        try:
+            call_command('recalcular_taxonomia_clientes', stdout=out, stderr=out, **kwargs)
+            output = out.getvalue()
+
+            # Extraer la línea de resumen del output ("OK: X creados, Y actualizados…").
+            summary_line = None
+            for line in output.split('\n'):
+                if 'creados' in line and 'actualizados' in line:
+                    summary_line = line.strip()
+                    break
+
+            if summary_line:
+                messages.success(
+                    request,
+                    f'✅ Taxonomía recalculada ({modo}). {summary_line}'
+                )
+            else:
+                messages.success(request, f'✅ Recalculación {modo} completada.')
+        except Exception as exc:
+            messages.error(request, f'❌ Error recalculando taxonomía: {exc}')
+
+        return redirect('admin:ventas_clientetaxonomia_changelist')

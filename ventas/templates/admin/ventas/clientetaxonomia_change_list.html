@@ -1,0 +1,33 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block object-tools-items %}
+  <li>
+    <form method="post"
+          action="{% url 'admin:recalcular_taxonomia_clientes' %}"
+          style="display:inline; margin-right:8px;"
+          onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').innerText='⏳ Recalculando... (~20s)'; return confirm('¿Recalcular la taxonomía de todos los clientes?\n\nTarda ~20-30 segundos. La página se refrescará cuando termine.');">
+      {% csrf_token %}
+      <button type="submit"
+              class="button"
+              style="background:#b78b5b; color:white; border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-weight:600;">
+        🔄 Recalcular taxonomía (full)
+      </button>
+    </form>
+  </li>
+  <li>
+    <form method="post"
+          action="{% url 'admin:recalcular_taxonomia_clientes' %}?incremental=24h"
+          style="display:inline; margin-right:8px;"
+          onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').innerText='⏳ Procesando...';">
+      {% csrf_token %}
+      <button type="submit"
+              class="button"
+              style="background:#5a7a3a; color:white; border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-weight:600;"
+              title="Solo recalcula clientes con actividad en las últimas 24 horas (~5s)">
+        ⚡ Refresh incremental (24h)
+      </button>
+    </form>
+  </li>
+  {{ block.super }}
+{% endblock %}
