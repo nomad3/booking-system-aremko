@@ -886,7 +886,9 @@ class Cliente(models.Model):
             producto = rp.producto
             if not producto:
                 continue
-            precio_unit = rp.precio_unitario or producto.precio_base or 0
+            # Fix: el campo se llama precio_unitario_venta (no precio_unitario).
+            # Bug pre-existente que estaba enmascarado por el try/except del display.
+            precio_unit = rp.precio_unitario_venta or producto.precio_base or 0
             subtotal = Decimal(precio_unit) * (rp.cantidad or 1)
             por_familia['Productos'] += subtotal
 

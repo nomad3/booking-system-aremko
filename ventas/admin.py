@@ -562,12 +562,20 @@ class VentaReservaAdmin(admin.ModelAdmin):
 
         cliente = obj.cliente
 
-        # Ficha 360 con cache. Si falla, mostrar solo placeholder.
+        # Taxonomía multidimensional — la calculamos AL PRINCIPIO porque es
+        # independiente de ficha_360() (lee de tabla persistida). Si ficha_360
+        # falla, igual mostramos los 3 badges como mínimo útil.
+        taxonomia_line = self._build_taxonomia_badges_html(cliente)
+
+        # Ficha 360 con cache. Si falla, mostrar al menos los badges + error.
         try:
             ficha = cliente.ficha_360()
         except Exception as exc:
+            from django.utils.html import format_html
             return format_html(
-                '<span style="color:#888;">No se pudo calcular ficha del cliente: {}</span>',
+                '<div>{}</div>'
+                '<span style="color:#888;font-size:11px;">No se pudo calcular ficha extendida: {}</span>',
+                taxonomia_line,
                 str(exc)[:120],
             )
 
@@ -608,46 +616,8 @@ class VentaReservaAdmin(admin.ModelAdmin):
             ficha['tramo_actual'], ficha['numero_visitas'], recency_str,
         )
 
-        # Taxonomía multidimensional (3 ejes: Valor + Estilo + Contexto).
-        # Si el cliente no tiene fila en ClienteTaxonomia (cliente nuevo o cron
-        # aún no corrió), mostramos un placeholder discreto.
-        valor_colors = {
-            'Campeón': ('#d3f0d3', '#1c6a1c'),
-            'Leal': ('#d3f0d3', '#1c6a1c'),
-            'Gran Gastador Ocasional': ('#fbe7c0', '#7a5500'),
-            'Regular': ('#d9eafd', '#1a558a'),
-            'En Prueba': ('#eee', '#555'),
-            'En Riesgo': ('#fcdfc6', '#8a4a1a'),
-            'Dormido': ('#f8d2d2', '#8a1a1a'),
-            'Pre-sistema': ('#e8e8e8', '#666'),
-        }
-        try:
-            taxo = cliente.taxonomia  # OneToOne related_name
-            v_bg, v_fg = valor_colors.get(taxo.eje_valor, ('#eee', '#555'))
-            badge_tpl = (
-                '<span style="background:{};color:{};padding:2px 8px;border-radius:3px;'
-                'font-size:11px;font-weight:600;letter-spacing:0.3px;margin-right:5px;">{}</span>'
-            )
-            valor_badge = format_html(badge_tpl, v_bg, v_fg, taxo.eje_valor)
-            estilo_badge = format_html(badge_tpl, '#e8dff5', '#5a2a85', taxo.eje_estilo)
-            contexto_badge = format_html(badge_tpl, '#f5e8d8', '#7a4a1a', taxo.eje_contexto)
-            taxonomia_line = format_html(
-                '<div style="margin-top:6px;">'
-                '<span style="font-size:11px;color:#888;text-transform:uppercase;'
-                'letter-spacing:0.5px;margin-right:6px;">🎯 Perfil</span>'
-                '{}{}{}'
-                '</div>',
-                valor_badge, estilo_badge, contexto_badge,
-            )
-        except ClienteTaxonomia.DoesNotExist:
-            taxonomia_line = format_html(
-                '<div style="margin-top:6px;font-size:11px;color:#aaa;font-style:italic;">'
-                '🎯 Perfil aún no calculado'
-                '</div>'
-            )
-        except Exception:
-            # Tabla no existe aún (migración 0095 no aplicada) — fail silent.
-            taxonomia_line = ''
+        # (Taxonomía ya calculada al inicio de la función, antes del try/except
+        # de ficha_360 — para que aparezca aún si la ficha extendida falla.)
 
         # Total acumulado destacado
         total_str = f'${intcomma(int(ficha["total"]))}'
@@ -724,6 +694,52 @@ class VentaReservaAdmin(admin.ModelAdmin):
             cross_sell=cross_sell,
         )
     cliente_ficha_360_display.short_description = 'Ficha del cliente'
+
+    def _build_taxonomia_badges_html(self, cliente):
+        """Genera el HTML con los 3 badges de taxonomía del cliente.
+
+        Independiente de ficha_360() para que pueda mostrarse aún si esa
+        falla. Lee directo de ClienteTaxonomia (OneToOne related_name='taxonomia').
+        """
+        from django.utils.html import format_html
+
+        valor_colors = {
+            'Campeón': ('#d3f0d3', '#1c6a1c'),
+            'Leal': ('#d3f0d3', '#1c6a1c'),
+            'Gran Gastador Ocasional': ('#fbe7c0', '#7a5500'),
+            'Regular': ('#d9eafd', '#1a558a'),
+            'En Prueba': ('#eee', '#555'),
+            'En Riesgo': ('#fcdfc6', '#8a4a1a'),
+            'Dormido': ('#f8d2d2', '#8a1a1a'),
+            'Pre-sistema': ('#e8e8e8', '#666'),
+        }
+        try:
+            taxo = cliente.taxonomia
+            v_bg, v_fg = valor_colors.get(taxo.eje_valor, ('#eee', '#555'))
+            badge_tpl = (
+                '<span style="background:{};color:{};padding:2px 8px;border-radius:3px;'
+                'font-size:11px;font-weight:600;letter-spacing:0.3px;margin-right:5px;">{}</span>'
+            )
+            valor_badge = format_html(badge_tpl, v_bg, v_fg, taxo.eje_valor)
+            estilo_badge = format_html(badge_tpl, '#e8dff5', '#5a2a85', taxo.eje_estilo)
+            contexto_badge = format_html(badge_tpl, '#f5e8d8', '#7a4a1a', taxo.eje_contexto)
+            return format_html(
+                '<div style="margin-top:6px;">'
+                '<span style="font-size:11px;color:#888;text-transform:uppercase;'
+                'letter-spacing:0.5px;margin-right:6px;">🎯 Perfil</span>'
+                '{}{}{}'
+                '</div>',
+                valor_badge, estilo_badge, contexto_badge,
+            )
+        except ClienteTaxonomia.DoesNotExist:
+            return format_html(
+                '<div style="margin-top:6px;font-size:11px;color:#aaa;font-style:italic;">'
+                '🎯 Perfil aún no calculado'
+                '</div>'
+            )
+        except Exception:
+            # Tabla no existe (migración 0095 no aplicada) — fail silent.
+            return ''
 
     def fecha_reserva_corta(self, obj):
         if obj.fecha_reserva:
