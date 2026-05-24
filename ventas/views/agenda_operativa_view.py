@@ -29,6 +29,10 @@ from ..models import ReservaServicio, ReservaProducto, VentaReserva, Comanda
 def calcular_destino_comanda(venta_reserva):
     """Devuelve dict con destino sugerido para una comanda de esa reserva.
 
+    Muestra el NOMBRE ESPECÍFICO del servicio (ej. "Tina Hidromasaje
+    Hornopirén"), no solo el tipo genérico. Aremko tiene 8 tinas y varias
+    cabañas — la cocina necesita saber a cuál exactamente, no solo "TINA".
+
     Args:
         venta_reserva: instancia de VentaReserva (idealmente con
         reservaservicios__servicio prefetched para evitar query extra)
@@ -36,11 +40,13 @@ def calcular_destino_comanda(venta_reserva):
     Returns:
         {
             'destino': 'tina' | 'cabana' | 'sin_destino',
-            'label': str  ('TINA', 'CABAÑA', 'SIN DESTINO'),
-            'icon': str   ('🛁', '🏠', '❓'),
-            'verificar': bool  (True si reserva tiene tina+cabaña → cocina debe
-                                confirmar con cliente),
-            'razon_verificar': str  (mensaje para mostrar al lado del badge),
+            'label': str   (nombre del servicio específico, ej. "Tina
+                            Hidromasaje Hornopirén" o "Cabaña Calbuco"),
+            'icon': str    ('🛁', '🏠', '❓'),
+            'verificar': bool  (True si hay tina+cabaña → cocina confirma con cliente),
+            'razon_verificar': str  (incluye nombre del servicio alternativo
+                            cuando aplica, ej. "también hay Cabaña Calbuco
+                            — confirmar destino"),
         }
     """
     if venta_reserva is None:
@@ -49,29 +55,45 @@ def calcular_destino_comanda(venta_reserva):
             'verificar': True, 'razon_verificar': 'sin reserva asociada',
         }
 
-    # Recolectar tipos únicos de servicio en la reserva
-    tipos = {
-        rs.servicio.tipo_servicio
-        for rs in venta_reserva.reservaservicios.all()
-        if rs.servicio and rs.servicio.tipo_servicio
-    }
-    tiene_tina = 'tina' in tipos
-    tiene_cabana = 'cabana' in tipos
+    # Recolectar nombres específicos por tipo de servicio
+    tinas_nombres = []
+    cabanas_nombres = []
+    for rs in venta_reserva.reservaservicios.all():
+        if not rs.servicio or not rs.servicio.tipo_servicio:
+            continue
+        nombre = (rs.servicio.nombre or '').strip()
+        if not nombre:
+            continue
+        if rs.servicio.tipo_servicio == 'tina' and nombre not in tinas_nombres:
+            tinas_nombres.append(nombre)
+        elif rs.servicio.tipo_servicio == 'cabana' and nombre not in cabanas_nombres:
+            cabanas_nombres.append(nombre)
+
+    tiene_tina = bool(tinas_nombres)
+    tiene_cabana = bool(cabanas_nombres)
 
     if tiene_tina and tiene_cabana:
         return {
-            'destino': 'tina', 'label': 'TINA', 'icon': '🛁',
+            'destino': 'tina',
+            'label': ' + '.join(tinas_nombres),
+            'icon': '🛁',
             'verificar': True,
-            'razon_verificar': 'también hay cabaña — confirmar destino',
+            'razon_verificar': (
+                f'también hay {" + ".join(cabanas_nombres)} — confirmar destino'
+            ),
         }
     if tiene_tina:
         return {
-            'destino': 'tina', 'label': 'TINA', 'icon': '🛁',
+            'destino': 'tina',
+            'label': ' + '.join(tinas_nombres),
+            'icon': '🛁',
             'verificar': False, 'razon_verificar': '',
         }
     if tiene_cabana:
         return {
-            'destino': 'cabana', 'label': 'CABAÑA', 'icon': '🏠',
+            'destino': 'cabana',
+            'label': ' + '.join(cabanas_nombres),
+            'icon': '🏠',
             'verificar': False, 'razon_verificar': '',
         }
     return {
