@@ -75,6 +75,8 @@ from .models import (
     ContactoWhatsApp,
     TaxonomiaMovimiento,
     EventoCelebracion,
+    # Operación Vuelta a Casa (Etapa Geo.2)
+    Ciudad,
 )
 from django.http import HttpResponse
 import xlwt
@@ -1299,7 +1301,39 @@ class ClienteAdmin(admin.ModelAdmin):
             ),
             'classes': ('collapse',),
         }),
+        ('Categorización geográfica (Geo.2)', {
+            'fields': (
+                'ciudad_normalizada',
+                'region_geografica',
+                'ciudad_normalizada_manual',
+            ),
+            'description': (
+                "Categorización geográfica para personalizar mensajes WhatsApp. "
+                "<b>region_geografica</b>: <code>sur</code> (≤120km, vendrá en el día), "
+                "<code>nacional</code> (resto Chile, necesita alojamiento), "
+                "<code>extranjero</code> (excluido del cron), "
+                "<code>sin_clasificar</code> (falta dato). "
+                "<b>ciudad_normalizada</b>: mapeo al catálogo Ciudad. "
+                "<b>ciudad_normalizada_manual</b>: si editas estos campos, "
+                "marca este checkbox para que el comando normalizar_ciudades_clientes "
+                "respete tu edición y NO la sobrescriba."
+            ),
+            'classes': ('collapse',),
+        }),
     )
+    autocomplete_fields = ('ciudad_normalizada',)
+
+    def save_model(self, request, obj, form, change):
+        """Si el admin tocó algún campo de Geo.2, marcar el flag manual.
+
+        Esto evita que el comando normalizar_ciudades_clientes sobrescriba
+        ediciones manuales en próximas corridas.
+        """
+        if change and form.changed_data:
+            campos_geo = {'ciudad_normalizada', 'region_geografica'}
+            if campos_geo & set(form.changed_data):
+                obj.ciudad_normalizada_manual = True
+        super().save_model(request, obj, form, change)
 
     def get_search_results(self, request, queryset, search_term):
         """
@@ -5822,6 +5856,52 @@ class TaxonomiaMovimientoAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+# ============================================================================
+# Operación Vuelta a Casa · Etapa Geo.2 — Admin de Ciudad
+# ============================================================================
+
+@admin.register(Ciudad)
+class CiudadAdmin(admin.ModelAdmin):
+    """Catálogo editable de ciudades + aliases + región geográfica.
+
+    Jorge puede agregar nuevas ciudades o agregar aliases a ciudades existentes
+    sin tocar código (útil cuando aparecen variantes nuevas en la base que
+    el seed inicial no contemplaba).
+    """
+    list_display = (
+        'nombre_canonico', 'region_geografica', 'pais', 'activo',
+        'cantidad_aliases', 'modificado',
+    )
+    list_filter = ('region_geografica', 'activo', 'pais')
+    search_fields = ('nombre_canonico', 'aliases')
+    list_per_page = 100
+    ordering = ('region_geografica', 'nombre_canonico')
+
+    fieldsets = (
+        ('Identidad', {
+            'fields': ('nombre_canonico', 'region_geografica', 'pais', 'activo'),
+        }),
+        ('Aliases (variantes de escritura)', {
+            'fields': ('aliases',),
+            'description': (
+                "Lista de aliases separados por <code>|</code> en minúscula. "
+                "Ej: <code>puerto varas|pto varas|pto. varas|p. varas</code>. "
+                "El comando normalizar_ciudades_clientes busca case-insensitive "
+                "y trim-aware contra esta lista."
+            ),
+        }),
+        ('Auditoría', {
+            'fields': ('creado', 'modificado'),
+            'classes': ('collapse',),
+        }),
+    )
+    readonly_fields = ('creado', 'modificado')
+
+    def cantidad_aliases(self, obj):
+        return len(obj.aliases_list())
+    cantidad_aliases.short_description = '# aliases'
 
 
 @admin.register(EventoCelebracion)

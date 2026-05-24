@@ -31,6 +31,8 @@ AUTOMATION_API_KEY = os.getenv('AUTOMATION_API_KEY', '')
 # empresa o test).
 OVC_CLIENTES_EXCLUIDOS_ICONTAINS = [
     'aremko',
+    'carabineros',  # Geo.2: "Carabineros Rio Pescado", "Carabineros de Ensenada"
+                    # son cuentas institucionales, no personas físicas a contactar 1-a-1
 ]
 
 # Match EXACTO case-insensitive: el nombre completo debe coincidir.
