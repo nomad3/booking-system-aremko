@@ -462,3 +462,120 @@ def cron_gen_atencion_clientes(request):
             "error": str(e),
             "command": "gen_atencion_clientes"
         }, status=500)
+
+
+# ============================================================================
+# Operación Vuelta a Casa — Etapa 7
+# ============================================================================
+# 2 endpoints disparadores de cron HTTP (consumidos por cron-job.org).
+# Auth: ?token=<CRON_TOKEN> (mismo patrón que los demás crons del archivo).
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_generar_bandeja_whatsapp_diaria(request):
+    """
+    Endpoint para ejecutar generar_bandeja_whatsapp_diaria desde cron externo.
+
+    GET o POST: /ventas/api/cron/generar-bandeja-whatsapp-diaria/?token=xxx
+
+    Qué hace:
+    - Selecciona ~50 clientes elegibles para WhatsApp manual del día
+    - Asigna prioridad (P0-P6) según ciclo de vida y cohorte
+    - Busca plantilla aplicable (cascada de 5 niveles)
+    - Renderiza mensaje listo para que el operador copie/pegue
+    - Crea filas ContactoWhatsApp con estado='pendiente'
+
+    Idempotente: si ya hay bandeja del día, aborta limpio sin recrear.
+
+    Frecuencia recomendada: 06:00 AM hora Santiago, todos los días.
+    Tiempo medido en producción: ~12 segundos sobre 14.228 clientes.
+    """
+    import time
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            logger.warning("❌ Intento de acceso a cron generar_bandeja con token inválido")
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+
+    t0 = time.time()
+    try:
+        output = StringIO()
+        call_command('generar_bandeja_whatsapp_diaria', stdout=output)
+        elapsed = round(time.time() - t0, 2)
+
+        logger.info(f"✅ Cron generar_bandeja_whatsapp_diaria OK en {elapsed}s")
+
+        return JsonResponse({
+            "ok": True,
+            "message": "Bandeja diaria generada",
+            "command": "generar_bandeja_whatsapp_diaria",
+            "duracion_segundos": elapsed,
+            "output": output.getvalue(),
+        })
+    except Exception as e:
+        elapsed = round(time.time() - t0, 2)
+        logger.error(f"❌ Error en cron generar_bandeja_whatsapp_diaria ({elapsed}s): {e}",
+                     exc_info=True)
+        return JsonResponse({
+            "ok": False,
+            "error": str(e),
+            "command": "generar_bandeja_whatsapp_diaria",
+            "duracion_segundos": elapsed,
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_cruzar_reservas_contactos_whatsapp(request):
+    """
+    Endpoint para ejecutar cruzar_reservas_contactos_whatsapp desde cron externo.
+
+    GET o POST: /ventas/api/cron/cruzar-reservas-contactos-whatsapp/?token=xxx
+
+    Qué hace:
+    - Itera VentaReserva creadas en las últimas 48 horas
+    - Para cada una, busca último ContactoWhatsApp enviado al cliente
+      dentro de los 30 días previos (con convirtio=False)
+    - Si encuentra match: marca convirtio=True, reserva_atribuida, fecha_atribucion
+
+    Idempotente: contactos ya convirtio=True se excluyen, reservas con
+    atribución previa se saltan.
+
+    Frecuencia recomendada: 23:30 hora Santiago, todos los días.
+    Tiempo estimado: <5 segundos (procesa solo 12-50 reservas/día).
+    """
+    import time
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            logger.warning("❌ Intento de acceso a cron cruzar_reservas con token inválido")
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+
+    t0 = time.time()
+    try:
+        output = StringIO()
+        call_command('cruzar_reservas_contactos_whatsapp', stdout=output)
+        elapsed = round(time.time() - t0, 2)
+
+        logger.info(f"✅ Cron cruzar_reservas_contactos_whatsapp OK en {elapsed}s")
+
+        return JsonResponse({
+            "ok": True,
+            "message": "Atribución de conversiones ejecutada",
+            "command": "cruzar_reservas_contactos_whatsapp",
+            "duracion_segundos": elapsed,
+            "output": output.getvalue(),
+        })
+    except Exception as e:
+        elapsed = round(time.time() - t0, 2)
+        logger.error(f"❌ Error en cron cruzar_reservas_contactos_whatsapp ({elapsed}s): {e}",
+                     exc_info=True)
+        return JsonResponse({
+            "ok": False,
+            "error": str(e),
+            "command": "cruzar_reservas_contactos_whatsapp",
+            "duracion_segundos": elapsed,
+        }, status=500)

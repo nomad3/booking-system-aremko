@@ -289,6 +289,17 @@ urlpatterns = [
     path('cron/enviar-campana-giftcard/', cron_views.cron_enviar_campana_giftcard, name='cron_enviar_campana_giftcard'),
     # Control de Gestión - Tareas Automáticas
     path('cron/gen-atencion-clientes/', cron_views.cron_gen_atencion_clientes, name='cron_gen_atencion_clientes'),
+    # Operación Vuelta a Casa (Etapa 7)
+    path(
+        'api/cron/generar-bandeja-whatsapp-diaria/',
+        cron_views.cron_generar_bandeja_whatsapp_diaria,
+        name='cron_generar_bandeja_whatsapp_diaria',
+    ),
+    path(
+        'api/cron/cruzar-reservas-contactos-whatsapp/',
+        cron_views.cron_cruzar_reservas_contactos_whatsapp,
+        name='cron_cruzar_reservas_contactos_whatsapp',
+    ),
     # === END CRON JOBS ===
 
     # Pack Descuento Management

@@ -70,6 +70,11 @@ from .models import (
     Competitor, CompetitorSnapshot, CompetitorSocialMedia,
     # Taxonomía multidimensional de clientes
     ClienteTaxonomia,
+    # Operación Vuelta a Casa (Etapa 7)
+    ScriptWhatsApp,
+    ContactoWhatsApp,
+    TaxonomiaMovimiento,
+    EventoCelebracion,
 )
 from django.http import HttpResponse
 import xlwt
@@ -1275,6 +1280,24 @@ class ClienteAdmin(admin.ModelAdmin):
         }),
         ('Ubicación', {
             'fields': ('pais', 'ciudad', 'region', 'comuna'),
+        }),
+        ('Operación Vuelta a Casa', {
+            'fields': (
+                'opt_out_whatsapp',
+                'proximo_contacto_no_antes_de',
+                'ultimo_contacto_outbound',
+            ),
+            'description': (
+                "Control de contacto WhatsApp manual. "
+                "<b>opt_out_whatsapp</b>: bloqueante permanente si el cliente "
+                "pidió no recibir más. "
+                "<b>proximo_contacto_no_antes_de</b>: fecha mínima para volver "
+                "a contactar (se setea automático en 'no_aplica' = +90d y "
+                "'más adelante' = +60d). "
+                "<b>ultimo_contacto_outbound</b>: cuándo enviamos el último "
+                "WhatsApp; el sistema respeta 30d de anti-saturación."
+            ),
+            'classes': ('collapse',),
         }),
     )
 
@@ -5617,3 +5640,227 @@ class ClienteTaxonomiaAdmin(admin.ModelAdmin):
             messages.error(request, f'❌ Error recalculando taxonomía: {exc}')
 
         return redirect('admin:ventas_clientetaxonomia_changelist')
+
+
+# ============================================================================
+# Operación Vuelta a Casa — Admin (Etapa 7)
+# ============================================================================
+
+@admin.register(ScriptWhatsApp)
+class ScriptWhatsAppAdmin(admin.ModelAdmin):
+    """Plantillas editables de mensajes WhatsApp por cohorte.
+
+    Jorge puede editar el texto y desactivar plantillas sin pedir cambios
+    de código. Cambios en estado/cohorte/salva son técnicos (afectan al
+    matching) y se desaconsejan vía readonly_fields en producción.
+    """
+    list_display = (
+        'script_id', 'nombre', 'estado_valor_target',
+        'cohorte_estilo', 'cohorte_contexto', 'salva', 'activo',
+        'modificado',
+    )
+    list_filter = ('estado_valor_target', 'salva', 'activo')
+    search_fields = ('script_id', 'nombre', 'plantilla_texto')
+    ordering = ('script_id',)
+    list_per_page = 50
+
+    fieldsets = (
+        ('Identificación', {
+            'fields': ('script_id', 'nombre', 'activo'),
+        }),
+        ('Targeting (técnico — modificar con cuidado)', {
+            'fields': ('estado_valor_target', 'cohorte_estilo', 'cohorte_contexto', 'salva'),
+            'description': (
+                "Estos 4 campos definen a qué cohorte aplica la plantilla. "
+                "Cambiarlos hace que el matching de la bandeja diaria cambie."
+            ),
+        }),
+        ('Mensaje', {
+            'fields': ('plantilla_texto',),
+            'description': (
+                "Placeholders disponibles: <code>{nombre}</code>, "
+                "<code>{ultima_visita_humanizada}</code>, <code>{dias_sin_venir}</code>, "
+                "<code>{ultimo_servicio}</code>, <code>{compania_habitual}</code>, "
+                "<code>{servicio_recomendado}</code>, <code>{sugerencia_dia}</code>, "
+                "<code>{sugerencia_hora}</code>, <code>{sugerencia_franja}</code>, "
+                "<code>{cupon_codigo}</code>, <code>{mes_proximo}</code>, "
+                "<code>{fecha_limite}</code>."
+            ),
+        }),
+        ('Auditoría', {
+            'fields': ('creado', 'modificado'),
+            'classes': ('collapse',),
+        }),
+    )
+    readonly_fields = ('creado', 'modificado')
+
+
+@admin.register(ContactoWhatsApp)
+class ContactoWhatsAppAdmin(admin.ModelAdmin):
+    """Log read-only de cada intento de contacto.
+
+    Solo nota_operador es editable (por si Jorge quiere agregar contexto a
+    un caso). El resto es snapshot de auditoría — no debe modificarse.
+    """
+    list_display = (
+        'id', 'cliente', 'script', 'fecha_sugerido', 'prioridad', 'salva',
+        'estado', 'fecha_envio', 'respondio', 'tipo_respuesta', 'convirtio',
+    )
+    list_filter = (
+        'estado', 'tipo_respuesta', 'convirtio', 'respondio',
+        'fecha_sugerido', 'operador', 'salva',
+    )
+    search_fields = ('cliente__nombre', 'cliente__telefono', 'script__script_id')
+    date_hierarchy = 'fecha_sugerido'
+    ordering = ('-fecha_sugerido', 'prioridad')
+    list_per_page = 50
+    autocomplete_fields = ('cliente', 'script', 'reserva_atribuida')
+
+    fieldsets = (
+        ('Cliente y script', {
+            'fields': ('cliente', 'script', 'salva', 'prioridad'),
+        }),
+        ('Snapshot al generar', {
+            'fields': (
+                'eje_valor_snapshot', 'eje_estilo_snapshot', 'eje_contexto_snapshot',
+                'dias_sin_venir_snapshot', 'gasto_historico_snapshot',
+            ),
+            'classes': ('collapse',),
+        }),
+        ('Mensaje', {
+            'fields': ('mensaje_renderizado', 'mensaje_enviado_editado'),
+        }),
+        ('Estado y envío', {
+            'fields': (
+                'fecha_sugerido', 'estado', 'fecha_envio', 'operador',
+            ),
+        }),
+        ('Respuesta del cliente', {
+            'fields': (
+                'respondio', 'tipo_respuesta', 'fecha_respuesta', 'nota_operador',
+            ),
+        }),
+        ('Atribución de conversión', {
+            'fields': ('convirtio', 'reserva_atribuida', 'fecha_atribucion'),
+            'classes': ('collapse',),
+        }),
+        ('Auditoría', {
+            'fields': ('creado',),
+            'classes': ('collapse',),
+        }),
+    )
+
+    readonly_fields = (
+        'cliente', 'script', 'salva', 'prioridad',
+        'eje_valor_snapshot', 'eje_estilo_snapshot', 'eje_contexto_snapshot',
+        'dias_sin_venir_snapshot', 'gasto_historico_snapshot',
+        'mensaje_renderizado', 'mensaje_enviado_editado',
+        'fecha_sugerido', 'estado', 'fecha_envio', 'operador',
+        'respondio', 'tipo_respuesta', 'fecha_respuesta',
+        'convirtio', 'reserva_atribuida', 'fecha_atribucion',
+        'creado',
+    )
+    # Única excepción editable: nota_operador (por si Jorge quiere agregar contexto)
+    # se deja FUERA de readonly_fields automáticamente.
+
+    def has_add_permission(self, request):
+        # No permitir crear ContactoWhatsApp manualmente desde admin —
+        # solo el cron generar_bandeja_whatsapp_diaria los crea.
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # Tampoco borrar — son auditoría histórica.
+        return False
+
+
+@admin.register(TaxonomiaMovimiento)
+class TaxonomiaMovimientoAdmin(admin.ModelAdmin):
+    """Bitácora viva read-only de cambios de tramo en la taxonomía."""
+    list_display = (
+        'id', 'cliente', 'fecha',
+        'eje_valor_antes', 'eje_valor_despues',
+        'evento_origen', 'contacto_whatsapp_atribuido',
+    )
+    list_filter = (
+        'fecha', 'evento_origen',
+        'eje_valor_antes', 'eje_valor_despues',
+    )
+    search_fields = ('cliente__nombre', 'cliente__telefono')
+    date_hierarchy = 'fecha'
+    ordering = ('-fecha', '-id')
+    list_per_page = 50
+    autocomplete_fields = ('cliente', 'reserva_relacionada', 'contacto_whatsapp_atribuido')
+
+    fieldsets = (
+        ('Cliente y fecha', {
+            'fields': ('cliente', 'fecha', 'evento_origen'),
+        }),
+        ('Estado anterior', {
+            'fields': ('eje_valor_antes', 'eje_estilo_antes', 'eje_contexto_antes'),
+        }),
+        ('Estado nuevo', {
+            'fields': ('eje_valor_despues', 'eje_estilo_despues', 'eje_contexto_despues'),
+        }),
+        ('Atribución', {
+            'fields': ('reserva_relacionada', 'contacto_whatsapp_atribuido'),
+            'classes': ('collapse',),
+        }),
+        ('Auditoría', {
+            'fields': ('creado',),
+            'classes': ('collapse',),
+        }),
+    )
+    readonly_fields = (
+        'cliente', 'fecha', 'evento_origen',
+        'eje_valor_antes', 'eje_estilo_antes', 'eje_contexto_antes',
+        'eje_valor_despues', 'eje_estilo_despues', 'eje_contexto_despues',
+        'reserva_relacionada', 'contacto_whatsapp_atribuido', 'creado',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(EventoCelebracion)
+class EventoCelebracionAdmin(admin.ModelAdmin):
+    """Hitos para destacar en la bandeja del operador (read-only)."""
+    list_display = (
+        'id', 'cliente', 'tipo', 'fecha',
+        'mostrado_en_bandeja', 'fecha_mostrado',
+    )
+    list_filter = ('tipo', 'fecha', 'mostrado_en_bandeja')
+    search_fields = ('cliente__nombre', 'cliente__telefono')
+    date_hierarchy = 'fecha'
+    ordering = ('-fecha', '-id')
+    list_per_page = 50
+    autocomplete_fields = ('cliente', 'movimiento_relacionado')
+
+    fieldsets = (
+        ('Cliente y tipo', {
+            'fields': ('cliente', 'tipo', 'fecha'),
+        }),
+        ('Mensaje sugerido', {
+            'fields': ('mensaje_sugerido',),
+        }),
+        ('Estado de visualización', {
+            'fields': ('mostrado_en_bandeja', 'fecha_mostrado'),
+        }),
+        ('Origen', {
+            'fields': ('movimiento_relacionado', 'creado'),
+            'classes': ('collapse',),
+        }),
+    )
+    readonly_fields = (
+        'cliente', 'tipo', 'fecha', 'mensaje_sugerido',
+        'mostrado_en_bandeja', 'fecha_mostrado',
+        'movimiento_relacionado', 'creado',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
