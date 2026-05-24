@@ -14,6 +14,73 @@ from collections import defaultdict
 import json
 from ..models import ReservaServicio, ReservaProducto, VentaReserva, Comanda
 
+
+# ---------------------------------------------------------------------------
+# Cálculo de destino sugerido para comandas (cocina/bar)
+# ---------------------------------------------------------------------------
+# Regla de negocio:
+#   - Solo tinas             → TINA
+#   - Solo cabañas           → CABAÑA
+#   - Tinas + cabañas        → TINA por defecto, ALERT (puede pedir cabaña)
+#   - Tinas + masajes        → TINA (masaje nunca lleva comanda)
+#   - Cabañas + masajes      → CABAÑA (masaje nunca lleva comanda)
+#   - Tinas + cabañas + masajes → aplica regla mixta (ignora masaje)
+#   - Solo masajes / sin tipos relevantes → SIN_DESTINO (raro tener comanda)
+def calcular_destino_comanda(venta_reserva):
+    """Devuelve dict con destino sugerido para una comanda de esa reserva.
+
+    Args:
+        venta_reserva: instancia de VentaReserva (idealmente con
+        reservaservicios__servicio prefetched para evitar query extra)
+
+    Returns:
+        {
+            'destino': 'tina' | 'cabana' | 'sin_destino',
+            'label': str  ('TINA', 'CABAÑA', 'SIN DESTINO'),
+            'icon': str   ('🛁', '🏠', '❓'),
+            'verificar': bool  (True si reserva tiene tina+cabaña → cocina debe
+                                confirmar con cliente),
+            'razon_verificar': str  (mensaje para mostrar al lado del badge),
+        }
+    """
+    if venta_reserva is None:
+        return {
+            'destino': 'sin_destino', 'label': 'SIN DESTINO', 'icon': '❓',
+            'verificar': True, 'razon_verificar': 'sin reserva asociada',
+        }
+
+    # Recolectar tipos únicos de servicio en la reserva
+    tipos = {
+        rs.servicio.tipo_servicio
+        for rs in venta_reserva.reservaservicios.all()
+        if rs.servicio and rs.servicio.tipo_servicio
+    }
+    tiene_tina = 'tina' in tipos
+    tiene_cabana = 'cabana' in tipos
+
+    if tiene_tina and tiene_cabana:
+        return {
+            'destino': 'tina', 'label': 'TINA', 'icon': '🛁',
+            'verificar': True,
+            'razon_verificar': 'también hay cabaña — confirmar destino',
+        }
+    if tiene_tina:
+        return {
+            'destino': 'tina', 'label': 'TINA', 'icon': '🛁',
+            'verificar': False, 'razon_verificar': '',
+        }
+    if tiene_cabana:
+        return {
+            'destino': 'cabana', 'label': 'CABAÑA', 'icon': '🏠',
+            'verificar': False, 'razon_verificar': '',
+        }
+    return {
+        'destino': 'sin_destino', 'label': 'SIN DESTINO', 'icon': '❓',
+        'verificar': True,
+        'razon_verificar': 'reserva sin tina ni cabaña — revisar',
+    }
+
+
 def staff_required(view_func):
     """Decorador para requerir que el usuario sea staff"""
     decorated_view = user_passes_test(lambda u: u.is_staff)(view_func)
@@ -596,7 +663,8 @@ def agenda_operativa(request):
         )
         .distinct()
         .select_related('venta_reserva__cliente', 'usuario_procesa')
-        .prefetch_related('detalles__producto')
+        # Etapa destino-comanda: prefetch servicios para calcular destino sin N+1
+        .prefetch_related('detalles__producto', 'venta_reserva__reservaservicios__servicio')
         .order_by('fecha_solicitud')
     )
 
@@ -611,6 +679,7 @@ def agenda_operativa(request):
         cliente_nombre = ''
         if c.venta_reserva and c.venta_reserva.cliente:
             cliente_nombre = c.venta_reserva.cliente.nombre
+        destino = calcular_destino_comanda(c.venta_reserva)
         comandas_data.append({
             'id': c.id,
             'estado': c.estado,
@@ -619,6 +688,12 @@ def agenda_operativa(request):
             'minutos_espera': minutos,
             'items': items,
             'usuario_procesa': c.usuario_procesa.get_short_name() if c.usuario_procesa else None,
+            # Destino sugerido para cocina/bar (regla tina/cabaña/masaje)
+            'destino': destino['destino'],
+            'destino_label': destino['label'],
+            'destino_icon': destino['icon'],
+            'destino_verificar': destino['verificar'],
+            'destino_razon': destino['razon_verificar'],
         })
 
     context = {
@@ -670,7 +745,7 @@ def comandas_pendientes_api(request):
         )
         .distinct()
         .select_related('venta_reserva__cliente', 'usuario_procesa')
-        .prefetch_related('detalles__producto')
+        .prefetch_related('detalles__producto', 'venta_reserva__reservaservicios__servicio')
         .order_by('fecha_solicitud')
     )
 
@@ -685,6 +760,7 @@ def comandas_pendientes_api(request):
         cliente_nombre = ''
         if c.venta_reserva and c.venta_reserva.cliente:
             cliente_nombre = c.venta_reserva.cliente.nombre
+        destino = calcular_destino_comanda(c.venta_reserva)
         data.append({
             'id': c.id,
             'estado': c.estado,
@@ -693,6 +769,11 @@ def comandas_pendientes_api(request):
             'minutos_espera': minutos,
             'items': items,
             'usuario_procesa': c.usuario_procesa.get_short_name() if c.usuario_procesa else None,
+            'destino': destino['destino'],
+            'destino_label': destino['label'],
+            'destino_icon': destino['icon'],
+            'destino_verificar': destino['verificar'],
+            'destino_razon': destino['razon_verificar'],
         })
 
     return JsonResponse({'success': True, 'comandas': data})
