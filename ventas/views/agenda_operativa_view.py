@@ -26,27 +26,29 @@ from ..models import ReservaServicio, ReservaProducto, VentaReserva, Comanda
 #   - Cabañas + masajes      → CABAÑA (masaje nunca lleva comanda)
 #   - Tinas + cabañas + masajes → aplica regla mixta (ignora masaje)
 #   - Solo masajes / sin tipos relevantes → SIN_DESTINO (raro tener comanda)
-def calcular_destino_comanda(venta_reserva):
-    """Devuelve dict con destino sugerido para una comanda de esa reserva.
+def calcular_destino_comanda(venta_reserva, hoy=None):
+    """Devuelve dict con destino sugerido + horario para una comanda.
 
-    Muestra el NOMBRE ESPECÍFICO del servicio (ej. "Tina Hidromasaje
-    Hornopirén"), no solo el tipo genérico. Aremko tiene 8 tinas y varias
-    cabañas — la cocina necesita saber a cuál exactamente, no solo "TINA".
+    Muestra el NOMBRE ESPECÍFICO + HORARIO del servicio reservado.
+    Aremko tiene 8 tinas y varias cabañas — la cocina necesita saber a
+    cuál y a qué hora exactamente, sin entrar a la reserva.
 
     Args:
         venta_reserva: instancia de VentaReserva (idealmente con
-        reservaservicios__servicio prefetched para evitar query extra)
+        reservaservicios__servicio prefetched)
+        hoy: fecha de referencia (default = hoy local). Servicios cuya
+        fecha_agendamiento coincide con `hoy` muestran su HH:MM normal;
+        los de otro día (típico: alojamiento multi-día) muestran "(en curso)"
+        para no confundir con el horario de hoy.
 
     Returns:
         {
             'destino': 'tina' | 'cabana' | 'sin_destino',
-            'label': str   (nombre del servicio específico, ej. "Tina
-                            Hidromasaje Hornopirén" o "Cabaña Calbuco"),
+            'label': str   ("Tina Hidromasaje Hornopirén · 18:00" o
+                            "Cabaña Calbuco · (en curso)" si multi-día),
             'icon': str    ('🛁', '🏠', '❓'),
-            'verificar': bool  (True si hay tina+cabaña → cocina confirma con cliente),
-            'razon_verificar': str  (incluye nombre del servicio alternativo
-                            cuando aplica, ej. "también hay Cabaña Calbuco
-                            — confirmar destino"),
+            'verificar': bool  (True si hay tina+cabaña → cocina confirma),
+            'razon_verificar': str  ("también hay Cabaña Calbuco · 14:00 — confirmar destino"),
         }
     """
     if venta_reserva is None:
@@ -55,44 +57,63 @@ def calcular_destino_comanda(venta_reserva):
             'verificar': True, 'razon_verificar': 'sin reserva asociada',
         }
 
-    # Recolectar nombres específicos por tipo de servicio
-    tinas_nombres = []
-    cabanas_nombres = []
+    if hoy is None:
+        hoy = timezone.localtime(timezone.now()).date()
+
+    # Recolectar (nombre, hora_formateada) por tipo
+    tinas = []      # list of (nombre, label_hora)
+    cabanas = []
     for rs in venta_reserva.reservaservicios.all():
         if not rs.servicio or not rs.servicio.tipo_servicio:
+            continue
+        tipo = rs.servicio.tipo_servicio
+        if tipo not in ('tina', 'cabana'):
             continue
         nombre = (rs.servicio.nombre or '').strip()
         if not nombre:
             continue
-        if rs.servicio.tipo_servicio == 'tina' and nombre not in tinas_nombres:
-            tinas_nombres.append(nombre)
-        elif rs.servicio.tipo_servicio == 'cabana' and nombre not in cabanas_nombres:
-            cabanas_nombres.append(nombre)
+        # Hora: si es hoy, mostrar HH:MM. Si es otro día (alojamiento multi-día),
+        # marcar "(en curso)" para no confundir con horario de hoy.
+        if rs.fecha_agendamiento == hoy:
+            hora_label = rs.hora_inicio or ''
+        else:
+            hora_label = '(en curso)'
 
-    tiene_tina = bool(tinas_nombres)
-    tiene_cabana = bool(cabanas_nombres)
+        item = (nombre, hora_label)
+        if tipo == 'tina' and item not in tinas:
+            tinas.append(item)
+        elif tipo == 'cabana' and item not in cabanas:
+            cabanas.append(item)
+
+    def _fmt(items):
+        """('Tina X', '18:00') → 'Tina X · 18:00'; concatena múltiples con ' + '."""
+        parts = []
+        for nombre, hora in items:
+            parts.append(f'{nombre} · {hora}' if hora else nombre)
+        return ' + '.join(parts)
+
+    tiene_tina = bool(tinas)
+    tiene_cabana = bool(cabanas)
 
     if tiene_tina and tiene_cabana:
         return {
             'destino': 'tina',
-            'label': ' + '.join(tinas_nombres),
+            'label': _fmt(tinas),
             'icon': '🛁',
             'verificar': True,
-            'razon_verificar': (
-                f'también hay {" + ".join(cabanas_nombres)} — confirmar destino'
-            ),
+            'razon_verificar': f'también hay {_fmt(cabanas)} — confirmar destino',
         }
     if tiene_tina:
         return {
             'destino': 'tina',
-            'label': ' + '.join(tinas_nombres),
+            'label': _fmt(tinas),
             'icon': '🛁',
             'verificar': False, 'razon_verificar': '',
         }
     if tiene_cabana:
         return {
             'destino': 'cabana',
-            'label': ' + '.join(cabanas_nombres),
+            'label': _fmt(cabanas),
             'icon': '🏠',
             'verificar': False, 'razon_verificar': '',
         }
@@ -701,7 +722,7 @@ def agenda_operativa(request):
         cliente_nombre = ''
         if c.venta_reserva and c.venta_reserva.cliente:
             cliente_nombre = c.venta_reserva.cliente.nombre
-        destino = calcular_destino_comanda(c.venta_reserva)
+        destino = calcular_destino_comanda(c.venta_reserva, hoy=hoy)
         comandas_data.append({
             'id': c.id,
             'estado': c.estado,
@@ -782,7 +803,7 @@ def comandas_pendientes_api(request):
         cliente_nombre = ''
         if c.venta_reserva and c.venta_reserva.cliente:
             cliente_nombre = c.venta_reserva.cliente.nombre
-        destino = calcular_destino_comanda(c.venta_reserva)
+        destino = calcular_destino_comanda(c.venta_reserva, hoy=hoy)
         data.append({
             'id': c.id,
             'estado': c.estado,
