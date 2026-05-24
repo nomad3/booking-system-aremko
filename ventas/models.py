@@ -787,6 +787,38 @@ class Cliente(models.Model):
         ),
     )
 
+    # ───────────── Operación Vuelta a Casa · Etapa Geo.2 ─────────────
+    # Categorización geográfica para personalizar mensajes WhatsApp según
+    # cercanía a Puerto Varas. Se pobla con normalizar_ciudades_clientes
+    # a partir de Cliente.ciudad (texto libre) y Cliente.comuna (FK).
+    ciudad_normalizada = models.ForeignKey(
+        'Ciudad',  # forward ref — Ciudad está definida más abajo en este archivo
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='clientes',
+        help_text="Mapeo del texto libre 'ciudad' a una Ciudad canónica.",
+    )
+    region_geografica = models.CharField(
+        max_length=20,
+        choices=[
+            ('sur', 'Sur (≤120 km)'),
+            ('nacional', 'Resto de Chile'),
+            ('extranjero', 'Extranjero'),
+            ('sin_clasificar', 'Sin clasificar'),
+        ],
+        default='sin_clasificar',
+        db_index=True,
+        help_text="Categoría geográfica derivada. Define el tipo de mensaje WhatsApp.",
+    )
+    ciudad_normalizada_manual = models.BooleanField(
+        default=False,
+        help_text=(
+            "True si el admin editó ciudad_normalizada/region_geografica "
+            "manualmente. El comando normalizar_ciudades_clientes RESPETA "
+            "estas ediciones y no las sobrescribe."
+        ),
+    )
+
     @staticmethod
     def normalize_phone(phone_str):
         """
@@ -7026,3 +7058,76 @@ class EventoCelebracion(models.Model):
 
     def __str__(self):
         return f"Celebración {self.cliente_id} ({self.tipo}) {self.fecha}"
+
+
+# ============================================================================
+# Operación Vuelta a Casa · Etapa Geo.2 — Ciudad + región geográfica
+# ============================================================================
+# Eje geográfico para personalizar mensajes WhatsApp según si el cliente
+# vive cerca (servicio puntual) o lejos (pack alojamiento). 4 categorías:
+#   - sur: ≤120 km Puerto Varas — viene en el día
+#   - nacional: resto de Chile — necesita alojamiento
+#   - extranjero: no-Chile — excluir del cron
+#   - sin_clasificar: sin info — captura inline en bandeja (Geo.4)
+
+
+class Ciudad(models.Model):
+    """Catálogo de ciudades con aliases para normalización + región geo.
+
+    Diseño:
+        - nombre_canonico: el nombre "oficial" que se muestra y se persiste
+          en Cliente.ciudad_normalizada → ciudad.nombre_canonico
+        - aliases: lista separada por `|` de variantes en minúscula que
+          deben mapearse a este canónico. Ej: "puerto varas" tiene aliases
+          "pto varas|pto. varas|p. varas|ptovaras|puert varas". El comando
+          normalizar_ciudades_clientes hace lookup case-insensitive sobre
+          esta lista.
+        - region_geografica: clasificación operacional para el cron WhatsApp
+        - pais: default Chile; permite filtrar extranjeros sin enumerar
+
+    El admin permite agregar aliases sin tocar código — útil cuando aparece
+    una variante nueva en la base.
+    """
+    REGION_CHOICES = [
+        ('sur', 'Sur (≤120 km Puerto Varas)'),
+        ('nacional', 'Resto de Chile'),
+        ('extranjero', 'Extranjero'),
+    ]
+
+    nombre_canonico = models.CharField(
+        max_length=100, unique=True, db_index=True,
+        help_text="Nombre 'oficial' que se muestra (ej. 'Puerto Varas').",
+    )
+    aliases = models.TextField(
+        blank=True,
+        help_text=(
+            "Aliases en minúscula separados por |. Ej: "
+            "'puerto varas|pto varas|pto. varas|p. varas'. Lookup es "
+            "case-insensitive y trim-aware."
+        ),
+    )
+    region_geografica = models.CharField(
+        max_length=20, choices=REGION_CHOICES, db_index=True,
+    )
+    pais = models.CharField(max_length=50, default='Chile')
+    activo = models.BooleanField(default=True)
+
+    creado = models.DateTimeField(auto_now_add=True)
+    modificado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Ciudad"
+        verbose_name_plural = "Ciudades"
+        ordering = ['region_geografica', 'nombre_canonico']
+        indexes = [
+            models.Index(fields=['region_geografica', 'activo'], name='idx_ciudad_region_activo'),
+        ]
+
+    def __str__(self):
+        return f"{self.nombre_canonico} ({self.region_geografica})"
+
+    def aliases_list(self):
+        """Devuelve la lista de aliases como list[str] en minúscula y trimmed."""
+        if not self.aliases:
+            return []
+        return [a.strip().lower() for a in self.aliases.split('|') if a.strip()]
