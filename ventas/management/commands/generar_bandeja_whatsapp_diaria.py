@@ -62,6 +62,7 @@ from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from typing import List, Optional
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
@@ -205,7 +206,8 @@ class Command(BaseCommand):
         self, fecha_obj: date, cliente_id_filter: Optional[int]
     ) -> List[ClienteTaxonomia]:
         """Devuelve lista de ClienteTaxonomia + cliente prefetched que pasan
-        los filtros base (opt-out, sin teléfono, gracia, anti-saturación)."""
+        los filtros base (opt-out, sin teléfono, gracia, anti-saturación,
+        exclusión por nombre staff/proxy)."""
 
         qs = (
             ClienteTaxonomia.objects
@@ -222,6 +224,30 @@ class Command(BaseCommand):
         # P0 también lo respeta — es coherente.)
         corte_anti_saturacion = fecha_obj - timedelta(days=self.DIAS_ANTI_SATURACION)
         qs = qs.exclude(cliente__ultimo_contacto_outbound__gte=corte_anti_saturacion)
+
+        # ──── Etapa 5.5.1: exclusión por nombre staff/proxy ────
+        # Aremko Hotel Spa, Jorge Aguilera, Angélica Toloza Poblete, etc.
+        # No son personas reales — son "cuentas proxy" donde el staff registra
+        # reservas cuando el cliente no se identifica. Si llegan a la bandeja,
+        # el sistema les envía mensajes "vuelta a casa" a uno mismo.
+        nombres_icontains = getattr(settings, 'OVC_CLIENTES_EXCLUIDOS_ICONTAINS', []) or []
+        nombres_iexact = getattr(settings, 'OVC_CLIENTES_EXCLUIDOS_IEXACT', []) or []
+        if nombres_icontains or nombres_iexact:
+            n_antes = qs.count()
+            for patron in nombres_icontains:
+                if patron:
+                    qs = qs.exclude(cliente__nombre__icontains=patron)
+            for patron in nombres_iexact:
+                if patron:
+                    qs = qs.exclude(cliente__nombre__iexact=patron)
+            n_despues = qs.count()
+            n_excluidos_nombre = n_antes - n_despues
+            if n_excluidos_nombre > 0:
+                self.stdout.write(self.style.WARNING(
+                    f"  Excluidos por OVC_CLIENTES_EXCLUIDOS_* (staff/proxy): "
+                    f"{n_excluidos_nombre} (icontains={nombres_icontains}, "
+                    f"iexact={nombres_iexact})"
+                ))
 
         if cliente_id_filter:
             qs = qs.filter(cliente_id=cliente_id_filter)

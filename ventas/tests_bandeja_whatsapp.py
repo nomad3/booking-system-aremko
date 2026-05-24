@@ -668,3 +668,128 @@ class GenerarBandejaCommandTests(TestCase):
         # No hay script Regular → debe loguear warning, no crashear
         self._run()
         self.assertEqual(ContactoWhatsApp.objects.count(), 0)
+
+
+# ============================================================================
+# Etapa 5.5.1 — Exclusión por nombre (clientes staff/proxy)
+# ============================================================================
+
+from django.test import override_settings
+
+
+@override_settings(
+    OVC_CLIENTES_EXCLUIDOS_ICONTAINS=['aremko'],
+    OVC_CLIENTES_EXCLUIDOS_IEXACT=['Jorge Aguilera', 'Deborah'],
+)
+class ExclusionPorNombreTests(TestCase):
+    """Valida el filtro de Etapa 5.5.1: clientes proxy/staff no entran a bandeja."""
+
+    def setUp(self):
+        ScriptWhatsApp.objects.all().delete()
+        # Script genérico Dormido para que cualquier cliente Dormido tenga match
+        self.script = ScriptWhatsApp.objects.create(
+            script_id='B.1.TEST', nombre='Dormido genérico',
+            estado_valor_target='Dormido',
+            cohorte_estilo='', cohorte_contexto='', salva=1,
+            plantilla_texto='Hola {nombre}',
+        )
+
+    def _make_cliente_dormido(self, nombre, telefono):
+        cli = Cliente.objects.create(nombre=nombre, telefono=telefono)
+        ClienteTaxonomia.objects.create(
+            cliente=cli, eje_valor='Dormido',
+            eje_estilo='Amante de las Tinas', eje_contexto='Visitante Pareja',
+            dias_desde_ultima_visita=200, gasto_total=100000,
+            ultima_visita=date.today() - timedelta(days=200),
+        )
+        return cli
+
+    def _run(self, **kwargs):
+        out = StringIO()
+        call_command('generar_bandeja_whatsapp_diaria', stdout=out, **kwargs)
+        return out.getvalue()
+
+    # ---- icontains ----
+    def test_aremko_hotel_spa_se_excluye_por_icontains(self):
+        self._make_cliente_dormido('Aremko Hotel Spa', '+56912340001')
+        self._make_cliente_dormido('Cliente Real', '+56912340002')
+        self._run()
+        contactos = list(ContactoWhatsApp.objects.values_list('cliente__nombre', flat=True))
+        self.assertIn('Cliente Real', contactos)
+        self.assertNotIn('Aremko Hotel Spa', contactos)
+
+    def test_icontains_es_case_insensitive(self):
+        self._make_cliente_dormido('AREMKO PRUEBAS', '+56912340003')
+        self._make_cliente_dormido('aremko test', '+56912340004')
+        self._run()
+        contactos = list(ContactoWhatsApp.objects.values_list('cliente__nombre', flat=True))
+        self.assertNotIn('AREMKO PRUEBAS', contactos)
+        self.assertNotIn('aremko test', contactos)
+
+    # ---- iexact ----
+    def test_jorge_aguilera_exacto_se_excluye(self):
+        self._make_cliente_dormido('Jorge Aguilera', '+56912340005')
+        self._run()
+        contactos = list(ContactoWhatsApp.objects.values_list('cliente__nombre', flat=True))
+        self.assertNotIn('Jorge Aguilera', contactos)
+
+    def test_jorge_mendoza_NO_se_excluye(self):
+        """Patrón iexact NO debe disparar contra homónimos legítimos."""
+        self._make_cliente_dormido('Jorge Mendoza', '+56912340006')
+        self._make_cliente_dormido('Jorge Pérez Aguilera', '+56912340007')
+        self._run()
+        contactos = list(ContactoWhatsApp.objects.values_list('cliente__nombre', flat=True))
+        self.assertIn('Jorge Mendoza', contactos)
+        self.assertIn('Jorge Pérez Aguilera', contactos)  # NO match exacto
+
+    def test_iexact_es_case_insensitive(self):
+        self._make_cliente_dormido('JORGE AGUILERA', '+56912340008')
+        self._make_cliente_dormido('jorge aguilera', '+56912340009')
+        self._run()
+        contactos = list(ContactoWhatsApp.objects.values_list('cliente__nombre', flat=True))
+        self.assertNotIn('JORGE AGUILERA', contactos)
+        self.assertNotIn('jorge aguilera', contactos)
+
+    # ---- Combinación ----
+    def test_multiples_patrones_se_aplican_todos(self):
+        self._make_cliente_dormido('Aremko Hotel Spa', '+56912340010')
+        self._make_cliente_dormido('Jorge Aguilera', '+56912340011')
+        self._make_cliente_dormido('Deborah', '+56912340012')
+        self._make_cliente_dormido('Cliente Normal', '+56912340013')
+        self._run()
+        contactos = list(ContactoWhatsApp.objects.values_list('cliente__nombre', flat=True))
+        self.assertEqual(contactos, ['Cliente Normal'])
+
+    # ---- Edge case: nombre vacío ----
+    def test_cliente_sin_nombre_no_crashea(self):
+        """El cron NO debe explotar si un cliente tiene nombre vacío."""
+        Cliente.objects.create(nombre='', telefono='+56912340014')
+        # No le agrego ClienteTaxonomia (no entrará a la bandeja igual),
+        # pero confirmamos que el query base con icontains de '' no crashea
+        # cuando hay nombres vacíos en otras filas.
+        self._make_cliente_dormido('Cliente Real', '+56912340015')
+        self._run()
+        # No assertion fuerte: solo que no crasheó.
+
+    @override_settings(
+        OVC_CLIENTES_EXCLUIDOS_ICONTAINS=[],
+        OVC_CLIENTES_EXCLUIDOS_IEXACT=[],
+    )
+    def test_sin_settings_no_excluye_nada(self):
+        """Con listas vacías, todos los candidatos pasan (backward compat)."""
+        self._make_cliente_dormido('Aremko Hotel Spa', '+56912340016')
+        self._make_cliente_dormido('Jorge Aguilera', '+56912340017')
+        self._run()
+        contactos = list(ContactoWhatsApp.objects.values_list('cliente__nombre', flat=True))
+        self.assertIn('Aremko Hotel Spa', contactos)
+        self.assertIn('Jorge Aguilera', contactos)
+
+    # ---- Logging ----
+    def test_log_reporta_cuantos_excluyo(self):
+        self._make_cliente_dormido('Aremko Hotel Spa', '+56912340018')
+        self._make_cliente_dormido('Jorge Aguilera', '+56912340019')
+        self._make_cliente_dormido('Cliente Real', '+56912340020')
+        out = self._run()
+        # Mensaje exacto del log
+        self.assertIn('Excluidos por OVC_CLIENTES_EXCLUIDOS_*', out)
+        self.assertIn('2', out)  # 2 excluidos (Aremko + Jorge)

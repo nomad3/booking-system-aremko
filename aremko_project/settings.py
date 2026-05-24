@@ -17,6 +17,32 @@ DEBUG = os.getenv('DEBUG') == 'True'
 # Usado por endpoints en /ventas/api/cron/* y /ventas/api/campaigns/*
 AUTOMATION_API_KEY = os.getenv('AUTOMATION_API_KEY', '')
 
+# ────────────────────────────────────────────────────────────────────────────
+# Operación Vuelta a Casa — Etapa 5.5.1
+# Clientes "proxy" / staff que deben ser excluidos del cron diario de
+# bandeja WhatsApp. Estos son nombres que el staff usa cuando un cliente
+# no se identifica al reservar (Aremko Hotel Spa, etc.) o cuentas del propio
+# equipo (Jorge, Angélica, Deborah, Ernesto). Si llegan a la bandeja, se
+# auto-envían mensajes de "vuelta a casa" raros.
+# ────────────────────────────────────────────────────────────────────────────
+
+# Match PARCIAL case-insensitive: cualquier nombre que CONTENGA estos strings
+# se excluye. Usar solo para palabras inequívocas (ej. "aremko" siempre indica
+# empresa o test).
+OVC_CLIENTES_EXCLUIDOS_ICONTAINS = [
+    'aremko',
+]
+
+# Match EXACTO case-insensitive: el nombre completo debe coincidir.
+# Usar para nombres de personas (evita falsos positivos con homónimos
+# legítimos: un cliente real llamado "Jorge Mendoza" NO se excluye).
+OVC_CLIENTES_EXCLUIDOS_IEXACT = [
+    'Jorge Aguilera',
+    'Angélica Toloza Poblete',
+    'Deborah',
+    'Ernesto',
+]
+
 # Configuraciones de seguridad
 SECURE_SSL_REDIRECT = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
