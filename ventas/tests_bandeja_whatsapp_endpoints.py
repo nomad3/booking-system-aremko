@@ -516,3 +516,100 @@ class ScriptsEstadisticasTests(BandejaWhatsappEndpointsTestCase):
         self.assertEqual(s['tasa_respuesta'], 0.5)
         self.assertEqual(s['reservaron'], 0)
         self.assertEqual(s['tasa_conversion'], 0.0)
+
+
+# ============================================================================
+# Etapa 5.5.2 — POST bloquear-cliente/
+# ============================================================================
+
+@override_settings(AUTOMATION_API_KEY=TEST_API_KEY)
+class BloquearClienteTests(BandejaWhatsappEndpointsTestCase):
+    def _url(self, cid):
+        return f'/ventas/api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/{cid}/bloquear-cliente/'
+
+    # ---- Auth ----
+    def test_sin_token_401(self):
+        r = self.client_http.post(
+            self._url(self.contacto.id),
+            data=json.dumps({'operador': 'jorge'}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 401)
+
+    def test_token_invalido_401(self):
+        r = self.client_http.post(
+            self._url(self.contacto.id),
+            data=json.dumps({'operador': 'jorge'}),
+            content_type='application/json',
+            HTTP_X_API_KEY='token-falso',
+        )
+        self.assertEqual(r.status_code, 401)
+
+    # ---- 404 ----
+    def test_404_si_contacto_no_existe(self):
+        r = self._post(self._url(99999), {'operador': 'jorge'})
+        self.assertEqual(r.status_code, 404)
+
+    # ---- Bloqueo efectivo ----
+    def test_200_bloquea_cliente_opt_out(self):
+        r = self._post(self._url(self.contacto.id), {
+            'operador': 'jorge', 'razon': 'cliente proxy - staff',
+        })
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data['success'])
+        self.assertTrue(data['cliente_bloqueado'])
+        self.assertEqual(data['cliente_id'], self.cli.id)
+
+        self.cli.refresh_from_db()
+        self.assertTrue(self.cli.opt_out_whatsapp)
+
+    def test_200_tambien_marca_contacto_como_no_aplica(self):
+        # Contacto está pendiente en setUp
+        self._post(self._url(self.contacto.id), {
+            'operador': 'jorge', 'razon': 'proxy',
+        })
+        self.contacto.refresh_from_db()
+        self.assertEqual(self.contacto.estado, 'no_aplica')
+        self.assertEqual(self.contacto.nota_operador, 'proxy')
+        self.assertEqual(self.contacto.operador, 'jorge')
+
+    def test_contacto_no_pendiente_no_se_toca_pero_cliente_si_se_bloquea(self):
+        # Contacto ya enviado: bloquear cliente pero NO modificar el contacto
+        self.contacto.estado = 'enviado'
+        self.contacto.fecha_envio = timezone.now()
+        self.contacto.save()
+
+        r = self._post(self._url(self.contacto.id), {'operador': 'jorge'})
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data['cliente_bloqueado'])
+        self.assertFalse(data['contacto_actualizado'])
+
+        self.cli.refresh_from_db()
+        self.contacto.refresh_from_db()
+        self.assertTrue(self.cli.opt_out_whatsapp)
+        self.assertEqual(self.contacto.estado, 'enviado')  # no cambió
+
+    # ---- Razón vacía es válida ----
+    def test_razon_vacia_funciona(self):
+        r = self._post(self._url(self.contacto.id), {'operador': 'jorge'})
+        self.assertEqual(r.status_code, 200)
+        self.cli.refresh_from_db()
+        self.assertTrue(self.cli.opt_out_whatsapp)
+
+    # ---- Idempotencia ----
+    def test_bloquear_dos_veces_no_crashea(self):
+        # Primera vez: bloquea
+        r1 = self._post(self._url(self.contacto.id), {'operador': 'jorge'})
+        self.assertEqual(r1.status_code, 200)
+        self.assertTrue(r1.json()['cliente_bloqueado'])
+
+        # Segunda vez: ya estaba bloqueado, no es error
+        r2 = self._post(self._url(self.contacto.id), {'operador': 'jorge'})
+        self.assertEqual(r2.status_code, 200)
+        # cliente_bloqueado=False porque ya estaba bloqueado de antes
+        self.assertFalse(r2.json()['cliente_bloqueado'])
+
+        self.cli.refresh_from_db()
+        self.assertTrue(self.cli.opt_out_whatsapp)

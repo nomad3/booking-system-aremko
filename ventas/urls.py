@@ -388,6 +388,11 @@ urlpatterns = [
         'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/<int:contacto_id>/registrar-respuesta/',
         ovc_views.registrar_respuesta, name='ovc_registrar_respuesta',
     ),
+    # Etapa 5.5.2 — bloqueo manual desde la bandeja
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/<int:contacto_id>/bloquear-cliente/',
+        ovc_views.bloquear_cliente, name='ovc_bloquear_cliente',
+    ),
     path(
         'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/explicacion/<int:contacto_id>/',
         ovc_views.explicacion, name='ovc_explicacion',

@@ -786,3 +786,91 @@ def scripts_estadisticas(request):
         'periodo': {'desde': desde.isoformat(), 'hasta': hasta.isoformat()},
         'scripts': out,
     })
+
+
+# ============================================================================
+# Etapa 5.5.2 — POST bandeja-whatsapp/<id>/bloquear-cliente/
+# ============================================================================
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def bloquear_cliente(request, contacto_id: int):
+    """Bloquea PERMANENTEMENTE al cliente para no recibir más WhatsApp.
+
+    Disparado por el botón "No volver a contactar" en la bandeja cuando el
+    operador detecta que el destinatario es staff/proxy/fallecido/etc.
+
+    Body JSON:
+        {
+            "operador": "jorge",
+            "razon": "cliente proxy - staff"
+        }
+
+    Side effects:
+        - Cliente.opt_out_whatsapp = True (bloqueo permanente, sin gracia)
+        - Si el contacto está en 'pendiente', se marca como 'no_aplica' con
+          nota_operador = razón (preserva auditoría)
+        - Log INFO con operador + razón + cliente_id
+
+    Idempotente:
+        Si el cliente ya está bloqueado, devuelve 200 con cliente_bloqueado=False
+        (no estaba sin bloqueo, nada nuevo que hacer), pero igual marca el
+        contacto como no_aplica si está pendiente.
+    """
+    import json
+
+    err = _require_api_key(request)
+    if err:
+        return err
+
+    try:
+        body = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Body must be JSON'}, status=400)
+
+    try:
+        contacto = ContactoWhatsApp.objects.select_related('cliente').get(id=contacto_id)
+    except ContactoWhatsApp.DoesNotExist:
+        return JsonResponse({'error': 'ContactoWhatsApp no existe'}, status=404)
+
+    if contacto.cliente is None:
+        return JsonResponse(
+            {'error': 'Contacto sin cliente asociado — no se puede bloquear'},
+            status=400,
+        )
+
+    razon = (body.get('razon') or '').strip()
+    operador = (body.get('operador') or '').strip()
+
+    # Bloquear cliente (idempotente)
+    cliente_bloqueado = False
+    if not contacto.cliente.opt_out_whatsapp:
+        contacto.cliente.opt_out_whatsapp = True
+        contacto.cliente.save(update_fields=['opt_out_whatsapp'])
+        cliente_bloqueado = True
+
+    # Actualizar contacto pendiente (también idempotente)
+    contacto_actualizado = False
+    if contacto.estado == 'pendiente':
+        contacto.estado = 'no_aplica'
+        if operador:
+            contacto.operador = operador
+        if razon:
+            contacto.nota_operador = razon
+        contacto.save(update_fields=['estado', 'operador', 'nota_operador'])
+        contacto_actualizado = True
+
+    logger.info(
+        "Bloqueo manual cliente_id=%s por operador=%r razon=%r "
+        "(cliente_bloqueado=%s, contacto_actualizado=%s)",
+        contacto.cliente_id, operador, razon,
+        cliente_bloqueado, contacto_actualizado,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'cliente_id': contacto.cliente_id,
+        'cliente_bloqueado': cliente_bloqueado,
+        'contacto_id': contacto.id,
+        'contacto_actualizado': contacto_actualizado,
+    })
