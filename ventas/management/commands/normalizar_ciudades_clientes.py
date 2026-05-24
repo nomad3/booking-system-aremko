@@ -174,9 +174,15 @@ class Command(BaseCommand):
         # ---- Procesar ----
         stats = Counter()
         no_match_textos = Counter()
-        actualizados = 0
+        cambios_pendientes: List[Cliente] = []  # buffer para bulk_update
 
-        # Iteramos en chunks (clienta optimizada Django)
+        # IMPORTANTE: usamos bulk_update en lugar de cliente.save() porque
+        # Cliente.save() ejecuta un override que valida teléfono — si algún
+        # cliente tiene teléfono no soportado (ej. +1 USA), un solo save()
+        # lanza ValidationError y aborta TODA la corrida.
+        # bulk_update va directo a SQL UPDATE, no ejecuta save(), no valida.
+        # Bonus: es ~10x más rápido (1 query por chunk vs 1 por cliente).
+
         for cliente in qs.iterator(chunk_size=500):
             metodo, nueva_ciudad, nueva_region = self._clasificar(cliente, lookup)
             stats[metodo] += 1
@@ -190,16 +196,20 @@ class Command(BaseCommand):
                 cliente.ciudad_normalizada_id != (nueva_ciudad.id if nueva_ciudad else None)
                 or cliente.region_geografica != nueva_region
             )
-            if cambio and not dry_run:
+            if cambio:
                 cliente.ciudad_normalizada = nueva_ciudad
                 cliente.region_geografica = nueva_region
                 # NO tocamos ciudad_normalizada_manual (sigue False)
-                cliente.save(update_fields=[
-                    'ciudad_normalizada', 'region_geografica',
-                ])
-                actualizados += 1
-            elif cambio and dry_run:
-                actualizados += 1
+                cambios_pendientes.append(cliente)
+
+        # ---- Persistir en bulk (si no es dry-run) ----
+        actualizados = len(cambios_pendientes)
+        if not dry_run and cambios_pendientes:
+            Cliente.objects.bulk_update(
+                cambios_pendientes,
+                ['ciudad_normalizada', 'region_geografica'],
+                batch_size=500,
+            )
 
         # ---- Reporte ----
         elapsed = time.time() - t0
