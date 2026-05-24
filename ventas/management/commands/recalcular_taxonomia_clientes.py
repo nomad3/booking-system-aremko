@@ -131,12 +131,35 @@ class Command(BaseCommand):
             '--batch-size', type=int, default=500,
             help='Tamaño de batch para bulk_create/bulk_update (default 500).',
         )
+        # ──── Operación Vuelta a Casa · Etapa 5.3 ────
+        # Flag opt-in para registrar TaxonomiaMovimiento + EventoCelebracion
+        # cuando se detectan cambios en los ejes. Default OFF garantiza que
+        # el comportamiento actual NO cambia (bit-exact) hasta que se opta in.
+        parser.add_argument(
+            '--registrar-movimientos', action='store_true',
+            help=(
+                'OPT-IN: registra TaxonomiaMovimiento + EventoCelebracion '
+                'cuando detecta cambios en los ejes. Default OFF — '
+                'comportamiento bit-exact al actual.'
+            ),
+        )
+        parser.add_argument(
+            '--evento-origen', type=str, default='recalculo_features',
+            choices=['reserva', 'paso_tiempo', 'recalculo_features', 'manual'],
+            help=(
+                "Valor de evento_origen para los TaxonomiaMovimiento creados "
+                "(solo aplica con --registrar-movimientos). "
+                "Default 'recalculo_features'."
+            ),
+        )
 
     def handle(self, *args, **opts):
         t0 = time.time()
         dry_run = opts['dry_run']
         batch_size = opts['batch_size']
         modificados_desde_str = opts['solo_modificados_desde']
+        registrar_movimientos = opts['registrar_movimientos']
+        evento_origen = opts['evento_origen']
 
         today = timezone.now().date()
         # periodo_start = primer día del mes "hace 23 meses".
@@ -213,12 +236,23 @@ class Command(BaseCommand):
                 self._print_distribution(features)
                 return
 
-            stats = self._persist(features, batch_size=batch_size)
+            stats = self._persist(
+                features,
+                batch_size=batch_size,
+                registrar_movimientos=registrar_movimientos,
+                evento_origen=evento_origen,
+            )
             elapsed = time.time() - t0
             self.stdout.write(self.style.SUCCESS(
                 f"OK: {stats['created']:,} creados, {stats['updated']:,} actualizados, "
                 f"{stats['unchanged']:,} sin cambios. Tiempo: {elapsed:.1f}s"
             ))
+            if registrar_movimientos:
+                self.stdout.write(self.style.NOTICE(
+                    f"Bitácora viva: {stats['movimientos_creados']:,} movimientos, "
+                    f"{stats['celebraciones_creadas']:,} celebraciones "
+                    f"(evento_origen='{evento_origen}')"
+                ))
             self._print_distribution(features)
 
     # -----------------------------------------------------------------------
@@ -479,7 +513,13 @@ class Command(BaseCommand):
     # -----------------------------------------------------------------------
     # Persistencia: split create+update para eficiencia
     # -----------------------------------------------------------------------
-    def _persist(self, features: Dict[int, dict], batch_size: int) -> dict:
+    def _persist(
+        self,
+        features: Dict[int, dict],
+        batch_size: int,
+        registrar_movimientos: bool = False,
+        evento_origen: str = 'recalculo_features',
+    ) -> dict:
         # 1) IDs ya en la tabla
         existing = {
             t.cliente_id: t
@@ -492,12 +532,32 @@ class Command(BaseCommand):
         to_update: List[ClienteTaxonomia] = []
         unchanged = 0
 
+        # ──── Etapa 5.3: capturar snapshots para Bitácora Viva ────
+        # Solo si flag opt-in. Si OFF, esta lista queda vacía y todo el bloque
+        # de registro al final se skipea → comportamiento bit-exact al previo.
+        # Cada entrada: (cliente_id, antes_dict | None, despues_dict)
+        snapshots_para_movimientos: List[Tuple[int, Optional[dict], dict]] = []
+
         for cid, f in features.items():
             data = self._features_to_model_kwargs(f)
             inst = existing.get(cid)
+
+            # Capturar 3 ejes ANTES de modificar (solo si vamos a registrar)
+            antes_ejes = None
+            if registrar_movimientos and inst is not None:
+                antes_ejes = {
+                    'eje_valor': inst.eje_valor,
+                    'eje_estilo': inst.eje_estilo,
+                    'eje_contexto': inst.eje_contexto,
+                }
+
             if inst is None:
                 obj = ClienteTaxonomia(cliente_id=cid, **data)
                 to_create.append(obj)
+                if registrar_movimientos:
+                    # Cliente nuevo: anterior=None, generar_movimientos_y_celebraciones
+                    # creará el movimiento como "creación inicial" sin celebraciones.
+                    snapshots_para_movimientos.append((cid, None, data))
             else:
                 changed = False
                 for k, v in data.items():
@@ -506,6 +566,8 @@ class Command(BaseCommand):
                         changed = True
                 if changed:
                     to_update.append(inst)
+                    if registrar_movimientos:
+                        snapshots_para_movimientos.append((cid, antes_ejes, data))
                 else:
                     unchanged += 1
 
@@ -524,10 +586,45 @@ class Command(BaseCommand):
                 to_update, FIELDS_TO_UPDATE, batch_size=batch_size
             )
 
+        # ──── Etapa 5.3: registrar movimientos + celebraciones ────
+        # Solo entra si flag --registrar-movimientos. Si OFF, snapshots_para_movimientos
+        # está vacío y todo este bloque se skipea (cero overhead).
+        movimientos_creados = 0
+        celebraciones_creadas = 0
+        if registrar_movimientos and snapshots_para_movimientos:
+            from ventas.models import Cliente
+            from ventas.services.taxonomia_movimientos_service import (
+                generar_movimientos_y_celebraciones,
+            )
+
+            # Optimización: cargar todos los Cliente involucrados de una vez
+            cliente_ids_movimiento = [s[0] for s in snapshots_para_movimientos]
+            clientes = {
+                c.id: c for c in Cliente.objects.filter(id__in=cliente_ids_movimiento)
+            }
+
+            for cid, antes_dict, despues_dict in snapshots_para_movimientos:
+                cli = clientes.get(cid)
+                if cli is None:
+                    # Cliente borrado entre que cargamos features y ahora
+                    # (extremadamente raro pero defensivo)
+                    continue
+                mov, celebs = generar_movimientos_y_celebraciones(
+                    cliente=cli,
+                    taxo_anterior=antes_dict,
+                    taxo_nuevo=despues_dict,
+                    evento_origen=evento_origen,
+                )
+                if mov is not None:
+                    movimientos_creados += 1
+                celebraciones_creadas += len(celebs)
+
         return {
             'created': len(to_create),
             'updated': len(to_update),
             'unchanged': unchanged,
+            'movimientos_creados': movimientos_creados,
+            'celebraciones_creadas': celebraciones_creadas,
         }
 
     @staticmethod
