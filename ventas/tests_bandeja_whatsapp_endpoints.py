@@ -613,3 +613,183 @@ class BloquearClienteTests(BandejaWhatsappEndpointsTestCase):
 
         self.cli.refresh_from_db()
         self.assertTrue(self.cli.opt_out_whatsapp)
+
+
+# ============================================================================
+# Etapa 5.6 — GET del-dia/ (historial del día)
+# ============================================================================
+
+@override_settings(AUTOMATION_API_KEY=TEST_API_KEY)
+class DelDiaTests(BandejaWhatsappEndpointsTestCase):
+    URL = '/ventas/api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/del-dia/'
+
+    def _crear_contacto(self, cliente=None, estado='pendiente', operador='',
+                         fecha_envio=None, prioridad=5, gasto=100000,
+                         fecha_sugerido=None):
+        """Helper para crear ContactoWhatsApp con campos variables."""
+        cliente = cliente or self.cli
+        return ContactoWhatsApp.objects.create(
+            cliente=cliente, script=self.script,
+            eje_valor_snapshot='Dormido',
+            eje_estilo_snapshot='', eje_contexto_snapshot='',
+            dias_sin_venir_snapshot=200, salva=1,
+            gasto_historico_snapshot=gasto,
+            mensaje_renderizado='Hola test',
+            fecha_sugerido=fecha_sugerido or date.today(),
+            estado=estado, operador=operador,
+            fecha_envio=fecha_envio, prioridad=prioridad,
+        )
+
+    # ---- Auth ----
+    def test_sin_token_401(self):
+        r = self.client_http.get(self.URL)
+        self.assertEqual(r.status_code, 401)
+
+    def test_token_invalido_401(self):
+        r = self.client_http.get(self.URL, HTTP_X_API_KEY='invalido')
+        self.assertEqual(r.status_code, 401)
+
+    # ---- Default fecha = hoy ----
+    def test_default_fecha_es_hoy(self):
+        r = self._get(self.URL)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['fecha'], date.today().isoformat())
+
+    def test_fecha_explicita_se_respeta(self):
+        r = self._get(self.URL + '?fecha=2026-05-01')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['fecha'], '2026-05-01')
+
+    def test_fecha_invalida_400(self):
+        r = self._get(self.URL + '?fecha=NO-VALIDA')
+        self.assertEqual(r.status_code, 400)
+
+    # ---- Inclusión de contactos ----
+    def test_sin_filtro_operador_incluye_pendientes(self):
+        # setUp ya creó self.contacto en estado='pendiente'
+        r = self._get(self.URL)
+        data = r.json()
+        ids = [c['id'] for c in data['contactos']]
+        self.assertIn(self.contacto.id, ids)
+        self.assertEqual(data['stats']['pendientes'], 1)
+
+    def test_filtro_operador_NO_incluye_pendientes(self):
+        # Pendiente del setUp + 1 enviado por jorge
+        self.contacto2 = self._crear_contacto(
+            estado='enviado', operador='jorge',
+            fecha_envio=timezone.now(),
+        )
+        r = self._get(self.URL + '?operador=jorge')
+        data = r.json()
+        ids = [c['id'] for c in data['contactos']]
+        # Solo el enviado de jorge, no el pendiente (no tiene operador)
+        self.assertIn(self.contacto2.id, ids)
+        self.assertNotIn(self.contacto.id, ids)
+        self.assertEqual(data['operador_filtro'], 'jorge')
+
+    def test_filtro_operador_excluye_otros_operadores(self):
+        c_jorge = self._crear_contacto(
+            estado='enviado', operador='jorge', fecha_envio=timezone.now(),
+        )
+        c_deborah = self._crear_contacto(
+            estado='enviado', operador='deborah', fecha_envio=timezone.now(),
+        )
+        r = self._get(self.URL + '?operador=jorge')
+        ids = [c['id'] for c in r.json()['contactos']]
+        self.assertIn(c_jorge.id, ids)
+        self.assertNotIn(c_deborah.id, ids)
+
+    # ---- Orden ----
+    def test_orden_procesados_primero_pendientes_despues(self):
+        # Borrar el pendiente del setUp y crear: 2 enviados (en distintas horas) + 1 pendiente
+        self.contacto.delete()
+        ahora = timezone.now()
+        c_pend = self._crear_contacto(estado='pendiente', prioridad=1)
+        c_viejo = self._crear_contacto(
+            estado='enviado', operador='x',
+            fecha_envio=ahora - timedelta(hours=2),
+        )
+        c_reciente = self._crear_contacto(
+            estado='enviado', operador='x',
+            fecha_envio=ahora,
+        )
+        r = self._get(self.URL)
+        ids = [c['id'] for c in r.json()['contactos']]
+        # Reciente primero, después viejo, después pendiente
+        self.assertEqual(ids, [c_reciente.id, c_viejo.id, c_pend.id])
+
+    # ---- Stats ----
+    def test_stats_cuenta_por_estado(self):
+        # Borrar el pendiente del setUp
+        self.contacto.delete()
+        ahora = timezone.now()
+        self._crear_contacto(estado='enviado', operador='x', fecha_envio=ahora)
+        self._crear_contacto(estado='enviado', operador='x', fecha_envio=ahora)
+        self._crear_contacto(estado='omitido', operador='x', fecha_envio=ahora)
+        self._crear_contacto(estado='no_aplica', operador='x', fecha_envio=ahora)
+        self._crear_contacto(estado='pendiente')
+
+        r = self._get(self.URL)
+        stats = r.json()['stats']
+        self.assertEqual(stats['enviados'], 2)
+        self.assertEqual(stats['omitidos'], 1)
+        self.assertEqual(stats['no_aplica'], 1)
+        self.assertEqual(stats['pendientes'], 1)
+        self.assertEqual(r.json()['total'], 5)
+
+    # ---- Limit ----
+    def test_limit_default_100(self):
+        # Default es 100, no validamos contenido, solo que la key venga
+        r = self._get(self.URL)
+        self.assertEqual(r.json()['limit_aplicado'], 100)
+
+    def test_limit_explicito_se_respeta(self):
+        r = self._get(self.URL + '?limit=50')
+        self.assertEqual(r.json()['limit_aplicado'], 50)
+
+    def test_limit_cap_max_500(self):
+        r = self._get(self.URL + '?limit=9999')
+        self.assertEqual(r.json()['limit_aplicado'], 500)
+
+    def test_limit_minimo_1(self):
+        r = self._get(self.URL + '?limit=0')
+        self.assertEqual(r.json()['limit_aplicado'], 1)
+
+    def test_limit_invalido_usa_default(self):
+        r = self._get(self.URL + '?limit=abc')
+        self.assertEqual(r.json()['limit_aplicado'], 100)
+
+    # ---- cliente_opt_out_actual ----
+    def test_cliente_opt_out_actual_refleja_estado_actual(self):
+        # Inicialmente cliente NO bloqueado
+        r = self._get(self.URL)
+        c = next(c for c in r.json()['contactos'] if c['id'] == self.contacto.id)
+        self.assertFalse(c['cliente_opt_out_actual'])
+
+        # Bloqueamos cliente y volvemos a consultar
+        self.cli.opt_out_whatsapp = True
+        self.cli.save()
+        r2 = self._get(self.URL)
+        c2 = next(c for c in r2.json()['contactos'] if c['id'] == self.contacto.id)
+        self.assertTrue(c2['cliente_opt_out_actual'])
+
+    # ---- Campos extra del serializador historial ----
+    def test_response_incluye_campos_de_respuesta(self):
+        # Marcar el contacto como enviado + con respuesta
+        self.contacto.estado = 'enviado'
+        self.contacto.fecha_envio = timezone.now()
+        self.contacto.operador = 'jorge'
+        self.contacto.respondio = True
+        self.contacto.tipo_respuesta = 'interesado'
+        self.contacto.nota_operador = 'quiere viernes'
+        self.contacto.mensaje_enviado_editado = 'edited text'
+        self.contacto.save()
+
+        r = self._get(self.URL)
+        c = next(c for c in r.json()['contactos'] if c['id'] == self.contacto.id)
+        self.assertEqual(c['operador'], 'jorge')
+        self.assertEqual(c['respondio'], True)
+        self.assertEqual(c['tipo_respuesta'], 'interesado')
+        self.assertEqual(c['nota_operador'], 'quiere viernes')
+        self.assertEqual(c['mensaje_enviado_editado'], 'edited text')
+        self.assertIsNotNone(c['fecha_envio'])

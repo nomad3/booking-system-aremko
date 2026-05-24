@@ -874,3 +874,165 @@ def bloquear_cliente(request, contacto_id: int):
         'contacto_id': contacto.id,
         'contacto_actualizado': contacto_actualizado,
     })
+
+
+# ============================================================================
+# Etapa 5.6 — GET bandeja-whatsapp/del-dia/
+# ============================================================================
+# Historial del día: lista de TODOS los contactos del día (procesados +
+# pendientes) para que el operador pueda "deshacer" o reaccionar a casos
+# que detectó después (ej. cliente respondió por WhatsApp tarde).
+
+
+# Cap del query param `limit` para proteger el server de queries gigantes.
+DEL_DIA_LIMIT_MAX = 500
+DEL_DIA_LIMIT_DEFAULT = 100
+
+# Estados considerados "procesados" (tienen operador asociado).
+ESTADOS_PROCESADOS = ('enviado', 'omitido', 'no_aplica', 'descartado')
+
+
+def _serializar_contacto_historial(c: ContactoWhatsApp) -> dict:
+    """Versión del serializador con TODOS los campos relevantes para historial.
+
+    Extiende _serializar_contacto agregando:
+      - mensaje_enviado_editado (si el operador editó el texto)
+      - fecha_envio, operador
+      - respondio, tipo_respuesta, nota_operador
+      - cliente_opt_out_actual (estado actual del Cliente.opt_out_whatsapp,
+        NO del snapshot — clave para que el frontend sepa si el botón
+        "Bloquear permanente" ya está cumplido)
+    """
+    base = _serializar_contacto(c)
+    base.update({
+        'mensaje_enviado_editado': c.mensaje_enviado_editado or '',
+        'fecha_envio': c.fecha_envio.isoformat() if c.fecha_envio else None,
+        'operador': c.operador or '',
+        'respondio': bool(c.respondio),
+        'tipo_respuesta': c.tipo_respuesta or '',
+        'nota_operador': c.nota_operador or '',
+        'cliente_opt_out_actual': (
+            bool(c.cliente.opt_out_whatsapp) if c.cliente else False
+        ),
+    })
+    return base
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def del_dia(request):
+    """Devuelve TODOS los contactos del día (procesados + pendientes).
+
+    Query params:
+        fecha=YYYY-MM-DD   (opcional, default: hoy zona horaria Santiago)
+        operador=jorge     (opcional, filtra solo procesados de ese operador)
+        limit=100          (opcional, default 100, max 500)
+
+    Reglas de filtrado:
+        - Sin operador: devuelve TODOS los contactos del día (procesados +
+          pendientes) sin importar quién los procesó.
+        - Con operador: devuelve SOLO contactos procesados (enviado/omitido/
+          no_aplica/descartado) cuyo operador coincide. NO incluye pendientes
+          (los pendientes aún no tienen operador asociado, no tendría sentido
+          filtrar por uno).
+
+    Orden:
+        1. Procesados primero, por fecha_envio DESC (más reciente arriba —
+           útil para "deshacer última acción").
+        2. Pendientes después, por prioridad ASC, gasto_historico_snapshot DESC
+           (sin operador filter — los pendientes no entran si hay operador).
+    """
+    err = _require_api_key(request)
+    if err:
+        return err
+
+    # ---- Parse fecha ----
+    fecha_str = request.GET.get('fecha')
+    if fecha_str:
+        fecha_obj = _parse_fecha(fecha_str)
+        if fecha_obj is None:
+            return JsonResponse(
+                {'error': f'Parámetro fecha inválido: {fecha_str!r}. Formato YYYY-MM-DD.'},
+                status=400,
+            )
+    else:
+        fecha_obj = timezone.localtime(timezone.now()).date()
+
+    # ---- Parse limit ----
+    try:
+        limit = int(request.GET.get('limit', DEL_DIA_LIMIT_DEFAULT))
+    except (TypeError, ValueError):
+        limit = DEL_DIA_LIMIT_DEFAULT
+    limit = max(1, min(limit, DEL_DIA_LIMIT_MAX))
+
+    # ---- Parse operador ----
+    operador_filtro = (request.GET.get('operador') or '').strip() or None
+
+    # ---- Query base: contactos del día ----
+    qs_base = (
+        ContactoWhatsApp.objects
+        .select_related('cliente', 'cliente__taxonomia', 'script')
+        .filter(fecha_sugerido=fecha_obj)
+    )
+
+    # ---- Aplicar filtros según presencia de operador ----
+    if operador_filtro:
+        # Solo procesados de ese operador (los pendientes no tienen operador)
+        qs_visibles = qs_base.filter(
+            estado__in=ESTADOS_PROCESADOS,
+            operador=operador_filtro,
+        )
+    else:
+        # Todo el día (procesados + pendientes)
+        qs_visibles = qs_base
+
+    # ---- Stats ANTES de aplicar limit ----
+    stats = {
+        'enviados': 0,
+        'omitidos': 0,
+        'no_aplica': 0,
+        'pendientes': 0,
+        'descartados': 0,
+    }
+    # Una sola query agregando por estado
+    from django.db.models import Count
+    estado_counts = dict(
+        qs_visibles.values_list('estado').annotate(n=Count('id')).values_list('estado', 'n')
+    )
+    stats['enviados'] = estado_counts.get('enviado', 0)
+    stats['omitidos'] = estado_counts.get('omitido', 0)
+    stats['no_aplica'] = estado_counts.get('no_aplica', 0)
+    stats['pendientes'] = estado_counts.get('pendiente', 0)
+    stats['descartados'] = estado_counts.get('descartado', 0)
+    total = sum(stats.values())
+
+    # ---- Ordenar y materializar ----
+    # Para combinar "procesados por fecha_envio DESC" + "pendientes por prioridad ASC",
+    # hacemos 2 querysets y los concatenamos en Python.
+    qs_procesados = (
+        qs_visibles
+        .filter(estado__in=ESTADOS_PROCESADOS, fecha_envio__isnull=False)
+        .order_by('-fecha_envio', '-id')
+    )
+    qs_pendientes = (
+        qs_visibles
+        .filter(estado='pendiente')
+        .order_by('prioridad', '-gasto_historico_snapshot', 'id')
+    )
+
+    # Materializar respetando limit total
+    procesados_list = list(qs_procesados[:limit])
+    restantes = max(0, limit - len(procesados_list))
+    pendientes_list = list(qs_pendientes[:restantes]) if restantes else []
+    ordenados = procesados_list + pendientes_list
+
+    contactos_data = [_serializar_contacto_historial(c) for c in ordenados]
+
+    return JsonResponse({
+        'fecha': fecha_obj.isoformat(),
+        'operador_filtro': operador_filtro or '',
+        'total': total,
+        'stats': stats,
+        'limit_aplicado': limit,
+        'contactos': contactos_data,
+    })

@@ -393,6 +393,11 @@ urlpatterns = [
         'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/<int:contacto_id>/bloquear-cliente/',
         ovc_views.bloquear_cliente, name='ovc_bloquear_cliente',
     ),
+    # Etapa 5.6 — historial del día (drawer "deshacer última acción")
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/del-dia/',
+        ovc_views.del_dia, name='ovc_del_dia',
+    ),
     path(
         'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/explicacion/<int:contacto_id>/',
         ovc_views.explicacion, name='ovc_explicacion',
