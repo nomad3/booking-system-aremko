@@ -41,6 +41,7 @@ OVC_CLIENTES_EXCLUIDOS_ICONTAINS = [
 OVC_CLIENTES_EXCLUIDOS_IEXACT = [
     'Jorge Aguilera',
     'Angélica Toloza Poblete',
+    'Angèlica Toloza',  # variante tilde grave en BD (cliente_id 360)
     'Deborah',
     'Ernesto',
 ]
