@@ -46,26 +46,46 @@ PRIORIDAD_LABEL = {
 }
 
 
-def _buscar_inline(scripts, estado, estilo, contexto, salva):
-    """Replica buscar_script_cascada pero sobre lista en memoria (sin queries)."""
-    base = [s for s in scripts if s['estado_valor_target'] == estado and s['salva'] == salva]
-    # Nivel 1: exacto
-    for s in base:
-        if s['cohorte_estilo'] == estilo and s['cohorte_contexto'] == contexto:
-            return s
-    # Nivel 2: estilo + cualquier contexto
-    for s in base:
-        if s['cohorte_estilo'] == estilo and s['cohorte_contexto'] == '':
-            return s
-    # Nivel 3: cualquier estilo + contexto
-    for s in base:
-        if s['cohorte_estilo'] == '' and s['cohorte_contexto'] == contexto:
-            return s
-    # Nivel 4: genérico
-    for s in base:
-        if s['cohorte_estilo'] == '' and s['cohorte_contexto'] == '':
-            return s
-    return None
+def _buscar_inline(scripts, estado, estilo, contexto, salva, region=''):
+    """Replica buscar_script_cascada (Geo.3) pero sobre lista en memoria.
+
+    Misma lógica del service: bloque por region específica primero, fallback
+    a region='' solo si region='sur' o region=''.
+    """
+    base = [
+        s for s in scripts
+        if s['estado_valor_target'] == estado and s['salva'] == salva
+    ]
+
+    def _en_bloque(region_target):
+        bloque = [s for s in base if s['region_geografica_target'] == region_target]
+        # Nivel 1: exacto
+        for s in bloque:
+            if s['cohorte_estilo'] == estilo and s['cohorte_contexto'] == contexto:
+                return s
+        # Nivel 2: estilo + cualquier contexto
+        for s in bloque:
+            if s['cohorte_estilo'] == estilo and s['cohorte_contexto'] == '':
+                return s
+        # Nivel 3: cualquier estilo + contexto
+        for s in bloque:
+            if s['cohorte_estilo'] == '' and s['cohorte_contexto'] == contexto:
+                return s
+        # Nivel 4: genérico
+        for s in bloque:
+            if s['cohorte_estilo'] == '' and s['cohorte_contexto'] == '':
+                return s
+        return None
+
+    if not region:
+        return _en_bloque('')
+
+    s = _en_bloque(region)
+    if s:
+        return s
+    if region == 'sur':
+        return _en_bloque('')
+    return None  # nacional / sin_clasificar sin fallback
 
 
 class Command(BaseCommand):
@@ -83,6 +103,7 @@ class Command(BaseCommand):
             ScriptWhatsApp.objects.filter(activo=True).values(
                 'script_id', 'estado_valor_target',
                 'cohorte_estilo', 'cohorte_contexto', 'salva',
+                'region_geografica_target',  # Geo.3
             )
         )
 
@@ -103,6 +124,8 @@ class Command(BaseCommand):
             .exclude(cliente__telefono='')
             .exclude(cliente__proximo_contacto_no_antes_de__gt=hoy)
             .exclude(cliente__ultimo_contacto_outbound__gte=hoy - timedelta(days=DIAS_ANTI_SAT))
+            # Geo.3.a: excluir extranjeros (no reciben WhatsApp)
+            .exclude(cliente__region_geografica='extranjero')
         )
         elegibles = list(qs)
         total_tax = ClienteTaxonomia.objects.count()
@@ -133,13 +156,15 @@ class Command(BaseCommand):
             if p == 0:
                 salvas_p0[salva] += 1
 
+            region_cliente = tax.cliente.region_geografica or 'sin_clasificar'
             script = _buscar_inline(
-                scripts, tax.eje_valor, tax.eje_estilo, tax.eje_contexto, salva
+                scripts, tax.eje_valor, tax.eje_estilo, tax.eje_contexto, salva,
+                region=region_cliente,
             )
             if script is None:
                 sin_script_por_prio[p] += 1
                 sin_script_detalle[
-                    (tax.eje_valor, tax.eje_estilo, tax.eje_contexto, salva)
+                    (tax.eje_valor, tax.eje_estilo, tax.eje_contexto, salva, region_cliente)
                 ] += 1
 
         # ============================================================
@@ -199,10 +224,10 @@ class Command(BaseCommand):
             out.write('Top 10 cohortes sin script aplicable:')
             out.write('  ' + '-' * 64)
             top = sin_script_detalle.most_common(10)
-            for (valor, estilo, contexto, salva), n in top:
+            for (valor, estilo, contexto, salva, region), n in top:
                 out.write(
                     f'  [{n:>4}] valor={valor!r}, estilo={estilo!r}, '
-                    f'contexto={contexto!r}, salva={salva}'
+                    f'contexto={contexto!r}, salva={salva}, region={region!r}'
                 )
             out.write('')
 

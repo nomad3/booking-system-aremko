@@ -323,19 +323,21 @@ class Command(BaseCommand):
                 agotados += 1
                 continue
 
-            # ---- Buscar script en cascada ----
+            # ---- Buscar script en cascada (Geo.3: con región) ----
+            region_cliente = cliente.region_geografica or 'sin_clasificar'
             script = buscar_script_cascada(
                 scripts_qs,
                 estado_valor=tax.eje_valor,
                 estilo=tax.eje_estilo,
                 contexto=tax.eje_contexto,
                 salva=salva,
+                region=region_cliente,
             )
             if script is None:
                 sin_script += 1
                 logger.warning(
-                    "Sin script aplicable: cliente_id=%s estado=%r estilo=%r contexto=%r salva=%s",
-                    cliente.id, tax.eje_valor, tax.eje_estilo, tax.eje_contexto, salva,
+                    "Sin script aplicable: cliente_id=%s estado=%r estilo=%r contexto=%r salva=%s region=%r",
+                    cliente.id, tax.eje_valor, tax.eje_estilo, tax.eje_contexto, salva, region_cliente,
                 )
                 continue
 

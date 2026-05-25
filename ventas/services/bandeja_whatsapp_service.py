@@ -194,22 +194,56 @@ def calcular_prioridad(
 # Búsqueda de script en cascada (5 niveles)
 # ============================================================================
 
-def buscar_script_cascada(scripts_qs, estado_valor: str, estilo: str, contexto: str, salva: int):
+def buscar_script_cascada(
+    scripts_qs, estado_valor: str, estilo: str, contexto: str, salva: int,
+    region: str = '',
+):
     """Busca el ScriptWhatsApp más específico aplicable a este cliente.
 
-    Cascada (gana la primera que matchea):
-        1. exacto:    estado_valor + estilo + contexto + salva
-        2. parcial:   estado_valor + estilo + (contexto vacío) + salva
-        3. parcial:   estado_valor + (estilo vacío) + contexto + salva
-        4. genérico:  estado_valor + (estilo vacío) + (contexto vacío) + salva
-        5. None — sin match, el caller debe loguear warning y saltar
+    Cascada extendida (Etapa Geo.3) — la región es la dimensión PRIORITARIA.
+
+    Para un cliente con region=X y resto de parámetros:
+        Bloque "región específica" (region=X):
+          1. estado + estilo + contexto + salva + region=X
+          2. estado + estilo + salva + region=X         (cualquier contexto)
+          3. estado + contexto + salva + region=X       (cualquier estilo)
+          4. estado + salva + region=X                  (genérico de región)
+
+        Fallback a plantillas region='' (backward-compat):
+          - Si region='sur' o region='' (caller no pasó): permitir caer a
+            niveles 5-8 con region='' (las 17 plantillas iniciales sirven
+            como fallback para sur).
+          - Si region='nacional' o region='sin_clasificar': NO permitir
+            fallback. Los textos region='' asumen sur y dirían frases tipo
+            "esta semana" que suenan desubicadas para Santiago. Mejor
+            retornar None y que el caller loguee warning + salte cliente.
+
+        Niveles fallback (solo si se permite):
+          5. estado + estilo + contexto + salva + region=''
+          6. estado + estilo + salva + region=''
+          7. estado + contexto + salva + region=''
+          8. estado + salva + region=''                 (genérico universal)
+
+    Args:
+        scripts_qs: queryset base de ScriptWhatsApp (caller lo prepara)
+        estado_valor: ej. 'En Riesgo', 'Dormido', 'Leal'
+        estilo: ej. 'Amante de las Tinas' (vacío = sin estilo específico)
+        contexto: ej. 'Visitante Pareja' (vacío = sin contexto específico)
+        salva: 1, 2 o 3
+        region: 'sur', 'nacional', 'sin_clasificar' o '' (default = '' = sur o no clasificado).
+                NUNCA 'extranjero' (esos clientes no llegan acá).
+
+    Returns:
+        ScriptWhatsApp instance o None si no hay match aceptable.
 
     Notas:
-        - scripts_qs debe ser un queryset filtrado por activo=True y la salva
-          correspondiente (el caller lo prepara). Recibimos el queryset para
-          poder testear con mocks/in-memory en los tests sin tocar DB.
-        - El orden de evaluación es importante: si hay un script específico
-          (nivel 1) Y un genérico (nivel 4) para el mismo target, gana el 1.
+        - Backward compatibility total: callers que no pasen `region`
+          obtienen el comportamiento original (cascada de 4 niveles sobre
+          region='').
+        - Para region 'sur' explícito: si no hay específica, cae al fallback
+          region='' (los textos actuales sirven).
+        - Para region 'nacional' o 'sin_clasificar': si no hay específica,
+          retorna None (mejor no enviar que enviar mensaje desubicado).
     """
     base = scripts_qs.filter(
         estado_valor_target=estado_valor,
@@ -217,24 +251,40 @@ def buscar_script_cascada(scripts_qs, estado_valor: str, estilo: str, contexto: 
         activo=True,
     )
 
-    # Nivel 1: match exacto
-    s = base.filter(cohorte_estilo=estilo, cohorte_contexto=contexto).first()
+    def _buscar_en_bloque(region_target: str):
+        """4 niveles de cascada dentro de una región fija."""
+        bloque = base.filter(region_geografica_target=region_target)
+        # Nivel 1: exacto
+        s = bloque.filter(cohorte_estilo=estilo, cohorte_contexto=contexto).first()
+        if s:
+            return s
+        # Nivel 2: estilo + cualquier contexto
+        s = bloque.filter(cohorte_estilo=estilo, cohorte_contexto='').first()
+        if s:
+            return s
+        # Nivel 3: cualquier estilo + contexto
+        s = bloque.filter(cohorte_estilo='', cohorte_contexto=contexto).first()
+        if s:
+            return s
+        # Nivel 4: genérico
+        return bloque.filter(cohorte_estilo='', cohorte_contexto='').first()
+
+    # Si caller NO pasó región (compat), comportamiento original sobre region=''
+    if not region:
+        return _buscar_en_bloque('')
+
+    # Bloque específico de la región solicitada
+    s = _buscar_en_bloque(region)
     if s:
         return s
 
-    # Nivel 2: estilo + cualquier contexto
-    s = base.filter(cohorte_estilo=estilo, cohorte_contexto='').first()
-    if s:
-        return s
+    # Fallback a region='' SOLO para 'sur' — los textos universales sirven
+    if region == 'sur':
+        return _buscar_en_bloque('')
 
-    # Nivel 3: cualquier estilo + contexto
-    s = base.filter(cohorte_estilo='', cohorte_contexto=contexto).first()
-    if s:
-        return s
-
-    # Nivel 4: genérico (cualquier estilo + cualquier contexto)
-    s = base.filter(cohorte_estilo='', cohorte_contexto='').first()
-    return s  # puede ser None
+    # Para 'nacional' / 'sin_clasificar': mejor None que enviar mensaje
+    # desubicado. El caller loguea warning y salta el cliente.
+    return None
 
 
 # ============================================================================
