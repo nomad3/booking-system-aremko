@@ -793,3 +793,225 @@ class ExclusionPorNombreTests(TestCase):
         # Mensaje exacto del log
         self.assertIn('Excluidos por OVC_CLIENTES_EXCLUIDOS_*', out)
         self.assertIn('2', out)  # 2 excluidos (Aremko + Jorge)
+
+
+# ============================================================================
+# Etapa Geo.3 — Cascada + filtro extranjero + plantillas geo
+# ============================================================================
+
+class CascadaGeoTests(TestCase):
+    """Tests de la cascada extendida con región (Geo.3.b)."""
+
+    def setUp(self):
+        ScriptWhatsApp.objects.all().delete()
+        # Plantilla universal (region='') - fallback para sur
+        self.s_universal = ScriptWhatsApp.objects.create(
+            script_id='UNI.1', nombre='Universal',
+            estado_valor_target='Dormido',
+            cohorte_estilo='', cohorte_contexto='', salva=1,
+            region_geografica_target='',
+            plantilla_texto='universal',
+        )
+        # Plantilla específica nacional
+        self.s_nacional = ScriptWhatsApp.objects.create(
+            script_id='NAC.1', nombre='Nacional',
+            estado_valor_target='Dormido',
+            cohorte_estilo='', cohorte_contexto='', salva=1,
+            region_geografica_target='nacional',
+            plantilla_texto='pack alojamiento',
+        )
+
+    def test_cliente_sur_usa_universal_fallback(self):
+        s = buscar_script_cascada(
+            ScriptWhatsApp.objects.all(),
+            estado_valor='Dormido', estilo='', contexto='', salva=1,
+            region='sur',
+        )
+        # No hay plantilla específica sur → cae al fallback universal
+        self.assertEqual(s.script_id, 'UNI.1')
+
+    def test_cliente_nacional_usa_plantilla_nacional(self):
+        s = buscar_script_cascada(
+            ScriptWhatsApp.objects.all(),
+            estado_valor='Dormido', estilo='', contexto='', salva=1,
+            region='nacional',
+        )
+        self.assertEqual(s.script_id, 'NAC.1')
+
+    def test_cliente_nacional_sin_plantilla_NO_cae_a_universal(self):
+        # En Riesgo no tiene plantilla nacional ni universal
+        s = buscar_script_cascada(
+            ScriptWhatsApp.objects.all(),
+            estado_valor='En Riesgo', estilo='', contexto='', salva=1,
+            region='nacional',
+        )
+        # Debe retornar None — mejor no enviar que enviar mensaje desubicado
+        self.assertIsNone(s)
+
+    def test_cliente_sin_clasificar_sin_plantilla_NO_cae_a_universal(self):
+        s = buscar_script_cascada(
+            ScriptWhatsApp.objects.all(),
+            estado_valor='En Riesgo', estilo='', contexto='', salva=1,
+            region='sin_clasificar',
+        )
+        self.assertIsNone(s)
+
+    def test_caller_sin_region_comportamiento_original(self):
+        """Backward-compat: caller que no pasa region usa cascada original."""
+        s = buscar_script_cascada(
+            ScriptWhatsApp.objects.all(),
+            estado_valor='Dormido', estilo='', contexto='', salva=1,
+            # NO pasamos region
+        )
+        # Cae a la plantilla universal directamente
+        self.assertEqual(s.script_id, 'UNI.1')
+
+    def test_plantilla_region_mas_especifica_gana_sobre_universal(self):
+        """Si hay plantilla nacional Y universal, nacional gana para region=nacional."""
+        s = buscar_script_cascada(
+            ScriptWhatsApp.objects.all(),
+            estado_valor='Dormido', estilo='', contexto='', salva=1,
+            region='nacional',
+        )
+        self.assertEqual(s.script_id, 'NAC.1')  # NO 'UNI.1'
+
+    def test_plantilla_sur_explicita_no_existe_pero_universal_si(self):
+        """region='sur' sin plantilla sur específica → fallback universal."""
+        # No hay plantilla con region='sur' explícita, solo universal y nacional
+        s = buscar_script_cascada(
+            ScriptWhatsApp.objects.all(),
+            estado_valor='Dormido', estilo='', contexto='', salva=1,
+            region='sur',
+        )
+        self.assertEqual(s.script_id, 'UNI.1')
+
+
+class FiltroExtranjeroTests(TestCase):
+    """Tests del filtro automático de extranjeros en el cron (Geo.3.a)."""
+
+    def setUp(self):
+        ScriptWhatsApp.objects.all().delete()
+        ScriptWhatsApp.objects.create(
+            script_id='B.1.GEO', nombre='Dormido genérico',
+            estado_valor_target='Dormido',
+            cohorte_estilo='', cohorte_contexto='', salva=1,
+            region_geografica_target='',
+            plantilla_texto='Hola {nombre}',
+        )
+
+    def _make_cliente(self, telefono, region):
+        cli = Cliente.objects.create(
+            nombre=f'Test {region}', telefono=telefono,
+            region_geografica=region,
+        )
+        ClienteTaxonomia.objects.create(
+            cliente=cli, eje_valor='Dormido',
+            eje_estilo='Amante de las Tinas', eje_contexto='Visitante Pareja',
+            dias_desde_ultima_visita=200, gasto_total=100000,
+            ultima_visita=date.today() - timedelta(days=200),
+        )
+        return cli
+
+    def _run(self, **kwargs):
+        out = StringIO()
+        call_command('generar_bandeja_whatsapp_diaria', stdout=out, **kwargs)
+        return out.getvalue()
+
+    def test_extranjero_se_excluye_de_bandeja(self):
+        cli_sur = self._make_cliente('+56912349001', 'sur')
+        cli_ext = self._make_cliente('+56912349002', 'extranjero')
+
+        self._run()
+
+        contactos_clientes = list(
+            ContactoWhatsApp.objects.values_list('cliente__nombre', flat=True)
+        )
+        self.assertIn('Test sur', contactos_clientes)
+        self.assertNotIn('Test extranjero', contactos_clientes)
+
+    def test_log_reporta_excluidos_por_region(self):
+        self._make_cliente('+56912349003', 'extranjero')
+        self._make_cliente('+56912349004', 'extranjero')
+        self._make_cliente('+56912349005', 'sur')
+
+        out = self._run()
+        self.assertIn("Excluidos por region='extranjero'", out)
+        self.assertIn('2', out)  # 2 extranjeros excluidos
+
+
+class PlantillasGeoCascadaIntegracionTests(TestCase):
+    """Test end-to-end: cliente nacional matchea plantilla nacional."""
+
+    def setUp(self):
+        ScriptWhatsApp.objects.all().delete()
+        # Plantilla nacional específica
+        self.s_nacional = ScriptWhatsApp.objects.create(
+            script_id='B.1-N.TEST', nombre='Pack alojamiento',
+            estado_valor_target='Dormido',
+            cohorte_estilo='', cohorte_contexto='', salva=1,
+            region_geografica_target='nacional',
+            plantilla_texto='Hola {nombre}, pack 2 noches.',
+        )
+        # Plantilla sin_clasificar específica
+        self.s_sc = ScriptWhatsApp.objects.create(
+            script_id='B.1-SC.TEST', nombre='Neutra',
+            estado_valor_target='Dormido',
+            cohorte_estilo='', cohorte_contexto='', salva=1,
+            region_geografica_target='sin_clasificar',
+            plantilla_texto='Hola {nombre}, cuéntame desde dónde vienes.',
+        )
+        # Plantilla universal (sirve solo para sur)
+        self.s_universal = ScriptWhatsApp.objects.create(
+            script_id='B.1.UNI.TEST', nombre='Universal',
+            estado_valor_target='Dormido',
+            cohorte_estilo='', cohorte_contexto='', salva=1,
+            region_geografica_target='',
+            plantilla_texto='Hola {nombre}, ven esta semana.',
+        )
+
+    def _make_cliente(self, telefono, region):
+        cli = Cliente.objects.create(
+            nombre=f'Cliente {region}', telefono=telefono,
+            region_geografica=region,
+        )
+        ClienteTaxonomia.objects.create(
+            cliente=cli, eje_valor='Dormido',
+            eje_estilo='Amante de las Tinas', eje_contexto='Visitante Pareja',
+            dias_desde_ultima_visita=200, gasto_total=100000,
+            ultima_visita=date.today() - timedelta(days=200),
+        )
+        return cli
+
+    def _run(self):
+        out = StringIO()
+        call_command('generar_bandeja_whatsapp_diaria', stdout=out)
+        return out.getvalue()
+
+    def test_cliente_sur_recibe_universal(self):
+        self._make_cliente('+56912350001', 'sur')
+        self._run()
+        c = ContactoWhatsApp.objects.get()
+        self.assertEqual(c.script.script_id, 'B.1.UNI.TEST')
+        self.assertIn('ven esta semana', c.mensaje_renderizado)
+
+    def test_cliente_nacional_recibe_pack_alojamiento(self):
+        self._make_cliente('+56912350002', 'nacional')
+        self._run()
+        c = ContactoWhatsApp.objects.get()
+        self.assertEqual(c.script.script_id, 'B.1-N.TEST')
+        self.assertIn('pack 2 noches', c.mensaje_renderizado)
+
+    def test_cliente_sin_clasificar_recibe_neutra(self):
+        self._make_cliente('+56912350003', 'sin_clasificar')
+        self._run()
+        c = ContactoWhatsApp.objects.get()
+        self.assertEqual(c.script.script_id, 'B.1-SC.TEST')
+        self.assertIn('cuéntame', c.mensaje_renderizado)
+
+    def test_cliente_nacional_sin_plantilla_nacional_no_recibe_universal(self):
+        # Borrar la plantilla nacional → no debe caer al universal
+        self.s_nacional.delete()
+        self._make_cliente('+56912350004', 'nacional')
+        self._run()
+        # Cero contactos creados
+        self.assertEqual(ContactoWhatsApp.objects.count(), 0)
