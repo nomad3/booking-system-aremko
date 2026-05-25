@@ -297,6 +297,26 @@ class Command(BaseCommand):
         if cliente_ids_filtro is not None:
             eligibles = eligibles & cliente_ids_filtro
 
+        # 2.5) Clientes con historial de servicios románticos (Etapa Pareja Rom.)
+        # Pre-query única que devuelve set de cliente_ids con al menos 1
+        # reserva de los servicios marcados como románticos en settings.
+        # Usado abajo para enriquecer features con 'tiene_historial_romantico'.
+        from django.conf import settings as _settings
+        servicios_romanticos_ids = getattr(
+            _settings, 'OVC_SERVICIOS_ROMANTICOS_IDS', []
+        ) or []
+        if servicios_romanticos_ids:
+            cliente_ids_romanticos = set(
+                ReservaServicio.objects
+                .filter(servicio_id__in=servicios_romanticos_ids)
+                .exclude(venta_reserva__estado_pago='cancelado')
+                .values_list('venta_reserva__cliente_id', flat=True)
+                .distinct()
+            )
+            cliente_ids_romanticos.discard(None)
+        else:
+            cliente_ids_romanticos = set()
+
         # 3) Aggregator por cliente
         per_cli: Dict[int, dict] = defaultdict(lambda: {
             'fechas_creacion_ventas': set(),
@@ -500,6 +520,10 @@ class Command(BaseCommand):
                 'visitas_history_count': visitas_hist,
                 'primera_visita_global': primera_global,
                 'antiguedad_meses': antiguedad_meses,
+                # Etapa Pareja Romántica: usado por _classify_eje_contexto
+                # para asignar 'Pareja Romántica' cuando hay historial de
+                # ambientación romántica (incluso con 1 sola visita).
+                'tiene_historial_romantico': cid in cliente_ids_romanticos,
             }
 
         meta = {

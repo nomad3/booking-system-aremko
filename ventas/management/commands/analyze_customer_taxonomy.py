@@ -234,6 +234,23 @@ def _classify_eje_contexto(f: dict) -> str:
     max_temp = max(pct_verano, pct_otono, pct_invierno, pct_primavera)
     meses_rel = f['meses_relacion_actual']
 
+    # 0) Historial romántico: si el cliente contrató al menos 1 servicio
+    #    de ambientación romántica (whitelist en
+    #    settings.OVC_SERVICIOS_ROMANTICOS_IDS) Y vino con compañía
+    #    (avg ∈ [1.5, 2.5]) → 'Pareja Romántica' incluso con 1 visita.
+    #
+    #    El criterio histórico exigía ≥3 visitas + finde, pero validamos
+    #    en producción (analizar_pareja_romantica 2026-05-25) que el 80%
+    #    de los románticos son Dormidos/En Riesgo con 1 visita única
+    #    (celebración aniversario/proposición/luna de miel) — los
+    #    perdíamos en 'Visitante Pareja'.
+    #
+    #    El rango avg [1.5, 2.5] excluye reservas individuales (capaz
+    #    contrataron ambientación para sí mismos en algún caso raro)
+    #    y grupos (avg≥3 no aplica romántico).
+    if f.get('tiene_historial_romantico') and 1.5 <= avg <= 2.5:
+        return 'Pareja Romántica'
+
     # 1) Patrones confirmados (≥3 visitas)
     if visitas >= 3:
         if 1.8 <= avg <= 2.2 and pct_finde >= 50:

@@ -46,6 +46,19 @@ OVC_CLIENTES_EXCLUIDOS_IEXACT = [
     'Ernesto',
 ]
 
+# IDs de Servicios cuyo consumo marca al cliente como "Pareja Romántica"
+# en la heurística de eje_contexto (recalcular_taxonomia_clientes).
+# Validado con el reporte analizar_pareja_romantica 2026-05-25:
+#   22 = Ambientación romántica R1 (96 reservas históricas)
+#   23 = Ambientación romántica R2 (12)
+#   77 = San Valentin 2026 (35)
+#   24 = Decoración Simple · Azul (20)
+#   66 = Decoración Simple · Rosado (8)
+# Total: ~171 reservas. Se excluyen intencionalmente Ambientación Mamá
+# y Decoración Cumpleaños (no son románticos, son Día de la Madre y
+# Cumpleaños respectivamente).
+OVC_SERVICIOS_ROMANTICOS_IDS = [22, 23, 24, 66, 77]
+
 # Configuraciones de seguridad
 SECURE_SSL_REDIRECT = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
