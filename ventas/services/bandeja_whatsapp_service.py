@@ -123,6 +123,18 @@ def calcular_prioridad(
 
     Reglas (en orden de evaluación, primera que matchea gana):
 
+        FILTRO PREVIO — días mínimos desde última visita
+            Si el cliente vino hace menos del mínimo configurado en
+            settings.OVC_DIAS_MINIMO_DESDE_ULTIMA_VISITA[eje_valor], retorna
+            None ANTES de evaluar cualquier P. Esto evita que un Campeón con
+            visita hace 4 días reciba "te echamos de menos" porque no había
+            ultimo_contacto_outbound aún.
+
+            Valores configurados (settings):
+                Campeón=45, Leal=60, Regular=30, Gran Gastador Ocasional=45.
+                En Riesgo/Dormido/En Prueba/Pre-sistema=0 (las heurísticas
+                P1-P3 ya tienen su propio chequeo de inactividad).
+
         P0  Leal / Campeón          ultimo_contacto_outbound es NULL
                                     o (hoy - ultimo_contacto_outbound).days > 30
                                     → mesa chica, toque mensual
@@ -149,6 +161,20 @@ def calcular_prioridad(
               (clientes Regular dentro de cadencia, Pre-sistema,
               Gran Gastador Ocasional sin atrasos, etc.)
     """
+    # ---------- Filtro previo: días mínimos desde última visita ----------
+    # Bloquea entrada a bandeja si el cliente vino hace muy poco para su
+    # clasificación. Lazy import de settings para mantener el módulo testeable
+    # sin Django runtime cuando se importan otros helpers (humanize_*, etc.).
+    from django.conf import settings
+    dias_minimo_map = getattr(settings, 'OVC_DIAS_MINIMO_DESDE_ULTIMA_VISITA', {})
+    dias_minimo = dias_minimo_map.get(eje_valor, 0)
+    if (
+        dias_minimo > 0
+        and dias_desde_ultima_visita is not None
+        and dias_desde_ultima_visita < dias_minimo
+    ):
+        return None
+
     # ---------- P0: Mesa chica (Leal + Campeón, contacto mensual) ----------
     if eje_valor in ('Leal', 'Campeón'):
         if ultimo_contacto_outbound is None:

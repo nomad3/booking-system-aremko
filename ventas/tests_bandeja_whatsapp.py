@@ -202,10 +202,14 @@ class CalcularPrioridadTests(TestCase):
     )
 
     def _call(self, **overrides):
+        # Default dias=100 para que todos los tests pasen el filtro previo
+        # de OVC_DIAS_MINIMO_DESDE_ULTIMA_VISITA (Campeón=45, Leal=60, etc.).
+        # Cada test que necesite verificar bordes de inactividad/visita
+        # reciente lo sobreescribe explícitamente.
         kw = {
             **self.BASE_KWARGS,
             'eje_valor': 'Regular',
-            'dias_desde_ultima_visita': 30,
+            'dias_desde_ultima_visita': 100,
             'ultimo_contacto_outbound': None,
         }
         kw.update(overrides)
@@ -335,11 +339,12 @@ class CalcularPrioridadTests(TestCase):
         )
 
     def test_regular_dentro_cadencia_no_aplica(self):
-        # avg=30d, no viene hace 25d → todavía está dentro
+        # avg=30d, no viene hace 50d → pasa filtro (>=30) pero P4 requiere >60
+        # → None por cadencia, no por filtro previo
         self.assertIsNone(
             self._call(
                 eje_valor='Regular',
-                dias_desde_ultima_visita=25,
+                dias_desde_ultima_visita=50,
                 dias_entre_visitas_avg=30.0,
             )
         )
@@ -359,7 +364,66 @@ class CalcularPrioridadTests(TestCase):
         self.assertIsNone(self._call(eje_valor='Pre-sistema'))
 
     def test_gg_ocasional_sin_regla_no_aplica(self):
+        # GG Ocasional min=45, dias=100 pasa filtro pero ninguna regla P aplica.
         self.assertIsNone(self._call(eje_valor='Gran Gastador Ocasional'))
+
+    # ---- Filtro previo: días mínimos desde última visita ----
+    # Bug fix 2026-05-25: Campeones/Leales con visita reciente entraban a
+    # bandeja P0 porque su ultimo_contacto_outbound era NULL (nunca habíamos
+    # corrido el sistema). Resultado: cliente Ema (Campeón, visita hace 4d)
+    # iba a recibir "te echamos de menos". El filtro previo bloquea ese caso.
+    def test_filtro_campeon_visita_reciente_bloqueado(self):
+        # Campeón con visita hace 30d (< 45 mínimo) → None aunque P0 calzaría.
+        self.assertIsNone(
+            self._call(
+                eje_valor='Campeón',
+                dias_desde_ultima_visita=30,
+                ultimo_contacto_outbound=None,
+            )
+        )
+
+    def test_filtro_campeon_visita_60d_califica_p0(self):
+        # Campeón con visita hace 60d (>= 45 mínimo) → P0 normal.
+        self.assertEqual(
+            self._call(
+                eje_valor='Campeón',
+                dias_desde_ultima_visita=60,
+                ultimo_contacto_outbound=None,
+            ),
+            0
+        )
+
+    def test_filtro_leal_visita_50d_bloqueado(self):
+        # Leal con visita hace 50d (< 60 mínimo) → None.
+        self.assertIsNone(
+            self._call(
+                eje_valor='Leal',
+                dias_desde_ultima_visita=50,
+                ultimo_contacto_outbound=None,
+            )
+        )
+
+    def test_filtro_leal_visita_90d_califica_p0(self):
+        # Leal con visita hace 90d (>= 60 mínimo) → P0 normal.
+        self.assertEqual(
+            self._call(
+                eje_valor='Leal',
+                dias_desde_ultima_visita=90,
+                ultimo_contacto_outbound=None,
+            ),
+            0
+        )
+
+    def test_filtro_dormido_365d_califica_p6(self):
+        # Dormido tiene min=0 (heurística P3/P6 ya cubre inactividad).
+        # 365 días → fuera de ventana [195-210] → cae a P6.
+        self.assertEqual(
+            self._call(
+                eje_valor='Dormido',
+                dias_desde_ultima_visita=365,
+            ),
+            6
+        )
 
 
 # ============================================================================

@@ -60,6 +60,30 @@ OVC_CLIENTES_EXCLUIDOS_IEXACT = [
 OVC_SERVICIOS_ROMANTICOS_IDS = [22, 23, 24, 66, 77]
 
 # ────────────────────────────────────────────────────────────────────────────
+# Días MÍNIMOS desde última visita para entrar a bandeja WhatsApp
+# ────────────────────────────────────────────────────────────────────────────
+# Bugfix urgente 2026-05-25: Campeones con visita hace 4 días estaban
+# entrando a P0 (mesa chica) porque ultimo_contacto_outbound era NULL.
+# Resultado: mensaje "te echamos de menos" a clientes recién visitados.
+#
+# Esta tabla aplica un filtro adicional a calcular_prioridad: si la persona
+# vino hace menos del mínimo configurado para su clasificación, NO entra a
+# bandeja sin importar qué prioridad ganaría.
+#
+# Valores 0 = sin filtro (las heurísticas P1/P3/P4 ya tienen su propio chequeo
+# de inactividad, no necesitan refuerzo).
+OVC_DIAS_MINIMO_DESDE_ULTIMA_VISITA = {
+    'Campeón': 45,                   # 1.5 meses post-visita
+    'Leal': 60,                       # 2 meses post-visita
+    'Regular': 30,                    # 1 mes post-visita
+    'Gran Gastador Ocasional': 45,    # 1.5 meses post-visita
+    'En Prueba': 0,                   # heurística P2 ya define ventanas (30/60/80)
+    'En Riesgo': 0,                   # heurística P1/P5 ya define
+    'Dormido': 0,                     # heurística P3/P6 ya define
+    'Pre-sistema': 0,
+}
+
+# ────────────────────────────────────────────────────────────────────────────
 # Operación Vuelta a Casa — Variaciones IA on-demand
 # ────────────────────────────────────────────────────────────────────────────
 # Toggle global para que los endpoints /siguiente/ y /marcar-enviado/ devuelvan
