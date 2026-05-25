@@ -793,3 +793,85 @@ class DelDiaTests(BandejaWhatsappEndpointsTestCase):
         self.assertEqual(c['nota_operador'], 'quiere viernes')
         self.assertEqual(c['mensaje_enviado_editado'], 'edited text')
         self.assertIsNotNone(c['fecha_envio'])
+
+
+# ============================================================================
+# Commit puente Geo — campos region_geografica + ciudad_canonica en responses
+# ============================================================================
+
+@override_settings(AUTOMATION_API_KEY=TEST_API_KEY)
+class CommitPuenteGeoTests(BandejaWhatsappEndpointsTestCase):
+    """Verifica que los 3 endpoints exponen region_geografica + ciudad_canonica."""
+
+    def test_siguiente_incluye_campos_geo_basico(self):
+        # Sin ciudad_normalizada ni region asignada (default sin_clasificar)
+        url = '/ventas/api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/siguiente/'
+        r = self._get(url)
+        data = r.json()
+        cliente_obj = data['contacto']['cliente']
+        self.assertIn('region_geografica', cliente_obj)
+        self.assertIn('ciudad_canonica', cliente_obj)
+        # Default: sin clasificar, sin ciudad
+        self.assertEqual(cliente_obj['region_geografica'], 'sin_clasificar')
+        self.assertIsNone(cliente_obj['ciudad_canonica'])
+
+    def test_siguiente_con_cliente_clasificado(self):
+        # Crear Ciudad y asignarla
+        from ventas.models import Ciudad
+        c_pv = Ciudad.objects.create(
+            nombre_canonico='Puerto Varas', aliases='puerto varas',
+            region_geografica='sur',
+        )
+        self.cli.ciudad_normalizada = c_pv
+        self.cli.region_geografica = 'sur'
+        self.cli.save()
+
+        url = '/ventas/api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/siguiente/'
+        r = self._get(url)
+        cliente_obj = r.json()['contacto']['cliente']
+        self.assertEqual(cliente_obj['region_geografica'], 'sur')
+        self.assertEqual(cliente_obj['ciudad_canonica'], 'Puerto Varas')
+
+    def test_del_dia_incluye_campos_geo(self):
+        from ventas.models import Ciudad
+        c_stgo = Ciudad.objects.create(
+            nombre_canonico='Santiago', aliases='santiago',
+            region_geografica='nacional',
+        )
+        self.cli.ciudad_normalizada = c_stgo
+        self.cli.region_geografica = 'nacional'
+        self.cli.save()
+
+        url = '/ventas/api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/del-dia/'
+        r = self._get(url)
+        c = r.json()['contactos'][0]
+        self.assertEqual(c['cliente']['region_geografica'], 'nacional')
+        self.assertEqual(c['cliente']['ciudad_canonica'], 'Santiago')
+
+    def test_marcar_enviado_siguiente_pre_resuelto_incluye_geo(self):
+        # Crear segundo contacto pendiente con ciudad asignada
+        from ventas.models import Ciudad
+        c_pv = Ciudad.objects.create(
+            nombre_canonico='Puerto Varas', aliases='puerto varas',
+            region_geografica='sur',
+        )
+        cli2 = Cliente.objects.create(
+            nombre='Otro', telefono='+56987650200',
+            ciudad_normalizada=c_pv, region_geografica='sur',
+        )
+        ContactoWhatsApp.objects.create(
+            cliente=cli2, script=self.script,
+            eje_valor_snapshot='Dormido', eje_estilo_snapshot='',
+            eje_contexto_snapshot='',
+            dias_sin_venir_snapshot=100, salva=1, mensaje_renderizado='x',
+            prioridad=3, fecha_sugerido=date.today(), estado='pendiente',
+        )
+        # Marcar el primero como enviado
+        url = f'/ventas/api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/{self.contacto.id}/marcar-enviado/'
+        r = self._post(url, {'operador': 'test'})
+        data = r.json()
+        siguiente = data['siguiente']
+        self.assertEqual(siguiente['tipo'], 'nuevo_contacto')
+        # El siguiente cliente (con ciudad asignada) trae los campos geo
+        self.assertEqual(siguiente['contacto']['cliente']['region_geografica'], 'sur')
+        self.assertEqual(siguiente['contacto']['cliente']['ciudad_canonica'], 'Puerto Varas')

@@ -131,9 +131,18 @@ def _serializar_perfil(cliente: Cliente, tax) -> dict:
 
 
 def _serializar_contacto(c: ContactoWhatsApp) -> dict:
-    """Estructura del contacto para el frontend."""
+    """Estructura del contacto para el frontend.
+
+    Incluye categorización geográfica (Etapa Geo.2 ya deployada):
+      - cliente.region_geografica: 'sur' | 'nacional' | 'extranjero' | 'sin_clasificar'
+      - cliente.ciudad_canonica: nombre canónico de Ciudad o null si sin clasificar
+    """
     tax = getattr(c.cliente, 'taxonomia', None) if c.cliente else None
     telefono = c.cliente.telefono if c.cliente else ''
+    ciudad_canonica = (
+        c.cliente.ciudad_normalizada.nombre_canonico
+        if c.cliente and c.cliente.ciudad_normalizada else None
+    )
     return {
         'id': c.id,
         'cliente': {
@@ -141,6 +150,11 @@ def _serializar_contacto(c: ContactoWhatsApp) -> dict:
             'nombre': c.cliente.nombre if c.cliente else '',
             'telefono': telefono,
             'telefono_limpio': telefono.replace('+', '').replace(' ', '') if telefono else '',
+            # Etapa Geo.2 — campos geográficos expuestos para badge visual
+            'region_geografica': (
+                c.cliente.region_geografica if c.cliente else 'sin_clasificar'
+            ),
+            'ciudad_canonica': ciudad_canonica,
         },
         'perfil_resumen': _serializar_perfil(c.cliente, tax),
         'script_id': c.script.script_id if c.script else '',
@@ -209,7 +223,7 @@ def siguiente(request):
     hasta = hoy - timedelta(days=VENTANA_RESPUESTA_PENDIENTE_MIN)
     resp_pend = (
         ContactoWhatsApp.objects
-        .select_related('cliente', 'script')
+        .select_related('cliente', 'cliente__ciudad_normalizada', 'script')
         .filter(
             estado='enviado',
             fecha_envio__date__gte=desde,
@@ -229,7 +243,7 @@ def siguiente(request):
     # ---- 2. Celebraciones pendientes del día ----
     celeb = (
         EventoCelebracion.objects
-        .select_related('cliente')
+        .select_related('cliente', 'cliente__ciudad_normalizada')
         .filter(fecha=hoy, mostrado_en_bandeja=False)
         .order_by('creado')
         .first()
@@ -255,7 +269,7 @@ def siguiente(request):
     # ---- 3. Próximo contacto pendiente del día ----
     nuevo = (
         ContactoWhatsApp.objects
-        .select_related('cliente', 'script')
+        .select_related('cliente', 'cliente__ciudad_normalizada', 'script')
         .filter(fecha_sugerido=hoy, estado='pendiente')
         .order_by('prioridad', '-gasto_historico_snapshot', 'id')
         .first()
@@ -316,7 +330,7 @@ def marcar_enviado(request, contacto_id: int):
     mensaje_editado = body.get('mensaje_enviado_editado', '') or ''
 
     try:
-        contacto = ContactoWhatsApp.objects.select_related('cliente').get(id=contacto_id)
+        contacto = ContactoWhatsApp.objects.select_related('cliente', 'cliente__ciudad_normalizada').get(id=contacto_id)
     except ContactoWhatsApp.DoesNotExist:
         return JsonResponse({'error': f'ContactoWhatsApp {contacto_id} no existe'}, status=404)
 
@@ -369,7 +383,7 @@ def _resolver_siguiente_payload(hoy: date) -> dict:
     """Versión inline de siguiente() que no requiere request (reuso interno)."""
     nuevo = (
         ContactoWhatsApp.objects
-        .select_related('cliente', 'script')
+        .select_related('cliente', 'cliente__ciudad_normalizada', 'script')
         .filter(fecha_sugerido=hoy, estado='pendiente')
         .order_by('prioridad', '-gasto_historico_snapshot', 'id')
         .first()
@@ -438,7 +452,7 @@ def marcar_no_aplica(request, contacto_id: int):
         return JsonResponse({'error': 'Body must be JSON'}, status=400)
 
     try:
-        contacto = ContactoWhatsApp.objects.select_related('cliente').get(id=contacto_id)
+        contacto = ContactoWhatsApp.objects.select_related('cliente', 'cliente__ciudad_normalizada').get(id=contacto_id)
     except ContactoWhatsApp.DoesNotExist:
         return JsonResponse({'error': 'ContactoWhatsApp no existe'}, status=404)
 
@@ -502,7 +516,7 @@ def registrar_respuesta(request, contacto_id: int):
         return JsonResponse({'error': 'Body must be JSON'}, status=400)
 
     try:
-        contacto = ContactoWhatsApp.objects.select_related('cliente').get(id=contacto_id)
+        contacto = ContactoWhatsApp.objects.select_related('cliente', 'cliente__ciudad_normalizada').get(id=contacto_id)
     except ContactoWhatsApp.DoesNotExist:
         return JsonResponse({'error': 'ContactoWhatsApp no existe'}, status=404)
 
@@ -829,7 +843,7 @@ def bloquear_cliente(request, contacto_id: int):
         return JsonResponse({'error': 'Body must be JSON'}, status=400)
 
     try:
-        contacto = ContactoWhatsApp.objects.select_related('cliente').get(id=contacto_id)
+        contacto = ContactoWhatsApp.objects.select_related('cliente', 'cliente__ciudad_normalizada').get(id=contacto_id)
     except ContactoWhatsApp.DoesNotExist:
         return JsonResponse({'error': 'ContactoWhatsApp no existe'}, status=404)
 
@@ -971,7 +985,7 @@ def del_dia(request):
     # ---- Query base: contactos del día ----
     qs_base = (
         ContactoWhatsApp.objects
-        .select_related('cliente', 'cliente__taxonomia', 'script')
+        .select_related('cliente', 'cliente__taxonomia', 'cliente__ciudad_normalizada', 'script')
         .filter(fecha_sugerido=fecha_obj)
     )
 
