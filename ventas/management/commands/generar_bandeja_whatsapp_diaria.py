@@ -225,6 +225,19 @@ class Command(BaseCommand):
         corte_anti_saturacion = fecha_obj - timedelta(days=self.DIAS_ANTI_SATURACION)
         qs = qs.exclude(cliente__ultimo_contacto_outbound__gte=corte_anti_saturacion)
 
+        # ──── Etapa Geo.3.a: filtro automático extranjeros ────
+        # Clientes con region_geografica='extranjero' NO reciben WhatsApp
+        # outbound — el costo de un mensaje internacional + la baja conversión
+        # esperada hacen que mejor sean campañas separadas (email, etc).
+        # Loguear cuántos se excluyen para auditoría.
+        n_antes_extranjero = qs.count()
+        qs = qs.exclude(cliente__region_geografica='extranjero')
+        n_excluidos_extranjero = n_antes_extranjero - qs.count()
+        if n_excluidos_extranjero > 0:
+            self.stdout.write(self.style.NOTICE(
+                f"  Excluidos por region='extranjero': {n_excluidos_extranjero}"
+            ))
+
         # ──── Etapa 5.5.1: exclusión por nombre staff/proxy ────
         # Aremko Hotel Spa, Jorge Aguilera, Angélica Toloza Poblete, etc.
         # No son personas reales — son "cuentas proxy" donde el staff registra

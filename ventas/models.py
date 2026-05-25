@@ -6767,6 +6767,27 @@ class ScriptWhatsApp(models.Model):
         help_text="Permite desactivar plantilla sin borrarla (A/B testing futuro).",
     )
 
+    # ───── Etapa Geo.3 — target geográfico ─────
+    # Cuando vacío ('') = plantilla aplica a cualquier región. Las 17 plantillas
+    # iniciales (Geo.1/Etapa 2) quedaron con '' → sirven como fallback para 'sur'.
+    # Las plantillas nuevas de Geo.3 (nacional + sin_clasificar) llevan el sufijo.
+    # 'extranjero' NO está como choice porque el cron excluye esos clientes.
+    region_geografica_target = models.CharField(
+        max_length=20,
+        blank=True, default='',
+        choices=[
+            ('', 'Cualquier región'),
+            ('sur', 'Sur'),
+            ('nacional', 'Resto de Chile'),
+            ('sin_clasificar', 'Sin clasificar'),
+        ],
+        help_text=(
+            "Región geográfica del cliente a la que aplica esta plantilla. "
+            "Vacío = aplica a cualquier región (fallback). "
+            "'sur'/'nacional'/'sin_clasificar' = plantilla específica."
+        ),
+    )
+
     creado = models.DateTimeField(auto_now_add=True)
     modificado = models.DateTimeField(auto_now=True)
 
@@ -6782,6 +6803,11 @@ class ScriptWhatsApp(models.Model):
             models.Index(
                 fields=['estado_valor_target', 'activo'],
                 name='idx_script_estado_activo',
+            ),
+            # Geo.3: índice para lookup eficiente con región
+            models.Index(
+                fields=['region_geografica_target', 'estado_valor_target', 'salva'],
+                name='idx_script_region_match',
             ),
         ]
 
