@@ -59,6 +59,28 @@ OVC_CLIENTES_EXCLUIDOS_IEXACT = [
 # Cumpleaños respectivamente).
 OVC_SERVICIOS_ROMANTICOS_IDS = [22, 23, 24, 66, 77]
 
+# ────────────────────────────────────────────────────────────────────────────
+# Operación Vuelta a Casa — Variaciones IA on-demand
+# ────────────────────────────────────────────────────────────────────────────
+# Toggle global para que los endpoints /siguiente/ y /marcar-enviado/ devuelvan
+# un mensaje_variado generado por LLM (Gemini Flash Lite vía OpenRouter).
+# Cuando está apagado, mensaje_variado siempre = null en el response y el
+# frontend usa mensaje_renderizado original.
+# Costo estimado: ~$4/mes con Gemini Flash Lite a ~50 envíos/día.
+# Reversible en cualquier momento via env var sin redeploy.
+OVC_USAR_VARIACIONES_IA = os.getenv('OVC_USAR_VARIACIONES_IA', 'false').lower() == 'true'
+
+# Timeout en segundos. Si el LLM tarda más, el endpoint hace fallback a
+# mensaje_variado=null y devuelve el response normal — no bloquea al operador.
+OVC_VARIACION_TIMEOUT_SECONDS = int(os.getenv('OVC_VARIACION_TIMEOUT_SECONDS', '3'))
+
+# Modelo de OpenRouter a usar. Default: Gemini 2.0 Flash Lite (más barato).
+# Otros candidatos sin renombrar settings: anthropic/claude-haiku-4 o
+# google/gemini-flash-1.5.
+OVC_VARIACION_LLM_MODEL = os.getenv(
+    'OVC_VARIACION_LLM_MODEL', 'google/gemini-2.0-flash-lite-001',
+)
+
 # Configuraciones de seguridad
 SECURE_SSL_REDIRECT = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG

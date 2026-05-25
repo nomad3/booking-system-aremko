@@ -130,12 +130,19 @@ def _serializar_perfil(cliente: Cliente, tax) -> dict:
     }
 
 
-def _serializar_contacto(c: ContactoWhatsApp) -> dict:
+def _serializar_contacto(c: ContactoWhatsApp, agregar_variacion: bool = False) -> dict:
     """Estructura del contacto para el frontend.
 
     Incluye categorización geográfica (Etapa Geo.2 ya deployada):
       - cliente.region_geografica: 'sur' | 'nacional' | 'extranjero' | 'sin_clasificar'
       - cliente.ciudad_canonica: nombre canónico de Ciudad o null si sin clasificar
+
+    Variaciones IA (Etapa Variación):
+      - mensaje_variado: SOLO se intenta generar si agregar_variacion=True
+        Y settings.OVC_USAR_VARIACIONES_IA=True. Si cualquier capa falla,
+        devuelve None y el frontend usa mensaje_renderizado como fallback.
+      - Siempre presente en el response (None si no aplica) para shape
+        consistente del JSON.
     """
     tax = getattr(c.cliente, 'taxonomia', None) if c.cliente else None
     telefono = c.cliente.telefono if c.cliente else ''
@@ -143,6 +150,16 @@ def _serializar_contacto(c: ContactoWhatsApp) -> dict:
         c.cliente.ciudad_normalizada.nombre_canonico
         if c.cliente and c.cliente.ciudad_normalizada else None
     )
+
+    # Variación IA on-demand. Solo se invoca para flujos que efectivamente
+    # van a enviar el mensaje (nuevo_contacto en /siguiente/, pre-resuelto
+    # en /marcar-enviado/). NO se invoca en /del-dia/, respuesta_pendiente,
+    # celebracion ni en pre-cargas masivas — sería costoso y no aporta.
+    mensaje_variado = None
+    if agregar_variacion:
+        from ventas.services.variacion_ia_service import generar_variacion_mensaje
+        mensaje_variado = generar_variacion_mensaje(c.mensaje_renderizado)
+
     return {
         'id': c.id,
         'cliente': {
@@ -160,6 +177,7 @@ def _serializar_contacto(c: ContactoWhatsApp) -> dict:
         'script_id': c.script.script_id if c.script else '',
         'salva': c.salva,
         'mensaje_renderizado': c.mensaje_renderizado,
+        'mensaje_variado': mensaje_variado,
         'prioridad': c.prioridad,
         'fecha_sugerido': c.fecha_sugerido.isoformat() if c.fecha_sugerido else None,
         'estado': c.estado,
@@ -277,7 +295,9 @@ def siguiente(request):
     if nuevo:
         return JsonResponse({
             'tipo': 'nuevo_contacto',
-            'contacto': _serializar_contacto(nuevo),
+            # agregar_variacion=True → intenta llamar al LLM si toggle ON.
+            # Si OVC_USAR_VARIACIONES_IA=False, mensaje_variado queda en null.
+            'contacto': _serializar_contacto(nuevo, agregar_variacion=True),
             'progreso': _progreso_dia(hoy),
         })
 
@@ -391,7 +411,9 @@ def _resolver_siguiente_payload(hoy: date) -> dict:
     if nuevo:
         return {
             'tipo': 'nuevo_contacto',
-            'contacto': _serializar_contacto(nuevo),
+            # agregar_variacion=True igual que en /siguiente/ (este path se
+            # usa cuando /marcar-enviado/ pre-resuelve el siguiente_contacto).
+            'contacto': _serializar_contacto(nuevo, agregar_variacion=True),
             'progreso': _progreso_dia(hoy),
         }
     return {'tipo': 'fin_del_dia', 'progreso': _progreso_dia(hoy)}
