@@ -398,6 +398,11 @@ urlpatterns = [
         'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/del-dia/',
         ovc_views.del_dia, name='ovc_del_dia',
     ),
+    # Etapa Geo.4 — captura inline de ubicación desde TarjetaCliente
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/clientes/<int:cliente_id>/actualizar-ubicacion/',
+        ovc_views.actualizar_ubicacion, name='ovc_actualizar_ubicacion',
+    ),
     path(
         'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/explicacion/<int:contacto_id>/',
         ovc_views.explicacion, name='ovc_explicacion',

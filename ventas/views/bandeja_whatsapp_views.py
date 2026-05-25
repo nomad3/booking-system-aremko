@@ -1050,3 +1050,134 @@ def del_dia(request):
         'limit_aplicado': limit,
         'contactos': contactos_data,
     })
+
+
+# ============================================================================
+# Etapa Geo.4 — POST clientes/<cliente_id>/actualizar-ubicacion/
+# ============================================================================
+# Captura inline de ubicación desde la TarjetaCliente cuando el operador
+# detecta que el cliente menciona su ciudad en el chat WhatsApp. El operador
+# escribe el texto, el endpoint lo normaliza contra el catálogo Ciudad y
+# marca la edición como manual (cron futuro respeta).
+#
+# SIN rapidfuzz en v1 (consistente con Geo.2 — los aliases manuales
+# cubren 99% de los casos detectados). Si después aparecen variantes
+# que el operador escribe frecuentemente y no matchean, las agregamos
+# como alias vía admin de Ciudad.
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def actualizar_ubicacion(request, cliente_id: int):
+    """Operador actualiza la ubicación de un cliente desde la bandeja.
+
+    Body JSON:
+        {"ciudad": "pto varas", "operador": "jorge"}
+
+    Lógica:
+        1. Valida cliente_id existe (404 si no)
+        2. Valida ciudad >= 2 caracteres (400 si no)
+        3. Normaliza el texto vía _LookupCiudades (canonico → alias)
+        4. Si match: setea ciudad_normalizada FK + region_geografica
+           desde la Ciudad matcheada
+        5. Si NO match: deja region='sin_clasificar', ciudad_normalizada=NULL
+        6. SIEMPRE: setea ciudad_normalizada_manual=True (cron NO sobrescribe)
+        7. SIEMPRE: persiste Cliente.ciudad con el texto literal (para
+           que el admin pueda revisar 'asdkjhaskdjh' después)
+        8. Loguea INFO con resultado
+
+    Importante: la edición SOBRESCRIBE el valor previo (no requiere flag).
+    Si el cliente ya tenía ciudad_normalizada del cron automático, el
+    operador la pisa con su edición. Cron futuro respeta porque
+    ciudad_normalizada_manual=True.
+
+    Uso bulk_update via filter(id).update() para BYPASS del Cliente.save()
+    override (que valida teléfono y aborta si formato no soportado).
+    """
+    import json
+
+    err = _require_api_key(request)
+    if err:
+        return err
+
+    try:
+        body = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Body must be JSON'}, status=400)
+
+    ciudad_input = (body.get('ciudad') or '').strip()
+    operador = (body.get('operador') or '').strip()
+
+    if len(ciudad_input) < 2:
+        return JsonResponse(
+            {'error': 'ciudad debe tener al menos 2 caracteres'},
+            status=400,
+        )
+
+    try:
+        cliente = Cliente.objects.get(id=cliente_id)
+    except Cliente.DoesNotExist:
+        return JsonResponse(
+            {'error': f'Cliente {cliente_id} no existe'},
+            status=404,
+        )
+
+    # Lookup contra catálogo Ciudad (precarga ~96 ciudades + aliases en memoria)
+    from ventas.management.commands.normalizar_ciudades_clientes import (
+        _LookupCiudades, _normalizar, _es_extranjero_por_texto,
+    )
+    lookup = _LookupCiudades()
+
+    ciudad_match = None
+    match_method = 'no_match'
+    region = 'sin_clasificar'
+
+    # 1. Extranjero por marcador en texto (gana sobre canónico para casos
+    #    ambiguos como "Río Negro, Argentina" → extranjero, no Río Negro Chile)
+    if _es_extranjero_por_texto(ciudad_input):
+        ciudad_match = lookup.extranjero_generico
+        match_method = 'extranjero_texto'
+        region = 'extranjero'
+    else:
+        # 2. Match canónico exacto (case-insensitive + trim + sin puntos)
+        clave = _normalizar(ciudad_input)
+        ciudad_match = lookup.por_canonico.get(clave)
+        if ciudad_match:
+            match_method = 'canonico'
+            region = ciudad_match.region_geografica
+        else:
+            # 3. Match contra aliases
+            ciudad_match = lookup.por_alias.get(clave)
+            if ciudad_match:
+                match_method = 'alias'
+                region = ciudad_match.region_geografica
+            # 4. (no_match) → quedan los defaults sin_clasificar/None
+
+    # Persistir vía .update() para bypass del Cliente.save() override
+    # (que valida teléfono y lanza ValidationError si formato no soportado).
+    Cliente.objects.filter(id=cliente_id).update(
+        ciudad=ciudad_input,
+        ciudad_normalizada=ciudad_match,
+        region_geografica=region,
+        ciudad_normalizada_manual=True,
+    )
+
+    ciudad_canonica_resp = (
+        ciudad_match.nombre_canonico if ciudad_match else None
+    )
+
+    logger.info(
+        "Ubicación actualizada cliente_id=%s por operador=%r input=%r "
+        "resultado=%r region=%r match_method=%s",
+        cliente_id, operador, ciudad_input,
+        ciudad_canonica_resp, region, match_method,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'cliente_id': cliente_id,
+        'ciudad_input': ciudad_input,
+        'region_geografica': region,
+        'ciudad_canonica': ciudad_canonica_resp,
+        'match_method': match_method,
+        'match_score': None,  # v1 sin rapidfuzz — siempre None
+    })

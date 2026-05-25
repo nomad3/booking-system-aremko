@@ -848,6 +848,227 @@ class CommitPuenteGeoTests(BandejaWhatsappEndpointsTestCase):
         self.assertEqual(c['cliente']['region_geografica'], 'nacional')
         self.assertEqual(c['cliente']['ciudad_canonica'], 'Santiago')
 
+    def _placeholder_for_geo4_block(self):
+        pass
+
+
+# ============================================================================
+# Etapa Geo.4 — POST clientes/<id>/actualizar-ubicacion/
+# ============================================================================
+
+@override_settings(AUTOMATION_API_KEY=TEST_API_KEY)
+class ActualizarUbicacionTests(BandejaWhatsappEndpointsTestCase):
+    """Tests E2E del endpoint Geo.4 para captura inline de ubicación."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from ventas.models import Ciudad
+        # Catálogo mínimo para los tests
+        cls.c_pv = Ciudad.objects.create(
+            nombre_canonico='Puerto Varas',
+            aliases='puerto varas|pto varas|pto. varas|p. varas',
+            region_geografica='sur',
+        )
+        cls.c_stgo = Ciudad.objects.create(
+            nombre_canonico='Santiago',
+            aliases='santiago|stgo',
+            region_geografica='nacional',
+        )
+        cls.c_extra = Ciudad.objects.create(
+            nombre_canonico='_otros_extranjero_',
+            aliases='',
+            region_geografica='extranjero',
+        )
+
+    def _url(self, cid):
+        return f'/ventas/api/aremko-cli/operacion-vuelta-a-casa/clientes/{cid}/actualizar-ubicacion/'
+
+    # ---- Auth ----
+    def test_sin_token_401(self):
+        r = self.client_http.post(
+            self._url(self.cli.id),
+            data=json.dumps({'ciudad': 'pto varas'}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 401)
+
+    def test_token_invalido_401(self):
+        r = self.client_http.post(
+            self._url(self.cli.id),
+            data=json.dumps({'ciudad': 'pto varas'}),
+            content_type='application/json',
+            HTTP_X_API_KEY='invalido',
+        )
+        self.assertEqual(r.status_code, 401)
+
+    # ---- Validaciones ----
+    def test_404_cliente_no_existe(self):
+        r = self._post(self._url(999999), {'ciudad': 'pto varas'})
+        self.assertEqual(r.status_code, 404)
+
+    def test_400_ciudad_vacia(self):
+        r = self._post(self._url(self.cli.id), {'ciudad': ''})
+        self.assertEqual(r.status_code, 400)
+
+    def test_400_ciudad_un_solo_char(self):
+        r = self._post(self._url(self.cli.id), {'ciudad': 'a'})
+        self.assertEqual(r.status_code, 400)
+
+    def test_400_body_no_json(self):
+        r = self.client_http.post(
+            self._url(self.cli.id),
+            data='no es json',
+            content_type='application/json',
+            **self.auth_headers,
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_ciudad_solo_espacios_es_400(self):
+        r = self._post(self._url(self.cli.id), {'ciudad': '   '})
+        self.assertEqual(r.status_code, 400)
+
+    # ---- Match canónico ----
+    def test_match_canonico(self):
+        r = self._post(self._url(self.cli.id), {
+            'ciudad': 'Puerto Varas', 'operador': 'jorge',
+        })
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['ciudad_input'], 'Puerto Varas')
+        self.assertEqual(data['ciudad_canonica'], 'Puerto Varas')
+        self.assertEqual(data['region_geografica'], 'sur')
+        self.assertEqual(data['match_method'], 'canonico')
+        self.assertIsNone(data['match_score'])
+
+        # Verifica persistencia
+        self.cli.refresh_from_db()
+        self.assertEqual(self.cli.ciudad, 'Puerto Varas')
+        self.assertEqual(self.cli.ciudad_normalizada_id, self.c_pv.id)
+        self.assertEqual(self.cli.region_geografica, 'sur')
+        self.assertTrue(self.cli.ciudad_normalizada_manual)
+
+    def test_match_canonico_case_insensitive(self):
+        r = self._post(self._url(self.cli.id), {'ciudad': 'puerto varas'})
+        data = r.json()
+        self.assertEqual(data['match_method'], 'canonico')
+        self.assertEqual(data['ciudad_canonica'], 'Puerto Varas')
+
+    # ---- Match alias ----
+    def test_match_alias_pto_varas(self):
+        r = self._post(self._url(self.cli.id), {'ciudad': 'pto varas'})
+        data = r.json()
+        self.assertEqual(data['match_method'], 'alias')
+        self.assertEqual(data['ciudad_canonica'], 'Puerto Varas')
+        self.assertEqual(data['region_geografica'], 'sur')
+
+    def test_match_alias_con_punto(self):
+        r = self._post(self._url(self.cli.id), {'ciudad': 'pto. varas'})
+        data = r.json()
+        self.assertEqual(data['match_method'], 'alias')
+
+    # ---- Extranjero por texto ----
+    def test_match_extranjero_buenos_aires(self):
+        r = self._post(self._url(self.cli.id), {'ciudad': 'Buenos Aires'})
+        data = r.json()
+        self.assertEqual(data['region_geografica'], 'extranjero')
+        self.assertEqual(data['match_method'], 'extranjero_texto')
+
+        self.cli.refresh_from_db()
+        self.assertEqual(self.cli.region_geografica, 'extranjero')
+
+    def test_match_extranjero_argentina_en_texto(self):
+        r = self._post(self._url(self.cli.id), {'ciudad': 'Mendoza, Argentina'})
+        data = r.json()
+        self.assertEqual(data['region_geografica'], 'extranjero')
+
+    # ---- No match ----
+    def test_no_match_texto_random(self):
+        r = self._post(self._url(self.cli.id), {
+            'ciudad': 'asdkjhaskdjh', 'operador': 'jorge',
+        })
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data['match_method'], 'no_match')
+        self.assertEqual(data['region_geografica'], 'sin_clasificar')
+        self.assertIsNone(data['ciudad_canonica'])
+
+        # IMPORTANTE: el texto literal sí queda en Cliente.ciudad para revisión admin
+        self.cli.refresh_from_db()
+        self.assertEqual(self.cli.ciudad, 'asdkjhaskdjh')
+        self.assertIsNone(self.cli.ciudad_normalizada)
+        self.assertEqual(self.cli.region_geografica, 'sin_clasificar')
+        # Flag manual SÍ se setea aunque sea no_match (operador hizo decisión)
+        self.assertTrue(self.cli.ciudad_normalizada_manual)
+
+    # ---- Flag manual ----
+    def test_flag_manual_se_setea_en_match(self):
+        r = self._post(self._url(self.cli.id), {'ciudad': 'Santiago'})
+        self.cli.refresh_from_db()
+        self.assertTrue(self.cli.ciudad_normalizada_manual)
+
+    def test_sobrescribe_clasificacion_previa(self):
+        # Cliente ya tenía sur asignado por el cron
+        self.cli.ciudad_normalizada = self.c_pv
+        self.cli.region_geografica = 'sur'
+        self.cli.ciudad_normalizada_manual = False  # no manual aún
+        self.cli.save()
+
+        # Operador detecta que en realidad es de Santiago
+        r = self._post(self._url(self.cli.id), {'ciudad': 'Santiago', 'operador': 'jorge'})
+        self.assertEqual(r.status_code, 200)
+
+        self.cli.refresh_from_db()
+        self.assertEqual(self.cli.ciudad_normalizada_id, self.c_stgo.id)
+        self.assertEqual(self.cli.region_geografica, 'nacional')
+        self.assertTrue(self.cli.ciudad_normalizada_manual)
+
+    def test_sobrescribe_aunque_ya_fuera_manual(self):
+        # Cliente ya tenía manual=True, operador cambia de idea
+        self.cli.ciudad_normalizada = self.c_pv
+        self.cli.region_geografica = 'sur'
+        self.cli.ciudad_normalizada_manual = True
+        self.cli.save()
+
+        r = self._post(self._url(self.cli.id), {'ciudad': 'Santiago'})
+        self.cli.refresh_from_db()
+        # Sobrescribió igual
+        self.assertEqual(self.cli.ciudad_normalizada_id, self.c_stgo.id)
+        self.assertEqual(self.cli.region_geografica, 'nacional')
+
+    # ---- Bypass del Cliente.save() override ----
+    def test_funciona_con_telefono_formato_no_estandar(self):
+        """Garantiza que el endpoint NO falla por validación de teléfono.
+
+        Cliente.save() override valida teléfono, pero usamos
+        .filter().update() que va directo a SQL.
+        """
+        # Crear cliente con teléfono raro saltándonos la validación
+        cli_usa = Cliente(
+            nombre='USA Test', telefono='+19999999999',
+            ciudad='', region_geografica='sin_clasificar',
+        )
+        # Bypass save() validation usando objects.bulk_create()
+        Cliente.objects.bulk_create([cli_usa])
+        cli_usa = Cliente.objects.get(nombre='USA Test')
+
+        # Llamar al endpoint NO debe crashear con ValidationError de teléfono
+        r = self._post(self._url(cli_usa.id), {'ciudad': 'Santiago'})
+        self.assertEqual(r.status_code, 200)
+        cli_usa.refresh_from_db()
+        self.assertEqual(cli_usa.region_geografica, 'nacional')
+
+
+@override_settings(AUTOMATION_API_KEY=TEST_API_KEY)
+class CommitPuenteGeoTests2(BandejaWhatsappEndpointsTestCase):
+    """(placeholder, real CommitPuenteGeoTests above remains active)"""
+
+    def _placeholder(self):
+        pass
+
+    # Re-include only the test_marcar_enviado_siguiente_pre_resuelto_incluye_geo
+    # below — moved out of CommitPuenteGeoTests for ordering reasons.
+
     def test_marcar_enviado_siguiente_pre_resuelto_incluye_geo(self):
         # Crear segundo contacto pendiente con ciudad asignada
         from ventas.models import Ciudad
