@@ -1215,12 +1215,15 @@ def actualizar_ubicacion(request, cliente_id: int):
 @csrf_exempt
 @require_http_methods(["GET"])
 def metricas_operadores(request):
-    """GET /api/v1/ovc/metricas-operadores
+    """GET /ventas/api/aremko-cli/operacion-vuelta-a-casa/metricas-operadores/
 
     Query params:
         desde=YYYY-MM-DD                (default hace 30 días)
         hasta=YYYY-MM-DD                (default hoy)
         ventana_atribucion_dias=N       (default 60, max 365)
+        operadores_esperados=a,b,c      (opcional; fuerza que estos operadores
+                                         aparezcan en el ranking aunque no
+                                         hayan enviado mensajes en el período)
 
     Response: ver docstring de
     `ventas.services.metricas_operadores_service.calcular_metricas_operadores`
@@ -1240,6 +1243,14 @@ def metricas_operadores(request):
             {'error': 'ventana_atribucion_dias debe ser entero'}, status=400,
         )
 
+    # operadores_esperados: lista separada por comas (lowercase + strip)
+    operadores_esperados_raw = request.GET.get('operadores_esperados') or ''
+    operadores_esperados = [
+        o.strip().lower()
+        for o in operadores_esperados_raw.split(',')
+        if o.strip()
+    ]
+
     # Validaciones defensivas
     if desde > hasta:
         return JsonResponse(
@@ -1250,12 +1261,30 @@ def metricas_operadores(request):
             {'error': 'ventana_atribucion_dias debe estar en [1, 365]'}, status=400,
         )
 
-    from ventas.services.metricas_operadores_service import (
-        calcular_metricas_operadores,
-    )
-    data = calcular_metricas_operadores(
-        desde=desde,
-        hasta=hasta,
-        ventana_atribucion_dias=ventana,
-    )
-    return JsonResponse(data)
+    # Wrapper try/except con logger.exception() para que cualquier traceback
+    # quede visible en Render logs (Django con DEBUG=False solo escupe HTML
+    # genérico al cliente y oculta el stack sin este hook explícito).
+    try:
+        from ventas.services.metricas_operadores_service import (
+            calcular_metricas_operadores,
+        )
+        data = calcular_metricas_operadores(
+            desde=desde,
+            hasta=hasta,
+            ventana_atribucion_dias=ventana,
+            operadores_esperados=operadores_esperados,
+        )
+        return JsonResponse(data)
+    except Exception as exc:
+        logger.exception(
+            "Error en metricas-operadores desde=%s hasta=%s ventana=%s "
+            "operadores_esperados=%r: %s",
+            desde, hasta, ventana, operadores_esperados, exc,
+        )
+        return JsonResponse(
+            {
+                'error': 'internal_server_error',
+                'detail': f'{type(exc).__name__}: {exc}',
+            },
+            status=500,
+        )

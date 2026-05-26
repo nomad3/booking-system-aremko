@@ -58,6 +58,7 @@ def calcular_metricas_operadores(
     desde: date,
     hasta: date,
     ventana_atribucion_dias: int = 60,
+    operadores_esperados: Optional[list] = None,
 ) -> dict:
     """Calcula totales y ranking de operadores en el período.
 
@@ -66,6 +67,10 @@ def calcular_metricas_operadores(
         hasta: fecha final (inclusive) — filtro sobre fecha_envio del contacto
         ventana_atribucion_dias: ventana hacia adelante desde fecha_envio para
             considerar reservas como atribuibles. Default 60 días.
+        operadores_esperados: lista opcional de keys lowercase (ej.
+            ['deborah', 'jorge', 'angelica']). Si se proporciona, esos
+            operadores aparecen en el ranking con métricas en 0 aunque no
+            hayan enviado mensajes en el período.
 
     Returns:
         dict con shape definido en el brief MVP:
@@ -190,6 +195,12 @@ def calcular_metricas_operadores(
         'reservas_ids': set(),     # para evitar doble conteo
         'display_names': Counter(),  # para elegir el display name del grupo
     })
+
+    # Seed con operadores_esperados para que aparezcan con ceros aunque no
+    # hayan enviado nada.
+    for op_esperado in (operadores_esperados or []):
+        if op_esperado:
+            agg[op_esperado]['display_names'][op_esperado] += 1
 
     for c in contactos_enviados:
         op_raw = (c['operador'] or '').strip()
