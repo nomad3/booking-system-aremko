@@ -419,6 +419,11 @@ urlpatterns = [
         'api/aremko-cli/operacion-vuelta-a-casa/scripts-estadisticas/',
         ovc_views.scripts_estadisticas, name='ovc_scripts_estadisticas',
     ),
+    # MVP métricas atribución por operador (Jorge 2026-05-26)
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/metricas-operadores/',
+        ovc_views.metricas_operadores, name='ovc_metricas_operadores',
+    ),
     # === END Operación Vuelta a Casa ===
     # === END AREMKO-CLI API ===
 

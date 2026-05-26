@@ -1203,3 +1203,59 @@ def actualizar_ubicacion(request, cliente_id: int):
         'match_method': match_method,
         'match_score': None,  # v1 sin rapidfuzz — siempre None
     })
+
+
+# ============================================================================
+# Métricas de atribución por operador (MVP — Jorge 2026-05-26)
+# ============================================================================
+# Endpoint analítico read-only que retorna ranking de operadores con métricas:
+# mensajes enviados, respuestas, reservas atribuidas (last-touch), monto.
+# Lógica pura en ventas/services/metricas_operadores_service.py.
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def metricas_operadores(request):
+    """GET /api/v1/ovc/metricas-operadores
+
+    Query params:
+        desde=YYYY-MM-DD                (default hace 30 días)
+        hasta=YYYY-MM-DD                (default hoy)
+        ventana_atribucion_dias=N       (default 60, max 365)
+
+    Response: ver docstring de
+    `ventas.services.metricas_operadores_service.calcular_metricas_operadores`
+    """
+    err = _require_api_key(request)
+    if err:
+        return err
+
+    hoy = timezone.now().date()
+    desde = _parse_fecha(request.GET.get('desde')) or (hoy - timedelta(days=30))
+    hasta = _parse_fecha(request.GET.get('hasta')) or hoy
+
+    try:
+        ventana = int(request.GET.get('ventana_atribucion_dias') or 60)
+    except ValueError:
+        return JsonResponse(
+            {'error': 'ventana_atribucion_dias debe ser entero'}, status=400,
+        )
+
+    # Validaciones defensivas
+    if desde > hasta:
+        return JsonResponse(
+            {'error': 'desde debe ser <= hasta'}, status=400,
+        )
+    if ventana < 1 or ventana > 365:
+        return JsonResponse(
+            {'error': 'ventana_atribucion_dias debe estar en [1, 365]'}, status=400,
+        )
+
+    from ventas.services.metricas_operadores_service import (
+        calcular_metricas_operadores,
+    )
+    data = calcular_metricas_operadores(
+        desde=desde,
+        hasta=hasta,
+        ventana_atribucion_dias=ventana,
+    )
+    return JsonResponse(data)
