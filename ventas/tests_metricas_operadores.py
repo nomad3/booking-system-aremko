@@ -107,6 +107,33 @@ class MetricasOperadoresServiceTests(TestCase):
             respondio=respondio,
         )
 
+    def _crear_servicio(self, nombre, categoria_nombre, tipo_servicio, precio_base=50000):
+        cat, _ = CategoriaServicio.objects.get_or_create(nombre=categoria_nombre)
+        return Servicio.objects.create(
+            nombre=nombre,
+            categoria=cat,
+            tipo_servicio=tipo_servicio,
+            precio_base=Decimal(precio_base),
+            duracion=60,
+        )
+
+    def _agregar_linea(self, venta_reserva, servicio, precio_unitario, cantidad):
+        """Crea una ReservaServicio (línea) con precio + cantidad explícitos.
+
+        IMPORTANTE: para servicios como "Descuento Servicios" Aremko hackea
+        la semántica — precio_unitario_venta=-1 y cantidad_personas=N pesos
+        a descontar. Este helper acepta cualquier valor incluso negativos.
+        """
+        f_agend = (venta_reserva.fecha_creacion or timezone.now()).date() + timedelta(days=7)
+        return ReservaServicio.objects.create(
+            venta_reserva=venta_reserva,
+            servicio=servicio,
+            fecha_agendamiento=f_agend,
+            hora_inicio='15:00',
+            cantidad_personas=cantidad,
+            precio_unitario_venta=Decimal(precio_unitario),
+        )
+
     def _crear_reserva(
         self, cliente, fecha_creacion_date, total=100000,
         estado_pago='pagado', con_servicio_tina=False,
@@ -122,12 +149,15 @@ class MetricasOperadoresServiceTests(TestCase):
         )
         vr.refresh_from_db()
         if con_servicio_tina:
+            # precio_unitario_venta debe estar SETEADO (no None) para que el
+            # cálculo de subtotal funcione. Aquí 60000 × 2 personas = 120000.
             ReservaServicio.objects.create(
                 venta_reserva=vr,
                 servicio=self.serv_tina,
                 fecha_agendamiento=fecha_creacion_date + timedelta(days=7),
                 hora_inicio='15:00',
                 cantidad_personas=2,
+                precio_unitario_venta=Decimal('60000'),
             )
         return vr
 
@@ -314,7 +344,134 @@ class MetricasOperadoresServiceTests(TestCase):
         self.assertEqual(len(op['familias_top']), 1)
         self.assertEqual(op['familias_top'][0]['familia'], 'Tinas')
         self.assertEqual(op['familias_top'][0]['reservas'], 1)
-        self.assertEqual(op['familias_top'][0]['monto'], 60000)
+        # Subtotal = precio_unitario_venta($60000) × cantidad_personas(2) = 120000
+        self.assertEqual(op['familias_top'][0]['monto'], 120000)
+
+    # ==================================================================
+    # Bug familias_top con descuentos (Jorge 2026-05-26 PM)
+    # ==================================================================
+
+    def test_familias_caso_real_jorge_tina_mas_descuento(self):
+        """Caso real del brief: Tina $50K + Descuento -$8K → Tinas $50K, Otros -$8K."""
+        self._crear_contacto_enviado(self.cli, HOY - timedelta(days=10))
+        vr = self._crear_reserva(
+            self.cli, HOY - timedelta(days=5), total=42000,
+        )
+        # Línea Tina normal: $50.000 × 1 persona = $50.000
+        s_tina = self._crear_servicio('Tina 2p', 'Tinas', 'tina', precio_base=50000)
+        self._agregar_linea(vr, s_tina, precio_unitario=50000, cantidad=1)
+        # Línea Descuento (hack Aremko): precio=-1 × cantidad=8000 = -$8.000
+        # NO existe categoría 'Descuentos' en _mapear_familia → cae a 'Otros'
+        s_desc = self._crear_servicio('Descuento Servicios', 'Descuentos', 'otro')
+        self._agregar_linea(vr, s_desc, precio_unitario=-1, cantidad=8000)
+
+        data = self._llamar(desde=HOY - timedelta(days=30), hasta=HOY)
+        op = data['operadores'][0]
+
+        familias = {f['familia']: f for f in op['familias_top']}
+        self.assertIn('Tinas', familias)
+        self.assertIn('Otros', familias)
+        self.assertEqual(familias['Tinas']['monto'], 50000)
+        self.assertEqual(familias['Tinas']['reservas'], 1)
+        self.assertEqual(familias['Otros']['monto'], -8000)
+        self.assertEqual(familias['Otros']['reservas'], 1)
+
+        # Coherencia: monto_atribuido del operador = total de la reserva ($42K)
+        self.assertEqual(op['monto_atribuido'], 42000)
+        # Y suma de familias también suma al total
+        suma_familias = sum(f['monto'] for f in op['familias_top'])
+        self.assertEqual(suma_familias, 42000)
+
+    def test_familias_reserva_solo_tina_sin_descuento(self):
+        """Caso normal del brief: Tina $200K única → Tinas $200K."""
+        self._crear_contacto_enviado(self.cli, HOY - timedelta(days=10))
+        vr = self._crear_reserva(self.cli, HOY - timedelta(days=5), total=200000)
+        s = self._crear_servicio('Tina Acanto', 'Tinas', 'tina')
+        self._agregar_linea(vr, s, precio_unitario=200000, cantidad=1)
+
+        data = self._llamar(desde=HOY - timedelta(days=30), hasta=HOY)
+        op = data['operadores'][0]
+        self.assertEqual(len(op['familias_top']), 1)
+        self.assertEqual(op['familias_top'][0]['familia'], 'Tinas')
+        self.assertEqual(op['familias_top'][0]['monto'], 200000)
+        self.assertEqual(op['familias_top'][0]['reservas'], 1)
+
+    def test_familias_dos_reservas_misma_familia(self):
+        """2 reservas Tinas ($50K + $200K) → Tinas: reservas=2, monto=$250K."""
+        self._crear_contacto_enviado(self.cli, HOY - timedelta(days=20))
+        s = self._crear_servicio('Tina', 'Tinas', 'tina')
+        vr1 = self._crear_reserva(self.cli, HOY - timedelta(days=10), total=50000)
+        self._agregar_linea(vr1, s, precio_unitario=50000, cantidad=1)
+        vr2 = self._crear_reserva(self.cli, HOY - timedelta(days=3), total=200000)
+        self._agregar_linea(vr2, s, precio_unitario=200000, cantidad=1)
+
+        data = self._llamar(desde=HOY - timedelta(days=30), hasta=HOY)
+        op = data['operadores'][0]
+        familias = {f['familia']: f for f in op['familias_top']}
+        self.assertEqual(familias['Tinas']['reservas'], 2)
+        self.assertEqual(familias['Tinas']['monto'], 250000)
+
+    def test_familias_reserva_combinada_tres_familias(self):
+        """Tina $50K + Masaje $80K + Descuento -$10K → 3 familias."""
+        self._crear_contacto_enviado(self.cli, HOY - timedelta(days=10))
+        vr = self._crear_reserva(self.cli, HOY - timedelta(days=5), total=120000)
+        s_tina = self._crear_servicio('Tina', 'Tinas', 'tina')
+        s_masaje = self._crear_servicio('Masaje 90min', 'Masajes', 'masaje')
+        s_desc = self._crear_servicio('Descuento', 'Descuentos', 'otro')
+        self._agregar_linea(vr, s_tina, precio_unitario=50000, cantidad=1)
+        self._agregar_linea(vr, s_masaje, precio_unitario=80000, cantidad=1)
+        self._agregar_linea(vr, s_desc, precio_unitario=-1, cantidad=10000)
+
+        data = self._llamar(desde=HOY - timedelta(days=30), hasta=HOY)
+        op = data['operadores'][0]
+        familias = {f['familia']: f for f in op['familias_top']}
+        self.assertEqual(familias['Tinas']['monto'], 50000)
+        self.assertEqual(familias['Masajes']['monto'], 80000)
+        self.assertEqual(familias['Otros']['monto'], -10000)
+        # Suma de familias = total reserva
+        self.assertEqual(sum(f['monto'] for f in op['familias_top']), 120000)
+
+    def test_familias_solo_descuentos(self):
+        """Caso extremo: reserva solo con líneas negativas (gift card refund, etc).
+        Familia 'Otros' aparece en negativo, único en familias_top."""
+        self._crear_contacto_enviado(self.cli, HOY - timedelta(days=10))
+        vr = self._crear_reserva(self.cli, HOY - timedelta(days=5), total=-5000)
+        s_desc = self._crear_servicio('Descuento Grande', 'Descuentos', 'otro')
+        self._agregar_linea(vr, s_desc, precio_unitario=-1, cantidad=5000)
+
+        data = self._llamar(desde=HOY - timedelta(days=30), hasta=HOY)
+        op = data['operadores'][0]
+        self.assertEqual(len(op['familias_top']), 1)
+        self.assertEqual(op['familias_top'][0]['familia'], 'Otros')
+        self.assertEqual(op['familias_top'][0]['monto'], -5000)
+        self.assertEqual(op['familias_top'][0]['reservas'], 1)
+
+    def test_familias_orden_por_abs_monto_descuento_grande_aparece_en_top(self):
+        """Si hay 4 familias y un descuento grande, ordena por |monto| desc.
+        El descuento grande NO debe hundirse al fondo."""
+        self._crear_contacto_enviado(self.cli, HOY - timedelta(days=10))
+        vr = self._crear_reserva(self.cli, HOY - timedelta(days=5), total=85000)
+        s_tina = self._crear_servicio('Tina', 'Tinas', 'tina')
+        s_masaje = self._crear_servicio('Masaje', 'Masajes', 'masaje')
+        s_cab = self._crear_servicio('Cabaña X', 'Cabañas', 'cabana')
+        s_desc = self._crear_servicio('Descuento', 'Descuentos', 'otro')
+        self._agregar_linea(vr, s_tina, precio_unitario=10000, cantidad=1)
+        self._agregar_linea(vr, s_masaje, precio_unitario=20000, cantidad=1)
+        self._agregar_linea(vr, s_cab, precio_unitario=5000, cantidad=1)
+        # Descuento grande: -$50K (mayor magnitud que cualquier familia)
+        self._agregar_linea(vr, s_desc, precio_unitario=-1, cantidad=50000)
+
+        data = self._llamar(desde=HOY - timedelta(days=30), hasta=HOY)
+        op = data['operadores'][0]
+        # Top 3 ordenado por abs(monto): Descuento (50K) > Masaje (20K) > Tina (10K)
+        self.assertEqual(len(op['familias_top']), 3)
+        self.assertEqual(op['familias_top'][0]['familia'], 'Otros')
+        self.assertEqual(op['familias_top'][0]['monto'], -50000)
+        self.assertEqual(op['familias_top'][1]['familia'], 'Masajes')
+        self.assertEqual(op['familias_top'][1]['monto'], 20000)
+        self.assertEqual(op['familias_top'][2]['familia'], 'Tinas')
+        self.assertEqual(op['familias_top'][2]['monto'], 10000)
+        # Cabañas (5K) queda fuera del top 3
 
 
 @override_settings(AUTOMATION_API_KEY='test-key-metricas')

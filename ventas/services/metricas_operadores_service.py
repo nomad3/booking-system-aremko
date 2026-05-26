@@ -255,19 +255,28 @@ def calcular_metricas_operadores(
         agg[op_key]['reservas_ids'].add(reserva_id)
 
     # ──── Paso 5: familias_top por operador ────
-    # Cargar servicios de las reservas atribuidas para mapear familias.
-    todas_reservas_atribuidas = {rid for rid, _ in atribuciones.items()}
+    # Calcular subtotales por (reserva, familia) usando línea por línea:
+    #     subtotal = ReservaServicio.precio_unitario_venta × cantidad_personas
+    #
+    # Aremko modela descuentos como líneas de servicio especiales:
+    #   - Servicio "Descuento Servicios" (familia 'Otros')
+    #   - precio_unitario_venta = $-1
+    #   - cantidad_personas = N (pesos a descontar; semántica hackeada del
+    #     modelo — NO son personas, son pesos)
+    #
+    # Por lo tanto NO debemos filtrar líneas con precio_unitario_venta > 0
+    # ni dividir el total entre familias: el descuento debe restar de
+    # 'Otros' y los servicios reales sumar en su familia respectiva.
+    todas_reservas_atribuidas = set(atribuciones.keys())
+
+    # familias_por_operador[op_key][familia] = {'reservas': set, 'monto': int}
+    # Usamos set para reservas (cuenta distinct), no int — una reserva con 3
+    # líneas Tinas no debe contar 3 veces.
     familias_por_operador: dict[str, dict[str, dict]] = defaultdict(
-        lambda: defaultdict(lambda: {'reservas': 0, 'monto': 0})
+        lambda: defaultdict(lambda: {'reservas': set(), 'monto': 0})
     )
 
     if todas_reservas_atribuidas:
-        # Para cada ReservaServicio dentro de las reservas atribuidas,
-        # mapear familia + contar reserva + sumar monto.
-        # Una reserva puede tener varios servicios: agrupamos por familia única
-        # por reserva (no contamos 1 reserva como 3 si tiene 3 servicios de la
-        # misma familia). El monto se atribuye a la familia "dominante"
-        # (primera encontrada por reserva).
         reserva_servicios = (
             ReservaServicio.objects
             .filter(venta_reserva_id__in=todas_reservas_atribuidas)
@@ -276,28 +285,41 @@ def calcular_metricas_operadores(
                 'venta_reserva_id',
                 'servicio__tipo_servicio',
                 'servicio__categoria__nombre',
+                'precio_unitario_venta',
+                'cantidad_personas',
             )
         )
-        # Agrupar familias presentes en cada reserva
-        familias_por_reserva: dict[int, set[str]] = defaultdict(set)
+
+        # Sub-acumulación: (reserva_id, familia) → subtotal en CLP
+        subtotal_por_reserva_familia: dict[tuple, int] = defaultdict(int)
+        familias_de_reserva: dict[int, set[str]] = defaultdict(set)
+
         for rs in reserva_servicios:
             categoria_nombre = rs['servicio__categoria__nombre'] or ''
             tipo = rs['servicio__tipo_servicio'] or ''
             familia = _mapear_familia(categoria_nombre, tipo)
-            familias_por_reserva[rs['venta_reserva_id']].add(familia)
+            precio = rs['precio_unitario_venta'] or 0
+            cantidad = rs['cantidad_personas'] or 0
+            # int() para evitar Decimal en aritmética posterior
+            subtotal = int(precio * cantidad)
+            rid = rs['venta_reserva_id']
+            subtotal_por_reserva_familia[(rid, familia)] += subtotal
+            familias_de_reserva[rid].add(familia)
 
-        # Para cada reserva atribuida, contar reserva en cada familia presente
-        # y sumar monto / N_familias para no inflar el total.
+        # Propagar a operador correspondiente. Una reserva sin líneas (raro,
+        # defensivo) cae como 'Otros' con monto=total de la reserva.
         for reserva_id, contacto in atribuciones.items():
             op_key = contacto_a_opkey[contacto['id']]
-            r = reservas_por_id[reserva_id]
-            monto_total_reserva = int(r['total'] or 0)
-            familias_set = familias_por_reserva.get(reserva_id) or {'Otros'}
-            n_familias = len(familias_set)
-            monto_por_familia = monto_total_reserva // n_familias  # entero
+            familias_set = familias_de_reserva.get(reserva_id)
+            if not familias_set:
+                familias_set = {'Otros'}
+                subtotal_por_reserva_familia[(reserva_id, 'Otros')] = int(
+                    reservas_por_id[reserva_id]['total'] or 0
+                )
             for fam in familias_set:
-                familias_por_operador[op_key][fam]['reservas'] += 1
-                familias_por_operador[op_key][fam]['monto'] += monto_por_familia
+                sub = subtotal_por_reserva_familia[(reserva_id, fam)]
+                familias_por_operador[op_key][fam]['reservas'].add(reserva_id)
+                familias_por_operador[op_key][fam]['monto'] += sub
 
     # ──── Paso 6: construir response ────
     operadores_out = []
@@ -308,14 +330,21 @@ def calcular_metricas_operadores(
         n_reservas = stats['reservas_atribuidas']
         monto = stats['monto_atribuido']
 
-        # Top 3 familias por monto
+        # Top 3 familias por magnitud (abs) — un descuento grande aparece
+        # en el top en lugar de hundirse al fondo (los negativos siempre
+        # quedarían últimos si ordenamos por valor literal). El monto se
+        # preserva con su signo en el output; solo el ranking usa abs.
         familias_dict = familias_por_operador.get(op_key, {})
         familias_top = sorted(
             [
-                {'familia': fam, 'reservas': d['reservas'], 'monto': d['monto']}
+                {
+                    'familia': fam,
+                    'reservas': len(d['reservas']),
+                    'monto': d['monto'],
+                }
                 for fam, d in familias_dict.items()
             ],
-            key=lambda x: (-x['monto'], -x['reservas'], x['familia']),
+            key=lambda x: (-abs(x['monto']), -x['reservas'], x['familia']),
         )[:3]
 
         operadores_out.append({
