@@ -6819,10 +6819,14 @@ class ContactoWhatsApp(models.Model):
     """Cada fila es un intento de contacto sugerido a un cliente en un día.
 
     Flujo de estados:
-        pendiente  → enviado    (operador hizo el envío manual)
-                   → omitido    (operador lo saltó hoy, queda elegible mañana)
-                   → no_aplica  (teléfono inválido, falleció, etc; 90 días gracia)
-                   → descartado (revalidación detectó cambio de estado del cliente)
+        pendiente  → enviado              (operador hizo el envío manual)
+                   → omitido              (operador lo saltó hoy, queda elegible mañana)
+                   → no_aplica            (teléfono inválido, falleció, etc; 90 días gracia)
+                   → descartado           (revalidación detectó cambio de estado del cliente)
+                   → expirado_acumulacion (>OVC_DIAS_MAX_ACUMULACION sin acción del operador
+                                           — el cron lo retira para que la bandeja no se
+                                           atasque; el cliente podrá volver a entrar
+                                           más adelante por su clasificación)
 
     Atribución de conversión:
         El cron nocturno `cruzar_reservas_contactos_whatsapp` busca VentaReserva
@@ -6836,6 +6840,7 @@ class ContactoWhatsApp(models.Model):
         ('omitido', 'Omitido (sin enviar)'),
         ('no_aplica', 'No aplica'),
         ('descartado', 'Descartado por revalidación'),
+        ('expirado_acumulacion', 'Expirado por acumulación (>7 días sin acción)'),
     ]
     TIPO_RESPUESTA_CHOICES = [
         ('reservo', 'Reservó'),

@@ -84,6 +84,23 @@ OVC_DIAS_MINIMO_DESDE_ULTIMA_VISITA = {
 }
 
 # ────────────────────────────────────────────────────────────────────────────
+# Acumulación de pendientes entre días (cron generar_bandeja_whatsapp_diaria)
+# ────────────────────────────────────────────────────────────────────────────
+# Feature 2026-05-26: cuando un ContactoWhatsApp queda en estado='pendiente'
+# al cierre del día, se arrastra al día siguiente para presionar a Deborah
+# a completar su meta diaria. Sin esto, los pendientes quedaban invisibles
+# (filtros por fecha_sugerido=hoy en endpoints) y se perdía oportunidad.
+#
+# Comportamiento del cron diario:
+#   1. Expirar pendientes con fecha_sugerido < hoy - DIAS_MAX_ACUMULACION
+#      (estado pasa a 'expirado_acumulacion' — el cliente puede volver a
+#      entrar más adelante si su clasificación lo selecciona)
+#   2. Arrastrar pendientes restantes [hoy - DIAS_MAX_ACUMULACION, hoy-1]
+#      a fecha_sugerido=hoy
+#   3. Generar nuevos del día con dedupe (excluyendo clientes ya arrastrados)
+OVC_DIAS_MAX_ACUMULACION = int(os.getenv('OVC_DIAS_MAX_ACUMULACION', '7'))
+
+# ────────────────────────────────────────────────────────────────────────────
 # Operación Vuelta a Casa — Variaciones IA on-demand
 # ────────────────────────────────────────────────────────────────────────────
 # Toggle global para que los endpoints /siguiente/ y /marcar-enviado/ devuelvan

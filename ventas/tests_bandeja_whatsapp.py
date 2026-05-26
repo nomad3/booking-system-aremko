@@ -733,6 +733,140 @@ class GenerarBandejaCommandTests(TestCase):
         self._run()
         self.assertEqual(ContactoWhatsApp.objects.count(), 0)
 
+    # ========================================================================
+    # Feature 2026-05-26: Acumulación de pendientes entre días
+    # ========================================================================
+
+    def _crear_pendiente_historico(self, cliente, dias_atras, estado='pendiente'):
+        """Helper: crea un ContactoWhatsApp con fecha_sugerido en el pasado."""
+        return ContactoWhatsApp.objects.create(
+            cliente=cliente,
+            script=self.script_dormido,
+            eje_valor_snapshot='Dormido',
+            eje_estilo_snapshot='Amante de las Tinas',
+            eje_contexto_snapshot='Visitante Pareja',
+            dias_sin_venir_snapshot=200,
+            salva=1,
+            mensaje_renderizado=f'mensaje histórico de hace {dias_atras}d',
+            prioridad=3,
+            fecha_sugerido=date.today() - timedelta(days=dias_atras),
+            estado=estado,
+        )
+
+    def test_arrastra_pendiente_del_dia_anterior(self):
+        """Test 1 del brief: pendiente de ayer aparece en bandeja de hoy."""
+        # Crear cliente extra (diferente al cli_dormido del setUp) con
+        # pendiente histórico de ayer. Lo hacemos opt_out=True para que el
+        # cron NO lo seleccione como candidato nuevo — así aislamos la
+        # validación del arrastre puro.
+        otro_cli = self._make_cliente_taxonomia(
+            nombre='Arrastrado Uno',
+            telefono='+56911111001',
+            eje_valor='Dormido',
+            dias_desde_ultima_visita=200,
+            opt_out_whatsapp=True,
+        )
+        pendiente_ayer = self._crear_pendiente_historico(otro_cli, dias_atras=1)
+
+        self._run()
+
+        pendiente_ayer.refresh_from_db()
+        self.assertEqual(
+            pendiente_ayer.fecha_sugerido, date.today(),
+            "El pendiente de ayer debe haberse arrastrado a hoy"
+        )
+        self.assertEqual(pendiente_ayer.estado, 'pendiente')
+
+    def test_no_arrastra_enviado_ni_omitido(self):
+        """Test 2 del brief: contactos enviados/omitidos NO se arrastran."""
+        cli_enviado = self._make_cliente_taxonomia(
+            nombre='Ya Enviado',
+            telefono='+56911111002',
+            eje_valor='Dormido',
+            dias_desde_ultima_visita=200,
+            opt_out_whatsapp=True,
+        )
+        cli_omitido = self._make_cliente_taxonomia(
+            nombre='Ya Omitido',
+            telefono='+56911111003',
+            eje_valor='Dormido',
+            dias_desde_ultima_visita=200,
+            opt_out_whatsapp=True,
+        )
+        ayer = date.today() - timedelta(days=1)
+        enviado = self._crear_pendiente_historico(
+            cli_enviado, dias_atras=1, estado='enviado'
+        )
+        omitido = self._crear_pendiente_historico(
+            cli_omitido, dias_atras=1, estado='omitido'
+        )
+
+        self._run()
+
+        enviado.refresh_from_db()
+        omitido.refresh_from_db()
+        self.assertEqual(
+            enviado.fecha_sugerido, ayer,
+            "Enviado NO debe arrastrarse — su fecha queda intacta"
+        )
+        self.assertEqual(enviado.estado, 'enviado')
+        self.assertEqual(
+            omitido.fecha_sugerido, ayer,
+            "Omitido NO debe arrastrarse — su fecha queda intacta"
+        )
+        self.assertEqual(omitido.estado, 'omitido')
+
+    def test_expira_pendiente_muy_viejo(self):
+        """Test 3 del brief: pendiente de hace 10 días → expirado_acumulacion."""
+        cli_viejo = self._make_cliente_taxonomia(
+            nombre='Pendiente Viejo',
+            telefono='+56911111004',
+            eje_valor='Dormido',
+            dias_desde_ultima_visita=200,
+            opt_out_whatsapp=True,
+        )
+        viejo = self._crear_pendiente_historico(cli_viejo, dias_atras=10)
+
+        # OVC_DIAS_MAX_ACUMULACION default = 7, así que 10 > 7 → debe expirar
+        self._run()
+
+        viejo.refresh_from_db()
+        self.assertEqual(
+            viejo.estado, 'expirado_acumulacion',
+            "Pendiente con >7 días debe marcarse como expirado"
+        )
+        # La fecha original se preserva (auditoría)
+        self.assertEqual(
+            viejo.fecha_sugerido, date.today() - timedelta(days=10),
+            "fecha_sugerido del expirado NO debe moverse"
+        )
+
+    def test_dedupe_cliente_arrastrado_y_candidato_nuevo(self):
+        """Test 4 del brief: cliente con pendiente de ayer + califica hoy
+        → solo aparece una vez (el arrastrado), NO se duplica."""
+        # cli_dormido del setUp es candidato P3. Le creamos un pendiente de
+        # ayer para que sea arrastrado. Luego el cron NO debe crearle un
+        # nuevo (violaría unique_pendiente_por_cliente_dia).
+        pendiente_ayer = self._crear_pendiente_historico(
+            self.cli_dormido, dias_atras=1
+        )
+
+        self._run()
+
+        # Solo debe existir 1 ContactoWhatsApp pendiente para este cliente
+        # con fecha_sugerido=hoy (el arrastrado)
+        pendientes_hoy = ContactoWhatsApp.objects.filter(
+            cliente=self.cli_dormido,
+            fecha_sugerido=date.today(),
+            estado='pendiente',
+        )
+        self.assertEqual(
+            pendientes_hoy.count(), 1,
+            "Cliente arrastrado NO debe duplicarse al generar nuevos"
+        )
+        # Y debe ser EL MISMO objeto del arrastre (mismo id)
+        self.assertEqual(pendientes_hoy.first().id, pendiente_ayer.id)
+
 
 # ============================================================================
 # Etapa 5.5.1 — Exclusión por nombre (clientes staff/proxy)

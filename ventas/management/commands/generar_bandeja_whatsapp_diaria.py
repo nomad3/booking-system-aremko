@@ -174,6 +174,13 @@ class Command(BaseCommand):
                 f"  --force: borrados {deleted} pendientes previos para {fecha_obj}"
             ))
 
+        # ---- Acumulación: expirar viejos + arrastrar pendientes del período ----
+        # Feature 2026-05-26: contactos en estado='pendiente' de días anteriores
+        # se arrastran a fecha_obj para que aparezcan en la bandeja del operador.
+        # Los más viejos que OVC_DIAS_MAX_ACUMULACION se marcan como expirados.
+        if not dry_run and not cliente_id_filter:
+            self._arrastrar_y_expirar_pendientes(fecha_obj)
+
         # ---- Cargar candidatos ----
         candidatos = self._cargar_candidatos(fecha_obj, cliente_id_filter)
         self.stdout.write(f"  Candidatos elegibles tras filtros: {len(candidatos)}")
@@ -197,6 +204,100 @@ class Command(BaseCommand):
         # ---- Reporte final ----
         elapsed = time.time() - t0
         self._reportar(resultados, elapsed, dry_run)
+
+    # ========================================================================
+    # Acumulación de pendientes entre días
+    # ========================================================================
+
+    def _arrastrar_y_expirar_pendientes(self, fecha_obj: date) -> None:
+        """Expira pendientes muy viejos y arrastra el resto a fecha_obj.
+
+        Comportamiento:
+          1. Expira (estado='expirado_acumulacion') todo pendiente con
+             fecha_sugerido < fecha_obj - OVC_DIAS_MAX_ACUMULACION.
+          2. Arrastra (update fecha_sugerido=fecha_obj) todo pendiente en
+             [fecha_obj - OVC_DIAS_MAX_ACUMULACION, fecha_obj - 1d].
+             Excluye clientes que YA tienen un pendiente en fecha_obj para
+             respetar el constraint unique_pendiente_por_cliente_dia.
+
+        Side effects: 2 logs informativos en stdout y logger.
+
+        Notas:
+          - Solo se llama cuando NOT dry_run y NOT cliente_id_filter, así
+            que el caller ya garantizó modo "cron real".
+          - Si OVC_DIAS_MAX_ACUMULACION = 0, expira todo lo pendiente
+            anterior a hoy (modo "sin acumulación"). Útil para revertir
+            la feature sin redeploy.
+        """
+        dias_max = getattr(settings, 'OVC_DIAS_MAX_ACUMULACION', 7)
+        limite_minimo = fecha_obj - timedelta(days=dias_max)
+
+        # --- Paso 1: expirar muy viejos (< limite_minimo) ---
+        muy_viejos = ContactoWhatsApp.objects.filter(
+            estado='pendiente',
+            fecha_sugerido__lt=limite_minimo,
+        )
+        n_expirados = muy_viejos.update(estado='expirado_acumulacion')
+        if n_expirados > 0:
+            self.stdout.write(self.style.WARNING(
+                f"  Expirados {n_expirados} pendientes con >{dias_max} días "
+                f"(fecha_sugerido < {limite_minimo})"
+            ))
+            logger.info(
+                "Acumulación: expirados %s pendientes con fecha_sugerido < %s",
+                n_expirados, limite_minimo,
+            )
+
+        # --- Paso 2: arrastrar pendientes del período [limite_minimo, fecha_obj-1] ---
+        # Excluir clientes que ya tienen pendiente del día (constraint
+        # unique_pendiente_por_cliente_dia los rechazaría con IntegrityError).
+        clientes_ya_hoy_ids = list(
+            ContactoWhatsApp.objects
+            .filter(fecha_sugerido=fecha_obj, estado='pendiente')
+            .values_list('cliente_id', flat=True)
+        )
+        pendientes_periodo = ContactoWhatsApp.objects.filter(
+            estado='pendiente',
+            fecha_sugerido__gte=limite_minimo,
+            fecha_sugerido__lt=fecha_obj,
+        ).exclude(cliente_id__in=clientes_ya_hoy_ids)
+        n_arrastrados = pendientes_periodo.update(fecha_sugerido=fecha_obj)
+        if n_arrastrados > 0:
+            self.stdout.write(self.style.NOTICE(
+                f"  Arrastrados {n_arrastrados} pendientes de días anteriores "
+                f"a {fecha_obj}"
+            ))
+            logger.info(
+                "Acumulación: arrastrados %s pendientes a fecha_sugerido=%s",
+                n_arrastrados, fecha_obj,
+            )
+
+        # Si quedaron pendientes sin arrastrar por colisión, loguear cuántos
+        # (no es un error — son clientes que ya están en la bandeja del día).
+        no_arrastrados = ContactoWhatsApp.objects.filter(
+            estado='pendiente',
+            fecha_sugerido__gte=limite_minimo,
+            fecha_sugerido__lt=fecha_obj,
+        ).count()
+        if no_arrastrados > 0:
+            self.stdout.write(
+                f"  · {no_arrastrados} pendientes sin arrastrar "
+                f"(cliente ya tiene pendiente del día)"
+            )
+
+    def _clientes_con_pendiente_hoy(self, fecha_obj: date) -> set:
+        """IDs de clientes que ya tienen un ContactoWhatsApp pendiente con
+        fecha_sugerido=fecha_obj. Usado para dedupe al generar nuevos.
+
+        Incluye:
+          - Pendientes nativos generados en corrida previa del día (raro)
+          - Pendientes arrastrados desde días anteriores
+        """
+        return set(
+            ContactoWhatsApp.objects
+            .filter(fecha_sugerido=fecha_obj, estado='pendiente')
+            .values_list('cliente_id', flat=True)
+        )
 
     # ========================================================================
     # Carga de candidatos
@@ -307,11 +408,25 @@ class Command(BaseCommand):
         creados = 0
         sin_script = 0
         agotados = 0
+        duplicados_arrastre = 0
         por_prioridad: Counter = Counter()
         sample: List[dict] = []
 
+        # Dedupe contra pendientes ya en la bandeja del día (arrastrados o
+        # generados en corrida previa). Sin esto, generaríamos un nuevo
+        # ContactoWhatsApp para un cliente que ya tiene uno pendiente, lo
+        # cual viola unique_pendiente_por_cliente_dia → IntegrityError.
+        clientes_ya_en_bandeja = (
+            self._clientes_con_pendiente_hoy(fecha_obj) if not dry_run else set()
+        )
+
         for tax, prioridad in candidatos_priorizados:
             cliente = tax.cliente
+
+            # ---- Dedupe: cliente ya tiene pendiente del día ----
+            if cliente.id in clientes_ya_en_bandeja:
+                duplicados_arrastre += 1
+                continue
 
             # ---- Cuántas salvas ya recibió este cliente (en la vida) ----
             salvas_previas = ContactoWhatsApp.objects.filter(
@@ -386,6 +501,7 @@ class Command(BaseCommand):
             'creados': creados,
             'sin_script': sin_script,
             'agotados': agotados,
+            'duplicados_arrastre': duplicados_arrastre,
             'por_prioridad': dict(por_prioridad),
             'sample': sample,
         }
@@ -407,6 +523,10 @@ class Command(BaseCommand):
         if r['agotados']:
             self.stdout.write(
                 f"  · {r['agotados']} candidatos ya agotaron sus 3 salvas (saltados)"
+            )
+        if r.get('duplicados_arrastre'):
+            self.stdout.write(
+                f"  · {r['duplicados_arrastre']} candidatos ya en bandeja del día (arrastrados o previos)"
             )
 
         if r['por_prioridad']:
