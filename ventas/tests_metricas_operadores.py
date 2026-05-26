@@ -12,7 +12,7 @@ Cubre los 6 casos solicitados en el brief MVP (Jorge 2026-05-26):
 Más:
     - Normalización de operador (deborah vs Deborah vs DEBORAH)
     - Ranking ordenado por monto DESC
-    - familias_top calcula via _mapear_categoria_a_familia
+    - familias_top calcula via _mapear_familia (inlineada en el servicio)
     - Endpoint requiere X-API-KEY (smoke test)
 
 Ejecutar:

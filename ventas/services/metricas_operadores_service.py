@@ -20,7 +20,10 @@ Recalculo en vivo (NO usa el campo cacheado convirtio):
     Si crece, materializar a tabla agregada AtribucionContacto.
 
 Familia de servicios:
-    Reutiliza `ClienteTaxonomia._mapear_categoria_a_familia()`. 5 valores:
+    Función pura local `_mapear_familia(categoria_nombre, tipo_servicio)`.
+    Misma lógica que `Cliente._mapear_categoria_a_familia()` (línea ~1019
+    de models.py), inlineada para no depender de un staticmethod interno
+    de Cliente que podría moverse/renombrarse. 5 valores:
     Tinas, Masajes, Cabañas, Ambientaciones, Otros.
 
 Normalización de operador:
@@ -43,7 +46,6 @@ from typing import Optional
 from django.utils import timezone
 
 from ventas.models import (
-    ClienteTaxonomia,
     ContactoWhatsApp,
     ReservaServicio,
     VentaReserva,
@@ -52,6 +54,29 @@ from ventas.models import (
 
 # Estados de VentaReserva.estado_pago que NO cuentan como conversión
 ESTADOS_PAGO_DESCARTADOS = {'cancelado'}
+
+
+def _mapear_familia(categoria_nombre: str, tipo_servicio: str = '') -> str:
+    """Normaliza categoria.nombre + tipo_servicio a una de 5 familias.
+
+    Misma lógica que `Cliente._mapear_categoria_a_familia` (línea ~1019 de
+    models.py). Inlineada acá para no depender de un staticmethod interno
+    de Cliente que podría moverse/renombrarse.
+
+    Returns:
+        Una de: 'Ambientaciones', 'Tinas', 'Masajes', 'Cabañas', 'Otros'.
+    """
+    c = (categoria_nombre or '').lower().strip()
+    t = (tipo_servicio or '').lower().strip()
+    if 'ambientac' in c or 'decora' in c:
+        return 'Ambientaciones'
+    if 'tina' in c or t == 'tina':
+        return 'Tinas'
+    if 'masaje' in c or t == 'masaje':
+        return 'Masajes'
+    if 'caba' in c or 'alojamient' in c or t == 'cabana':
+        return 'Cabañas'
+    return 'Otros'
 
 
 def calcular_metricas_operadores(
@@ -258,9 +283,7 @@ def calcular_metricas_operadores(
         for rs in reserva_servicios:
             categoria_nombre = rs['servicio__categoria__nombre'] or ''
             tipo = rs['servicio__tipo_servicio'] or ''
-            familia = ClienteTaxonomia._mapear_categoria_a_familia(
-                categoria_nombre, tipo
-            )
+            familia = _mapear_familia(categoria_nombre, tipo)
             familias_por_reserva[rs['venta_reserva_id']].add(familia)
 
         # Para cada reserva atribuida, contar reserva en cada familia presente
