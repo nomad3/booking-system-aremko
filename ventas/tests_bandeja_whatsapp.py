@@ -1213,3 +1213,107 @@ class PlantillasGeoCascadaIntegracionTests(TestCase):
         self._run()
         # Cero contactos creados
         self.assertEqual(ContactoWhatsApp.objects.count(), 0)
+
+
+# ============================================================================
+# Migración 0107 — saludo Deborah (cosmético cross-cutting)
+# ============================================================================
+
+class Migracion0107SaludoDeborahTests(TestCase):
+    """Valida el reemplazo de las 4 variantes de saludo viejas por la firma
+    canónica nueva 'Te saluda Deborah desde Aremko Spa Boutique'.
+
+    Importa la función `actualizar_saludo` de la migración 0107 y la corre
+    sobre scripts de test (NO confía en los seeds, así el test queda
+    autocontenido y robusto incluso si los seeds cambian en el futuro).
+    """
+
+    def setUp(self):
+        ScriptWhatsApp.objects.all().delete()
+
+    def _crear(self, script_id, texto):
+        return ScriptWhatsApp.objects.create(
+            script_id=script_id,
+            nombre=f'Test {script_id}',
+            estado_valor_target='Dormido',
+            cohorte_estilo='', cohorte_contexto='', salva=1,
+            plantilla_texto=texto,
+        )
+
+    def _aplicar_migracion(self):
+        # Importar la función de la migración para reutilizar su lógica real
+        import importlib
+        mod = importlib.import_module(
+            'ventas.migrations.0107_saludo_deborah'
+        )
+        # apps falso: usamos el get_model real de Django
+        from django.apps import apps as django_apps
+
+        class _AppsShim:
+            def get_model(self, app_label, model_name):
+                return django_apps.get_model(app_label, model_name)
+
+        mod.actualizar_saludo(_AppsShim(), schema_editor=None)
+
+    def test_reemplaza_te_escribe_aremko_de_puerto_varas(self):
+        s = self._crear('A.X', 'Hola María, te escribe Aremko de Puerto Varas.\n\nResto del mensaje.')
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        self.assertIn('te saluda Deborah desde Aremko Spa Boutique', s.plantilla_texto)
+        self.assertNotIn('te escribe Aremko', s.plantilla_texto)
+
+    def test_reemplaza_te_escribo_de_aremko_mesa_chica(self):
+        # Mesa chica empieza con mayúscula tras signo de interrogación
+        s = self._crear('E.X', 'Hola María, ¿cómo has estado? Te escribo de Aremko.\n\nResto.')
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        self.assertIn('Te saluda Deborah desde Aremko Spa Boutique', s.plantilla_texto)
+        self.assertNotIn('Te escribo de Aremko', s.plantilla_texto)
+
+    def test_reemplaza_te_escribe_aremko_simple(self):
+        s = self._crear('A.Y', 'Hola María, te escribe Aremko.\n\nResto.')
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        self.assertIn('te saluda Deborah desde Aremko Spa Boutique', s.plantilla_texto)
+        # Ya no debe quedar el saludo viejo aislado
+        self.assertNotIn('te escribe Aremko.', s.plantilla_texto)
+
+    def test_reemplaza_soy_de_aremko(self):
+        s = self._crear('C.X', 'Hola María, soy de Aremko.\n\nResto.')
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        self.assertIn('te saluda Deborah desde Aremko Spa Boutique', s.plantilla_texto)
+        self.assertNotIn('soy de Aremko', s.plantilla_texto)
+
+    def test_orden_largo_primero_no_rompe(self):
+        # Si la migración procesara los patrones en orden inverso (corto primero),
+        # 'te escribe Aremko' se reemplazaría primero y dejaría dangling
+        # ' de Puerto Varas' colgando. Validamos que NO ocurre.
+        s = self._crear('A.Z', 'Hola, te escribe Aremko de Puerto Varas, escapada.')
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        self.assertEqual(
+            s.plantilla_texto,
+            'Hola, te saluda Deborah desde Aremko Spa Boutique, escapada.',
+            "El reemplazo debe procesar la variante larga primero"
+        )
+
+    def test_idempotente_segunda_corrida_no_rompe(self):
+        # Si la migración corre 2 veces (raro pero posible con --fake o errores),
+        # la segunda no debe corromper el texto. Como la firma nueva ya no
+        # contiene ninguno de los 4 patrones viejos, no hay reemplazos.
+        s = self._crear('A.W', 'Hola, te escribe Aremko.')
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        texto_post_1 = s.plantilla_texto
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        self.assertEqual(s.plantilla_texto, texto_post_1)
+
+    def test_script_sin_saludo_viejo_no_se_toca(self):
+        # D.1 / D.2 originales no tienen saludo Aremko, solo "Hola {nombre},"
+        texto_original = 'Hola María,\n\nMensaje sin saludo de marca.'
+        s = self._crear('D.X', texto_original)
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        self.assertEqual(s.plantilla_texto, texto_original)

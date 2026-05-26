@@ -106,6 +106,38 @@ class GenerarVariacionMensajeTests(TestCase):
         self.assertIsNone(r)
         mock_openai.assert_not_called()
 
+    # ------------------------------------------------------------------
+    # Test del prompt: firma "Deborah desde Aremko Spa Boutique"
+    # ------------------------------------------------------------------
+    # No testeamos contra un LLM real (costoso y flaky). Validamos que el
+    # SYSTEM_PROMPT contenga las reglas explícitas que evitan regresión.
+    def test_prompt_preserva_firma_deborah(self):
+        """El SYSTEM_PROMPT debe contener la regla de preservar la firma de marca."""
+        from ventas.services.variacion_ia_service import VARIACION_SYSTEM_PROMPT
+        # Regla afirmativa
+        self.assertIn(
+            'saluda Deborah desde Aremko Spa Boutique',
+            VARIACION_SYSTEM_PROMPT,
+            "El prompt debe nombrar literalmente la firma a preservar"
+        )
+        # Sección PRESERVAR LITERALMENTE
+        self.assertIn(
+            'PRESERVAR LITERALMENTE',
+            VARIACION_SYSTEM_PROMPT,
+            "El prompt debe tener sección PRESERVAR LITERALMENTE"
+        )
+        # Prohibición explícita de abreviar a "te saluda Aremko" / "soy de Aremko"
+        self.assertIn(
+            'te saluda Aremko',
+            VARIACION_SYSTEM_PROMPT,
+            "El prompt debe mencionar la abreviación prohibida 'te saluda Aremko'"
+        )
+        self.assertIn(
+            'soy de Aremko',
+            VARIACION_SYSTEM_PROMPT,
+            "El prompt debe mencionar la abreviación prohibida 'soy de Aremko'"
+        )
+
 
 # ============================================================================
 # Tests de endpoints (integración)
