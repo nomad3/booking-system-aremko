@@ -1317,3 +1317,99 @@ class Migracion0107SaludoDeborahTests(TestCase):
         self._aplicar_migracion()
         s.refresh_from_db()
         self.assertEqual(s.plantilla_texto, texto_original)
+
+
+# ============================================================================
+# Migración 0108 — quitar "almuerzo" de plantillas (bug contenido Jorge)
+# ============================================================================
+
+class Migracion0108QuitarAlmuerzoTests(TestCase):
+    """Valida que la migración elimina las menciones a 'almuerzo' que
+    prometían algo que Aremko no ofrece. NO toca 'desayunos' que sí existe
+    como servicio."""
+
+    def setUp(self):
+        ScriptWhatsApp.objects.all().delete()
+
+    def _crear(self, script_id, texto):
+        return ScriptWhatsApp.objects.create(
+            script_id=script_id,
+            nombre=f'Test {script_id}',
+            estado_valor_target='En Riesgo',
+            cohorte_estilo='', cohorte_contexto='', salva=1,
+            plantilla_texto=texto,
+        )
+
+    def _aplicar_migracion(self):
+        import importlib
+        mod = importlib.import_module('ventas.migrations.0108_quitar_almuerzo_plantillas')
+        from django.apps import apps as django_apps
+
+        class _AppsShim:
+            def get_model(self, app_label, model_name):
+                return django_apps.get_model(app_label, model_name)
+
+        mod.quitar_almuerzo(_AppsShim(), schema_editor=None)
+
+    def test_reemplaza_a3_dia_spa_5_horas_almuerzo(self):
+        original = (
+            "Hola María, te saluda Deborah desde Aremko Spa Boutique.\n\n"
+            "Como te gusta el día completo (tina + masaje + descanso), te aviso que "
+            "abrimos una nueva opción: día spa de 5 horas con almuerzo incluido entre semana.\n\n"
+            "¿Te lo cuento por aquí?"
+        )
+        s = self._crear('A.3', original)
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        self.assertIn('día de spa entre semana', s.plantilla_texto)
+        self.assertNotIn('almuerzo', s.plantilla_texto.lower())
+        self.assertNotIn('5 horas', s.plantilla_texto)
+
+    def test_reemplaza_a3n_pack_2_noches_almuerzo(self):
+        original = (
+            "Hola María, te saluda Deborah desde Aremko Spa Boutique.\n\n"
+            "Como les gustó el día completo, te aviso que abrimos un "
+            "pack 2 noches + spa + almuerzo para que vuelvan sin estrés de organizar nada. "
+            "Hasta 30 de mayo con tarifa especial.\n\n"
+            "¿Les armo opciones?"
+        )
+        s = self._crear('A.3-N', original)
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        self.assertIn('pack 2 noches + spa, ideal para desconectarse', s.plantilla_texto)
+        self.assertIn('tabla de quesos, jamones o mixta para compartir', s.plantilla_texto)
+        self.assertNotIn('almuerzo', s.plantilla_texto.lower())
+
+    def test_no_toca_desayunos_que_si_existe(self):
+        """Aremko SÍ tiene servicio de desayuno (pack alojamiento+desayuno).
+        La migración NO debe tocar plantillas que solo mencionan desayunos."""
+        original = (
+            "Hola María, te saluda Deborah desde Aremko Spa Boutique.\n\n"
+            "Como les gustaron las tinas la última vez, te aviso que tenemos "
+            "un pack romántico: 2 noches en cabaña con tina caliente privada + desayunos."
+        )
+        s = self._crear('A.1-N', original)
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        self.assertEqual(s.plantilla_texto, original)
+        self.assertIn('desayunos', s.plantilla_texto)
+
+    def test_idempotente_segunda_corrida(self):
+        original = (
+            "abrimos una nueva opción: día spa de 5 horas con almuerzo incluido entre semana."
+        )
+        s = self._crear('A.3', original)
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        texto_post_1 = s.plantilla_texto
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        self.assertEqual(s.plantilla_texto, texto_post_1)
+        self.assertNotIn('almuerzo', s.plantilla_texto.lower())
+
+    def test_script_sin_almuerzo_no_se_toca(self):
+        original = "Hola María, te saluda Deborah desde Aremko Spa Boutique. Te acordamos tu última visita."
+        s = self._crear('Z.1', original)
+        self._aplicar_migracion()
+        s.refresh_from_db()
+        self.assertEqual(s.plantilla_texto, original)

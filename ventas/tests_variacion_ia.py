@@ -138,6 +138,29 @@ class GenerarVariacionMensajeTests(TestCase):
             "El prompt debe mencionar la abreviación prohibida 'soy de Aremko'"
         )
 
+    def test_prompt_prohibe_inventar_comidas(self):
+        """Bug crítico Jorge 2026-05-26: el LLM no debe introducir 'almuerzo',
+        'cena', 'restaurante', etc. en la variación porque Aremko no tiene
+        restaurante. Solo tabla para compartir + desayunos existen."""
+        from ventas.services.variacion_ia_service import VARIACION_SYSTEM_PROMPT
+        # Sección OFERTA REAL DE AREMKO presente
+        self.assertIn(
+            'OFERTA REAL DE AREMKO',
+            VARIACION_SYSTEM_PROMPT,
+            "El prompt debe tener sección OFERTA REAL DE AREMKO"
+        )
+        # Términos prohibidos listados explícitamente
+        for prohibido in ['almuerzo', 'cena', 'restaurante', 'menú', 'gourmet']:
+            self.assertIn(
+                prohibido,
+                VARIACION_SYSTEM_PROMPT,
+                f"El prompt debe mencionar la palabra prohibida {prohibido!r}"
+            )
+        # Servicios permitidos mencionados (tabla + desayunos)
+        self.assertIn('tabla de quesos', VARIACION_SYSTEM_PROMPT)
+        self.assertIn('tabla de jamones', VARIACION_SYSTEM_PROMPT)
+        self.assertIn('desayunos', VARIACION_SYSTEM_PROMPT)
+
 
 # ============================================================================
 # Tests de endpoints (integración)
