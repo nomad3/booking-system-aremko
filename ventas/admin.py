@@ -5974,6 +5974,8 @@ class RefugioConfigAdmin(SingletonModelAdmin):
                 'paquete_incluye',
                 'fecha_limite_oferta',
                 'cupo_disponible_texto',
+                'garantia_texto',
+                'garantia_url',
             ),
         }),
         ('Por qué Aremko', {

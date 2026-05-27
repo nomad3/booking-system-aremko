@@ -171,7 +171,36 @@ class RefugioLandingTests(TestCase):
         self.assertNotIn('alojamiento 1 noche', html)
 
     # ──────────────────────────────────────────────────────────────────
-    # Test 8: ciudad_origen se captura en el form y persiste en el lead
+    # Test 8: línea sutil "Respaldado por la Garantía Aremko" al pie del precio
+    # ──────────────────────────────────────────────────────────────────
+    def test_garantia_aparece_al_pie_del_precio(self):
+        url = reverse('refugio_landing')
+
+        # Caso 1: defaults — debe aparecer texto + link a /garantia/
+        resp = self.client.get(url)
+        html = resp.content.decode('utf-8')
+        self.assertIn('Respaldado por la Garantía Aremko', html)
+        self.assertIn('refugio-garantia-link', html)
+        self.assertIn('href="/garantia/"', html)
+
+        # Caso 2: garantia_url vacío → texto plano sin link
+        self.config.garantia_url = ''
+        self.config.save()
+        resp = self.client.get(url)
+        html = resp.content.decode('utf-8')
+        self.assertIn('Respaldado por la Garantía Aremko', html)
+        self.assertNotIn('href="/garantia/"', html)
+
+        # Caso 3: garantia_texto vacío → no aparece la línea
+        self.config.garantia_texto = ''
+        self.config.save()
+        resp = self.client.get(url)
+        html = resp.content.decode('utf-8')
+        self.assertNotIn('Respaldado por la Garantía Aremko', html)
+        self.assertNotIn('refugio-garantia-link', html)
+
+    # ──────────────────────────────────────────────────────────────────
+    # Test 9: ciudad_origen se captura en el form y persiste en el lead
     # ──────────────────────────────────────────────────────────────────
     def test_ciudad_origen_se_persiste(self):
         # 1) El form debe tener el input ciudad_origen

@@ -99,6 +99,22 @@
 }
 .refugio-precio-card .moneda { font-size: 1.2rem; vertical-align: top; }
 .refugio-precio-card .unidad { font-size: 1rem; color: var(--light-gray); }
+.refugio-garantia-link {
+    display: inline-block;
+    font-size: 0.85rem;
+    color: var(--light-gray);
+    text-decoration: none;
+    margin-top: -8px;
+    margin-bottom: 18px;
+    opacity: 0.85;
+    transition: opacity 0.2s ease;
+}
+.refugio-garantia-link:hover {
+    color: var(--dark-gray);
+    text-decoration: underline;
+    opacity: 1;
+}
+.refugio-garantia-link i { font-size: 0.7rem; margin-left: 3px; }
 .refugio-incluye-list { list-style: none; padding: 0; }
 .refugio-incluye-list li {
     padding: 12px 0;
@@ -227,7 +243,16 @@
                     <div class="precio">
                         <span class="moneda">$</span>{{ config.precio_clp|floatformat:"0" }}
                     </div>
-                    <p class="unidad mb-3">por 2 personas, todo incluido</p>
+                    <p class="unidad mb-1">por 2 personas, todo incluido</p>
+                    {% if config.garantia_texto %}
+                        {% if config.garantia_url %}
+                        <a href="{{ config.garantia_url }}" class="refugio-garantia-link" data-event="refugio_garantia_click">
+                            {{ config.garantia_texto }}<i class="fas fa-external-link-alt" aria-hidden="true"></i>
+                        </a>
+                        {% else %}
+                        <span class="refugio-garantia-link" aria-hidden="false">{{ config.garantia_texto }}</span>
+                        {% endif %}
+                    {% endif %}
                     <a href="#refugio-formulario" class="btn-refugio" data-event="refugio_precio_cta_click">
                         Reserva tu Refugio
                     </a>

@@ -7326,6 +7326,22 @@ class RefugioConfig(SingletonModel):
         verbose_name="Detalles · Cómo llegar",
     )
 
+    # Garantía (subtítulo sutil al pie del precio)
+    garantia_texto = models.CharField(
+        max_length=200,
+        default="Respaldado por la Garantía Aremko",
+        blank=True,
+        verbose_name="Garantía · texto sutil pie del precio",
+        help_text="Línea pequeña debajo de 'por 2 personas, todo incluido'. Si está vacío, no se muestra.",
+    )
+    garantia_url = models.CharField(
+        max_length=300,
+        default="/garantia/",
+        blank=True,
+        verbose_name="Garantía · URL del link",
+        help_text="Path relativo (ej. /garantia/) o URL absoluta. Si está vacío, el texto se muestra sin link.",
+    )
+
     # SEO
     seo_title = models.CharField(
         max_length=120,
