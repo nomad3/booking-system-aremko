@@ -86,12 +86,15 @@ class RefugioLandingTests(TestCase):
         self.assertEqual(lead.status, 'nuevo')
         self.assertIsNotNone(lead.fecha_tentativa)
 
-        # Emails enviados: 1 al equipo + 1 al cliente
+        # Emails enviados: 1 al equipo (con N destinatarios) + 1 al cliente
         self.assertEqual(len(mail.outbox), 2)
         emails_to = {addr for m in mail.outbox for addr in m.to}
+        # Cliente recibe confirmación
         self.assertIn('jorge@example.com', emails_to)
+        # Equipo: los 3 destinatarios del setting REFUGIO_LEAD_NOTIFICACIONES
         self.assertIn('comunicaciones@aremko.cl', emails_to)
         self.assertIn('aremkospa@gmail.com', emails_to)
+        self.assertIn('ventas@aremko.cl', emails_to)  # Deborah · operadora comercial
 
     # ──────────────────────────────────────────────────────────────────
     # Test 4: POST sin campos requeridos → 400

@@ -378,6 +378,19 @@ EMAIL_MONTHLY_LIMIT_PER_CLIENT = int(os.getenv('EMAIL_MONTHLY_LIMIT_PER_CLIENT',
 # Configuración mejorada de Email
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'comunicaciones@aremko.cl')
 VENTAS_FROM_EMAIL = os.getenv('VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
+
+# Destinatarios de notificación cuando entra un lead nuevo en /refugio/.
+# Configurable vía env REFUGIO_LEAD_NOTIFICACIONES (coma-separados) para
+# poder ajustar sin redeploy. Default: 3 cuentas del equipo Aremko.
+#   - comunicaciones@aremko.cl: bandeja general
+#   - aremkospa@gmail.com:      Jorge (dueño)
+#   - ventas@aremko.cl:         Deborah (operadora comercial Refugio)
+REFUGIO_LEAD_NOTIFICACIONES = [
+    e.strip() for e in os.getenv(
+        'REFUGIO_LEAD_NOTIFICACIONES',
+        'comunicaciones@aremko.cl,aremkospa@gmail.com,ventas@aremko.cl',
+    ).split(',') if e.strip()
+]
 # Email Backend - usar console para desarrollo si no hay credenciales
 # Email Backend - SendGrid (Anymail)
 if os.getenv('SENDGRID_API_KEY'):

@@ -782,12 +782,17 @@ def refugio_submit_view(request):
         )
         logger.info(f"[Refugio] Lead {lead.id} creado: {lead.nombre} <{lead.email}>")
 
-        # --- Email al equipo (TO: comunicaciones + aremkospa) ---
+        # --- Email al equipo ---
+        # Destinatarios desde settings.REFUGIO_LEAD_NOTIFICACIONES para que
+        # se puedan ajustar sin redeploy (env REFUGIO_LEAD_NOTIFICACIONES
+        # coma-separados). Fallback hardcoded por seguridad si el setting
+        # no está definido.
         try:
-            equipo_emails = [
-                'comunicaciones@aremko.cl',
-                'aremkospa@gmail.com',
-            ]
+            equipo_emails = getattr(
+                settings,
+                'REFUGIO_LEAD_NOTIFICACIONES',
+                ['comunicaciones@aremko.cl', 'aremkospa@gmail.com', 'ventas@aremko.cl'],
+            )
             subject_equipo = f"[Refugio] Nuevo lead: {lead.nombre}"
             body_equipo = render_to_string('ventas/emails/refugio_lead_equipo.txt', {
                 'lead': lead,
