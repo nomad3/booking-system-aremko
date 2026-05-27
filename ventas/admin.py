@@ -5994,9 +5994,9 @@ class RefugioConfigAdmin(SingletonModelAdmin):
         ('CTA final', {
             'fields': ('cta_final_titulo', 'cta_final_subtitulo'),
         }),
-        ('SEO / Open Graph', {
+        ('SEO / Open Graph (incluye imagen de fondo del hero)', {
             'fields': ('seo_title', 'seo_description', 'og_image'),
-            'classes': ('collapse',),
+            'description': 'La imagen Open Graph (1200×630 px) se usa como fondo del hero de la landing Y como vista previa al compartir el link en WhatsApp/Meta/Twitter.',
         }),
     )
 
