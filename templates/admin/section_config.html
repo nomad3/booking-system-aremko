@@ -94,6 +94,51 @@
             </div>
         </div>
 
+        {# ── Landing Refugio Aremko (campaña 15-jun-2026) ────────── #}
+
+        {# RefugioConfig Card — singleton de textos, precio, paquete, SEO #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-leaf card-icon text-danger-modern"></i>
+                    <h5 class="card-title">Configuración Landing Refugio</h5>
+                    <p class="small text-muted mb-2">Textos, precio, paquete, garantía, SEO. Activar/desactivar landing.</p>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_refugioconfig_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver/Editar</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# RefugioImagen Card — galería de fotos #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-images card-icon text-danger-modern"></i>
+                    <h5 class="card-title">Galería Refugio</h5>
+                    <p class="small text-muted mb-2">Subir/ordenar fotos de la landing.</p>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_refugioimagen_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Lista</a>
+                        <a href="{% url 'admin:ventas_refugioimagen_add' %}" class="btn btn-sm btn-modern btn-primary-modern">Subir Foto</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# RefugioLead Card — bandeja de leads del formulario #}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card h-100 text-center card-hover">
+                <div class="card-body">
+                    <i class="fas fa-inbox card-icon text-danger-modern"></i>
+                    <h5 class="card-title">Leads Refugio</h5>
+                    <p class="small text-muted mb-2">Bandeja de solicitudes del formulario público.</p>
+                    <div class="card-link-container d-grid gap-2">
+                        <a href="{% url 'admin:ventas_refugiolead_changelist' %}" class="btn btn-sm btn-modern btn-secondary-modern">Ver Bandeja</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 {% endblock %}
