@@ -6003,11 +6003,24 @@ class RefugioConfigAdmin(SingletonModelAdmin):
 
 @admin.register(RefugioImagen)
 class RefugioImagenAdmin(admin.ModelAdmin):
-    list_display = ('id', 'alt_text', 'orden', 'activa', 'created_at')
+    list_display = ('thumbnail', 'id', 'alt_text', 'orden', 'activa', 'created_at')
+    list_display_links = ('thumbnail', 'id', 'alt_text')
     list_editable = ('orden', 'activa')
     list_filter = ('activa',)
     search_fields = ('alt_text',)
     ordering = ('orden', 'id')
+    list_per_page = 50
+
+    def thumbnail(self, obj):
+        from django.utils.html import format_html
+        if obj.imagen:
+            return format_html(
+                '<img src="{}" style="height:60px; width:90px; object-fit:cover; '
+                'border-radius:6px; box-shadow:0 2px 6px rgba(0,0,0,0.15);" />',
+                obj.imagen.url,
+            )
+        return '—'
+    thumbnail.short_description = 'Vista previa'
 
 
 @admin.register(RefugioLead)
