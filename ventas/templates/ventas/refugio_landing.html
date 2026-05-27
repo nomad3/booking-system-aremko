@@ -127,19 +127,42 @@
 .refugio-incluye-list li i { color: var(--primary-color); margin-right: 12px; }
 .refugio-bg-alt { background-color: #FAF0E6; }
 .refugio-bg-cream { background-color: #FFF8F0; }
-.refugio-galeria-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 12px;
+.refugio-carousel {
+    max-width: 900px;
+    margin: 0 auto;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
 }
-.refugio-galeria-grid img {
+.refugio-carousel-img {
     width: 100%;
-    height: 220px;
+    height: 500px;
     object-fit: cover;
-    border-radius: 10px;
-    transition: transform 0.3s ease;
 }
-.refugio-galeria-grid img:hover { transform: scale(1.03); }
+@media (max-width: 768px) {
+    .refugio-carousel-img { height: 320px; }
+}
+.refugio-carousel .carousel-control-prev,
+.refugio-carousel .carousel-control-next {
+    width: 8%;
+    opacity: 0.7;
+}
+.refugio-carousel .carousel-control-prev:hover,
+.refugio-carousel .carousel-control-next:hover { opacity: 1; }
+.refugio-carousel .carousel-indicators {
+    margin-bottom: 0.8rem;
+}
+.refugio-carousel .carousel-indicators button {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: rgba(255,255,255,0.6);
+    border: 2px solid rgba(0,0,0,0.2);
+    margin: 0 4px;
+}
+.refugio-carousel .carousel-indicators button.active {
+    background-color: var(--primary-color);
+}
 .refugio-form-card {
     background: var(--white);
     border-radius: 20px;
@@ -277,15 +300,47 @@
 </section>
 
 {# ── SECCIÓN 5 · GALERÍA ──────────────────────────────────────── #}
+{# Carrusel Bootstrap 5 (auto-play 5s, controles + indicadores).      #}
+{# Si hay 1 sola foto se muestra sin controles. Si hay 0 no se ve.    #}
 {% if imagenes %}
 <section class="refugio-section refugio-bg-alt" id="refugio-galeria">
     <div class="container">
         <h2>Galería</h2>
-        <div class="refugio-galeria-grid">
-            {% for img in imagenes %}
-            <img src="{{ img.imagen.url }}" alt="{{ img.alt_text|default:'Refugio Aremko' }}" loading="lazy">
-            {% endfor %}
+        <div id="refugioCarousel" class="carousel slide refugio-carousel" data-bs-ride="carousel" data-bs-interval="5000">
+            {% if imagenes|length > 1 %}
+            <div class="carousel-indicators">
+                {% for img in imagenes %}
+                <button type="button" data-bs-target="#refugioCarousel" data-bs-slide-to="{{ forloop.counter0 }}"
+                        {% if forloop.first %}class="active" aria-current="true"{% endif %}
+                        aria-label="Foto {{ forloop.counter }}"></button>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="carousel-inner">
+                {% for img in imagenes %}
+                <div class="carousel-item{% if forloop.first %} active{% endif %}">
+                    <img src="{{ img.imagen.url }}" alt="{{ img.alt_text|default:'Refugio Aremko' }}"
+                         class="d-block w-100 refugio-carousel-img" loading="lazy">
+                </div>
+                {% endfor %}
+            </div>
+            {% if imagenes|length > 1 %}
+            <button class="carousel-control-prev" type="button" data-bs-target="#refugioCarousel" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Anterior</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#refugioCarousel" data-bs-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Siguiente</span>
+            </button>
+            {% endif %}
         </div>
+        {% if imagenes|length == 1 %}
+        <p class="text-center text-muted mt-3 small">
+            <i class="fas fa-info-circle me-1"></i>
+            Próximamente más fotos del Refugio.
+        </p>
+        {% endif %}
     </div>
 </section>
 {% endif %}
