@@ -151,33 +151,49 @@ class Command(BaseCommand):
             f"(orden por prioridad ASC, id DESC):"
         )
         self.stdout.write(
-            f"    {'#':>3} {'cli_id':>6} {'P':>2} {'nombre':30} {'tel':>9} "
-            f"| {'eje_valor':12} {'dias':>5} {'min':>3} {'check':5} "
-            f"| {'fecha_envio':16} {'estado':10}"
+            f"    [tax_now=taxonomía actual | snap=snapshot guardado al "
+            f"crear contacto]"
+        )
+        self.stdout.write(
+            f"    {'#':>3} {'cli_id':>6} {'P':>2} {'nombre':25} {'tel':>9} "
+            f"| {'eje_now':10} {'eje_snap':10} "
+            f"| {'dias_now':>8} {'dias_snap':>9} {'min':>3} {'check':6} "
+            f"| {'creado':16}"
         )
         for i, c in enumerate(
             qs.filter(estado='pendiente').order_by('prioridad', '-id')[:limite], 1
         ):
             cli = c.cliente
             tax = getattr(cli, 'taxonomia', None)
-            eje_v = (tax.eje_valor if tax else '?')[:12]
-            dias = tax.dias_desde_ultima_visita if tax else None
-            dias_min = dias_min_map.get(eje_v.strip(), 0)
-            # ¿debería haber sido bloqueado por filtro días mínimos?
-            bloqueado_filtro = (
-                dias_min > 0 and dias is not None and dias < dias_min
+            eje_now = (tax.eje_valor if tax else '?')[:10]
+            eje_snap = (c.eje_valor_snapshot or '?')[:10]
+            dias_now = tax.dias_desde_ultima_visita if tax else None
+            dias_snap = c.dias_sin_venir_snapshot
+            # Filtro evalúa con eje_snap + dias_snap (lo que vio el cron al crear)
+            dias_min = dias_min_map.get((eje_snap or '').strip(), 0)
+            bloqueado_filtro_actual = (
+                dias_min > 0 and dias_now is not None and dias_now < dias_min
             )
-            marker = (
-                '⚠BUG' if bloqueado_filtro
-                else ('—' if dias_min == 0 else 'ok')
+            bloqueado_filtro_snap = (
+                dias_min > 0 and dias_snap is not None and dias_snap < dias_min
             )
+            # Detección de bug: snapshot None pero ahora tiene valor (race condition)
+            if dias_min > 0 and dias_snap is None and dias_now is not None:
+                marker = '⚠RACE'
+            elif bloqueado_filtro_snap:
+                marker = '⚠BUG'
+            elif dias_min == 0:
+                marker = '—'
+            else:
+                marker = 'ok'
             tel_short = (cli.telefono or '?')[-9:]
-            nombre_short = (cli.nombre or '?')[:30]
-            fecha_envio = c.fecha_envio.strftime('%Y-%m-%d %H:%M') if c.fecha_envio else '-'
+            nombre_short = (cli.nombre or '?')[:25]
+            creado_str = c.creado.strftime('%Y-%m-%d %H:%M') if c.creado else '-'
             self.stdout.write(
-                f"    {i:>3} {cli.id:>6} P{c.prioridad} {nombre_short:30} {tel_short:>9} "
-                f"| {eje_v:12} {str(dias):>5} {str(dias_min):>3} {marker:5} "
-                f"| {fecha_envio:16} {c.estado:10}"
+                f"    {i:>3} {cli.id:>6} P{c.prioridad} {nombre_short:25} {tel_short:>9} "
+                f"| {eje_now:10} {eje_snap:10} "
+                f"| {str(dias_now):>8} {str(dias_snap):>9} {str(dias_min):>3} {marker:6} "
+                f"| {creado_str:16}"
             )
 
         # ────────── 7. CONTACTOS HISTÓRICOS PARA ESTE CLIENTE EN BANDEJA ──────────

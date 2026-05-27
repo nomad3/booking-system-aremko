@@ -168,12 +168,20 @@ def calcular_prioridad(
     from django.conf import settings
     dias_minimo_map = getattr(settings, 'OVC_DIAS_MINIMO_DESDE_ULTIMA_VISITA', {})
     dias_minimo = dias_minimo_map.get(eje_valor, 0)
-    if (
-        dias_minimo > 0
-        and dias_desde_ultima_visita is not None
-        and dias_desde_ultima_visita < dias_minimo
-    ):
-        return None
+    if dias_minimo > 0:
+        # Caso 1: dato presente y dentro del rango bloqueado.
+        if dias_desde_ultima_visita is not None and dias_desde_ultima_visita < dias_minimo:
+            return None
+        # Caso 2: dias_desde_ultima_visita es None pero el segmento (Campeón/Leal/
+        # Regular/GG Ocasional) implica historial real. None aquí significa
+        # taxonomía stale o race condition (cron taxonomía aún no procesó al
+        # cliente). Más seguro saltar al cliente hoy que arriesgar "te echamos
+        # de menos" a alguien que vino ayer. Bugfix 2026-05-27: cliente
+        # Campeón con visita 10d entró a bandeja porque snapshot fue None.
+        if dias_desde_ultima_visita is None and eje_valor in (
+            'Campeón', 'Leal', 'Regular', 'Gran Gastador Ocasional',
+        ):
+            return None
 
     # ---------- P0: Mesa chica (Leal + Campeón, contacto mensual) ----------
     if eje_valor in ('Leal', 'Campeón'):

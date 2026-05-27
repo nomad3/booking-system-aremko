@@ -425,6 +425,47 @@ class CalcularPrioridadTests(TestCase):
             6
         )
 
+    # ---- Bugfix 2026-05-27: dias=None con segmento de alto valor ----
+    # Cliente cli=22 (Jorge Aguilera, Campeón con visita 10d real) entró a
+    # bandeja P0 pese al filtro porque su snapshot tenía dias=None (probable
+    # race condition entre cron de taxonomía y cron de bandeja). Fix: cuando
+    # eje_valor implica historial real (Campeón/Leal/Regular/GG Ocasional) y
+    # dias_desde_ultima_visita es None, también bloquear conservadoramente.
+
+    def test_filtro_campeon_dias_none_bloqueado(self):
+        """Campeón con dias=None → None (race condition taxonomía stale)."""
+        self.assertIsNone(
+            self._call(
+                eje_valor='Campeón',
+                dias_desde_ultima_visita=None,
+                ultimo_contacto_outbound=None,
+            )
+        )
+
+    def test_filtro_leal_dias_none_bloqueado(self):
+        self.assertIsNone(
+            self._call(
+                eje_valor='Leal',
+                dias_desde_ultima_visita=None,
+                ultimo_contacto_outbound=None,
+            )
+        )
+
+    def test_filtro_dormido_dias_none_no_bloqueado_por_filtro(self):
+        """Dormido tiene dias_minimo=0 → el guard NO aplica. Cae a P3/P6
+        que tienen su propio chequeo (None → P6 no aplica, retorna None
+        por la rama 'else' normal sin que sea por el filtro previo)."""
+        # Dormido con dias=None: P3 requiere 195-210 (None falla), P6 sin
+        # condición — pero el código actual de P6 retorna 6 incondicional.
+        # Caso poco realista (Dormido SIN dias) pero defensivamente OK.
+        self.assertEqual(
+            self._call(
+                eje_valor='Dormido',
+                dias_desde_ultima_visita=None,
+            ),
+            6  # cae a P6 (resto) aunque dias sea None
+        )
+
 
 # ============================================================================
 # Tests de buscar_script_cascada (con DB real, tests más livianos)
