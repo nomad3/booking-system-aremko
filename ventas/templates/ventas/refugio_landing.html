@@ -1,5 +1,5 @@
 {% extends "ventas/base_public.html" %}
-{% load static %}
+{% load static humanize %}
 
 {# ──────────────────────────────────────────────────────────────────
    Landing "Refugio Aremko" — campaña 15-jun-2026
@@ -43,6 +43,7 @@
 {% endblock %}
 
 {% block extra_style %}
+<style>
 .refugio-hero {
     {% if og_image_url %}
     background: linear-gradient(rgba(92, 64, 51, 0.45), rgba(92, 64, 51, 0.55)),
@@ -100,12 +101,12 @@
 .refugio-precio-card .moneda { font-size: 1.2rem; vertical-align: top; }
 .refugio-precio-card .unidad { font-size: 1rem; color: var(--light-gray); }
 .refugio-garantia-link {
-    display: inline-block;
+    display: block;
     font-size: 0.85rem;
     color: var(--light-gray);
     text-decoration: none;
-    margin-top: -8px;
-    margin-bottom: 18px;
+    margin-top: 4px;
+    margin-bottom: 20px;
     opacity: 0.85;
     transition: opacity 0.2s ease;
 }
@@ -203,6 +204,7 @@
     font-size: 0.95rem;
     margin: 0;
 }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -241,7 +243,7 @@
                 <div class="refugio-precio-card">
                     <p class="mb-0 text-muted">Inversión total</p>
                     <div class="precio">
-                        <span class="moneda">$</span>{{ config.precio_clp|floatformat:"0" }}
+                        <span class="moneda">$</span>{{ config.precio_clp|intcomma }}
                     </div>
                     <p class="unidad mb-1">por 2 personas, todo incluido</p>
                     {% if config.garantia_texto %}
