@@ -44,8 +44,12 @@
 
 {% block extra_style %}
 .refugio-hero {
+    {% if og_image_url %}
     background: linear-gradient(rgba(92, 64, 51, 0.45), rgba(92, 64, 51, 0.55)),
-                url('{% if og_image_url %}{{ og_image_url }}{% else %}{% static "images/aremko-og-image.jpg" %}{% endif %}') center/cover no-repeat;
+                url('{{ og_image_url }}') center/cover no-repeat;
+    {% else %}
+    background: linear-gradient(135deg, #5C4033 0%, #A0522D 60%, #D2B48C 100%);
+    {% endif %}
     color: var(--white);
     padding: 100px 20px;
     text-align: center;
