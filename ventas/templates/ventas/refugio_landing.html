@@ -1,0 +1,430 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+
+{# ──────────────────────────────────────────────────────────────────
+   Landing "Refugio Aremko" — campaña 15-jun-2026
+   ──────────────────────────────────────────────────────────────────
+   Texto + precio + galería editables vía RefugioConfig singleton +
+   RefugioImagen (admin). Formulario POST a /refugio/submit/ vía AJAX.
+   ────────────────────────────────────────────────────────────────── #}
+
+{% block title %}{{ config.seo_title }}{% endblock %}
+
+{% block meta_description %}
+<meta name="description" content="{{ config.seo_description }}">
+{% endblock %}
+
+{% block og_title %}{{ config.seo_title }}{% endblock %}
+{% block og_description %}{{ config.seo_description }}{% endblock %}
+{% block og_image %}{% if og_image_url %}{{ request.scheme }}://{{ request.get_host }}{{ og_image_url }}{% else %}{{ request.scheme }}://{{ request.get_host }}/static/images/aremko-og-image.jpg{% endif %}{% endblock %}
+
+{% block twitter_title %}{{ config.seo_title }}{% endblock %}
+{% block twitter_description %}{{ config.seo_description }}{% endblock %}
+{% block twitter_image %}{% if og_image_url %}{{ request.scheme }}://{{ request.get_host }}{{ og_image_url }}{% else %}{{ request.scheme }}://{{ request.get_host }}/static/images/aremko-twitter-image.jpg{% endif %}{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": "{{ config.hero_title }}",
+  "description": "{{ config.seo_description }}",
+  "brand": {"@type": "Brand", "name": "Aremko Spa"},
+  "offers": {
+    "@type": "Offer",
+    "price": "{{ config.precio_clp }}",
+    "priceCurrency": "CLP",
+    "availability": "https://schema.org/InStock",
+    "url": "{{ canonical_url }}"{% if config.fecha_limite_oferta %},
+    "priceValidUntil": "{{ config.fecha_limite_oferta|date:'Y-m-d' }}"{% endif %}
+  }
+}
+</script>
+{% endblock %}
+
+{% block extra_style %}
+.refugio-hero {
+    background: linear-gradient(rgba(92, 64, 51, 0.45), rgba(92, 64, 51, 0.55)),
+                url('{% if og_image_url %}{{ og_image_url }}{% else %}{% static "images/aremko-og-image.jpg" %}{% endif %}') center/cover no-repeat;
+    color: var(--white);
+    padding: 100px 20px;
+    text-align: center;
+    min-height: 70vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.refugio-hero h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+.refugio-hero .lead {
+    font-size: 1.4rem;
+    max-width: 720px;
+    margin: 0 auto 2rem;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+}
+@media (max-width: 768px) {
+    .refugio-hero { padding: 70px 16px; min-height: 60vh; }
+    .refugio-hero h1 { font-size: 2.1rem; }
+    .refugio-hero .lead { font-size: 1.1rem; }
+}
+.refugio-section { padding: 70px 0; }
+.refugio-section h2 {
+    color: var(--dark-gray);
+    font-weight: 700;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+.refugio-precio-card {
+    background: var(--white);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+    text-align: center;
+    max-width: 520px;
+    margin: 0 auto;
+}
+.refugio-precio-card .precio {
+    font-size: 3.2rem;
+    color: var(--primary-color);
+    font-weight: 700;
+    margin: 0.5rem 0;
+}
+.refugio-precio-card .moneda { font-size: 1.2rem; vertical-align: top; }
+.refugio-precio-card .unidad { font-size: 1rem; color: var(--light-gray); }
+.refugio-incluye-list { list-style: none; padding: 0; }
+.refugio-incluye-list li {
+    padding: 12px 0;
+    border-bottom: 1px solid #eee;
+    color: var(--dark-gray);
+    font-size: 1.05rem;
+}
+.refugio-incluye-list li:last-child { border-bottom: none; }
+.refugio-incluye-list li i { color: var(--primary-color); margin-right: 12px; }
+.refugio-bg-alt { background-color: #FAF0E6; }
+.refugio-bg-cream { background-color: #FFF8F0; }
+.refugio-galeria-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+.refugio-galeria-grid img {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    border-radius: 10px;
+    transition: transform 0.3s ease;
+}
+.refugio-galeria-grid img:hover { transform: scale(1.03); }
+.refugio-form-card {
+    background: var(--white);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+    max-width: 640px;
+    margin: 0 auto;
+}
+.refugio-form-card .form-control {
+    border-radius: 8px;
+    padding: 12px 16px;
+    border: 1px solid #ddd;
+}
+.refugio-form-card .form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(160, 82, 45, 0.15);
+}
+.btn-refugio {
+    background-color: var(--primary-color);
+    color: var(--white) !important;
+    border: none;
+    padding: 14px 36px;
+    border-radius: 30px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+}
+.btn-refugio:hover {
+    background-color: #8B4513;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(160, 82, 45, 0.3);
+    color: var(--white) !important;
+}
+.refugio-urgencia {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--white);
+    padding: 6px 18px;
+    border-radius: 20px;
+    font-size: 0.95rem;
+    margin-bottom: 16px;
+    border: 1px solid rgba(255,255,255,0.4);
+}
+.refugio-detalle-item {
+    text-align: center;
+    padding: 30px 16px;
+}
+.refugio-detalle-item i {
+    font-size: 2.4rem;
+    color: var(--primary-color);
+    margin-bottom: 12px;
+}
+.refugio-detalle-item h5 {
+    color: var(--dark-gray);
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+.refugio-detalle-item p {
+    color: var(--light-gray);
+    font-size: 0.95rem;
+    margin: 0;
+}
+{% endblock %}
+
+{% block content %}
+
+{# ── SECCIÓN 1 · HERO ─────────────────────────────────────────── #}
+<section class="refugio-hero" id="refugio-hero">
+    <div>
+        {% if config.cupo_disponible_texto %}
+        <span class="refugio-urgencia">
+            <i class="fas fa-clock me-1"></i> {{ config.cupo_disponible_texto }}
+        </span>
+        {% endif %}
+        <h1>{{ config.hero_title }}</h1>
+        <p class="lead">{{ config.hero_subtitle }}</p>
+        <a href="#refugio-formulario" class="btn-refugio" data-event="refugio_hero_cta_click">
+            {{ config.hero_cta_text }}
+        </a>
+    </div>
+</section>
+
+{# ── SECCIÓN 2 · QUÉ INCLUYE + SECCIÓN 3 · INVERSIÓN ──────────── #}
+<section class="refugio-section refugio-bg-cream" id="refugio-incluye">
+    <div class="container">
+        <h2>{{ config.paquete_titulo }}</h2>
+        <div class="row align-items-center">
+            <div class="col-lg-6 mb-4">
+                <ul class="refugio-incluye-list">
+                    {% for item in config.incluye_list %}
+                    <li><i class="fas fa-check-circle"></i> {{ item }}</li>
+                    {% empty %}
+                    <li><i class="fas fa-info-circle"></i> Detalles próximamente.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="col-lg-6">
+                <div class="refugio-precio-card">
+                    <p class="mb-0 text-muted">Inversión total</p>
+                    <div class="precio">
+                        <span class="moneda">$</span>{{ config.precio_clp|floatformat:"0" }}
+                    </div>
+                    <p class="unidad mb-3">CLP · para 2 personas</p>
+                    <a href="#refugio-formulario" class="btn-refugio" data-event="refugio_precio_cta_click">
+                        Reserva tu Refugio
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# ── SECCIÓN 4 · POR QUÉ AREMKO ───────────────────────────────── #}
+<section class="refugio-section" id="refugio-por-que">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 text-center">
+                <h2>{{ config.por_que_titulo }}</h2>
+                <p class="lead text-muted">{{ config.por_que_texto }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# ── SECCIÓN 5 · GALERÍA ──────────────────────────────────────── #}
+{% if imagenes %}
+<section class="refugio-section refugio-bg-alt" id="refugio-galeria">
+    <div class="container">
+        <h2>Galería</h2>
+        <div class="refugio-galeria-grid">
+            {% for img in imagenes %}
+            <img src="{{ img.imagen.url }}" alt="{{ img.alt_text|default:'Refugio Aremko' }}" loading="lazy">
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{# ── SECCIÓN 7 · DETALLES ─────────────────────────────────────── #}
+<section class="refugio-section" id="refugio-detalles">
+    <div class="container">
+        <h2>Lo que debes saber</h2>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="refugio-detalle-item">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <h5>Ubicación</h5>
+                    <p>Aremko Spa Boutique · Puerto Varas, Región de Los Lagos</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="refugio-detalle-item">
+                    <i class="fas fa-clock"></i>
+                    <h5>Duración</h5>
+                    <p>Check-in 15:00 · Late check-out 14:00 del día siguiente</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="refugio-detalle-item">
+                    <i class="fas fa-shield-alt"></i>
+                    <h5>Garantía Aremko</h5>
+                    <p>Si tu tina llega a 37°C o menos, es gratis. <a href="{% url 'garantia' %}">Ver garantía</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# ── SECCIÓN 8 · FORMULARIO ───────────────────────────────────── #}
+<section class="refugio-section refugio-bg-cream" id="refugio-formulario">
+    <div class="container">
+        <div class="row justify-content-center mb-4">
+            <div class="col-lg-8 text-center">
+                <h2>{{ config.cta_final_titulo }}</h2>
+                <p class="lead text-muted">{{ config.cta_final_subtitulo }}</p>
+            </div>
+        </div>
+
+        <div class="refugio-form-card">
+            <form id="refugio-form" method="post" action="{% url 'refugio_submit' %}" novalidate>
+                {% csrf_token %}
+                {# UTM hidden inputs — capturados desde GET por la view #}
+                <input type="hidden" name="utm_source" value="{{ request.GET.utm_source|default:'' }}">
+                <input type="hidden" name="utm_medium" value="{{ request.GET.utm_medium|default:'' }}">
+                <input type="hidden" name="utm_campaign" value="{{ request.GET.utm_campaign|default:'' }}">
+                <input type="hidden" name="utm_content" value="{{ request.GET.utm_content|default:'' }}">
+                <input type="hidden" name="utm_term" value="{{ request.GET.utm_term|default:'' }}">
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="refugio-nombre" class="form-label">Nombre *</label>
+                        <input type="text" class="form-control" id="refugio-nombre" name="nombre" required maxlength="120">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="refugio-email" class="form-label">Email *</label>
+                        <input type="email" class="form-control" id="refugio-email" name="email" required maxlength="254">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="refugio-telefono" class="form-label">Teléfono (WhatsApp)</label>
+                        <input type="tel" class="form-control" id="refugio-telefono" name="telefono" placeholder="+56 9 ..." maxlength="30">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="refugio-fecha" class="form-label">Fecha tentativa</label>
+                        <input type="date" class="form-control" id="refugio-fecha" name="fecha_tentativa">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="refugio-personas" class="form-label">Personas</label>
+                        <input type="number" class="form-control" id="refugio-personas" name="num_personas" value="2" min="1" max="20">
+                    </div>
+                    <div class="col-12">
+                        <label for="refugio-mensaje" class="form-label">Mensaje (opcional)</label>
+                        <textarea class="form-control" id="refugio-mensaje" name="mensaje" rows="3" placeholder="¿Alguna preferencia o consulta?"></textarea>
+                    </div>
+                    <div class="col-12 text-center mt-3">
+                        <button type="submit" class="btn-refugio" id="refugio-submit-btn">
+                            <i class="fas fa-paper-plane me-2"></i>Enviar solicitud
+                        </button>
+                    </div>
+                </div>
+
+                <div id="refugio-form-result" class="mt-4" role="status" aria-live="polite"></div>
+            </form>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_script %}
+<script>
+(function () {
+    // GA4: page view específico del refugio (además del page_view automático de gtag)
+    if (typeof gtag === 'function') {
+        gtag('event', 'refugio_view', {
+            event_category: 'refugio_landing',
+            page_path: window.location.pathname,
+        });
+    }
+
+    // Tracking de clicks en CTAs marcados con data-event
+    document.querySelectorAll('[data-event]').forEach(function (el) {
+        el.addEventListener('click', function () {
+            var name = el.getAttribute('data-event');
+            if (typeof gtag === 'function') {
+                gtag('event', name, { event_category: 'refugio_landing' });
+            }
+            if (window.fbq) {
+                window.fbq('trackCustom', name);
+            }
+        });
+    });
+
+    // Submit del formulario vía AJAX
+    var form = document.getElementById('refugio-form');
+    var btn = document.getElementById('refugio-submit-btn');
+    var result = document.getElementById('refugio-form-result');
+
+    if (!form) return;
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!form.nombre.value.trim() || !form.email.value.trim()) {
+            result.innerHTML = '<div class="alert alert-warning mb-0">Por favor completa nombre y email.</div>';
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Enviando…';
+        result.innerHTML = '';
+
+        var fd = new FormData(form);
+
+        fetch(form.action, {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        })
+            .then(function (r) { return r.json().catch(function () { return { success: false, error: 'Respuesta inválida del servidor.' }; }); })
+            .then(function (data) {
+                if (data.success) {
+                    result.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-2"></i>' + (data.message || '¡Gracias! Te contactamos pronto.') + '</div>';
+                    form.reset();
+                    if (typeof gtag === 'function') {
+                        gtag('event', 'refugio_form_submit', {
+                            event_category: 'refugio_landing',
+                            event_label: 'success',
+                        });
+                    }
+                    if (window.fbq) {
+                        window.fbq('track', 'Lead', { content_category: 'refugio' });
+                    }
+                } else {
+                    result.innerHTML = '<div class="alert alert-danger mb-0">' + (data.error || 'Ocurrió un error. Intenta nuevamente.') + '</div>';
+                }
+            })
+            .catch(function () {
+                result.innerHTML = '<div class="alert alert-danger mb-0">No se pudo enviar el formulario. Revisa tu conexión.</div>';
+            })
+            .finally(function () {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Enviar solicitud';
+            });
+    });
+})();
+</script>
+{% endblock %}

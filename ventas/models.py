@@ -7192,3 +7192,259 @@ class Ciudad(models.Model):
         if not self.aliases:
             return []
         return [a.strip().lower() for a in self.aliases.split('|') if a.strip()]
+
+
+# ──────────────────────────────────────────────────────────────────────
+#  Landing "Refugio Aremko" (campaña 15-jun-2026)
+#  ──────────────────────────────────────────────────────────────────
+#  RefugioConfig: singleton editable desde admin (precio, textos, fechas)
+#  RefugioImagen: galería ordenable, hasta N fotos
+#  RefugioLead:   leads que llegan del formulario público con UTM tracking
+# ──────────────────────────────────────────────────────────────────────
+
+
+class RefugioConfig(SingletonModel):
+    """Configuración editable desde admin de la landing /refugio/.
+
+    Singleton: una sola fila en BD. Acceso vía RefugioConfig.get_solo().
+    """
+
+    # Hero
+    hero_title = models.CharField(
+        max_length=200,
+        default="Refugio Aremko",
+        verbose_name="Título Hero",
+    )
+    hero_subtitle = models.CharField(
+        max_length=300,
+        default="Una pausa de 24 horas para reconectar contigo",
+        verbose_name="Subtítulo Hero",
+    )
+    hero_cta_text = models.CharField(
+        max_length=60,
+        default="Reserva tu Refugio",
+        verbose_name="Texto botón principal Hero",
+    )
+
+    # Oferta
+    precio_clp = models.PositiveIntegerField(
+        default=270000,
+        verbose_name="Precio (CLP)",
+        help_text="Precio total del paquete Refugio en pesos chilenos.",
+    )
+    paquete_titulo = models.CharField(
+        max_length=120,
+        default="Tu Refugio Incluye",
+        verbose_name="Título sección paquete",
+    )
+    paquete_incluye = models.TextField(
+        default=(
+            "Alojamiento 1 noche en cabaña\n"
+            "Tina caliente privada\n"
+            "Masaje relajante 60 min por persona\n"
+            "Desayuno de campo\n"
+            "Late check-out 14:00"
+        ),
+        verbose_name="Lista 'Qué incluye' (una línea por item)",
+        help_text="Una línea por ítem. Se renderizan como bullets en la landing.",
+    )
+
+    # Disponibilidad
+    fecha_limite_oferta = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name="Fecha límite oferta",
+        help_text="Si se completa, se muestra como urgencia en la landing.",
+    )
+    cupo_disponible_texto = models.CharField(
+        max_length=120,
+        default="Cupos limitados",
+        blank=True,
+        verbose_name="Texto urgencia/escasez",
+    )
+
+    # Por qué Aremko
+    por_que_titulo = models.CharField(
+        max_length=200,
+        default="¿Por qué Aremko?",
+        verbose_name="Título sección 'Por qué'",
+    )
+    por_que_texto = models.TextField(
+        default=(
+            "Llevamos años cuidando a quienes buscan desconectar. "
+            "Tinajas calientes con vista al sur, masajes terapéuticos "
+            "y un entorno pensado para que recuperes el ritmo."
+        ),
+        verbose_name="Texto 'Por qué Aremko'",
+    )
+
+    # Footer / CTA final
+    cta_final_titulo = models.CharField(
+        max_length=200,
+        default="Reserva tu Refugio",
+        verbose_name="Título CTA final",
+    )
+    cta_final_subtitulo = models.CharField(
+        max_length=300,
+        default="Te contactamos dentro de 24 horas para coordinar tu fecha.",
+        verbose_name="Subtítulo CTA final",
+    )
+
+    # SEO
+    seo_title = models.CharField(
+        max_length=70,
+        default="Refugio Aremko · Pausa de 24h en Puerto Varas",
+        verbose_name="SEO Title",
+    )
+    seo_description = models.CharField(
+        max_length=200,
+        default=(
+            "Pasa una noche en Aremko Spa: cabaña, tina caliente, masaje "
+            "y desayuno por $270.000. Reserva tu Refugio en Puerto Varas."
+        ),
+        verbose_name="SEO Meta Description",
+    )
+    og_image = models.ImageField(
+        upload_to='refugio/',
+        blank=True,
+        null=True,
+        verbose_name="Imagen Open Graph (1200x630)",
+    )
+
+    # Control
+    activo = models.BooleanField(
+        default=True,
+        verbose_name="Landing activa",
+        help_text="Si está desactivada, la URL /refugio/ devuelve 404.",
+    )
+
+    def __str__(self):
+        return "Configuración Landing Refugio Aremko"
+
+    def incluye_list(self):
+        """Devuelve paquete_incluye como list[str], una línea por item."""
+        if not self.paquete_incluye:
+            return []
+        return [linea.strip() for linea in self.paquete_incluye.splitlines() if linea.strip()]
+
+    class Meta:
+        verbose_name = "Configuración Landing Refugio"
+        verbose_name_plural = "Configuración Landing Refugio"
+
+
+class RefugioImagen(models.Model):
+    """Galería de imágenes para la landing Refugio.
+
+    Orden controlado por campo 'orden'. Solo se muestran las activas.
+    """
+
+    imagen = models.ImageField(
+        upload_to='refugio/galeria/',
+        verbose_name="Imagen",
+    )
+    alt_text = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Alt text (SEO/accesibilidad)",
+        help_text="Descripción para lectores de pantalla y SEO.",
+    )
+    orden = models.PositiveIntegerField(
+        default=10,
+        verbose_name="Orden",
+        help_text="Menor número = aparece primero.",
+    )
+    activa = models.BooleanField(default=True, verbose_name="Activa")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Imagen Refugio"
+        verbose_name_plural = "Galería Refugio"
+        ordering = ['orden', 'id']
+
+    def __str__(self):
+        return f"Refugio · {self.alt_text or self.imagen.name} (orden={self.orden})"
+
+
+class RefugioLead(models.Model):
+    """Lead capturado por el formulario de la landing /refugio/.
+
+    Separado del modelo Lead general porque:
+        - Necesita campos específicos (fecha tentativa, num personas)
+        - Tracking UTM persistente (source/medium/campaign)
+        - No contamina el embudo B2B de Lead
+
+    Email de notificación se envía a comunicaciones@aremko.cl + aremkospa@gmail.com
+    al momento de crearse (signal post_save o explícito en view).
+    """
+
+    STATUS_CHOICES = [
+        ('nuevo', 'Nuevo'),
+        ('contactado', 'Contactado'),
+        ('cotizado', 'Cotizado'),
+        ('reservado', 'Reservado'),
+        ('descartado', 'Descartado'),
+    ]
+
+    # Datos del lead
+    nombre = models.CharField(max_length=120, verbose_name="Nombre")
+    email = models.EmailField(verbose_name="Email")
+    telefono = models.CharField(
+        max_length=30,
+        blank=True,
+        verbose_name="Teléfono",
+        help_text="Idealmente con +56. Si viene sin prefijo se acepta igual.",
+    )
+    fecha_tentativa = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name="Fecha tentativa",
+    )
+    num_personas = models.PositiveSmallIntegerField(
+        default=2,
+        verbose_name="Número de personas",
+    )
+    mensaje = models.TextField(
+        blank=True,
+        verbose_name="Mensaje libre",
+    )
+
+    # Tracking UTM
+    utm_source = models.CharField(max_length=120, blank=True, verbose_name="utm_source")
+    utm_medium = models.CharField(max_length=120, blank=True, verbose_name="utm_medium")
+    utm_campaign = models.CharField(max_length=120, blank=True, verbose_name="utm_campaign")
+    utm_content = models.CharField(max_length=120, blank=True, verbose_name="utm_content")
+    utm_term = models.CharField(max_length=120, blank=True, verbose_name="utm_term")
+    referer = models.CharField(max_length=500, blank=True, verbose_name="Referer")
+
+    # Forense
+    ip_address = models.GenericIPAddressField(blank=True, null=True, verbose_name="IP")
+    user_agent = models.CharField(max_length=500, blank=True, verbose_name="User-Agent")
+
+    # Workflow
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='nuevo',
+        verbose_name="Estado",
+    )
+    notas_internas = models.TextField(
+        blank=True,
+        verbose_name="Notas internas",
+        help_text="Notas del equipo de ventas. No se muestran al cliente.",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Recibido")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Lead Refugio"
+        verbose_name_plural = "Leads Refugio"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at'], name='idx_refugiolead_created'),
+            models.Index(fields=['status', '-created_at'], name='idx_refugiolead_status'),
+            models.Index(fields=['utm_campaign'], name='idx_refugiolead_utm_camp'),
+        ]
+
+    def __str__(self):
+        return f"{self.nombre} · {self.email} · {self.created_at:%Y-%m-%d}"

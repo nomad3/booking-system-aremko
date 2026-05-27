@@ -643,3 +643,192 @@ Aguas Calientes & Spa | Puerto Varas, Chile
             'success': False,
             'error': 'Ocurrió un error al procesar tu solicitud. Por favor intenta nuevamente o contáctanos por WhatsApp.'
         }, status=500)
+
+
+# ──────────────────────────────────────────────────────────────────────
+#  Landing "Refugio Aremko" — vistas públicas (campaña 15-jun-2026)
+# ──────────────────────────────────────────────────────────────────────
+
+def _get_client_ip(request):
+    """Extrae IP del request respetando X-Forwarded-For (Render proxy)."""
+    xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    if xff:
+        # Primer IP de la lista (el cliente real)
+        return xff.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR') or None
+
+
+def refugio_landing_view(request):
+    """Landing page pública de la campaña Refugio Aremko.
+
+    Texto + precio + galería editables vía RefugioConfig singleton.
+    Si `RefugioConfig.activo == False` devuelve 404 (campaña cerrada).
+    """
+    from django.http import Http404
+    from ..models import RefugioConfig, RefugioImagen
+
+    config = RefugioConfig.get_solo()
+    if not config.activo:
+        raise Http404("Campaña Refugio no activa")
+
+    # Galería ordenable desde admin
+    imagenes = list(RefugioImagen.objects.filter(activa=True).order_by('orden', 'id'))
+
+    # Canonical + meta SEO
+    try:
+        canonical_url = request.build_absolute_uri(request.path)
+    except Exception:
+        canonical_url = request.path
+
+    # Capturar UTM en la sesión para que sobrevivan el submit (POST)
+    utm_keys = ('utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term')
+    utm_data = {k: request.GET.get(k, '') for k in utm_keys if request.GET.get(k)}
+    if utm_data:
+        request.session['refugio_utm'] = utm_data
+
+    context = {
+        'config': config,
+        'imagenes': imagenes,
+        'canonical_url': canonical_url,
+        # Bloques SEO consumidos por base_public.html
+        'page_title': config.seo_title,
+        'meta_description': config.seo_description,
+        'og_image_url': config.og_image.url if config.og_image else None,
+    }
+    return render(request, 'ventas/refugio_landing.html', context)
+
+
+def refugio_submit_view(request):
+    """Procesa el formulario de la landing /refugio/.
+
+    Endpoint POST que:
+        1. Valida campos requeridos
+        2. Crea RefugioLead con UTM tracking + IP + UA
+        3. Manda email al equipo interno (comunicaciones + aremkospa)
+        4. Manda email de confirmación al lead
+        5. Devuelve JSON success o error
+    """
+    from django.http import JsonResponse, Http404
+    from django.core.mail import EmailMultiAlternatives
+    from django.template.loader import render_to_string
+    from django.conf import settings
+    from datetime import datetime
+    from ..models import RefugioConfig, RefugioLead
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    config = RefugioConfig.get_solo()
+    if not config.activo:
+        raise Http404("Campaña Refugio no activa")
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+
+    try:
+        # Datos del formulario
+        nombre = request.POST.get('nombre', '').strip()
+        email = request.POST.get('email', '').strip()
+        telefono = request.POST.get('telefono', '').strip()
+        fecha_tentativa = request.POST.get('fecha_tentativa', '').strip()
+        num_personas = request.POST.get('num_personas', '2').strip()
+        mensaje = request.POST.get('mensaje', '').strip()
+
+        # Validación mínima
+        if not nombre or not email:
+            return JsonResponse({
+                'success': False,
+                'error': 'Nombre y email son obligatorios.'
+            }, status=400)
+
+        # Parsear num_personas
+        try:
+            num_personas = int(num_personas)
+            if num_personas < 1 or num_personas > 20:
+                num_personas = 2
+        except (TypeError, ValueError):
+            num_personas = 2
+
+        # Parsear fecha (opcional)
+        fecha_obj = None
+        if fecha_tentativa:
+            try:
+                fecha_obj = datetime.strptime(fecha_tentativa, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
+        # UTM: prioridad a POST hidden inputs, fallback a sesión
+        utm_session = request.session.get('refugio_utm', {})
+        def _utm(key):
+            return (request.POST.get(key) or utm_session.get(key) or '').strip()[:120]
+
+        lead = RefugioLead.objects.create(
+            nombre=nombre[:120],
+            email=email[:254],
+            telefono=telefono[:30],
+            fecha_tentativa=fecha_obj,
+            num_personas=num_personas,
+            mensaje=mensaje,
+            utm_source=_utm('utm_source'),
+            utm_medium=_utm('utm_medium'),
+            utm_campaign=_utm('utm_campaign'),
+            utm_content=_utm('utm_content'),
+            utm_term=_utm('utm_term'),
+            referer=(request.META.get('HTTP_REFERER') or '')[:500],
+            ip_address=_get_client_ip(request),
+            user_agent=(request.META.get('HTTP_USER_AGENT') or '')[:500],
+        )
+        logger.info(f"[Refugio] Lead {lead.id} creado: {lead.nombre} <{lead.email}>")
+
+        # --- Email al equipo (TO: comunicaciones + aremkospa) ---
+        try:
+            equipo_emails = [
+                'comunicaciones@aremko.cl',
+                'aremkospa@gmail.com',
+            ]
+            subject_equipo = f"[Refugio] Nuevo lead: {lead.nombre}"
+            body_equipo = render_to_string('ventas/emails/refugio_lead_equipo.txt', {
+                'lead': lead,
+                'config': config,
+            })
+            email_equipo = EmailMultiAlternatives(
+                subject=subject_equipo,
+                body=body_equipo,
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'comunicaciones@aremko.cl'),
+                to=equipo_emails,
+                reply_to=[lead.email] if lead.email else None,
+            )
+            email_equipo.send(fail_silently=True)
+        except Exception as e:
+            logger.warning(f"[Refugio] No se pudo enviar email al equipo: {e}")
+
+        # --- Email confirmación al lead ---
+        try:
+            subject_cli = "Recibimos tu solicitud · Refugio Aremko"
+            body_cli = render_to_string('ventas/emails/refugio_lead_confirmacion.txt', {
+                'lead': lead,
+                'config': config,
+            })
+            email_cli = EmailMultiAlternatives(
+                subject=subject_cli,
+                body=body_cli,
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'comunicaciones@aremko.cl'),
+                to=[lead.email],
+                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+            )
+            email_cli.send(fail_silently=True)
+        except Exception as e:
+            logger.warning(f"[Refugio] No se pudo enviar confirmación al lead: {e}")
+
+        return JsonResponse({
+            'success': True,
+            'message': '¡Gracias! Recibimos tu solicitud y te contactamos dentro de 24 horas.',
+            'lead_id': lead.id,
+        })
+
+    except Exception as e:
+        logger.exception(f"[Refugio] Error procesando submit: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': 'Ocurrió un error al procesar tu solicitud. Intenta nuevamente o escríbenos por WhatsApp.',
+        }, status=500)

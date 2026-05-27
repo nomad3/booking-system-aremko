@@ -1,0 +1,22 @@
+Hola {{ lead.nombre }},
+
+¡Gracias por interesarte en el Refugio Aremko!
+
+Recibimos tu solicitud y un miembro de nuestro equipo te va a contactar
+dentro de las próximas 24 horas para coordinar fecha, confirmar
+disponibilidad y enviarte el link de pago.
+
+Esto es lo que registramos:
+
+  · Email:           {{ lead.email }}
+  · Teléfono:        {{ lead.telefono|default:"(no proporcionado)" }}
+  · Fecha tentativa: {{ lead.fecha_tentativa|date:"d/m/Y"|default:"(a coordinar)" }}
+  · N° personas:     {{ lead.num_personas }}
+
+Si necesitas adelantar algo o cambiar un dato, respondes a este correo
+o nos escribes por WhatsApp al +56 9 5790 2525.
+
+Nos vemos pronto en Puerto Varas.
+
+— Equipo Aremko Spa Boutique
+   www.aremko.cl

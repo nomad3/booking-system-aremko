@@ -77,6 +77,10 @@ from .models import (
     EventoCelebracion,
     # Operación Vuelta a Casa (Etapa Geo.2)
     Ciudad,
+    # Landing Refugio Aremko (campaña 15-jun-2026)
+    RefugioConfig,
+    RefugioImagen,
+    RefugioLead,
 )
 from django.http import HttpResponse
 import xlwt
@@ -5944,3 +5948,92 @@ class EventoCelebracionAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+# ──────────────────────────────────────────────────────────────────────
+#  Landing "Refugio Aremko" — admin (campaña 15-jun-2026)
+# ──────────────────────────────────────────────────────────────────────
+
+
+@admin.register(RefugioConfig)
+class RefugioConfigAdmin(SingletonModelAdmin):
+    """Admin singleton para la configuración de la landing /refugio/."""
+
+    fieldsets = (
+        ('Control', {
+            'fields': ('activo',),
+            'description': 'Si desactivas la landing, /refugio/ devuelve 404.',
+        }),
+        ('Hero', {
+            'fields': ('hero_title', 'hero_subtitle', 'hero_cta_text'),
+        }),
+        ('Oferta', {
+            'fields': (
+                'precio_clp',
+                'paquete_titulo',
+                'paquete_incluye',
+                'fecha_limite_oferta',
+                'cupo_disponible_texto',
+            ),
+        }),
+        ('Por qué Aremko', {
+            'fields': ('por_que_titulo', 'por_que_texto'),
+        }),
+        ('CTA final', {
+            'fields': ('cta_final_titulo', 'cta_final_subtitulo'),
+        }),
+        ('SEO / Open Graph', {
+            'fields': ('seo_title', 'seo_description', 'og_image'),
+            'classes': ('collapse',),
+        }),
+    )
+
+
+@admin.register(RefugioImagen)
+class RefugioImagenAdmin(admin.ModelAdmin):
+    list_display = ('id', 'alt_text', 'orden', 'activa', 'created_at')
+    list_editable = ('orden', 'activa')
+    list_filter = ('activa',)
+    search_fields = ('alt_text',)
+    ordering = ('orden', 'id')
+
+
+@admin.register(RefugioLead)
+class RefugioLeadAdmin(admin.ModelAdmin):
+    list_display = (
+        'created_at', 'nombre', 'email', 'telefono',
+        'fecha_tentativa', 'num_personas', 'status',
+        'utm_source', 'utm_campaign',
+    )
+    list_filter = ('status', 'utm_source', 'utm_medium', 'utm_campaign', 'created_at')
+    search_fields = ('nombre', 'email', 'telefono', 'notas_internas')
+    date_hierarchy = 'created_at'
+    readonly_fields = (
+        'created_at', 'updated_at',
+        'ip_address', 'user_agent', 'referer',
+        'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+    )
+
+    fieldsets = (
+        ('Lead', {
+            'fields': ('nombre', 'email', 'telefono', 'fecha_tentativa', 'num_personas', 'mensaje'),
+        }),
+        ('Workflow', {
+            'fields': ('status', 'notas_internas'),
+        }),
+        ('Tracking UTM', {
+            'fields': ('utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'referer'),
+            'classes': ('collapse',),
+        }),
+        ('Forense', {
+            'fields': ('ip_address', 'user_agent', 'created_at', 'updated_at'),
+            'classes': ('collapse',),
+        }),
+    )
+
+    actions = ['marcar_contactados']
+
+    def marcar_contactados(self, request, queryset):
+        n = queryset.update(status='contactado')
+        self.message_user(request, f"{n} leads marcados como contactados.")
+    marcar_contactados.short_description = "Marcar como contactados"

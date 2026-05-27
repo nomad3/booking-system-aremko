@@ -1,0 +1,31 @@
+Hola equipo,
+
+Llegó un nuevo lead desde la landing de Refugio Aremko.
+
+— DATOS DEL LEAD ————————————————————————————————
+Nombre:           {{ lead.nombre }}
+Email:            {{ lead.email }}
+Teléfono:         {{ lead.telefono|default:"(no proporcionado)" }}
+Fecha tentativa:  {{ lead.fecha_tentativa|date:"d/m/Y"|default:"(no especificada)" }}
+N° personas:      {{ lead.num_personas }}
+
+Mensaje:
+{{ lead.mensaje|default:"(sin mensaje)" }}
+
+— TRACKING ——————————————————————————————————————
+utm_source:    {{ lead.utm_source|default:"-" }}
+utm_medium:    {{ lead.utm_medium|default:"-" }}
+utm_campaign:  {{ lead.utm_campaign|default:"-" }}
+utm_content:   {{ lead.utm_content|default:"-" }}
+utm_term:      {{ lead.utm_term|default:"-" }}
+Referer:       {{ lead.referer|default:"-" }}
+
+— METADATOS —————————————————————————————————————
+Recibido:      {{ lead.created_at|date:"d/m/Y H:i" }}
+IP:            {{ lead.ip_address|default:"-" }}
+ID interno:    #{{ lead.id }}
+
+Acción sugerida: contactar dentro de 24 horas vía WhatsApp/email.
+Ver lead en admin: /admin/ventas/refugiolead/{{ lead.id }}/change/
+
+— Aremko Spa Boutique · Landing Refugio

@@ -6,7 +6,7 @@ from django.conf.urls.static import static # Import static
 # from ventas import views
 from django.contrib.auth import views as auth_views # Import auth views
 # Import the specific view functions needed for root URLs
-from ventas.views.public_views import homepage_view, empresas_view, empresas_presentacion_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view, garantia_view, tarjetas_qr_reviews_view, encuesta_satisfaccion_view, encuesta_gracias_view
+from ventas.views.public_views import homepage_view, empresas_view, empresas_presentacion_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view, garantia_view, tarjetas_qr_reviews_view, encuesta_satisfaccion_view, encuesta_gracias_view, refugio_landing_view, refugio_submit_view
 from ventas.views import flow_views
 # Removed direct import of ventas.urls
 
@@ -15,7 +15,8 @@ from ventas.sitemaps import (
     HomepageSitemap,
     MainPagesSitemap,
     CorporatePagesSitemap,
-    CategoriaSitemap
+    CategoriaSitemap,
+    RefugioLandingSitemap,
 )
 from aremko_blog.sitemaps import AremkoBlogIndexSitemap, AremkoBlogPostSitemap
 from django.views.generic import TemplateView
@@ -25,6 +26,7 @@ sitemaps = {
     'main-pages': MainPagesSitemap,
     'corporate': CorporatePagesSitemap,
     'categorias': CategoriaSitemap,
+    'refugio': RefugioLandingSitemap,
     'blog_index': AremkoBlogIndexSitemap,
     'blog_posts': AremkoBlogPostSitemap,
 }
@@ -40,6 +42,9 @@ urlpatterns = [
     path('productos/', productos_view, name='productos'),
     # Garantía Aremko (diferenciador único — del reporte 7 Maletas)
     path('garantia/', garantia_view, name='garantia'),
+    # Landing campaña "Refugio Aremko" (lanzamiento 15-jun-2026)
+    path('refugio/', refugio_landing_view, name='refugio_landing'),
+    path('refugio/submit/', refugio_submit_view, name='refugio_submit'),
     # Tarjetas QR imprimibles para Google Reviews (asset operativo interno)
     path('tarjetas-qr-reviews/', tarjetas_qr_reviews_view, name='tarjetas_qr_reviews'),
     # Encuesta de satisfacción D+1 (Tarea 1.4 plan maestro - sistema VoC nativo)

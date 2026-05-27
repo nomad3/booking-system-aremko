@@ -47,6 +47,29 @@ class CorporatePagesSitemap(Sitemap):
         return reverse(item)
 
 
+class RefugioLandingSitemap(Sitemap):
+    """Sitemap para la landing de campaña Refugio Aremko.
+
+    Solo se incluye si la campaña está activa (RefugioConfig.activo=True).
+    """
+    changefreq = 'weekly'
+    priority = 0.8
+
+    def items(self):
+        # Import local para evitar ciclo en arranque
+        from .models import RefugioConfig
+        try:
+            config = RefugioConfig.get_solo()
+            if config.activo:
+                return ['refugio_landing']
+        except Exception:
+            pass
+        return []
+
+    def location(self, item):
+        return reverse(item)
+
+
 class CategoriaSitemap(Sitemap):
     """Sitemap dinámico para categorías de servicios individuales"""
     changefreq = 'weekly'
