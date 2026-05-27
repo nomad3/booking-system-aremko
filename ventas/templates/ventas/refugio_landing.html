@@ -227,7 +227,7 @@
                     <div class="precio">
                         <span class="moneda">$</span>{{ config.precio_clp|floatformat:"0" }}
                     </div>
-                    <p class="unidad mb-3">CLP · para 2 personas</p>
+                    <p class="unidad mb-3">por 2 personas, todo incluido</p>
                     <a href="#refugio-formulario" class="btn-refugio" data-event="refugio_precio_cta_click">
                         Reserva tu Refugio
                     </a>
@@ -263,30 +263,45 @@
 </section>
 {% endif %}
 
-{# ── SECCIÓN 7 · DETALLES ─────────────────────────────────────── #}
+{# ── SECCIÓN 7 · DETALLES "Lo que debes saber" ─────────────── #}
+{# 5 items editables desde RefugioConfig admin #}
 <section class="refugio-section" id="refugio-detalles">
     <div class="container">
         <h2>Lo que debes saber</h2>
         <div class="row">
-            <div class="col-md-4">
+            <div class="col-md-6 col-lg-4">
                 <div class="refugio-detalle-item">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <h5>Ubicación</h5>
-                    <p>Aremko Spa Boutique · Puerto Varas, Región de Los Lagos</p>
+                    <i class="fas fa-calendar-check"></i>
+                    <h5>Cuándo usarlo</h5>
+                    <p>{{ config.restricciones_fechas_texto }}</p>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6 col-lg-4">
                 <div class="refugio-detalle-item">
                     <i class="fas fa-clock"></i>
                     <h5>Duración</h5>
-                    <p>Check-in 15:00 · Late check-out 14:00 del día siguiente</p>
+                    <p>{{ config.duracion_texto }}</p>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6 col-lg-4">
                 <div class="refugio-detalle-item">
-                    <i class="fas fa-shield-alt"></i>
-                    <h5>Garantía Aremko</h5>
-                    <p>Si tu tina llega a 37°C o menos, es gratis. <a href="{% url 'garantia' %}">Ver garantía</a></p>
+                    <i class="fas fa-undo"></i>
+                    <h5>Cancelación</h5>
+                    <p>{{ config.cancelacion_texto }}</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="refugio-detalle-item">
+                    <i class="fas fa-user-friends"></i>
+                    <h5>Para quién</h5>
+                    <p>{{ config.para_quien_texto }}</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="refugio-detalle-item">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <h5>Cómo llegar</h5>
+                    <p>{{ config.como_llegar_texto }}</p>
                 </div>
             </div>
         </div>
@@ -325,6 +340,10 @@
                     <div class="col-md-6">
                         <label for="refugio-telefono" class="form-label">Teléfono (WhatsApp)</label>
                         <input type="tel" class="form-control" id="refugio-telefono" name="telefono" placeholder="+56 9 ..." maxlength="30">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="refugio-ciudad" class="form-label">Ciudad de origen</label>
+                        <input type="text" class="form-control" id="refugio-ciudad" name="ciudad_origen" placeholder="Ej: Santiago, Concepción, Puerto Montt" maxlength="120">
                     </div>
                     <div class="col-md-3">
                         <label for="refugio-fecha" class="form-label">Fecha tentativa</label>

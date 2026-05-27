@@ -1,13 +1,16 @@
 """
 Tests para la landing "Refugio Aremko" (campaña 15-jun-2026).
 
-Cubre los 6 escenarios del brief:
+Cubre el copy correcto del paquete 3 días / 2 noches (Jorge 2026-05-27 PM):
+
     1. GET /refugio/ → 200 con HTML correcto cuando la campaña está activa
     2. GET /refugio/ → 404 cuando la campaña está desactivada
     3. POST /refugio/submit/ válido → 200 JSON + RefugioLead creado + email
     4. POST /refugio/submit/ sin campos requeridos → 400 JSON
     5. POST con UTM en GET previo + hidden inputs → UTM persistidos en el lead
     6. JSON-LD Product/Offer presente en el HTML para SEO/rich results
+    7. Copy correcto del paquete 3D/2N (no aparece 'desayuno' ni 'late check-out')
+    8. Campo ciudad_origen se persiste y aparece en formulario
 
 Ejecutar:
     python manage.py test ventas.tests_refugio_landing
@@ -142,3 +145,46 @@ class RefugioLandingTests(TestCase):
         self.assertIn('"@type": "Offer"', html)
         self.assertIn('"priceCurrency": "CLP"', html)
         self.assertIn('"price": "270000"', html)
+
+    # ──────────────────────────────────────────────────────────────────
+    # Test 7: Copy correcto del paquete 3D/2N — NO debe aparecer
+    # 'desayuno' ni 'late check-out' en la landing
+    # ──────────────────────────────────────────────────────────────────
+    def test_copy_paquete_3d_2n_sin_desayuno_ni_late_checkout(self):
+        url = reverse('refugio_landing')
+        resp = self.client.get(url)
+        html = resp.content.decode('utf-8').lower()
+
+        # Frases que SÍ deben aparecer (del paquete 3D/2N)
+        self.assertIn('tres días para volver a tu centro', html)
+        self.assertIn('dos noches en cabaña', html)
+        self.assertIn('masaje en pareja', html)
+        self.assertIn('cortesía aremko', html)
+        self.assertIn('cupos limitados — 5 cabañas', html)
+        self.assertIn('48 horas', html)  # cancelación
+        self.assertIn('15-jun', html)    # restricción fechas
+
+        # Frases que NO deben aparecer (paquete viejo de 24h)
+        self.assertNotIn('desayuno', html)
+        self.assertNotIn('late check-out', html)
+        self.assertNotIn('pausa de 24 horas', html)
+        self.assertNotIn('alojamiento 1 noche', html)
+
+    # ──────────────────────────────────────────────────────────────────
+    # Test 8: ciudad_origen se captura en el form y persiste en el lead
+    # ──────────────────────────────────────────────────────────────────
+    def test_ciudad_origen_se_persiste(self):
+        # 1) El form debe tener el input ciudad_origen
+        resp = self.client.get(reverse('refugio_landing'))
+        self.assertContains(resp, 'name="ciudad_origen"')
+
+        # 2) Submit con ciudad debe persistirla
+        resp = self.client.post(reverse('refugio_submit'), {
+            'nombre': 'Lead con Ciudad',
+            'email': 'ciudad@example.com',
+            'num_personas': '2',
+            'ciudad_origen': 'Concepción',
+        })
+        self.assertEqual(resp.status_code, 200)
+        lead = RefugioLead.objects.get(email='ciudad@example.com')
+        self.assertEqual(lead.ciudad_origen, 'Concepción')

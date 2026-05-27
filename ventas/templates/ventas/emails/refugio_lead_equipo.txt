@@ -6,6 +6,7 @@ Llegó un nuevo lead desde la landing de Refugio Aremko.
 Nombre:           {{ lead.nombre }}
 Email:            {{ lead.email }}
 Teléfono:         {{ lead.telefono|default:"(no proporcionado)" }}
+Ciudad origen:    {{ lead.ciudad_origen|default:"(no especificada)" }}
 Fecha tentativa:  {{ lead.fecha_tentativa|date:"d/m/Y"|default:"(no especificada)" }}
 N° personas:      {{ lead.num_personas }}
 

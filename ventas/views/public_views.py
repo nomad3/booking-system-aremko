@@ -730,6 +730,7 @@ def refugio_submit_view(request):
         nombre = request.POST.get('nombre', '').strip()
         email = request.POST.get('email', '').strip()
         telefono = request.POST.get('telefono', '').strip()
+        ciudad_origen = request.POST.get('ciudad_origen', '').strip()
         fecha_tentativa = request.POST.get('fecha_tentativa', '').strip()
         num_personas = request.POST.get('num_personas', '2').strip()
         mensaje = request.POST.get('mensaje', '').strip()
@@ -766,6 +767,7 @@ def refugio_submit_view(request):
             nombre=nombre[:120],
             email=email[:254],
             telefono=telefono[:30],
+            ciudad_origen=ciudad_origen[:120],
             fecha_tentativa=fecha_obj,
             num_personas=num_personas,
             mensaje=mensaje,

@@ -5979,6 +5979,16 @@ class RefugioConfigAdmin(SingletonModelAdmin):
         ('Por qué Aremko', {
             'fields': ('por_que_titulo', 'por_que_texto'),
         }),
+        ('Detalles operativos ("Lo que debes saber")', {
+            'fields': (
+                'duracion_texto',
+                'restricciones_fechas_texto',
+                'cancelacion_texto',
+                'para_quien_texto',
+                'como_llegar_texto',
+            ),
+            'description': 'Estos 5 ítems se muestran en la sección "Lo que debes saber" de la landing.',
+        }),
         ('CTA final', {
             'fields': ('cta_final_titulo', 'cta_final_subtitulo'),
         }),
@@ -6002,11 +6012,11 @@ class RefugioImagenAdmin(admin.ModelAdmin):
 class RefugioLeadAdmin(admin.ModelAdmin):
     list_display = (
         'created_at', 'nombre', 'email', 'telefono',
-        'fecha_tentativa', 'num_personas', 'status',
+        'ciudad_origen', 'fecha_tentativa', 'num_personas', 'status',
         'utm_source', 'utm_campaign',
     )
-    list_filter = ('status', 'utm_source', 'utm_medium', 'utm_campaign', 'created_at')
-    search_fields = ('nombre', 'email', 'telefono', 'notas_internas')
+    list_filter = ('status', 'utm_source', 'utm_medium', 'utm_campaign', 'ciudad_origen', 'created_at')
+    search_fields = ('nombre', 'email', 'telefono', 'ciudad_origen', 'notas_internas')
     date_hierarchy = 'created_at'
     readonly_fields = (
         'created_at', 'updated_at',
@@ -6016,7 +6026,10 @@ class RefugioLeadAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Lead', {
-            'fields': ('nombre', 'email', 'telefono', 'fecha_tentativa', 'num_personas', 'mensaje'),
+            'fields': (
+                'nombre', 'email', 'telefono', 'ciudad_origen',
+                'fecha_tentativa', 'num_personas', 'mensaje',
+            ),
         }),
         ('Workflow', {
             'fields': ('status', 'notas_internas'),

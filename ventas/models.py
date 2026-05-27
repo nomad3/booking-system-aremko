@@ -7207,17 +7207,21 @@ class RefugioConfig(SingletonModel):
     """Configuración editable desde admin de la landing /refugio/.
 
     Singleton: una sola fila en BD. Acceso vía RefugioConfig.get_solo().
+
+    Paquete actual (Jorge 2026-05-27 PM): 3 días / 2 noches en cabaña,
+    masaje en pareja (1 sesión), 2 sesiones de tinas, segunda noche
+    cortesía. Lanzamiento 15-jun-2026.
     """
 
     # Hero
     hero_title = models.CharField(
         max_length=200,
-        default="Refugio Aremko",
+        default="Tres días para volver a tu centro",
         verbose_name="Título Hero",
     )
     hero_subtitle = models.CharField(
         max_length=300,
-        default="Una pausa de 24 horas para reconectar contigo",
+        default="Refugio Aremko · 2 noches en cabaña con masajes y tinas calientes",
         verbose_name="Subtítulo Hero",
     )
     hero_cta_text = models.CharField(
@@ -7239,14 +7243,16 @@ class RefugioConfig(SingletonModel):
     )
     paquete_incluye = models.TextField(
         default=(
-            "Alojamiento 1 noche en cabaña\n"
-            "Tina caliente privada\n"
-            "Masaje relajante 60 min por persona\n"
-            "Desayuno de campo\n"
-            "Late check-out 14:00"
+            "Dos noches en cabaña de naturaleza — Cabaña privada para 2 personas\n"
+            "Masaje en pareja — Una sesión profesional, en simultáneo\n"
+            "Tinas calientes en pareja — Dos tardes con vista al bosque\n"
+            "🎁 Cortesía Aremko — La segunda noche, regalo nuestro"
         ),
         verbose_name="Lista 'Qué incluye' (una línea por item)",
-        help_text="Una línea por ítem. Se renderizan como bullets en la landing.",
+        help_text=(
+            "Una línea por ítem. Se renderizan como bullets en la landing. "
+            "Para una línea con regalo/cortesía empezar con emoji 🎁."
+        ),
     )
 
     # Disponibilidad
@@ -7258,7 +7264,7 @@ class RefugioConfig(SingletonModel):
     )
     cupo_disponible_texto = models.CharField(
         max_length=120,
-        default="Cupos limitados",
+        default="Cupos limitados — 5 cabañas",
         blank=True,
         verbose_name="Texto urgencia/escasez",
     )
@@ -7290,17 +7296,48 @@ class RefugioConfig(SingletonModel):
         verbose_name="Subtítulo CTA final",
     )
 
+    # Detalles operativos ("Lo que debes saber")
+    duracion_texto = models.CharField(
+        max_length=300,
+        default="Check-in en el día 1 · Check-out el día 3. Dos noches completas en cabaña.",
+        verbose_name="Detalles · Duración",
+    )
+    restricciones_fechas_texto = models.TextField(
+        default=(
+            "Válido cualquier día durante el mes de lanzamiento "
+            "(15-jun a 15-jul-2026). Desde el 16-jul en adelante, "
+            "solo domingo a jueves."
+        ),
+        verbose_name="Detalles · Cuándo usarlo",
+    )
+    cancelacion_texto = models.CharField(
+        max_length=300,
+        default="Hasta 48 horas antes del check-in sin costo.",
+        verbose_name="Detalles · Política de cancelación",
+    )
+    para_quien_texto = models.CharField(
+        max_length=300,
+        default="Pensado para parejas o adultos buscando una pausa profunda.",
+        verbose_name="Detalles · Para quién",
+    )
+    como_llegar_texto = models.CharField(
+        max_length=300,
+        default="15 minutos en auto desde el centro de Puerto Varas.",
+        verbose_name="Detalles · Cómo llegar",
+    )
+
     # SEO
     seo_title = models.CharField(
-        max_length=70,
-        default="Refugio Aremko · Pausa de 24h en Puerto Varas",
+        max_length=120,
+        default="Refugio Aremko · 3 días en Puerto Varas | Cabaña + masajes + tinas",
         verbose_name="SEO Title",
     )
     seo_description = models.CharField(
-        max_length=200,
+        max_length=300,
         default=(
-            "Pasa una noche en Aremko Spa: cabaña, tina caliente, masaje "
-            "y desayuno por $270.000. Reserva tu Refugio en Puerto Varas."
+            "Tres días para volver a tu centro. Cabaña en naturaleza, "
+            "masaje en pareja, tinas calientes. La segunda noche, cortesía "
+            "Aremko. $270.000 por 2 personas."
         ),
         verbose_name="SEO Meta Description",
     )
@@ -7402,6 +7439,12 @@ class RefugioLead(models.Model):
     num_personas = models.PositiveSmallIntegerField(
         default=2,
         verbose_name="Número de personas",
+    )
+    ciudad_origen = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="Ciudad de origen",
+        help_text="De dónde viene el lead — útil para segmentar campañas.",
     )
     mensaje = models.TextField(
         blank=True,
