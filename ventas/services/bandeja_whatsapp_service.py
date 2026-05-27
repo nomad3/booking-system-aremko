@@ -146,8 +146,12 @@ def calcular_prioridad(
                                     {28-32, 58-62, 78-82}
                                     → momento clave de consolidación
 
-        P3  Dormido                 días_sin_venir ∈ [195, 210]
-                                    → ventana 6-7 meses (segunda chance)
+        P3  Dormido                 días_sin_venir ∈ [180, 230]
+                                    → ventana ~6-7.5 meses (segunda chance);
+                                    ampliada 2026-05-27 para garantizar
+                                    volumen diario en bandeja sin entrar a
+                                    zonas radicalmente distintas (200 vs 230
+                                    días psicológicamente similar)
 
         P4  Regular atrasado        días_sin_venir > 60 AND
                                     dias_entre_visitas_avg < 45
@@ -202,9 +206,9 @@ def calcular_prioridad(
         if 28 <= d <= 32 or 58 <= d <= 62 or 78 <= d <= 82:
             return 2
 
-    # ---------- P3: Dormido en ventana segunda chance [195-210] ----------
+    # ---------- P3: Dormido en ventana segunda chance [180-230] ----------
     if eje_valor == 'Dormido':
-        if dias_desde_ultima_visita is not None and 195 <= dias_desde_ultima_visita <= 210:
+        if dias_desde_ultima_visita is not None and 180 <= dias_desde_ultima_visita <= 230:
             return 3
 
     # ---------- P4: Regular atrasado (avg < 45d, no viene hace >60d) ----------

@@ -179,6 +179,7 @@ def _serializar_contacto(c: ContactoWhatsApp, agregar_variacion: bool = False) -
         'mensaje_renderizado': c.mensaje_renderizado,
         'mensaje_variado': mensaje_variado,
         'prioridad': c.prioridad,
+        'es_relleno': c.es_relleno,
         'fecha_sugerido': c.fecha_sugerido.isoformat() if c.fecha_sugerido else None,
         'estado': c.estado,
     }

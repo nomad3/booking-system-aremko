@@ -189,16 +189,51 @@ class Command(BaseCommand):
         candidatos_priorizados = self._asignar_prioridades(candidatos, fecha_obj)
         self.stdout.write(f"  Candidatos con prioridad asignada: {len(candidatos_priorizados)}")
 
-        # ---- Ordenar y limitar ----
-        candidatos_priorizados.sort(
-            key=lambda x: (x[1], -(x[0].gasto_total or 0))
+        # ---- Ordenar y aplicar target + fallback ----
+        # Feature 2026-05-27: garantizar volumen estable de ~50/día.
+        # Separamos óptimos (P0-P4) del resto (P5/P6). Si los óptimos no
+        # llenan el target, completamos con resto ordenado por gasto, y
+        # marcamos esos contactos con es_relleno=True para análisis
+        # diferenciado de conversión.
+        target = getattr(settings, 'OVC_TARGET_DIARIO', limit)
+
+        optimos = [(t, p) for t, p in candidatos_priorizados if p <= 4]
+        resto = [(t, p) for t, p in candidatos_priorizados if p >= 5]
+        optimos.sort(key=lambda x: (x[1], -(x[0].gasto_total or 0)))
+        resto.sort(key=lambda x: (x[1], -(x[0].gasto_total or 0)))
+
+        ids_relleno: set = set()  # cliente_ids que entraron por fallback
+
+        if cliente_id_filter:
+            # Modo debug: ignora target/fallback, mantiene comportamiento previo
+            final = candidatos_priorizados
+        elif len(optimos) >= target:
+            # Sobran óptimos → tomar target, sin relleno
+            final = optimos[:target]
+        else:
+            # Faltan óptimos → completar con resto
+            faltantes = target - len(optimos)
+            relleno_tomados = resto[:faltantes]
+            ids_relleno = {t.cliente_id for t, _ in relleno_tomados}
+            final = optimos + relleno_tomados
+
+        candidatos_priorizados = final
+
+        n_optimos = sum(1 for _, p in final if p <= 4)
+        n_rellenos = len(final) - n_optimos
+        self.stdout.write(
+            f"  Target diario: {target} | óptimos P0-P4: {n_optimos} | "
+            f"rellenos P5-P6: {n_rellenos} | total: {len(final)}"
         )
-        if not cliente_id_filter:
-            candidatos_priorizados = candidatos_priorizados[:limit]
+        logger.info(
+            "Bandeja %s: total=%s óptimos_P0_P4=%s rellenos_P5_P6=%s target=%s",
+            fecha_obj, len(final), n_optimos, n_rellenos, target,
+        )
 
         # ---- Generar contactos ----
         resultados = self._generar_contactos(
-            candidatos_priorizados, fecha_obj, dry_run=dry_run
+            candidatos_priorizados, fecha_obj, dry_run=dry_run,
+            ids_relleno=ids_relleno,
         )
 
         # ---- Reporte final ----
@@ -397,9 +432,14 @@ class Command(BaseCommand):
     # ========================================================================
 
     def _generar_contactos(
-        self, candidatos_priorizados: List[tuple], fecha_obj: date, dry_run: bool
+        self, candidatos_priorizados: List[tuple], fecha_obj: date,
+        dry_run: bool, ids_relleno: Optional[set] = None,
     ) -> dict:
         """Para cada candidato resuelve script + render y crea ContactoWhatsApp.
+
+        Args:
+            ids_relleno: set de cliente_ids que entraron por fallback target.
+                         Sus contactos quedan con es_relleno=True.
 
         Returns:
             dict con keys: 'creados', 'sin_script', 'agotados', 'por_prioridad',
@@ -462,6 +502,7 @@ class Command(BaseCommand):
             mensaje = script.plantilla_texto.format_map(ctx)
 
             # ---- Persistir (o simular) ----
+            es_relleno_flag = bool(ids_relleno) and cliente.id in ids_relleno
             if not dry_run:
                 ContactoWhatsApp.objects.create(
                     cliente=cliente,
@@ -476,6 +517,7 @@ class Command(BaseCommand):
                     prioridad=prioridad,
                     fecha_sugerido=fecha_obj,
                     estado='pendiente',
+                    es_relleno=es_relleno_flag,
                 )
 
             creados += 1

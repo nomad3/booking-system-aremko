@@ -6952,6 +6952,18 @@ class ContactoWhatsApp(models.Model):
 
     creado = models.DateTimeField(auto_now_add=True)
 
+    # Feature 2026-05-27: distinguir contactos óptimos (P0-P4) vs los que
+    # entraron por fallback de OVC_TARGET_DIARIO (P5/P6 cuando los óptimos
+    # no llenaron el cupo). Permite análisis diferenciado de conversión.
+    es_relleno = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text=(
+            "True si entró por fallback target (P5/P6 que llenaron cupo). "
+            "False si vino de prioridad óptima P0-P4 propia."
+        ),
+    )
+
     class Meta:
         verbose_name = "Contacto WhatsApp"
         verbose_name_plural = "Contactos WhatsApp"

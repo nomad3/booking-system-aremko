@@ -151,7 +151,7 @@ def calcular_metricas_operadores(
             fecha_envio__gte=desde_dt,
             fecha_envio__lte=hasta_dt,
         )
-        .values('id', 'cliente_id', 'fecha_envio', 'operador', 'respondio')
+        .values('id', 'cliente_id', 'fecha_envio', 'operador', 'respondio', 'es_relleno')
     )
 
     # ──── Paso 2: candidatos a reserva — todas las reservas no canceladas
@@ -367,6 +367,28 @@ def calcular_metricas_operadores(
     t_reservas = sum(o['reservas_atribuidas'] for o in operadores_out)
     t_monto = sum(o['monto_atribuido'] for o in operadores_out)
 
+    # Breakdown óptimos vs rellenos (feature 2026-05-27: validar si el
+    # fallback target degrada tasa de conversión).
+    enviados_optimos = sum(
+        1 for c in contactos_enviados if not c.get('es_relleno', False)
+    )
+    enviados_rellenos = sum(
+        1 for c in contactos_enviados if c.get('es_relleno', False)
+    )
+    reservas_optimas = 0
+    reservas_rellenas = 0
+    monto_optimos = 0
+    monto_rellenos = 0
+    for reserva_id, contacto in atribuciones.items():
+        r = reservas_por_id[reserva_id]
+        monto_r = int(r['total'] or 0)
+        if contacto.get('es_relleno', False):
+            reservas_rellenas += 1
+            monto_rellenos += monto_r
+        else:
+            reservas_optimas += 1
+            monto_optimos += monto_r
+
     return {
         'periodo': {
             'desde': desde.isoformat(),
@@ -381,6 +403,20 @@ def calcular_metricas_operadores(
             'tasa_conversion': round(t_reservas / t_enviados, 3) if t_enviados else 0.0,
             'monto_atribuido': t_monto,
             'ticket_promedio_atribuido': round(t_monto / t_reservas) if t_reservas else 0,
+        },
+        'breakdown_optimos_vs_rellenos': {
+            'optimos': {
+                'mensajes_enviados': enviados_optimos,
+                'reservas_atribuidas': reservas_optimas,
+                'tasa_conversion': round(reservas_optimas / enviados_optimos, 3) if enviados_optimos else 0.0,
+                'monto_atribuido': monto_optimos,
+            },
+            'rellenos': {
+                'mensajes_enviados': enviados_rellenos,
+                'reservas_atribuidas': reservas_rellenas,
+                'tasa_conversion': round(reservas_rellenas / enviados_rellenos, 3) if enviados_rellenos else 0.0,
+                'monto_atribuido': monto_rellenos,
+            },
         },
         'operadores': operadores_out,
     }

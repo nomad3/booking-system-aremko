@@ -313,11 +313,31 @@ class CalcularPrioridadTests(TestCase):
             )
         )
 
-    # ---- P3: Dormido [195-210] ----
+    # ---- P3: Dormido [180-230] (ampliada 2026-05-27) ----
     def test_p3_dormido_200d(self):
         self.assertEqual(
             self._call(eje_valor='Dormido', dias_desde_ultima_visita=200),
             3
+        )
+
+    def test_p3_dormido_220d_dentro_ventana_ampliada(self):
+        # Antes era P6 (210 era el tope viejo). Ahora P3 hasta 230d.
+        self.assertEqual(
+            self._call(eje_valor='Dormido', dias_desde_ultima_visita=220),
+            3
+        )
+
+    def test_p3_dormido_180d_borde_inferior(self):
+        self.assertEqual(
+            self._call(eje_valor='Dormido', dias_desde_ultima_visita=180),
+            3
+        )
+
+    def test_p6_dormido_245d_fuera_ventana_ampliada(self):
+        # 245 > 230 → cae a P6 (resto)
+        self.assertEqual(
+            self._call(eje_valor='Dormido', dias_desde_ultima_visita=245),
+            6
         )
 
     def test_p6_dormido_400d(self):

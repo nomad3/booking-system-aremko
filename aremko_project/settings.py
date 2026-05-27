@@ -101,6 +101,15 @@ OVC_DIAS_MINIMO_DESDE_ULTIMA_VISITA = {
 OVC_DIAS_MAX_ACUMULACION = int(os.getenv('OVC_DIAS_MAX_ACUMULACION', '7'))
 
 # ────────────────────────────────────────────────────────────────────────────
+# Target diario de contactos en bandeja (piso operativo + tope)
+# ────────────────────────────────────────────────────────────────────────────
+# Feature 2026-05-27: garantizar volumen estable. Si los óptimos P0-P4 no
+# llenan el target, el cron completa con P5/P6 (En Riesgo/Dormido resto)
+# marcándolos como es_relleno=True para análisis diferenciado.
+# Si el universo total es menor al target, NO inventa — toma lo que hay.
+OVC_TARGET_DIARIO = int(os.getenv('OVC_TARGET_DIARIO', '50'))
+
+# ────────────────────────────────────────────────────────────────────────────
 # Operación Vuelta a Casa — Variaciones IA on-demand
 # ────────────────────────────────────────────────────────────────────────────
 # Toggle global para que los endpoints /siguiente/ y /marcar-enviado/ devuelvan
