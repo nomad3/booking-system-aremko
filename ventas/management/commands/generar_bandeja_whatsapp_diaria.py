@@ -314,6 +314,7 @@ class Command(BaseCommand):
             ClienteTaxonomia.objects
             .select_related('cliente')
             .exclude(cliente__opt_out_whatsapp=True)
+            .exclude(cliente__es_staff_proxy=True)
             .exclude(cliente__telefono__isnull=True)
             .exclude(cliente__telefono='')
             .exclude(cliente__proximo_contacto_no_antes_de__gt=fecha_obj)

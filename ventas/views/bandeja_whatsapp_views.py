@@ -1206,6 +1206,104 @@ def actualizar_ubicacion(request, cliente_id: int):
 
 
 # ============================================================================
+# Marcar cliente como staff/proxy (solicitado por aremko-cli 2026-05-27 PM)
+# ============================================================================
+# Reemplaza el flujo "operador detecta staff en bandeja → pide al agente
+# editar OVC_CLIENTES_EXCLUIDOS_IEXACT + redeploy (~30min)" por un click
+# desde la tarjeta (~5 segundos). Marca `es_staff_proxy=True` en el cliente
+# (bloqueante permanente, el cron lo filtra), descarta el contacto actual
+# del día si existe, y deja auditoría con `razon` + operador.
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def marcar_staff(request, cliente_id: int):
+    """POST /api/aremko-cli/operacion-vuelta-a-casa/clientes/<id>/marcar-staff/
+
+    Body JSON:
+        {"razon": "Jorge Aguilera, dueño del spa", "operador": "deborah"}
+
+    Lógica:
+        1. Valida cliente_id existe (404)
+        2. Marca Cliente.es_staff_proxy=True + razon vía .update() para
+           bypass del Cliente.save() override (que normaliza teléfono y
+           podría fallar con +1 USA u otros formatos no soportados)
+        3. Descarta TODOS los ContactoWhatsApp pendientes del cliente
+           (estado='descartado'), no solo el del día — si el cron generó
+           varios días atrás, los limpia todos
+        4. Loguea operador + razon para auditoría
+
+    Returns: {success, cliente_id, contactos_descartados, nombre_cliente}
+
+    Importante: bloqueante permanente. El cron generar_bandeja_whatsapp_diaria
+    excluye `es_staff_proxy=True` antes de evaluar candidatos. NO requiere
+    cambio de settings ni redeploy.
+
+    Decisión administrativa (NO comercial como opt_out_whatsapp). El cliente
+    sigue pudiendo reservar normalmente — solo no entra a la campaña
+    Operación Vuelta a Casa.
+    """
+    import json
+
+    err = _require_api_key(request)
+    if err:
+        return err
+
+    try:
+        body = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Body must be JSON'}, status=400)
+
+    razon = (body.get('razon') or '').strip()[:200]  # truncar a max_length
+    operador = (body.get('operador') or '').strip()
+
+    try:
+        cliente = Cliente.objects.get(id=cliente_id)
+    except Cliente.DoesNotExist:
+        return JsonResponse(
+            {'error': f'Cliente {cliente_id} no existe'},
+            status=404,
+        )
+
+    if cliente.es_staff_proxy:
+        # Idempotencia: ya estaba marcado, solo reportar (sin volver a tocar BD)
+        return JsonResponse({
+            'success': True,
+            'cliente_id': cliente_id,
+            'nombre_cliente': cliente.nombre,
+            'already_marked': True,
+            'contactos_descartados': 0,
+        })
+
+    # 1. Marcar el cliente vía .update() (bypass save() override)
+    Cliente.objects.filter(id=cliente_id).update(
+        es_staff_proxy=True,
+        es_staff_proxy_razon=razon,
+    )
+
+    # 2. Descartar TODOS los ContactoWhatsApp pendientes de este cliente
+    #    (puede haber varios días si el cron generó antes de marcar staff)
+    n_descartados = ContactoWhatsApp.objects.filter(
+        cliente_id=cliente_id,
+        estado='pendiente',
+    ).update(estado='descartado')
+
+    logger.info(
+        "Cliente marcado staff: cliente_id=%s nombre=%r operador=%r "
+        "razon=%r contactos_descartados=%s",
+        cliente_id, cliente.nombre, operador, razon, n_descartados,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'cliente_id': cliente_id,
+        'nombre_cliente': cliente.nombre,
+        'razon': razon,
+        'contactos_descartados': n_descartados,
+        'already_marked': False,
+    })
+
+
+# ============================================================================
 # Métricas de atribución por operador (MVP — Jorge 2026-05-26)
 # ============================================================================
 # Endpoint analítico read-only que retorna ranking de operadores con métricas:

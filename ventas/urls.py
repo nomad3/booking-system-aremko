@@ -403,6 +403,11 @@ urlpatterns = [
         'api/aremko-cli/operacion-vuelta-a-casa/clientes/<int:cliente_id>/actualizar-ubicacion/',
         ovc_views.actualizar_ubicacion, name='ovc_actualizar_ubicacion',
     ),
+    # Marcar cliente como staff/proxy (Aremko interno, no cliente real)
+    path(
+        'api/aremko-cli/operacion-vuelta-a-casa/clientes/<int:cliente_id>/marcar-staff/',
+        ovc_views.marcar_staff, name='ovc_marcar_staff',
+    ),
     path(
         'api/aremko-cli/operacion-vuelta-a-casa/bandeja-whatsapp/explicacion/<int:contacto_id>/',
         ovc_views.explicacion, name='ovc_explicacion',

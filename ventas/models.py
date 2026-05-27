@@ -819,6 +819,24 @@ class Cliente(models.Model):
         ),
     )
 
+    # ───── Cliente staff/proxy (Aremko, dueños, recepcionistas) ─────
+    # Marcado por el operador desde la bandeja cuando aparece un cliente
+    # interno (Jorge Aguilera, Deborah, Ernesto, etc.). Bloqueante
+    # permanente para Operación Vuelta a Casa — el cron NO los selecciona
+    # como candidatos. Decisión administrativa (no comercial como opt_out_whatsapp).
+    es_staff_proxy = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text=(
+            "True si este registro es de personal Aremko o cuenta proxy del "
+            "staff (no cliente real). Excluido de bandeja WhatsApp."
+        ),
+    )
+    es_staff_proxy_razon = models.CharField(
+        max_length=200, blank=True, default='',
+        help_text="Por qué se marcó como staff/proxy (auditoría).",
+    )
+
     @staticmethod
     def normalize_phone(phone_str):
         """
