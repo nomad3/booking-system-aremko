@@ -26,7 +26,7 @@ Criterios de calificación (en services/bandeja_whatsapp_service.py):
 Idempotente vía update_or_create por script_id.
 """
 
-from django.db import migrations
+from django.db import migrations, models
 
 
 PLANTILLAS_REFUGIO = [
@@ -155,5 +155,22 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # 1) Ampliar max_length de ScriptWhatsApp.script_id de 10 a 30
+        #    Los nuevos script_id Refugio superan los 10 chars:
+        #      "B.refugio-N"     = 11
+        #      "B.refugio-SC"    = 12
+        #      "B.refugio-DOR-N" = 15
+        #      "B.refugio-DOR-SC"= 16
+        migrations.AlterField(
+            model_name='scriptwhatsapp',
+            name='script_id',
+            field=models.CharField(
+                db_index=True,
+                help_text="Convención: 'A.1', 'B.2', 'B.refugio-N', etc. Letra=grupo, sufijo opcional.",
+                max_length=30,
+                unique=True,
+            ),
+        ),
+        # 2) Insertar las 4 plantillas Refugio (idempotente vía update_or_create)
         migrations.RunPython(crear_plantillas_refugio, reverse_code=eliminar_plantillas_refugio),
     ]

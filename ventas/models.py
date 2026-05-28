@@ -6744,8 +6744,8 @@ class ScriptWhatsApp(models.Model):
     # si alguien cambia una etiqueta en un lado, se actualiza en ambos.
 
     script_id = models.CharField(
-        max_length=10, unique=True, db_index=True,
-        help_text="Convención: 'A.1', 'B.2', etc. Letra=grupo, número=variante.",
+        max_length=30, unique=True, db_index=True,
+        help_text="Convención: 'A.1', 'B.2', 'B.refugio-N', etc. Letra=grupo, sufijo opcional.",
     )
     nombre = models.CharField(
         max_length=120,
