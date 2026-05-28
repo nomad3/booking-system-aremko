@@ -329,6 +329,79 @@ def buscar_script_cascada(
 # Helpers que SÍ tocan DB (separados para poder testearlos con DB de test)
 # ============================================================================
 
+# ─────────────────────────────────────────────────────────────────────
+#  Programa Refugio Aremko (Jorge 2026-05-27 PM)
+#  ─────────────────────────────────────────────────────────────────
+#  Refugio REEMPLAZA la cascada normal cuando el cliente califica:
+#      - region in (nacional, sin_clasificar) — NO sur
+#      - eje_valor in (En Riesgo, Dormido)
+#      - salva == 1 (solo primera oportunidad)
+#      - anti-saturación: no recibió Refugio en últimos 60 días
+#  Si NO califica → cascada normal sin cambios.
+# ─────────────────────────────────────────────────────────────────────
+
+REFUGIO_VENTANA_SATURACION_DIAS = 60
+REFUGIO_REGIONES_ELEGIBLES = ('nacional', 'sin_clasificar')
+REFUGIO_ESTADOS_ELEGIBLES = ('En Riesgo', 'Dormido')
+
+
+def califica_refugio(cliente, eje_valor: str, salva: int, hoy=None) -> bool:
+    """Decide si este cliente recibe plantilla Refugio en vez de la normal.
+
+    Args:
+        cliente: instancia Cliente con region_geografica
+        eje_valor: 'En Riesgo' / 'Dormido' / etc. (de ClienteTaxonomia)
+        salva: 1, 2 o 3
+        hoy: date opcional para tests (default: timezone.now().date())
+
+    Returns:
+        True si califica para recibir un B.refugio-*.
+    """
+    from datetime import date, timedelta
+    from django.utils import timezone
+    from ventas.models import ContactoWhatsApp
+
+    if cliente.region_geografica not in REFUGIO_REGIONES_ELEGIBLES:
+        return False
+    if eje_valor not in REFUGIO_ESTADOS_ELEGIBLES:
+        return False
+    if salva != 1:
+        return False
+
+    # Anti-saturación: si recibió un Refugio enviado en los últimos 60 días, skip
+    if hoy is None:
+        hoy = timezone.now().date()
+    desde = hoy - timedelta(days=REFUGIO_VENTANA_SATURACION_DIAS)
+    ya_recibio = ContactoWhatsApp.objects.filter(
+        cliente_id=cliente.id,
+        script__script_id__startswith='B.refugio',
+        estado='enviado',
+        fecha_envio__date__gte=desde,
+    ).exists()
+    return not ya_recibio
+
+
+def buscar_script_refugio(cliente, eje_valor: str):
+    """Devuelve el ScriptWhatsApp Refugio según estado + región del cliente.
+
+    Args:
+        cliente: instancia Cliente con region_geografica ya validada
+        eje_valor: 'En Riesgo' o 'Dormido' (ya validado)
+
+    Returns:
+        ScriptWhatsApp o None si no se encuentra la plantilla esperada
+        (no debería pasar si la migración 0115 fue aplicada).
+    """
+    from ventas.models import ScriptWhatsApp
+
+    region_suffix = 'N' if cliente.region_geografica == 'nacional' else 'SC'
+    if eje_valor == 'Dormido':
+        script_id = f'B.refugio-DOR-{region_suffix}'
+    else:  # En Riesgo
+        script_id = f'B.refugio-{region_suffix}'
+    return ScriptWhatsApp.objects.filter(script_id=script_id, activo=True).first()
+
+
 def obtener_ultimo_servicio_nombre(cliente_id: int) -> str:
     """Nombre del último servicio reservado por el cliente.
 

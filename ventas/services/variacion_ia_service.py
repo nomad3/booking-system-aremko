@@ -54,6 +54,12 @@ OFERTA REAL DE AREMKO (NO inventar comida que no existe):
 - NUNCA introduzcas en tu variación las palabras "almuerzo", "cena", "comida", "restaurante", "menú", "platos", "gastronómico", "cocina", "gourmet", "brunch" — aunque tu entrenamiento las asocie a "spa + relax + experiencia completa". Esas palabras prometen algo que Aremko no ofrece y generan frustración + cancelaciones.
 - Si la plantilla original menciona "tabla", preservá esa mención exacta. Si NO menciona comida en absoluto, NO la introduzcas en la variación.
 
+PROGRAMA REFUGIO AREMKO (paquete 3 días / 2 noches con cabaña + masaje en pareja + tinas, segunda noche cortesía):
+- Si el mensaje original menciona "Refugio Aremko" (nombre del programa), debes preservar ese nombre LITERALMENTE. NO lo cambies por "el refugio", "nuestra propuesta", "el paquete" ni ninguna otra forma genérica.
+- Si el mensaje contiene la URL "aremko.cl/refugio", debe aparecer LITERAL en tu variación, sin modificar (no la acortes, no la cambies a "nuestro sitio", no agregues https:// o www. si no estaba).
+- La palabra "cortesía" (referida a la segunda noche) es una decisión comercial: preservarla LITERAL. NO la reemplaces por "gratis", "regalo", "free", "bonus", "incluida", "de regalo" ni similares. "Cortesía nuestra" es el término exacto que usa Aremko.
+- NO exageres ahorros ni descuentos en porcentajes (no inventes "50% off", "ahorras X miles", etc.) — el paquete tiene precio fijo $270.000 y la cortesía se expresa solo como "la segunda noche, cortesía nuestra".
+
 PROHIBIDO ABSOLUTAMENTE:
 - Introducir placeholders entre llaves como {nombre}, {dias_sin_venir}, {fecha_limite} o cualquier otro — el mensaje YA está renderizado, todos los datos van LITERALES en tu output
 - Reemplazar un nombre de persona, ciudad o producto por una variable o un nombre distinto

@@ -77,6 +77,8 @@ from ventas.services.bandeja_whatsapp_service import (
     buscar_script_cascada,
     build_render_context,
     calcular_prioridad,
+    califica_refugio,
+    buscar_script_refugio,
 )
 
 
@@ -481,14 +483,26 @@ class Command(BaseCommand):
 
             # ---- Buscar script en cascada (Geo.3: con región) ----
             region_cliente = cliente.region_geografica or 'sin_clasificar'
-            script = buscar_script_cascada(
-                scripts_qs,
-                estado_valor=tax.eje_valor,
-                estilo=tax.eje_estilo,
-                contexto=tax.eje_contexto,
-                salva=salva,
-                region=region_cliente,
-            )
+
+            # ── PRIORIDAD 0: Programa Refugio Aremko ────────────────
+            # Si el cliente califica para Refugio (nacional/SC + En Riesgo/
+            # Dormido + salva 1 + sin Refugio en 60d), se le entrega esa
+            # plantilla en VEZ de la cascada normal. Ver califica_refugio
+            # en services/bandeja_whatsapp_service.py.
+            script = None
+            if califica_refugio(cliente, tax.eje_valor, salva, hoy=fecha_obj):
+                script = buscar_script_refugio(cliente, tax.eje_valor)
+
+            # ── Cascada normal (fallback si NO califica Refugio) ────
+            if script is None:
+                script = buscar_script_cascada(
+                    scripts_qs,
+                    estado_valor=tax.eje_valor,
+                    estilo=tax.eje_estilo,
+                    contexto=tax.eje_contexto,
+                    salva=salva,
+                    region=region_cliente,
+                )
             if script is None:
                 sin_script += 1
                 logger.warning(
