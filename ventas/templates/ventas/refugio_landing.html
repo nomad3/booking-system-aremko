@@ -510,9 +510,17 @@
                     result.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-2"></i>' + (data.message || '¡Gracias! Te contactamos pronto.') + '</div>';
                     form.reset();
                     if (typeof gtag === 'function') {
+                        // GA4: evento custom para análisis del embudo Refugio
                         gtag('event', 'refugio_form_submit', {
                             event_category: 'refugio_landing',
                             event_label: 'success',
+                        });
+                        // Google Ads: conversión "Refugio Form Submit" (valor $270K CLP)
+                        // Cuenta 539-975-0827 (ecolonco1@gmail.com). Conversion creada 2026-05-29.
+                        gtag('event', 'conversion', {
+                            'send_to': 'AW-18196625156/2z2aCNrR4rUcEITu6eRD',
+                            'value': 270000,
+                            'currency': 'CLP',
                         });
                     }
                     if (window.fbq) {
