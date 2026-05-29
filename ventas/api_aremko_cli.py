@@ -1518,6 +1518,283 @@ def bookings_monthly_by_family(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@csrf_exempt
+@require_http_methods(["GET"])
+def bookings_monthly_by_product(request):
+    """
+    Tendencias mensuales por producto SKU (6-36 meses hacia atrás).
+
+    Espejo a nivel SKU de bookings_monthly_by_family. La diferencia clave es la
+    fórmula de revenue:
+        - Servicios:  precio_unitario × cantidad_personas
+        - Productos:  precio_unitario × cantidad    ← este endpoint
+
+    Query params:
+        months (int, default 24, min 1, max 36): meses hacia atrás incluyendo
+            el actual. Si excede 36 retorna 400.
+        top (int, opcional): limitar el output a los N productos con mayor
+            total_revenue. Si se omite, devuelve todos los productos con ≥1
+            venta en el rango.
+
+    Response shape (HTTP 200):
+        {
+          "months": 24,
+          "first_month": "2024-06",
+          "last_month":  "2026-05",
+          "data": [
+            {
+              "month": "2024-06",
+              "month_label": "jun 2024",
+              "products": {
+                "<product_id>": {
+                  "name": "Crema corporal lavanda 200ml",
+                  "count": 12,
+                  "revenue": 240000
+                },
+                ...
+              },
+              "total": { "count": 50, "revenue": 1200000 }
+            },
+            ...
+          ],
+          "summary_by_product": {            # ordenado por total_revenue desc
+            "<product_id>": {
+              "name": "Crema corporal lavanda 200ml",
+              "total_count": 200,
+              "total_revenue": 5000000,
+              "avg_monthly_revenue": 208333,
+              "best_month":  { "month": "2025-12", "revenue": 480000 },
+              "worst_month": { "month": "2025-02", "revenue": 0 },
+              "trend_slope_pct": -3.2
+            },
+            ...
+          }
+        }
+
+    Reglas:
+    - Revenue = Sum(Coalesce(precio_unitario_venta, producto__precio_base) * cantidad).
+    - Excluye ventas canceladas (estado_pago='cancelado').
+    - Solo se incluyen productos con ≥1 venta en el rango (descarta SKUs descontinuados).
+    - En `data[i].products` SE OMITEN los productos sin ventas en ese mes
+      (frontend trata la ausencia como 0). Evita matriz 30+ SKUs × 24 meses.
+    - `summary_by_product` siempre tiene a TODOS los productos del rango
+      (ordenados por total_revenue desc).
+    - trend_slope_pct: misma fórmula que monthly-by-family (primer cuarto vs
+      último cuarto). Si <6 meses con datos válidos, retorna null.
+    - statement_timeout local 8000ms.
+    """
+    try:
+        # --- 1) Parsear y validar 'months' ---
+        try:
+            months_count = int(request.GET.get('months', '24'))
+        except (TypeError, ValueError):
+            months_count = 24
+        if months_count > 36:
+            return JsonResponse({'error': 'máximo 36 meses'}, status=400)
+        if months_count < 1:
+            months_count = 1
+
+        # --- 1b) Parsear 'top' opcional ---
+        top_raw = request.GET.get('top')
+        top_n = None
+        if top_raw is not None:
+            try:
+                top_n = int(top_raw)
+                if top_n < 1:
+                    top_n = None
+            except (TypeError, ValueError):
+                top_n = None
+
+        # Imports locales (consistente con otros endpoints de este módulo).
+        from calendar import monthrange
+        from django.db.models.functions import TruncMonth
+        from django.db import connection, transaction
+
+        # Import local de ReservaProducto para evitar ciclo si este módulo se
+        # importa antes de que models.py termine de cargar.
+        from .models import ReservaProducto
+
+        # --- 2) Construir la lista de meses ascendente ---
+        today = timezone.now().date()
+        last_y, last_m = today.year, today.month
+        months_list = []
+        for offset in range(months_count - 1, -1, -1):
+            total = (last_y * 12 + (last_m - 1)) - offset
+            y = total // 12
+            m = (total % 12) + 1
+            first_day = _date_cls(y, m, 1)
+            last_day = _date_cls(y, m, monthrange(y, m)[1])
+            months_list.append((y, m, first_day, last_day))
+
+        periodo_start = months_list[0][2]
+        periodo_stop = months_list[-1][3]
+
+        # --- 3) Query agrupada por (mes, producto) ---
+        # stats_by_month_product[(y, m, producto_id)] = {'count', 'revenue', 'name'}
+        stats_by_month_product = {}
+        # Nombres por producto_id (para resolver una sola vez).
+        product_names = {}
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                try:
+                    cursor.execute("SET LOCAL statement_timeout = '8s'")
+                except Exception:
+                    pass  # SQLite en tests no soporta esto.
+
+            productos_qs = ReservaProducto.objects.filter(
+                venta_reserva__fecha_creacion__date__gte=periodo_start,
+                venta_reserva__fecha_creacion__date__lte=periodo_stop,
+                producto__isnull=False,
+            ).exclude(
+                venta_reserva__estado_pago='cancelado',
+            ).annotate(
+                mes=TruncMonth('venta_reserva__fecha_creacion'),
+            ).values('mes', 'producto_id', 'producto__nombre').annotate(
+                count=Count('id'),
+                revenue=Sum(
+                    Coalesce(F('precio_unitario_venta'), F('producto__precio_base'))
+                    * F('cantidad')
+                ),
+            )
+
+            for row in productos_qs:
+                mes_val = row['mes']
+                if hasattr(mes_val, 'date'):
+                    mes_val = mes_val.date()
+                if mes_val is None:
+                    continue
+                y_, m_ = mes_val.year, mes_val.month
+                pid = row['producto_id']
+                pname = row['producto__nombre'] or f'Producto #{pid}'
+                if pid not in product_names:
+                    product_names[pid] = pname
+
+                key = (y_, m_, pid)
+                prev = stats_by_month_product.get(key, {'count': 0, 'revenue': 0.0})
+                stats_by_month_product[key] = {
+                    'count': prev['count'] + (row['count'] or 0),
+                    'revenue': prev['revenue'] + float(row['revenue'] or 0),
+                }
+
+        # --- 4) Calcular totales por producto para determinar el universo y ordenarlo ---
+        # totals_by_product[pid] = {'total_count', 'total_revenue', 'monthly_revenues': [...]}
+        totals_by_product = {}
+        for pid in product_names:
+            monthly_revenues = []
+            monthly_counts = []
+            for (y, m, _fd, _ld) in months_list:
+                stat = stats_by_month_product.get((y, m, pid), {'count': 0, 'revenue': 0.0})
+                monthly_revenues.append(stat['revenue'])
+                monthly_counts.append(stat['count'])
+            totals_by_product[pid] = {
+                'total_count': sum(monthly_counts),
+                'total_revenue': sum(monthly_revenues),
+                'monthly_revenues': monthly_revenues,
+                'monthly_counts': monthly_counts,
+            }
+
+        # Orden por total_revenue desc (Python preserva insertion order en dicts).
+        product_ids_sorted = sorted(
+            totals_by_product.keys(),
+            key=lambda pid: totals_by_product[pid]['total_revenue'],
+            reverse=True,
+        )
+        if top_n is not None:
+            product_ids_sorted = product_ids_sorted[:top_n]
+        product_ids_set = set(product_ids_sorted)
+
+        # --- 5) Armar 'data' ascendente. Omitir productos sin ventas en cada mes. ---
+        data = []
+        for (y, m, _fd, _ld) in months_list:
+            products_block = {}
+            total_count = 0
+            total_revenue = 0.0
+            for pid in product_ids_sorted:
+                stat = stats_by_month_product.get((y, m, pid))
+                if stat is None or (stat['count'] == 0 and stat['revenue'] == 0):
+                    continue  # sparse: omitir si no hubo ventas ese mes
+                products_block[str(pid)] = {
+                    'name': product_names[pid],
+                    'count': stat['count'],
+                    'revenue': round(stat['revenue'], 2),
+                }
+                total_count += stat['count']
+                total_revenue += stat['revenue']
+            data.append({
+                'month': f'{y:04d}-{m:02d}',
+                'month_label': f'{MES_LABELS_ES[m - 1]} {y}',
+                'products': products_block,
+                'total': {
+                    'count': total_count,
+                    'revenue': round(total_revenue, 2),
+                },
+            })
+
+        # --- 6) summary_by_product con best/worst/trend (ordenado por revenue) ---
+        n = len(data)
+        quarter = max(1, n // 4)
+        summary_by_product = {}
+        for pid in product_ids_sorted:
+            t = totals_by_product[pid]
+            revenues = t['monthly_revenues']
+
+            total_revenue_p = t['total_revenue']
+            total_count_p = t['total_count']
+            avg_monthly_revenue = total_revenue_p / n if n else 0
+
+            # best/worst month por revenue (empate gana el más antiguo).
+            best_idx = max(range(n), key=lambda i: revenues[i]) if n else 0
+            worst_idx = min(range(n), key=lambda i: revenues[i]) if n else 0
+
+            # trend_slope_pct: primer cuarto vs último cuarto.
+            # Si <6 meses con datos válidos (>0), retornar null como pide el brief.
+            meses_con_datos = sum(1 for r in revenues if r > 0)
+            if meses_con_datos < 6:
+                trend_slope_pct = None
+            else:
+                avg_first_q = sum(revenues[:quarter]) / quarter
+                avg_last_q = sum(revenues[-quarter:]) / quarter
+                if avg_first_q == 0:
+                    trend_slope_pct = None
+                else:
+                    trend_slope_pct = round(((avg_last_q - avg_first_q) / avg_first_q) * 100, 1)
+
+            summary_by_product[str(pid)] = {
+                'name': product_names[pid],
+                'total_count': total_count_p,
+                'total_revenue': round(total_revenue_p, 2),
+                'avg_monthly_revenue': round(avg_monthly_revenue, 2),
+                'best_month': {
+                    'month': data[best_idx]['month'],
+                    'revenue': round(revenues[best_idx], 2),
+                },
+                'worst_month': {
+                    'month': data[worst_idx]['month'],
+                    'revenue': round(revenues[worst_idx], 2),
+                },
+                'trend_slope_pct': trend_slope_pct,
+            }
+
+        response = {
+            'months': months_count,
+            'first_month': data[0]['month'] if data else None,
+            'last_month': data[-1]['month'] if data else None,
+            'data': data,
+            'summary_by_product': summary_by_product,
+        }
+
+        logger.info(
+            f"aremko-cli: monthly_by_product months={months_count} "
+            f"products={len(product_ids_sorted)} top={top_n} "
+            f"first={response['first_month']} last={response['last_month']}"
+        )
+        return JsonResponse(response)
+
+    except Exception as e:
+        logger.error(f"Error in bookings_monthly_by_product: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
 # Combinaciones explícitas para bookings_family_combinations.
 # Cada reserva cae en EXACTAMENTE UNA por su set único de familias core.
 # 'otros' agrupa reservas sin familia core (set vacío o sólo 'otros').
