@@ -193,6 +193,13 @@ def get_custom_events_last_7d() -> dict:
         'cta_blog_click',
         'reservation_started',
         'reservation_completed',
+        # Programa Refugio (paquete 3D/2N $270K, landing aremko.cl/refugio).
+        # Disparados desde refugio_landing.html via gtag(). El brief semanal
+        # los usa para medir conversión del soft-launch sin depender solo
+        # del Pixel Meta.
+        'refugio_view',
+        'refugio_form_submit',
+        'refugio_garantia_click',
     ]
 
     filt = FilterExpression(
