@@ -1560,6 +1560,7 @@ def bookings_monthly_by_product(request):
           "summary_by_product": {            # ordenado por total_revenue desc
             "<product_id>": {
               "name": "Crema corporal lavanda 200ml",
+              "category": "Aromaterapia",     # (v1.1) str | null
               "total_count": 200,
               "total_revenue": 5000000,
               "avg_monthly_revenue": 208333,
@@ -1579,6 +1580,10 @@ def bookings_monthly_by_product(request):
       (frontend trata la ausencia como 0). Evita matriz 30+ SKUs × 24 meses.
     - `summary_by_product` siempre tiene a TODOS los productos del rango
       (ordenados por total_revenue desc).
+    - `category` en summary_by_product: nombre de producto.categoria. null si
+      el producto no tiene categoría asignada (FK on_delete=SET_NULL maneja
+      huérfanos automáticamente). El frontend agrupa nulls bajo "Sin categoría".
+      Solo en summary, NO en data[i].products (estable en el tiempo).
     - trend_slope_pct: misma fórmula que monthly-by-family (primer cuarto vs
       último cuarto). Si <6 meses con datos válidos, retorna null.
     - statement_timeout local 8000ms.
@@ -1632,8 +1637,10 @@ def bookings_monthly_by_product(request):
         # --- 3) Query agrupada por (mes, producto) ---
         # stats_by_month_product[(y, m, producto_id)] = {'count', 'revenue', 'name'}
         stats_by_month_product = {}
-        # Nombres por producto_id (para resolver una sola vez).
+        # Nombres y categorías por producto_id (resolución única — son estables
+        # en el tiempo, así no inflamos el payload repitiéndolos por mes).
         product_names = {}
+        product_categories = {}  # pid -> str | None (None si sin categoría o huérfana)
         with transaction.atomic():
             with connection.cursor() as cursor:
                 try:
@@ -1649,7 +1656,10 @@ def bookings_monthly_by_product(request):
                 venta_reserva__estado_pago='cancelado',
             ).annotate(
                 mes=TruncMonth('venta_reserva__fecha_creacion'),
-            ).values('mes', 'producto_id', 'producto__nombre').annotate(
+            ).values(
+                'mes', 'producto_id', 'producto__nombre',
+                'producto__categoria__nombre',
+            ).annotate(
                 count=Count('id'),
                 revenue=Sum(
                     Coalesce(F('precio_unitario_venta'), F('producto__precio_base'))
@@ -1668,6 +1678,11 @@ def bookings_monthly_by_product(request):
                 pname = row['producto__nombre'] or f'Producto #{pid}'
                 if pid not in product_names:
                     product_names[pid] = pname
+                # Categoría: producto.categoria es FK on_delete=SET_NULL, así que
+                # el nombre puede venir null sin necesidad de detectar huérfanos
+                # explícitamente. Asignamos una sola vez por pid.
+                if pid not in product_categories:
+                    product_categories[pid] = row['producto__categoria__nombre']
 
                 key = (y_, m_, pid)
                 prev = stats_by_month_product.get(key, {'count': 0, 'revenue': 0.0})
@@ -1761,6 +1776,7 @@ def bookings_monthly_by_product(request):
 
             summary_by_product[str(pid)] = {
                 'name': product_names[pid],
+                'category': product_categories.get(pid),  # str | None
                 'total_count': total_count_p,
                 'total_revenue': round(total_revenue_p, 2),
                 'avg_monthly_revenue': round(avg_monthly_revenue, 2),
