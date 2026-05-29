@@ -90,6 +90,7 @@ def build_user_prompt(
     calendario_chile: Optional[str] = None,
     pipeline_reservas: Optional[dict] = None,
     trends: Optional[dict] = None,
+    active_campaigns_detail: Optional[list] = None,
 ) -> str:
     """Construye el user prompt con toda la info contextual."""
 
@@ -163,6 +164,26 @@ DATOS:
 
 === ANÁLISIS IA META PRE-PROCESADO (alertas + oportunidades + acciones) ===
 {json.dumps(meta_analysis, indent=2, ensure_ascii=False, default=str)[:6000] if meta_analysis else '(no disponible)'}
+
+=== META ADS: CAMPAÑAS ACTIVAS — DETALLE POR ADSET Y ANUNCIO (últimos 7 días) ===
+INSTRUCCIONES PARA ANALIZAR (solo si hay campañas activas):
+- Cada campaña trae `totals`, `by_adset` (audiencias) y `by_ad` (variantes creativas), con `leads`, `landing_page_views` (LPV), `link_clicks`, `cpl`, `lpv_rate`, `frequency` extraídos.
+- `days_since_start` te dice cuán madura está. Reglas:
+  * <3 días → fase de Aprendizaje de Meta. NO recomendar pausar nada todavía, datos ruidosos.
+  * 3-7 días → primera optimización razonable: identificar variante ganadora.
+  * >7 días → A/B test con confianza estadística decente.
+- A/B test por variante (`by_ad`): la GANADORA se decide por CPL (Costo por Lead), NO por CTR. Si todos tienen 0 leads, comparar por LPV rate (>60% saludable). CTR alto sin leads = curiosidad sin intención (creativo gancho pero copy/landing no convence).
+- A/B test por audiencia (`by_adset`): comparar CPL entre adsets. La audiencia con CPL más bajo merece más presupuesto. Si una está en frequency >3 (fatiga), refrescar creativo aunque CPL sea bueno.
+- Umbrales de alerta (con `days_since_start >= 3`):
+  * CTR <1% por más de 48h → creativo no resuena, pausar o refresh
+  * CPL >$15.000 CLP → replantear (audiencia, copy o oferta)
+  * Frequency >3 → fatiga, refresh creativo o ampliar audiencia
+  * Anuncio con 0 entrega (impressions = 0) por >24h → revisar (puede estar pausado individualmente, mal targeting o rejected)
+- Si una campaña tiene 0 leads pero alto CTR + alto LPV rate → la fricción está en el formulario o el precio, no en el anuncio.
+- Recomendaciones concretas en `acciones_meta_ads` del output: especificar campaign_name + adset_name + ad_name + acción exacta (pausar, escalar a $X, duplicar y refresh).
+
+DATOS:
+{json.dumps(active_campaigns_detail, indent=2, ensure_ascii=False, default=str)[:7000] if active_campaigns_detail else '(no hay campañas Meta Ads ACTIVE en este momento, o el token no tiene permisos sobre las cuentas activas — verificar reference_meta_api_aremko.md)'}
 
 === TU OUTPUT (JSON estricto, sin markdown) ===
 
@@ -1061,6 +1082,71 @@ def get_meta_snapshot_safe(persist: bool = True, with_analysis: bool = True) -> 
         return None
 
 
+def get_active_campaigns_detail_safe(days: int = 7) -> Optional[list]:
+    """Detalle granular (adset + ad) de campañas Meta Ads ACTIVE — todas las cuentas.
+
+    Itera todas las cuentas publicitarias accesibles al system user claudeAremko
+    y trae el detalle por adset y por anuncio de las top 5 campañas ACTIVE por
+    spend en cada cuenta. Incluye leads, LPV, CPL, lpv_rate extraídos del
+    array `actions` de Insights API.
+
+    Use case: el LLM puede hacer A/B analysis (qué variante convierte mejor),
+    detectar fatiga de creativo (frequency > 3), y sugerir pausar/escalar
+    según CPL vs umbral.
+
+    Args:
+        days: ventana de los insights (default 7d, alineado con el ciclo
+            semanal del brief).
+
+    Returns:
+        Lista de dicts por cuenta, cada uno con sus campañas activas, o None
+        si falla todo o no hay cuentas con campañas activas. Estructura:
+        [
+          {
+            "account_id": "act_455070225054110",
+            "account_name": "BM Aremko CLP",
+            "campaigns": [
+              {
+                "campaign_id": "...",
+                "name": "Refugio Aremko - Lanzamiento Junio 2026",
+                "objective": "OUTCOME_LEADS",
+                "days_since_start": 2,
+                "totals": {spend, leads, cpl, ...},
+                "by_adset": [...],
+                "by_ad": [...]
+              }, ...
+            ]
+          }, ...
+        ]
+    """
+    try:
+        from .meta_reporter import list_accessible_ad_accounts, get_active_campaigns_detail
+        accounts = list_accessible_ad_accounts()
+        details = []
+        for acct in accounts:
+            acct_id = acct.get('id')
+            if not acct_id:
+                continue
+            try:
+                campaigns_detail = get_active_campaigns_detail(
+                    acct_id, days=days, max_campaigns=5,
+                )
+                if campaigns_detail:  # solo agregar cuentas con campañas activas
+                    details.append({
+                        'account_id': acct_id,
+                        'account_name': acct.get('name'),
+                        'campaigns': campaigns_detail,
+                    })
+            except Exception as exc:
+                logger.warning(
+                    f'Error obteniendo campañas activas de {acct_id}: {exc}'
+                )
+        return details if details else None
+    except Exception as exc:
+        logger.warning(f'Active campaigns detail no disponible: {exc}')
+        return None
+
+
 def _tendencia_serie(valores: list) -> dict:
     """Dada una lista de valores en orden cronológico (más antiguo → más nuevo),
     calcula deltas y dirección de tendencia.
@@ -1238,6 +1324,7 @@ def call_llm(
     calendario_chile: Optional[str] = None,
     pipeline_reservas: Optional[dict] = None,
     trends: Optional[dict] = None,
+    active_campaigns_detail: Optional[list] = None,
     model: Optional[str] = None,
 ) -> dict:
     """Llama a OpenRouter con todo el contexto y devuelve el brief en dict."""
@@ -1273,6 +1360,7 @@ def call_llm(
         calendario_chile=calendario_chile,
         pipeline_reservas=pipeline_reservas,
         trends=trends,
+        active_campaigns_detail=active_campaigns_detail,
     )
 
     client = OpenAI(api_key=api_key, base_url=base_url)
@@ -1342,6 +1430,19 @@ def generate_brief() -> dict:
             f'voc={trends["_meta"].get("voc_snapshots", 0)}'
         )
 
+    # Sub-fase 2C: detalle granular de campañas Meta Ads ACTIVE para A/B analysis.
+    # Útil cuando hay campañas en curso (ej. Refugio soft-launch). El LLM lo
+    # usa para identificar variante ganadora, alertas de fatiga, sugerir
+    # pausar/escalar. Ventana 7d para alinear con ciclo semanal del brief.
+    active_campaigns_detail = get_active_campaigns_detail_safe(days=7)
+    if active_campaigns_detail:
+        n_accounts = len(active_campaigns_detail)
+        n_campaigns = sum(len(a.get('campaigns', [])) for a in active_campaigns_detail)
+        logger.info(
+            f'Active campaigns detail: {n_accounts} cuentas con '
+            f'{n_campaigns} campañas ACTIVE'
+        )
+
     brief = call_llm(
         semana_inicio=semana_inicio,
         semana_fin=semana_fin,
@@ -1357,6 +1458,7 @@ def generate_brief() -> dict:
         calendario_chile=calendario_chile,
         pipeline_reservas=pipeline_reservas,
         trends=trends,
+        active_campaigns_detail=active_campaigns_detail,
     )
 
     return {
@@ -1373,5 +1475,6 @@ def generate_brief() -> dict:
         'reviews_resumen': reviews_resumen,
         'pipeline_reservas': pipeline_reservas,
         'trends': trends,
+        'active_campaigns_detail': active_campaigns_detail,
         'metricas_disponibles': bool(ga4_snapshot or gsc_snapshot or meta_snapshot),
     }

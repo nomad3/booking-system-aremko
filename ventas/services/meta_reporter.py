@@ -449,6 +449,214 @@ def get_campaigns_summary(account_id: str = AD_ACCOUNT_PRINCIPAL, limit: int = 5
     return campaigns
 
 
+def _extract_action_metrics(actions: list) -> dict:
+    """Extrae métricas accionables del array `actions` de Insights API.
+
+    Args:
+        actions: lista de dicts {action_type, value} como vienen del Graph API.
+
+    Returns:
+        dict con keys: leads, landing_page_views, link_clicks, video_views,
+        post_engagement, post_reactions. Todos int (default 0).
+
+    Nota sobre leads: Meta devuelve tanto 'lead' como 'offsite_conversion.fb_pixel_lead'
+    y suelen contar el mismo evento (Pixel + CAPI duplicados). Tomamos el max para
+    evitar duplicar. Si Lead Ads (formulario instantáneo Meta) también está activo,
+    aparece como 'leadgen.other' — también lo capturamos vía max.
+    """
+    out = {
+        'leads': 0,
+        'landing_page_views': 0,
+        'link_clicks': 0,
+        'video_views': 0,
+        'post_engagement': 0,
+        'post_reactions': 0,
+    }
+    if not actions:
+        return out
+
+    lead_candidates = []
+    for a in actions:
+        atype = a.get('action_type')
+        try:
+            val = int(a.get('value') or 0)
+        except (TypeError, ValueError):
+            val = 0
+        if atype in ('lead', 'offsite_conversion.fb_pixel_lead', 'leadgen.other'):
+            lead_candidates.append(val)
+        elif atype == 'landing_page_view':
+            out['landing_page_views'] = max(out['landing_page_views'], val)
+        elif atype == 'link_click':
+            out['link_clicks'] = max(out['link_clicks'], val)
+        elif atype == 'video_view':
+            out['video_views'] = max(out['video_views'], val)
+        elif atype == 'post_engagement':
+            out['post_engagement'] = max(out['post_engagement'], val)
+        elif atype == 'post_reaction':
+            out['post_reactions'] = max(out['post_reactions'], val)
+    out['leads'] = max(lead_candidates) if lead_candidates else 0
+    return out
+
+
+def get_active_campaigns_detail(account_id: str = AD_ACCOUNT_PRINCIPAL,
+                                 days: int = 7,
+                                 max_campaigns: int = 5) -> list:
+    """Detalle granular (por adset + por anuncio) de las campañas ACTIVE.
+
+    Útil para A/B testing y monitoreo de campañas en curso. Limita a las
+    top N campañas ACTIVE por spend para no inflar el JSON con muchas
+    campañas si la cuenta tiene varias activas en paralelo.
+
+    Args:
+        account_id: ID de cuenta publicitaria (formato 'act_XXXXX').
+        days: ventana temporal de los insights (default 7d, máx 28d).
+        max_campaigns: top N campañas ACTIVE por spend a incluir.
+
+    Returns:
+        Lista de dicts, una por campaña ACTIVE. Cada dict trae:
+            - campaign_id, name, objective, status, daily_budget
+            - days_since_start (útil para distinguir aprendizaje vs maduro)
+            - totals: {spend, impressions, clicks, ctr, cpc, reach, frequency,
+                       leads, landing_page_views, link_clicks, cpl}
+            - by_adset: lista de adsets con sus métricas + leads/LPV/CPL
+            - by_ad: lista de anuncios con sus métricas + leads/LPV/CPL
+
+    Vacía si la cuenta no tiene campañas ACTIVE.
+    """
+    # 1) Listar todas las campañas y filtrar las ACTIVE.
+    all_campaigns = get_campaigns_summary(account_id, limit=50)
+    active = [c for c in all_campaigns if c.get('status') == 'ACTIVE']
+    if not active:
+        return []
+
+    # 2) Ordenar por spend desc y limitar a top N.
+    active.sort(key=lambda c: float(c.get('spend') or 0), reverse=True)
+    active = active[:max_campaigns]
+
+    # 3) Para cada campaña ACTIVE, traer detalle por adset + por anuncio.
+    since = (date.today() - timedelta(days=days)).isoformat()
+    until = date.today().isoformat()
+    time_range = f'{{"since":"{since}","until":"{until}"}}'
+
+    result = []
+    for c in active:
+        cid = c.get('id')
+        if not cid:
+            continue
+
+        # Detalle del campaign (presupuesto, fechas).
+        try:
+            base = _get(f"/{cid}", {
+                "fields": "id,name,status,objective,created_time,start_time,"
+                          "stop_time,daily_budget,lifetime_budget",
+            })
+        except Exception as e:
+            logger.warning(f"Error fetching campaign base {cid}: {e}")
+            base = {}
+
+        # Totales de la campaña en la ventana.
+        try:
+            totals_raw = _get(f"/{cid}/insights", {
+                "fields": "spend,impressions,clicks,ctr,cpc,reach,frequency,actions",
+                "time_range": time_range,
+            }).get("data", [])
+            totals_row = totals_raw[0] if totals_raw else {}
+        except Exception as e:
+            logger.warning(f"Error fetching campaign insights {cid}: {e}")
+            totals_row = {}
+
+        totals = _enrich_insights_row(totals_row)
+
+        # Breakdown por adset.
+        try:
+            adsets_raw = _get(f"/{cid}/insights", {
+                "level": "adset",
+                "fields": "adset_id,adset_name,impressions,clicks,spend,ctr,"
+                          "cpc,reach,frequency,actions",
+                "time_range": time_range,
+            }).get("data", [])
+        except Exception as e:
+            logger.warning(f"Error fetching adset insights {cid}: {e}")
+            adsets_raw = []
+        by_adset = [_enrich_insights_row(r) for r in adsets_raw]
+
+        # Breakdown por anuncio.
+        try:
+            ads_raw = _get(f"/{cid}/insights", {
+                "level": "ad",
+                "fields": "ad_id,ad_name,adset_name,impressions,clicks,spend,"
+                          "ctr,actions",
+                "time_range": time_range,
+            }).get("data", [])
+        except Exception as e:
+            logger.warning(f"Error fetching ad insights {cid}: {e}")
+            ads_raw = []
+        by_ad = [_enrich_insights_row(r) for r in ads_raw]
+
+        # days_since_start: útil para que el LLM sepa si la campaña sigue
+        # en aprendizaje (Meta tarda 3-7d en estabilizar) o ya es maduro.
+        days_since_start = None
+        start_str = base.get('start_time') or c.get('start_time') or base.get('created_time')
+        if start_str:
+            try:
+                from datetime import datetime as _dt, timezone as _tz
+                start_dt = _dt.fromisoformat(start_str.replace('Z', '+00:00'))
+                delta = _dt.now(_tz.utc) - start_dt
+                days_since_start = max(0, delta.days)
+            except (ValueError, TypeError):
+                pass
+
+        result.append({
+            "campaign_id": cid,
+            "name": c.get('name') or base.get('name'),
+            "objective": c.get('objective'),
+            "status": "ACTIVE",
+            "daily_budget_clp": float(base.get('daily_budget') or 0) if base.get('daily_budget') else None,
+            "lifetime_budget_clp": float(base.get('lifetime_budget') or 0) if base.get('lifetime_budget') else None,
+            "days_since_start": days_since_start,
+            "totals": totals,
+            "by_adset": by_adset,
+            "by_ad": by_ad,
+        })
+
+    return result
+
+
+def _enrich_insights_row(row: dict) -> dict:
+    """Toma una fila de Insights API y devuelve un dict limpio con métricas
+    accionables. Quita el array `actions` raw (verbose) y reemplaza con
+    métricas extraídas. Calcula CPL si hay leads.
+    """
+    if not row:
+        return {}
+    actions = row.get('actions') or []
+    extracted = _extract_action_metrics(actions)
+    out = {k: v for k, v in row.items() if k != 'actions'}
+    # Castear numéricos a float/int para JSON limpio.
+    for key in ('spend', 'ctr', 'cpc', 'frequency'):
+        if key in out:
+            try:
+                out[key] = float(out[key])
+            except (TypeError, ValueError):
+                pass
+    for key in ('impressions', 'clicks', 'reach'):
+        if key in out:
+            try:
+                out[key] = int(out[key])
+            except (TypeError, ValueError):
+                pass
+    out.update(extracted)
+    # CPL (Costo por Lead). None si no hay leads aún.
+    spend = float(out.get('spend') or 0)
+    leads = extracted['leads']
+    out['cpl'] = round(spend / leads, 2) if leads > 0 else None
+    # LPV rate (qué % de link clicks llegó a la landing).
+    link_clicks = extracted['link_clicks']
+    lpv = extracted['landing_page_views']
+    out['lpv_rate'] = round((lpv / link_clicks) * 100, 1) if link_clicks > 0 else None
+    return out
+
+
 def get_campaign_detail(campaign_id: str, days: int = 30) -> dict:
     """Detalle de una campaña especifica con metricas dia a dia."""
     since = (date.today() - timedelta(days=days)).isoformat()
