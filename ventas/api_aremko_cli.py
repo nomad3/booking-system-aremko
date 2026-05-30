@@ -10,7 +10,7 @@ from django.db.models import Sum, Avg, Count, Q, Min, F
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from datetime import datetime, timedelta, date as _date_cls
-from .models import VentaReserva, Cliente, ReservaServicio, Pago
+from .models import VentaReserva, Cliente, ReservaServicio, ReservaProducto, Pago
 import logging
 
 # Mapeo unico de tipos de servicio a nombres de familia.
