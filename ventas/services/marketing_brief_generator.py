@@ -91,6 +91,7 @@ def build_user_prompt(
     pipeline_reservas: Optional[dict] = None,
     trends: Optional[dict] = None,
     active_campaigns_detail: Optional[list] = None,
+    google_ads_snapshot: Optional[dict] = None,
 ) -> str:
     """Construye el user prompt con toda la info contextual."""
 
@@ -184,6 +185,23 @@ INSTRUCCIONES PARA ANALIZAR (solo si hay campañas activas):
 
 DATOS:
 {json.dumps(active_campaigns_detail, indent=2, ensure_ascii=False, default=str)[:7000] if active_campaigns_detail else '(no hay campañas Meta Ads ACTIVE en este momento, o el token no tiene permisos sobre las cuentas activas — verificar reference_meta_api_aremko.md)'}
+
+=== GOOGLE ADS (Search) — CAMPAÑAS ACTIVAS, KEYWORDS Y SEARCH TERMS ===
+INSTRUCCIONES PARA ANALIZAR (solo si Google Ads tiene datos — soft-launch arrancó 2026-05-29):
+- Comparar canales: Meta es push (audience interest), Google es pull (intent). La pregunta clave es CPL (Costo por Lead) en cada canal. Si Meta tiene CPL X y Google tiene CPL Y, recomendar dónde escalar.
+- Para cada campaña activa Google Ads: revisar `totals.cpl_clp` vs `totals.cpc_clp` y `totals.ctr`. CPL <$10K verde, $10-15K amarillo, >$15K rojo.
+- `by_ad_group`: si hay 2+ ad groups en la campaña, identificar cuál convierte mejor por CPL.
+- `top_keywords`: las keywords ordenadas por impresiones. Mirar Quality Score (quality_score):
+  * QS 1-4 = pagás CPC alto y aparecés menos. Si keyword core tiene QS<5, revisar landing relevance.
+  * QS 8-10 = excelente, replicar la estructura en nuevas keywords.
+- `top_search_terms`: BÚSQUEDAS REALES que dispararon anuncios (único de Google Search, no existe en Meta). Mostrar top 5 en el resumen para que Jorge vea qué pregunta su público.
+- `negative_keyword_candidates`: pre-flag de búsquedas con 5+ clicks y 0 conversiones → recomendar agregarlas como negative keywords para no malgastar presupuesto.
+- `low_quality_score_keywords`: keywords con QS<5. Recomendación accionable: revisar copy del anuncio + landing para esa palabra.
+- Saldo prepagado: si la campaña Google tiene `daily_budget_clp` y vemos `spend_clp` agregado por días, calcular días de saldo restante (asumiendo $100K iniciales). Si <20% restante, alerta para recargar.
+- Si Google Ads viene con (no disponible), simplemente NO inventes datos — di "Google Ads aún no integrado al brief, credenciales API pendientes" y sigue.
+
+DATOS:
+{json.dumps(google_ads_snapshot, indent=2, ensure_ascii=False, default=str)[:6000] if google_ads_snapshot else '(no disponible — credenciales OAuth Google Ads aún no configuradas. Cuando Jorge obtenga Developer Token de un MCC aprobado, configurar env vars GOOGLE_ADS_* en Render. Mientras tanto, datos de Google se ven indirectamente via GA4 utm_source=google&utm_medium=cpc)'}
 
 === TU OUTPUT (JSON estricto, sin markdown) ===
 
@@ -1082,6 +1100,38 @@ def get_meta_snapshot_safe(persist: bool = True, with_analysis: bool = True) -> 
         return None
 
 
+def get_google_ads_snapshot_safe(days: int = 28) -> Optional[dict]:
+    """Snapshot de Google Ads para alimentar el brief semanal.
+
+    Análogo a get_meta_snapshot_safe pero para Google Ads. Retorna None si:
+    - Credenciales OAuth de Google Ads no configuradas (estado actual al 2026-05-30
+      hasta que Jorge obtenga developer token, demora 1-3d hábiles)
+    - Token expirado o cuenta sin permisos
+    - Cualquier error fatal
+
+    Tolerante: si retorna None, el brief sigue funcionando sin Google Ads.
+    """
+    try:
+        from .google_ads_reporter import get_snapshot_safe
+        snap = get_snapshot_safe(days=days)
+        if snap is None:
+            logger.info(
+                'Google Ads snapshot no disponible (credenciales pendientes '
+                'o conectividad). Brief continúa sin Google Ads.'
+            )
+            return None
+        n_campaigns = len(snap.get('campaigns_period') or [])
+        n_active = len(snap.get('active_campaigns_detail') or [])
+        logger.info(
+            f'Google Ads snapshot OK: {n_campaigns} campañas en periodo, '
+            f'{n_active} activas con detalle granular'
+        )
+        return snap
+    except Exception as exc:
+        logger.warning(f'Google Ads snapshot no disponible: {exc}')
+        return None
+
+
 def get_active_campaigns_detail_safe(days: int = 7) -> Optional[list]:
     """Detalle granular (adset + ad) de campañas Meta Ads ACTIVE — todas las cuentas.
 
@@ -1325,6 +1375,7 @@ def call_llm(
     pipeline_reservas: Optional[dict] = None,
     trends: Optional[dict] = None,
     active_campaigns_detail: Optional[list] = None,
+    google_ads_snapshot: Optional[dict] = None,
     model: Optional[str] = None,
 ) -> dict:
     """Llama a OpenRouter con todo el contexto y devuelve el brief en dict."""
@@ -1361,6 +1412,7 @@ def call_llm(
         pipeline_reservas=pipeline_reservas,
         trends=trends,
         active_campaigns_detail=active_campaigns_detail,
+        google_ads_snapshot=google_ads_snapshot,
     )
 
     client = OpenAI(api_key=api_key, base_url=base_url)
@@ -1443,6 +1495,12 @@ def generate_brief() -> dict:
             f'{n_campaigns} campañas ACTIVE'
         )
 
+    # Sub-fase 2C extendida: snapshot Google Ads (paralelo a Meta).
+    # Cuando las credenciales OAuth estén configuradas (env vars GOOGLE_ADS_*),
+    # el LLM tendrá visibilidad de la campaña Refugio Search + keywords + search terms
+    # + quality scores. Mientras tanto retorna None gracefully sin romper el brief.
+    google_ads_snapshot = get_google_ads_snapshot_safe(days=28)
+
     brief = call_llm(
         semana_inicio=semana_inicio,
         semana_fin=semana_fin,
@@ -1459,6 +1517,7 @@ def generate_brief() -> dict:
         pipeline_reservas=pipeline_reservas,
         trends=trends,
         active_campaigns_detail=active_campaigns_detail,
+        google_ads_snapshot=google_ads_snapshot,
     )
 
     return {
@@ -1476,5 +1535,6 @@ def generate_brief() -> dict:
         'pipeline_reservas': pipeline_reservas,
         'trends': trends,
         'active_campaigns_detail': active_campaigns_detail,
-        'metricas_disponibles': bool(ga4_snapshot or gsc_snapshot or meta_snapshot),
+        'google_ads_snapshot': google_ads_snapshot,
+        'metricas_disponibles': bool(ga4_snapshot or gsc_snapshot or meta_snapshot or google_ads_snapshot),
     }
