@@ -140,7 +140,19 @@ DATOS:
 === BLOG POSTS RECIENTES (no repetir temas, sí reciclar conceptos) ===
 {json.dumps(blog_posts_recientes, indent=2, ensure_ascii=False, default=str)}
 
-=== GA4 (sitio web aremko.cl) — ÚLTIMOS 7 DÍAS vs 7 ANTERIORES ===
+=== GA4 (sitio web aremko.cl) — ÚLTIMOS 7 DÍAS vs 7 ANTERIORES + ATRIBUCIÓN 28D ===
+INSTRUCCIONES PARA USAR ESTE BLOQUE:
+- `overview`: comparativa 7d vs 7d previos. Si conversions cae >20%, alerta.
+- `traffic_sources`: top 10 fuentes 7d (volumen).
+- `custom_events`: contadores 7d de whatsapp_click, phone_click, cta_blog_click, reservation_started, reservation_completed, refugio_view, refugio_form_submit, refugio_garantia_click. Si refugio_form_submit aparece y >0 → confirma que el embudo Refugio convierte. Si refugio_view crece pero refugio_form_submit no → fricción en formulario.
+- `conversions_attribution` (28d): atribución multi-canal por evento × source × medium. Es la fuente más rica para decisiones de inversión.
+  * `total_conversions` y `total_users`: agregados del mes.
+  * `by_event`: cuál evento custom genera más conversiones (whatsapp_click es típicamente #1, reservation_completed indica reservas online directas, refugio_form_submit indica leads).
+  * `by_source_medium`: tabla con evento + source + medium + conversions. El top source es típicamente "google organic" (SEO). Mirar también el aporte de Instagram orgánico ("igMeta social"), Direct (clientes recurrentes), Facebook orgánico, ChatGPT/Perplexity referral (canal emergente AI).
+  * Detectar canales NUEVOS o emergentes con >2 conversions (ej. chatgpt.com, perplexity, lm.facebook.com) y mencionarlos como oportunidad de Visibilidad.
+- `top_sources_with_cvr` (28d): top 15 fuentes con CONVERSION RATE (conversions/sessions). Es la métrica clave para priorizar inversión. Una fuente con muchas sesiones pero bajo CVR puede ser tráfico de baja intención. Una fuente con pocas sesiones pero alto CVR es candidato a escalar.
+
+DATOS:
 {json.dumps(ga4_snapshot, indent=2, ensure_ascii=False, default=str) if ga4_snapshot else '(no disponible)'}
 
 === GOOGLE SEARCH CONSOLE (búsqueda orgánica) — ÚLTIMOS 7 DÍAS vs 7 ANTERIORES ===

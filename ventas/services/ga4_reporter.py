@@ -225,6 +225,124 @@ def get_custom_events_last_7d() -> dict:
     return out
 
 
+def get_conversions_by_source_medium(days: int = 28, limit: int = 100) -> dict:
+    """Conversiones por evento × source × medium (atribución multi-canal).
+
+    Espejo del reporte que muestra el agente aremko-cli en dashboard web:
+    para cada evento custom (whatsapp_click, refugio_form_submit,
+    reservation_completed, etc.), trae cuántas conversions/users vinieron
+    de cada source/medium combinado.
+
+    Returns:
+        dict con keys:
+          'total_conversions': int (suma de conversions de TODOS los eventos)
+          'total_users': int (usuarios únicos que convirtieron)
+          'by_event': dict {eventName: {conversions, eventCount, totalUsers}}
+          'by_source': lista de dicts con eventName, source, medium,
+                       conversions, totalUsers (top N por conversions)
+          'period_days': N
+    """
+    from google.analytics.data_v1beta.types import OrderBy
+
+    start = (date.today() - timedelta(days=days)).isoformat()
+    end = (date.today() - timedelta(days=1)).isoformat()
+    ranges = [{'name': f'last_{days}d', 'start': start, 'end': end}]
+
+    # --- A) Agregado por evento ---
+    res_evt = _run_report(
+        metrics=['conversions', 'eventCount', 'totalUsers'],
+        dimensions=['eventName'],
+        date_ranges=ranges,
+        order_bys=[OrderBy(metric=OrderBy.MetricOrderBy(metric_name='conversions'), desc=True)],
+        limit=50,
+    )
+
+    by_event = {}
+    total_conversions = 0
+    total_users = 0
+    for row in res_evt['rows']:
+        evt = row.get('eventName', '')
+        convs = row.get('conversions', 0)
+        # Solo nos interesan eventos que son conversion (conversions > 0)
+        if convs > 0:
+            by_event[evt] = {
+                'conversions': convs,
+                'event_count': row.get('eventCount', 0),
+                'users': row.get('totalUsers', 0),
+            }
+            total_conversions += convs
+    # totalUsers del overall (para deduplicar usuarios que convirtieron en varios eventos)
+    if res_evt.get('totals'):
+        total_users = res_evt['totals'][0].get('totalUsers', 0)
+
+    # --- B) Breakdown por evento × source × medium ---
+    res_attr = _run_report(
+        metrics=['conversions', 'totalUsers'],
+        dimensions=['eventName', 'sessionSource', 'sessionMedium'],
+        date_ranges=ranges,
+        order_bys=[OrderBy(metric=OrderBy.MetricOrderBy(metric_name='conversions'), desc=True)],
+        limit=limit,
+    )
+    by_source = []
+    for row in res_attr['rows']:
+        if row.get('conversions', 0) > 0:  # filtrar filas vacías
+            by_source.append({
+                'event': row.get('eventName', ''),
+                'source': row.get('sessionSource', '(not set)'),
+                'medium': row.get('sessionMedium', '(not set)'),
+                'conversions': row.get('conversions', 0),
+                'users': row.get('totalUsers', 0),
+            })
+
+    return {
+        'period_days': days,
+        'total_conversions': total_conversions,
+        'total_users': total_users,
+        'by_event': by_event,
+        'by_source_medium': by_source,
+    }
+
+
+def get_top_traffic_sources_with_conversion(days: int = 28, limit: int = 15) -> list:
+    """Top fuentes de tráfico CON conversion rate (útil para evaluar qué canales convierten mejor).
+
+    Distinto a get_traffic_sources_last_7d() que solo trae sesiones. Acá calculamos
+    conversion_rate (conversions / sessions) — la métrica clave para priorizar inversión.
+    """
+    from google.analytics.data_v1beta.types import OrderBy
+
+    start = (date.today() - timedelta(days=days)).isoformat()
+    end = (date.today() - timedelta(days=1)).isoformat()
+    ranges = [{'name': f'last_{days}d', 'start': start, 'end': end}]
+
+    res = _run_report(
+        metrics=['sessions', 'totalUsers', 'engagedSessions', 'conversions',
+                 'bounceRate', 'averageSessionDuration'],
+        dimensions=['sessionDefaultChannelGroup', 'sessionSource', 'sessionMedium'],
+        date_ranges=ranges,
+        order_bys=[OrderBy(metric=OrderBy.MetricOrderBy(metric_name='sessions'), desc=True)],
+        limit=limit,
+    )
+
+    out = []
+    for row in res['rows']:
+        sessions = row.get('sessions', 0) or 0
+        convs = row.get('conversions', 0) or 0
+        out.append({
+            'channel_group': row.get('sessionDefaultChannelGroup', '(not set)'),
+            'source': row.get('sessionSource', '(not set)'),
+            'medium': row.get('sessionMedium', '(not set)'),
+            'sessions': sessions,
+            'users': row.get('totalUsers', 0),
+            'engaged_sessions': row.get('engagedSessions', 0),
+            'conversions': convs,
+            'conversion_rate_pct': round((convs / sessions) * 100, 2) if sessions else 0.0,
+            'bounce_rate_pct': round((row.get('bounceRate', 0) or 0) * 100, 1),
+            'avg_session_duration_sec': round(row.get('averageSessionDuration', 0) or 0, 1),
+        })
+    return out
+
+
 def get_devices_last_7d() -> list:
     """Distribución por device category."""
     ranges = _date_ranges_last_7_and_prev()[:1]
@@ -250,6 +368,8 @@ def get_full_snapshot() -> dict:
         'top_pages': [],
         'custom_events': {},
         'devices': [],
+        'conversions_attribution': {},  # nuevo (atribución por source/medium, 28d)
+        'top_sources_with_cvr': [],     # nuevo (top fuentes con conversion rate, 28d)
         'errors': [],
     }
 
@@ -259,6 +379,10 @@ def get_full_snapshot() -> dict:
         ('top_pages', get_top_pages_last_7d),
         ('custom_events', get_custom_events_last_7d),
         ('devices', get_devices_last_7d),
+        # Nuevos (2026-05-30): atribución multi-canal con conversion rate
+        # Espejo del reporte que el agente aremko-cli muestra en su dashboard
+        ('conversions_attribution', get_conversions_by_source_medium),
+        ('top_sources_with_cvr', get_top_traffic_sources_with_conversion),
     ]
 
     for name, fn in sections:
