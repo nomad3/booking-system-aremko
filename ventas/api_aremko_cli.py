@@ -869,6 +869,265 @@ def bookings_detalle(request):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+def bookings_detalle_productos(request):
+    """
+    Detalle fila-por-fila de PRODUCTOS vendidos en un rango de fechas.
+
+    Espejo de bookings_detalle pero para `ReservaProducto` (productos retail
+    vendidos junto a las reservas: gift cards, comestibles, cremas, etc.).
+
+    Pensado para que la "Consulta en lenguaje natural" del agente aremko-cli
+    pueda responder preguntas como:
+        - "ventas de café marley en abril"
+        - "qué productos consumió el cliente +56987654321 en mayo"
+        - "gift cards vendidas este año"
+
+    Query params (mismos que bookings_detalle salvo que NO hay familia ni proveedor):
+        fecha_desde (YYYY-MM-DD, requerido si no hay cliente)
+        fecha_hasta (YYYY-MM-DD, requerido si no hay cliente)
+        producto    (opcional: substring icontains contra producto.nombre)
+        categoria   (opcional: substring icontains contra producto.categoria.nombre)
+        cliente     (opcional: substring contra nombre/telefono/email/documento_identidad).
+                    Cuando se usa: las fechas son opcionales (default desde 2000)
+                    y NO aplica el cap de 92 días — historial completo del cliente.
+        limit       (opcional, default 500, máx 500 hardcoded)
+
+    Filtra por `VentaReserva.fecha_creacion` (fecha de la venta, no de entrega).
+    Excluye `estado_pago='cancelado'` y líneas con `producto__isnull=True` (huérfanas).
+    Orden: fecha_creacion DESC, venta_reserva_id DESC.
+
+    Regla revenue:
+        precio_unitario × cantidad  (NO cantidad_personas — eso aplica solo a
+        servicios. Misma fórmula que el endpoint monthly-by-product).
+
+    Response (HTTP 200):
+        {
+          "fecha_desde": "2026-05-01",
+          "fecha_hasta": "2026-05-30",
+          "filtros_aplicados": {
+            "producto": "café",
+            "categoria": null,
+            "cliente": null
+          },
+          "total_revenue": 487500,
+          "total_unidades": 142,
+          "total_lineas": 89,
+          "truncated": false,
+          "rows": [
+            {
+              "fecha": "2026-05-15",
+              "cliente_id": 123,
+              "cliente_nombre": "Juan Pérez",
+              "cliente_telefono": "+56987654321",
+              "cliente_email": "juan@example.com",
+              "venta_reserva_id": 12345,
+              "producto_id": 7,
+              "producto_nombre": "Cafe Marley Mediano-pequeño",
+              "categoria": "Bebestibles",
+              "cantidad": 2,
+              "precio_unitario": 5000,
+              "revenue": 10000,
+              "metodo_pago": "Mercado Pago",
+              "estado_pago": "pagado"
+            }
+          ]
+        }
+    """
+    from django.db import connection, transaction
+    from django.db.models import Q
+    from datetime import date
+
+    # --- Filtros base ---
+    cliente_filtro = (request.GET.get('cliente') or '').strip()
+    fecha_desde_str = request.GET.get('fecha_desde')
+    fecha_hasta_str = request.GET.get('fecha_hasta')
+
+    # Si hay filtro de cliente, las fechas son opcionales (historial completo).
+    # Si NO hay cliente, las fechas son obligatorias y el rango se limita a 92 días.
+    if cliente_filtro:
+        if fecha_desde_str:
+            fecha_desde = parse_date(fecha_desde_str)
+            if not fecha_desde:
+                return JsonResponse({'error': 'Formato de fecha_desde inválido. Usa YYYY-MM-DD'}, status=400)
+        else:
+            fecha_desde = date(2000, 1, 1)
+
+        if fecha_hasta_str:
+            fecha_hasta = parse_date(fecha_hasta_str)
+            if not fecha_hasta:
+                return JsonResponse({'error': 'Formato de fecha_hasta inválido. Usa YYYY-MM-DD'}, status=400)
+        else:
+            fecha_hasta = timezone.now().date()
+
+        if fecha_desde > fecha_hasta:
+            return JsonResponse({'error': 'fecha_desde no puede ser mayor que fecha_hasta'}, status=400)
+    else:
+        if not fecha_desde_str or not fecha_hasta_str:
+            return JsonResponse({
+                'error': 'fecha_desde y fecha_hasta son requeridos (YYYY-MM-DD) cuando no se filtra por cliente',
+            }, status=400)
+
+        fecha_desde = parse_date(fecha_desde_str)
+        fecha_hasta = parse_date(fecha_hasta_str)
+        if not fecha_desde or not fecha_hasta:
+            return JsonResponse({'error': 'Formato de fecha inválido. Usa YYYY-MM-DD'}, status=400)
+
+        if fecha_desde > fecha_hasta:
+            return JsonResponse({'error': 'fecha_desde no puede ser mayor que fecha_hasta'}, status=400)
+
+        if (fecha_hasta - fecha_desde).days > DETALLE_MAX_DAYS:
+            return JsonResponse({
+                'error': f'rango máximo {DETALLE_MAX_DAYS} días (~3 meses) cuando no se filtra por cliente',
+            }, status=400)
+
+    # --- Filtros opcionales ---
+    producto_filtro = (request.GET.get('producto') or '').strip()
+    categoria_filtro = (request.GET.get('categoria') or '').strip()
+
+    # --- Limit (hard cap 500) ---
+    try:
+        limit = int(request.GET.get('limit', DETALLE_HARD_LIMIT))
+    except (TypeError, ValueError):
+        limit = DETALLE_HARD_LIMIT
+    limit = max(1, min(DETALLE_HARD_LIMIT, limit))
+
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                try:
+                    cursor.execute("SET LOCAL statement_timeout = '8s'")
+                except Exception:
+                    pass  # SQLite en tests no soporta esto.
+
+            qs = ReservaProducto.objects.select_related(
+                'producto', 'producto__categoria',
+                'venta_reserva', 'venta_reserva__cliente',
+            ).filter(
+                venta_reserva__fecha_creacion__date__gte=fecha_desde,
+                venta_reserva__fecha_creacion__date__lte=fecha_hasta,
+                producto__isnull=False,
+            ).exclude(
+                venta_reserva__estado_pago='cancelado',
+            )
+
+            if producto_filtro:
+                qs = qs.filter(producto__nombre__icontains=producto_filtro)
+
+            if categoria_filtro:
+                qs = qs.filter(producto__categoria__nombre__icontains=categoria_filtro)
+
+            if cliente_filtro:
+                # Match parcial sobre 4 campos del cliente. icontains soporta
+                # substrings (ej. '987654321' matchea '+56987654321').
+                qs = qs.filter(
+                    Q(venta_reserva__cliente__nombre__icontains=cliente_filtro) |
+                    Q(venta_reserva__cliente__telefono__icontains=cliente_filtro) |
+                    Q(venta_reserva__cliente__email__icontains=cliente_filtro) |
+                    Q(venta_reserva__cliente__documento_identidad__icontains=cliente_filtro)
+                )
+
+            # Orden: fecha venta DESC, reserva DESC (más reciente primero).
+            qs = qs.order_by(
+                '-venta_reserva__fecha_creacion',
+                '-venta_reserva_id',
+                '-id',
+            ).distinct()
+
+            # Pedimos limit + 1 para detectar truncated.
+            rows_qs = list(qs[:limit + 1])
+            truncated = len(rows_qs) > limit
+            rows_qs = rows_qs[:limit]
+
+            # Pre-cargar métodos de pago (1 query en lote).
+            venta_ids = {r.venta_reserva_id for r in rows_qs}
+            metodos_por_venta = {}
+            if venta_ids:
+                pagos_qs = Pago.objects.filter(
+                    venta_reserva_id__in=venta_ids,
+                ).order_by('venta_reserva_id', '-fecha_pago').values(
+                    'venta_reserva_id', 'metodo_pago',
+                )
+                for p in pagos_qs:
+                    metodos_por_venta.setdefault(p['venta_reserva_id'], p['metodo_pago'])
+
+            rows = []
+            total_revenue = 0
+            total_unidades = 0
+            for r in rows_qs:
+                producto = r.producto
+                venta = r.venta_reserva
+                if not venta or not producto:
+                    continue
+
+                cliente = venta.cliente if venta else None
+
+                # Revenue: precio congelado al momento de la venta, fallback a
+                # precio_base actual del catálogo. Multiplicado por cantidad
+                # (NO cantidad_personas — esa fórmula es solo para servicios).
+                precio_unit = r.precio_unitario_venta
+                if precio_unit is None:
+                    precio_unit = producto.precio_base
+                precio_unit = int(precio_unit or 0)
+                cantidad = r.cantidad or 1
+                revenue_linea = precio_unit * cantidad
+
+                categoria_nombre = None
+                if producto.categoria_id and producto.categoria:
+                    categoria_nombre = producto.categoria.nombre
+
+                # Fecha de la venta (no fecha_entrega que puede ser null o futura).
+                fecha_venta = (
+                    venta.fecha_creacion.date()
+                    if venta.fecha_creacion else None
+                )
+
+                rows.append({
+                    'fecha': fecha_venta.isoformat() if fecha_venta else None,
+                    'cliente_id': cliente.id if cliente else None,
+                    'cliente_nombre': cliente.nombre if cliente else None,
+                    'cliente_telefono': (cliente.telefono or None) if cliente else None,
+                    'cliente_email': (cliente.email or None) if cliente else None,
+                    'venta_reserva_id': venta.id,
+                    'producto_id': producto.id,
+                    'producto_nombre': producto.nombre,
+                    'categoria': categoria_nombre,
+                    'cantidad': cantidad,
+                    'precio_unitario': precio_unit,
+                    'revenue': revenue_linea,
+                    'metodo_pago': metodos_por_venta.get(venta.id),
+                    'estado_pago': venta.estado_pago,
+                })
+                total_revenue += revenue_linea
+                total_unidades += cantidad
+
+        logger.info(
+            f"aremko-cli: bookings_detalle_productos {fecha_desde}→{fecha_hasta} "
+            f"producto={producto_filtro or '-'} categoria={categoria_filtro or '-'} "
+            f"cliente={cliente_filtro or '-'} filas={len(rows)} "
+            f"revenue={total_revenue} truncated={truncated}"
+        )
+        return JsonResponse({
+            'fecha_desde': fecha_desde.isoformat(),
+            'fecha_hasta': fecha_hasta.isoformat(),
+            'filtros_aplicados': {
+                'producto': producto_filtro or None,
+                'categoria': categoria_filtro or None,
+                'cliente': cliente_filtro or None,
+            },
+            'total_revenue': total_revenue,
+            'total_unidades': total_unidades,
+            'total_lineas': len(rows),
+            'truncated': truncated,
+            'rows': rows,
+        })
+
+    except Exception as e:
+        logger.error(f"Error in bookings_detalle_productos: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
 def bookings_by_payment_method(request):
     """
     Estadísticas de pagos agrupadas por método de pago con comparativas
