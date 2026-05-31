@@ -730,8 +730,13 @@
                             {% endif %}
                             <li><i class="fas fa-spa"></i>Jets de hidromasaje · junto al río</li>
                         </ul>
+                        {% if disp.es_cortesia %}
+                        <div class="price-total" style="color:#2e7d32;"><i class="fas fa-gift me-1"></i>Cortesía</div>
+                        <div class="price-unit-note">{{ disp.unit_note }}</div>
+                        {% else %}
                         <div class="price-total">${% if disp.precio_total %}{{ disp.precio_total|floatformat:0|intcomma }}{% else %}{{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}{% endif %}</div>
                         <div class="price-unit-note">{% if disp.unit_note %}{{ disp.unit_note }}{% else %}por tina · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</div>
+                        {% endif %}
                         <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                 data-servicio-id="{{ servicio.id }}"
                                 data-servicio-nombre="{{ servicio.nombre|escapejs }}"
@@ -773,8 +778,13 @@
                             {% endif %}
                             <li><i class="fas fa-tree"></i>Bosque nativo · junto al río</li>
                         </ul>
+                        {% if disp.es_cortesia %}
+                        <div class="price-total" style="color:#2e7d32;"><i class="fas fa-gift me-1"></i>Cortesía</div>
+                        <div class="price-unit-note">{{ disp.unit_note }}</div>
+                        {% else %}
                         <div class="price-total">${% if disp.precio_total %}{{ disp.precio_total|floatformat:0|intcomma }}{% else %}{{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}{% endif %}</div>
                         <div class="price-unit-note">{% if disp.unit_note %}{{ disp.unit_note }}{% else %}por tina · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</div>
+                        {% endif %}
                         <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                 data-servicio-id="{{ servicio.id }}"
                                 data-servicio-nombre="{{ servicio.nombre|escapejs }}"

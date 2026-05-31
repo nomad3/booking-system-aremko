@@ -115,6 +115,7 @@ def tina_display(servicio):
         'precio_total': None,
         'unit_note': None,
         'hook': None,
+        'es_cortesia': False,
     }
     if 'niño' in nombre or 'nino' in nombre:
         overrides['capacidad_texto'] = '1 niño adicional'
@@ -177,6 +178,8 @@ def tina_display(servicio):
         )
     elif 'yates' in nombre:
         overrides['duracion_texto'] = 'Uso ilimitado'
+        overrides['es_cortesia'] = True
+        overrides['unit_note'] = 'Uso libre para todos los huéspedes de Aremko'
         overrides['hook'] = (
             'Volcán remoto en la Patagonia profunda. La tina de '
             'uso ilimitado para quienes buscan desconexión total.'
