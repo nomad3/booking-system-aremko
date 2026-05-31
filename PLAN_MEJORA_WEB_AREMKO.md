@@ -124,7 +124,7 @@ Archivos: `homepage.html`, `base_public.html` (CSS variables)
 | 2026-05-31 | E1 | Quick wins checkout: alertas inline, stepper, confianza, política cancelación, teléfono amable. | pendiente |
 | 2026-05-31 | E0+E1 | **Desplegado a producción** (merge a `main` + push, `5cc8f2f`). Templates validados con Django offline (sintaxis OK). Render auto-deploy. | ✅ verificado por Jorge (screenshots) |
 | 2026-05-31 | E1 | Autocompletado por teléfono visible + saludo "¡Hola de nuevo!". Desplegado (`b5358b3`). | ✅ E1 aprobada |
-| 2026-05-31 | Feature | **Video opcional por servicio** (`Servicio.video_url`). Deploy zero-downtime: columna creada a mano + push `c24cc86` + migrate manual. Soporta E2 (visual). | pendiente: correr migrate + cargar primeros videos |
+| 2026-05-31 | Feature | **Video opcional por servicio** (`Servicio.video_url`). Deploy zero-downtime: columna creada a mano + push `c24cc86` + migrate manual (`0116 ... OK`). Soporta E2 (visual). | ✅ desplegado y migrado · pendiente: cargar primeros videos |
 
 ## 📎 Referencias
 - Diagnóstico base: análisis del sitio en vivo + código (`checkout.html`, `cart.html`, `homepage.html`).
