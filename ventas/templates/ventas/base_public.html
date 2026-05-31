@@ -5,6 +5,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    {# --- Resource hints: adelanta la conexion a origenes externos criticos (mejora LCP/FCP) --- #}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://res.cloudinary.com">
+    {# dns-prefetch como respaldo + para origenes de tracking (no criticos para el primer render) #}
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+    <link rel="dns-prefetch" href="https://connect.facebook.net">
+
     <title>{% block title %}Aremko{% endblock %}</title>
     {% block meta_description %}{% endblock %}
     {% if canonical_url %}

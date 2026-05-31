@@ -99,7 +99,8 @@ Archivos: `homepage.html`, `base_public.html` (CSS variables)
 - [x] **AggregateRating** en el negocio (homepage): 4.5★ / 930 reseñas (Google 669 @4.5 + TripAdvisor 261 @4.4) + 3 `Review` reales. → habilita ⭐ en Google. Validado como JSON.
 - [x] **Product/Offer por servicio** (con precios reales de la BD) → JSON-LD `ItemList` de `Product`+`Offer` generado en la vista con `json.dumps` (escape seguro), excluye servicios gratis. Inyectado como 2º script ld+json en la home.
 - [ ] FAQPage en homepage — **baja prioridad** (Google ya casi no muestra FAQ rich results para sitios comerciales desde 2023).
-- [ ] **Core Web Vitals**: optimizar imagen del hero (formatos next-gen, `preload`, lazy-load del resto), reducir LCP/CLS.
+- [x] **Core Web Vitals (front-end, seguro)**: `preconnect` a fonts/Bootstrap/Font Awesome/Cloudinary + `dns-prefetch` a GTM/Meta en `base_public.html` → adelanta conexiones, mejora LCP/FCP. (gtag async ✅, fonts display=swap ✅, aremko-events.js defer ✅, imágenes lazy ✅ ya estaban).
+- [ ] **TTFB del servidor** (~1s): `gunicorn --workers 1` es el cuello. Subir workers (depende de RAM del plan Render) y/o cachear la home. PENDIENTE — requiere datos del plan de Render.
 - [ ] Completar `meta_description`/`seo_title` por servicio (campos ya existen en modelos).
 - [ ] `alt` descriptivo en imágenes; revisar sitemaps e internal linking blog ↔ servicios.
 - [ ] Páginas locales (Puerto Varas / Los Lagos) con skill `programmatic-seo`.
