@@ -1411,9 +1411,10 @@ class ServicioAdmin(admin.ModelAdmin):
                 'imagen_preview', 'imagen',
                 'imagen_2_preview', 'imagen_2',
                 'imagen_3_preview', 'imagen_3',
+                'video_url',
                 'descripcion_web',
             ),
-            'description': 'Imagen principal + hasta 2 imágenes adicionales que se muestran en el carousel de la card pública.'
+            'description': 'Imagen principal + hasta 2 imágenes adicionales (carousel de la card pública). Si pones una URL de video, se muestra el video en lugar de las fotos.'
         })
     )
 

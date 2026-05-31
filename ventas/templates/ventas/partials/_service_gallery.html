@@ -8,7 +8,12 @@ Contexto requerido:
   - id_prefix: prefijo del id del carousel (ej: "carousel-masaje-online")
 {% endcomment %}
 {% with imgs=obj|imagenes_disponibles %}
-{% if imgs|length > 1 %}
+{% if obj.video_url %}
+<video class="card-img-top" autoplay muted loop playsinline preload="metadata"{% if imgs %} poster="{{ imgs.0 }}"{% endif %} style="object-fit: cover; width: 100%;">
+    <source src="{{ obj.video_url }}">
+    {% if imgs %}<img src="{{ imgs.0 }}" class="card-img-top" alt="{{ alt_text }}" loading="lazy">{% endif %}
+</video>
+{% elif imgs|length > 1 %}
 <div id="{{ id_prefix }}-{{ obj.id }}" class="carousel slide card-carousel" data-bs-interval="false" data-bs-touch="true">
     <div class="carousel-indicators">
         {% for url in imgs %}

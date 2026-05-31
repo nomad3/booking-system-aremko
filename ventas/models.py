@@ -508,6 +508,12 @@ class Servicio(models.Model):
         null=True,
         help_text="Tercera imagen del servicio (opcional, aparece en el carousel de la card)."
     )
+    video_url = models.URLField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text="URL de un video corto opcional (mp4/webm directo, ej. Cloudinary). Si se completa, se muestra en la card en lugar de las fotos. Si queda vacío, se muestran las fotos."
+    )
     descripcion_web = models.TextField(
         blank=True,
         null=True,
