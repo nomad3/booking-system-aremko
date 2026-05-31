@@ -54,6 +54,16 @@ Homepage → [clic "Reservar ahora"] → Modal (Fecha/Hora/Personas) → "Agrega
 
 > 📌 Baseline real (GA4 + Core Web Vitals) queda pendiente de un export/acceso. Acordado: avanzar a E1 y **medir el impacto después** con los eventos ya instalados (InitiateCheckout, reservation_completed).
 
+**Baseline de rendimiento medido (2026-05-31, home, móvil aprox.):**
+| Métrica | Valor | Lectura |
+|---|---|---|
+| TTFB (respuesta del servidor) | **~1.03 s** | 🔴 Lento (ideal <0.5s). Server-side: Django/Render con 1 worker gunicorn. Afecta LCP y SEO. |
+| Peso del HTML | **132 KB** | 🟠 Alto para solo HTML (mucho contenido inline). |
+| Imágenes | 29 (27 con `lazy`) | 🟢 Lazy-loading ya implementado. |
+| Carruseles / scripts / CSS | 168 / 10 / 5 | 🟠 Muchos carruseles = DOM/JS pesado. |
+
+→ Palanca clave para E4: **bajar TTFB** (servidor) y **optimizar el hero/LCP**. El lazy-load ya está bien.
+
 ## ⬜ ETAPA 1 — Quick wins de checkout  · `P1` · Estado: **PENDIENTE**
 **Ataca:** abandono directo del carrito, con bajo riesgo.
 Archivo principal: `ventas/templates/ventas/checkout.html`
