@@ -69,7 +69,7 @@ Homepage → [clic "Reservar ahora"] → Modal (Fecha/Hora/Personas) → "Agrega
 
 → Palanca clave para E4: **bajar TTFB** (servidor) y **optimizar el hero/LCP**. El lazy-load ya está bien.
 
-## 🟡 ETAPA 1 — Quick wins de checkout  · `P1` · Estado: **EN PROGRESO** (rama `mejora-web-etapa0`)
+## ✅ ETAPA 1 — Quick wins de checkout  · `P1` · Estado: **APROBADA y DESPLEGADA** (2026-05-31)
 **Ataca:** abandono directo del carrito, con bajo riesgo.
 Archivo principal: `ventas/templates/ventas/checkout.html`
 - [x] Reemplazados todos los `alert()` de validación/checkout por banner inline elegante (`#checkoutAlert` + `showCheckoutError()`). Quedan solo 2 fallbacks intencionales.
@@ -77,7 +77,9 @@ Archivo principal: `ventas/templates/ventas/checkout.html`
 - [x] **Stepper de progreso**: Carrito ✓ → Tus datos → Pago.
 - [x] Señales de confianza: candado + "Pago seguro" + tarjetas/WebPay vía Flow + **política de cancelación visible** (48h → 100%; <48h reagenda). Línea de garantía también bajo el botón "Pagar y reservar".
 - [x] Mensaje honesto de tranquilidad (no contador falso): la `PendingReservation` se crea al pagar con TTL real de 60 min (`PENDING_RESERVATION_TTL_MINUTES`); en la página de checkout el horario aún no está bloqueado, así que el copy dice "guardamos tu horario mientras finalizas el pago".
+- [x] **Autocompletado por teléfono más visible**: aviso "¿Ya nos visitaste? Escribe tu teléfono y completamos tus datos" + saludo personalizado "👋 ¡Hola de nuevo, [Nombre]!". El backend ya existía (`/api/cliente-por-telefono/`).
 - [ ] *(opcional, pendiente)* Reordenar layout: subir el selector de método de pago a la columna del botón (hoy el botón vive en Row 1 y el método en Row 2). Mitigado con la línea de confianza bajo el botón.
+- [ ] *(opcional, requiere migración manual)* Índice dedicado de `telefono` para búsqueda instantánea a futuro (hoy el índice es compuesto y empieza por `nombre`).
 **Éxito:** subir la tasa checkout→reserva confirmada vs baseline E0.
 
 > Política de cancelación confirmada por Jorge: **48h antes → reembolso 100%; menos de 48h sin reembolso pero se puede reagendar.**

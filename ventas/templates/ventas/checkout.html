@@ -206,6 +206,18 @@
         margin-bottom: 26px;
     }
 
+    /* Aviso de autocompletado para clientes que vuelven */
+    .returning-hint {
+        background: #eafaf1;
+        border: 1px solid #b7e4c7;
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 0.88rem;
+        color: #1b5e3f;
+        margin-bottom: 18px;
+    }
+    .returning-hint i { color: #28a745; }
+
 </style>
 {% endblock %}
 
@@ -245,6 +257,9 @@
                 <div class="col-lg-7"> {# Contact Info takes more space #}
                     <div class="checkout-form">
                         <h4 class="mb-4">Información de Contacto</h4>
+                        <div class="returning-hint">
+                            <i class="fas fa-bolt me-1"></i><strong>¿Ya nos visitaste?</strong> Escribe tu teléfono y completamos tus datos automáticamente.
+                        </div>
                         <form id="checkoutForm">
                             <div class="mb-3">
                                 <label for="checkoutTelefono" class="form-label">Teléfono *</label>
@@ -674,7 +689,10 @@ Email para comprobante: ventas@aremko.cl</pre>
                 if (data.found) {
                     // Cliente encontrado - auto-fill con datos completos
                     phoneInput.classList.add('is-valid');
-                    validationMsg.textContent = '✓ Cliente encontrado. Datos cargados automáticamente.';
+                    const primerNombre = (data.nombre || '').trim().split(' ')[0];
+                    validationMsg.textContent = primerNombre
+                        ? `👋 ¡Hola de nuevo, ${primerNombre}! Cargamos tus datos automáticamente.`
+                        : '✓ Cliente encontrado. Datos cargados automáticamente.';
                     validationMsg.className = 'form-text text-success';
 
                     console.log("Cliente encontrado (datos completos):", data);
