@@ -114,6 +114,8 @@ Archivos: `homepage.html`, `base_public.html` (CSS variables)
 |---|---|---|---|
 | 2026-05-30 | — | Diagnóstico inicial + creación del plan | Jorge |
 | 2026-05-30 | E0 | Limpieza homepage duplicado (vacío) + Yates "$0" → "Cortesía". Rama `mejora-web-etapa0`. Falta baseline de datos. | pendiente |
+| 2026-05-31 | E1 | Quick wins checkout: alertas inline, stepper, confianza, política cancelación, teléfono amable. | pendiente |
+| 2026-05-31 | E0+E1 | **Desplegado a producción** (merge a `main` + push, `5cc8f2f`). Templates validados con Django offline (sintaxis OK). Render auto-deploy. | pendiente verificación visual |
 
 ## 📎 Referencias
 - Diagnóstico base: análisis del sitio en vivo + código (`checkout.html`, `cart.html`, `homepage.html`).
