@@ -737,6 +737,11 @@
                         <div class="price-total">${% if disp.precio_total %}{{ disp.precio_total|floatformat:0|intcomma }}{% else %}{{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}{% endif %}</div>
                         <div class="price-unit-note">{% if disp.unit_note %}{{ disp.unit_note }}{% else %}por tina · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</div>
                         {% endif %}
+                        {% if disp.es_cortesia %}
+                        <div class="btn btn-success w-100 mt-auto" style="cursor:default;pointer-events:none;">
+                            <i class="fas fa-gift me-2"></i>Uso libre para huéspedes
+                        </div>
+                        {% else %}
                         <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                 data-servicio-id="{{ servicio.id }}"
                                 data-servicio-nombre="{{ servicio.nombre|escapejs }}"
@@ -746,6 +751,7 @@
                                 data-servicio-max="{{ servicio.capacidad_maxima }}">
                             <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                         </button>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -785,6 +791,11 @@
                         <div class="price-total">${% if disp.precio_total %}{{ disp.precio_total|floatformat:0|intcomma }}{% else %}{{ servicio.precio_base|multiply:servicio.capacidad_maxima|floatformat:0|intcomma }}{% endif %}</div>
                         <div class="price-unit-note">{% if disp.unit_note %}{{ disp.unit_note }}{% else %}por tina · {{ servicio.capacidad_maxima }} persona{{ servicio.capacidad_maxima|pluralize }}{% endif %}</div>
                         {% endif %}
+                        {% if disp.es_cortesia %}
+                        <div class="btn btn-success w-100 mt-auto" style="cursor:default;pointer-events:none;">
+                            <i class="fas fa-gift me-2"></i>Uso libre para huéspedes
+                        </div>
+                        {% else %}
                         <button class="btn btn-primary w-100 mt-auto js-open-booking-modal"
                                 data-servicio-id="{{ servicio.id }}"
                                 data-servicio-nombre="{{ servicio.nombre|escapejs }}"
@@ -794,6 +805,7 @@
                                 data-servicio-max="{{ servicio.capacidad_maxima }}">
                             <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                         </button>
+                        {% endif %}
                     </div>
                 </div>
             </div>

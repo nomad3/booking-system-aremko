@@ -45,13 +45,14 @@ Homepage → [clic "Reservar ahora"] → Modal (Fecha/Hora/Personas) → "Agrega
 
 ## 🟡 ETAPA 0 — Medición base y limpieza  · `P0` · Estado: **EN PROGRESO** (rama `mejora-web-etapa0`)
 **Por qué primero:** sin baseline no sabemos qué mejora funcionó ni dónde sangra más el embudo.
-- [ ] Leer embudo en GA4/Meta: `view_service → add_to_cart → InitiateCheckout → reservation_completed → Purchase`. Cuantificar % de caída por paso. *(pendiente — requiere acceso a datos)*
-- [ ] Baseline de métricas: tasa carrito→pago, abandono checkout, Core Web Vitals (LCP/CLS/INP), posiciones SEO clave. *(pendiente)*
+- [~] Embudo GA4/Meta: el notebook *Aremko Digital Marketing* solo tiene **metas, no datos reales** (objetivo conversión Google Ads >5%, Meta >3%; crecimiento reservas +20/50/100%). **Faltan cifras reales** de add_to_cart→checkout→reserva → requiere export de GA4.
+- [~] Core Web Vitals: PageSpeed Insights API sin key está con cuota agotada. Correr manual en pagespeed.web.dev o configurar API key. *(pendiente)*
 - [x] Resolver duplicación de `homepage.html`: el archivo `language=ventas/templates/ventas/homepage.html` estaba **vacío** y commiteado por error (Django nunca lo servía). Eliminado. El real es `ventas/templates/ventas/homepage.html`.
-- [x] Tina **Yates**: ya no muestra "$0". Es **uso gratuito para todos los huéspedes** → ahora la tarjeta muestra "🎁 Cortesía · Uso libre para todos los huéspedes de Aremko". Fix centralizado en el filtro `tina_display` (`es_cortesia`) + `homepage.html`.
+- [x] Tina **Yates**: ya no muestra "$0". Es **uso gratuito para todos los huéspedes** → la tarjeta muestra "🎁 Cortesía · Uso libre para todos los huéspedes de Aremko". Fix centralizado en filtro `tina_display` (`es_cortesia`) + `homepage.html`.
+- [x] **Decisión Yates = uso libre sin reserva**: el botón "Reservar ahora" se reemplazó por "Uso libre para huéspedes" (no abre modal, no entra al carrito).
 **Éxito:** tener números de partida y saber el paso #1 que más pierde gente.
 
-> ⚠️ Decisión pendiente (Yates): hoy sigue teniendo botón "Reservar ahora" que abre el modal con precio $0. ¿La Yates debe ser reservable por horario (gratis) o es de uso libre sin reserva? Definir en E0/E1.
+> 📌 Baseline real (GA4 + Core Web Vitals) queda pendiente de un export/acceso. Acordado: avanzar a E1 y **medir el impacto después** con los eventos ya instalados (InitiateCheckout, reservation_completed).
 
 ## ⬜ ETAPA 1 — Quick wins de checkout  · `P1` · Estado: **PENDIENTE**
 **Ataca:** abandono directo del carrito, con bajo riesgo.
