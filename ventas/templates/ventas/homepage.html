@@ -235,6 +235,11 @@
   ]
 }
 </script>
+{% if productos_jsonld %}
+<script type="application/ld+json">
+{{ productos_jsonld|safe }}
+</script>
+{% endif %}
 {% endblock %}
 
 {% block extra_style %}

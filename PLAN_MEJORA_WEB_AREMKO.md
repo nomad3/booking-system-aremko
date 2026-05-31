@@ -97,7 +97,7 @@ Archivos: `homepage.html`, `base_public.html` (CSS variables)
 **Base existente:** OG/Twitter tags ✅, sitemaps (3 apps) ✅, robots ✅, campos `meta_description`/`seo_title`/`og_image` ✅, blog ✅.
 **Corrección al diagnóstico:** SÍ había JSON-LD (homepage tiene `SpaOrSalon`+`WebSite`+`TouristAttraction`+`LodgingBusiness`+`BreadcrumbList`; `garantia.html` tiene `FAQPage`). El gap real era el **AggregateRating**.
 - [x] **AggregateRating** en el negocio (homepage): 4.5★ / 930 reseñas (Google 669 @4.5 + TripAdvisor 261 @4.4) + 3 `Review` reales. → habilita ⭐ en Google. Validado como JSON.
-- [ ] **Product/Offer por servicio** (con precios reales de la BD) → precio "desde $X" en el resultado.
+- [x] **Product/Offer por servicio** (con precios reales de la BD) → JSON-LD `ItemList` de `Product`+`Offer` generado en la vista con `json.dumps` (escape seguro), excluye servicios gratis. Inyectado como 2º script ld+json en la home.
 - [ ] FAQPage en homepage — **baja prioridad** (Google ya casi no muestra FAQ rich results para sitios comerciales desde 2023).
 - [ ] **Core Web Vitals**: optimizar imagen del hero (formatos next-gen, `preload`, lazy-load del resto), reducir LCP/CLS.
 - [ ] Completar `meta_description`/`seo_title` por servicio (campos ya existen en modelos).

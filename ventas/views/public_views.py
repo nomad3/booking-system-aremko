@@ -1,3 +1,4 @@
+import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.contrib import messages
@@ -82,8 +83,55 @@ def homepage_view(request):
     except Exception:
         canonical_url = request.path
 
+    # --- JSON-LD de Productos/Offers por servicio (SEO: precio en resultados) ---
+    # Se construye con json.dumps para garantizar escape correcto (comillas,
+    # saltos de línea en descripciones). Solo servicios publicados con precio > 0.
+    try:
+        base_url = request.build_absolute_uri('/').rstrip('/')
+    except Exception:
+        base_url = ''
+    producto_items = []
+    posicion = 0
+    for s in servicios:
+        precio = int(s.precio_base) if s.precio_base else 0
+        if precio <= 0:
+            continue  # omite cortesía/gratis (ej. tina Yates)
+        posicion += 1
+        descripcion = (s.descripcion_web or f"{s.nombre} en Aremko Spa Boutique, Puerto Varas.").strip()
+        if len(descripcion) > 300:
+            descripcion = descripcion[:297] + "..."
+        producto = {
+            "@type": "Product",
+            "name": s.nombre,
+            "description": descripcion,
+            "brand": {"@type": "Brand", "name": "Aremko Spa"},
+            "offers": {
+                "@type": "Offer",
+                "price": str(precio),
+                "priceCurrency": "CLP",
+                "availability": "https://schema.org/InStock",
+                "url": f"{base_url}/#servicios",
+            },
+        }
+        try:
+            if s.imagen:
+                producto["image"] = request.build_absolute_uri(s.imagen.url)
+        except Exception:
+            pass
+        producto_items.append({"@type": "ListItem", "position": posicion, "item": producto})
+
+    productos_jsonld = ""
+    if producto_items:
+        productos_jsonld = json.dumps({
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            "name": "Servicios de Aremko Spa Puerto Varas",
+            "itemListElement": producto_items,
+        }, ensure_ascii=False).replace("<", "\\u003c")  # evita romper el </script>
+
     context = {
         'servicios': servicios,
+        'productos_jsonld': productos_jsonld,
         'categorias': categorias,
         'cart': cart,
         'hero_image_url': hero_image_url,
