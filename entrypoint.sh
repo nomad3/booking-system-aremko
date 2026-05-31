@@ -100,6 +100,10 @@ else
 
     # Iniciar Gunicorn para servir la aplicación, usando el puerto asignado por Render
     PORT=${PORT:-8000}
-    echo "Iniciando Gunicorn en 0.0.0.0:$PORT con 1 worker, timeout 120s, log-level warning..."
-    exec gunicorn aremko_project.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level warning
+    # Workers: plan Render Standard (2GB RAM, 1 CPU). 3 workers (regla 2*CPU+1)
+    # caben de sobra en 2GB (~250MB c/u) y eliminan el cuello de "1 worker que
+    # encola todo". --max-requests recicla cada worker para evitar fugas de memoria.
+    WEB_WORKERS=${WEB_WORKERS:-3}
+    echo "Iniciando Gunicorn en 0.0.0.0:$PORT con $WEB_WORKERS workers, timeout 120s, log-level warning..."
+    exec gunicorn aremko_project.wsgi:application --bind 0.0.0.0:$PORT --workers $WEB_WORKERS --timeout 120 --max-requests 1000 --max-requests-jitter 100 --log-level warning
 fi

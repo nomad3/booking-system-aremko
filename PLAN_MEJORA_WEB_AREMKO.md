@@ -100,7 +100,8 @@ Archivos: `homepage.html`, `base_public.html` (CSS variables)
 - [x] **Product/Offer por servicio** (con precios reales de la BD) → JSON-LD `ItemList` de `Product`+`Offer` generado en la vista con `json.dumps` (escape seguro), excluye servicios gratis. Inyectado como 2º script ld+json en la home.
 - [ ] FAQPage en homepage — **baja prioridad** (Google ya casi no muestra FAQ rich results para sitios comerciales desde 2023).
 - [x] **Core Web Vitals (front-end, seguro)**: `preconnect` a fonts/Bootstrap/Font Awesome/Cloudinary + `dns-prefetch` a GTM/Meta en `base_public.html` → adelanta conexiones, mejora LCP/FCP. (gtag async ✅, fonts display=swap ✅, aremko-events.js defer ✅, imágenes lazy ✅ ya estaban).
-- [ ] **TTFB del servidor** (~1s): `gunicorn --workers 1` es el cuello. Subir workers (depende de RAM del plan Render) y/o cachear la home. PENDIENTE — requiere datos del plan de Render.
+- [x] **TTFB / concurrencia**: Render plan **Standard (2GB/1CPU)** confirmado → subido `gunicorn --workers 1 → 3` (configurable vía `WEB_WORKERS`) + `--max-requests` para reciclar workers. Elimina el cuello de "1 worker encola todo" bajo carga real. ~750MB de 2GB, holgado.
+- [ ] **Caché de la home** (pendiente, opcional): el render de un request tarda ~1s (vista+queries); cachear la home unos minutos bajaría el TTFB para visitantes. Tiene tradeoff de frescura (invalidar al editar servicios).
 - [ ] Completar `meta_description`/`seo_title` por servicio (campos ya existen en modelos).
 - [ ] `alt` descriptivo en imágenes; revisar sitemaps e internal linking blog ↔ servicios.
 - [ ] Páginas locales (Puerto Varas / Los Lagos) con skill `programmatic-seo`.
