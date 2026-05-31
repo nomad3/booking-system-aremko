@@ -14,6 +14,7 @@ import re
 from django.db.models import Sum, F, DecimalField, FloatField # Added DecimalField, FloatField
 from django.db.models.functions import Coalesce # Coalesce es una función de DB
 from solo.models import SingletonModel # Added import for django-solo
+from cloudinary_storage.storage import VideoMediaCloudinaryStorage  # storage de video (resource_type=video) para FileField de video
 
 class Proveedor(models.Model):
     nombre = models.CharField(max_length=100)
@@ -508,11 +509,19 @@ class Servicio(models.Model):
         null=True,
         help_text="Tercera imagen del servicio (opcional, aparece en el carousel de la card)."
     )
+    video = models.FileField(
+        upload_to='servicios/videos/',
+        storage=VideoMediaCloudinaryStorage(),
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Video corto opcional subido desde tu computador (mp4/webm, idealmente <15 seg y liviano). Si se sube, se muestra en la card en lugar de las fotos. Para videos grandes ya hosteados, usa 'Video URL'."
+    )
     video_url = models.URLField(
         max_length=500,
         blank=True,
         default='',
-        help_text="URL de un video corto opcional (mp4/webm directo, ej. Cloudinary). Si se completa, se muestra en la card en lugar de las fotos. Si queda vacío, se muestran las fotos."
+        help_text="Alternativa: URL de un video ya hosteado (mp4/webm directo, ej. Cloudinary). Se usa solo si NO subiste un archivo en 'Video'. Si ambos están vacíos, se muestran las fotos."
     )
     descripcion_web = models.TextField(
         blank=True,
