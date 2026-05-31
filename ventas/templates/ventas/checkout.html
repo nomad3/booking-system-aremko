@@ -131,6 +131,81 @@
         margin-bottom: 15px;
     }
 
+    /* Stepper de progreso */
+    .checkout-steps {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 28px;
+    }
+    .checkout-step {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--light-gray);
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    .checkout-step .step-num {
+        width: 26px; height: 26px;
+        border-radius: 50%;
+        background: #e9ecef;
+        color: #6c757d;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+    }
+    .checkout-step.active { color: var(--primary-color); }
+    .checkout-step.active .step-num { background: var(--primary-color); color: #fff; }
+    .checkout-step.done .step-num { background: #28a745; color: #fff; }
+    .checkout-step-sep { color: #ced4da; align-self: center; }
+
+    /* Alerta inline (reemplaza alert() nativo) */
+    .checkout-alert {
+        display: none;
+        background: #fff3f3;
+        border: 1px solid #f5c2c7;
+        color: #842029;
+        border-radius: 10px;
+        padding: 14px 18px;
+        margin-bottom: 22px;
+        font-weight: 500;
+    }
+    .checkout-alert.show { display: block; }
+
+    /* Bloque de confianza / seguridad */
+    .trust-block {
+        margin-top: 18px;
+        padding-top: 16px;
+        border-top: 1px solid #eee;
+    }
+    .trust-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--dark-gray);
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+    }
+    .trust-line i { color: #28a745; }
+    .cancellation-note {
+        background: #f0f7ff;
+        border: 1px solid #cfe2ff;
+        border-radius: 8px;
+        padding: 12px 14px;
+        font-size: 0.85rem;
+        color: #0a4275;
+        margin-top: 10px;
+    }
+    .reassurance {
+        text-align: center;
+        color: var(--light-gray);
+        font-size: 0.95rem;
+        margin-bottom: 26px;
+    }
+
 </style>
 {% endblock %}
 
@@ -152,6 +227,19 @@
         <h1 class="checkout-title">Finalizar Reserva</h1>
 
         {% if cart.servicios or cart.giftcards %}
+            <!-- Stepper de progreso -->
+            <div class="checkout-steps">
+                <div class="checkout-step done"><span class="step-num"><i class="fas fa-check"></i></span> Carrito</div>
+                <span class="checkout-step-sep"><i class="fas fa-chevron-right"></i></span>
+                <div class="checkout-step active"><span class="step-num">2</span> Tus datos</div>
+                <span class="checkout-step-sep"><i class="fas fa-chevron-right"></i></span>
+                <div class="checkout-step"><span class="step-num">3</span> Pago</div>
+            </div>
+            <p class="reassurance"><i class="far fa-clock me-1"></i>Estás a un paso. Completa tus datos y confirma tu reserva — guardamos tu horario mientras finalizas el pago.</p>
+
+            <!-- Alerta inline (errores de validación/checkout) -->
+            <div id="checkoutAlert" class="checkout-alert"></div>
+
             <!-- Row 1: Contact Info & Order Summary -->
             <div class="row mb-4">
                 <div class="col-lg-7"> {# Contact Info takes more space #}
@@ -227,6 +315,9 @@
                                 <i class="fas fa-lock me-1"></i> Pagar y reservar
                             </button>
                         </div>
+                        <p class="text-center mt-3 mb-0" style="font-size:0.82rem;color:#6c757d;">
+                            <i class="fas fa-lock me-1 text-success"></i> Pago seguro · Cancela y recupera el 100% hasta 48h antes
+                        </p>
                     </div>
                 </div>
             </div>
@@ -327,6 +418,18 @@ Email para comprobante: ventas@aremko.cl</pre>
                         {% else %}
                             <p>No hay métodos de pago disponibles en este momento.</p>
                         {% endif %}
+
+                        <!-- Señales de confianza -->
+                        <div class="trust-block">
+                            <div class="trust-line"><i class="fas fa-lock"></i> Pago seguro y encriptado</div>
+                            <div class="trust-line"><i class="fas fa-credit-card"></i> Tarjetas de crédito, débito y WebPay vía Flow</div>
+                            <div class="trust-line"><i class="fas fa-shield-alt"></i> Tus datos están protegidos</div>
+                            <div class="cancellation-note">
+                                <strong><i class="far fa-calendar-check me-1"></i>Política de cancelación:</strong>
+                                Cancela hasta <strong>48 horas antes</strong> y te devolvemos el <strong>100%</strong>.
+                                Con menos de 48 horas no hay reembolso, pero puedes <strong>reagendar</strong> tu visita.
+                            </div>
+                        </div>
                     </div>
                     <!-- End Payment Method Selection -->
                 </div>
@@ -388,6 +491,22 @@ Email para comprobante: ventas@aremko.cl</pre>
 
     // --- Global Variables ---
     let isProcessingCheckout = false; // Flag to prevent double submission
+
+    // --- Inline alert helper (reemplaza alert() nativo) ---
+    function showCheckoutError(message) {
+        const box = document.getElementById('checkoutAlert');
+        if (box) {
+            box.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>' + message;
+            box.classList.add('show');
+            box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            alert(message); // Fallback si el contenedor no existe
+        }
+    }
+    function clearCheckoutError() {
+        const box = document.getElementById('checkoutAlert');
+        if (box) { box.classList.remove('show'); box.innerHTML = ''; }
+    }
 
     // --- Region/Comuna Functions ---
     // Extrae el array sin importar si DRF devuelve [] o {count, results: []}
@@ -508,7 +627,7 @@ Email para comprobante: ventas@aremko.cl</pre>
             const hasInvalidChars = /[a-zA-Z]/.test(cleanedTelefono);
             if (hasInvalidChars) {
                 phoneInput.classList.add('is-invalid');
-                errorMsg.textContent = '❌ Solo acepta números. No uses letras.';
+                errorMsg.textContent = 'El teléfono solo puede contener números (ej: +569 1234 5678).';
                 errorMsg.style.display = 'block';
                 return;
             }
@@ -733,7 +852,7 @@ Email para comprobante: ventas@aremko.cl</pre>
 
     function handleCheckoutError(error, overlay, button) {
         console.error('Error durante el checkout:', error);
-        alert(`Error al procesar la reserva: ${error.message}. Por favor, intenta nuevamente.`);
+        showCheckoutError(`No pudimos procesar tu reserva: ${error.message}. Por favor, intenta nuevamente o escríbenos por WhatsApp.`);
         hideProcessing(overlay, button); // Hide overlay and reset button on error
     }
 
@@ -883,6 +1002,7 @@ Email para comprobante: ventas@aremko.cl</pre>
 
                 if (isProcessingCheckout) return;
                 isProcessingCheckout = true;
+                clearCheckoutError();
 
                 // --- Form Validation ---
                 const nombre = document.getElementById('checkoutNombre').value;
@@ -894,12 +1014,12 @@ Email para comprobante: ventas@aremko.cl</pre>
                 const paymentMethodInput = document.querySelector('input[name="paymentMethod"]:checked');
 
                 if (!nombre || !email || !telefono) {
-                    alert('Por favor completa nombre, email y teléfono.');
+                    showCheckoutError('Por favor completa tu nombre, email y teléfono para continuar.');
                     hideProcessing(null, completeCheckoutBtn);
                     return;
                 }
                 if (!paymentMethodInput) {
-                    alert('Por favor selecciona un método de pago.');
+                    showCheckoutError('Por favor selecciona un método de pago.');
                      hideProcessing(null, completeCheckoutBtn);
                     return;
                 }
@@ -908,7 +1028,7 @@ Email para comprobante: ventas@aremko.cl</pre>
 
                 const csrfToken = getCookie('csrftoken');
                 if (!csrfToken) {
-                    alert("Error de seguridad. Intenta recargar la página.");
+                    showCheckoutError('Hubo un problema de seguridad. Por favor recarga la página e intenta de nuevo.');
                     hideProcessing(null, completeCheckoutBtn);
                     return;
                 }
@@ -934,7 +1054,7 @@ Email para comprobante: ventas@aremko.cl</pre>
                 } else if (paymentMethod === 'mercadopago_link') {
                     handleMercadoPagoCheckout(formData, processingOverlay, completeCheckoutBtn);
                 } else {
-                    alert('Método de pago no soportado.');
+                    showCheckoutError('Método de pago no soportado. Por favor elige otra opción.');
                     hideProcessing(processingOverlay, completeCheckoutBtn);
                 }
             });

@@ -64,16 +64,18 @@ Homepage → [clic "Reservar ahora"] → Modal (Fecha/Hora/Personas) → "Agrega
 
 → Palanca clave para E4: **bajar TTFB** (servidor) y **optimizar el hero/LCP**. El lazy-load ya está bien.
 
-## ⬜ ETAPA 1 — Quick wins de checkout  · `P1` · Estado: **PENDIENTE**
+## 🟡 ETAPA 1 — Quick wins de checkout  · `P1` · Estado: **EN PROGRESO** (rama `mejora-web-etapa0`)
 **Ataca:** abandono directo del carrito, con bajo riesgo.
 Archivo principal: `ventas/templates/ventas/checkout.html`
-- [ ] Reemplazar todos los `alert()` (líneas ~736, 897, 911, 937) por feedback inline elegante.
-- [ ] Validación de teléfono amable: no bloquear en `blur`, aceptar formatos comunes, validar al enviar.
-- [ ] Reordenar layout: **método de pago junto al botón** "Pagar y reservar" (hoy el botón está arriba del selector). Una columna lógica en móvil.
-- [ ] **Stepper de progreso** (Paso 1 de 3) en carrito/checkout.
-- [ ] Señales de confianza: candado + logos WebPay/tarjetas + "Pago seguro" + **política de cancelación visible**.
-- [ ] Mensaje "**Tu horario está reservado por X minutos**" (la PendingReservation puede expirar; comunicarlo reduce incertidumbre).
+- [x] Reemplazados todos los `alert()` de validación/checkout por banner inline elegante (`#checkoutAlert` + `showCheckoutError()`). Quedan solo 2 fallbacks intencionales.
+- [x] Validación de teléfono amable: mensaje de error suavizado (sin "❌"), con ejemplo de formato.
+- [x] **Stepper de progreso**: Carrito ✓ → Tus datos → Pago.
+- [x] Señales de confianza: candado + "Pago seguro" + tarjetas/WebPay vía Flow + **política de cancelación visible** (48h → 100%; <48h reagenda). Línea de garantía también bajo el botón "Pagar y reservar".
+- [x] Mensaje honesto de tranquilidad (no contador falso): la `PendingReservation` se crea al pagar con TTL real de 60 min (`PENDING_RESERVATION_TTL_MINUTES`); en la página de checkout el horario aún no está bloqueado, así que el copy dice "guardamos tu horario mientras finalizas el pago".
+- [ ] *(opcional, pendiente)* Reordenar layout: subir el selector de método de pago a la columna del botón (hoy el botón vive en Row 1 y el método en Row 2). Mitigado con la línea de confianza bajo el botón.
 **Éxito:** subir la tasa checkout→reserva confirmada vs baseline E0.
+
+> Política de cancelación confirmada por Jorge: **48h antes → reembolso 100%; menos de 48h sin reembolso pero se puede reagendar.**
 
 ## ⬜ ETAPA 2 — Hero visual + identidad base  · `P2` · Estado: **PENDIENTE**
 **Ataca:** "no refleja lo lindo del lugar". Usa skill `guia-diseno-ui-moderno`.
