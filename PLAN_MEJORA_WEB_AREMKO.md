@@ -14,6 +14,11 @@ Y, en paralelo, **mejorar el SEO** para traer más tráfico calificado.
 Para cada etapa: **proponer → aprobar → implementar → verificar → actualizar este plan + memoria**.
 Ninguna etapa se da por cerrada sin aprobación explícita del owner. Al aprobar, se marca ✅ y se registra la fecha.
 
+## ⚙️ Notas operativas de deploy (IMPORTANTE)
+- **Las migraciones NO son automáticas.** En `entrypoint.sh`, `python manage.py migrate` está comentado a propósito. Un push a `main` dispara build + deploy + `collectstatic`, pero **NO** corre migrate.
+- Cuando una etapa requiera migraciones (ej. E3/E4 con campos nuevos), **hay que correrlas a mano en la shell de Render** (`python manage.py migrate`) y respaldar la BD antes.
+- Separar siempre: "código (auto al push)" vs "migración (manual en Render shell)".
+
 ---
 
 ## 📊 Criterio de priorización (visión dueño + diseñador experto)
