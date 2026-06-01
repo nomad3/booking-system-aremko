@@ -501,9 +501,19 @@ def refugio_leads_summary(request):
     """
     from collections import Counter
     from datetime import timedelta
+    from django.conf import settings as dj_settings
     from django.utils import timezone
     from django.utils.dateparse import parse_date
     from ventas.models import RefugioLead
+
+    # Seguridad: APIKeyAuthentication devuelve None si falta el header (no bloquea),
+    # así que exigimos explícitamente un X-API-Key válido para no exponer datos de leads.
+    expected_key = getattr(dj_settings, 'LUNA_API_KEY', None)
+    if not expected_key or request.META.get('HTTP_X_API_KEY') != expected_key:
+        return Response(
+            {'error': 'No autorizado. Se requiere header X-API-Key válido.'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
 
     hoy = timezone.localdate()
     desde = parse_date(request.GET.get('desde', '') or '') or (hoy - timedelta(days=30))
