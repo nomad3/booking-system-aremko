@@ -227,6 +227,108 @@
     font-size: 0.95rem;
     margin: 0;
 }
+
+/* ── CRO: WhatsApp como conversión primaria ───────────────────── */
+.refugio-hero-ctas {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+.btn-whatsapp-refugio {
+    background-color: #25D366;
+    color: #fff !important;
+    border: none;
+    padding: 15px 34px;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 1.15rem;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+    box-shadow: 0 6px 18px rgba(37, 211, 102, 0.35);
+}
+.btn-whatsapp-refugio:hover {
+    background-color: #1da851;
+    color: #fff !important;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(37, 211, 102, 0.45);
+}
+.btn-refugio.btn-secundario {
+    background-color: transparent;
+    border: 2px solid rgba(255,255,255,0.7);
+}
+/* Franja de confianza bajo el hero (garantía + rating real) */
+.refugio-trust-strip {
+    display: flex;
+    gap: 10px 22px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 20px;
+    color: var(--white);
+    font-size: 0.95rem;
+}
+.refugio-trust-strip span { display: inline-flex; align-items: center; gap: 6px; }
+.refugio-trust-strip .stars { color: #ffc107; }
+
+/* Barra sticky de WhatsApp (solo móvil) */
+.refugio-sticky-cta {
+    display: none;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 1040;
+    background: #fff;
+    border-top: 1px solid #e6e0d6;
+    padding: 10px 14px;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+}
+.refugio-sticky-cta a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    background: #25D366;
+    color: #fff !important;
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 13px;
+    border-radius: 12px;
+    text-decoration: none;
+}
+@media (max-width: 768px) {
+    .refugio-sticky-cta { display: block; }
+    body { padding-bottom: 72px; } /* espacio para que la barra no tape contenido */
+    .btn-whatsapp-refugio, .refugio-hero-ctas .btn-refugio { width: 100%; justify-content: center; }
+}
+
+/* Reseñas / prueba social */
+.refugio-rating-badge {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: #fff; border: 1px solid #eee; border-radius: 14px;
+    padding: 12px 20px; margin-bottom: 26px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.refugio-rating-badge .num { font-size: 1.6rem; font-weight: 800; color: var(--dark-gray); }
+.refugio-rating-badge .stars { color: #ffc107; font-size: 1.1rem; }
+.refugio-review-card {
+    background: #fff; border-radius: 14px; padding: 22px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06); height: 100%;
+}
+.refugio-review-card .stars { color: #ffc107; margin-bottom: 8px; }
+.refugio-review-card .texto { color: var(--dark-gray); font-style: italic; margin-bottom: 10px; }
+.refugio-review-card .autor { font-weight: 700; color: var(--dark-gray); font-size: 0.9rem; }
+.refugio-review-card .fuente { color: var(--light-gray); font-size: 0.82rem; }
+
+/* Detalles opcionales colapsables del formulario */
+.refugio-detalles-toggle {
+    cursor: pointer; color: var(--primary-color); font-weight: 600;
+    list-style: none; padding: 8px 0; user-select: none;
+}
+.refugio-detalles-toggle::-webkit-details-marker { display: none; }
 </style>
 {% endblock %}
 
@@ -242,9 +344,20 @@
         {% endif %}
         <h1>{{ config.hero_title }}</h1>
         <p class="lead">{{ config.hero_subtitle }}</p>
-        <a href="#refugio-formulario" class="btn-refugio" data-event="refugio_hero_cta_click">
-            {{ config.hero_cta_text }}
-        </a>
+        <div class="refugio-hero-ctas">
+            <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20el%20Refugio%20Aremko%20(2%20noches%20%24270.000).%20%5BRefugio%5D"
+               target="_blank" rel="noopener"
+               class="btn-whatsapp-refugio" data-event="refugio_whatsapp_click">
+                <i class="fab fa-whatsapp"></i> Reservar por WhatsApp
+            </a>
+            <a href="#refugio-formulario" class="btn-refugio btn-secundario" data-event="refugio_hero_cta_click">
+                {{ config.hero_cta_text }}
+            </a>
+        </div>
+        <div class="refugio-trust-strip">
+            <span><i class="fas fa-shield-alt"></i> Garantía Aremko: si tu tina no llega a 38&deg;C, es gratis</span>
+            <span class="stars"><i class="fas fa-star"></i> 4,5</span><span>&middot; 669 reseñas en Google</span>
+        </div>
     </div>
 </section>
 
@@ -390,6 +503,43 @@
     </div>
 </section>
 
+{# ── SECCIÓN 7.5 · PRUEBA SOCIAL (reseñas reales) ─────────────── #}
+<section class="refugio-section" id="refugio-resenas">
+    <div class="container text-center">
+        <div class="refugio-rating-badge">
+            <span class="stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star-half-alt"></i></span>
+            <span><span class="num">4,5</span> · 669 reseñas en Google &nbsp;|&nbsp; 4,4 en Tripadvisor (N.&deg;1 de Puerto Varas)</span>
+        </div>
+        <h2 class="mb-4">Lo que dicen nuestros huéspedes</h2>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="refugio-review-card">
+                    <div class="stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                    <p class="texto">"Espectacular, se nota la vocación que tienen, no tengo palabras para describir sus masajes."</p>
+                    <div class="autor">Karina R.</div>
+                    <div class="fuente">Trip.com · Marzo 2026</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="refugio-review-card">
+                    <div class="stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                    <p class="texto">"El lugar es precioso, en un entorno de bosques y Río Pescado... un lujo en Puerto Varas."</p>
+                    <div class="autor">pilarisl</div>
+                    <div class="fuente">Trip.com · Febrero 2026</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="refugio-review-card">
+                    <div class="stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                    <p class="texto">"Hace meses no dormía tan bien y tanto."</p>
+                    <div class="autor">CaroFR2015</div>
+                    <div class="fuente">Trip.com · Febrero 2026</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
 {# ── SECCIÓN 8 · FORMULARIO ───────────────────────────────────── #}
 <section class="refugio-section refugio-bg-cream" id="refugio-formulario">
     <div class="container">
@@ -416,33 +566,45 @@
                         <input type="text" class="form-control" id="refugio-nombre" name="nombre" required maxlength="120">
                     </div>
                     <div class="col-md-6">
-                        <label for="refugio-email" class="form-label">Email *</label>
-                        <input type="email" class="form-control" id="refugio-email" name="email" required maxlength="254">
-                    </div>
-                    <div class="col-md-6">
-                        <label for="refugio-telefono" class="form-label">Teléfono (WhatsApp)</label>
-                        <input type="tel" class="form-control" id="refugio-telefono" name="telefono" placeholder="+56 9 ..." maxlength="30">
-                    </div>
-                    <div class="col-md-6">
-                        <label for="refugio-ciudad" class="form-label">Ciudad de origen</label>
-                        <input type="text" class="form-control" id="refugio-ciudad" name="ciudad_origen" placeholder="Ej: Santiago, Concepción, Puerto Montt" maxlength="120">
-                    </div>
-                    <div class="col-md-3">
-                        <label for="refugio-fecha" class="form-label">Fecha tentativa</label>
-                        <input type="date" class="form-control" id="refugio-fecha" name="fecha_tentativa">
-                    </div>
-                    <div class="col-md-3">
-                        <label for="refugio-personas" class="form-label">Personas</label>
-                        <input type="number" class="form-control" id="refugio-personas" name="num_personas" value="2" min="1" max="20">
+                        <label for="refugio-telefono" class="form-label">WhatsApp *</label>
+                        <input type="tel" class="form-control" id="refugio-telefono" name="telefono" required placeholder="+56 9 ..." maxlength="30">
                     </div>
                     <div class="col-12">
-                        <label for="refugio-mensaje" class="form-label">Mensaje (opcional)</label>
-                        <textarea class="form-control" id="refugio-mensaje" name="mensaje" rows="3" placeholder="¿Alguna preferencia o consulta?"></textarea>
+                        <label for="refugio-email" class="form-label">Email <span class="text-muted">(opcional)</span></label>
+                        <input type="email" class="form-control" id="refugio-email" name="email" maxlength="254">
+                    </div>
+                    <div class="col-12">
+                        <details>
+                            <summary class="refugio-detalles-toggle"><i class="fas fa-plus-circle me-1"></i>Agregar detalles (opcional)</summary>
+                            <div class="row g-3 mt-1">
+                                <div class="col-md-6">
+                                    <label for="refugio-ciudad" class="form-label">Ciudad de origen</label>
+                                    <input type="text" class="form-control" id="refugio-ciudad" name="ciudad_origen" placeholder="Ej: Santiago, Concepción, Puerto Montt" maxlength="120">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="refugio-fecha" class="form-label">Fecha tentativa</label>
+                                    <input type="date" class="form-control" id="refugio-fecha" name="fecha_tentativa">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="refugio-personas" class="form-label">Personas</label>
+                                    <input type="number" class="form-control" id="refugio-personas" name="num_personas" value="2" min="1" max="20">
+                                </div>
+                                <div class="col-12">
+                                    <label for="refugio-mensaje" class="form-label">Mensaje</label>
+                                    <textarea class="form-control" id="refugio-mensaje" name="mensaje" rows="2" placeholder="¿Alguna preferencia o consulta?"></textarea>
+                                </div>
+                            </div>
+                        </details>
                     </div>
                     <div class="col-12 text-center mt-3">
                         <button type="submit" class="btn-refugio" id="refugio-submit-btn">
-                            <i class="fas fa-paper-plane me-2"></i>Enviar solicitud
+                            <i class="fas fa-paper-plane me-2"></i>Quiero que me contacten
                         </button>
+                        <p class="text-muted small mt-2 mb-0">
+                            O reserva directo por
+                            <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20el%20Refugio%20Aremko%20(2%20noches%20%24270.000).%20%5BRefugio%5D"
+                               target="_blank" rel="noopener" data-event="refugio_whatsapp_click">WhatsApp</a>
+                        </p>
                     </div>
                 </div>
 
@@ -451,6 +613,14 @@
         </div>
     </div>
 </section>
+
+{# ── Barra sticky de WhatsApp (solo móvil) ─────────────────────── #}
+<div class="refugio-sticky-cta">
+    <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20el%20Refugio%20Aremko%20(2%20noches%20%24270.000).%20%5BRefugio%5D"
+       target="_blank" rel="noopener" data-event="refugio_whatsapp_click">
+        <i class="fab fa-whatsapp"></i> Reservar por WhatsApp
+    </a>
+</div>
 
 {% endblock %}
 
@@ -487,8 +657,8 @@
 
     form.addEventListener('submit', function (e) {
         e.preventDefault();
-        if (!form.nombre.value.trim() || !form.email.value.trim()) {
-            result.innerHTML = '<div class="alert alert-warning mb-0">Por favor completa nombre y email.</div>';
+        if (!form.nombre.value.trim() || !form.telefono.value.trim()) {
+            result.innerHTML = '<div class="alert alert-warning mb-0">Por favor completa tu nombre y WhatsApp.</div>';
             return;
         }
 

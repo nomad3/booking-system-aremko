@@ -783,11 +783,11 @@ def refugio_submit_view(request):
         num_personas = request.POST.get('num_personas', '2').strip()
         mensaje = request.POST.get('mensaje', '').strip()
 
-        # Validación mínima
-        if not nombre or not email:
+        # Validación mínima (CRO: WhatsApp es el campo primario; email opcional)
+        if not nombre or not telefono:
             return JsonResponse({
                 'success': False,
-                'error': 'Nombre y email son obligatorios.'
+                'error': 'Nombre y WhatsApp son obligatorios.'
             }, status=400)
 
         # Parsear num_personas
@@ -857,23 +857,24 @@ def refugio_submit_view(request):
         except Exception as e:
             logger.warning(f"[Refugio] No se pudo enviar email al equipo: {e}")
 
-        # --- Email confirmación al lead ---
-        try:
-            subject_cli = "Recibimos tu solicitud · Refugio Aremko"
-            body_cli = render_to_string('ventas/emails/refugio_lead_confirmacion.txt', {
-                'lead': lead,
-                'config': config,
-            })
-            email_cli = EmailMultiAlternatives(
-                subject=subject_cli,
-                body=body_cli,
-                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'comunicaciones@aremko.cl'),
-                to=[lead.email],
-                reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
-            )
-            email_cli.send(fail_silently=True)
-        except Exception as e:
-            logger.warning(f"[Refugio] No se pudo enviar confirmación al lead: {e}")
+        # --- Email confirmación al lead (solo si dejó email; ahora es opcional) ---
+        if lead.email:
+            try:
+                subject_cli = "Recibimos tu solicitud · Refugio Aremko"
+                body_cli = render_to_string('ventas/emails/refugio_lead_confirmacion.txt', {
+                    'lead': lead,
+                    'config': config,
+                })
+                email_cli = EmailMultiAlternatives(
+                    subject=subject_cli,
+                    body=body_cli,
+                    from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'comunicaciones@aremko.cl'),
+                    to=[lead.email],
+                    reply_to=[getattr(settings, 'VENTAS_FROM_EMAIL', 'ventas@aremko.cl')],
+                )
+                email_cli.send(fail_silently=True)
+            except Exception as e:
+                logger.warning(f"[Refugio] No se pudo enviar confirmación al lead: {e}")
 
         return JsonResponse({
             'success': True,
