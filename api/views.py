@@ -466,3 +466,70 @@ def availability_summary(request):
     }
 
     return Response(response_data)
+
+
+# ---------------------------------------------------------------------------
+# Refugio Leads — conteo REAL desde la BD (fuente de verdad), no el Pixel.
+# El evento fb_pixel_lead de Meta esta contaminado (se dispara tambien en el
+# checkout via Pixel + CAPI). Para "leads de campana" usar SIEMPRE este endpoint.
+# ---------------------------------------------------------------------------
+
+def _refugio_canal(source, medium):
+    """Mapea utm_source/medium a un canal de alto nivel para reporting."""
+    s = (source or '').lower()
+    if 'facebook' in s or s in ('fb', 'meta'):
+        return 'facebook'
+    if 'instagram' in s or s == 'ig':
+        return 'instagram'
+    if 'google' in s:
+        return 'google'
+    if s in ('', '(directo)', 'direct', 'directo'):
+        return 'directo/organico'
+    return s  # otros origenes se reportan tal cual
+
+
+@api_view(['GET'])
+@authentication_classes([APIKeyAuthentication])
+def refugio_leads_summary(request):
+    """Resumen de leads REALES del formulario /refugio/ (tabla ventas_refugiolead).
+
+    GET /api/refugio-leads/summary/?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
+    Auth: header X-API-Key. Solo lectura.
+
+    Devuelve total + desglose por utm_source, utm_medium y por canal. Es la
+    FUENTE DE VERDAD para "leads de campana" (no usar fb_pixel_lead de Meta).
+    """
+    from collections import Counter
+    from datetime import timedelta
+    from django.utils import timezone
+    from django.utils.dateparse import parse_date
+    from ventas.models import RefugioLead
+
+    hoy = timezone.localdate()
+    desde = parse_date(request.GET.get('desde', '') or '') or (hoy - timedelta(days=30))
+    hasta = parse_date(request.GET.get('hasta', '') or '') or hoy
+
+    qs = RefugioLead.objects.filter(
+        created_at__date__gte=desde,
+        created_at__date__lte=hasta,
+    )
+
+    def norm(v):
+        return ((v or '').strip().lower()) or '(directo)'
+
+    by_source, by_medium, by_canal = Counter(), Counter(), Counter()
+    for src, med in qs.values_list('utm_source', 'utm_medium'):
+        by_source[norm(src)] += 1
+        by_medium[norm(med)] += 1
+        by_canal[_refugio_canal(src, med)] += 1
+
+    return Response({
+        'fuente': 'ventas_refugiolead (BD — fuente de verdad)',
+        'desde': str(desde),
+        'hasta': str(hasta),
+        'total': qs.count(),
+        'by_utm_source': dict(by_source),
+        'by_utm_medium': dict(by_medium),
+        'by_canal': dict(by_canal),
+        'nota': 'Conteo real de sumisiones del formulario /refugio/. NO usar fb_pixel_lead de Meta (contaminado por eventos Lead del checkout).',
+    })
