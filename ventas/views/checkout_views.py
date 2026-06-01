@@ -512,10 +512,10 @@ def complete_checkout(request):
             print(f"PendingReservation #{pending.id} creada para {cliente.nombre} (${cart['total']:,.0f})")
 
             try:
-                from ..services.meta_capi_service import send_lead_event
+                from ..services.meta_capi_service import send_schedule_event
                 client_ip = (request.META.get('HTTP_X_FORWARDED_FOR') or '').split(',')[0].strip() \
                     or request.META.get('REMOTE_ADDR')
-                send_lead_event(
+                send_schedule_event(
                     pending_id=pending.id,
                     amount=float(cart['total']),
                     email=cliente.email,
@@ -528,7 +528,7 @@ def complete_checkout(request):
                     event_source_url=request.build_absolute_uri('/checkout/'),
                 )
             except Exception as capi_err:
-                print(f"Meta CAPI Lead fallo (no critico): {capi_err}")
+                print(f"Meta CAPI Schedule fallo (no critico): {capi_err}")
 
             return JsonResponse({
                 'success': True,

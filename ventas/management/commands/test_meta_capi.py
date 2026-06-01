@@ -16,15 +16,15 @@ evento en vivo sin que cuente como conversion real.
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 
-from ventas.services.meta_capi_service import send_purchase_event, send_lead_event
+from ventas.services.meta_capi_service import send_purchase_event, send_schedule_event
 
 
 class Command(BaseCommand):
-    help = "Envia un evento de prueba a Meta CAPI (Purchase o Lead)."
+    help = "Envia un evento de prueba a Meta CAPI (Purchase o Schedule)."
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--event', choices=['purchase', 'lead'], default='purchase',
+            '--event', choices=['purchase', 'schedule'], default='purchase',
             help='Tipo de evento a enviar.',
         )
         parser.add_argument('--venta-id', type=int, default=999999)
@@ -61,14 +61,14 @@ class Command(BaseCommand):
             )
             label = f"Purchase (venta_id={opts['venta_id']})"
         else:
-            result = send_lead_event(
+            result = send_schedule_event(
                 pending_id=opts['pending_id'],
                 amount=opts['amount'],
                 email=opts['email'],
                 phone=opts['phone'],
                 nombre_completo=opts['nombre'],
             )
-            label = f"Lead (pending_id={opts['pending_id']})"
+            label = f"Schedule (pending_id={opts['pending_id']})"
 
         if result.get('ok'):
             self.stdout.write(self.style.SUCCESS(f"OK - {label} enviado a Meta."))

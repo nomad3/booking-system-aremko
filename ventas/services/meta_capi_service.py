@@ -198,7 +198,7 @@ def send_purchase_event(
     )
 
 
-def send_lead_event(
+def send_schedule_event(
     *,
     pending_id: int,
     amount: float,
@@ -211,9 +211,12 @@ def send_lead_event(
     fbc: Optional[str] = None,
     event_source_url: Optional[str] = None,
 ) -> dict:
-    """Envia evento Lead via CAPI al crear PendingReservation.
+    """Envia evento Schedule via CAPI al crear PendingReservation (reserva agendada,
+    pago pendiente).
 
-    event_id deterministico: lead_<pending_id>.
+    Antes era 'Lead'; se cambio a 'Schedule' para dejar 'Lead' EXCLUSIVO del
+    formulario Refugio. event_id deterministico: schedule_<pending_id> (debe
+    coincidir con el Pixel client-side para deduplicar).
     """
     nombre = apellido = None
     if nombre_completo:
@@ -233,8 +236,8 @@ def send_lead_event(
     }
 
     return _post_event(
-        event_name="Lead",
-        event_id=f"lead_{pending_id}",
+        event_name="Schedule",
+        event_id=f"schedule_{pending_id}",
         user_data=user_data,
         custom_data=custom_data,
         event_source_url=event_source_url,
