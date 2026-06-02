@@ -110,6 +110,20 @@ OVC_DIAS_MAX_ACUMULACION = int(os.getenv('OVC_DIAS_MAX_ACUMULACION', '7'))
 OVC_TARGET_DIARIO = int(os.getenv('OVC_TARGET_DIARIO', '50'))
 
 # ────────────────────────────────────────────────────────────────────────────
+# Disparo de la campaña de plantillas Meta (aremko-cli / Go)
+# ────────────────────────────────────────────────────────────────────────────
+# Tras generar_bandeja_whatsapp_diaria, Django llama a este endpoint de Go para
+# que envíe las plantillas de salva 1 (Cloud API): pull pending-template-sends →
+# SendTemplate → mark-template-sent/failed. Es SÍNCRONO (~decenas de seg para 50).
+# Seguro: si ningún script tiene meta_template_name cargado, Go responde total:0
+# y no manda nada. Vaciar la URL (o --no-campaign) para desactivar el disparo.
+OVC_RUN_TEMPLATE_CAMPAIGN_URL = os.getenv(
+    'OVC_RUN_TEMPLATE_CAMPAIGN_URL',
+    'https://aremko-cli-backend.onrender.com/api/v1/whatsapp/run-template-campaign',
+)
+OVC_TEMPLATE_CAMPAIGN_TIMEOUT = int(os.getenv('OVC_TEMPLATE_CAMPAIGN_TIMEOUT', '120'))
+
+# ────────────────────────────────────────────────────────────────────────────
 # Operación Vuelta a Casa — Variaciones IA on-demand
 # ────────────────────────────────────────────────────────────────────────────
 # Toggle global para que los endpoints /siguiente/ y /marcar-enviado/ devuelvan

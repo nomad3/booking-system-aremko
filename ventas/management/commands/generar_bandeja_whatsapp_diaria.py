@@ -128,6 +128,10 @@ class Command(BaseCommand):
             '--force', action='store_true',
             help='Sobreescribe si ya existe bandeja para la fecha (borra pendientes previos).',
         )
+        parser.add_argument(
+            '--no-campaign', action='store_true',
+            help='No gatilla la campaña de plantillas Meta (Go) al terminar.',
+        )
 
     # ========================================================================
     # Entry point
@@ -241,6 +245,69 @@ class Command(BaseCommand):
         # ---- Reporte final ----
         elapsed = time.time() - t0
         self._reportar(resultados, elapsed, dry_run)
+
+        # ---- Disparo de la campaña de plantillas Meta (aremko-cli / Go) ----
+        # Justo después de generar la bandeja, gatillar el envío automático de
+        # salva 1 vía Cloud API. Seguro e idempotente: si no hay scripts con
+        # meta_template_name, Go responde total:0. No corre en dry-run ni en modo
+        # debug por cliente, ni si se pasó --no-campaign.
+        if not dry_run and not cliente_id_filter and not opts.get('no_campaign'):
+            self._disparar_campana_plantillas(limit)
+
+    # ========================================================================
+    # Disparo de la campaña de plantillas Meta (Go envía)
+    # ========================================================================
+
+    def _disparar_campana_plantillas(self, limit: int) -> None:
+        """Llama al endpoint de aremko-cli (Go) que hace pull + SendTemplate +
+        callbacks. Nunca rompe la generación de bandeja si el disparo falla."""
+        url = getattr(settings, 'OVC_RUN_TEMPLATE_CAMPAIGN_URL', '') or ''
+        if not url:
+            self.stdout.write(
+                "  · Campaña plantillas: OVC_RUN_TEMPLATE_CAMPAIGN_URL vacío, omitida."
+            )
+            return
+        api_key = getattr(settings, 'LUNA_API_KEY', '') or ''
+        if not api_key:
+            self.stdout.write(self.style.WARNING(
+                "  · Campaña plantillas: falta LUNA_API_KEY, omitida."
+            ))
+            return
+        timeout = int(getattr(settings, 'OVC_TEMPLATE_CAMPAIGN_TIMEOUT', 120))
+
+        self.stdout.write(f"\n  Gatillando campaña de plantillas Meta → {url} (limit={limit})…")
+        try:
+            import requests
+            resp = requests.post(
+                url,
+                params={'limit': limit},
+                headers={'X-API-Key': api_key},
+                timeout=timeout,
+            )
+            if resp.status_code == 200:
+                try:
+                    data = resp.json()
+                except ValueError:
+                    data = {}
+                self.stdout.write(self.style.SUCCESS(
+                    f"  ✓ Campaña plantillas: total={data.get('total')} "
+                    f"enviados={data.get('enviados')} fallidos={data.get('fallidos')}"
+                ))
+                logger.info("Campaña plantillas Meta: %s", data)
+            else:
+                self.stdout.write(self.style.WARNING(
+                    f"  ⚠ Campaña plantillas: HTTP {resp.status_code} — {resp.text[:300]}"
+                ))
+                logger.warning(
+                    "Campaña plantillas HTTP %s: %s", resp.status_code, resp.text[:500]
+                )
+        except Exception as e:
+            # El disparo es best-effort: un fallo de red/timeout no debe abortar
+            # ni marcar como fallida la generación de la bandeja (ya persistida).
+            self.stdout.write(self.style.WARNING(
+                f"  ⚠ Campaña plantillas: error al llamar a Go ({e})"
+            ))
+            logger.warning("Campaña plantillas error: %s", e, exc_info=True)
 
     # ========================================================================
     # Acumulación de pendientes entre días
