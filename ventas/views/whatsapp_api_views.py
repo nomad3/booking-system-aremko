@@ -197,9 +197,10 @@ def inbound(request):
 # Tipos de mensaje con adjunto que aceptamos.
 _MEDIA_TYPES = {'image', 'video', 'audio', 'voice', 'document', 'sticker'}
 
-# Tope de tamaño de adjunto (Cloudinary raw ~10 MB en planes bajos). Configurable
-# por settings.WHATSAPP_MEDIA_MAX_BYTES. Default 10 MB. El lado Go también limita.
-_MEDIA_MAX_BYTES_DEFAULT = 10 * 1024 * 1024
+# Tope de tamaño de adjunto. 16 MB = límite de la Cloud API para video/audio (cubre
+# también imagen 5 MB y voz). Configurable por settings.WHATSAPP_MEDIA_MAX_BYTES.
+# El lado Go también limita.
+_MEDIA_MAX_BYTES_DEFAULT = 16 * 1024 * 1024
 
 
 @csrf_exempt
