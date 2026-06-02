@@ -6239,12 +6239,34 @@ from .models import WhatsAppMessage as _WhatsAppMessage
 
 @admin.register(_WhatsAppMessage)
 class WhatsAppMessageAdmin(admin.ModelAdmin):
-    list_display = ('id', 'timestamp', 'direction', 'phone', 'cliente', 'msg_type', 'status', 'requiere_atencion')
+    list_display = ('id', 'timestamp', 'direction', 'phone', 'cliente', 'msg_type', 'status', 'tiene_adjunto', 'requiere_atencion')
     list_filter = ('direction', 'status', 'requiere_atencion', 'msg_type')
-    search_fields = ('phone', 'wa_message_id', 'body', 'cliente__nombre')
+    search_fields = ('phone', 'wa_message_id', 'body', 'cliente__nombre', 'original_filename')
     readonly_fields = ('wa_message_id', 'direction', 'phone', 'cliente', 'body', 'msg_type',
-                       'timestamp', 'status', 'contact_name', 'contacto_whatsapp', 'created_at')
+                       'timestamp', 'status', 'contact_name', 'contacto_whatsapp', 'created_at',
+                       'mime_type', 'original_filename', 'media_preview')
     date_hierarchy = 'timestamp'
+
+    @admin.display(description='Adjunto', boolean=True)
+    def tiene_adjunto(self, obj):
+        return bool(obj.media_file)
+
+    @admin.display(description='Adjunto / Comprobante')
+    def media_preview(self, obj):
+        from django.utils.html import format_html
+        if not obj.media_file:
+            return '—'
+        try:
+            url = obj.media_file.url
+        except Exception:
+            return '(archivo no disponible)'
+        nombre = obj.original_filename or 'archivo'
+        if (obj.mime_type or '').startswith('image/'):
+            return format_html(
+                '<a href="{}" target="_blank"><img src="{}" style="max-width:320px;max-height:320px;border:1px solid #ccc;border-radius:6px"/></a>',
+                url, url,
+            )
+        return format_html('<a href="{}" target="_blank">📎 {}</a>', url, nombre)
 
     def has_add_permission(self, request):
         return False

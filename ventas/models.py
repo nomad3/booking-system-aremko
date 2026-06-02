@@ -15,6 +15,7 @@ from django.db.models import Sum, F, DecimalField, FloatField # Added DecimalFie
 from django.db.models.functions import Coalesce # Coalesce es una función de DB
 from solo.models import SingletonModel # Added import for django-solo
 from cloudinary_storage.storage import VideoMediaCloudinaryStorage  # storage de video (resource_type=video) para FileField de video
+from cloudinary_storage.storage import RawMediaCloudinaryStorage  # storage raw (resource_type=raw) para adjuntos WhatsApp (pdf/audio/imagen/video)
 
 class Proveedor(models.Model):
     nombre = models.CharField(max_length=100)
@@ -7715,6 +7716,16 @@ class WhatsAppMessage(models.Model):
     timestamp = models.DateTimeField(db_index=True, help_text="Momento del mensaje (de Meta).")
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, blank=True)
     contact_name = models.CharField(max_length=160, blank=True)
+    # Adjuntos (foto/PDF/voz/video). aremko-cli descarga los bytes de la Cloud API
+    # y los sube vía /api/whatsapp/inbound-media. Storage RAW (resource_type=raw)
+    # para servir cualquier tipo (imagen, pdf, audio, video) tal cual.
+    media_file = models.FileField(
+        upload_to='whatsapp/', storage=RawMediaCloudinaryStorage(),
+        null=True, blank=True, max_length=255,
+        help_text="Adjunto del mensaje (comprobante, foto, audio, etc.). Nombre con UUID.",
+    )
+    mime_type = models.CharField(max_length=120, blank=True, help_text="Ej. image/jpeg, application/pdf, audio/ogg.")
+    original_filename = models.CharField(max_length=255, blank=True, help_text="Nombre original del archivo (útil en documentos).")
     # Conexión con la conversación/bandeja OVC
     contacto_whatsapp = models.ForeignKey('ContactoWhatsApp', on_delete=models.SET_NULL, null=True, blank=True, related_name='mensajes_wa')
     requiere_atencion = models.BooleanField(default=False, db_index=True, help_text="Entrante sin atender por el operador.")

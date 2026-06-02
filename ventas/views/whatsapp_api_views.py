@@ -10,6 +10,9 @@ Rutas:
 """
 
 import json
+import os
+import uuid
+import mimetypes
 from datetime import datetime, timedelta, timezone as dt_tz
 
 from django.conf import settings
@@ -77,6 +80,65 @@ def _match_or_create_cliente(phone, nombre=''):
             return None
 
 
+def _link_contacto_ovc(cliente, msg, ts):
+    """Bandeja OVC: marca el contacto activo del cliente como 'respondió' y lo
+    enlaza al mensaje. Devuelve el ContactoWhatsApp o None. Compartido por los
+    entrantes de texto y de media."""
+    if not cliente:
+        return None
+    contacto = (
+        ContactoWhatsApp.objects
+        .filter(cliente=cliente, estado__in=['enviado', 'pendiente'])
+        .order_by('-fecha_envio', '-fecha_sugerido')
+        .first()
+    )
+    if contacto:
+        if not contacto.respondio:
+            contacto.respondio = True
+            contacto.fecha_respuesta = ts
+            contacto.save(update_fields=['respondio', 'fecha_respuesta'])
+        msg.contacto_whatsapp = contacto
+        msg.save(update_fields=['contacto_whatsapp'])
+    return contacto
+
+
+def _media_label(msg_type, original_filename=''):
+    """Etiqueta de preview para un adjunto sin caption (lista de conversaciones)."""
+    t = (msg_type or '').lower()
+    if t == 'image':
+        return '📷 Foto'
+    if t == 'video':
+        return '🎥 Video'
+    if t in ('audio', 'voice'):
+        return '🎤 Nota de voz'
+    if t == 'document':
+        nombre = (original_filename or '').strip()
+        return f'📄 {nombre}' if nombre else '📄 Documento'
+    if t == 'sticker':
+        return '🟢 Sticker'
+    return ''
+
+
+def _guess_extension(original_filename, mime_type):
+    """Extensión del archivo: primero del nombre original, luego del mime_type."""
+    _, ext = os.path.splitext(original_filename or '')
+    if ext:
+        return ext[:12]
+    guessed = mimetypes.guess_extension((mime_type or '').split(';')[0].strip())
+    return guessed or ''
+
+
+def _media_url(request, msg):
+    """URL absoluta del adjunto (el frontend vive en otro dominio). Si el storage
+    ya devuelve una URL absoluta (Cloudinary), build_absolute_uri la deja igual."""
+    if not msg.media_file:
+        return None
+    try:
+        return request.build_absolute_uri(msg.media_file.url)
+    except Exception:
+        return None
+
+
 @csrf_exempt
 def inbound(request):
     err = _check_luna_key(request)
@@ -118,21 +180,7 @@ def inbound(request):
 
     # Bandeja OVC: marcar el contacto del cliente como "respondió" (respuesta pendiente
     # de atención por el operador). Reusa el flag respondio/fecha_respuesta existente.
-    contacto = None
-    if cliente:
-        contacto = (
-            ContactoWhatsApp.objects
-            .filter(cliente=cliente, estado__in=['enviado', 'pendiente'])
-            .order_by('-fecha_envio', '-fecha_sugerido')
-            .first()
-        )
-        if contacto:
-            if not contacto.respondio:
-                contacto.respondio = True
-                contacto.fecha_respuesta = ts
-                contacto.save(update_fields=['respondio', 'fecha_respuesta'])
-            msg.contacto_whatsapp = contacto
-            msg.save(update_fields=['contacto_whatsapp'])
+    contacto = _link_contacto_ovc(cliente, msg, ts)
 
     return JsonResponse({
         'ok': True,
@@ -143,6 +191,80 @@ def inbound(request):
         # atender el entrante (queda como requiere_atencion en WhatsAppMessage).
         'requiere_atencion_sin_contacto': bool(cliente and not contacto),
         'ventana_24h_hasta': _ventana_24h(ts),
+    })
+
+
+# Tipos de mensaje con adjunto que aceptamos.
+_MEDIA_TYPES = {'image', 'video', 'audio', 'voice', 'document', 'sticker'}
+
+
+@csrf_exempt
+def inbound_media(request):
+    """POST /api/whatsapp/inbound-media (multipart/form-data) — entrante con adjunto.
+
+    aremko-cli descarga los bytes de la Cloud API (con el token) y nos los sube acá.
+    Guardamos el archivo (nombre UUID, no el del cliente) y creamos el WhatsAppMessage.
+    Idempotente por wa_message_id.
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    wa_id = (request.POST.get('wa_message_id') or '').strip()
+    phone = (request.POST.get('from') or '').strip()
+    if not wa_id or not phone:
+        return JsonResponse({'error': 'wa_message_id y from son obligatorios'}, status=400)
+
+    upload = request.FILES.get('file')
+    if not upload:
+        return JsonResponse({'error': "Falta el archivo 'file' (multipart/form-data)"}, status=400)
+
+    msg_type = (request.POST.get('type') or 'document').lower()[:30]
+    if msg_type not in _MEDIA_TYPES:
+        msg_type = 'document'
+    caption = request.POST.get('caption') or ''
+    mime_type = (request.POST.get('mime_type') or getattr(upload, 'content_type', '') or '')[:120]
+    original_filename = (request.POST.get('filename') or getattr(upload, 'name', '') or '')[:255]
+    contact_name = (request.POST.get('contact_name') or '')[:160]
+    ts = _parse_ts(request.POST.get('timestamp'))
+
+    # Idempotencia por wa_message_id
+    existing = WhatsAppMessage.objects.filter(wa_message_id=wa_id).first()
+    if existing:
+        return JsonResponse({
+            'success': True, 'idempotent': True,
+            'wa_message_id': wa_id,
+            'message_id': existing.id,
+            'cliente_id': existing.cliente_id,
+            'media_url': _media_url(request, existing),
+        })
+
+    cliente = _match_or_create_cliente(phone, contact_name)
+
+    # Nombre con UUID + extensión (evita colisiones y path traversal del nombre del cliente).
+    ext = _guess_extension(original_filename, mime_type)
+    stored_name = f"{uuid.uuid4().hex}{ext}"
+
+    msg = WhatsAppMessage(
+        cliente=cliente, direction='in', wa_message_id=wa_id, phone=phone[:20],
+        body=caption, msg_type=msg_type, timestamp=ts, status='received',
+        contact_name=contact_name, requiere_atencion=True,
+        mime_type=mime_type, original_filename=original_filename,
+    )
+    # upload_to='whatsapp/' antepone la carpeta; save=False para persistir una sola vez.
+    msg.media_file.save(stored_name, upload, save=False)
+    msg.save()
+
+    _link_contacto_ovc(cliente, msg, ts)
+
+    return JsonResponse({
+        'success': True,
+        'wa_message_id': wa_id,
+        'message_id': msg.id,
+        'cliente_id': cliente.id if cliente else None,
+        'media_url': _media_url(request, msg),
     })
 
 
@@ -236,6 +358,9 @@ def conversation(request):
             'type': m.msg_type,
             'status': m.status,
             'timestamp': m.timestamp.isoformat(),
+            'media_url': _media_url(request, m),
+            'mime_type': m.mime_type or None,
+            'filename': m.original_filename or None,
         } for m in recientes],
     })
 
@@ -317,11 +442,18 @@ def conversations(request):
         phone = a['phone']
         m = last_msg.get(phone)
         cli = cliente_map.get(phone)
+        # Preview: caption si hay; si es adjunto sin texto, etiqueta (📷/🎥/📄...).
+        if m and m.body:
+            preview = m.body
+        elif m and m.media_file:
+            preview = _media_label(m.msg_type, m.original_filename)
+        else:
+            preview = ''
         conversations_out.append({
             'phone': phone,
             'cliente_id': cli.id if cli else None,
             'cliente_nombre': (cli.nombre if cli and cli.nombre else None),
-            'ultimo_mensaje': (m.body if m else ''),
+            'ultimo_mensaje': preview,
             'ultimo_direction': (m.direction if m else None),
             'ultimo_timestamp': a['ultimo_ts'].isoformat() if a['ultimo_ts'] else None,
             'sin_responder': sin_resp.get(phone, 0),
