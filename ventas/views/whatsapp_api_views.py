@@ -9,6 +9,9 @@ Rutas:
   GET  /api/whatsapp/conversation/  → historial (in+out) por teléfono
   GET  /api/whatsapp/conversations/ → lista de conversaciones (una fila por teléfono)
   POST /api/whatsapp/conversations/<phone>/marcar-atendido/ → saca de la cola de pendientes
+  GET  /api/whatsapp/pending-template-sends → bandeja salva 1 lista para plantilla Meta
+  POST /api/whatsapp/mark-template-sent     → Go confirma envío de plantilla
+  POST /api/whatsapp/mark-template-failed   → Go reporta fallo de envío
 """
 
 import json
@@ -585,4 +588,190 @@ def marcar_atendido(request, phone):
         'phone': phone,
         'actualizado': bool(actualizado),
         'mensajes_actualizados': actualizado,
+    })
+
+
+# ============================================================================
+# Campaña de plantillas Meta (Operación Vuelta a Casa) — Django decide, Go envía.
+# Django arma la bandeja (ContactoWhatsApp salva 1) y resuelve los params; Go
+# hace el SendTemplate y reporta con mark-template-sent / mark-template-failed.
+# ============================================================================
+
+def _resolver_params(contacto, hoy):
+    """Resuelve la lista ordenada de params {{1}},{{2}}… para la plantilla Meta,
+    según script.meta_variables_orden, usando el mismo render context del cron."""
+    from ..services.bandeja_whatsapp_service import build_render_context
+    orden = contacto.script.meta_variables_orden or []
+    if not orden:
+        return []
+    cliente = contacto.cliente
+    try:
+        tax = cliente.taxonomia
+    except Exception:
+        tax = None
+    ctx = build_render_context(cliente, tax, hoy)
+    # SafeDict: claves faltantes → ''. Convertir todo a str (Meta exige strings).
+    return [str(ctx.get(ph, '') or '') for ph in orden]
+
+
+def pending_template_sends(request):
+    """GET /api/whatsapp/pending-template-sends?limit=N — contactos salva 1
+    pendientes elegibles para envío automático por plantilla Meta.
+
+    Elegible = estado='pendiente', salva=1, y el script tiene meta_template_name.
+    Orden: prioridad ASC (más urgente primero), luego fecha_sugerido ASC.
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+
+    try:
+        limit = min(max(int(request.GET.get('limit', 50)), 1), 200)
+    except (ValueError, TypeError):
+        limit = 50
+
+    hoy = timezone.now().date()
+
+    qs = (
+        ContactoWhatsApp.objects
+        .filter(estado='pendiente', salva=1)
+        .exclude(script__meta_template_name='')
+        .exclude(script__meta_template_name__isnull=True)
+        .select_related('cliente', 'script')
+        .order_by('prioridad', 'fecha_sugerido', 'id')[:limit]
+    )
+
+    items = []
+    for c in qs:
+        phone = (c.cliente.telefono or '').strip() if c.cliente else ''
+        if not phone:
+            continue  # sin teléfono no se puede enviar; el cron normal no debería generarlo
+        items.append({
+            'contacto_id': c.id,
+            'phone': phone,
+            'meta_template_name': c.script.meta_template_name,
+            'language': c.script.meta_language or 'es',
+            'params': _resolver_params(c, hoy),
+            'script_id': c.script.script_id,
+        })
+
+    return JsonResponse({'count': len(items), 'pending': items})
+
+
+@csrf_exempt
+def mark_template_sent(request):
+    """POST /api/whatsapp/mark-template-sent — Go confirma envío de la plantilla.
+
+    Body JSON: { "contacto_id": 123, "wa_message_id": "wamid..." }
+    Marca el ContactoWhatsApp como enviado (operador='cloud-api') y registra el
+    WhatsAppMessage saliente. Idempotente por contacto_id.
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    contacto_id = data.get('contacto_id')
+    wa_id = (data.get('wa_message_id') or '').strip()
+    if not contacto_id:
+        return JsonResponse({'error': 'contacto_id es obligatorio'}, status=400)
+
+    contacto = (
+        ContactoWhatsApp.objects.select_related('cliente').filter(id=contacto_id).first()
+    )
+    if not contacto:
+        return JsonResponse({'error': 'contacto no encontrado'}, status=404)
+
+    # Idempotencia por contacto_id: si ya está enviado, no duplicar.
+    if contacto.estado == 'enviado':
+        return JsonResponse({
+            'success': True, 'idempotent': True,
+            'contacto_id': contacto.id, 'estado': contacto.estado,
+        })
+
+    now = timezone.now()
+    contacto.estado = 'enviado'
+    contacto.fecha_envio = now
+    contacto.operador = 'cloud-api'
+    contacto.save(update_fields=['estado', 'fecha_envio', 'operador'])
+
+    cliente = contacto.cliente
+    phone = (cliente.telefono or '').strip() if cliente else ''
+
+    # Registrar el saliente en el hilo (idempotente por wa_message_id).
+    message_id = None
+    if wa_id:
+        existing = WhatsAppMessage.objects.filter(wa_message_id=wa_id).first()
+        if existing:
+            message_id = existing.id
+        else:
+            msg = WhatsAppMessage.objects.create(
+                cliente=cliente, direction='out', wa_message_id=wa_id,
+                phone=phone[:20], body=contacto.mensaje_renderizado or '',
+                msg_type='template', timestamp=now, status='sent',
+            )
+            message_id = msg.id
+
+    if phone:
+        _outbound_side_effects(cliente, phone, now)
+
+    return JsonResponse({
+        'success': True,
+        'contacto_id': contacto.id,
+        'estado': contacto.estado,
+        'message_id': message_id,
+    })
+
+
+@csrf_exempt
+def mark_template_failed(request):
+    """POST /api/whatsapp/mark-template-failed — Go reporta fallo de envío.
+
+    Body JSON: { "contacto_id": 123, "error": "..." }
+    Saca el contacto de 'pendiente' (→ 'omitido') para que no quede colgado;
+    como 'omitido' no cuenta salva ni satura, el cron del día siguiente puede
+    re-generarlo como salva 1 (reintento natural). Guarda el error en nota.
+    Idempotente: si ya no está pendiente, responde ok sin cambios.
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    contacto_id = data.get('contacto_id')
+    error_txt = (data.get('error') or '').strip()
+    if not contacto_id:
+        return JsonResponse({'error': 'contacto_id es obligatorio'}, status=400)
+
+    contacto = ContactoWhatsApp.objects.filter(id=contacto_id).first()
+    if not contacto:
+        return JsonResponse({'error': 'contacto no encontrado'}, status=404)
+
+    if contacto.estado != 'pendiente':
+        return JsonResponse({
+            'success': True, 'idempotent': True,
+            'contacto_id': contacto.id, 'estado': contacto.estado,
+        })
+
+    nota = contacto.nota_operador or ''
+    marca = f"[cloud-api fallo {timezone.now():%Y-%m-%d %H:%M}] {error_txt}".strip()
+    contacto.nota_operador = (nota + ('\n' if nota else '') + marca)[:5000]
+    contacto.estado = 'omitido'
+    contacto.operador = 'cloud-api'
+    contacto.save(update_fields=['estado', 'operador', 'nota_operador'])
+
+    return JsonResponse({
+        'success': True,
+        'contacto_id': contacto.id,
+        'estado': contacto.estado,
     })

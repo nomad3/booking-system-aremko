@@ -6822,6 +6822,26 @@ class ScriptWhatsApp(models.Model):
         ),
     )
 
+    # ───── Cloud API: mapeo a plantilla aprobada por Meta ─────
+    # Lo llena Jorge cuando diseña/aprueba la plantilla en la WABA. Si
+    # meta_template_name está vacío → el script NO es elegible para envío
+    # automático (solo bandeja manual). Solo aplica a salva 1.
+    meta_template_name = models.CharField(
+        max_length=100, blank=True,
+        help_text="Nombre de la plantilla aprobada en Meta (ej. 'vuelta_en_riesgo_1'). Vacío = no se envía automático.",
+    )
+    meta_language = models.CharField(
+        max_length=10, default='es',
+        help_text="Código de idioma de la plantilla en Meta (ej. 'es'). Meta no tiene es_CL.",
+    )
+    meta_variables_orden = models.JSONField(
+        default=list, blank=True,
+        help_text=(
+            "Lista ordenada de placeholders que mapean a {{1}},{{2}}… de la plantilla Meta. "
+            'Ej: ["nombre", "ultima_visita_humanizada"]. Vacío = plantilla sin variables.'
+        ),
+    )
+
     creado = models.DateTimeField(auto_now_add=True)
     modificado = models.DateTimeField(auto_now=True)
 

@@ -5744,7 +5744,7 @@ class ScriptWhatsAppAdmin(admin.ModelAdmin):
     list_display = (
         'script_id', 'nombre', 'estado_valor_target',
         'cohorte_estilo', 'cohorte_contexto', 'salva', 'activo',
-        'modificado',
+        'meta_template_name', 'modificado',
     )
     list_filter = ('estado_valor_target', 'salva', 'activo')
     search_fields = ('script_id', 'nombre', 'plantilla_texto')
@@ -5772,6 +5772,18 @@ class ScriptWhatsAppAdmin(admin.ModelAdmin):
                 "<code>{sugerencia_hora}</code>, <code>{sugerencia_franja}</code>, "
                 "<code>{cupon_codigo}</code>, <code>{mes_proximo}</code>, "
                 "<code>{fecha_limite}</code>."
+            ),
+        }),
+        ('Plantilla Meta (Cloud API — envío automático salva 1)', {
+            'fields': ('meta_template_name', 'meta_language', 'meta_variables_orden'),
+            'description': (
+                "Para que este script se envíe AUTOMÁTICAMENTE por la Cloud API "
+                "(solo salva 1): poné el <b>nombre exacto</b> de la plantilla aprobada "
+                "en Meta. Vacío = no se envía automático (solo bandeja manual).<br>"
+                "<code>meta_variables_orden</code> = lista JSON con los placeholders "
+                "en el orden de las variables de la plantilla "
+                "(<code>{{1}}</code>, <code>{{2}}</code>…). "
+                'Ej: <code>[\"nombre\", \"ultima_visita_humanizada\"]</code>.'
             ),
         }),
         ('Auditoría', {
