@@ -1,0 +1,60 @@
+{% extends "ventas/base_public.html" %}
+{% block title %}Registrar acompañante · Aremko Spa{% endblock %}
+{% block meta_description %}<meta name="description" content="Registra los datos de tu acompañante para coordinar la experiencia de masaje en Aremko Spa.">{% endblock %}
+
+{% block content %}
+<section class="py-5" style="background:var(--background);min-height:70vh;">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-6 col-md-9">
+
+        <div class="text-center mb-4">
+          <h1 class="h3" style="color:var(--dark-gray);">Datos de tu acompañante</h1>
+          <p class="text-muted">Para preparar mejor la experiencia, registra a la persona que te acompañará al masaje.</p>
+        </div>
+
+        {% if exito %}
+          <div class="card shadow-sm"><div class="card-body p-4 p-md-5 text-center">
+            <i class="fas fa-check-circle text-success" style="font-size:3rem;"></i>
+            <h2 class="h4 mt-3">¡Listo! Acompañante registrado.</h2>
+            <p class="text-muted">Le enviaremos su ficha de bienestar. También puedes compartirle este enlace para que la complete:</p>
+            <a href="{{ ficha_url }}" class="btn btn-outline-primary btn-sm">Ficha de bienestar del acompañante</a>
+          </div></div>
+        {% else %}
+          {% if error %}<div class="alert alert-warning">{{ error }}</div>{% endif %}
+          <form method="post" class="card shadow-sm"><div class="card-body p-4 p-md-5">
+            {% csrf_token %}
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label">Nombre del acompañante *</label>
+                <input type="text" name="nombre" class="form-control" required maxlength="160">
+              </div>
+              <div class="col-12">
+                <label class="form-label">WhatsApp del acompañante *</label>
+                <input type="tel" name="telefono" class="form-control" required maxlength="30" placeholder="+56 9 ...">
+              </div>
+              <div class="col-12">
+                <label class="form-label">Email del acompañante <span class="text-muted">(opcional)</span></label>
+                <input type="email" name="email" class="form-control" maxlength="254">
+              </div>
+              <div class="col-12 mt-2">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="autoriza" id="autoriza" required>
+                  <label class="form-check-label" for="autoriza">
+                    Confirmo que cuento con autorización de mi acompañante para compartir estos datos básicos y coordinar el servicio. *
+                  </label>
+                </div>
+                <p class="form-text mt-2">Ver nuestra <a href="{% url 'privacidad' %}" target="_blank" rel="noopener">Política de Privacidad</a>.</p>
+              </div>
+              <div class="col-12 text-center mt-2">
+                <button type="submit" class="btn btn-primary px-4"><i class="fas fa-user-plus me-2"></i>Registrar acompañante</button>
+              </div>
+            </div>
+          </div></form>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

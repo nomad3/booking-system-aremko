@@ -8,6 +8,7 @@ from django.contrib.auth import views as auth_views # Import auth views
 # Import the specific view functions needed for root URLs
 from ventas.views.public_views import homepage_view, empresas_view, empresas_presentacion_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view, garantia_view, tarjetas_qr_reviews_view, encuesta_satisfaccion_view, encuesta_gracias_view, refugio_landing_view, refugio_submit_view, privacy_policy_view
 from ventas.views import flow_views
+from ventas.views import masaje_views
 # Removed direct import of ventas.urls
 
 from django.contrib.sitemaps.views import sitemap
@@ -46,6 +47,10 @@ urlpatterns = [
     # Política de Privacidad (ruta pública /privacidad/ — la que carga Meta).
     # Solo en el urlconf de aremko.cl; destinopuertovaras.cl usa dpv_root_urls.py.
     path('privacidad/', privacy_policy_view, name='privacidad'),
+
+    # Conexión-Masajes: formularios públicos con token (ficha de bienestar + acompañante)
+    path('masaje/ficha/<str:token>/', masaje_views.masaje_ficha, name='masaje_ficha'),
+    path('masaje/acompanante/<str:token>/', masaje_views.masaje_registrar_acompanante, name='masaje_registrar_acompanante'),
 
     # Landing campaña "Refugio Aremko" (lanzamiento 15-jun-2026)
     path('refugio/', refugio_landing_view, name='refugio_landing'),
