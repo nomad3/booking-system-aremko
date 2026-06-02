@@ -113,3 +113,8 @@ Módulo **"Ficha de Bienestar para Masajes"**: registrar a **cada persona** que 
 | Fecha | Fase | Avance | Aprobado |
 |---|---|---|---|
 | 2026-06-01 | — | Creación del plan (grounded en modelos reales) | — |
+| 2026-06-01 | F0 | Decisiones: canal=email; WhatsApp stub (Cloud API después); v1=F1-F4; emails masaje reemplazan; resumen terapeuta en admin. | Jorge |
+| 2026-06-01 | F1-F4 | **v1 code-complete** (4 commits locales, NO desplegado): modelos+migración 0118 (validada con Django real), servicio+signal defensivo, formularios públicos con token, admin (inline+alerta+resumen terapeuta+acción email). | pendiente deploy |
+
+> **v1 DEPLOY pendiente:** push a main + **`migrate ventas` MANUAL en Render**. ⚠️ Correr migrate **pronto tras el deploy**: el admin de VentaReserva tiene el inline de participantes que consulta la tabla nueva; hasta correr migrate, abrir una reserva en el admin daría error 500 (el sitio público NO se afecta — el signal es defensivo).
+> **Pendiente post-v1:** F8 tests, F9 docs recepción; v2 = emails de seguimiento (F6-F7) + envío real WhatsApp (Cloud API).
