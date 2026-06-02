@@ -407,6 +407,38 @@ class ComandaInline(admin.TabularInline):
         return False
 
 
+from .models import BienestarMasajeFicha, ParticipanteMasajeReserva, SeguimientoBienestarMasaje
+from django.utils.html import format_html as _format_html_masaje
+
+
+class ParticipanteMasajeReservaInline(admin.TabularInline):
+    """Conexión-Masajes: participantes de masaje de la reserva (comprador + acompañantes)."""
+    model = ParticipanteMasajeReserva
+    extra = 0
+    fields = ('tipo_participante', 'nombre', 'telefono', 'email', 'estado_contacto', 'alerta', 'enlaces')
+    readonly_fields = ('alerta', 'enlaces')
+
+    def alerta(self, obj):
+        if obj and obj.tipo_participante == 'acompanante' and not (obj.nombre and obj.telefono):
+            return _format_html_masaje('<span style="color:#b8860b;font-weight:600;">⚠ Falta registrar datos del acompañante</span>')
+        if obj and obj.estado_contacto == 'ficha_completada':
+            return _format_html_masaje('<span style="color:#28a745;">✓ Ficha completada</span>')
+        return '—'
+    alerta.short_description = 'Alerta'
+
+    def enlaces(self, obj):
+        if not obj or not obj.token_formulario:
+            return '—'
+        from django.urls import reverse
+        ficha = reverse('masaje_ficha', kwargs={'token': obj.token_formulario})
+        out = _format_html_masaje('<a href="{}" target="_blank">Ficha de bienestar</a>', ficha)
+        if obj.tipo_participante == 'comprador':
+            acomp = reverse('masaje_registrar_acompanante', kwargs={'token': obj.token_formulario})
+            out = _format_html_masaje('{} &nbsp;|&nbsp; <a href="{}" target="_blank">Registrar acompañante</a>', out, acomp)
+        return out
+    enlaces.short_description = 'Enlaces (token)'
+
+
 class VentaReservaAdmin(admin.ModelAdmin):
     form = VentaReservaAdminForm
     change_form_template = 'admin/ventas/ventareserva/change_form.html'
@@ -422,7 +454,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
-    inlines = [ReservaServicioInline, ReservaProductoInline, GiftCardInline, PagoInline, ComandaInline]
+    inlines = [ReservaServicioInline, ReservaProductoInline, GiftCardInline, PagoInline, ComandaInline, ParticipanteMasajeReservaInline]
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
         'productos_y_cantidades', 'servicios_y_cantidades',
@@ -6067,3 +6099,84 @@ class RefugioLeadAdmin(admin.ModelAdmin):
         n = queryset.update(status='contactado')
         self.message_user(request, f"{n} leads marcados como contactados.")
     marcar_contactados.short_description = "Marcar como contactados"
+
+
+# ===========================================================================
+# Conexión-Masajes — Admin (Ficha de Bienestar)
+# ===========================================================================
+
+@admin.register(BienestarMasajeFicha)
+class BienestarMasajeFichaAdmin(admin.ModelAdmin):
+    list_display = ('id', 'nombre_completo', 'reserva', 'objetivo_principal', 'intensidad_preferida', 'estado_ficha', 'created_at')
+    list_filter = ('estado_ficha', 'objetivo_principal', 'intensidad_preferida', 'consentimiento_marketing')
+    search_fields = ('nombre_completo', 'telefono', 'email', 'reserva__id')
+    autocomplete_fields = ('cliente',)
+    readonly_fields = ('fecha_consentimiento', 'consentimiento_texto', 'created_at', 'updated_at')
+    fieldsets = (
+        ('Persona', {'fields': ('cliente', 'reserva', 'servicio_reservado', 'nombre_completo', 'telefono', 'email', 'fecha_nacimiento', 'ciudad', 'origen', 'estado_ficha')}),
+        ('Preferencias de bienestar', {'fields': ('objetivo_principal', 'intensidad_preferida', 'zonas_tension', 'zonas_evitar', 'observaciones_bienestar', 'condiciones_declaradas')}),
+        ('Resumen del terapeuta (post-masaje)', {
+            'fields': ('obs_terapeuta', 'zonas_trabajadas', 'intensidad_aplicada', 'sugerencia_frecuencia', 'recomendacion_texto'),
+            'description': '⚠ Evitar lenguaje médico. Registrar solo observaciones de bienestar y experiencia (no diagnóstico ni tratamiento).',
+        }),
+        ('Consentimientos (registro legal)', {'fields': ('consentimiento_datos', 'consentimiento_marketing', 'fecha_consentimiento', 'consentimiento_texto')}),
+        ('Auditoría', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
+    )
+
+
+@admin.register(ParticipanteMasajeReserva)
+class ParticipanteMasajeReservaAdmin(admin.ModelAdmin):
+    list_display = ('id', 'nombre', 'tipo_participante', 'telefono', 'estado_contacto', 'reserva', 'created_at')
+    list_filter = ('tipo_participante', 'estado_contacto')
+    search_fields = ('nombre', 'telefono', 'email', 'reserva__id')
+    autocomplete_fields = ('cliente',)
+    readonly_fields = ('token_formulario', 'created_at', 'updated_at')
+    actions = ['enviar_link_acompanante']
+
+    def enviar_link_acompanante(self, request, queryset):
+        """Envía por email al comprador el link para registrar a su acompañante."""
+        from django.core.mail import EmailMessage
+        from django.conf import settings
+        from django.urls import reverse
+        enviados = 0
+        for p in queryset.filter(tipo_participante='comprador'):
+            if not p.email:
+                continue
+            link = request.build_absolute_uri(
+                reverse('masaje_registrar_acompanante', kwargs={'token': p.token_formulario})
+            )
+            cuerpo = (
+                f"Hola {p.nombre or ''},\n\n"
+                "Para preparar mejor la experiencia de masaje en Aremko, cada persona "
+                "completa una ficha breve de bienestar. Registra aquí los datos de tu "
+                f"acompañante:\n{link}\n\n¡Gracias!\nEquipo Aremko"
+            )
+            try:
+                EmailMessage(
+                    subject="Registra a tu acompañante · Aremko Spa",
+                    body=cuerpo,
+                    from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'comunicaciones@aremko.cl'),
+                    to=[p.email],
+                ).send(fail_silently=True)
+                p.estado_contacto = 'email_enviado'
+                p.fecha_envio = timezone.now()
+                p.save(update_fields=['estado_contacto', 'fecha_envio', 'updated_at'])
+                enviados += 1
+            except Exception as exc:
+                self.message_user(request, f"Error con {p.email}: {exc}", level=messages.ERROR)
+        self.message_user(request, f"{enviados} email(s) de registro de acompañante enviados.")
+    enviar_link_acompanante.short_description = "Enviar link de registro de acompañante (al comprador)"
+
+
+@admin.register(SeguimientoBienestarMasaje)
+class SeguimientoBienestarMasajeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'tipo_email', 'estado', 'fecha_programada', 'fecha_envio', 'participante', 'reserva')
+    list_filter = ('estado', 'tipo_email')
+    search_fields = ('participante__nombre', 'reserva__id', 'asunto')
+    readonly_fields = ('created_at',)
+    actions = ['cancelar_seguimiento']
+
+    def cancelar_seguimiento(self, request, queryset):
+        n = queryset.filter(estado='pendiente').update(estado='cancelado')
+        self.message_user(request, f"{n} seguimiento(s) cancelado(s).")
+    cancelar_seguimiento.short_description = "Cancelar seguimientos pendientes"
