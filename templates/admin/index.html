@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load static i18n %}
+{% load static i18n ventas_extras %}
 
 {% block extrahead %}
     {{ block.super }}
@@ -18,6 +18,21 @@
 
     <!-- Main Content - Section Cards -->
     <div class="row g-4">
+
+        {% if user|has_group:"Masajistas" and not user.is_superuser %}
+        <!-- Vista simplificada para masajistas: solo su ficha de bienestar -->
+        <div class="col-lg-5 col-md-8 col-sm-12 mx-auto">
+            <a href="{% url 'admin:ventas_bienestarmasajeficha_changelist' %}" class="text-decoration-none">
+                <div class="card h-100 text-center card-hover">
+                    <div class="card-body">
+                        <div style="font-size:2.4rem;">🧖</div>
+                        <h5 class="card-title">Fichas de Bienestar</h5>
+                        <p class="card-text text-muted">Completa el resumen de bienestar de tus sesiones de masaje.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        {% else %}
 
         <!-- CRM Section Card -->
         <div class="col-lg-4 col-md-6 col-sm-12">
@@ -106,6 +121,7 @@
         </div>
 
         <!-- Add more section cards if needed -->
+        {% endif %}
 
     </div>
 </div>

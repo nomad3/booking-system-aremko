@@ -297,3 +297,13 @@ def cabana_display(servicio):
             'bosque valdiviano. Su perfume acompaña el despertar.'
         )
     return overrides
+
+
+@register.filter
+def has_group(user, group_name):
+    """True si el usuario pertenece al grupo indicado (por nombre). Uso en templates:
+    {% if user|has_group:"Masajistas" %}"""
+    try:
+        return bool(user) and user.is_authenticated and user.groups.filter(name=group_name).exists()
+    except Exception:
+        return False
