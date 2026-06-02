@@ -7691,3 +7691,42 @@ class SeguimientoBienestarMasaje(models.Model):
 
     def __str__(self):
         return f"{self.get_tipo_email_display()} · {self.estado} · {self.fecha_programada:%Y-%m-%d}"
+
+
+# ===========================================================================
+# WhatsApp Cloud API — persistencia de conversaciones (fuente de verdad en Django)
+# Las recibe/envía aremko-cli (Go) vía Cloud API; aquí se guardan y se conectan a
+# la bandeja OVC (ContactoWhatsApp). Tabla NUEVA -> migrate manual en Render.
+# ===========================================================================
+
+class WhatsAppMessage(models.Model):
+    DIRECTION_CHOICES = [('in', 'Entrante'), ('out', 'Saliente')]
+    STATUS_CHOICES = [
+        ('sent', 'Enviado'), ('delivered', 'Entregado'), ('read', 'Leído'),
+        ('received', 'Recibido'), ('failed', 'Error'),
+    ]
+
+    cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True, related_name='whatsapp_messages')
+    direction = models.CharField(max_length=3, choices=DIRECTION_CHOICES, db_index=True)
+    wa_message_id = models.CharField(max_length=128, unique=True, db_index=True, help_text="ID del mensaje en Meta (idempotencia).")
+    phone = models.CharField(max_length=20, db_index=True, help_text="Teléfono E.164 del cliente.")
+    body = models.TextField(blank=True)
+    msg_type = models.CharField(max_length=30, default='text', help_text="text, image, audio, etc.")
+    timestamp = models.DateTimeField(db_index=True, help_text="Momento del mensaje (de Meta).")
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, blank=True)
+    contact_name = models.CharField(max_length=160, blank=True)
+    # Conexión con la conversación/bandeja OVC
+    contacto_whatsapp = models.ForeignKey('ContactoWhatsApp', on_delete=models.SET_NULL, null=True, blank=True, related_name='mensajes_wa')
+    requiere_atencion = models.BooleanField(default=False, db_index=True, help_text="Entrante sin atender por el operador.")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Mensaje WhatsApp"
+        verbose_name_plural = "Mensajes WhatsApp"
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['phone', 'timestamp'], name='idx_wamsg_phone_ts'),
+        ]
+
+    def __str__(self):
+        return f"[{self.direction}] {self.phone} · {self.timestamp:%Y-%m-%d %H:%M}"

@@ -6231,3 +6231,20 @@ class SeguimientoBienestarMasajeAdmin(admin.ModelAdmin):
         n = queryset.filter(estado='pendiente').update(estado='cancelado')
         self.message_user(request, f"{n} seguimiento(s) cancelado(s).")
     cancelar_seguimiento.short_description = "Cancelar seguimientos pendientes"
+
+
+# WhatsApp Cloud API — mensajes (solo lectura, para visibilidad del equipo)
+from .models import WhatsAppMessage as _WhatsAppMessage
+
+
+@admin.register(_WhatsAppMessage)
+class WhatsAppMessageAdmin(admin.ModelAdmin):
+    list_display = ('id', 'timestamp', 'direction', 'phone', 'cliente', 'msg_type', 'status', 'requiere_atencion')
+    list_filter = ('direction', 'status', 'requiere_atencion', 'msg_type')
+    search_fields = ('phone', 'wa_message_id', 'body', 'cliente__nombre')
+    readonly_fields = ('wa_message_id', 'direction', 'phone', 'cliente', 'body', 'msg_type',
+                       'timestamp', 'status', 'contact_name', 'contacto_whatsapp', 'created_at')
+    date_hierarchy = 'timestamp'
+
+    def has_add_permission(self, request):
+        return False

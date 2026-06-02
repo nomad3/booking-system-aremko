@@ -9,6 +9,7 @@ from django.contrib.auth import views as auth_views # Import auth views
 from ventas.views.public_views import homepage_view, empresas_view, empresas_presentacion_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view, garantia_view, tarjetas_qr_reviews_view, encuesta_satisfaccion_view, encuesta_gracias_view, refugio_landing_view, refugio_submit_view, privacy_policy_view
 from ventas.views import flow_views
 from ventas.views import masaje_views
+from ventas.views import whatsapp_api_views
 # Removed direct import of ventas.urls
 
 from django.contrib.sitemaps.views import sitemap
@@ -51,6 +52,12 @@ urlpatterns = [
     # Conexión-Masajes: formularios públicos con token (ficha de bienestar + acompañante)
     path('masaje/ficha/<str:token>/', masaje_views.masaje_ficha, name='masaje_ficha'),
     path('masaje/acompanante/<str:token>/', masaje_views.masaje_registrar_acompanante, name='masaje_registrar_acompanante'),
+
+    # WhatsApp Cloud API: persistencia de conversaciones (consumido por aremko-cli/Go).
+    # Auth X-API-Key. Solo en aremko.cl.
+    path('api/whatsapp/inbound', whatsapp_api_views.inbound, name='whatsapp_inbound'),
+    path('api/whatsapp/outbound', whatsapp_api_views.outbound, name='whatsapp_outbound'),
+    path('api/whatsapp/conversation/', whatsapp_api_views.conversation, name='whatsapp_conversation'),
 
     # Landing campaña "Refugio Aremko" (lanzamiento 15-jun-2026)
     path('refugio/', refugio_landing_view, name='refugio_landing'),
