@@ -3758,6 +3758,14 @@ class SalaServicioAdmin(admin.ModelAdmin):
 @admin.register(Comanda)
 class ComandaAdmin(admin.ModelAdmin):
     """Admin para gestión de comandas"""
+
+    def has_module_permission(self, request):
+        # Conexión-Masajes: ocultar este módulo a los masajistas (solo ven la ficha).
+        u = request.user
+        if u.is_authenticated and (not u.is_superuser) and u.groups.filter(name='Masajistas').exists():
+            return False
+        return super().has_module_permission(request)
+
     list_display = (
         'id', 'hora_solicitud', 'cliente_nombre', 'estado_badge',
         'entrega_objetivo_display', 'total_items', 'tiempo_espera_display',
@@ -5627,6 +5635,13 @@ class ClienteTaxonomiaAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def has_module_permission(self, request):
+        # Conexión-Masajes: ocultar este módulo a los masajistas (solo ven la ficha).
+        u = request.user
+        if u.is_authenticated and (not u.is_superuser) and u.groups.filter(name='Masajistas').exists():
+            return False
+        return super().has_module_permission(request)
 
     # ---------- Columnas custom ----------
     def cliente_link(self, obj):
