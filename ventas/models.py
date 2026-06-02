@@ -7522,3 +7522,172 @@ class RefugioLead(models.Model):
 
     def __str__(self):
         return f"{self.nombre} · {self.email} · {self.created_at:%Y-%m-%d}"
+
+
+# ===========================================================================
+# Conexión-Masajes — Ficha de Bienestar para Masajes (v1: captura + ficha + admin)
+# Lenguaje de BIENESTAR (nunca médico/clínico). Canal v1 = email; WhatsApp pendiente
+# (Cloud API). Modelos nuevos (tablas nuevas) -> requieren migrate manual en Render.
+# ===========================================================================
+
+class BienestarMasajeFicha(models.Model):
+    """Ficha de bienestar individual por persona que recibe masaje.
+    NO es ficha clínica ni diagnóstico: solo preferencias/zonas de tensión para
+    adaptar la experiencia."""
+
+    OBJETIVO_CHOICES = [
+        ('relajacion', 'Relajación'),
+        ('reducir_estres', 'Reducir estrés'),
+        ('aliviar_tension_muscular', 'Aliviar tensión muscular'),
+        ('descanso', 'Descanso'),
+        ('recuperacion_deportiva', 'Recuperación deportiva'),
+        ('experiencia_pareja', 'Experiencia en pareja'),
+        ('otro', 'Otro'),
+    ]
+    INTENSIDAD_CHOICES = [('suave', 'Suave'), ('media', 'Media'), ('firme', 'Firme')]
+    ORIGEN_CHOICES = [
+        ('comprador', 'Comprador'), ('acompanante', 'Acompañante'),
+        ('recepcion', 'Recepción'), ('admin', 'Admin'),
+    ]
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'), ('completada', 'Completada'), ('incompleta', 'Incompleta'),
+    ]
+    FRECUENCIA_CHOICES = [
+        ('cada_15_dias', 'Cada 15 días'), ('mensual', 'Mensual'),
+        ('cada_2_meses', 'Cada 2 meses'), ('ocasional', 'Ocasional'),
+    ]
+
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, null=True, blank=True, related_name='fichas_bienestar')
+    reserva = models.ForeignKey(VentaReserva, on_delete=models.CASCADE, related_name='fichas_bienestar')
+    servicio_reservado = models.ForeignKey(ReservaServicio, on_delete=models.SET_NULL, null=True, blank=True, related_name='fichas_bienestar')
+
+    # Datos de la persona
+    nombre_completo = models.CharField(max_length=160)
+    telefono = models.CharField(max_length=30, blank=True)
+    email = models.EmailField(blank=True)
+    fecha_nacimiento = models.DateField(null=True, blank=True)
+    ciudad = models.CharField(max_length=120, blank=True)
+
+    # Preferencias de bienestar (todas opcionales)
+    objetivo_principal = models.CharField(max_length=30, choices=OBJETIVO_CHOICES, blank=True)
+    intensidad_preferida = models.CharField(max_length=10, choices=INTENSIDAD_CHOICES, blank=True)
+    zonas_tension = models.CharField(max_length=255, blank=True, verbose_name="Zonas de tensión")
+    zonas_evitar = models.CharField(max_length=255, blank=True, verbose_name="Zonas que prefiere evitar")
+    observaciones_bienestar = models.TextField(blank=True)
+    condiciones_declaradas = models.TextField(
+        blank=True,
+        help_text="Esta información se usa solo para adaptar la experiencia de bienestar. No constituye evaluación médica ni diagnóstico.",
+    )
+
+    # Consentimientos (registro legal: fecha + texto exacto aceptado)
+    consentimiento_datos = models.BooleanField(default=False)
+    consentimiento_marketing = models.BooleanField(default=False)
+    fecha_consentimiento = models.DateTimeField(null=True, blank=True)
+    consentimiento_texto = models.TextField(blank=True, help_text="Texto exacto del consentimiento aceptado.")
+
+    origen = models.CharField(max_length=12, choices=ORIGEN_CHOICES, default='acompanante')
+    estado_ficha = models.CharField(max_length=12, choices=ESTADO_CHOICES, default='pendiente', db_index=True)
+
+    # Resumen del terapeuta (post-masaje, se llena en el Admin). Solo bienestar, no médico.
+    obs_terapeuta = models.TextField(blank=True, verbose_name="Observaciones del terapeuta")
+    zonas_trabajadas = models.CharField(max_length=255, blank=True)
+    intensidad_aplicada = models.CharField(max_length=10, choices=INTENSIDAD_CHOICES, blank=True)
+    sugerencia_frecuencia = models.CharField(max_length=15, choices=FRECUENCIA_CHOICES, blank=True)
+    recomendacion_texto = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Ficha de bienestar (masaje)"
+        verbose_name_plural = "Fichas de bienestar (masajes)"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Ficha bienestar · {self.nombre_completo} · reserva {self.reserva_id}"
+
+
+class ParticipanteMasajeReserva(models.Model):
+    """Cada persona que recibe masaje en una reserva (comprador o acompañante)."""
+
+    TIPO_CHOICES = [('comprador', 'Comprador'), ('acompanante', 'Acompañante')]
+    ESTADO_CONTACTO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('email_enviado', 'Email enviado'),
+        ('formulario_abierto', 'Formulario abierto'),
+        ('ficha_completada', 'Ficha completada'),
+        ('no_responde', 'No responde'),
+    ]
+
+    reserva = models.ForeignKey(VentaReserva, on_delete=models.CASCADE, related_name='participantes_masaje')
+    cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True, related_name='participaciones_masaje')
+    ficha_bienestar = models.OneToOneField(BienestarMasajeFicha, on_delete=models.SET_NULL, null=True, blank=True, related_name='participante')
+
+    nombre = models.CharField(max_length=160, blank=True)
+    telefono = models.CharField(max_length=30, blank=True)
+    email = models.EmailField(blank=True)
+    tipo_participante = models.CharField(max_length=12, choices=TIPO_CHOICES)
+    estado_contacto = models.CharField(max_length=20, choices=ESTADO_CONTACTO_CHOICES, default='pendiente', db_index=True)
+
+    # Token único y seguro para el formulario público (patrón secrets.token_urlsafe)
+    token_formulario = models.CharField(max_length=64, unique=True, db_index=True, blank=True)
+    # 'fecha_envio' generaliza el antiguo 'fecha_envio_whatsapp' (canal v1 = email)
+    fecha_envio = models.DateTimeField(null=True, blank=True)
+    fecha_completado_formulario = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Participante de masaje"
+        verbose_name_plural = "Participantes de masaje"
+        ordering = ['reserva', 'tipo_participante']
+
+    def save(self, *args, **kwargs):
+        if not self.token_formulario:
+            import secrets
+            self.token_formulario = secrets.token_urlsafe(32)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.get_tipo_participante_display()} · {self.nombre or '(sin datos)'} · reserva {self.reserva_id}"
+
+
+class SeguimientoBienestarMasaje(models.Model):
+    """Email de seguimiento programado por participante (scaffolding v2 — el envío
+    automatizado se implementa en v2; en v1 solo se crea el modelo)."""
+
+    TIPO_EMAIL_CHOICES = [
+        ('gracias_visita', 'Gracias por la visita'),
+        ('encuesta_24h', 'Encuesta 24h'),
+        ('seguimiento_7d', 'Seguimiento 7 días'),
+        ('recomendacion_30d', 'Recomendación 30 días'),
+        ('reactivacion_60d', 'Reactivación 60 días'),
+        ('reactivacion_90d', 'Reactivación 90 días'),
+    ]
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'), ('enviado', 'Enviado'),
+        ('error', 'Error'), ('cancelado', 'Cancelado'),
+    ]
+
+    participante = models.ForeignKey(ParticipanteMasajeReserva, on_delete=models.CASCADE, related_name='seguimientos')
+    reserva = models.ForeignKey(VentaReserva, on_delete=models.CASCADE, related_name='seguimientos_masaje')
+    cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True, related_name='seguimientos_masaje')
+
+    tipo_email = models.CharField(max_length=20, choices=TIPO_EMAIL_CHOICES)
+    estado = models.CharField(max_length=12, choices=ESTADO_CHOICES, default='pendiente', db_index=True)
+    fecha_programada = models.DateTimeField(db_index=True)
+    fecha_envio = models.DateTimeField(null=True, blank=True)
+    asunto = models.CharField(max_length=255, blank=True)
+    cuerpo = models.TextField(blank=True)
+    error_log = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Seguimiento de bienestar (masaje)"
+        verbose_name_plural = "Seguimientos de bienestar (masajes)"
+        ordering = ['fecha_programada']
+
+    def __str__(self):
+        return f"{self.get_tipo_email_display()} · {self.estado} · {self.fecha_programada:%Y-%m-%d}"
