@@ -3,7 +3,9 @@
 Auth: header X-API-Key (LUNA_API_KEY), mismo esquema que la bandeja OVC.
 Rutas:
   POST /api/whatsapp/inbound        → guarda entrante, matchea/crea cliente, marca OVC
+  POST /api/whatsapp/inbound-media  → entrante con adjunto (foto/PDF/voz/video)
   POST /api/whatsapp/outbound       → guarda saliente ligado al cliente
+  POST /api/whatsapp/outbound-media → saliente con adjunto (foto/PDF/audio/video)
   GET  /api/whatsapp/conversation/  → historial (in+out) por teléfono
   GET  /api/whatsapp/conversations/ → lista de conversaciones (una fila por teléfono)
   POST /api/whatsapp/conversations/<phone>/marcar-atendido/ → saca de la cola de pendientes
@@ -316,15 +318,21 @@ def outbound(request):
         body=body, msg_type='text', timestamp=ts, status='sent',
     )
 
-    # Anti-saturación de la bandeja: registrar último contacto saliente.
+    _outbound_side_effects(cliente, phone, ts)
+
+    return JsonResponse({'ok': True, 'message_id': msg.id,
+                         'cliente_id': cliente.id if cliente else None})
+
+
+def _outbound_side_effects(cliente, phone, ts):
+    """Efectos comunes de un saliente: registrar último contacto (anti-saturación
+    de la bandeja) y limpiar la cola de pendientes (responder = atender)."""
     if cliente:
         try:
             cliente.ultimo_contacto_outbound = ts.date()
             cliente.save(update_fields=['ultimo_contacto_outbound'])
         except Exception:
             pass
-
-    # Responder YA cuenta como atender: limpia la cola de pendientes de ese teléfono.
     try:
         WhatsAppMessage.objects.filter(
             phone=phone[:20], direction='in', requiere_atencion=True,
@@ -332,8 +340,77 @@ def outbound(request):
     except Exception:
         pass
 
-    return JsonResponse({'ok': True, 'message_id': msg.id,
-                         'cliente_id': cliente.id if cliente else None})
+
+@csrf_exempt
+def outbound_media(request):
+    """POST /api/whatsapp/outbound-media (multipart/form-data) — saliente con adjunto.
+
+    Guarda el MISMO archivo que se envió por la Cloud API para mostrarlo en el hilo.
+    Idempotente por wa_message_id. No marca requiere_atencion (es saliente).
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    wa_id = (request.POST.get('wa_message_id') or '').strip()
+    phone = (request.POST.get('to') or '').strip()
+    if not wa_id or not phone:
+        return JsonResponse({'error': 'wa_message_id y to son obligatorios'}, status=400)
+
+    upload = request.FILES.get('file')
+    if not upload:
+        return JsonResponse({'error': "Falta el archivo 'file' (multipart/form-data)"}, status=400)
+
+    max_bytes = int(getattr(settings, 'WHATSAPP_MEDIA_MAX_BYTES', _MEDIA_MAX_BYTES_DEFAULT))
+    size = getattr(upload, 'size', 0) or 0
+    if size > max_bytes:
+        return JsonResponse({
+            'error': 'Archivo demasiado grande',
+            'max_bytes': max_bytes,
+            'max_mb': round(max_bytes / (1024 * 1024), 1),
+            'size_bytes': size,
+        }, status=413)
+
+    msg_type = (request.POST.get('type') or 'document').lower()[:30]
+    if msg_type not in _MEDIA_TYPES:
+        msg_type = 'document'
+    caption = request.POST.get('caption') or ''
+    mime_type = (request.POST.get('mime_type') or getattr(upload, 'content_type', '') or '')[:120]
+    original_filename = (request.POST.get('filename') or getattr(upload, 'name', '') or '')[:255]
+    ts = _parse_ts(request.POST.get('timestamp'))
+
+    existing = WhatsAppMessage.objects.filter(wa_message_id=wa_id).first()
+    if existing:
+        return JsonResponse({
+            'success': True, 'idempotent': True,
+            'message_id': existing.id,
+            'cliente_id': existing.cliente_id,
+            'media_url': _media_url(request, existing),
+        })
+
+    cliente = _match_or_create_cliente(phone)
+
+    ext = _guess_extension(original_filename, mime_type)
+    stored_name = f"{uuid.uuid4().hex}{ext}"
+
+    msg = WhatsAppMessage(
+        cliente=cliente, direction='out', wa_message_id=wa_id, phone=phone[:20],
+        body=caption, msg_type=msg_type, timestamp=ts, status='sent',
+        mime_type=mime_type, original_filename=original_filename,
+    )
+    msg.media_file.save(stored_name, upload, save=False)
+    msg.save()
+
+    _outbound_side_effects(cliente, phone, ts)
+
+    return JsonResponse({
+        'success': True,
+        'message_id': msg.id,
+        'cliente_id': cliente.id if cliente else None,
+        'media_url': _media_url(request, msg),
+    })
 
 
 def conversation(request):

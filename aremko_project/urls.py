@@ -58,6 +58,7 @@ urlpatterns = [
     path('api/whatsapp/inbound', whatsapp_api_views.inbound, name='whatsapp_inbound'),
     path('api/whatsapp/inbound-media', whatsapp_api_views.inbound_media, name='whatsapp_inbound_media'),
     path('api/whatsapp/outbound', whatsapp_api_views.outbound, name='whatsapp_outbound'),
+    path('api/whatsapp/outbound-media', whatsapp_api_views.outbound_media, name='whatsapp_outbound_media'),
     path('api/whatsapp/conversation/', whatsapp_api_views.conversation, name='whatsapp_conversation'),
     path('api/whatsapp/conversations/', whatsapp_api_views.conversations, name='whatsapp_conversations'),
     path('api/whatsapp/conversations/<str:phone>/marcar-atendido/', whatsapp_api_views.marcar_atendido, name='whatsapp_marcar_atendido'),
