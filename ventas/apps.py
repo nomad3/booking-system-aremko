@@ -40,6 +40,15 @@ class VentasConfig(AppConfig):
                 f"No se pudo importar giftcard_signals: {exc}"
             )
 
+        # Conexión-Masajes: signal que genera participantes al guardar un masaje
+        try:
+            import ventas.signals.masaje_signals  # noqa: F401
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"No se pudo importar masaje_signals: {exc}"
+            )
+
         # Los modelos ya están registrados en admin.py usando decoradores @admin.register
         # No necesitamos registrarlos manualmente aquí
         # Importar admin para asegurar que se ejecuten los decoradores

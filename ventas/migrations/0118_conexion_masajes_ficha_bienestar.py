@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='BienestarMasajeFicha',
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('nombre_completo', models.CharField(max_length=160)),
                 ('telefono', models.CharField(blank=True, max_length=30)),
                 ('email', models.EmailField(blank=True, max_length=254)),
@@ -53,7 +53,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ParticipanteMasajeReserva',
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('nombre', models.CharField(blank=True, max_length=160)),
                 ('telefono', models.CharField(blank=True, max_length=30)),
                 ('email', models.EmailField(blank=True, max_length=254)),
@@ -77,7 +77,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='SeguimientoBienestarMasaje',
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('tipo_email', models.CharField(max_length=20, choices=[('gracias_visita', 'Gracias por la visita'), ('encuesta_24h', 'Encuesta 24h'), ('seguimiento_7d', 'Seguimiento 7 días'), ('recomendacion_30d', 'Recomendación 30 días'), ('reactivacion_60d', 'Reactivación 60 días'), ('reactivacion_90d', 'Reactivación 90 días')])),
                 ('estado', models.CharField(default='pendiente', db_index=True, max_length=12, choices=[('pendiente', 'Pendiente'), ('enviado', 'Enviado'), ('error', 'Error'), ('cancelado', 'Cancelado')])),
                 ('fecha_programada', models.DateTimeField(db_index=True)),
