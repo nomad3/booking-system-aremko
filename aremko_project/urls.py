@@ -58,6 +58,8 @@ urlpatterns = [
     path('api/whatsapp/inbound', whatsapp_api_views.inbound, name='whatsapp_inbound'),
     path('api/whatsapp/outbound', whatsapp_api_views.outbound, name='whatsapp_outbound'),
     path('api/whatsapp/conversation/', whatsapp_api_views.conversation, name='whatsapp_conversation'),
+    path('api/whatsapp/conversations/', whatsapp_api_views.conversations, name='whatsapp_conversations'),
+    path('api/whatsapp/conversations/<str:phone>/marcar-atendido/', whatsapp_api_views.marcar_atendido, name='whatsapp_marcar_atendido'),
 
     # Landing campaña "Refugio Aremko" (lanzamiento 15-jun-2026)
     path('refugio/', refugio_landing_view, name='refugio_landing'),
