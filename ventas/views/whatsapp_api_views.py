@@ -10,13 +10,25 @@ Rutas:
 import json
 from datetime import datetime, timedelta, timezone as dt_tz
 
+from django.conf import settings
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 
 from ..models import WhatsAppMessage, ContactoWhatsApp, Cliente
-from .bandeja_whatsapp_views import _require_api_key
+
+
+def _check_luna_key(request):
+    """Auth alineada con /api/refugio-leads/summary/: valida X-API-Key contra
+    settings.LUNA_API_KEY (NO AUTOMATION_API_KEY). Header case-insensitive.
+    Devuelve None si OK, o JsonResponse 401 si falta/es inválida."""
+    expected = getattr(settings, 'LUNA_API_KEY', None)
+    # request.headers es case-insensitive (X-Api-Key == X-API-Key); META como respaldo.
+    provided = request.headers.get('X-API-Key') or request.META.get('HTTP_X_API_KEY')
+    if not expected or not provided or provided != expected:
+        return JsonResponse({'error': 'No autorizado. Se requiere header X-API-Key válido.'}, status=401)
+    return None
 
 
 def _parse_ts(value):
@@ -65,7 +77,7 @@ def _match_or_create_cliente(phone, nombre=''):
 
 @csrf_exempt
 def inbound(request):
-    err = _require_api_key(request)
+    err = _check_luna_key(request)
     if err:
         return err
     if request.method != 'POST':
@@ -134,7 +146,7 @@ def inbound(request):
 
 @csrf_exempt
 def outbound(request):
-    err = _require_api_key(request)
+    err = _check_luna_key(request)
     if err:
         return err
     if request.method != 'POST':
@@ -177,7 +189,7 @@ def outbound(request):
 
 
 def conversation(request):
-    err = _require_api_key(request)
+    err = _check_luna_key(request)
     if err:
         return err
     phone = (request.GET.get('phone') or '').strip()
