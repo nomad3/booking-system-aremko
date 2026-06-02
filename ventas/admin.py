@@ -6112,6 +6112,42 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
     search_fields = ('nombre_completo', 'telefono', 'email', 'reserva__id')
     autocomplete_fields = ('cliente',)
     readonly_fields = ('fecha_consentimiento', 'consentimiento_texto', 'created_at', 'updated_at')
+
+    # Campos que el masajista SÍ puede editar (resumen post-masaje); el resto, solo lectura.
+    THERAPIST_FIELDS = ('obs_terapeuta', 'zonas_trabajadas', 'intensidad_aplicada', 'sugerencia_frecuencia', 'recomendacion_texto')
+    MASAJISTA_READONLY = ('nombre_completo', 'telefono', 'objetivo_principal', 'intensidad_preferida',
+                          'zonas_tension', 'zonas_evitar', 'observaciones_bienestar', 'condiciones_declaradas')
+
+    def _es_masajista(self, request):
+        u = request.user
+        return (not u.is_superuser) and u.groups.filter(name='Masajistas').exists()
+
+    def get_fieldsets(self, request, obj=None):
+        if self._es_masajista(request):
+            return (
+                ('Cliente y preferencias (solo lectura)', {'fields': self.MASAJISTA_READONLY}),
+                ('Resumen del terapeuta (completa aquí)', {
+                    'fields': self.THERAPIST_FIELDS,
+                    'description': '⚠ Evitar lenguaje médico. Registrar solo observaciones de bienestar y experiencia (no diagnóstico ni tratamiento).',
+                }),
+            )
+        return self.fieldsets
+
+    def get_readonly_fields(self, request, obj=None):
+        if self._es_masajista(request):
+            return self.MASAJISTA_READONLY
+        return self.readonly_fields
+
+    def has_add_permission(self, request):
+        if self._es_masajista(request):
+            return False
+        return super().has_add_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        if self._es_masajista(request):
+            return False
+        return super().has_delete_permission(request, obj)
+
     fieldsets = (
         ('Persona', {'fields': ('cliente', 'reserva', 'servicio_reservado', 'nombre_completo', 'telefono', 'email', 'fecha_nacimiento', 'ciudad', 'origen', 'estado_ficha')}),
         ('Preferencias de bienestar', {'fields': ('objetivo_principal', 'intensidad_preferida', 'zonas_tension', 'zonas_evitar', 'observaciones_bienestar', 'condiciones_declaradas')}),
