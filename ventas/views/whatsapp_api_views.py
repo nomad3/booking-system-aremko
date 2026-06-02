@@ -197,6 +197,10 @@ def inbound(request):
 # Tipos de mensaje con adjunto que aceptamos.
 _MEDIA_TYPES = {'image', 'video', 'audio', 'voice', 'document', 'sticker'}
 
+# Tope de tamaño de adjunto (Cloudinary raw ~10 MB en planes bajos). Configurable
+# por settings.WHATSAPP_MEDIA_MAX_BYTES. Default 10 MB. El lado Go también limita.
+_MEDIA_MAX_BYTES_DEFAULT = 10 * 1024 * 1024
+
 
 @csrf_exempt
 def inbound_media(request):
@@ -220,6 +224,17 @@ def inbound_media(request):
     upload = request.FILES.get('file')
     if not upload:
         return JsonResponse({'error': "Falta el archivo 'file' (multipart/form-data)"}, status=400)
+
+    # Tope de tamaño: rechaza antes de subir a Cloudinary (evita el error de storage).
+    max_bytes = int(getattr(settings, 'WHATSAPP_MEDIA_MAX_BYTES', _MEDIA_MAX_BYTES_DEFAULT))
+    size = getattr(upload, 'size', 0) or 0
+    if size > max_bytes:
+        return JsonResponse({
+            'error': 'Archivo demasiado grande',
+            'max_bytes': max_bytes,
+            'max_mb': round(max_bytes / (1024 * 1024), 1),
+            'size_bytes': size,
+        }, status=413)
 
     msg_type = (request.POST.get('type') or 'document').lower()[:30]
     if msg_type not in _MEDIA_TYPES:
