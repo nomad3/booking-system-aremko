@@ -300,6 +300,10 @@ urlpatterns = [
         cron_views.cron_cruzar_reservas_contactos_whatsapp,
         name='cron_cruzar_reservas_contactos_whatsapp',
     ),
+    # Inventario — descontar comandas con fecha de entrega vencida
+    path('cron/entregas-comandas-vencidas/', cron_views.cron_entregas_comandas_vencidas, name='cron_entregas_comandas_vencidas'),
+    # Conexión-Masajes — enviar emails de seguimiento (si MASAJE_SEGUIMIENTOS_ACTIVOS=true)
+    path('cron/seguimientos-masaje/', cron_views.cron_seguimientos_masaje, name='cron_seguimientos_masaje'),
     # === END CRON JOBS ===
 
     # Pack Descuento Management

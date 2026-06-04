@@ -579,3 +579,75 @@ def cron_cruzar_reservas_contactos_whatsapp(request):
             "command": "cruzar_reservas_contactos_whatsapp",
             "duracion_segundos": elapsed,
         }, status=500)
+
+
+def _validar_cron_token(request):
+    """Valida el token de cron (env CRON_TOKEN). Devuelve None si OK o un
+    JsonResponse 403 si es inválido. Si no hay CRON_TOKEN seteado, no exige token."""
+    expected_token = os.getenv('CRON_TOKEN')
+    if expected_token:
+        request_token = request.GET.get('token') or request.POST.get('token')
+        if request_token != expected_token:
+            logger.warning("❌ Intento de acceso a cron con token inválido")
+            return JsonResponse({"ok": False, "error": "Token inválido"}, status=403)
+    return None
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_entregas_comandas_vencidas(request):
+    """Endpoint cron: descuenta inventario de comandas cuya fecha de entrega
+    objetivo ya venció y no se marcaron 'entregada'.
+
+    GET o POST: /ventas/cron/entregas-comandas-vencidas/?token=xxx
+    Frecuencia recomendada: Diario (ej. 06:30 AM).
+    """
+    err = _validar_cron_token(request)
+    if err:
+        return err
+    try:
+        output = StringIO()
+        call_command('procesar_entregas_comandas_vencidas', stdout=output)
+        logger.info("✅ Cron procesar_entregas_comandas_vencidas ejecutado vía HTTP")
+        return JsonResponse({
+            "ok": True,
+            "message": "Entregas de comandas vencidas procesadas",
+            "command": "procesar_entregas_comandas_vencidas",
+            "output": output.getvalue(),
+        })
+    except Exception as e:
+        logger.error(f"❌ Error en cron entregas-comandas-vencidas: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False, "error": str(e),
+            "command": "procesar_entregas_comandas_vencidas",
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_seguimientos_masaje(request):
+    """Endpoint cron: envía los emails de seguimiento de bienestar (masajes)
+    vencidos. Solo envía si MASAJE_SEGUIMIENTOS_ACTIVOS=true; si no, solo informa.
+
+    GET o POST: /ventas/cron/seguimientos-masaje/?token=xxx
+    Frecuencia recomendada: Diario (ej. 10:00 AM).
+    """
+    err = _validar_cron_token(request)
+    if err:
+        return err
+    try:
+        output = StringIO()
+        call_command('enviar_seguimientos_masaje', stdout=output)
+        logger.info("✅ Cron enviar_seguimientos_masaje ejecutado vía HTTP")
+        return JsonResponse({
+            "ok": True,
+            "message": "Seguimientos de masaje procesados",
+            "command": "enviar_seguimientos_masaje",
+            "output": output.getvalue(),
+        })
+    except Exception as e:
+        logger.error(f"❌ Error en cron seguimientos-masaje: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False, "error": str(e),
+            "command": "enviar_seguimientos_masaje",
+        }, status=500)
