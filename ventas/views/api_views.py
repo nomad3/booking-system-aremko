@@ -135,16 +135,11 @@ class VentaReservaViewSet(viewsets.ModelViewSet):
 
                 producto = get_object_or_404(Producto, id=producto_id)
 
-                # Verificar si hay inventario suficiente
-                if producto.cantidad_disponible < cantidad:
-                    raise ValidationError(f"No hay suficiente inventario para el producto {producto.nombre}.")
-
-                # El inventario se descuenta AUTOMÁTICAMENTE al crear el
-                # ReservaProducto (signal post_save `actualizar_inventario`,
-                # created=True → reducir_inventario). NO descontar también aquí:
-                # hacerlo duplicaba el descuento de stock (bug "duplicó la
-                # cantidad de productos ingresados"). El chequeo de stock de
-                # arriba ya impide vender sin inventario.
+                # NO se bloquea la venta por falta de stock: el producto se vende
+                # ahora (sin fecha_entrega) y el inventario se descuenta recién al
+                # ENTREGAR (cuando se setea fecha_entrega). Regla "vender igual".
+                # El descuento lo hace el signal post_save `actualizar_inventario`
+                # según fecha_entrega — acá NO se descuenta a mano (duplicaba).
                 ReservaProducto.objects.create(
                     venta_reserva=venta_reserva,
                     producto=producto,

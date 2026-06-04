@@ -5404,16 +5404,21 @@ Aquí está tu link para hacer tu pedido de cafetería/bar:
 
         super().save(*args, **kwargs)
 
-        # Propagar fecha_entrega a ReservaProducto cuando la comanda pasa a 'entregada'
+        # Propagar fecha_entrega a ReservaProducto cuando la comanda pasa a 'entregada'.
+        # IMPORTANTE: se itera y se hace save() por instancia (NO .update()), porque
+        # .update() NO dispara el signal post_save y, con la regla "descontar al
+        # entregar", el inventario se descuenta justo en este momento (fecha NULL→hoy).
         if self.estado == 'entregada' and estado_anterior and estado_anterior != 'entregada':
             from django.utils import timezone
             hoy = timezone.now().date()
             for detalle in self.detalles.select_related('producto').all():
-                ReservaProducto.objects.filter(
+                for rp in ReservaProducto.objects.filter(
                     venta_reserva=self.venta_reserva,
                     producto=detalle.producto,
                     fecha_entrega__isnull=True,
-                ).update(fecha_entrega=hoy)
+                ):
+                    rp.fecha_entrega = hoy
+                    rp.save(update_fields=['fecha_entrega'])  # dispara el descuento de stock
 
         # Auto-crear ReservaProducto por cada DetalleComanda (solo si es nueva comanda)
         # y NO viene del admin (el admin usa save_formset para esto)

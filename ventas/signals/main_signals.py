@@ -435,23 +435,47 @@ def actualizar_total_al_guardar_producto(sender, instance, created, raw, using, 
 
 @receiver(post_save, sender=ReservaProducto) # Keep this signal for inventory updates
 def actualizar_inventario(sender, instance, created, **kwargs):
+    """Regla de negocio: el inventario se descuenta cuando el producto se ENTREGA,
+    no cuando se vende. Un ReservaProducto descuenta stock solo si tiene
+    `fecha_entrega`; mientras esté en NULL (vendido pero no entregado) no toca el
+    inventario.
+
+    Se usa un único cálculo de "stock retenido por esta línea" para cubrir todos
+    los casos sin doble conteo:
+        retenido = cantidad   si fecha_entrega != NULL
+                 = 0          si fecha_entrega == NULL
+    El ajuste a aplicar es (retenido_ahora - retenido_antes):
+        - crear con fecha     → descuenta cantidad
+        - crear sin fecha      → no toca stock
+        - poner fecha (entrega)→ descuenta cantidad (NULL→fecha)
+        - quitar fecha         → devuelve stock (fecha→NULL)
+        - cambiar cantidad ya entregado → ajusta solo el delta
+    """
     try:
         producto = instance.producto
-        if producto:
-            if created:
-                with transaction.atomic():
-                    producto.reducir_inventario(instance.cantidad)
+        if not producto:
+            return
+
+        if created:
+            retenido_antes = 0
+        else:
+            fecha_antes = getattr(instance, '_fecha_entrega_anterior', None)
+            cant_antes = getattr(instance, '_cantidad_anterior', 0)
+            retenido_antes = cant_antes if fecha_antes is not None else 0
+
+        retenido_ahora = instance.cantidad if instance.fecha_entrega is not None else 0
+
+        diff = retenido_ahora - retenido_antes
+        if diff == 0:
+            return
+
+        with transaction.atomic():
+            # Re-fetch product inside transaction for safety
+            prod_atomic = Producto.objects.select_for_update().get(pk=producto.pk)
+            if diff > 0:
+                prod_atomic.reducir_inventario(diff)
             else:
-                cantidad_anterior = getattr(instance, '_cantidad_anterior', 0)
-                diferencia = instance.cantidad - cantidad_anterior
-                if diferencia != 0:
-                    with transaction.atomic():
-                        # Re-fetch product inside transaction for safety
-                        prod_atomic = Producto.objects.select_for_update().get(pk=producto.pk)
-                        if diferencia > 0:
-                            prod_atomic.reducir_inventario(diferencia)
-                        else:
-                            prod_atomic.incrementar_inventario(-diferencia)
+                prod_atomic.incrementar_inventario(-diff)
     except ObjectDoesNotExist:
         logger.warning(f"Producto not found when updating inventory for ReservaProducto {instance.pk}.")
     except Exception as e:
@@ -464,13 +488,19 @@ def actualizar_inventario(sender, instance, created, **kwargs):
 
 @receiver(pre_save, sender=ReservaProducto) # Keep this signal for inventory updates
 def guardar_cantidad_anterior(sender, instance, **kwargs):
+    """Guarda cantidad y fecha_entrega ANTERIORES para que actualizar_inventario
+    detecte el delta de cantidad y la transición de fecha (NULL↔fecha)."""
     if instance.pk:
         try:
-            instance._cantidad_anterior = ReservaProducto.objects.get(pk=instance.pk).cantidad
+            anterior = ReservaProducto.objects.get(pk=instance.pk)
+            instance._cantidad_anterior = anterior.cantidad
+            instance._fecha_entrega_anterior = anterior.fecha_entrega
         except ReservaProducto.DoesNotExist:
             instance._cantidad_anterior = 0
+            instance._fecha_entrega_anterior = None
     else:
         instance._cantidad_anterior = 0
+        instance._fecha_entrega_anterior = None
 
 @receiver(pre_save, sender=ReservaProducto)
 def congelar_precio_producto(sender, instance, **kwargs):
@@ -500,9 +530,12 @@ def congelar_precio_servicio(sender, instance, **kwargs):
 
 @receiver(post_delete, sender=ReservaProducto) # Keep this signal for inventory updates
 def restaurar_inventario_al_eliminar_producto(sender, instance, **kwargs):
+    # Devolver stock SOLO si la línea ya había descontado (tenía fecha_entrega).
+    # Si se elimina una venta aún no entregada (fecha_entrega NULL), nunca tocó
+    # el inventario, así que no hay que devolver nada.
     try:
         producto = instance.producto
-        if producto:
+        if producto and instance.fecha_entrega is not None:
             with transaction.atomic():
                 # Re-fetch product to be safe and lock
                 producto_obj = Producto.objects.select_for_update().get(pk=producto.pk)
