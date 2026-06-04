@@ -79,6 +79,87 @@ def _contenido(tipo, nombre):
     return ("Aremko", f"{saludo}\n\nGracias por visitarnos." + FIRMA)
 
 
+CAMPOS_RESUMEN_TERAPEUTA = (
+    'obs_terapeuta', 'zonas_trabajadas', 'intensidad_aplicada',
+    'sugerencia_frecuencia', 'recomendacion_texto',
+)
+
+
+def ficha_tiene_resumen_terapeuta(ficha):
+    """True si la masajista ya cargó al menos un campo del resumen del terapeuta."""
+    return any((getattr(ficha, c, '') or '').strip() for c in CAMPOS_RESUMEN_TERAPEUTA)
+
+
+def _contenido_resumen(ficha, nombre):
+    """Email 'resumen de bienestar' (F7) armado con lo que cargó la masajista.
+    Transaccional (informa sobre la propia sesión) + CTA suave a reservar.
+    Lenguaje de bienestar, NUNCA médico."""
+    n = nombre or ""
+    saludo = f"Hola {n}," if n else "Hola,"
+    lineas = [
+        saludo,
+        "",
+        "Queremos compartirte un breve resumen de tu experiencia de bienestar en Aremko:",
+        "",
+    ]
+    if (ficha.zonas_trabajadas or '').strip():
+        lineas.append(f"• Zonas trabajadas: {ficha.zonas_trabajadas.strip()}")
+    if (ficha.intensidad_aplicada or '').strip():
+        lineas.append(f"• Intensidad aplicada: {ficha.intensidad_aplicada.strip()}")
+    if (ficha.obs_terapeuta or '').strip():
+        lineas.append(f"• Observaciones: {ficha.obs_terapeuta.strip()}")
+    if (ficha.sugerencia_frecuencia or '').strip():
+        lineas.append(f"• Sugerencia de frecuencia: {ficha.sugerencia_frecuencia.strip()}")
+    if (ficha.recomendacion_texto or '').strip():
+        lineas.append("")
+        lineas.append(ficha.recomendacion_texto.strip())
+    lineas += [
+        "",
+        f"Cuando quieras volver a darte este espacio, reserva aquí: {RESERVAR_URL}",
+        FIRMA.strip(),
+    ]
+    return ("Tu resumen de bienestar en Aremko 🌿", "\n".join(lineas))
+
+
+def programar_resumen_bienestar(ficha):
+    """Programa (inmediato) el email de resumen cuando la masajista completa su
+    resumen. Idempotente: un solo 'resumen_bienestar' por participante. Devuelve
+    el Seguimiento creado o None."""
+    from ..models import SeguimientoBienestarMasaje
+
+    if not ficha_tiene_resumen_terapeuta(ficha):
+        return None
+    participante = getattr(ficha, 'participante', None)  # OneToOne reverse
+    if participante is None:
+        return None
+    if SeguimientoBienestarMasaje.objects.filter(
+        participante=participante, tipo_email='resumen_bienestar',
+    ).exists():
+        return None
+
+    cliente = participante.cliente or getattr(ficha, 'cliente', None)
+    email = (participante.email or getattr(ficha, 'email', '') or
+             (cliente.email if cliente else '') or '').strip()
+    if not email:
+        return None
+
+    nombre = ((participante.nombre or (cliente.nombre if cliente else '') or '')
+              .strip().split(' ')[0])
+    asunto, cuerpo = _contenido_resumen(ficha, nombre)
+    seg = SeguimientoBienestarMasaje.objects.create(
+        participante=participante,
+        reserva=participante.reserva,
+        cliente=cliente,
+        tipo_email='resumen_bienestar',
+        fecha_programada=timezone.now(),
+        asunto=asunto,
+        cuerpo=cuerpo,
+        estado='pendiente',
+    )
+    logger.info("[Masajes] Resumen de bienestar programado para participante %s", participante.id)
+    return seg
+
+
 def programar_seguimientos_masaje(participante):
     """Crea los SeguimientoBienestarMasaje pendientes para el participante (al
     completar su ficha). Idempotente por (participante, tipo_email). Comerciales

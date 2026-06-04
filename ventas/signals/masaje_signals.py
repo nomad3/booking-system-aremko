@@ -10,7 +10,7 @@ import logging
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from ..models import ReservaServicio
+from ..models import ReservaServicio, BienestarMasajeFicha
 
 logger = logging.getLogger(__name__)
 
@@ -31,3 +31,14 @@ def generar_participantes_al_guardar_masaje(sender, instance, **kwargs):
         generar_participantes_masaje(venta)
     except Exception as exc:  # nunca interrumpir el guardado de la reserva
         logger.warning("[Masajes] No se generaron participantes (no critico): %s", exc)
+
+
+@receiver(post_save, sender=BienestarMasajeFicha, dispatch_uid='masaje_programar_resumen')
+def programar_resumen_al_completar_terapeuta(sender, instance, **kwargs):
+    """Cuando la masajista completa su resumen en la ficha, programa el email de
+    'resumen de bienestar' (F7). Defensivo + idempotente (no reenvía)."""
+    try:
+        from ..services.masaje_seguimiento_service import programar_resumen_bienestar
+        programar_resumen_bienestar(instance)
+    except Exception as exc:  # nunca interrumpir el guardado de la ficha
+        logger.warning("[Masajes] No se programó el resumen de bienestar (no critico): %s", exc)

@@ -7706,6 +7706,7 @@ class SeguimientoBienestarMasaje(models.Model):
     TIPO_EMAIL_CHOICES = [
         ('gracias_visita', 'Gracias por la visita'),
         ('encuesta_24h', 'Encuesta 24h'),
+        ('resumen_bienestar', 'Resumen de bienestar (post-masaje)'),
         ('seguimiento_7d', 'Seguimiento 7 días'),
         ('recomendacion_30d', 'Recomendación 30 días'),
         ('reactivacion_60d', 'Reactivación 60 días'),
