@@ -410,6 +410,22 @@ class ComandaInline(admin.TabularInline):
 from .models import BienestarMasajeFicha, ParticipanteMasajeReserva, SeguimientoBienestarMasaje
 from django.utils.html import format_html as _format_html_masaje
 
+MASAJE_BASE_URL = "https://www.aremko.cl"
+
+
+def _masaje_link_copiable(url, etiqueta="Copiar link"):
+    """Widget de admin: campo de solo-lectura con la URL + botón que la copia al
+    portapapeles (para que Deborah la pegue en WhatsApp en vez de abrirla)."""
+    return _format_html_masaje(
+        '<input type="text" readonly value="{}" style="width:250px;font-size:11px;" '
+        'onclick="this.select();"> '
+        '<button type="button" style="font-size:11px;cursor:pointer;" '
+        "onclick=\"var i=this.previousElementSibling;i.select();"
+        "if(navigator.clipboard)navigator.clipboard.writeText(i.value);"
+        "this.textContent='✓ Copiado';return false;\">\U0001F4CB {}</button>",
+        url, etiqueta,
+    )
+
 
 class ParticipanteMasajeReservaInline(admin.TabularInline):
     """Conexión-Masajes: participantes de masaje de la reserva (comprador + acompañantes)."""
@@ -430,16 +446,16 @@ class ParticipanteMasajeReservaInline(admin.TabularInline):
         if not obj or not obj.token_formulario:
             return '—'
         from django.urls import reverse
-        ficha = reverse('masaje_ficha', kwargs={'token': obj.token_formulario})
-        out = _format_html_masaje('<a href="{}" target="_blank">Ficha de bienestar</a>', ficha)
-        # El link "Registrar acompañante" solo aplica si la reserva tiene acompañante
-        # (masaje de 2+). En el masaje individual no se muestra.
+        from django.utils.safestring import mark_safe
+        ficha = MASAJE_BASE_URL + reverse('masaje_ficha', kwargs={'token': obj.token_formulario})
+        partes = [_masaje_link_copiable(ficha, 'Copiar link ficha')]
+        # "Registrar acompañante" solo si la reserva tiene acompañante (masaje 2+).
         if obj.tipo_participante == 'comprador' and obj.reserva_id and \
                 obj.reserva.participantes_masaje.filter(tipo_participante='acompanante').exists():
-            acomp = reverse('masaje_registrar_acompanante', kwargs={'token': obj.token_formulario})
-            out = _format_html_masaje('{} &nbsp;|&nbsp; <a href="{}" target="_blank">Registrar acompañante</a>', out, acomp)
-        return out
-    enlaces.short_description = 'Enlaces (token)'
+            acomp = MASAJE_BASE_URL + reverse('masaje_registrar_acompanante', kwargs={'token': obj.token_formulario})
+            partes.append(_masaje_link_copiable(acomp, 'Copiar link acompañante'))
+        return mark_safe('<br>'.join(partes))
+    enlaces.short_description = 'Enlaces (copiar para WhatsApp)'
 
 
 class VentaReservaAdmin(admin.ModelAdmin):
@@ -6195,16 +6211,16 @@ class ParticipanteMasajeReservaAdmin(admin.ModelAdmin):
     actions = ['enviar_ficha_email', 'enviar_link_acompanante']
 
     def enlaces_envio(self, obj):
-        """Muestra el link de la ficha + un link wa.me listo para enviar por
-        WhatsApp a mano (mientras el WhatsApp automático no esté conectado)."""
+        """Link de la ficha COPIABLE (para pegar en WhatsApp) + un link wa.me que
+        abre el chat con el mensaje ya armado (envío manual de Deborah)."""
         if not obj or not obj.token_formulario:
             return '—'
         from django.urls import reverse
+        from django.utils.safestring import mark_safe
         from urllib.parse import quote
         ruta = reverse('masaje_ficha', kwargs={'token': obj.token_formulario})
-        url = f"https://www.aremko.cl{ruta}"
-        partes = [_format_html_masaje(
-            '<b>Ficha:</b> <a href="{}" target="_blank">{}</a>', url, url)]
+        url = f"{MASAJE_BASE_URL}{ruta}"
+        partes = [_masaje_link_copiable(url, 'Copiar link ficha')]
         tel = ''.join(ch for ch in (obj.telefono or '') if ch.isdigit())
         if tel:
             nombre = (obj.nombre or '').split(' ')[0]
@@ -6212,9 +6228,9 @@ class ParticipanteMasajeReservaAdmin(admin.ModelAdmin):
                    f"masaje, completa tu ficha de bienestar (1 min): {url}")
             wa = f"https://wa.me/{tel}?text={quote(msg)}"
             partes.append(_format_html_masaje(
-                '<b>WhatsApp:</b> <a href="{}" target="_blank">Abrir chat con el link</a>', wa))
-        return _format_html_masaje('<br>'.join('{}' for _ in partes), *partes)
-    enlaces_envio.short_description = 'Enviar ficha (email / WhatsApp)'
+                '<a href="{}" target="_blank">💬 Abrir WhatsApp con el mensaje listo</a>', wa))
+        return mark_safe('<br>'.join(partes))
+    enlaces_envio.short_description = 'Enviar ficha (copiar link / WhatsApp)'
 
     def enviar_ficha_email(self, request, queryset):
         """Envía por email a cada participante (con email) el link de su ficha."""
