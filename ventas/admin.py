@@ -6156,17 +6156,54 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
 
     # Campos que el masajista SÍ puede editar (resumen post-masaje); el resto, solo lectura.
     THERAPIST_FIELDS = ('obs_terapeuta', 'zonas_trabajadas', 'intensidad_aplicada', 'sugerencia_frecuencia', 'recomendacion_texto')
-    MASAJISTA_READONLY = ('nombre_completo', 'telefono', 'objetivo_principal', 'intensidad_preferida',
+    # Lo que el masajista PUEDE ver (NO incluye teléfono, email ni datos de contacto):
+    # identificación mínima (nombre + horario + N° reserva) + preferencias de bienestar.
+    MASAJISTA_READONLY = ('m_nombre', 'm_reserva', 'm_fecha_servicio', 'm_hora_servicio',
+                          'objetivo_principal', 'intensidad_preferida',
                           'zonas_tension', 'zonas_evitar', 'observaciones_bienestar', 'condiciones_declaradas')
 
     def _es_masajista(self, request):
         u = request.user
         return (not u.is_superuser) and u.groups.filter(name='Masajistas').exists()
 
+    # --- Campos de solo lectura "seguros" para el masajista (sin datos de contacto) ---
+    def _masaje_rs(self, obj):
+        if not obj or not obj.reserva_id:
+            return None
+        return (obj.reserva.reservaservicios
+                .filter(servicio__tipo_servicio='masaje')
+                .order_by('fecha_agendamiento', 'hora_inicio')
+                .first())
+
+    def m_nombre(self, obj):
+        return (obj.nombre_completo or (obj.cliente.nombre if obj and obj.cliente_id else '') or '—')
+    m_nombre.short_description = 'Cliente'
+
+    def m_reserva(self, obj):
+        return f"#{obj.reserva_id}" if (obj and obj.reserva_id) else '—'
+    m_reserva.short_description = 'N° de reserva'
+
+    def m_fecha_servicio(self, obj):
+        rs = self._masaje_rs(obj)
+        return rs.fecha_agendamiento.strftime('%d/%m/%Y') if (rs and rs.fecha_agendamiento) else '—'
+    m_fecha_servicio.short_description = 'Fecha del servicio'
+
+    def m_hora_servicio(self, obj):
+        rs = self._masaje_rs(obj)
+        return str(rs.hora_inicio)[:5] if (rs and rs.hora_inicio) else '—'
+    m_hora_servicio.short_description = 'Hora'
+
     def get_fieldsets(self, request, obj=None):
         if self._es_masajista(request):
             return (
-                ('Cliente y preferencias (solo lectura)', {'fields': self.MASAJISTA_READONLY}),
+                ('Cliente y horario', {
+                    'fields': ('m_nombre', 'm_reserva', 'm_fecha_servicio', 'm_hora_servicio'),
+                    'description': 'Datos mínimos para preparar la sesión.',
+                }),
+                ('Preferencias de bienestar (solo lectura)', {
+                    'fields': ('objetivo_principal', 'intensidad_preferida', 'zonas_tension',
+                               'zonas_evitar', 'observaciones_bienestar', 'condiciones_declaradas'),
+                }),
                 ('Resumen del terapeuta (completa aquí)', {
                     'fields': self.THERAPIST_FIELDS,
                     'description': '⚠ Evitar lenguaje médico. Registrar solo observaciones de bienestar y experiencia (no diagnóstico ni tratamiento).',
@@ -6178,6 +6215,20 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
         if self._es_masajista(request):
             return self.MASAJISTA_READONLY
         return self.readonly_fields
+
+    def get_list_display(self, request):
+        # El masajista NO ve teléfono/email en el listado (el default ya los omite,
+        # pero fijamos columnas seguras explícitamente).
+        if self._es_masajista(request):
+            return ('m_nombre', 'm_reserva', 'm_fecha_servicio', 'objetivo_principal',
+                    'intensidad_preferida', 'estado_ficha')
+        return self.list_display
+
+    def get_search_fields(self, request):
+        # Evitar que el masajista busque por teléfono/email.
+        if self._es_masajista(request):
+            return ('nombre_completo', 'reserva__id')
+        return self.search_fields
 
     def has_add_permission(self, request):
         if self._es_masajista(request):
