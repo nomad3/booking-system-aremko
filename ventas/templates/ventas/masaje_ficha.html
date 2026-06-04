@@ -1,113 +1,128 @@
-{% extends "ventas/base_public.html" %}
-{% block title %}Ficha de Bienestar · Aremko Spa{% endblock %}
-{% block meta_description %}<meta name="description" content="Completa tu ficha de bienestar para adaptar tu experiencia de masaje en Aremko Spa.">{% endblock %}
-
-{% block content %}
-<section class="py-5" style="background:var(--background);min-height:70vh;">
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-7 col-md-9">
-
-        <div class="text-center mb-4">
-          <h1 class="h3" style="color:var(--dark-gray);">Tu Ficha de Bienestar</h1>
-          <p class="text-muted">Cuéntanos tus preferencias para adaptar tu experiencia de masaje. Toma menos de 2 minutos.</p>
-        </div>
-
-        {% if exito %}
-          <div class="card shadow-sm"><div class="card-body p-4 p-md-5 text-center">
-            <i class="fas fa-check-circle text-success" style="font-size:3rem;"></i>
-            <h2 class="h4 mt-3">¡Gracias! Tu ficha quedó registrada.</h2>
-            <p class="text-muted mb-0">Tu terapeuta la usará para adaptar tu experiencia de bienestar. ¡Te esperamos en Aremko!</p>
-          </div></div>
-        {% elif ya_completada %}
-          <div class="card shadow-sm"><div class="card-body p-4 p-md-5 text-center">
-            <i class="fas fa-info-circle text-primary" style="font-size:2.6rem;"></i>
-            <h2 class="h5 mt-3">Esta ficha ya fue completada</h2>
-            <p class="text-muted mb-0">Si necesitas corregir algún dato, escríbenos por WhatsApp y lo ajustamos.</p>
-          </div></div>
-        {% else %}
-          {% if error %}<div class="alert alert-warning">{{ error }}</div>{% endif %}
-          <form method="post" class="card shadow-sm"><div class="card-body p-4 p-md-5">
-            {% csrf_token %}
-            <div class="row g-3">
-              <div class="col-md-6">
-                <label class="form-label">Nombre completo *</label>
-                <input type="text" name="nombre_completo" class="form-control" required maxlength="160" value="{{ participante.nombre }}">
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">Teléfono (WhatsApp) *</label>
-                <input type="tel" name="telefono" class="form-control" required maxlength="30" placeholder="+56 9 ..." value="{{ participante.telefono }}">
-              </div>
-              <div class="col-12">
-                <label class="form-label">Email <span class="text-muted">(opcional)</span></label>
-                <input type="email" name="email" class="form-control" maxlength="254" value="{{ participante.email }}">
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">Objetivo principal de tu experiencia</label>
-                <select name="objetivo_principal" class="form-select">
-                  <option value="">Elige una opción…</option>
-                  {% for val, lbl in objetivos %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
-                </select>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">Intensidad preferida</label>
-                <select name="intensidad_preferida" class="form-select">
-                  <option value="">Elige una opción…</option>
-                  {% for val, lbl in intensidades %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
-                </select>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">Zonas de tensión</label>
-                <input type="text" name="zonas_tension" class="form-control" maxlength="255" placeholder="Ej: cuello, espalda baja">
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">Zonas que prefieres evitar</label>
-                <input type="text" name="zonas_evitar" class="form-control" maxlength="255">
-              </div>
-              <div class="col-12">
-                <label class="form-label">Observaciones para adaptar tu experiencia <span class="text-muted">(opcional)</span></label>
-                <textarea name="observaciones_bienestar" class="form-control" rows="2"></textarea>
-              </div>
-              <div class="col-12">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" name="alergia_aceites" id="alergia_aceites"
-                         onchange="document.getElementById('alergia_detalle_wrap').style.display = this.checked ? 'block' : 'none';">
-                  <label class="form-check-label" for="alergia_aceites">
-                    ¿Tienes sensibilidad o alergia a algún aceite de masaje?
-                  </label>
-                </div>
-                <div class="mt-2" id="alergia_detalle_wrap" style="display:none;">
-                  <label class="form-label">¿A cuál aceite? <span class="text-muted">(si lo sabes)</span></label>
-                  <input type="text" name="alergia_aceites_detalle" class="form-control" placeholder="Ej: almendras, coco…">
-                </div>
-              </div>
-              <div class="col-12">
-                <label class="form-label">Algo que debamos considerar <span class="text-muted">(opcional)</span></label>
-                <textarea name="condiciones_declaradas" class="form-control" rows="2"></textarea>
-                <div class="form-text">Esta información se usa solo para adaptar tu experiencia de bienestar. No constituye evaluación médica ni diagnóstico.</div>
-              </div>
-
-              <div class="col-12 mt-2">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" name="consentimiento_datos" id="cdatos" required>
-                  <label class="form-check-label" for="cdatos">{{ consent_datos_texto }} *</label>
-                </div>
-                <div class="form-check mt-2">
-                  <input class="form-check-input" type="checkbox" name="consentimiento_marketing" id="cmkt">
-                  <label class="form-check-label" for="cmkt">{{ consent_mkt_texto }}</label>
-                </div>
-                <p class="form-text mt-2">Ver nuestra <a href="{% url 'privacidad' %}" target="_blank" rel="noopener">Política de Privacidad</a>.</p>
-              </div>
-
-              <div class="col-12 text-center mt-2">
-                <button type="submit" class="btn btn-primary px-4"><i class="fas fa-spa me-2"></i>Enviar mi ficha</button>
-              </div>
-            </div>
-          </div></form>
-        {% endif %}
-
-      </div>
-    </div>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Tu Ficha de Bienestar · Aremko Spa</title>
+  <meta name="description" content="Completa tu ficha de bienestar para adaptar tu experiencia de masaje en Aremko Spa.">
+  <style>
+    :root { --brown:#b5651d; --bg:#faf6f0; --line:#eee3d4; --dark:#3a3a3a; }
+    * { box-sizing:border-box; }
+    body { font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg);
+           color:var(--dark); margin:0; padding:0 0 48px; -webkit-text-size-adjust:100%; }
+    .top { background:var(--brown); color:#fff; text-align:center; padding:18px 16px; }
+    .top .logo { font-size:1.35rem; font-weight:700; letter-spacing:.02em; }
+    .top .tag { font-size:13px; opacity:.92; margin-top:3px; }
+    .wrap { max-width:560px; margin:0 auto; padding:18px 16px; }
+    h1 { font-size:1.4rem; margin:6px 0 4px; text-align:center; }
+    .lead { color:#888; text-align:center; font-size:14px; margin:0 0 18px; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:18px 16px;
+            box-shadow:0 2px 10px rgba(0,0,0,.04); }
+    label { display:block; font-size:14px; color:#555; font-weight:600; margin:14px 0 6px; }
+    label .opt { color:#aaa; font-weight:400; }
+    input[type=text], input[type=tel], input[type=email], textarea, select {
+      width:100%; font-size:16px; padding:12px 13px; border:1px solid #ccc; border-radius:11px;
+      background:#fff; color:var(--dark); }
+    textarea { min-height:70px; resize:vertical; }
+    .req { color:var(--brown); }
+    .hint { color:#999; font-size:12px; margin-top:5px; }
+    .check { display:flex; align-items:flex-start; gap:10px; margin-top:14px; font-size:14px; line-height:1.4; }
+    .check input { width:20px; height:20px; margin-top:2px; flex:0 0 auto; }
+    .btn { display:block; width:100%; background:var(--brown); color:#fff; border:none; border-radius:13px;
+           padding:16px; font-size:17px; font-weight:700; margin-top:22px; cursor:pointer; }
+    .btn:active { opacity:.85; }
+    .alert { background:#fff3cd; border:1px solid #ffe69c; color:#8a6d3b; border-radius:11px; padding:12px; margin-bottom:14px; }
+    .state { background:#fff; border:1px solid var(--line); border-radius:16px; padding:30px 20px; text-align:center; }
+    .state .ic { font-size:3rem; }
+    a { color:var(--brown); }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="logo">🌿 Aremko Spa</div>
+    <div class="tag">Puerto Varas</div>
   </div>
-</section>
-{% endblock %}
+
+  <div class="wrap">
+    {% if exito %}
+      <div class="state">
+        <div class="ic">✅</div>
+        <h1>¡Gracias! Tu ficha quedó registrada.</h1>
+        <p class="lead">Tu terapeuta la usará para adaptar tu experiencia de bienestar. ¡Te esperamos en Aremko!</p>
+      </div>
+    {% elif ya_completada %}
+      <div class="state">
+        <div class="ic">📋</div>
+        <h1>Esta ficha ya fue completada</h1>
+        <p class="lead">Si necesitas corregir algún dato, escríbenos por WhatsApp y lo ajustamos.</p>
+      </div>
+    {% else %}
+      <h1>Tu Ficha de Bienestar</h1>
+      <p class="lead">Cuéntanos tus preferencias para adaptar tu experiencia de masaje. Toma menos de 2 minutos.</p>
+
+      {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="card">
+          <label>Nombre completo <span class="req">*</span></label>
+          <input type="text" name="nombre_completo" required maxlength="160" value="{{ participante.nombre }}">
+
+          <label>Teléfono (WhatsApp) <span class="req">*</span></label>
+          <input type="tel" name="telefono" required maxlength="30" placeholder="+56 9 ..." value="{{ participante.telefono }}">
+
+          <label>Email <span class="opt">(opcional)</span></label>
+          <input type="email" name="email" maxlength="254" value="{{ participante.email }}">
+
+          <label>Objetivo principal de tu experiencia</label>
+          <select name="objetivo_principal">
+            <option value="">Elige una opción…</option>
+            {% for val, lbl in objetivos %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
+          </select>
+
+          <label>Intensidad preferida</label>
+          <select name="intensidad_preferida">
+            <option value="">Elige una opción…</option>
+            {% for val, lbl in intensidades %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
+          </select>
+
+          <label>Zonas de tensión</label>
+          <input type="text" name="zonas_tension" maxlength="255" placeholder="Ej: cuello, espalda baja">
+
+          <label>Zonas que prefieres evitar</label>
+          <input type="text" name="zonas_evitar" maxlength="255">
+
+          <label>Observaciones para adaptar tu experiencia <span class="opt">(opcional)</span></label>
+          <textarea name="observaciones_bienestar" rows="2"></textarea>
+
+          <div class="check">
+            <input type="checkbox" name="alergia_aceites" id="alergia_aceites"
+                   onchange="document.getElementById('alergia_detalle_wrap').style.display = this.checked ? 'block' : 'none';">
+            <label for="alergia_aceites" style="margin:0;font-weight:600;">¿Tienes sensibilidad o alergia a algún aceite de masaje?</label>
+          </div>
+          <div id="alergia_detalle_wrap" style="display:none;">
+            <label>¿A cuál aceite? <span class="opt">(si lo sabes)</span></label>
+            <input type="text" name="alergia_aceites_detalle" placeholder="Ej: almendras, coco…">
+          </div>
+
+          <label>Algo que debamos considerar <span class="opt">(opcional)</span></label>
+          <textarea name="condiciones_declaradas" rows="2"></textarea>
+          <div class="hint">Esta información se usa solo para adaptar tu experiencia de bienestar. No constituye evaluación médica ni diagnóstico.</div>
+
+          <div class="check">
+            <input type="checkbox" name="consentimiento_datos" id="cdatos" required>
+            <label for="cdatos" style="margin:0;font-weight:400;">{{ consent_datos_texto }} <span class="req">*</span></label>
+          </div>
+          <div class="check">
+            <input type="checkbox" name="consentimiento_marketing" id="cmkt">
+            <label for="cmkt" style="margin:0;font-weight:400;">{{ consent_mkt_texto }}</label>
+          </div>
+          <div class="hint">Ver nuestra <a href="{% url 'privacidad' %}" target="_blank" rel="noopener">Política de Privacidad</a>.</div>
+
+          <button type="submit" class="btn">🌿 Enviar mi ficha</button>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+</body>
+</html>
