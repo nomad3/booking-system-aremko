@@ -6185,6 +6185,21 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
             prov = Proveedor.objects.filter(email__iexact=request.user.email).first()
         return prov
 
+    def get_queryset(self, request):
+        """Regla de acceso: solo admin/coordinación ven todas las fichas; un
+        masajista solo ve/abre las fichas de los masajes ASIGNADOS a él. Nadie más.
+        Filtra a nivel de datos: una ficha no asignada no es accesible ni por URL."""
+        qs = super().get_queryset(request)
+        if self._es_masajista(request):
+            prov = self._proveedor_de_usuario(request)
+            if not prov:
+                return qs.none()
+            return qs.filter(
+                reserva__reservaservicios__servicio__tipo_servicio='masaje',
+                reserva__reservaservicios__proveedor_asignado=prov,
+            ).distinct()
+        return qs
+
     def _es_asignado(self, request, obj):
         """True si algún masaje de la reserva de esta ficha está asignado al
         Proveedor del usuario logueado."""
