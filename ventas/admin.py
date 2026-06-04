@@ -6191,8 +6191,72 @@ class ParticipanteMasajeReservaAdmin(admin.ModelAdmin):
     list_filter = ('tipo_participante', 'estado_contacto')
     search_fields = ('nombre', 'telefono', 'email', 'reserva__id')
     autocomplete_fields = ('cliente',)
-    readonly_fields = ('token_formulario', 'created_at', 'updated_at')
-    actions = ['enviar_link_acompanante']
+    readonly_fields = ('token_formulario', 'created_at', 'updated_at', 'enlaces_envio')
+    actions = ['enviar_ficha_email', 'enviar_link_acompanante']
+
+    def enlaces_envio(self, obj):
+        """Muestra el link de la ficha + un link wa.me listo para enviar por
+        WhatsApp a mano (mientras el WhatsApp automático no esté conectado)."""
+        if not obj or not obj.token_formulario:
+            return '—'
+        from django.urls import reverse
+        from urllib.parse import quote
+        ruta = reverse('masaje_ficha', kwargs={'token': obj.token_formulario})
+        url = f"https://www.aremko.cl{ruta}"
+        partes = [_format_html_masaje(
+            '<b>Ficha:</b> <a href="{}" target="_blank">{}</a>', url, url)]
+        tel = ''.join(ch for ch in (obj.telefono or '') if ch.isdigit())
+        if tel:
+            nombre = (obj.nombre or '').split(' ')[0]
+            msg = (f"Hola {nombre}, te escribimos de Aremko Spa. Para preparar tu "
+                   f"masaje, completa tu ficha de bienestar (1 min): {url}")
+            wa = f"https://wa.me/{tel}?text={quote(msg)}"
+            partes.append(_format_html_masaje(
+                '<b>WhatsApp:</b> <a href="{}" target="_blank">Abrir chat con el link</a>', wa))
+        return _format_html_masaje('<br>'.join('{}' for _ in partes), *partes)
+    enlaces_envio.short_description = 'Enviar ficha (email / WhatsApp)'
+
+    def enviar_ficha_email(self, request, queryset):
+        """Envía por email a cada participante (con email) el link de su ficha."""
+        from django.core.mail import EmailMessage
+        from django.conf import settings
+        from django.urls import reverse
+        enviados = sin_email = 0
+        for p in queryset:
+            if not p.email:
+                sin_email += 1
+                continue
+            link = request.build_absolute_uri(
+                reverse('masaje_ficha', kwargs={'token': p.token_formulario})
+            )
+            nombre = (p.nombre or '').split(' ')[0]
+            cuerpo = (
+                f"Hola {nombre},\n\n"
+                "Para preparar tu experiencia de masaje en Aremko, te pedimos completar "
+                "una ficha breve de bienestar (toma 1 minuto):\n\n"
+                f"{link}\n\n"
+                "Es opcional, pero nos ayuda a adaptar tu masaje a lo que necesitas.\n\n"
+                "Con cariño,\nEquipo Aremko · Puerto Varas"
+            )
+            try:
+                EmailMessage(
+                    subject="Completa tu ficha de bienestar · Aremko Spa",
+                    body=cuerpo,
+                    from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'comunicaciones@aremko.cl'),
+                    to=[p.email],
+                ).send(fail_silently=False)
+                if p.estado_contacto in ('pendiente', ''):
+                    p.estado_contacto = 'email_enviado'
+                p.fecha_envio = timezone.now()
+                p.save(update_fields=['estado_contacto', 'fecha_envio', 'updated_at'])
+                enviados += 1
+            except Exception as exc:
+                self.message_user(request, f"Error con {p.email}: {exc}", level=messages.ERROR)
+        msg = f"{enviados} ficha(s) enviada(s) por email."
+        if sin_email:
+            msg += f" {sin_email} sin email (omitidos)."
+        self.message_user(request, msg)
+    enviar_ficha_email.short_description = "📧 Enviar ficha de bienestar por email"
 
     def enviar_link_acompanante(self, request, queryset):
         """Envía por email al comprador el link para registrar a su acompañante."""
