@@ -6235,12 +6235,26 @@ class SeguimientoBienestarMasajeAdmin(admin.ModelAdmin):
     list_filter = ('estado', 'tipo_email')
     search_fields = ('participante__nombre', 'reserva__id', 'asunto')
     readonly_fields = ('created_at',)
-    actions = ['cancelar_seguimiento']
+    actions = ['cancelar_seguimiento', 'enviar_ahora_prueba']
 
     def cancelar_seguimiento(self, request, queryset):
         n = queryset.filter(estado='pendiente').update(estado='cancelado')
         self.message_user(request, f"{n} seguimiento(s) cancelado(s).")
     cancelar_seguimiento.short_description = "Cancelar seguimientos pendientes"
+
+    def enviar_ahora_prueba(self, request, queryset):
+        """Envía AHORA los seguimientos seleccionados, ignorando el flag global
+        MASAJE_SEGUIMIENTOS_ACTIVOS. Útil para probar el email puntualmente sin
+        encender el envío automático para todos."""
+        from .services.masaje_seguimiento_service import enviar_seguimiento
+        enviados = errores = 0
+        for seg in queryset.exclude(estado='cancelado'):
+            if enviar_seguimiento(seg):
+                enviados += 1
+            else:
+                errores += 1
+        self.message_user(request, f"Prueba: {enviados} enviado(s), {errores} con error.")
+    enviar_ahora_prueba.short_description = "Enviar AHORA (prueba, ignora el flag global)"
 
 
 # WhatsApp Cloud API — mensajes (solo lectura, para visibilidad del equipo)
