@@ -1181,6 +1181,7 @@ class ProveedorAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'es_masajista', 'porcentaje_comision', 'telefono', 'email', 'banco')
     list_filter = ('es_masajista', 'banco')
     search_fields = ('nombre', 'rut', 'email')
+    raw_id_fields = ('usuario',)
 
     fieldsets = (
         ('Información Básica', {
@@ -1189,6 +1190,11 @@ class ProveedorAdmin(admin.ModelAdmin):
         ('Configuración de Pagos', {
             'fields': ('es_masajista', 'porcentaje_comision', 'rut'),
             'description': 'Configuración para el sistema de pagos a masajistas'
+        }),
+        ('Acceso del masajista', {
+            'fields': ('usuario',),
+            'description': 'Usuario de login de este masajista. Al vincularlo, solo verá/editará '
+                           'las fichas de bienestar de los masajes que tenga asignados.',
         }),
         ('Datos Bancarios', {
             'fields': ('banco', 'tipo_cuenta', 'numero_cuenta'),
@@ -6166,6 +6172,27 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
         u = request.user
         return (not u.is_superuser) and u.groups.filter(name='Masajistas').exists()
 
+    def _proveedor_de_usuario(self, request):
+        """El Proveedor (masajista) vinculado al usuario de login. Primero por el
+        vínculo explícito Proveedor.usuario; si no, por email coincidente."""
+        from .models import Proveedor
+        prov = Proveedor.objects.filter(usuario=request.user).first()
+        if not prov and getattr(request.user, 'email', ''):
+            prov = Proveedor.objects.filter(email__iexact=request.user.email).first()
+        return prov
+
+    def _es_asignado(self, request, obj):
+        """True si algún masaje de la reserva de esta ficha está asignado al
+        Proveedor del usuario logueado."""
+        if obj is None or not obj.reserva_id:
+            return False
+        prov = self._proveedor_de_usuario(request)
+        if not prov:
+            return False
+        return obj.reserva.reservaservicios.filter(
+            servicio__tipo_servicio='masaje', proveedor_asignado=prov,
+        ).exists()
+
     # --- Campos de solo lectura "seguros" para el masajista (sin datos de contacto) ---
     def _masaje_rs(self, obj):
         if not obj or not obj.reserva_id:
@@ -6174,6 +6201,12 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
                 .filter(servicio__tipo_servicio='masaje')
                 .order_by('fecha_agendamiento', 'hora_inicio')
                 .first())
+
+    def m_asignacion(self, obj):
+        rs = self._masaje_rs(obj)
+        prov = rs.proveedor_asignado if rs else None
+        return prov.nombre if prov else '— Sin masajista asignado —'
+    m_asignacion.short_description = 'Masajista asignado'
 
     def m_nombre(self, obj):
         return (obj.nombre_completo or (obj.cliente.nombre if obj and obj.cliente_id else '') or '—')
@@ -6195,33 +6228,42 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
 
     def get_fieldsets(self, request, obj=None):
         if self._es_masajista(request):
+            asignado = self._es_asignado(request, obj)
+            resumen_desc = (
+                '⚠ Evitar lenguaje médico (solo bienestar/experiencia, no diagnóstico).'
+                if asignado else
+                '🔒 Esta ficha NO está asignada a ti: es solo lectura. Solo el masajista asignado puede completar el resumen.'
+            )
             return (
                 ('Cliente y horario', {
-                    'fields': ('m_nombre', 'm_reserva', 'm_fecha_servicio', 'm_hora_servicio'),
+                    'fields': ('m_nombre', 'm_reserva', 'm_fecha_servicio', 'm_hora_servicio', 'm_asignacion'),
                     'description': 'Datos mínimos para preparar la sesión.',
                 }),
                 ('Preferencias de bienestar (solo lectura)', {
                     'fields': ('objetivo_principal', 'intensidad_preferida', 'zonas_tension',
                                'zonas_evitar', 'observaciones_bienestar', 'condiciones_declaradas'),
                 }),
-                ('Resumen del terapeuta (completa aquí)', {
+                ('Resumen del terapeuta', {
                     'fields': self.THERAPIST_FIELDS,
-                    'description': '⚠ Evitar lenguaje médico. Registrar solo observaciones de bienestar y experiencia (no diagnóstico ni tratamiento).',
+                    'description': resumen_desc,
                 }),
             )
         return self.fieldsets
 
     def get_readonly_fields(self, request, obj=None):
         if self._es_masajista(request):
-            return self.MASAJISTA_READONLY
+            ro = list(self.MASAJISTA_READONLY) + ['m_asignacion']
+            # Si NO es la masajista asignada, también el resumen es solo lectura.
+            if not self._es_asignado(request, obj):
+                ro += list(self.THERAPIST_FIELDS)
+            return tuple(ro)
         return self.readonly_fields
 
     def get_list_display(self, request):
-        # El masajista NO ve teléfono/email en el listado (el default ya los omite,
-        # pero fijamos columnas seguras explícitamente).
+        # El masajista NO ve teléfono/email en el listado; sí ve a quién está asignada.
         if self._es_masajista(request):
-            return ('m_nombre', 'm_reserva', 'm_fecha_servicio', 'objetivo_principal',
-                    'intensidad_preferida', 'estado_ficha')
+            return ('m_nombre', 'm_reserva', 'm_fecha_servicio', 'm_asignacion',
+                    'estado_ficha')
         return self.list_display
 
     def get_search_fields(self, request):
@@ -6234,6 +6276,16 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
         if self._es_masajista(request):
             return False
         return super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        # El masajista solo puede EDITAR (guardar el resumen) si la ficha está
+        # asignada a él. Con obj=None (listado) devolvemos True para que pueda
+        # entrar; las no asignadas se abren en solo lectura (tiene view por grupo).
+        if self._es_masajista(request):
+            if obj is None:
+                return True
+            return self._es_asignado(request, obj)
+        return super().has_change_permission(request, obj)
 
     def has_delete_permission(self, request, obj=None):
         if self._es_masajista(request):

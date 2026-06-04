@@ -36,6 +36,16 @@ class Proveedor(models.Model):
         help_text='Indica si este proveedor es un masajista',
         verbose_name='Es Masajista'
     )
+    # Vínculo con el usuario de login del masajista. Permite que cada masajista
+    # vea/edite SOLO las fichas de los masajes que tiene asignados (proveedor_asignado).
+    usuario = models.OneToOneField(
+        User,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='proveedor',
+        help_text='Usuario de login de este proveedor (para masajistas: ver/editar sus fichas asignadas).',
+        verbose_name='Usuario vinculado',
+    )
     rut = models.CharField(
         max_length=12,
         blank=True,
