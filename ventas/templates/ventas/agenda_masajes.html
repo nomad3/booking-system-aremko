@@ -5,29 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Agenda de Masajes · Aremko</title>
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; background:#faf6f0; color:#333; margin:0; padding:0; }
-    .wrap { max-width: 1000px; margin: 0 auto; padding: 16px; }
-    h1 { font-size: 1.5rem; margin: 12px 0 4px; }
-    .sub { color:#888; font-size: 13px; margin-bottom: 16px; }
-    .bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; background:#fff; border:1px solid #eee;
-           border-radius:10px; padding:12px; margin-bottom:14px; }
-    .bar input[type=date]{ padding:6px 8px; font-size:14px; border:1px solid #ccc; border-radius:6px; }
-    .btn { display:inline-block; padding:6px 12px; border-radius:6px; text-decoration:none; font-size:13px;
-           border:1px solid #b5651d; color:#b5651d; background:#fff; cursor:pointer; }
-    .btn:hover { background:#b5651d; color:#fff; }
-    .btn-primary { background:#b5651d; color:#fff; }
-    .btn[disabled], .btn.disabled { opacity:.4; pointer-events:none; }
-    table { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden;
-            box-shadow:0 1px 3px rgba(0,0,0,.06); }
-    th, td { text-align:left; padding:10px 12px; border-bottom:1px solid #f0eadf; font-size:14px; }
-    th { background:#b5651d; color:#fff; font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
-    tr:last-child td { border-bottom:none; }
-    .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; }
+    :root { --brown:#b5651d; --bg:#faf6f0; --line:#eee3d4; }
+    * { box-sizing:border-box; }
+    body { font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:#333; margin:0; padding:0 0 40px; -webkit-text-size-adjust:100%; }
+    .wrap { max-width:680px; margin:0 auto; padding:14px 14px 0; }
+    a.toplink { color:var(--brown); text-decoration:none; font-size:14px; }
+    h1 { font-size:1.5rem; margin:10px 0 2px; }
+    .sub { color:#888; font-size:13px; margin-bottom:14px; }
+    .bar { background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px; margin-bottom:14px; }
+    .bar .nav { display:flex; gap:8px; align-items:center; }
+    .bar input[type=date]{ flex:1; min-width:0; padding:9px 8px; font-size:16px; border:1px solid #ccc; border-radius:9px; }
+    .bar .count { color:#666; font-size:13px; text-align:center; margin-top:8px; }
+    .btn { display:inline-block; padding:9px 12px; border-radius:9px; text-decoration:none; font-size:14px;
+           border:1px solid var(--brown); color:var(--brown); background:#fff; cursor:pointer; white-space:nowrap; }
+    .btn:active { opacity:.8; }
+    .btn-primary { background:var(--brown); color:#fff; }
+    .btn.disabled { opacity:.4; pointer-events:none; }
+    /* tarjetas de masaje */
+    .mcard { background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px;
+             box-shadow:0 1px 4px rgba(0,0,0,.05); }
+    .mc-top { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .mc-hora { font-size:1.3rem; font-weight:800; color:#222; }
+    .mc-cliente { font-size:1.05rem; font-weight:700; margin:8px 0 2px; }
+    .mc-meta { color:#777; font-size:13px; }
+    .mc-action { margin-top:12px; }
+    .mc-action .btn-primary { display:block; text-align:center; padding:13px; font-size:15px; }
+    .pill { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; }
     .ok { background:#e6f4ea; color:#1e7e34; }
     .pend { background:#fff3cd; color:#8a6d3b; }
-    .empty { text-align:center; color:#999; padding:30px; }
-    .hora { font-weight:700; white-space:nowrap; }
-    a.toplink { color:#b5651d; text-decoration:none; font-size:13px; }
+    .empty { text-align:center; color:#999; padding:34px 16px; background:#fff; border:1px solid var(--line); border-radius:14px; }
+    .nomas { color:#999; font-size:14px; }
   </style>
 </head>
 <body>
@@ -38,53 +45,43 @@
       {% if es_masajista %}Mostrando <b>tus masajes asignados</b>.{% else %}Mostrando <b>todos los masajes</b> de la fecha.{% endif %}
     </div>
 
-    <form method="get" class="bar">
-      {% if fecha_prev_iso %}
-        <a class="btn" href="?fecha={{ fecha_prev_iso }}">‹ Día anterior</a>
-      {% else %}
-        <span class="btn disabled">‹ Día anterior</span>
-      {% endif %}
-      <input type="date" name="fecha" value="{{ fecha_iso }}" min="{{ hoy_iso }}" onchange="this.form.submit()">
-      <a class="btn" href="?fecha={{ fecha_next_iso }}">Día siguiente ›</a>
-      {% if not es_hoy %}<a class="btn" href="?fecha={{ hoy_iso }}">Hoy</a>{% endif %}
-      <span style="margin-left:auto;color:#666;font-size:13px;">{{ total }} masaje{{ total|pluralize }} · {{ fecha|date:"l d/m/Y" }}</span>
-    </form>
+    <div class="bar">
+      <div class="nav">
+        {% if fecha_prev_iso %}<a class="btn" href="?fecha={{ fecha_prev_iso }}">‹</a>{% else %}<span class="btn disabled">‹</span>{% endif %}
+        <form method="get" style="flex:1;display:flex;">
+          <input type="date" name="fecha" value="{{ fecha_iso }}" min="{{ hoy_iso }}" onchange="this.form.submit()">
+        </form>
+        <a class="btn" href="?fecha={{ fecha_next_iso }}">›</a>
+        {% if not es_hoy %}<a class="btn" href="?fecha={{ hoy_iso }}">Hoy</a>{% endif %}
+      </div>
+      <div class="count">{{ total }} masaje{{ total|pluralize }} · {{ fecha|date:"l d/m/Y" }}</div>
+    </div>
 
     {% if masajista_sin_vinculo %}
-      <div class="empty">Tu usuario no está vinculado a un proveedor/masajista. Pide a administración que vincule tu usuario en <b>Proveedores → Acceso del masajista</b>.</div>
+      <div class="empty">Tu usuario no está vinculado a un proveedor/masajista. Pide a administración que lo vincule en <b>Proveedores → Acceso del masajista</b>.</div>
     {% elif filas %}
-      <table>
-        <thead>
-          <tr>
-            <th>Hora</th><th>Cliente</th><th>Tipo</th><th>Masajista</th><th>Ficha</th><th>Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for f in filas %}
-          <tr>
-            <td class="hora">{{ f.hora|default:"—" }}</td>
-            <td>{{ f.nombre }}<br><small style="color:#999;">Reserva #{{ f.reserva_id }}</small></td>
-            <td>{{ f.tipo }}</td>
-            <td>{{ f.masajista }}</td>
-            <td>
-              {% if f.ficha_id %}<span class="pill ok">✓ Completada</span>
-              {% else %}<span class="pill pend">Pendiente del cliente</span>{% endif %}
-            </td>
-            <td>
-              {% if f.ficha_id %}
-                {% if es_masajista %}
-                  <a class="btn btn-primary" href="{% url 'ventas:ficha_masajista' f.ficha_id %}">Abrir ficha</a>
-                {% else %}
-                  <a class="btn btn-primary" href="/admin/ventas/bienestarmasajeficha/{{ f.ficha_id }}/change/">Abrir ficha</a>
-                {% endif %}
+      {% for f in filas %}
+        <div class="mcard">
+          <div class="mc-top">
+            <span class="mc-hora">{{ f.hora|default:"—" }}</span>
+            {% if f.ficha_id %}<span class="pill ok">✓ Ficha completada</span>
+            {% else %}<span class="pill pend">Ficha pendiente</span>{% endif %}
+          </div>
+          <div class="mc-cliente">{{ f.nombre }}</div>
+          <div class="mc-meta">Reserva #{{ f.reserva_id }} · {{ f.tipo }}{% if not es_masajista %} · {{ f.masajista }}{% endif %}</div>
+          <div class="mc-action">
+            {% if f.ficha_id %}
+              {% if es_masajista %}
+                <a class="btn-primary btn" href="{% url 'ventas:ficha_masajista' f.ficha_id %}">Abrir ficha</a>
               {% else %}
-                <span style="color:#999;font-size:13px;">— sin ficha aún —</span>
+                <a class="btn-primary btn" href="/admin/ventas/bienestarmasajeficha/{{ f.ficha_id }}/change/">Abrir ficha</a>
               {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+            {% else %}
+              <span class="nomas">— el cliente aún no completó su ficha —</span>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
     {% else %}
       <div class="empty">No hay masajes para esta fecha.</div>
     {% endif %}
