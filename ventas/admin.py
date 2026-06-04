@@ -4156,16 +4156,11 @@ class ComandaAdmin(admin.ModelAdmin):
                         messages.warning(request, f"• {msg}")
                     messages.info(request, "La comanda se guardó pero algunos productos no actualizaron inventario")
 
-                # Crear ReservaProducto para cada detalle (solo si hay stock)
+                # Crear ReservaProducto para cada detalle, con fecha_entrega=NULL.
+                # El stock NO se descuenta al crear la comanda: se descuenta al
+                # entregar (estado='entregada') o al vencer la fecha objetivo (cron).
+                # Por eso se crean TODOS (incluso sin stock: "vender igual").
                 for detalle in comanda.detalles.all():
-                    # Solo procesar si hay stock suficiente
-                    if detalle.producto.cantidad_disponible >= detalle.cantidad:
-                        # Determinar fecha de entrega para ReservaProducto
-                        if comanda.fecha_entrega_objetivo:
-                            fecha_entrega_reserva = comanda.fecha_entrega_objetivo.date()
-                        else:
-                            fecha_entrega_reserva = timezone.now().date()
-
                         # Crear o actualizar ReservaProducto
                         try:
                             ReservaProducto.objects.get_or_create(
@@ -4174,7 +4169,7 @@ class ComandaAdmin(admin.ModelAdmin):
                                 defaults={
                                     'cantidad': detalle.cantidad,
                                     'precio_unitario_venta': detalle.precio_unitario,
-                                    'fecha_entrega': fecha_entrega_reserva
+                                    'fecha_entrega': None,  # se setea al entregar / al vencer objetivo
                                 }
                             )
                         except Exception as e:

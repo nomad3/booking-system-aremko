@@ -5404,40 +5404,57 @@ Aquí está tu link para hacer tu pedido de cafetería/bar:
 
         super().save(*args, **kwargs)
 
-        # Propagar fecha_entrega a ReservaProducto cuando la comanda pasa a 'entregada'.
-        # IMPORTANTE: se itera y se hace save() por instancia (NO .update()), porque
-        # .update() NO dispara el signal post_save y, con la regla "descontar al
-        # entregar", el inventario se descuenta justo en este momento (fecha NULL→hoy).
+        # Al pasar a 'entregada', descontar el inventario de sus productos.
         if self.estado == 'entregada' and estado_anterior and estado_anterior != 'entregada':
-            from django.utils import timezone
-            hoy = timezone.now().date()
-            for detalle in self.detalles.select_related('producto').all():
-                for rp in ReservaProducto.objects.filter(
-                    venta_reserva=self.venta_reserva,
-                    producto=detalle.producto,
-                    fecha_entrega__isnull=True,
-                ):
-                    rp.fecha_entrega = hoy
-                    rp.save(update_fields=['fecha_entrega'])  # dispara el descuento de stock
+            self.entregar_inventario()
 
         # Auto-crear ReservaProducto por cada DetalleComanda (solo si es nueva comanda)
-        # y NO viene del admin (el admin usa save_formset para esto)
+        # y NO viene del admin (el admin usa save_formset para esto).
+        # IMPORTANTE: se crea con fecha_entrega=NULL (NO la fecha objetivo). El stock
+        # NO se descuenta al crear la comanda: se descuenta recién cuando la comanda
+        # se entrega (estado='entregada') o cuando llega la fecha objetivo (cron).
+        # La fecha planificada vive en Comanda.fecha_entrega_objetivo.
         if is_new and not getattr(self, '_from_admin', False):
-            from django.utils import timezone
             for detalle in self.detalles.all():
-                # Determinar fecha de entrega para ReservaProducto
-                fecha_entrega_reserva = self.fecha_entrega_objetivo.date() if self.fecha_entrega_objetivo else timezone.now().date()
-
-                # Crear o actualizar ReservaProducto
                 ReservaProducto.objects.get_or_create(
                     venta_reserva=self.venta_reserva,
                     producto=detalle.producto,
                     defaults={
                         'cantidad': detalle.cantidad,
                         'precio_unitario_venta': detalle.precio_unitario,
-                        'fecha_entrega': fecha_entrega_reserva
+                        'fecha_entrega': None,  # se setea al entregar / al vencer objetivo
                     }
                 )
+
+    def entregar_inventario(self, fecha=None):
+        """Marca como entregados (setea fecha_entrega) los ReservaProducto de esta
+        comanda que aún no la tienen, lo que dispara el descuento de inventario vía
+        el signal post_save. Idempotente: las líneas ya entregadas (con fecha) se
+        omiten, así no hay doble descuento.
+
+        Se llama desde dos lados:
+          - al pasar la comanda a 'entregada' (entrega real anticipada o a tiempo),
+          - desde el cron `procesar_entregas_comandas_vencidas` cuando llega la
+            fecha objetivo sin que se haya marcado entregada.
+
+        Devuelve la cantidad de líneas marcadas.
+        """
+        from django.utils import timezone
+        if not self.venta_reserva:
+            return 0
+        if fecha is None:
+            fecha = timezone.now().date()
+        marcadas = 0
+        for detalle in self.detalles.select_related('producto').all():
+            for rp in ReservaProducto.objects.filter(
+                venta_reserva=self.venta_reserva,
+                producto=detalle.producto,
+                fecha_entrega__isnull=True,
+            ):
+                rp.fecha_entrega = fecha
+                rp.save(update_fields=['fecha_entrega'])  # dispara el descuento de stock
+                marcadas += 1
+        return marcadas
 
 
 class DetalleComanda(models.Model):

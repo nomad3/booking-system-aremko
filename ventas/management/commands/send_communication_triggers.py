@@ -163,6 +163,17 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"❌ Error en newsletters VIP: {str(e)}"))
             raise
 
+    def _run_inventory_deliveries(self):
+        """Descuenta inventario de comandas cuya fecha de entrega objetivo ya
+        venció y que no fueron marcadas como 'entregada'."""
+        from django.core.management import call_command
+        self.stdout.write("📦 Procesando entregas de inventario (comandas vencidas)...")
+        try:
+            call_command('procesar_entregas_comandas_vencidas')
+            self.stdout.write(self.style.SUCCESS("✅ Entregas de inventario procesadas"))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"❌ Error en entregas de inventario: {str(e)}"))
+
     def _run_all_triggers(self):
         """Ejecuta todos los triggers en secuencia"""
         self.stdout.write("🎯 Ejecutando todos los triggers...")
@@ -173,6 +184,7 @@ class Command(BaseCommand):
             ("🎂 Cumpleaños", self._run_birthday_messages),
             ("🔄 Reactivación", self._run_reactivation_campaigns),
             ("👑 VIP", self._run_vip_newsletters),
+            ("📦 Entregas inventario (comandas vencidas)", self._run_inventory_deliveries),
         ]
         
         for name, trigger_func in triggers:
