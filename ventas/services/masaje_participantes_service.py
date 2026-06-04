@@ -78,3 +78,44 @@ def generar_participantes_masaje(venta_reserva):
                 len(creados), getattr(venta_reserva, 'id', '?'),
             )
         return creados
+
+
+def sincronizar_participantes_masaje(venta_reserva):
+    """Ajusta a la baja los participantes cuando se quitan líneas de masaje.
+
+    target = suma de cantidad_personas de las líneas de masaje (0 si no quedan).
+    Si hay más participantes que target, elimina los SOBRANTES que NO tengan ficha
+    completada (acompañantes primero, luego comprador). NUNCA borra un participante
+    con ficha completada (preserva el dato). Devuelve cuántos eliminó."""
+    from ..models import ParticipanteMasajeReserva
+
+    masajes = venta_reserva.reservaservicios.filter(
+        servicio__tipo_servicio='masaje', cantidad_personas__gte=1,
+    )
+    target = sum((m.cantidad_personas or 1) for m in masajes)
+
+    participantes = list(
+        ParticipanteMasajeReserva.objects.filter(reserva=venta_reserva)
+    )
+    sobran = len(participantes) - target
+    if sobran <= 0:
+        return 0
+
+    # Solo se pueden quitar los que NO tienen ficha completada.
+    removibles = [
+        p for p in participantes
+        if not p.ficha_bienestar_id and p.estado_contacto != 'ficha_completada'
+    ]
+    # Acompañantes primero (id como desempate estable).
+    removibles.sort(key=lambda p: (0 if p.tipo_participante == 'acompanante' else 1, p.id))
+
+    eliminados = 0
+    for p in removibles[:sobran]:
+        p.delete()
+        eliminados += 1
+    if eliminados:
+        logger.info(
+            "[Masajes] %d participante(s) sobrante(s) eliminado(s) de reserva %s",
+            eliminados, getattr(venta_reserva, 'id', '?'),
+        )
+    return eliminados

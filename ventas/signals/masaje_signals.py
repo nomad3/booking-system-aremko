@@ -7,7 +7,7 @@ del migrate en Render— o hay cualquier error, se traga y se loguea).
 """
 
 import logging
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
 from ..models import ReservaServicio, BienestarMasajeFicha
@@ -31,6 +31,23 @@ def generar_participantes_al_guardar_masaje(sender, instance, **kwargs):
         generar_participantes_masaje(venta)
     except Exception as exc:  # nunca interrumpir el guardado de la reserva
         logger.warning("[Masajes] No se generaron participantes (no critico): %s", exc)
+
+
+@receiver(post_delete, sender=ReservaServicio, dispatch_uid='masaje_limpiar_participantes')
+def limpiar_participantes_al_eliminar_masaje(sender, instance, **kwargs):
+    """Al eliminar una línea de masaje, quita los participantes que sobren (sin
+    ficha completada). Defensivo: nunca rompe la eliminación."""
+    try:
+        servicio = getattr(instance, 'servicio', None)
+        if getattr(servicio, 'tipo_servicio', None) != 'masaje':
+            return
+        venta = getattr(instance, 'venta_reserva', None)
+        if venta is None or not getattr(venta, 'pk', None):
+            return  # si se borró toda la reserva, los participantes caen por cascade
+        from ..services.masaje_participantes_service import sincronizar_participantes_masaje
+        sincronizar_participantes_masaje(venta)
+    except Exception as exc:
+        logger.warning("[Masajes] No se limpiaron participantes (no critico): %s", exc)
 
 
 @receiver(post_save, sender=BienestarMasajeFicha, dispatch_uid='masaje_programar_resumen')
