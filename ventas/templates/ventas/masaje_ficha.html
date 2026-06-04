@@ -69,6 +69,19 @@
                 <textarea name="observaciones_bienestar" class="form-control" rows="2"></textarea>
               </div>
               <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="alergia_aceites" id="alergia_aceites"
+                         onchange="document.getElementById('alergia_detalle_wrap').style.display = this.checked ? 'block' : 'none';">
+                  <label class="form-check-label" for="alergia_aceites">
+                    ¿Tienes sensibilidad o alergia a algún aceite de masaje?
+                  </label>
+                </div>
+                <div class="mt-2" id="alergia_detalle_wrap" style="display:none;">
+                  <label class="form-label">¿A cuál aceite? <span class="text-muted">(si lo sabes)</span></label>
+                  <input type="text" name="alergia_aceites_detalle" class="form-control" placeholder="Ej: almendras, coco…">
+                </div>
+              </div>
+              <div class="col-12">
                 <label class="form-label">Algo que debamos considerar <span class="text-muted">(opcional)</span></label>
                 <textarea name="condiciones_declaradas" class="form-control" rows="2"></textarea>
                 <div class="form-text">Esta información se usa solo para adaptar tu experiencia de bienestar. No constituye evaluación médica ni diagnóstico.</div>

@@ -6155,7 +6155,7 @@ class RefugioLeadAdmin(admin.ModelAdmin):
 @admin.register(BienestarMasajeFicha)
 class BienestarMasajeFichaAdmin(admin.ModelAdmin):
     list_display = ('id', 'nombre_completo', 'reserva', 'objetivo_principal', 'intensidad_preferida', 'estado_ficha', 'created_at')
-    list_filter = ('estado_ficha', 'objetivo_principal', 'intensidad_preferida', 'consentimiento_marketing')
+    list_filter = ('estado_ficha', 'alergia_aceites', 'objetivo_principal', 'intensidad_preferida', 'consentimiento_marketing')
     search_fields = ('nombre_completo', 'telefono', 'email', 'reserva__id')
     autocomplete_fields = ('cliente',)
     # raw_id en lugar de dropdown: evita renderizar TODOS los ReservaServicio/
@@ -6170,7 +6170,8 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
     # identificación mínima (nombre + horario + N° reserva) + preferencias de bienestar.
     MASAJISTA_READONLY = ('m_nombre', 'm_reserva', 'm_fecha_servicio', 'm_hora_servicio',
                           'objetivo_principal', 'intensidad_preferida',
-                          'zonas_tension', 'zonas_evitar', 'observaciones_bienestar', 'condiciones_declaradas')
+                          'zonas_tension', 'zonas_evitar', 'observaciones_bienestar',
+                          'alergia_aceites', 'alergia_aceites_detalle', 'condiciones_declaradas')
 
     def _es_masajista(self, request):
         u = request.user
@@ -6260,7 +6261,8 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
                 }),
                 ('Preferencias de bienestar (solo lectura)', {
                     'fields': ('objetivo_principal', 'intensidad_preferida', 'zonas_tension',
-                               'zonas_evitar', 'observaciones_bienestar', 'condiciones_declaradas'),
+                               'zonas_evitar', 'observaciones_bienestar',
+                               'alergia_aceites', 'alergia_aceites_detalle', 'condiciones_declaradas'),
                 }),
                 ('Resumen del terapeuta', {
                     'fields': self.THERAPIST_FIELDS,
@@ -6313,7 +6315,7 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Persona', {'fields': ('cliente', 'reserva', 'servicio_reservado', 'nombre_completo', 'telefono', 'email', 'fecha_nacimiento', 'ciudad', 'origen', 'estado_ficha')}),
-        ('Preferencias de bienestar', {'fields': ('objetivo_principal', 'intensidad_preferida', 'zonas_tension', 'zonas_evitar', 'observaciones_bienestar', 'condiciones_declaradas')}),
+        ('Preferencias de bienestar', {'fields': ('objetivo_principal', 'intensidad_preferida', 'zonas_tension', 'zonas_evitar', 'observaciones_bienestar', 'alergia_aceites', 'alergia_aceites_detalle', 'condiciones_declaradas')}),
         ('Resumen del terapeuta (post-masaje)', {
             'fields': ('obs_terapeuta', 'zonas_trabajadas', 'intensidad_aplicada', 'sugerencia_frecuencia', 'recomendacion_texto'),
             'description': '⚠ Evitar lenguaje médico. Registrar solo observaciones de bienestar y experiencia (no diagnóstico ni tratamiento).',

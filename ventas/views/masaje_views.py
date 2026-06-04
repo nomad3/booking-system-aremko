@@ -101,6 +101,8 @@ def masaje_ficha(request, token):
         zonas_tension=(request.POST.get('zonas_tension') or '')[:255],
         zonas_evitar=(request.POST.get('zonas_evitar') or '')[:255],
         observaciones_bienestar=(request.POST.get('observaciones_bienestar') or ''),
+        alergia_aceites=(request.POST.get('alergia_aceites') == 'on'),
+        alergia_aceites_detalle=(request.POST.get('alergia_aceites_detalle') or '')[:255],
         condiciones_declaradas=(request.POST.get('condiciones_declaradas') or ''),
         consentimiento_datos=True,
         consentimiento_marketing=consent_mkt,

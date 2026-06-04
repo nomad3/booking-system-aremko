@@ -7631,6 +7631,16 @@ class BienestarMasajeFicha(models.Model):
     zonas_tension = models.CharField(max_length=255, blank=True, verbose_name="Zonas de tensión")
     zonas_evitar = models.CharField(max_length=255, blank=True, verbose_name="Zonas que prefiere evitar")
     observaciones_bienestar = models.TextField(blank=True)
+    # Sensibilidad/alergia a aceites de masaje — importante para elegir el aceite.
+    alergia_aceites = models.BooleanField(
+        default=False,
+        verbose_name="¿Sensibilidad o alergia a algún aceite de masaje?",
+    )
+    alergia_aceites_detalle = models.CharField(
+        max_length=255, blank=True,
+        verbose_name="¿A cuál aceite?",
+        help_text="Indica el/los aceite(s) a evitar, si la persona lo sabe.",
+    )
     condiciones_declaradas = models.TextField(
         blank=True,
         help_text="Esta información se usa solo para adaptar la experiencia de bienestar. No constituye evaluación médica ni diagnóstico.",
