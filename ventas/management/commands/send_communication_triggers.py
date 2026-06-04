@@ -174,6 +174,16 @@ class Command(BaseCommand):
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"❌ Error en entregas de inventario: {str(e)}"))
 
+    def _run_seguimientos_masaje(self):
+        """Envía los seguimientos de bienestar de masaje vencidos (si están activados)."""
+        from django.core.management import call_command
+        self.stdout.write("🧖 Procesando seguimientos de masaje...")
+        try:
+            call_command('enviar_seguimientos_masaje')
+            self.stdout.write(self.style.SUCCESS("✅ Seguimientos de masaje procesados"))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"❌ Error en seguimientos de masaje: {str(e)}"))
+
     def _run_all_triggers(self):
         """Ejecuta todos los triggers en secuencia"""
         self.stdout.write("🎯 Ejecutando todos los triggers...")
@@ -185,6 +195,7 @@ class Command(BaseCommand):
             ("🔄 Reactivación", self._run_reactivation_campaigns),
             ("👑 VIP", self._run_vip_newsletters),
             ("📦 Entregas inventario (comandas vencidas)", self._run_inventory_deliveries),
+            ("🧖 Seguimientos de masaje", self._run_seguimientos_masaje),
         ]
         
         for name, trigger_func in triggers:

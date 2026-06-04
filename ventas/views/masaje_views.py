@@ -123,6 +123,15 @@ def masaje_ficha(request, token):
     participante.fecha_completado_formulario = timezone.now()
     participante.save()
 
+    # F6: programar los emails de seguimiento post-visita (defensivo: nunca rompe
+    # el guardado de la ficha si algo falla). El envío real va por cron y está
+    # apagado por defecto (settings.MASAJE_SEGUIMIENTOS_ACTIVOS).
+    try:
+        from ..services.masaje_seguimiento_service import programar_seguimientos_masaje
+        programar_seguimientos_masaje(participante)
+    except Exception:
+        pass
+
     ctx['exito'] = True
     ctx['ya_completada'] = True
     return render(request, 'ventas/masaje_ficha.html', ctx)

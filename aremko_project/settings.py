@@ -110,6 +110,15 @@ OVC_DIAS_MAX_ACUMULACION = int(os.getenv('OVC_DIAS_MAX_ACUMULACION', '7'))
 OVC_TARGET_DIARIO = int(os.getenv('OVC_TARGET_DIARIO', '50'))
 
 # ────────────────────────────────────────────────────────────────────────────
+# Conexión-Masajes — envío de emails de seguimiento de bienestar (F6)
+# ────────────────────────────────────────────────────────────────────────────
+# APAGADO por defecto: los seguimientos se PROGRAMAN al completar la ficha, pero
+# el comando `enviar_seguimientos_masaje` NO los envía hasta poner esto en True
+# (env var MASAJE_SEGUIMIENTOS_ACTIVOS=true). Permite revisar/aprobar los textos
+# antes de mandar correos a clientes reales.
+MASAJE_SEGUIMIENTOS_ACTIVOS = os.getenv('MASAJE_SEGUIMIENTOS_ACTIVOS', 'false').lower() == 'true'
+
+# ────────────────────────────────────────────────────────────────────────────
 # Disparo de la campaña de plantillas Meta (aremko-cli / Go)
 # ────────────────────────────────────────────────────────────────────────────
 # Tras generar_bandeja_whatsapp_diaria, Django llama a este endpoint de Go para
