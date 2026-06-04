@@ -38,9 +38,11 @@ def generar_participantes_masaje(venta_reserva):
     if not masajes.exists():
         return []
 
-    # Nº de personas que reciben masaje (para parejas suele ser un servicio con
-    # cantidad_personas=2). Tomamos el máximo entre los masajes de la reserva.
-    cantidad = max(m.cantidad_personas for m in masajes)
+    # Nº TOTAL de personas que reciben masaje = SUMA de las líneas de masaje.
+    # Cubre las dos formas de cargar una reserva de pareja:
+    #   - 1 línea con cantidad_personas=2  → 2 personas
+    #   - 2 líneas con cantidad_personas=1 → 2 personas (lo más frecuente)
+    cantidad = sum((m.cantidad_personas or 1) for m in masajes)
 
     with transaction.atomic():
         existentes = list(
