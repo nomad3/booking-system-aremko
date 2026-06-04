@@ -62,44 +62,41 @@ def agenda_masajes(request):
             lineas = lineas.none()
             masajista_sin_vinculo = True
 
+    # UNA fila por MASAJE (línea de servicio) asignado — no por participante.
+    # Así el masajista ve exactamente los masajes que tiene asignados.
     filas = []
-    seen = set()
     for ls in lineas:
         vr = ls.venta_reserva
         if not vr:
             continue
         hora = str(ls.hora_inicio)[:5] if ls.hora_inicio else ''
         masajista = ls.proveedor_asignado.nombre if ls.proveedor_asignado_id else '— sin asignar —'
-        participantes = list(
-            vr.participantes_masaje.select_related('ficha_bienestar', 'cliente').all()
+        cant = ls.cantidad_personas or 1
+
+        # Ficha a abrir: la del comprador si existe; si no, la 1ª con ficha.
+        participantes = sorted(
+            vr.participantes_masaje.select_related('ficha_bienestar', 'cliente').all(),
+            key=lambda p: (0 if p.tipo_participante == 'comprador' else 1, p.id),
         )
-        if not participantes:
-            key = ('r', vr.id)
-            if key in seen:
-                continue
-            seen.add(key)
-            filas.append({
-                'hora': hora, 'reserva_id': vr.id, 'masajista': masajista,
-                'nombre': (vr.cliente.nombre if vr.cliente_id else '—'),
-                'tipo': '(sin participantes)', 'ficha_id': None,
-                'estado': '—', 'token': None,
-            })
-            continue
+        ficha_id = None
         for p in participantes:
-            key = (vr.id, p.id)
-            if key in seen:
-                continue
-            seen.add(key)
-            filas.append({
-                'hora': hora,
-                'reserva_id': vr.id,
-                'masajista': masajista,
-                'nombre': p.nombre or (vr.cliente.nombre if vr.cliente_id else '—'),
-                'tipo': p.get_tipo_participante_display(),
-                'ficha_id': p.ficha_bienestar_id,
-                'estado': 'Completada' if p.ficha_bienestar_id else 'Pendiente del cliente',
-                'token': p.token_formulario,
-            })
+            if p.ficha_bienestar_id:
+                ficha_id = p.ficha_bienestar_id
+                break
+        completas = sum(1 for p in participantes if p.ficha_bienestar_id)
+
+        filas.append({
+            'hora': hora,
+            'reserva_id': vr.id,
+            'masajista': masajista,
+            'nombre': (vr.cliente.nombre if vr.cliente_id
+                       else (participantes[0].nombre if participantes else '—')),
+            'cantidad': cant,
+            'ficha_id': ficha_id,
+            'estado': 'Completada' if completas else 'Pendiente del cliente',
+            'fichas_total': len(participantes),
+            'fichas_completas': completas,
+        })
 
     filas.sort(key=lambda f: (f['hora'] or '99:99', f['reserva_id']))
 
