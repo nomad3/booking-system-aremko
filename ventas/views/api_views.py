@@ -139,10 +139,12 @@ class VentaReservaViewSet(viewsets.ModelViewSet):
                 if producto.cantidad_disponible < cantidad:
                     raise ValidationError(f"No hay suficiente inventario para el producto {producto.nombre}.")
 
-                # Reducir inventario y agregar producto a la reserva
-                # Consider moving inventory logic to a signal or service
-                producto.cantidad_disponible -= cantidad
-                producto.save()
+                # El inventario se descuenta AUTOMÁTICAMENTE al crear el
+                # ReservaProducto (signal post_save `actualizar_inventario`,
+                # created=True → reducir_inventario). NO descontar también aquí:
+                # hacerlo duplicaba el descuento de stock (bug "duplicó la
+                # cantidad de productos ingresados"). El chequeo de stock de
+                # arriba ya impide vender sin inventario.
                 ReservaProducto.objects.create(
                     venta_reserva=venta_reserva,
                     producto=producto,

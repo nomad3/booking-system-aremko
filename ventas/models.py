@@ -1203,8 +1203,11 @@ class VentaReserva(models.Model):
         with transaction.atomic():  # Asegura la consistencia de los datos
             if cantidad > producto.cantidad_disponible:
                 raise ValueError("No hay suficiente inventario disponible para este producto.")
+            # `add(through_defaults=...)` crea el ReservaProducto, lo que dispara
+            # el signal post_save `actualizar_inventario` que YA descuenta el
+            # stock. NO llamar a reducir_inventario aquí también: duplicaba el
+            # descuento (mismo bug que en VentaReservaViewSet.create).
             self.productos.add(producto, through_defaults={'cantidad': cantidad})
-            producto.reducir_inventario(cantidad)
             self.calcular_total()  # <-- Llama a calcular_total aquí
 
     @property

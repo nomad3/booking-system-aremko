@@ -64,12 +64,9 @@ class ReservaProductoSerializer(serializers.ModelSerializer):
         fields = ['producto', 'cantidad']
 
     def create(self, validated_data):
-        producto = validated_data['producto']
-        cantidad = validated_data['cantidad']
-
-        # Reducir inventario durante la creación del producto
-        producto.reducir_inventario(cantidad)
-
+        # El inventario se descuenta automáticamente al crear el ReservaProducto
+        # (signal post_save `actualizar_inventario`). NO reducir aquí también:
+        # duplicaba el descuento de stock.
         return super().create(validated_data)
 
 class ReservaServicioSerializer(serializers.ModelSerializer):
@@ -134,9 +131,10 @@ class VentaReservaSerializer(serializers.ModelSerializer):
             producto = producto_data['producto']
             cantidad = producto_data['cantidad']
 
-            # Crear la relación producto-venta y reducir inventario
+            # Crear la relación producto-venta. El inventario lo descuenta el
+            # signal post_save al crear el ReservaProducto — NO reducir aquí
+            # también (duplicaba el descuento de stock).
             ReservaProducto.objects.create(venta_reserva=venta_reserva, producto=producto, cantidad=cantidad)
-            producto.reducir_inventario(cantidad)  # Reducir inventario
 
         # Calcular el total después de agregar productos
         venta_reserva.calcular_total()
@@ -150,9 +148,11 @@ class VentaReservaSerializer(serializers.ModelSerializer):
             producto = producto_data['producto']
             cantidad = producto_data['cantidad']
 
-            # Actualizar la relación producto-venta y reducir inventario
+            # Actualizar la relación producto-venta. El inventario lo ajusta el
+            # signal post_save (delta entre cantidad anterior y nueva al editar,
+            # o descuento completo al crear). NO reducir aquí también: duplicaba
+            # el descuento (y en update aplicaba el total en vez del delta).
             ReservaProducto.objects.update_or_create(venta_reserva=instance, producto=producto, defaults={'cantidad': cantidad})
-            producto.reducir_inventario(cantidad)  # Reducir inventario
 
         # Calcular el total después de actualizar productos
         instance.calcular_total()
