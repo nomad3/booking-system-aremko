@@ -1,8 +1,10 @@
 """Conexión-Masajes — generación de participantes de masaje por reserva.
 
-Cuando una reserva tiene un servicio de masaje con cantidad_personas > 1, se crea
-un ParticipanteMasajeReserva por persona. El comprador (VentaReserva.cliente) queda
-como primer participante; el resto como 'acompanante' (a completar luego).
+Cuando una reserva tiene un servicio de masaje (cantidad_personas >= 1) se crea un
+ParticipanteMasajeReserva por persona, para que CADA quien reciba masaje tenga su
+ficha de bienestar — incluido el masaje individual. El comprador
+(VentaReserva.cliente) queda como primer participante; el resto como 'acompanante'
+(a completar luego).
 
 Idempotente: no duplica participantes si ya existen.
 """
@@ -13,22 +15,25 @@ from django.db import transaction
 logger = logging.getLogger(__name__)
 
 
-def reserva_tiene_masaje_multiple(venta_reserva):
-    """True si la reserva tiene al menos un masaje con cantidad_personas > 1."""
+def reserva_tiene_masaje(venta_reserva):
+    """True si la reserva tiene al menos un masaje (cantidad_personas >= 1)."""
     return venta_reserva.reservaservicios.filter(
         servicio__tipo_servicio='masaje',
-        cantidad_personas__gt=1,
+        cantidad_personas__gte=1,
     ).exists()
 
 
 def generar_participantes_masaje(venta_reserva):
     """Crea los ParticipanteMasajeReserva faltantes para la reserva. Devuelve la
-    lista de los creados (vacía si no aplica o ya estaban todos)."""
+    lista de los creados (vacía si no aplica o ya estaban todos).
+
+    Aplica a masajes de 1 o más personas: para 1 persona crea solo al comprador
+    (su propia ficha); para 2+ crea comprador + acompañantes."""
     from ..models import ParticipanteMasajeReserva
 
     masajes = venta_reserva.reservaservicios.filter(
         servicio__tipo_servicio='masaje',
-        cantidad_personas__gt=1,
+        cantidad_personas__gte=1,
     )
     if not masajes.exists():
         return []

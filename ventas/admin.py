@@ -432,7 +432,10 @@ class ParticipanteMasajeReservaInline(admin.TabularInline):
         from django.urls import reverse
         ficha = reverse('masaje_ficha', kwargs={'token': obj.token_formulario})
         out = _format_html_masaje('<a href="{}" target="_blank">Ficha de bienestar</a>', ficha)
-        if obj.tipo_participante == 'comprador':
+        # El link "Registrar acompañante" solo aplica si la reserva tiene acompañante
+        # (masaje de 2+). En el masaje individual no se muestra.
+        if obj.tipo_participante == 'comprador' and obj.reserva_id and \
+                obj.reserva.participantes_masaje.filter(tipo_participante='acompanante').exists():
             acomp = reverse('masaje_registrar_acompanante', kwargs={'token': obj.token_formulario})
             out = _format_html_masaje('{} &nbsp;|&nbsp; <a href="{}" target="_blank">Registrar acompañante</a>', out, acomp)
         return out

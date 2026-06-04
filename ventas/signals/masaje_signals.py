@@ -1,8 +1,9 @@
 """Conexión-Masajes — signal que genera participantes al guardar un masaje.
 
-Al guardar un ReservaServicio de masaje con cantidad_personas > 1, se generan los
-ParticipanteMasajeReserva. Defensivo: NUNCA rompe el guardado (si la tabla aún no
-existe —antes del migrate en Render— o hay cualquier error, se traga y se loguea).
+Al guardar un ReservaServicio de masaje con cantidad_personas >= 1, se generan los
+ParticipanteMasajeReserva (incluido el masaje individual: 1 persona → 1 ficha del
+comprador). Defensivo: NUNCA rompe el guardado (si la tabla aún no existe —antes
+del migrate en Render— o hay cualquier error, se traga y se loguea).
 """
 
 import logging
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 def generar_participantes_al_guardar_masaje(sender, instance, **kwargs):
     try:
         cantidad = getattr(instance, 'cantidad_personas', 0) or 0
-        if cantidad <= 1:
+        if cantidad < 1:
             return
         servicio = getattr(instance, 'servicio', None)
         if getattr(servicio, 'tipo_servicio', None) != 'masaje':
