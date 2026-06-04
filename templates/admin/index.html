@@ -120,6 +120,27 @@
             </a>
         </div>
 
+        <!-- Masajes Section Card -->
+        <div class="col-lg-4 col-md-6 col-sm-12">
+             <a href="{% url 'admin:ventas_bienestarmasajeficha_changelist' %}" class="text-decoration-none">
+                <div class="card h-100 text-center card-hover">
+                    <div class="card-body">
+                        <div style="font-size:2.6rem;" class="mb-2">🧖</div>
+                        <h5 class="card-title">Masajes</h5>
+                        <p class="card-text text-muted">Ficha digital de cada persona, listados, pagos a masajistas y fidelización.</p>
+                        <div class="mt-3" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;">
+                            <a href="{% url 'admin:ventas_bienestarmasajeficha_changelist' %}" class="btn btn-sm btn-outline-primary" style="font-size: 11px;" onclick="event.stopPropagation();">🧖 Fichas</a>
+                            <a href="{% url 'admin:ventas_participantemasajereserva_changelist' %}" class="btn btn-sm btn-outline-secondary" style="font-size: 11px;" onclick="event.stopPropagation();">👥 Participantes</a>
+                            <a href="{% url 'admin:ventas_seguimientobienestarmasaje_changelist' %}" class="btn btn-sm btn-outline-info" style="font-size: 11px;" onclick="event.stopPropagation();">📨 Seguimientos</a>
+                            <a href="{% url 'ventas:dashboard_pagos_masajistas' %}" class="btn btn-sm btn-outline-success" style="font-size: 11px;" onclick="event.stopPropagation();">💵 Pagos</a>
+                            <a href="{% url 'admin:ventas_servicio_changelist' %}?tipo_servicio=masaje" class="btn btn-sm btn-outline-warning" style="font-size: 11px;" onclick="event.stopPropagation();">🧴 Servicios</a>
+                            <a href="{% url 'admin:ventas_horariomasajista_changelist' %}" class="btn btn-sm btn-outline-danger" style="font-size: 11px;" onclick="event.stopPropagation();">🗓️ Horarios</a>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
         <!-- Add more section cards if needed -->
         {% endif %}
 
