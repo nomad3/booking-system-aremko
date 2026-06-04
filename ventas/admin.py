@@ -6158,6 +6158,10 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
     list_filter = ('estado_ficha', 'objetivo_principal', 'intensidad_preferida', 'consentimiento_marketing')
     search_fields = ('nombre_completo', 'telefono', 'email', 'reserva__id')
     autocomplete_fields = ('cliente',)
+    # raw_id en lugar de dropdown: evita renderizar TODOS los ReservaServicio/
+    # VentaReserva (miles de filas) — eso causaba 500 al abrir la ficha
+    # (ReservaServicio.__str__ revienta si su servicio es nulo) y era lentísimo.
+    raw_id_fields = ('reserva', 'servicio_reservado')
     readonly_fields = ('fecha_consentimiento', 'consentimiento_texto', 'created_at', 'updated_at')
 
     # Campos que el masajista SÍ puede editar (resumen post-masaje); el resto, solo lectura.

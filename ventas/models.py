@@ -1434,7 +1434,8 @@ class ReservaServicio(models.Model):
         )
 
     def __str__(self):
-        return f"{self.servicio.nombre} reservado para {self.fecha_agendamiento} {self.hora_inicio}"
+        nombre = self.servicio.nombre if self.servicio_id else "(sin servicio)"
+        return f"{nombre} reservado para {self.fecha_agendamiento} {self.hora_inicio}"
 
     def calcular_precio(self):
         """Calcula el precio basado en el tipo de servicio.
