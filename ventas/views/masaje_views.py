@@ -54,6 +54,10 @@ def masaje_ficha(request, token):
     participante = get_object_or_404(ParticipanteMasajeReserva, token_formulario=token)
     ya_completada = bool(participante.ficha_bienestar_id) or participante.estado_contacto == 'ficha_completada'
 
+    # Modo staff: si quien abre es la masajista (usuario logueado), NO puede ver ni
+    # capturar teléfono/email del cliente — solo el resto de la ficha.
+    modo_staff = request.user.is_authenticated and request.user.is_staff
+
     ctx = {
         'participante': participante,
         'objetivos': BienestarMasajeFicha.OBJETIVO_CHOICES,
@@ -61,6 +65,7 @@ def masaje_ficha(request, token):
         'consent_datos_texto': CONSENT_DATOS_TEXTO,
         'consent_mkt_texto': CONSENT_MKT_TEXTO,
         'ya_completada': ya_completada,
+        'ocultar_contacto': modo_staff,
     }
 
     if request.method != 'POST':
@@ -75,19 +80,27 @@ def masaje_ficha(request, token):
         return render(request, 'ventas/masaje_ficha.html', ctx)
 
     nombre = (request.POST.get('nombre_completo') or participante.nombre or '').strip()
-    telefono = (request.POST.get('telefono') or participante.telefono or '').strip()
-    email = (request.POST.get('email') or '').strip()
+    if modo_staff:
+        # La masajista no ve/captura contacto: se usan los datos ya guardados.
+        telefono = (participante.telefono or '').strip()
+        email = (participante.email or '').strip()
+    else:
+        telefono = (request.POST.get('telefono') or participante.telefono or '').strip()
+        email = (request.POST.get('email') or '').strip()
     consent_datos = request.POST.get('consentimiento_datos') == 'on'
     consent_mkt = request.POST.get('consentimiento_marketing') == 'on'
 
-    if not nombre or not telefono:
+    if not nombre:
+        ctx['error'] = 'Por favor completa el nombre.'
+        return render(request, 'ventas/masaje_ficha.html', ctx)
+    if not modo_staff and not telefono:
         ctx['error'] = 'Por favor completa tu nombre y teléfono.'
         return render(request, 'ventas/masaje_ficha.html', ctx)
     if not consent_datos:
-        ctx['error'] = 'Para continuar debes aceptar el uso de tus datos para adaptar tu experiencia.'
+        ctx['error'] = 'Para continuar debes aceptar el uso de los datos para adaptar la experiencia.'
         return render(request, 'ventas/masaje_ficha.html', ctx)
 
-    cliente = _crear_o_actualizar_cliente(nombre, telefono, email)
+    cliente = _crear_o_actualizar_cliente(nombre, telefono, email) if telefono else participante.cliente
 
     texto_consent = CONSENT_DATOS_TEXTO + ((" | " + CONSENT_MKT_TEXTO) if consent_mkt else "")
     ficha = BienestarMasajeFicha.objects.create(
