@@ -6186,37 +6186,64 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
             prov = Proveedor.objects.filter(email__iexact=request.user.email).first()
         return prov
 
+    def _fichas_permitidas_ids(self, prov):
+        """IDs de BienestarMasajeFicha de las PERSONAS asignadas a este proveedor
+        (emparejando participante↔línea). Nadie más."""
+        from .models import VentaReserva
+        from .services.masaje_participantes_service import mapear_participante_a_linea
+        reservas = (
+            VentaReserva.objects
+            .filter(reservaservicios__servicio__tipo_servicio='masaje',
+                    reservaservicios__proveedor_asignado=prov)
+            .distinct()
+        )
+        ids = []
+        for vr in reservas:
+            mapeo = mapear_participante_a_linea(vr)
+            for p in vr.participantes_masaje.all():
+                ls = mapeo.get(p.id)
+                if ls and ls.proveedor_asignado_id == prov.id and p.ficha_bienestar_id:
+                    ids.append(p.ficha_bienestar_id)
+        return ids
+
     def get_queryset(self, request):
         """Regla de acceso: solo admin/coordinación ven todas las fichas; un
-        masajista solo ve/abre las fichas de los masajes ASIGNADOS a él. Nadie más.
-        Filtra a nivel de datos: una ficha no asignada no es accesible ni por URL."""
+        masajista solo ve/abre las fichas de las PERSONAS asignadas a él. Nadie más.
+        Filtra a nivel de datos: una ficha no suya no es accesible ni por URL."""
         qs = super().get_queryset(request)
         if self._es_masajista(request):
             prov = self._proveedor_de_usuario(request)
             if not prov:
                 return qs.none()
-            return qs.filter(
-                reserva__reservaservicios__servicio__tipo_servicio='masaje',
-                reserva__reservaservicios__proveedor_asignado=prov,
-            ).distinct()
+            return qs.filter(id__in=self._fichas_permitidas_ids(prov))
         return qs
 
     def _es_asignado(self, request, obj):
-        """True si algún masaje de la reserva de esta ficha está asignado al
-        Proveedor del usuario logueado."""
+        """True si la PERSONA de esta ficha está atendida por el Proveedor del
+        usuario (participante emparejado a una línea asignada a él)."""
         if obj is None or not obj.reserva_id:
             return False
         prov = self._proveedor_de_usuario(request)
         if not prov:
             return False
-        return obj.reserva.reservaservicios.filter(
-            servicio__tipo_servicio='masaje', proveedor_asignado=prov,
-        ).exists()
+        from .services.masaje_participantes_service import mapear_participante_a_linea
+        participante = getattr(obj, 'participante', None)
+        if participante is None:
+            return False
+        ls = mapear_participante_a_linea(obj.reserva).get(participante.id)
+        return bool(ls and ls.proveedor_asignado_id == prov.id)
 
     # --- Campos de solo lectura "seguros" para el masajista (sin datos de contacto) ---
     def _masaje_rs(self, obj):
+        """La línea de masaje emparejada con la persona de esta ficha (su masajista)."""
         if not obj or not obj.reserva_id:
             return None
+        from .services.masaje_participantes_service import mapear_participante_a_linea
+        participante = getattr(obj, 'participante', None)
+        if participante is not None:
+            ls = mapear_participante_a_linea(obj.reserva).get(participante.id)
+            if ls:
+                return ls
         return (obj.reserva.reservaservicios
                 .filter(servicio__tipo_servicio='masaje')
                 .order_by('fecha_agendamiento', 'hora_inicio')
@@ -6224,7 +6251,7 @@ class BienestarMasajeFichaAdmin(admin.ModelAdmin):
 
     def m_asignacion(self, obj):
         rs = self._masaje_rs(obj)
-        prov = rs.proveedor_asignado if rs else None
+        prov = rs.proveedor_asignado if (rs and rs.proveedor_asignado_id) else None
         return prov.nombre if prov else '— Sin masajista asignado —'
     m_asignacion.short_description = 'Masajista asignado'
 

@@ -48,57 +48,49 @@ def agenda_masajes(request):
     es_masajista = _es_masajista(request.user)
     prov = _proveedor_de_usuario(request.user) if es_masajista else None
 
+    masajista_sin_vinculo = es_masajista and not prov
+
+    # Reservas con masaje en la fecha.
     lineas = (
         ReservaServicio.objects
         .filter(servicio__tipo_servicio='masaje', fecha_agendamiento=fecha)
-        .select_related('servicio', 'proveedor_asignado', 'venta_reserva', 'venta_reserva__cliente')
-        .order_by('hora_inicio', 'id')
+        .select_related('proveedor_asignado', 'venta_reserva', 'venta_reserva__cliente')
     )
-    masajista_sin_vinculo = False
-    if es_masajista:
-        if prov:
-            lineas = lineas.filter(proveedor_asignado=prov)
-        else:
-            lineas = lineas.none()
-            masajista_sin_vinculo = True
+    reservas_ids = list(lineas.values_list('venta_reserva_id', flat=True).distinct())
 
-    # UNA fila por MASAJE (línea de servicio) asignado — no por participante.
-    # Así el masajista ve exactamente los masajes que tiene asignados.
+    from .. import models as _m
+    from ..services.masaje_participantes_service import mapear_participante_a_linea
+
+    # UNA fila por PERSONA (participante), atendida por el masajista de SU línea.
     filas = []
-    for ls in lineas:
-        vr = ls.venta_reserva
-        if not vr:
-            continue
-        hora = str(ls.hora_inicio)[:5] if ls.hora_inicio else ''
-        masajista = ls.proveedor_asignado.nombre if ls.proveedor_asignado_id else '— sin asignar —'
-        cant = ls.cantidad_personas or 1
+    if not masajista_sin_vinculo:
+        reservas = _m.VentaReserva.objects.filter(id__in=reservas_ids).select_related('cliente')
+        for vr in reservas:
+            mapeo = mapear_participante_a_linea(vr)  # {participante_id: ReservaServicio|None}
+            participantes = sorted(
+                vr.participantes_masaje.select_related('ficha_bienestar', 'cliente').all(),
+                key=lambda p: (0 if p.tipo_participante == 'comprador' else 1, p.id),
+            )
+            for p in participantes:
+                ls = mapeo.get(p.id)
+                # Solo personas cuya línea de masaje es de ESTA fecha.
+                if not ls or ls.fecha_agendamiento != fecha:
+                    continue
+                masajista_prov = ls.proveedor_asignado if ls.proveedor_asignado_id else None
+                # El masajista solo ve a SUS personas.
+                if es_masajista and not (masajista_prov and masajista_prov.id == prov.id):
+                    continue
+                filas.append({
+                    'hora': str(ls.hora_inicio)[:5] if (ls and ls.hora_inicio) else '',
+                    'reserva_id': vr.id,
+                    'masajista': masajista_prov.nombre if masajista_prov else '— sin asignar —',
+                    'nombre': p.nombre or (vr.cliente.nombre if vr.cliente_id else '—'),
+                    'tipo': p.get_tipo_participante_display(),
+                    'ficha_id': p.ficha_bienestar_id,
+                    'estado': 'Completada' if p.ficha_bienestar_id else 'Pendiente del cliente',
+                })
 
-        # Ficha a abrir: la del comprador si existe; si no, la 1ª con ficha.
-        participantes = sorted(
-            vr.participantes_masaje.select_related('ficha_bienestar', 'cliente').all(),
-            key=lambda p: (0 if p.tipo_participante == 'comprador' else 1, p.id),
-        )
-        ficha_id = None
-        for p in participantes:
-            if p.ficha_bienestar_id:
-                ficha_id = p.ficha_bienestar_id
-                break
-        completas = sum(1 for p in participantes if p.ficha_bienestar_id)
-
-        filas.append({
-            'hora': hora,
-            'reserva_id': vr.id,
-            'masajista': masajista,
-            'nombre': (vr.cliente.nombre if vr.cliente_id
-                       else (participantes[0].nombre if participantes else '—')),
-            'cantidad': cant,
-            'ficha_id': ficha_id,
-            'estado': 'Completada' if completas else 'Pendiente del cliente',
-            'fichas_total': len(participantes),
-            'fichas_completas': completas,
-        })
-
-    filas.sort(key=lambda f: (f['hora'] or '99:99', f['reserva_id']))
+    filas.sort(key=lambda f: (f['hora'] or '99:99', f['reserva_id'], f['nombre']))
 
     from datetime import timedelta
     fecha_next = fecha + timedelta(days=1)

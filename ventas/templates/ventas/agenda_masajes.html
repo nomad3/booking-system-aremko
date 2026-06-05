@@ -64,13 +64,11 @@
         <div class="mcard">
           <div class="mc-top">
             <span class="mc-hora">{{ f.hora|default:"—" }}</span>
-            {% if f.fichas_total > 1 %}
-              <span class="pill {% if f.fichas_completas == f.fichas_total %}ok{% else %}pend{% endif %}">{{ f.fichas_completas }}/{{ f.fichas_total }} fichas</span>
-            {% elif f.ficha_id %}<span class="pill ok">✓ Ficha completada</span>
+            {% if f.ficha_id %}<span class="pill ok">✓ Ficha completada</span>
             {% else %}<span class="pill pend">Ficha pendiente</span>{% endif %}
           </div>
           <div class="mc-cliente">{{ f.nombre }}</div>
-          <div class="mc-meta">Reserva #{{ f.reserva_id }}{% if f.cantidad > 1 %} · {{ f.cantidad }} personas{% endif %}{% if not es_masajista %} · {{ f.masajista }}{% endif %}</div>
+          <div class="mc-meta">Reserva #{{ f.reserva_id }} · {{ f.tipo }}{% if not es_masajista %} · {{ f.masajista }}{% endif %}</div>
           <div class="mc-action">
             {% if f.ficha_id %}
               {% if es_masajista %}

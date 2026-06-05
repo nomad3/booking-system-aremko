@@ -34,11 +34,17 @@ def ficha_masajista(request, ficha_id):
     )
 
     # ---- Control de acceso ----
+    # El masajista solo abre la ficha de SU persona: el participante de la ficha
+    # debe estar emparejado con una línea de masaje asignada a él.
     if _es_masajista(request.user):
         prov = _proveedor_de_usuario(request.user)
-        asignado = bool(prov and ficha.reserva_id and ficha.reserva.reservaservicios.filter(
-            servicio__tipo_servicio='masaje', proveedor_asignado=prov,
-        ).exists())
+        asignado = False
+        if prov and ficha.reserva_id:
+            from ..services.masaje_participantes_service import mapear_participante_a_linea
+            participante = getattr(ficha, 'participante', None)
+            if participante is not None:
+                ls = mapear_participante_a_linea(ficha.reserva).get(participante.id)
+                asignado = bool(ls and ls.proveedor_asignado_id == prov.id)
         if not asignado:
             raise Http404("Ficha no disponible.")
     # admin / coordinación: acceso completo

@@ -12,6 +12,40 @@ Idempotente: no duplica participantes si ya existen.
 import logging
 from django.db import transaction
 
+
+def mapear_participante_a_linea(venta_reserva):
+    """Empareja cada participante con su línea de masaje (ReservaServicio).
+
+    Se arman "slots" por persona: cada línea aporta `cantidad_personas` slots. Los
+    participantes (comprador primero, luego acompañantes por id) se asignan en
+    orden a esos slots. Devuelve {participante_id: ReservaServicio|None}.
+
+    Permite saber qué masajista (línea.proveedor_asignado) atiende a cada persona
+    sin necesidad de un campo nuevo en la BD.
+    """
+    lineas = list(
+        venta_reserva.reservaservicios
+        .filter(servicio__tipo_servicio='masaje', cantidad_personas__gte=1)
+        .select_related('proveedor_asignado')
+        .order_by('id')
+    )
+    slots = []
+    for ls in lineas:
+        for _ in range(ls.cantidad_personas or 1):
+            slots.append(ls)
+
+    participantes = sorted(
+        venta_reserva.participantes_masaje.all(),
+        key=lambda p: (0 if p.tipo_participante == 'comprador' else 1, p.id),
+    )
+    mapeo = {}
+    for i, p in enumerate(participantes):
+        if slots:
+            mapeo[p.id] = slots[i] if i < len(slots) else slots[-1]
+        else:
+            mapeo[p.id] = None
+    return mapeo
+
 logger = logging.getLogger(__name__)
 
 
