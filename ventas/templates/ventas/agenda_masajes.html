@@ -76,8 +76,10 @@
               {% else %}
                 <a class="btn-primary btn" href="/admin/ventas/bienestarmasajeficha/{{ f.ficha_id }}/change/">Abrir ficha</a>
               {% endif %}
+            {% elif f.token %}
+              <a class="btn-primary btn" href="{% url 'masaje_ficha' f.token %}" target="_blank">📝 Llenar ficha con el cliente</a>
             {% else %}
-              <span class="nomas">— el cliente aún no completó su ficha —</span>
+              <span class="nomas">— sin ficha —</span>
             {% endif %}
           </div>
         </div>

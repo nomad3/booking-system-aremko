@@ -88,6 +88,9 @@ def agenda_masajes(request):
                     'tipo': p.get_tipo_participante_display(),
                     'ficha_id': p.ficha_bienestar_id,
                     'estado': 'Completada' if p.ficha_bienestar_id else 'Pendiente del cliente',
+                    # token del formulario del cliente, para que la masajista la
+                    # llene con el cliente si éste llegó sin completarla.
+                    'token': p.token_formulario,
                 })
 
     filas.sort(key=lambda f: (f['hora'] or '99:99', f['reserva_id'], f['nombre']))
