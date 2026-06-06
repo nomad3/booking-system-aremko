@@ -117,6 +117,9 @@ OVC_TARGET_DIARIO = int(os.getenv('OVC_TARGET_DIARIO', '50'))
 # (env var MASAJE_SEGUIMIENTOS_ACTIVOS=true). Permite revisar/aprobar los textos
 # antes de mandar correos a clientes reales.
 MASAJE_SEGUIMIENTOS_ACTIVOS = os.getenv('MASAJE_SEGUIMIENTOS_ACTIVOS', 'false').lower() == 'true'
+# Remitente de los correos de masaje (dominio autenticado en SendGrid → sin "via
+# sendgrid.net" y mejor deliverability). Configurable por env.
+MASAJE_FROM_EMAIL = os.getenv('MASAJE_FROM_EMAIL', 'ventas@aremko.cl')
 
 # ────────────────────────────────────────────────────────────────────────────
 # Disparo de la campaña de plantillas Meta (aremko-cli / Go)

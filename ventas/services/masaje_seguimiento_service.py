@@ -36,8 +36,8 @@ FIRMA = "\n\nCon cariño,\nEquipo Aremko · Puerto Varas"
 
 
 def _contenido(tipo, nombre):
-    """Devuelve (asunto, cuerpo_texto) borrador por tipo. Editable: estos textos
-    son un punto de partida; revisar antes de activar el envío."""
+    """Devuelve (asunto, cuerpo) por tipo. El cuerpo es solo el MENSAJE (sin link
+    ni firma): el botón "Reservar" y la firma se agregan al renderizar el email."""
     n = nombre or ""
     saludo = f"Hola {n}," if n else "Hola,"
     if tipo == 'gracias_visita':
@@ -45,7 +45,7 @@ def _contenido(tipo, nombre):
             "Gracias por tu momento de bienestar en Aremko 🌿",
             f"{saludo}\n\nGracias por darte un espacio para ti en Aremko. Esperamos "
             f"que hayas salido más relajado/a y en calma.\n\nSi quieres contarnos "
-            f"cómo te sentiste, nos encanta leerte: solo responde este correo." + FIRMA,
+            f"cómo te sentiste, nos encanta leerte: solo responde este correo.",
         )
     if tipo == 'seguimiento_7d':
         return (
@@ -53,30 +53,61 @@ def _contenido(tipo, nombre):
             f"{saludo}\n\nYa pasó una semana de tu masaje. Muchas personas notan que "
             f"el bienestar se cuida mejor con cierta frecuencia. Si quieres mantener "
             f"esa sensación de calma, podemos reservarte un próximo espacio cuando te "
-            f"acomode.\n\nReserva aquí: {RESERVAR_URL}" + FIRMA,
+            f"acomode.",
         )
     if tipo == 'recomendacion_30d':
         return (
             "Un mes de bienestar: tu próximo espacio te espera 🌿",
             f"{saludo}\n\nHa pasado un mes desde tu visita. Si sentiste que ese rato "
-            f"de pausa te hizo bien, este puede ser un buen momento para repetirlo.\n\n"
-            f"Te dejamos el link para elegir día y hora: {RESERVAR_URL}" + FIRMA,
+            f"de pausa te hizo bien, este puede ser un buen momento para repetirlo.",
         )
     if tipo == 'reactivacion_60d':
         return (
             "Te echamos de menos en Aremko 🌿",
             f"{saludo}\n\nHace un par de meses que no te vemos. Tu bienestar nos "
             f"importa: si quieres regalarte de nuevo una pausa de masaje, aquí "
-            f"estamos para recibirte.\n\nReserva tu espacio: {RESERVAR_URL}" + FIRMA,
+            f"estamos para recibirte.",
         )
     if tipo == 'reactivacion_90d':
         return (
             "Un espacio para reencontrarte con tu calma 🌿",
             f"{saludo}\n\nYa han pasado unos meses desde tu última visita. Cuando "
             f"sientas que necesitas un respiro, en Aremko te tenemos un lugar "
-            f"tranquilo y a tu ritmo.\n\nReserva cuando quieras: {RESERVAR_URL}" + FIRMA,
+            f"tranquilo y a tu ritmo.",
         )
-    return ("Aremko", f"{saludo}\n\nGracias por visitarnos." + FIRMA)
+    return ("Aremko", f"{saludo}\n\nGracias por visitarnos.")
+
+
+def _render_html(cuerpo, cta_label=None):
+    """Envuelve el mensaje en una plantilla HTML de marca (header + cuerpo +
+    botón opcional + footer). El botón oculta el link de reserva."""
+    cuerpo_html = (cuerpo or '').replace('\n', '<br>')
+    boton = ''
+    if cta_label:
+        boton = (
+            '<div style="text-align:center;margin:28px 0 6px;">'
+            f'<a href="{RESERVAR_URL}" style="background:#b5651d;color:#ffffff;'
+            'text-decoration:none;padding:14px 30px;border-radius:10px;font-weight:bold;'
+            f'font-size:16px;display:inline-block;">{cta_label}</a></div>'
+        )
+    return (
+        '<div style="background:#faf6f0;padding:24px 12px;'
+        'font-family:Arial,Helvetica,sans-serif;">'
+        '<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;'
+        'overflow:hidden;border:1px solid #eee3d4;">'
+        '<div style="background:#b5651d;padding:22px;text-align:center;">'
+        '<div style="color:#ffffff;font-size:22px;font-weight:bold;">🌿 Aremko Spa</div>'
+        '<div style="color:#f6e9da;font-size:13px;margin-top:2px;">Puerto Varas</div>'
+        '</div>'
+        '<div style="padding:26px 24px;color:#3a3a3a;font-size:16px;line-height:1.6;">'
+        f'{cuerpo_html}{boton}'
+        '</div>'
+        '<div style="padding:16px 24px;background:#faf6f0;color:#999;font-size:12px;'
+        'text-align:center;border-top:1px solid #eee3d4;">'
+        'Con cariño, Equipo Aremko · Puerto Varas<br>'
+        '<a href="https://www.aremko.cl" style="color:#b5651d;">aremko.cl</a>'
+        '</div></div></div>'
+    )
 
 
 CAMPOS_RESUMEN_TERAPEUTA = (
@@ -115,8 +146,7 @@ def _contenido_resumen(ficha, nombre):
         lineas.append(ficha.recomendacion_texto.strip())
     lineas += [
         "",
-        f"Cuando quieras volver a darte este espacio, reserva aquí: {RESERVAR_URL}",
-        FIRMA.strip(),
+        "Cuando quieras volver a darte este espacio, reserva con nosotros.",
     ]
     return ("Tu resumen de bienestar en Aremko 🌿", "\n".join(lineas))
 
@@ -219,13 +249,20 @@ def enviar_seguimiento(seg):
         seg.save(update_fields=['estado', 'error_log'])
         return False
     try:
-        texto = seg.cuerpo or ''
-        html = ('<div style="font-family:Arial,sans-serif;font-size:15px;color:#333;'
-                'line-height:1.5;">' + texto.replace('\n', '<br>') + '</div>')
+        cuerpo = seg.cuerpo or ''
+        # CTA "Reservar" en todos salvo el de agradecimiento.
+        con_cta = seg.tipo_email != 'gracias_visita'
+        texto = cuerpo
+        if con_cta:
+            texto += f"\n\nReserva tu masaje: {RESERVAR_URL}"
+        texto += FIRMA
+        html = _render_html(cuerpo, 'Reservar mi masaje' if con_cta else None)
+        from_email = getattr(settings, 'MASAJE_FROM_EMAIL', None) or \
+            getattr(settings, 'DEFAULT_FROM_EMAIL', 'ventas@aremko.cl')
         msg = EmailMultiAlternatives(
             subject=seg.asunto or 'Aremko',
             body=texto,
-            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'comunicaciones@aremko.cl'),
+            from_email=from_email,
             to=[email],
         )
         msg.attach_alternative(html, "text/html")
