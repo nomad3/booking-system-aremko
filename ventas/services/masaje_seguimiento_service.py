@@ -186,7 +186,7 @@ def _contenido_resumen(ficha, nombre):
         "",
         "Cuando quieras volver a darte este espacio, reserva con nosotros.",
     ]
-    return ("Tu resumen de bienestar en Aremko 🌿", "\n".join(lineas))
+    return ("Tu resumen de bienestar en Aremko Spa Boutique 🌿", "\n".join(lineas))
 
 
 def programar_resumen_bienestar(ficha):
@@ -313,7 +313,7 @@ def enviar_seguimiento(seg, operador=''):
         from_email = getattr(settings, 'MASAJE_FROM_EMAIL', None) or \
             getattr(settings, 'DEFAULT_FROM_EMAIL', 'ventas@aremko.cl')
         msg = EmailMultiAlternatives(
-            subject=seg.asunto or 'Aremko',
+            subject=seg.asunto or 'Aremko Spa Boutique',
             body=texto,
             from_email=from_email,
             to=[email],
