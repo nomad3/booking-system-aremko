@@ -469,10 +469,16 @@ def complete_checkout(request):
                 'email': email,
                 'documento_identidad': documento_identidad,
             }
-            if region_id:
-                datos_cliente['region_id'] = int(region_id)
-            if comuna_id:
-                datos_cliente['comuna_id'] = int(comuna_id)
+            # Plan Geo E2: clasificación desde el checkout. "extranjero" marca país;
+            # comuna chilena → la zona (sur/nacional) se deriva sola (Cliente.save).
+            if region_id == 'extranjero':
+                datos_cliente['pais'] = 'Extranjero'
+            else:
+                if region_id:
+                    datos_cliente['region_id'] = int(region_id)
+                if comuna_id:
+                    datos_cliente['comuna_id'] = int(comuna_id)
+                    datos_cliente['pais'] = 'Chile'
 
             cliente, created, errors = ClienteService.crear_o_actualizar_cliente(datos_cliente)
 

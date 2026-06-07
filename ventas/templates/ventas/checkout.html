@@ -286,13 +286,13 @@
                                 <input type="text" class="form-control" id="checkoutDocumento" name="documento_identidad" autocomplete="off">
                             </div>
                             <div class="mb-3">
-                                <label for="checkoutRegion" class="form-label">Región (opcional, para enviarte ofertas locales)</label>
-                                <select class="form-select" id="checkoutRegion" name="region">
+                                <label for="checkoutRegion" class="form-label">Región / País *</label>
+                                <select class="form-select" id="checkoutRegion" name="region" required>
                                     <option value="">Seleccione una región</option>
                                 </select>
                             </div>
                             <div class="mb-3">
-                                <label for="checkoutComuna" class="form-label">Comuna (opcional)</label>
+                                <label for="checkoutComuna" class="form-label">Comuna *</label>
                                 <select class="form-select" id="checkoutComuna" name="comuna" disabled>
                                     <option value="">Primero seleccione una región</option>
                                 </select>
@@ -563,6 +563,12 @@ Email para comprobante: ventas@aremko.cl</pre>
                 option.textContent = region.nombre;
                 select.appendChild(option);
             });
+
+            // Plan Geo E2: opción para clientes fuera de Chile.
+            const extOpt = document.createElement('option');
+            extOpt.value = 'extranjero';
+            extOpt.textContent = '🌎 Vivo fuera de Chile';
+            select.appendChild(extOpt);
         } catch (error) {
             console.error('Error loading regiones:', error);
             const opt = document.createElement('option');
@@ -1007,7 +1013,11 @@ Email para comprobante: ventas@aremko.cl</pre>
                 const regionId = e.target.value;
                 const comunaSelect = document.getElementById('checkoutComuna');
 
-                if (regionId) {
+                if (regionId === 'extranjero') {
+                    comunaSelect.innerHTML = '<option value="">No aplica (extranjero)</option>';
+                    comunaSelect.value = '';
+                    comunaSelect.disabled = true;
+                } else if (regionId) {
                     loadComunas(regionId);
                 } else {
                     comunaSelect.innerHTML = '<option value="">Primero seleccione una región</option>';
@@ -1036,6 +1046,19 @@ Email para comprobante: ventas@aremko.cl</pre>
                 if (!nombre || !email || !telefono) {
                     showCheckoutError('Por favor completa tu nombre, email y teléfono para continuar.');
                     hideProcessing(null, completeCheckoutBtn);
+                    isProcessingCheckout = false;
+                    return;
+                }
+                if (!region) {
+                    showCheckoutError('Por favor selecciona tu región (o “Vivo fuera de Chile”).');
+                    hideProcessing(null, completeCheckoutBtn);
+                    isProcessingCheckout = false;
+                    return;
+                }
+                if (region !== 'extranjero' && !comuna) {
+                    showCheckoutError('Por favor selecciona tu comuna.');
+                    hideProcessing(null, completeCheckoutBtn);
+                    isProcessingCheckout = false;
                     return;
                 }
                 if (!paymentMethodInput) {
