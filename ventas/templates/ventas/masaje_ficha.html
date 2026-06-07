@@ -74,6 +74,13 @@
 
           <label>Email <span class="opt">(opcional)</span></label>
           <input type="email" name="email" maxlength="254" value="{{ participante.email }}">
+
+          <label>¿De qué comuna nos visitas? <span class="req">*</span></label>
+          <select name="comuna" required>
+            <option value="">Elige tu comuna…</option>
+            <option value="extranjero">🌎 Vengo del extranjero</option>
+            {% for c in comunas %}<option value="{{ c.id }}">{{ c.nombre }} ({{ c.region.nombre }})</option>{% endfor %}
+          </select>
           {% endif %}
 
           <label>Objetivo principal de tu experiencia</label>

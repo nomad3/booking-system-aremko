@@ -14,7 +14,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from ..models import ParticipanteMasajeReserva, BienestarMasajeFicha, Cliente
+from ..models import ParticipanteMasajeReserva, BienestarMasajeFicha, Cliente, Comuna
 
 CONSENT_DATOS_TEXTO = (
     "Acepto que Aremko utilice esta información para adaptar mi experiencia de "
@@ -70,6 +70,11 @@ def masaje_ficha(request, token):
         'ocultar_contacto': modo_staff,
     }
 
+    # Plan Geo E3: el cliente indica su comuna (la zona se deriva sola). No se le
+    # pide a la masajista (modo_staff) — ella no captura la ubicación del cliente.
+    if not modo_staff:
+        ctx['comunas'] = Comuna.objects.select_related('region').order_by('nombre')
+
     if request.method != 'POST':
         # marcar como "abierto" si estaba pendiente
         if participante.estado_contacto == 'email_enviado':
@@ -91,6 +96,7 @@ def masaje_ficha(request, token):
         email = (request.POST.get('email') or '').strip()
     consent_datos = request.POST.get('consentimiento_datos') == 'on'
     consent_mkt = request.POST.get('consentimiento_marketing') == 'on'
+    comuna_val = (request.POST.get('comuna') or '').strip()
 
     if not nombre:
         ctx['error'] = 'Por favor completa el nombre.'
@@ -98,11 +104,31 @@ def masaje_ficha(request, token):
     if not modo_staff and not telefono:
         ctx['error'] = 'Por favor completa tu nombre y teléfono.'
         return render(request, 'ventas/masaje_ficha.html', ctx)
+    if not modo_staff and not comuna_val:
+        ctx['error'] = 'Por favor indícanos tu comuna (o selecciona “Vengo del extranjero”).'
+        return render(request, 'ventas/masaje_ficha.html', ctx)
     if not consent_datos:
         ctx['error'] = 'Para continuar debes aceptar el uso de los datos para adaptar la experiencia.'
         return render(request, 'ventas/masaje_ficha.html', ctx)
 
     cliente = _crear_o_actualizar_cliente(nombre, telefono, email) if telefono else participante.cliente
+
+    # Plan Geo E3: aplicar la comuna/extranjero al cliente → la zona se deriva sola
+    # (Cliente.save). Defensivo: nunca rompe el guardado de la ficha.
+    if cliente and not modo_staff and comuna_val:
+        try:
+            if comuna_val == 'extranjero':
+                cliente.pais = 'Extranjero'
+                cliente.comuna = None
+            elif comuna_val.isdigit():
+                cm = Comuna.objects.filter(id=comuna_val).first()
+                if cm:
+                    cliente.comuna = cm
+                    if not (cliente.pais or '').strip():
+                        cliente.pais = 'Chile'
+            cliente.save()
+        except Exception:
+            pass
 
     texto_consent = CONSENT_DATOS_TEXTO + ((" | " + CONSENT_MKT_TEXTO) if consent_mkt else "")
     ficha = BienestarMasajeFicha.objects.create(
