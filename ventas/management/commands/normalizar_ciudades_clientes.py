@@ -44,71 +44,8 @@ from django.db.models import Q
 from ventas.models import Ciudad, Cliente
 
 
-# Marcadores textuales de país NO-Chile (case-insensitive en match).
-# Si la ciudad del cliente contiene cualquiera, se marca extranjero.
-MARCADORES_EXTRANJERO = [
-    'argentina', 'brasil', 'brazil', 'uruguay', 'peru', 'perú', 'bolivia',
-    'colombia', 'ecuador', 'usa', 'eeuu', 'ee.uu', 'estados unidos',
-    'mexico', 'méxico', 'españa', 'spain', 'francia', 'france',
-    'alemania', 'germany', 'italia', 'italy', 'inglaterra', 'uk',
-    'noruega', 'norway', 'bélgica', 'belgium', 'belgica',
-    'buenos aires', 'mendoza', 'sao paulo', 'são paulo', 'sao pablo',
-    'rio de janeiro', 'lima', 'madrid', 'barcelona', 'paris', 'london',
-    'miami', 'new york', 'denver', 'dallas', 'guadalajara',
-    'oslo', 'bruselas', 'brussels', 'neuquén', 'neuquen', 'santa fe, nm',
-]
-
-
-def _normalizar(texto: str) -> str:
-    """Normalización para comparación: lower + trim + collapse espacios + sin puntos."""
-    if not texto:
-        return ''
-    s = texto.strip().lower()
-    s = re.sub(r'\s+', ' ', s)
-    s = s.replace('.', '').replace(',', '')
-    return s
-
-
-def _es_extranjero_por_texto(texto: str) -> bool:
-    """True si contiene marcador inequívoco de país no-Chile."""
-    if not texto:
-        return False
-    s = texto.lower()
-    return any(m in s for m in MARCADORES_EXTRANJERO)
-
-
-class _LookupCiudades:
-    """Preindex de Ciudades para lookup O(1) en memoria."""
-
-    def __init__(self):
-        # Mapa: texto_normalizado → instancia Ciudad
-        self.por_canonico: Dict[str, Ciudad] = {}
-        self.por_alias: Dict[str, Ciudad] = {}
-        self.extranjero_generico: Optional[Ciudad] = None
-        self._cargar()
-
-    def _cargar(self):
-        for ciudad in Ciudad.objects.filter(activo=True):
-            if ciudad.nombre_canonico == '_otros_extranjero_':
-                self.extranjero_generico = ciudad
-                continue
-            self.por_canonico[_normalizar(ciudad.nombre_canonico)] = ciudad
-            for alias in ciudad.aliases_list():
-                self.por_alias[_normalizar(alias)] = ciudad
-
-    def lookup(self, texto: str) -> Optional[Ciudad]:
-        """Busca por canónico, luego por alias. Devuelve Ciudad o None."""
-        if not texto:
-            return None
-        clave = _normalizar(texto)
-        if not clave:
-            return None
-        # 1. Canónico exacto
-        c = self.por_canonico.get(clave)
-        if c:
-            return c
-        # 2. Alias exacto
-        return self.por_alias.get(clave)
+# La lógica de clasificación vive en un único servicio (Plan Geo E0).
+from ventas.services.geo_service import get_lookup, clasificar, _normalizar
 
 
 class Command(BaseCommand):
@@ -148,8 +85,8 @@ class Command(BaseCommand):
             f"Normalizar ciudades clientes {'(DRY-RUN)' if dry_run else '(escribiendo)'}"
         ))
 
-        # ---- Precargar lookup ----
-        lookup = _LookupCiudades()
+        # ---- Precargar lookup (fresco desde el catálogo) ----
+        lookup = get_lookup(refresh=True)
         self.stdout.write(
             f"  Ciudades cargadas: {len(lookup.por_canonico)} canónicas "
             f"+ {len(lookup.por_alias)} aliases "
@@ -219,47 +156,10 @@ class Command(BaseCommand):
     # Clasificación de un cliente (función pura, testeable)
     # ====================================================================
 
-    def _clasificar(
-        self, cliente, lookup: _LookupCiudades
-    ) -> Tuple[str, Optional[Ciudad], str]:
-        """Devuelve (metodo, ciudad_normalizada | None, region_geografica).
-
-        Métodos posibles:
-            match_canonico  — el texto coincide con un Ciudad.nombre_canonico
-            match_alias     — el texto coincide con un alias
-            inferencia_comuna — sin ciudad, pero comuna mapea a una Ciudad
-            extranjero_texto — el texto contiene marcador de país no-Chile
-            extranjero_pais  — Cliente.pais explícito != Chile
-            sin_match       — nada cumple → sin_clasificar
-        """
-        ciudad_texto = (cliente.ciudad or '').strip()
-        pais_texto = (cliente.pais or '').strip().lower()
-
-        # 1+2. Match contra ciudad text (canónico o alias)
-        if ciudad_texto:
-            # 4. Primero detección extranjero por texto (gana sobre canónico
-            #    en caso ambiguo — ej "Río Negro Argentina" debería ser extranjero)
-            if _es_extranjero_por_texto(ciudad_texto):
-                ciudad_extra = lookup.extranjero_generico
-                return ('extranjero_texto', ciudad_extra, 'extranjero')
-
-            match = lookup.lookup(ciudad_texto)
-            if match:
-                metodo = 'match_canonico' if _normalizar(ciudad_texto) in lookup.por_canonico else 'match_alias'
-                return (metodo, match, match.region_geografica)
-
-        # 5. País explícito no-Chile (sin ciudad reconocida)
-        if pais_texto and pais_texto not in ('chile', 'cl', ''):
-            return ('extranjero_pais', lookup.extranjero_generico, 'extranjero')
-
-        # 3. Inferencia desde comuna (solo si no había ciudad o no matcheó)
-        if cliente.comuna and cliente.comuna.nombre:
-            match = lookup.lookup(cliente.comuna.nombre)
-            if match:
-                return ('inferencia_comuna', match, match.region_geografica)
-
-        # Sin match
-        return ('sin_match', None, 'sin_clasificar')
+    def _clasificar(self, cliente, lookup):
+        """Delega en el servicio único de clasificación (ventas/services/geo_service).
+        Devuelve (metodo, ciudad_normalizada | None, region_geografica)."""
+        return clasificar(cliente.pais, cliente.ciudad, cliente.comuna, cliente.region, lookup)
 
     # ====================================================================
     # Reporte
@@ -275,6 +175,7 @@ class Command(BaseCommand):
         self.stdout.write('')
         self.stdout.write('  Distribución por método de clasificación:')
         for metodo in ['match_canonico', 'match_alias', 'inferencia_comuna',
+                       'comuna_nacional', 'nacional_inferido',
                        'extranjero_texto', 'extranjero_pais', 'sin_match']:
             n = stats.get(metodo, 0)
             pct = (n / total * 100) if total else 0

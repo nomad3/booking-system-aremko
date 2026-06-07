@@ -874,7 +874,7 @@ class Cliente(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Override save para normalizar teléfono antes de guardar
+        Override save para normalizar teléfono y derivar la zona geográfica.
         """
         if self.telefono:
             normalized = self.normalize_phone(self.telefono)
@@ -882,6 +882,20 @@ class Cliente(models.Model):
                 self.telefono = normalized
             else:
                 raise ValidationError(f"Formato de teléfono inválido: {self.telefono}")
+
+        # Plan Geo E0: derivar region_geografica + ciudad_normalizada al guardar.
+        # Solo si NO es edición manual; nunca DEGRADA (no borra una clasificación
+        # existente) y nunca bloquea el guardado si algo falla.
+        if not self.ciudad_normalizada_manual:
+            try:
+                from .services.geo_service import clasificar_cliente
+                _metodo, ciudad_norm, region_geo = clasificar_cliente(self)
+                if region_geo and region_geo != 'sin_clasificar':
+                    self.ciudad_normalizada = ciudad_norm
+                    self.region_geografica = region_geo
+            except Exception:
+                pass
+
         super().save(*args, **kwargs)
 
     def __str__(self):
