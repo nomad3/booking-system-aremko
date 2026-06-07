@@ -70,10 +70,9 @@ def masaje_ficha(request, token):
         'ocultar_contacto': modo_staff,
     }
 
-    # Plan Geo E3: el cliente indica su comuna (la zona se deriva sola). No se le
-    # pide a la masajista (modo_staff) — ella no captura la ubicación del cliente.
-    if not modo_staff:
-        ctx['comunas'] = Comuna.objects.select_related('region').order_by('nombre')
+    # Plan Geo E3: se captura la comuna (la zona se deriva sola). El cliente la
+    # indica (obligatoria); la masajista también puede ingresarla (opcional).
+    ctx['comunas'] = Comuna.objects.select_related('region').order_by('nombre')
 
     if request.method != 'POST':
         # marcar como "abierto" si estaba pendiente
@@ -114,8 +113,9 @@ def masaje_ficha(request, token):
     cliente = _crear_o_actualizar_cliente(nombre, telefono, email) if telefono else participante.cliente
 
     # Plan Geo E3: aplicar la comuna/extranjero al cliente → la zona se deriva sola
-    # (Cliente.save). Defensivo: nunca rompe el guardado de la ficha.
-    if cliente and not modo_staff and comuna_val:
+    # (Cliente.save). Aplica también si la ingresa la masajista. Defensivo: nunca
+    # rompe el guardado de la ficha.
+    if cliente and comuna_val:
         try:
             if comuna_val == 'extranjero':
                 cliente.pais = 'Extranjero'
