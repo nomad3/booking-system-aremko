@@ -34,6 +34,16 @@ def _boton(url, label):
     )
 
 
+def _enlace_copiable(url):
+    """Muestra la URL como texto seleccionable (para copiar y reenviar), no como
+    botón —un botón no se puede copiar fácil desde el correo."""
+    return (
+        '<div style="margin:8px 0 16px;padding:12px 14px;background:#faf6f0;'
+        'border:1px dashed #d9c7b5;border-radius:8px;word-break:break-all;font-size:14px;">'
+        f'<a href="{url}" style="color:#8a6d5a;">{url}</a></div>'
+    )
+
+
 def _render_html(cuerpo_html):
     return (
         '<div style="background:#faf6f0;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;">'
@@ -92,8 +102,9 @@ def enviar_invitacion_ficha_reserva(venta):
     if acompanantes:
         lineas += [
             "",
-            "Vienes acompañado/a: comparte este enlace para que cada acompañante "
-            "complete su propia ficha:",
+            "¿Vienes con acompañante? Copia y envíale este enlace por WhatsApp o "
+            "correo para que complete su propia ficha (le pediremos su nombre, "
+            "teléfono y email):",
         ]
         for a in acompanantes:
             lineas.append(_ficha_url(a.token_formulario))
@@ -108,10 +119,12 @@ def enviar_invitacion_ficha_reserva(venta):
         _boton(_ficha_url(comprador.token_formulario), 'Completar mi ficha'),
     ]
     if acompanantes:
-        cuerpo.append('<p style="margin-top:18px;">¿Vienes acompañado/a? Comparte '
-                      'este enlace para que complete su propia ficha:</p>')
+        cuerpo.append(
+            '<p style="margin-top:20px;">¿Vienes con acompañante? '
+            '<b>Copia y envíale este enlace</b> por WhatsApp o correo para que '
+            'complete su propia ficha (le pediremos su nombre, teléfono y email):</p>')
         for a in acompanantes:
-            cuerpo.append(_boton(_ficha_url(a.token_formulario), 'Ficha de mi acompañante'))
+            cuerpo.append(_enlace_copiable(_ficha_url(a.token_formulario)))
     html = _render_html(''.join(cuerpo))
 
     from_email = (getattr(settings, 'MASAJE_FROM_EMAIL', None)

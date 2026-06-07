@@ -68,12 +68,12 @@
           <label>Nombre completo <span class="req">*</span></label>
           <input type="text" name="nombre_completo" required maxlength="160" value="{{ participante.nombre }}">
 
-          {% if not ocultar_contacto %}
+          {% if pedir_contacto %}
           <label>Teléfono (WhatsApp) <span class="req">*</span></label>
           <input type="tel" name="telefono" required maxlength="30" placeholder="+56 9 ..." value="{{ participante.telefono }}">
 
-          <label>Email <span class="opt">(opcional)</span></label>
-          <input type="email" name="email" maxlength="254" value="{{ participante.email }}">
+          <label>Email <span class="req">*</span></label>
+          <input type="email" name="email" required maxlength="254" value="{{ participante.email }}">
           {% endif %}
 
           {% if ocultar_contacto %}

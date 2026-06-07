@@ -60,6 +60,11 @@ def masaje_ficha(request, token):
     # capturar teléfono/email del cliente — solo el resto de la ficha.
     modo_staff = request.user.is_authenticated and request.user.is_staff
 
+    # Pedir teléfono/email SOLO al acompañante que llena su propia ficha: del
+    # comprador ya tenemos esos datos (vinieron de la venta); del acompañante NO,
+    # y los necesitamos para comunicación futura. La masajista (staff) nunca los pide.
+    pedir_contacto = (not modo_staff) and (participante.tipo_participante == 'acompanante')
+
     ctx = {
         'participante': participante,
         'objetivos': BienestarMasajeFicha.OBJETIVO_CHOICES,
@@ -68,6 +73,7 @@ def masaje_ficha(request, token):
         'consent_mkt_texto': CONSENT_MKT_TEXTO,
         'ya_completada': ya_completada,
         'ocultar_contacto': modo_staff,
+        'pedir_contacto': pedir_contacto,
     }
 
     # Plan Geo E3: se captura la comuna (la zona se deriva sola). El cliente la
@@ -86,13 +92,15 @@ def masaje_ficha(request, token):
         return render(request, 'ventas/masaje_ficha.html', ctx)
 
     nombre = (request.POST.get('nombre_completo') or participante.nombre or '').strip()
-    if modo_staff:
-        # La masajista no ve/captura contacto: se usan los datos ya guardados.
-        telefono = (participante.telefono or '').strip()
-        email = (participante.email or '').strip()
-    else:
+    if pedir_contacto:
+        # Acompañante llenando su propia ficha: captura su teléfono y email.
         telefono = (request.POST.get('telefono') or participante.telefono or '').strip()
-        email = (request.POST.get('email') or '').strip()
+        email = (request.POST.get('email') or participante.email or '').strip()
+    else:
+        # Comprador o masajista: ya tenemos el contacto, no se vuelve a pedir.
+        cli_prev = participante.cliente if participante.cliente_id else None
+        telefono = (participante.telefono or (cli_prev.telefono if cli_prev else '') or '').strip()
+        email = (participante.email or (cli_prev.email if cli_prev else '') or '').strip()
     consent_datos = request.POST.get('consentimiento_datos') == 'on'
     consent_mkt = request.POST.get('consentimiento_marketing') == 'on'
     comuna_val = (request.POST.get('comuna') or '').strip()
@@ -100,8 +108,8 @@ def masaje_ficha(request, token):
     if not nombre:
         ctx['error'] = 'Por favor completa el nombre.'
         return render(request, 'ventas/masaje_ficha.html', ctx)
-    if not modo_staff and not telefono:
-        ctx['error'] = 'Por favor completa tu nombre y teléfono.'
+    if pedir_contacto and (not telefono or not email):
+        ctx['error'] = 'Por favor completa el teléfono y el email del acompañante.'
         return render(request, 'ventas/masaje_ficha.html', ctx)
     if not modo_staff and not comuna_val:
         ctx['error'] = 'Por favor indícanos tu comuna (o selecciona “Vengo del extranjero”).'
