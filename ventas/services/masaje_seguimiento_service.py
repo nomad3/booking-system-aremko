@@ -274,8 +274,9 @@ def programar_seguimientos_masaje(participante):
     return creados
 
 
-def enviar_seguimiento(seg):
-    """Envía un SeguimientoBienestarMasaje por email. Marca estado. Devuelve bool."""
+def enviar_seguimiento(seg, operador=''):
+    """Envía un SeguimientoBienestarMasaje por email. Marca estado. Devuelve bool.
+    operador: quién dispara el envío (bandeja de salida en aremko-cli)."""
     from django.core.mail import EmailMultiAlternatives
 
     cliente = (seg.participante.cliente if seg.participante_id else None) or \
@@ -321,7 +322,9 @@ def enviar_seguimiento(seg):
         msg.send()
         seg.estado = 'enviado'
         seg.fecha_envio = timezone.now()
-        seg.save(update_fields=['estado', 'fecha_envio'])
+        if operador:
+            seg.enviado_por = operador[:80]
+        seg.save(update_fields=['estado', 'fecha_envio', 'enviado_por'])
         return True
     except Exception as exc:
         seg.estado = 'error'
@@ -329,6 +332,16 @@ def enviar_seguimiento(seg):
         seg.save(update_fields=['estado', 'error_log'])
         logger.warning("[Masajes] Error enviando seguimiento %s: %s", seg.id, exc)
         return False
+
+
+def construir_html_preview(seg):
+    """HTML final tal cual se enviaría (para la vista previa de la bandeja de
+    salida en aremko-cli). Mismo render que enviar_seguimiento."""
+    cliente = (seg.participante.cliente if seg.participante_id else None) or \
+              (seg.cliente if seg.cliente_id else None)
+    con_cta = seg.tipo_email != 'gracias_visita'
+    url_b = baja_url(cliente.id if cliente else None)
+    return _render_html(seg.cuerpo or '', 'Reservar mi masaje' if con_cta else None, url_baja=url_b)
 
 
 def procesar_seguimientos_pendientes():

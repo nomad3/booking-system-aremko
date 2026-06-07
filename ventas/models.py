@@ -7750,6 +7750,11 @@ class SeguimientoBienestarMasaje(models.Model):
     cuerpo = models.TextField(blank=True)
     error_log = models.TextField(blank=True)
 
+    # Auditoría bandeja de salida (envío/edición manual desde aremko-cli)
+    enviado_por = models.CharField(max_length=80, blank=True, help_text="Operador que envió el correo (debora/angelica/jorge).")
+    editado_por = models.CharField(max_length=80, blank=True, help_text="Operador que editó por última vez asunto/cuerpo.")
+    editado_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

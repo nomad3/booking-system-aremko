@@ -9,16 +9,19 @@ Cubre el flujo end-to-end:
 - F7: el resumen del terapeuta programa el email 'resumen_bienestar' (idempotente)
 """
 
+import json
 from decimal import Decimal
 from datetime import timedelta
 
-from django.test import TestCase
+from django.core import mail
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from ventas.models import (
     Cliente, CategoriaServicio, Servicio, VentaReserva, ReservaServicio,
     ParticipanteMasajeReserva, BienestarMasajeFicha, SeguimientoBienestarMasaje,
+    ClientPreferences,
 )
 
 
@@ -196,3 +199,107 @@ class ResumenTerapeutaTests(MasajeConexionTestBase):
         ficha.obs_terapeuta = 'sesión tranquila'
         ficha.save()
         self.assertEqual(qs.count(), 1)
+
+
+@override_settings(LUNA_API_KEY='test-key', MASAJE_FROM_EMAIL='ventas@aremko.cl')
+class OutboxApiTests(MasajeConexionTestBase):
+    """Bandeja de salida (F1): list / preview / edit / send / cancel."""
+
+    KEY = {'HTTP_X_API_KEY': 'test-key'}
+
+    def _participante_con_seguimientos(self, email='out@test.com'):
+        cli = self._cliente(email=email)
+        vr = self._reserva_con_masaje(cli, cantidad=1)
+        p = ParticipanteMasajeReserva.objects.get(reserva=vr)
+        url = reverse('masaje_ficha', kwargs={'token': p.token_formulario})
+        self.client.post(url, {
+            'nombre_completo': 'Out Test', 'telefono': '915550000',
+            'email': email, 'consentimiento_datos': 'on',
+            'consentimiento_marketing': 'on',
+        })
+        p.refresh_from_db()
+        return p
+
+    def test_requiere_api_key(self):
+        self.assertEqual(self.client.get(reverse('masaje_outbox_list')).status_code, 401)
+
+    def test_list_separa_vencidos_y_programados(self):
+        p = self._participante_con_seguimientos()
+        # un seguimiento vencido (en el pasado) y el resto futuro
+        seg = SeguimientoBienestarMasaje.objects.filter(participante=p).first()
+        seg.fecha_programada = timezone.now() - timedelta(hours=1)
+        seg.save(update_fields=['fecha_programada'])
+
+        r = self.client.get(reverse('masaje_outbox_list'), **self.KEY)
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        ids_para_enviar = [i['id'] for i in data['para_enviar']]
+        self.assertIn(seg.id, ids_para_enviar)
+        # el vencido trae preview HTML con la marca nueva
+        item = next(i for i in data['para_enviar'] if i['id'] == seg.id)
+        self.assertIn('Aremko Spa Boutique', item['preview_html'])
+        self.assertTrue(data['total_programados'] >= 1)
+
+    def test_edit_actualiza_y_registra_operador(self):
+        p = self._participante_con_seguimientos()
+        seg = SeguimientoBienestarMasaje.objects.filter(participante=p).first()
+        url = reverse('masaje_outbox_edit', kwargs={'seg_id': seg.id})
+        r = self.client.patch(
+            url, data=json.dumps({'asunto': 'Nuevo asunto', 'cuerpo': 'Hola, texto corregido.',
+                                  'operador': 'debora'}),
+            content_type='application/json', **self.KEY)
+        self.assertEqual(r.status_code, 200)
+        seg.refresh_from_db()
+        self.assertEqual(seg.asunto, 'Nuevo asunto')
+        self.assertEqual(seg.cuerpo, 'Hola, texto corregido.')
+        self.assertEqual(seg.editado_por, 'debora')
+        self.assertIsNotNone(seg.editado_at)
+
+    def test_send_envia_y_registra(self):
+        p = self._participante_con_seguimientos(email='envio@test.com')
+        seg = SeguimientoBienestarMasaje.objects.filter(participante=p).first()
+        url = reverse('masaje_outbox_send', kwargs={'seg_id': seg.id})
+        r = self.client.post(url, data=json.dumps({'operador': 'jorge'}),
+                             content_type='application/json', **self.KEY)
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()['ok'])
+        seg.refresh_from_db()
+        self.assertEqual(seg.estado, 'enviado')
+        self.assertEqual(seg.enviado_por, 'jorge')
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('envio@test.com', mail.outbox[0].to)
+
+    def test_send_respeta_opt_out(self):
+        p = self._participante_con_seguimientos(email='baja@test.com')
+        # el cliente se dio de baja
+        prefs, _ = ClientPreferences.objects.get_or_create(cliente=p.cliente)
+        prefs.set_opt_out_all()
+        seg = SeguimientoBienestarMasaje.objects.filter(participante=p).first()
+        url = reverse('masaje_outbox_send', kwargs={'seg_id': seg.id})
+        r = self.client.post(url, data=json.dumps({'operador': 'jorge'}),
+                             content_type='application/json', **self.KEY)
+        self.assertEqual(r.status_code, 422)
+        self.assertFalse(r.json()['ok'])
+        seg.refresh_from_db()
+        self.assertEqual(seg.estado, 'cancelado')
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_cancel(self):
+        p = self._participante_con_seguimientos()
+        seg = SeguimientoBienestarMasaje.objects.filter(participante=p).first()
+        url = reverse('masaje_outbox_cancel', kwargs={'seg_id': seg.id})
+        r = self.client.post(url, data=json.dumps({'operador': 'angelica'}),
+                             content_type='application/json', **self.KEY)
+        self.assertEqual(r.status_code, 200)
+        seg.refresh_from_db()
+        self.assertEqual(seg.estado, 'cancelado')
+
+    def test_no_edita_si_ya_enviado(self):
+        p = self._participante_con_seguimientos()
+        seg = SeguimientoBienestarMasaje.objects.filter(participante=p).first()
+        seg.estado = 'enviado'
+        seg.save(update_fields=['estado'])
+        url = reverse('masaje_outbox_edit', kwargs={'seg_id': seg.id})
+        r = self.client.patch(url, data=json.dumps({'asunto': 'x'}),
+                              content_type='application/json', **self.KEY)
+        self.assertEqual(r.status_code, 409)

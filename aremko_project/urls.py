@@ -9,6 +9,7 @@ from django.contrib.auth import views as auth_views # Import auth views
 from ventas.views.public_views import homepage_view, empresas_view, empresas_presentacion_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view, garantia_view, tarjetas_qr_reviews_view, encuesta_satisfaccion_view, encuesta_gracias_view, refugio_landing_view, refugio_submit_view, privacy_policy_view
 from ventas.views import flow_views
 from ventas.views import masaje_views
+from ventas.views import masaje_outbox_api_views
 from ventas.views import whatsapp_api_views
 # Removed direct import of ventas.urls
 
@@ -53,6 +54,13 @@ urlpatterns = [
     path('masaje/ficha/<str:token>/', masaje_views.masaje_ficha, name='masaje_ficha'),
     path('masaje/acompanante/<str:token>/', masaje_views.masaje_registrar_acompanante, name='masaje_registrar_acompanante'),
     path('masaje/baja/<str:token>/', masaje_views.masaje_baja_comunicaciones, name='masaje_baja'),
+
+    # Conexión-Masajes: bandeja de salida (consumida por aremko-cli, X-API-Key)
+    path('api/masaje/outbox/', masaje_outbox_api_views.outbox_list, name='masaje_outbox_list'),
+    path('api/masaje/outbox/<int:seg_id>/preview/', masaje_outbox_api_views.outbox_preview, name='masaje_outbox_preview'),
+    path('api/masaje/outbox/<int:seg_id>/send/', masaje_outbox_api_views.outbox_send, name='masaje_outbox_send'),
+    path('api/masaje/outbox/<int:seg_id>/cancel/', masaje_outbox_api_views.outbox_cancel, name='masaje_outbox_cancel'),
+    path('api/masaje/outbox/<int:seg_id>/', masaje_outbox_api_views.outbox_edit, name='masaje_outbox_edit'),
 
     # WhatsApp Cloud API: persistencia de conversaciones (consumido por aremko-cli/Go).
     # Auth X-API-Key. Solo en aremko.cl.
