@@ -883,6 +883,15 @@ class Cliente(models.Model):
             else:
                 raise ValidationError(f"Formato de teléfono inválido: {self.telefono}")
 
+        # Plan Geo E1: mantener la región consistente con la comuna elegida
+        # (recepción solo elige comuna; la región se completa sola).
+        if self.comuna_id:
+            try:
+                if self.comuna and self.comuna.region_id:
+                    self.region_id = self.comuna.region_id
+            except Exception:
+                pass
+
         # Plan Geo E0: derivar region_geografica + ciudad_normalizada al guardar.
         # Solo si NO es edición manual; nunca DEGRADA (no borra una clasificación
         # existente) y nunca bloquea el guardado si algo falla.

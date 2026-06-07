@@ -1350,9 +1350,46 @@ class ComunaAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related('region')
 
 
+class ClienteAdminForm(forms.ModelForm):
+    """Plan Geo E1: País como selector Chile/Extranjero. Si es Chile, la comuna
+    es obligatoria (define la zona). Si es Extranjero, no lleva comuna."""
+
+    PAIS_CHOICES = [('Chile', 'Chile'), ('Extranjero', 'Extranjero')]
+    pais = forms.ChoiceField(
+        choices=PAIS_CHOICES, required=True, label='País',
+        help_text='“Chile” activa la comuna (obligatoria). “Extranjero” no requiere comuna.',
+    )
+
+    class Meta:
+        model = Cliente
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .services.geo_service import CHILE_VALUES
+        pais_val = (getattr(self.instance, 'pais', '') or '').strip().lower()
+        self.fields['pais'].initial = 'Chile' if (not pais_val or pais_val in CHILE_VALUES) else 'Extranjero'
+        if 'comuna' in self.fields:
+            # La obligatoriedad real depende del país; se valida en clean().
+            self.fields['comuna'].required = False
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('pais') == 'Chile':
+            if not cleaned.get('comuna'):
+                self.add_error('comuna', 'Selecciona la comuna del cliente (define la zona).')
+        else:
+            cleaned['comuna'] = None  # extranjero no lleva comuna
+        return cleaned
+
+
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
     """ClienteAdmin con autocomplete funcional y optimizaciones"""
+    form = ClienteAdminForm
+
+    class Media:
+        js = ('admin/js/cliente_geo_toggle.js',)
     search_fields = ('nombre', 'telefono', 'email')
     list_display = ('nombre', 'telefono', 'email')
     list_filter = ('created_at',)
@@ -1365,13 +1402,20 @@ class ClienteAdmin(admin.ModelAdmin):
             'fields': ('nombre', 'email', 'telefono', 'documento_identidad')
         }),
         ('Ubicación', {
-            'fields': ('pais', 'comuna', 'zona_display', 'ciudad', 'region'),
+            'fields': ('pais', 'comuna', 'zona_display'),
             'description': (
-                "Elige la <b>Comuna</b> (buscador): con eso la <b>Zona</b> "
-                "(sur/nacional/extranjero) se calcula automáticamente al guardar. "
-                "<b>Ciudad</b> es texto libre legacy (opcional). Para extranjeros, "
-                "indica el <b>País</b>."
+                "<b>País = Chile</b> → elige la <b>Comuna</b> (la <b>Zona</b> "
+                "sur/nacional se calcula sola al guardar). "
+                "<b>País = Extranjero</b> → no se necesita comuna."
             ),
+        }),
+        ('Datos legacy (opcional)', {
+            'fields': ('ciudad', 'region'),
+            'description': (
+                "Campos antiguos. <b>Ciudad</b> es texto libre; <b>Región</b> se "
+                "completa sola desde la comuna. Normalmente no necesitas tocarlos."
+            ),
+            'classes': ('collapse',),
         }),
         ('Operación Vuelta a Casa', {
             'fields': (
