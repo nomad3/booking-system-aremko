@@ -1344,7 +1344,7 @@ class ComunaAdmin(admin.ModelAdmin):
     search_fields = ('nombre', 'region__nombre')
     list_display = ('nombre', 'region')
     list_select_related = ('region',)
-    ordering = ('region__nombre', 'nombre')
+    ordering = ('nombre', 'region__nombre')  # alfabético por comuna (A→Z)
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('region')
