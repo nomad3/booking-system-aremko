@@ -108,7 +108,11 @@ def enviar_invitacion_ficha_reserva(venta):
         ]
         for a in acompanantes:
             lineas.append(_ficha_url(a.token_formulario))
-    lineas += ["", "Con cariño,", "Equipo Aremko Spa Boutique · Puerto Varas"]
+    lineas += [
+        "",
+        "🔒 Tus datos se tratan con absoluta reserva y por ningún motivo se comparten con terceros.",
+        "", "Con cariño,", "Equipo Aremko Spa Boutique · Puerto Varas",
+    ]
     texto = "\n".join(lineas)
 
     # --- HTML ---
@@ -125,6 +129,9 @@ def enviar_invitacion_ficha_reserva(venta):
             'complete su propia ficha (le pediremos su nombre, teléfono y email):</p>')
         for a in acompanantes:
             cuerpo.append(_enlace_copiable(_ficha_url(a.token_formulario)))
+    cuerpo.append(
+        '<p style="margin-top:18px;font-size:13px;color:#777;">🔒 Tus datos se '
+        'tratan con absoluta reserva y por ningún motivo se comparten con terceros.</p>')
     html = _render_html(''.join(cuerpo))
 
     from_email = (getattr(settings, 'MASAJE_FROM_EMAIL', None)
