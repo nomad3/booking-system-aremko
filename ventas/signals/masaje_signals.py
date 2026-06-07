@@ -10,9 +10,23 @@ import logging
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
-from ..models import ReservaServicio, BienestarMasajeFicha
+from ..models import ReservaServicio, BienestarMasajeFicha, VentaReserva
 
 logger = logging.getLogger(__name__)
+
+
+@receiver(post_save, sender=VentaReserva, dispatch_uid='masaje_enviar_ficha_al_pagar')
+def enviar_ficha_al_confirmar_pago(sender, instance, **kwargs):
+    """Al quedar la reserva pagada/parcial, envía al comprador el link de su ficha
+    (+ los de acompañantes para compartir). Idempotente y solo si la visita es a
+    futuro. Defensivo: nunca interrumpe el guardado de la reserva."""
+    try:
+        if getattr(instance, 'estado_pago', None) not in ('pagado', 'parcial'):
+            return
+        from ..services.masaje_invite_service import enviar_invitacion_ficha_reserva
+        enviar_invitacion_ficha_reserva(instance)
+    except Exception as exc:  # nunca interrumpir el guardado de la reserva
+        logger.warning("[Masajes] No se envió la invitación de ficha (no critico): %s", exc)
 
 
 @receiver(post_save, sender=ReservaServicio, dispatch_uid='masaje_generar_participantes')
