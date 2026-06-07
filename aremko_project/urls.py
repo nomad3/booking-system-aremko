@@ -52,6 +52,7 @@ urlpatterns = [
     # Conexión-Masajes: formularios públicos con token (ficha de bienestar + acompañante)
     path('masaje/ficha/<str:token>/', masaje_views.masaje_ficha, name='masaje_ficha'),
     path('masaje/acompanante/<str:token>/', masaje_views.masaje_registrar_acompanante, name='masaje_registrar_acompanante'),
+    path('masaje/baja/<str:token>/', masaje_views.masaje_baja_comunicaciones, name='masaje_baja'),
 
     # WhatsApp Cloud API: persistencia de conversaciones (consumido por aremko-cli/Go).
     # Auth X-API-Key. Solo en aremko.cl.

@@ -7,10 +7,12 @@ Seguridad: acceso solo por token seguro (secrets.token_urlsafe), nunca por ID.
 Registra fecha + texto exacto del consentimiento. Lenguaje de bienestar (no médico).
 """
 
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 
 from ..models import ParticipanteMasajeReserva, BienestarMasajeFicha, Cliente
 
@@ -197,3 +199,72 @@ def masaje_registrar_acompanante(request, token):
     ctx['exito'] = True
     ctx['ficha_url'] = reverse('masaje_ficha', kwargs={'token': acompanante.token_formulario})
     return render(request, 'ventas/masaje_acompanante.html', ctx)
+
+
+def _pagina_baja(titulo, mensaje, boton_confirmar=False):
+    """HTML mobile-first de marca para la página de baja de comunicaciones."""
+    boton = ''
+    if boton_confirmar:
+        boton = (
+            '<form method="post" style="margin-top:22px;">'
+            '<button type="submit" style="background:#b5651d;color:#fff;border:none;'
+            'padding:14px 30px;border-radius:10px;font-weight:bold;font-size:16px;'
+            'cursor:pointer;">Sí, darme de baja</button></form>'
+        )
+    return (
+        '<!doctype html><html lang="es"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f'<title>{titulo}</title></head>'
+        '<body style="margin:0;background:#faf6f0;font-family:Arial,Helvetica,sans-serif;">'
+        '<div style="max-width:520px;margin:40px auto;background:#fff;border-radius:16px;'
+        'overflow:hidden;border:1px solid #eee3d4;">'
+        '<div style="background:#b5651d;padding:24px;text-align:center;">'
+        '<div style="color:#fff;font-size:22px;font-weight:bold;">🌿 Aremko Spa Boutique</div>'
+        '<div style="color:#f6e9da;font-size:13px;margin-top:2px;">Puerto Varas</div></div>'
+        '<div style="padding:30px 26px;color:#3a3a3a;font-size:16px;line-height:1.6;text-align:center;">'
+        f'<h2 style="color:#b5651d;margin-top:0;">{titulo}</h2><p>{mensaje}</p>{boton}'
+        '</div></div></body></html>'
+    )
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def masaje_baja_comunicaciones(request, token):
+    """Baja de comunicaciones (email + WhatsApp + promociones) desde el enlace de
+    los correos de seguimiento. El token es firmado (codifica el id de cliente).
+    GET muestra confirmación; POST ejecuta la baja (evita bajas accidentales por
+    prefetch de los clientes de correo)."""
+    from django.core import signing
+    from ..models import ClientPreferences
+    from ..services.masaje_seguimiento_service import BAJA_SALT
+
+    try:
+        cliente_id = signing.loads(token, salt=BAJA_SALT)
+    except signing.BadSignature:
+        return HttpResponse(_pagina_baja(
+            "Enlace no válido",
+            "Este enlace de baja no es válido o está incompleto."), status=400)
+
+    cliente = Cliente.objects.filter(id=cliente_id).first()
+    if cliente is None:
+        return HttpResponse(_pagina_baja(
+            "No encontrado",
+            "No encontramos tu registro. Es posible que ya no estés en nuestra base."),
+            status=404)
+
+    if request.method == 'POST':
+        prefs, _ = ClientPreferences.objects.get_or_create(cliente=cliente)
+        prefs.set_opt_out_all()
+        if not cliente.opt_out_whatsapp:
+            cliente.opt_out_whatsapp = True
+            cliente.save(update_fields=['opt_out_whatsapp'])
+        return HttpResponse(_pagina_baja(
+            "Listo, te diste de baja 🌿",
+            "No volverás a recibir correos ni WhatsApp con información de Aremko Spa "
+            "Boutique. Si cambias de opinión, escríbenos cuando quieras."))
+
+    return HttpResponse(_pagina_baja(
+        "¿Dar de baja tus comunicaciones?",
+        "Si confirmas, dejarás de recibir correos y WhatsApp con información de "
+        "bienestar y promociones de Aremko Spa Boutique.",
+        boton_confirmar=True))

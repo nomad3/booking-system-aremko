@@ -17,11 +17,39 @@ import logging
 from datetime import timedelta
 
 from django.conf import settings
+from django.core import signing
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-RESERVAR_URL = "https://www.aremko.cl/masajes/"
+BASE_URL = "https://www.aremko.cl"
+RESERVAR_URL = f"{BASE_URL}/masajes/"
+
+# Token firmado para la baja de comunicaciones (no requiere migración ni guardar
+# el token: codifica el id del cliente y se valida con la SECRET_KEY).
+BAJA_SALT = "baja-comunicaciones-masaje"
+
+
+def baja_token(cliente_id):
+    """Token firmado (cliente_id) para el enlace de baja de comunicaciones."""
+    return signing.dumps(int(cliente_id), salt=BAJA_SALT)
+
+
+def baja_url(cliente_id):
+    """URL absoluta de baja para un cliente. None si no hay cliente."""
+    if not cliente_id:
+        return None
+    return f"{BASE_URL}/masaje/baja/{baja_token(cliente_id)}/"
+
+
+def cliente_acepta_email(cliente):
+    """False solo si el cliente se dio de baja explícitamente (preferences)."""
+    if cliente is None:
+        return True  # sin cliente no podemos verificar; el participante igual tiene email
+    prefs = getattr(cliente, 'preferences', None)
+    if prefs is not None and not prefs.accepts_email:
+        return False
+    return True
 
 # (tipo_email, offset desde que se completa la ficha, es_comercial)
 CADENCIA = [
@@ -32,7 +60,7 @@ CADENCIA = [
     ('reactivacion_90d',  timedelta(days=90),  True),
 ]
 
-FIRMA = "\n\nCon cariño,\nEquipo Aremko · Puerto Varas"
+FIRMA = "\n\nCon cariño,\nEquipo Aremko Spa Boutique · Puerto Varas"
 
 
 def _contenido(tipo, nombre):
@@ -42,9 +70,9 @@ def _contenido(tipo, nombre):
     saludo = f"Hola {n}," if n else "Hola,"
     if tipo == 'gracias_visita':
         return (
-            "Gracias por tu momento de bienestar en Aremko 🌿",
-            f"{saludo}\n\nGracias por darte un espacio para ti en Aremko. Esperamos "
-            f"que hayas salido más relajado/a y en calma.\n\nSi quieres contarnos "
+            "Gracias por tu momento de bienestar en Aremko Spa Boutique 🌿",
+            f"{saludo}\n\nGracias por darte un espacio para ti en Aremko Spa Boutique. "
+            f"Esperamos que hayas salido más relajado/a y en calma.\n\nSi quieres contarnos "
             f"cómo te sentiste, nos encanta leerte: solo responde este correo.",
         )
     if tipo == 'seguimiento_7d':
@@ -63,7 +91,7 @@ def _contenido(tipo, nombre):
         )
     if tipo == 'reactivacion_60d':
         return (
-            "Te echamos de menos en Aremko 🌿",
+            "Te echamos de menos en Aremko Spa Boutique 🌿",
             f"{saludo}\n\nHace un par de meses que no te vemos. Tu bienestar nos "
             f"importa: si quieres regalarte de nuevo una pausa de masaje, aquí "
             f"estamos para recibirte.",
@@ -72,15 +100,16 @@ def _contenido(tipo, nombre):
         return (
             "Un espacio para reencontrarte con tu calma 🌿",
             f"{saludo}\n\nYa han pasado unos meses desde tu última visita. Cuando "
-            f"sientas que necesitas un respiro, en Aremko te tenemos un lugar "
-            f"tranquilo y a tu ritmo.",
+            f"sientas que necesitas un respiro, en Aremko Spa Boutique te tenemos un "
+            f"lugar tranquilo y a tu ritmo.",
         )
-    return ("Aremko", f"{saludo}\n\nGracias por visitarnos.")
+    return ("Aremko Spa Boutique", f"{saludo}\n\nGracias por visitarnos.")
 
 
-def _render_html(cuerpo, cta_label=None):
+def _render_html(cuerpo, cta_label=None, url_baja=None):
     """Envuelve el mensaje en una plantilla HTML de marca (header + cuerpo +
-    botón opcional + footer). El botón oculta el link de reserva."""
+    botón opcional + footer). El botón oculta el link de reserva. Si se pasa
+    url_baja, el footer incluye el enlace para no recibir más comunicaciones."""
     cuerpo_html = (cuerpo or '').replace('\n', '<br>')
     boton = ''
     if cta_label:
@@ -90,21 +119,30 @@ def _render_html(cuerpo, cta_label=None):
             'text-decoration:none;padding:14px 30px;border-radius:10px;font-weight:bold;'
             f'font-size:16px;display:inline-block;">{cta_label}</a></div>'
         )
+    baja = ''
+    if url_baja:
+        baja = (
+            '<div style="text-align:center;margin:14px 0 4px;">'
+            f'<a href="{url_baja}" style="background:#b5651d;color:#ffffff;'
+            'text-decoration:none;padding:14px 30px;border-radius:10px;font-weight:bold;'
+            'font-size:16px;display:inline-block;">'
+            'No recibir más comunicaciones</a></div>'
+        )
     return (
         '<div style="background:#faf6f0;padding:24px 12px;'
         'font-family:Arial,Helvetica,sans-serif;">'
         '<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;'
         'overflow:hidden;border:1px solid #eee3d4;">'
         '<div style="background:#b5651d;padding:22px;text-align:center;">'
-        '<div style="color:#ffffff;font-size:22px;font-weight:bold;">🌿 Aremko Spa</div>'
+        '<div style="color:#ffffff;font-size:22px;font-weight:bold;">🌿 Aremko Spa Boutique</div>'
         '<div style="color:#f6e9da;font-size:13px;margin-top:2px;">Puerto Varas</div>'
         '</div>'
         '<div style="padding:26px 24px;color:#3a3a3a;font-size:16px;line-height:1.6;">'
-        f'{cuerpo_html}{boton}'
+        f'{cuerpo_html}{boton}{baja}'
         '</div>'
         '<div style="padding:16px 24px;background:#faf6f0;color:#999;font-size:12px;'
         'text-align:center;border-top:1px solid #eee3d4;">'
-        'Con cariño, Equipo Aremko · Puerto Varas<br>'
+        'Con cariño, Equipo Aremko Spa Boutique · Puerto Varas<br>'
         '<a href="https://www.aremko.cl" style="color:#b5651d;">aremko.cl</a>'
         '</div></div></div>'
     )
@@ -130,7 +168,7 @@ def _contenido_resumen(ficha, nombre):
     lineas = [
         saludo,
         "",
-        "Queremos compartirte un breve resumen de tu experiencia de bienestar en Aremko:",
+        "Queremos compartirte un breve resumen de tu experiencia de bienestar en Aremko Spa Boutique:",
         "",
     ]
     if (ficha.zonas_trabajadas or '').strip():
@@ -240,6 +278,16 @@ def enviar_seguimiento(seg):
     """Envía un SeguimientoBienestarMasaje por email. Marca estado. Devuelve bool."""
     from django.core.mail import EmailMultiAlternatives
 
+    cliente = (seg.participante.cliente if seg.participante_id else None) or \
+              (seg.cliente if seg.cliente_id else None)
+
+    # Respetar la baja: si el cliente se dio de baja, no enviar.
+    if not cliente_acepta_email(cliente):
+        seg.estado = 'cancelado'
+        seg.error_log = 'Cliente se dio de baja de las comunicaciones'
+        seg.save(update_fields=['estado', 'error_log'])
+        return False
+
     email = (seg.participante.email if seg.participante_id else '') or \
             (seg.cliente.email if seg.cliente_id else '') or ''
     email = email.strip()
@@ -252,11 +300,15 @@ def enviar_seguimiento(seg):
         cuerpo = seg.cuerpo or ''
         # CTA "Reservar" en todos salvo el de agradecimiento.
         con_cta = seg.tipo_email != 'gracias_visita'
+        url_baja = baja_url(cliente.id if cliente else None)
         texto = cuerpo
         if con_cta:
             texto += f"\n\nReserva tu masaje: {RESERVAR_URL}"
         texto += FIRMA
-        html = _render_html(cuerpo, 'Reservar mi masaje' if con_cta else None)
+        if url_baja:
+            texto += (f"\n\n---\nSi no deseas recibir más correos ni WhatsApp con "
+                      f"información, date de baja aquí: {url_baja}")
+        html = _render_html(cuerpo, 'Reservar mi masaje' if con_cta else None, url_baja=url_baja)
         from_email = getattr(settings, 'MASAJE_FROM_EMAIL', None) or \
             getattr(settings, 'DEFAULT_FROM_EMAIL', 'ventas@aremko.cl')
         msg = EmailMultiAlternatives(
