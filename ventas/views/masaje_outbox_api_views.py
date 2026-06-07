@@ -36,17 +36,72 @@ def _body(request):
     return {k: v for k, v in request.POST.items()}
 
 
+# Etiquetas legibles de region_geografica (mismas categorías que la bandeja WhatsApp).
+REGION_LABELS = {
+    'sur': 'Sur',
+    'nacional': 'Resto de Chile',
+    'extranjero': 'Extranjero',
+    'sin_clasificar': 'Sin clasificar',
+}
+
+
+def _cliente_de(seg):
+    p = seg.participante if seg.participante_id else None
+    return (p.cliente if p else None) or (seg.cliente if seg.cliente_id else None)
+
+
 def _destinatario(seg):
     """(nombre, email) del destinatario, desde participante o cliente."""
     p = seg.participante if seg.participante_id else None
-    cliente = (p.cliente if p else None) or (seg.cliente if seg.cliente_id else None)
+    cliente = _cliente_de(seg)
     nombre = ((p.nombre if p else '') or (cliente.nombre if cliente else '') or '').strip()
     email = ((p.email if p else '') or (cliente.email if cliente else '') or '').strip()
     return nombre, email
 
 
+def _contexto_reserva(seg):
+    """(servicio, fecha_visita) de la línea de masaje del participante.
+    Usa el mismo emparejamiento participante↔línea que la agenda; si no hay
+    participante, cae a la primera línea de masaje de la reserva."""
+    p = seg.participante if seg.participante_id else None
+    reserva = (p.reserva if p else None) or (seg.reserva if seg.reserva_id else None)
+    if reserva is None:
+        return None, None
+    linea = None
+    if p is not None:
+        try:
+            from ..services.masaje_participantes_service import mapear_participante_a_linea
+            linea = mapear_participante_a_linea(reserva).get(p.id)
+        except Exception:
+            linea = None
+    if linea is None:
+        linea = (reserva.reservaservicios
+                 .filter(servicio__tipo_servicio='masaje')
+                 .select_related('servicio').order_by('id').first())
+    if linea is None:
+        return None, None
+    servicio = linea.servicio.nombre if linea.servicio_id else None
+    fecha_visita = linea.fecha_agendamiento.isoformat() if linea.fecha_agendamiento else None
+    return servicio, fecha_visita
+
+
 def _serialize(seg, include_preview=False):
+    p = seg.participante if seg.participante_id else None
+    cliente = _cliente_de(seg)
     nombre, email = _destinatario(seg)
+
+    # Geo (mismas fuentes que la bandeja WhatsApp)
+    ciudad = (cliente.ciudad_normalizada.nombre_canonico
+              if (cliente and cliente.ciudad_normalizada_id) else None)
+    region = (cliente.region_geografica if cliente else 'sin_clasificar') or 'sin_clasificar'
+
+    # Teléfono (Cliente.telefono ya viene normalizado E.164; participante como respaldo)
+    telefono = ((cliente.telefono if cliente else '') or (p.telefono if p else '') or '').strip()
+
+    # Contexto de la reserva
+    servicio, fecha_visita = _contexto_reserva(seg)
+    num_visitas = cliente.numero_visitas() if cliente else 0
+
     data = {
         'id': seg.id,
         'tipo_email': seg.tipo_email,
@@ -54,6 +109,15 @@ def _serialize(seg, include_preview=False):
         'estado': seg.estado,
         'destinatario_nombre': nombre,
         'destinatario_email': email,
+        'destinatario_telefono': telefono,
+        'ciudad': ciudad,
+        'region': region,
+        'region_label': REGION_LABELS.get(region, region),
+        'apto_visita': region == 'sur',
+        'servicio': servicio,
+        'fecha_visita': fecha_visita,
+        'num_visitas': num_visitas,
+        'cliente_nuevo': num_visitas <= 1,
         'fecha_programada': seg.fecha_programada.isoformat() if seg.fecha_programada else None,
         'fecha_envio': seg.fecha_envio.isoformat() if seg.fecha_envio else None,
         'asunto': seg.asunto,
@@ -71,7 +135,8 @@ def _serialize(seg, include_preview=False):
 
 def _get_seg(seg_id):
     seg = SeguimientoBienestarMasaje.objects.filter(id=seg_id).select_related(
-        'participante', 'participante__cliente', 'cliente').first()
+        'participante', 'participante__cliente', 'participante__cliente__ciudad_normalizada',
+        'cliente', 'cliente__ciudad_normalizada').first()
     if seg is None:
         raise Http404("Seguimiento no encontrado")
     return seg
@@ -96,7 +161,8 @@ def outbox_list(request):
 
     ahora = timezone.now()
     base = SeguimientoBienestarMasaje.objects.filter(estado='pendiente').select_related(
-        'participante', 'participante__cliente', 'cliente')
+        'participante', 'participante__cliente', 'participante__cliente__ciudad_normalizada',
+        'cliente', 'cliente__ciudad_normalizada')
 
     venc = base.filter(fecha_programada__lte=ahora).order_by('fecha_programada')[:limit]
     para_enviar = [_serialize(s, include_preview=True) for s in venc]
