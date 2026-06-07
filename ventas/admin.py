@@ -17,6 +17,7 @@ from django.forms import DateInput, TimeInput, Select
 from .models import (
     Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto,
     Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio,
+    Region, Comuna,
     MovimientoCliente, Compra, DetalleCompra, GiftCard, GiftCardExperiencia, PackDescuento,
     # Massage Management Models
     MasajistaEspecialidad, HorarioMasajista, SalaServicio,
@@ -1327,6 +1328,28 @@ class ProductoAdmin(admin.ModelAdmin):
         return format_html('<span style="color: #999;">Sin imagen</span>')
     vista_previa_imagen.short_description = 'Imagen' 
 
+@admin.register(Region)
+class RegionAdmin(admin.ModelAdmin):
+    """Registrado para habilitar autocomplete de región en otros admins."""
+    search_fields = ('nombre',)
+    list_display = ('nombre',)
+    ordering = ('nombre',)
+
+
+@admin.register(Comuna)
+class ComunaAdmin(admin.ModelAdmin):
+    """Registrado para habilitar autocomplete de comuna (evita el N+1 de las
+    346 comunas en el form de Cliente). select_related('region') evita una query
+    por comuna al renderizar el __str__."""
+    search_fields = ('nombre', 'region__nombre')
+    list_display = ('nombre', 'region')
+    list_select_related = ('region',)
+    ordering = ('region__nombre', 'nombre')
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('region')
+
+
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
     """ClienteAdmin con autocomplete funcional y optimizaciones"""
@@ -1342,7 +1365,13 @@ class ClienteAdmin(admin.ModelAdmin):
             'fields': ('nombre', 'email', 'telefono', 'documento_identidad')
         }),
         ('Ubicación', {
-            'fields': ('pais', 'ciudad', 'region', 'comuna'),
+            'fields': ('pais', 'comuna', 'zona_display', 'ciudad', 'region'),
+            'description': (
+                "Elige la <b>Comuna</b> (buscador): con eso la <b>Zona</b> "
+                "(sur/nacional/extranjero) se calcula automáticamente al guardar. "
+                "<b>Ciudad</b> es texto libre legacy (opcional). Para extranjeros, "
+                "indica el <b>País</b>."
+            ),
         }),
         ('Operación Vuelta a Casa', {
             'fields': (
@@ -1382,7 +1411,25 @@ class ClienteAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
-    autocomplete_fields = ('ciudad_normalizada',)
+    autocomplete_fields = ('ciudad_normalizada', 'region', 'comuna')
+    readonly_fields = ('zona_display',)
+
+    @admin.display(description='Zona (calculada)')
+    def zona_display(self, obj):
+        """Muestra la zona derivada (region_geografica) + ciudad canónica, para
+        que recepción vea la clasificación sin abrir la sección Geo.2."""
+        if obj is None or obj.pk is None:
+            return mark_safe('<span style="color:#999;">Se calcula al guardar (elige la comuna).</span>')
+        etiquetas = {
+            'sur': '🟢 Sur (≤120 km)',
+            'nacional': '🔵 Resto de Chile',
+            'extranjero': '🌎 Extranjero',
+            'sin_clasificar': '⚪ Sin clasificar',
+        }
+        zona = etiquetas.get(obj.region_geografica, obj.region_geografica or '—')
+        ciudad = obj.ciudad_normalizada.nombre_canonico if obj.ciudad_normalizada_id else '—'
+        manual = ' · ✏️ editado manual' if obj.ciudad_normalizada_manual else ''
+        return format_html('<b>{}</b> &nbsp;·&nbsp; ciudad: {}{}', zona, ciudad, manual)
 
     def save_model(self, request, obj, form, change):
         """Si el admin tocó algún campo de Geo.2, marcar el flag manual.
