@@ -9,7 +9,7 @@
 
 | ID | Qué | Implementa | Estado | Última actualización |
 |----|-----|-----------|--------|----------------------|
-| H-001 | Antiduplicado 48 h + orden gracias→resumen + cron normalizar ciudades (bandeja Conexión-Masajes) | Django → luego aremko-cli (UI) | 🔵 INTEGRADO — Django `a10d1c9` + UI aremko-cli `2f0f793` (flags, "Enviar igual…" con forzar=true, 409 por motivo). Cron-job.org agendado ✅ (normalizar-ciudades diario 07:30 America/Santiago; endpoint probado OK, 10.403 sin_clasificar son históricos sin dato de ciudad). Pendiente de Jorge: validar la UI de la bandeja en prod → CERRADO | 2026-06-10 (agente Django) |
+| H-001 | Antiduplicado 48 h + orden gracias→resumen + cron normalizar ciudades (bandeja Conexión-Masajes) | Django → luego aremko-cli (UI) | ✅ CERRADO — Django `a10d1c9` + UI aremko-cli `2f0f793` + cron-job.org diario 07:30. Validado por Jorge en prod 2026-06-10 (bandeja OK; sin casos de bloqueo activos aún — los escenarios de candado/forzar se comprobarán con el uso). Contrato: `RESPUESTA_ANTIDUPLICADO_MASAJES.md` | 2026-06-10 (agente Django) |
 
 ## Estados
 
