@@ -85,10 +85,41 @@ def _contexto_reserva(seg):
     return servicio, fecha_visita
 
 
-def _serialize(seg, include_preview=False):
+def _fmt_local(dt):
+    """'DD/MM HH:MM' en hora local de Chile (para mensajes al operador)."""
+    return timezone.localtime(dt).strftime('%d/%m %H:%M') if dt else ''
+
+
+def _bloqueo_de(seg):
+    """Bloqueos R1/R2 de un seguimiento individual (mismo formato que el batch
+    svc.calcular_bloqueos). Solo aplica a pendientes."""
+    if seg.estado != 'pendiente':
+        return {'saturacion': None, 'orden_gracias_id': None}
+    gracias = svc.bloqueo_orden(seg)
+    return {
+        'saturacion': svc.bloqueo_saturacion(seg),
+        'orden_gracias_id': gracias.id if gracias else None,
+    }
+
+
+def _serialize(seg, include_preview=False, bloqueo=None):
     p = seg.participante if seg.participante_id else None
     cliente = _cliente_de(seg)
     nombre, email = _destinatario(seg)
+
+    # Bloqueos R1 (anti-saturación 48 h entre comerciales) y R2 (orden
+    # gracias→resumen). Campos ADITIVOS al contrato con aremko-cli.
+    if bloqueo is None:
+        bloqueo = _bloqueo_de(seg)
+    sat = bloqueo.get('saturacion')
+    orden_id = bloqueo.get('orden_gracias_id')
+    if orden_id:
+        bloqueo_motivo = "Primero envía el 'Gracias por la visita' a este cliente."
+    elif sat:
+        bloqueo_motivo = (f"Ya recibió un correo comercial hace menos de 48 h; "
+                          f"se desbloquea el {_fmt_local(sat['desbloquea_en'])}.")
+    else:
+        bloqueo_motivo = None
 
     # Geo (mismas fuentes que la bandeja WhatsApp)
     ciudad = (cliente.ciudad_normalizada.nombre_canonico
@@ -127,6 +158,10 @@ def _serialize(seg, include_preview=False):
         'editado_por': seg.editado_por,
         'editado_at': seg.editado_at.isoformat() if seg.editado_at else None,
         'error_log': seg.error_log,
+        'bloqueado_por_saturacion': bool(sat),
+        'desbloquea_en': sat['desbloquea_en'].isoformat() if sat else None,
+        'bloqueado_por_orden': bool(orden_id),
+        'bloqueo_motivo': bloqueo_motivo,
     }
     if include_preview:
         data['preview_html'] = svc.construir_html_preview(seg)
@@ -164,13 +199,16 @@ def outbox_list(request):
         'participante', 'participante__cliente', 'participante__cliente__ciudad_normalizada',
         'cliente', 'cliente__ciudad_normalizada')
 
-    venc = base.filter(fecha_programada__lte=ahora).order_by('fecha_programada')[:limit]
-    para_enviar = [_serialize(s, include_preview=True) for s in venc]
+    venc = list(base.filter(fecha_programada__lte=ahora).order_by('fecha_programada')[:limit])
+    bloqueos = svc.calcular_bloqueos(venc, ahora=ahora)
+    para_enviar = [_serialize(s, include_preview=True, bloqueo=bloqueos.get(s.id))
+                   for s in venc]
 
     programados = []
     if incluir_prog:
-        fut = base.filter(fecha_programada__gt=ahora).order_by('fecha_programada')[:limit]
-        programados = [_serialize(s) for s in fut]
+        fut = list(base.filter(fecha_programada__gt=ahora).order_by('fecha_programada')[:limit])
+        bloq_fut = svc.calcular_bloqueos(fut, ahora=ahora)
+        programados = [_serialize(s, bloqueo=bloq_fut.get(s.id)) for s in fut]
 
     return JsonResponse({
         'ok': True,
@@ -225,7 +263,14 @@ def outbox_edit(request, seg_id):
 @csrf_exempt
 @require_http_methods(["POST"])
 def outbox_send(request, seg_id):
-    """Envía ahora un seguimiento pendiente. Body: {operador}."""
+    """Envía ahora un seguimiento pendiente. Body: {operador, forzar}.
+
+    Bloqueos (responden 409 con 'motivo' en el body):
+    - orden_cadencia: es un resumen_bienestar y el gracias_visita del mismo
+      participante sigue pendiente. Bloqueo DURO (envía o cancela el gracias
+      primero); no admite forzar.
+    - anti_saturacion: es un comercial y el cliente recibió otro comercial hace
+      menos de 48 h. Admite override con forzar=true (queda en el log)."""
     err = _check_luna_key(request)
     if err:
         return err
@@ -235,6 +280,37 @@ def outbox_send(request, seg_id):
 
     data = _body(request)
     operador = (data.get('operador') or '').strip()
+    forzar = str(data.get('forzar', '')).strip().lower() in ('1', 'true', 'si', 'sí', 'yes')
+
+    gracias = svc.bloqueo_orden(seg)
+    if gracias is not None:
+        return JsonResponse({
+            'ok': False,
+            'motivo': 'orden_cadencia',
+            'detalle': (f"Primero envía el 'Gracias por la visita' (#{gracias.id}) "
+                        f"a este cliente; el resumen sale después."),
+            'gracias_pendiente_id': gracias.id,
+            'item': _serialize(seg),
+        }, status=409)
+
+    sat = svc.bloqueo_saturacion(seg)
+    if sat is not None and not forzar:
+        return JsonResponse({
+            'ok': False,
+            'motivo': 'anti_saturacion',
+            'detalle': (f"Ya se le envió un correo comercial hace poco; espera "
+                        f"hasta el {_fmt_local(sat['desbloquea_en'])} o reenvía "
+                        f"con forzar=true."),
+            'ultimo_envio': sat['ultimo_envio'].isoformat(),
+            'desbloquea_en': sat['desbloquea_en'].isoformat(),
+            'item': _serialize(seg),
+        }, status=409)
+    if sat is not None and forzar:
+        import logging
+        logging.getLogger(__name__).warning(
+            "[Masajes] Envío FORZADO pese a anti-saturación: seg=%s operador=%s",
+            seg.id, operador or '(sin operador)')
+
     enviado = svc.enviar_seguimiento(seg, operador=operador)
     seg.refresh_from_db()
     return JsonResponse({

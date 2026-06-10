@@ -18,6 +18,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core import signing
+from django.db.models import Q
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -52,13 +53,126 @@ def cliente_acepta_email(cliente):
     return True
 
 # (tipo_email, offset desde que se completa la ficha, es_comercial)
+# El gracias va INMEDIATO para garantizar el orden gracias → resumen (el
+# resumen_bienestar se programa aparte, ver programar_resumen_bienestar).
 CADENCIA = [
-    ('gracias_visita',    timedelta(hours=24), False),
+    ('gracias_visita',    timedelta(0),        False),
     ('seguimiento_7d',    timedelta(days=7),   True),
     ('recomendacion_30d', timedelta(days=30),  True),
     ('reactivacion_60d',  timedelta(days=60),  True),
     ('reactivacion_90d',  timedelta(days=90),  True),
 ]
+
+# Anti-saturación (R1): ventana mínima entre correos COMERCIALES al mismo
+# cliente. Los transaccionales (gracias_visita, resumen_bienestar) quedan
+# exentos: ni bloquean ni se bloquean.
+VENTANA_SATURACION = timedelta(hours=48)
+TIPOS_COMERCIALES = frozenset(t for t, _, comercial in CADENCIA if comercial)
+
+
+def _cliente_de_seg(seg):
+    return (seg.participante.cliente if seg.participante_id else None) or \
+           (seg.cliente if seg.cliente_id else None)
+
+
+def bloqueo_orden(seg):
+    """R2: si seg es un 'resumen_bienestar' y el participante todavía tiene un
+    'gracias_visita' pendiente, devuelve ese gracias (el resumen no debe salir
+    antes). Si no hay bloqueo, None."""
+    from ..models import SeguimientoBienestarMasaje
+
+    if seg.tipo_email != 'resumen_bienestar' or not seg.participante_id:
+        return None
+    return (SeguimientoBienestarMasaje.objects
+            .filter(participante_id=seg.participante_id,
+                    tipo_email='gracias_visita', estado='pendiente')
+            .exclude(id=seg.id).order_by('id').first())
+
+
+def bloqueo_saturacion(seg, ahora=None):
+    """R1: si seg es comercial y a su cliente ya se le envió OTRO comercial de
+    masajes hace menos de VENTANA_SATURACION, devuelve
+    {'ultimo_envio': dt, 'desbloquea_en': dt}. Si no hay bloqueo, None.
+    Sin cliente asociado no se puede verificar (no bloquea)."""
+    from ..models import SeguimientoBienestarMasaje
+
+    if seg.tipo_email not in TIPOS_COMERCIALES:
+        return None
+    cliente = _cliente_de_seg(seg)
+    if cliente is None:
+        return None
+    ahora = ahora or timezone.now()
+    ultimo = (SeguimientoBienestarMasaje.objects
+              .filter(tipo_email__in=TIPOS_COMERCIALES, estado='enviado',
+                      fecha_envio__gte=ahora - VENTANA_SATURACION)
+              .filter(Q(cliente_id=cliente.id) |
+                      Q(participante__cliente_id=cliente.id))
+              .exclude(id=seg.id)
+              .order_by('-fecha_envio').first())
+    if ultimo is None or ultimo.fecha_envio is None:
+        return None
+    return {'ultimo_envio': ultimo.fecha_envio,
+            'desbloquea_en': ultimo.fecha_envio + VENTANA_SATURACION}
+
+
+def calcular_bloqueos(segs, ahora=None):
+    """Versión batch de bloqueo_orden + bloqueo_saturacion para el listado del
+    outbox (evita N+1). Devuelve dict seg.id -> {'saturacion': dict|None,
+    'orden_gracias_id': int|None}. Solo evalúa seguimientos 'pendiente'."""
+    from ..models import SeguimientoBienestarMasaje
+
+    segs = [s for s in segs if s.estado == 'pendiente']
+    ahora = ahora or timezone.now()
+    res = {s.id: {'saturacion': None, 'orden_gracias_id': None} for s in segs}
+
+    # R2 — gracias pendientes por participante (para los resumen_bienestar)
+    part_ids = {s.participante_id for s in segs
+                if s.tipo_email == 'resumen_bienestar' and s.participante_id}
+    gracias_por_part = {}
+    if part_ids:
+        rows = (SeguimientoBienestarMasaje.objects
+                .filter(participante_id__in=part_ids,
+                        tipo_email='gracias_visita', estado='pendiente')
+                .order_by('id').values_list('participante_id', 'id'))
+        for pid, gid in rows:
+            gracias_por_part.setdefault(pid, gid)
+
+    # R1 — último comercial enviado (en ventana) por cliente
+    cli_ids = set()
+    for s in segs:
+        if s.tipo_email in TIPOS_COMERCIALES:
+            cli = _cliente_de_seg(s)
+            if cli is not None:
+                cli_ids.add(cli.id)
+    ultimo_por_cliente = {}
+    if cli_ids:
+        rows = (SeguimientoBienestarMasaje.objects
+                .filter(tipo_email__in=TIPOS_COMERCIALES, estado='enviado',
+                        fecha_envio__gte=ahora - VENTANA_SATURACION)
+                .filter(Q(cliente_id__in=cli_ids) |
+                        Q(participante__cliente_id__in=cli_ids))
+                .values_list('cliente_id', 'participante__cliente_id', 'fecha_envio'))
+        for cid, pcid, fe in rows:
+            if fe is None:
+                continue
+            for c in (cid, pcid):
+                if c in cli_ids and (c not in ultimo_por_cliente or fe > ultimo_por_cliente[c]):
+                    ultimo_por_cliente[c] = fe
+
+    for s in segs:
+        if s.tipo_email == 'resumen_bienestar' and s.participante_id:
+            gid = gracias_por_part.get(s.participante_id)
+            if gid and gid != s.id:
+                res[s.id]['orden_gracias_id'] = gid
+        elif s.tipo_email in TIPOS_COMERCIALES:
+            cli = _cliente_de_seg(s)
+            fe = ultimo_por_cliente.get(cli.id) if cli is not None else None
+            if fe is not None:
+                res[s.id]['saturacion'] = {
+                    'ultimo_envio': fe,
+                    'desbloquea_en': fe + VENTANA_SATURACION,
+                }
+    return res
 
 FIRMA = "\n\nCon cariño,\nEquipo Aremko Spa Boutique · Puerto Varas"
 
@@ -190,8 +304,10 @@ def _contenido_resumen(ficha, nombre):
 
 
 def programar_resumen_bienestar(ficha):
-    """Programa (inmediato) el email de resumen cuando la masajista completa su
-    resumen. Idempotente: un solo 'resumen_bienestar' por participante. Devuelve
+    """Programa el email de resumen cuando la masajista completa su resumen.
+    Idempotente: un solo 'resumen_bienestar' por participante. Para garantizar
+    el orden gracias → resumen, si el 'gracias_visita' del participante sigue
+    pendiente el resumen se programa +24 h después; si no, inmediato. Devuelve
     el Seguimiento creado o None."""
     from ..models import SeguimientoBienestarMasaje
 
@@ -211,6 +327,12 @@ def programar_resumen_bienestar(ficha):
     if not email:
         return None
 
+    gracias_pendiente = SeguimientoBienestarMasaje.objects.filter(
+        participante=participante, tipo_email='gracias_visita',
+        estado='pendiente',
+    ).exists()
+    fecha = timezone.now() + (timedelta(hours=24) if gracias_pendiente else timedelta(0))
+
     nombre = ((participante.nombre or (cliente.nombre if cliente else '') or '')
               .strip().split(' ')[0])
     asunto, cuerpo = _contenido_resumen(ficha, nombre)
@@ -219,7 +341,7 @@ def programar_resumen_bienestar(ficha):
         reserva=participante.reserva,
         cliente=cliente,
         tipo_email='resumen_bienestar',
-        fecha_programada=timezone.now(),
+        fecha_programada=fecha,
         asunto=asunto,
         cuerpo=cuerpo,
         estado='pendiente',
@@ -356,10 +478,19 @@ def procesar_seguimientos_pendientes():
         return {'activo': False, 'enviados': 0, 'errores': 0,
                 'pendientes_vencidos': due_qs.count()}
 
-    enviados = errores = 0
-    for seg in due_qs.select_related('participante', 'cliente'):
+    enviados = errores = omitidos = 0
+    # Orden por fecha_programada (Meta.ordering): con gracias_visita en offset 0
+    # el gracias sale naturalmente antes que el resumen.
+    for seg in due_qs.select_related('participante', 'participante__cliente', 'cliente'):
+        # Mismas reglas que la bandeja manual: orden gracias→resumen y
+        # anti-saturación de comerciales (48 h). Los bloqueados quedan
+        # pendientes para la próxima corrida.
+        if bloqueo_orden(seg) is not None or bloqueo_saturacion(seg) is not None:
+            omitidos += 1
+            continue
         if enviar_seguimiento(seg):
             enviados += 1
         else:
             errores += 1
-    return {'activo': True, 'enviados': enviados, 'errores': errores}
+    return {'activo': True, 'enviados': enviados, 'errores': errores,
+            'omitidos': omitidos}

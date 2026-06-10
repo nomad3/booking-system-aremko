@@ -651,3 +651,35 @@ def cron_seguimientos_masaje(request):
             "ok": False, "error": str(e),
             "command": "enviar_seguimientos_masaje",
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_normalizar_ciudades(request):
+    """Endpoint cron: normaliza la clasificación geográfica de los clientes
+    nuevos (region_geografica='sin_clasificar'). Idempotente; NUNCA pisa las
+    clasificaciones manuales (ciudad_normalizada_manual=True).
+
+    GET o POST: /ventas/cron/normalizar-ciudades/?token=xxx
+    Frecuencia recomendada: Diario (ej. 7:30 AM).
+    """
+    err = _validar_cron_token(request)
+    if err:
+        return err
+    try:
+        output = StringIO()
+        call_command('normalizar_ciudades_clientes', '--solo-sin-clasificar',
+                     stdout=output)
+        logger.info("✅ Cron normalizar_ciudades_clientes ejecutado vía HTTP")
+        return JsonResponse({
+            "ok": True,
+            "message": "Normalización de ciudades ejecutada (solo sin_clasificar)",
+            "command": "normalizar_ciudades_clientes --solo-sin-clasificar",
+            "output": output.getvalue(),
+        })
+    except Exception as e:
+        logger.error(f"❌ Error en cron normalizar-ciudades: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False, "error": str(e),
+            "command": "normalizar_ciudades_clientes",
+        }, status=500)
