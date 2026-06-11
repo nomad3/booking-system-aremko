@@ -16,4 +16,6 @@ urlpatterns = [
 
     # Leads Refugio — conteo REAL desde la BD (no el fb_pixel_lead de Meta).
     path('refugio-leads/summary/', views.refugio_leads_summary, name='refugio-leads-summary'),
+    # H-002: listado de leads (formulario + WhatsApp [Refugio]) para CPL real y Etapa 4b.
+    path('refugio-leads/', views.refugio_leads_list, name='refugio-leads-list'),
 ]

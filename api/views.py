@@ -543,3 +543,107 @@ def refugio_leads_summary(request):
         'by_canal': dict(by_canal),
         'nota': 'Conteo real de sumisiones del formulario /refugio/. NO usar fb_pixel_lead de Meta (contaminado por eventos Lead del checkout).',
     })
+
+@api_view(['GET'])
+@authentication_classes([APIKeyAuthentication])
+def refugio_leads_list(request):
+    """Listado de leads REALES de Refugio (H-002) — hermano de /summary/.
+
+    GET /api/refugio-leads/?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
+    Auth: header X-API-Key. Solo lectura.
+
+    Devuelve:
+    - leads_formulario: filas de ventas_refugiolead con UTM, canal derivado y
+      telefono_e164 (para cruzar contra reservas en la Etapa 4b).
+    - whatsapp_leads: conversaciones ENTRANTES iniciadas con el texto prellenado
+      del boton de la landing (el body trae el marcador '[Refugio]'), deduplicadas
+      por telefono. Es intencion WhatsApp convertida en contacto real; los CLICS
+      al boton (GA4) no viven en esta BD y los aporta aremko-cli.
+    """
+    from collections import Counter
+    from datetime import timedelta
+    from django.conf import settings as dj_settings
+    from django.utils import timezone
+    from django.utils.dateparse import parse_date
+    from ventas.models import RefugioLead, WhatsAppMessage
+    from ventas.services.phone_service import PhoneService
+
+    expected_key = getattr(dj_settings, 'LUNA_API_KEY', None)
+    if not expected_key or request.META.get('HTTP_X_API_KEY') != expected_key:
+        return Response(
+            {'error': 'No autorizado. Se requiere header X-API-Key válido.'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    hoy = timezone.localdate()
+    desde = parse_date(request.GET.get('desde', '') or '') or (hoy - timedelta(days=30))
+    hasta = parse_date(request.GET.get('hasta', '') or '') or hoy
+
+    def _e164(tel):
+        try:
+            return PhoneService.normalize_phone(tel) or ''
+        except Exception:
+            return ''
+
+    # --- Leads del formulario ---
+    qs = RefugioLead.objects.filter(
+        created_at__date__gte=desde, created_at__date__lte=hasta,
+    ).order_by('created_at')
+
+    leads_formulario, by_canal = [], Counter()
+    for lead in qs:
+        canal = _refugio_canal(lead.utm_source, lead.utm_medium)
+        by_canal[canal] += 1
+        leads_formulario.append({
+            'id': lead.id,
+            'nombre': lead.nombre,
+            'telefono': lead.telefono,
+            'telefono_e164': _e164(lead.telefono),
+            'email': lead.email,
+            'ciudad_origen': lead.ciudad_origen,
+            'fecha_tentativa': lead.fecha_tentativa.isoformat() if lead.fecha_tentativa else None,
+            'num_personas': lead.num_personas,
+            'canal': canal,
+            'utm_source': lead.utm_source,
+            'utm_medium': lead.utm_medium,
+            'utm_campaign': lead.utm_campaign,
+            'utm_content': lead.utm_content,
+            'status': lead.status,
+            'creado': timezone.localtime(lead.created_at).isoformat(),
+        })
+
+    # --- WhatsApp entrantes con marcador [Refugio] (1 por telefono) ---
+    wa_qs = WhatsAppMessage.objects.filter(
+        direction='in',
+        body__icontains='[refugio]',
+        timestamp__date__gte=desde, timestamp__date__lte=hasta,
+    ).order_by('timestamp')
+    whatsapp_leads, vistos = [], set()
+    for msg in wa_qs.select_related('cliente'):
+        tel = _e164(msg.phone) or msg.phone
+        if tel in vistos:
+            continue
+        vistos.add(tel)
+        whatsapp_leads.append({
+            'telefono_e164': tel,
+            'nombre': (msg.contact_name or (msg.cliente.nombre if msg.cliente_id else '') or ''),
+            'es_cliente_existente': bool(msg.cliente_id),
+            'primer_mensaje': timezone.localtime(msg.timestamp).isoformat(),
+        })
+
+    return Response({
+        'ok': True,
+        'fuente': 'ventas_refugiolead + ventas_whatsappmessage (BD — fuente de verdad)',
+        'periodo': {'desde': str(desde), 'hasta': str(hasta)},
+        'leads_formulario': leads_formulario,
+        'whatsapp_leads': whatsapp_leads,
+        'totales': {
+            'formulario_total': len(leads_formulario),
+            'formulario_por_canal': dict(by_canal),
+            'whatsapp_inbound_total': len(whatsapp_leads),
+            'whatsapp_clicks_total': None,
+            'nota_whatsapp': ('whatsapp_leads = mensajes ENTRANTES con marcador [Refugio] '
+                              '(contacto real). Los CLICS al boton wa.me los mide GA4 y '
+                              'los aporta aremko-cli (whatsapp_clicks_total=null aqui).'),
+        },
+    })
