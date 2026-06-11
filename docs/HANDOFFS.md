@@ -10,7 +10,7 @@
 | ID | Qué | Implementa | Estado | Última actualización |
 |----|-----|-----------|--------|----------------------|
 | H-001 | Antiduplicado 48 h + orden gracias→resumen + cron normalizar ciudades (bandeja Conexión-Masajes) | Django → luego aremko-cli (UI) | ✅ CERRADO — Django `a10d1c9` + UI aremko-cli `2f0f793` + cron-job.org diario 07:30. Validado por Jorge en prod 2026-06-10 (bandeja OK; sin casos de bloqueo activos aún — los escenarios de candado/forzar se comprobarán con el uso). Contrato: `RESPUESTA_ANTIDUPLICADO_MASAJES.md` | 2026-06-10 (agente Django) |
-| H-002 | Auditar discrepancia leads Refugio (Pixel 14 vs BD 3) + endpoint `GET /api/refugio-leads/` que LISTE leads (no solo conteos) para CPL real + cierre Etapa 4b (cruce teléfono→reservas→ROAS) | Django | 🔨 EN PROGRESO (Django) — tomado 2026-06-11, aprobado por Jorge | 2026-06-11 (agente Django) |
+| H-002 | Auditar discrepancia leads Refugio (Pixel 14 vs BD 3) + endpoint `GET /api/refugio-leads/` que LISTE leads (no solo conteos) para CPL real + cierre Etapa 4b (cruce teléfono→reservas→ROAS) | Django | 🟢 IMPLEMENTADO (Django `9f6f078`, endpoint en prod responde 401 sin key) — ver `RESPUESTA_H-002_medicion_leads_refugio.md`: diagnóstico = Lead contaminado por checkout hasta 06-01 + atribución Meta; bonus whatsapp_leads desde marcador [Refugio]. Espera a aremko-cli (card CPL + Etapa 4b) | 2026-06-11 (agente Django) |
 
 ## Estados
 
