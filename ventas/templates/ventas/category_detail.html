@@ -845,7 +845,7 @@ html {
                             <p class="price mb-0">${{ servicio.precio_base|floatformat:0|intcomma }} <small class="text-muted">por persona</small></p>
                             <small class="text-muted d-block mb-2" style="font-size:0.75rem;">IVA incluido</small>
                             <p class="card-text"><small class="text-muted">Duración: {{ servicio.duracion|duration_in_hours }}</small></p>
-                            <a href="https://wa.me/56976668080?text=Hola%2C%20quiero%20coordinar%20una%20sesi%C3%B3n%20de%20{{ servicio.nombre|urlencode }}"
+                            <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20coordinar%20una%20sesi%C3%B3n%20de%20{{ servicio.nombre|urlencode }}"
                                class="btn btn-success w-100 mt-auto" target="_blank">
                                 <i class="fab fa-whatsapp me-2"></i>Coordinar mi sesión
                             </a>
@@ -1113,7 +1113,7 @@ html {
                         {% else %}
                         {# Botones para reserva por WhatsApp cuando es complejo #}
                         <div class="d-grid gap-2">
-                            <a href="https://wa.me/56976668080?text=Hola%2C%20quiero%20reservar%20{{ servicio.nombre|urlencode }}"
+                            <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20{{ servicio.nombre|urlencode }}"
                                class="btn btn-success w-100" target="_blank">
                                 <i class="fab fa-whatsapp me-2"></i>Reservar por WhatsApp
                             </a>
@@ -1711,7 +1711,7 @@ html {
                         readonlyMsg.innerHTML = `
                             <i class="fas fa-info-circle me-2"></i>
                             Para reservar este servicio, por favor contáctanos por
-                            <a href="https://wa.me/56976668080?text=Hola%2C%20quiero%20reservar%20${encodeURIComponent(currentServicioNombre)}"
+                            <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20${encodeURIComponent(currentServicioNombre)}"
                                class="alert-link" target="_blank">
                                 <i class="fab fa-whatsapp"></i> WhatsApp
                             </a>
