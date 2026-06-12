@@ -6,7 +6,7 @@ from django.conf.urls.static import static # Import static
 # from ventas import views
 from django.contrib.auth import views as auth_views # Import auth views
 # Import the specific view functions needed for root URLs
-from ventas.views.public_views import homepage_view, empresas_view, empresas_presentacion_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view, garantia_view, tarjetas_qr_reviews_view, encuesta_satisfaccion_view, encuesta_gracias_view, refugio_landing_view, refugio_submit_view, privacy_policy_view
+from ventas.views.public_views import unsubscribe_view, homepage_view, empresas_view, empresas_presentacion_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view, garantia_view, tarjetas_qr_reviews_view, encuesta_satisfaccion_view, encuesta_gracias_view, refugio_landing_view, refugio_submit_view, privacy_policy_view
 from ventas.views import flow_views
 from ventas.views import masaje_views
 from ventas.views import masaje_outbox_api_views
@@ -77,6 +77,9 @@ urlpatterns = [
     path('api/whatsapp/mark-template-failed', whatsapp_api_views.mark_template_failed, name='whatsapp_mark_template_failed'),
 
     # Landing campaña "Refugio Aremko" (lanzamiento 15-jun-2026)
+    # Alias raíz de la baja: TODOS los emails históricos llevan este link
+    # (el real vive bajo /ventas/); sin esto, 'Darse de baja' daba 404.
+    path('unsubscribe/<str:email>/', unsubscribe_view, name='unsubscribe_root'),
     path('refugio/', refugio_landing_view, name='refugio_landing'),
     path('refugio/submit/', refugio_submit_view, name='refugio_submit'),
     # Tarjetas QR imprimibles para Google Reviews (asset operativo interno)
