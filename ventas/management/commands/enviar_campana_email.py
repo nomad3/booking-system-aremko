@@ -182,6 +182,14 @@ class Command(BaseCommand):
             
             for recipient in batch:
                 try:
+                    # Exclusión al ENVIAR (no al crear la campaña): respeta las
+                    # bajas y la blacklist ocurridas DESPUÉS de armar los lotes.
+                    if not dry_run and self._esta_excluido(recipient.email):
+                        recipient.status = 'excluded'
+                        recipient.error_message = 'Excluido: desuscrito o en lista negra'
+                        recipient.save()
+                        self.stdout.write(f'🚫 Excluido (baja/blacklist): {recipient.email}')
+                        continue
                     if self.send_email(recipient, dry_run):
                         processed += 1
                         if not dry_run:
@@ -249,6 +257,18 @@ class Command(BaseCommand):
         
         self.stdout.write(self.style.SUCCESS(f'✅ Procesados {processed} emails de la campaña {campaign.name}'))
 
+    def _esta_excluido(self, email):
+        """True si el email se dio de baja (NewsletterSubscriber inactivo) o está
+        en EmailBlacklist activa. Se chequea por cada envío para respetar las
+        bajas que llegan entre lote y lote."""
+        from ventas.models import EmailBlacklist, NewsletterSubscriber
+        email = (email or '').strip().lower()
+        if not email:
+            return True
+        if EmailBlacklist.objects.filter(email__iexact=email, is_active=True).exists():
+            return True
+        return NewsletterSubscriber.objects.filter(email__iexact=email, is_active=False).exists()
+
     def send_email(self, recipient, dry_run=False):
         """Envía un email individual con IA en tiempo real"""
         
@@ -301,11 +321,19 @@ class Command(BaseCommand):
             final_body_with_footer = final_body + get_email_footer_html(recipient.email)
 
             # Crear email con contenido final
+            # List-Unsubscribe one-click: requisito Gmail/Yahoo para remitentes
+            # masivos; el botón "Desuscribirse" del cliente de correo evita que
+            # el usuario marque Spam. El POST lo atiende unsubscribe_view.
+            unsubscribe_url = f"https://www.aremko.cl/unsubscribe/{recipient.email}/"
             msg = EmailMultiAlternatives(
                 subject=final_subject,
                 body=final_body,  # Fallback text sin HTML
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[recipient.email]
+                to=[recipient.email],
+                headers={
+                    'List-Unsubscribe': f'<{unsubscribe_url}>, <mailto:ventas@aremko.cl?subject=unsubscribe>',
+                    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+                },
             )
 
             # Agregar contenido HTML con footer de unsubscribe

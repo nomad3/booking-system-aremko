@@ -2,6 +2,7 @@ import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.contrib import messages
+from django.views.decorators.csrf import csrf_exempt
 from ..models import Servicio, CategoriaServicio, HomepageConfig, Lead, Producto, CategoriaProducto # Relative import, ADD HomepageConfig, Lead, Producto, CategoriaProducto
 
 
@@ -497,24 +498,42 @@ def subscribe_view(request):
 
 
 
+@csrf_exempt
 def unsubscribe_view(request, email):
     """
-    Maneja la desuscripción marcando el NewsletterSubscriber como inactivo.
+    Baja de comunicaciones de marketing.
+    - GET: link "darse de baja" del footer (muestra página de confirmación).
+    - POST: one-click unsubscribe de Gmail/Yahoo (header List-Unsubscribe-Post);
+      responde 200 sin UI. csrf_exempt porque el POST lo hace el proveedor de correo.
+    Además de desactivar NewsletterSubscriber, registra el email en EmailBlacklist
+    (reason='unsubscribe') — es lo que consulta enviar_campana_email para excluir.
     Nota: En un sistema más robusto, se usaría un token firmado.
     """
-    from ..models import NewsletterSubscriber
+    from django.http import HttpResponse
+    from ..models import NewsletterSubscriber, EmailBlacklist
     try:
-        # Buscar suscriptores con ese email
-        subscribers = NewsletterSubscriber.objects.filter(email=email, is_active=True)
-        count = subscribers.count()
-        if count > 0:
-            subscribers.update(is_active=False)
-            messages.success(request, f'Te has dado de baja exitosamente ({email}).')
-        else:
-            messages.info(request, 'No encontramos una suscripción activa con ese correo.')
-    except Exception as e:
+        NewsletterSubscriber.objects.filter(email=email, is_active=True).update(is_active=False)
+
+        email_norm = (email or '').strip().lower()
+        if email_norm and '@' in email_norm:
+            obj, created = EmailBlacklist.objects.get_or_create(
+                email=email_norm,
+                defaults={'reason': 'unsubscribe',
+                          'notes': 'Baja vía link del footer / one-click del cliente de correo'},
+            )
+            if not created and not obj.is_active:
+                obj.is_active = True
+                obj.reason = 'unsubscribe'
+                obj.save(update_fields=['is_active', 'reason'])
+
+        if request.method == 'POST':
+            return HttpResponse('OK')  # one-click: el cliente de correo no espera HTML
+        messages.success(request, f'Te has dado de baja exitosamente ({email}).')
+    except Exception:
+        if request.method == 'POST':
+            return HttpResponse('OK')
         messages.error(request, 'Ocurrió un error al procesar tu solicitud.')
-    
+
     return render(request, 'ventas/unsubscribe_success.html')
 
 
