@@ -440,7 +440,8 @@ def agenda_operativa(request):
                 'total': total,
                 'pagado': pagado,
                 'saldo_pendiente': saldo_pendiente,
-                'estado_reserva': servicio.venta_reserva.estado_reserva  # Agregar estado de la reserva
+                'estado_reserva': servicio.venta_reserva.estado_reserva,  # Agregar estado de la reserva
+                'comentarios': (venta.comentarios or '').strip(),  # Comentario de la reserva (instrucciones operativas)
             }
 
             # Agregar a la estructura correspondiente según el filtro

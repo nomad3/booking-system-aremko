@@ -49,6 +49,15 @@ class VentasConfig(AppConfig):
                 f"No se pudo importar masaje_signals: {exc}"
             )
 
+        # Comanda: hereda el comentario de la reserva en notas_generales
+        try:
+            import ventas.signals.comanda_comentario_signals  # noqa: F401
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"No se pudo importar comanda_comentario_signals: {exc}"
+            )
+
         # Los modelos ya están registrados en admin.py usando decoradores @admin.register
         # No necesitamos registrarlos manualmente aquí
         # Importar admin para asegurar que se ejecuten los decoradores

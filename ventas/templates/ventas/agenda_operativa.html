@@ -1066,6 +1066,13 @@
                         </div>
                         {% endif %}
                     {% endif %}
+                    {% if item.comentarios %}
+                    <div class="detalle-item comentario-reserva" style="align-items: flex-start; background: #FFF8E1; border-left: 4px solid #FB8C00; border-radius: 4px; padding: 8px 10px; margin: 6px 0;">
+                        <span>📝</span>
+                        <span style="white-space: pre-line; font-size: 13px; color: #5D4037; line-height: 1.45;"><strong style="color: #E65100;">Comentario reserva:</strong>
+{{ item.comentarios }}</span>
+                    </div>
+                    {% endif %}
                     <div class="detalle-item">
                         {% if item.tipo == 'preparacion_desayuno' %}
                             <span class="estado-pago-badge" style="background: #FFA726;">
