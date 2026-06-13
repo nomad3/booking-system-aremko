@@ -504,6 +504,12 @@ def conversations(request):
         ).order_by('-ultimo_ts')
     )
 
+    # H-006: pendientes (req>0) PRIMERO, luego por recencia — antes del corte
+    # [:limit]. Así un blast de plantillas salientes no empuja hacia abajo (ni
+    # tira fuera del límite) una conversación con un entrante sin responder.
+    _min_ts = datetime.min.replace(tzinfo=dt_tz.utc)  # guarda por si ultimo_ts es None
+    agg.sort(key=lambda a: (a['req'] > 0, a['ultimo_ts'] or _min_ts), reverse=True)
+
     def _pendiente(a):
         # El pendiente se basa SOLO en requiere_atencion (lo limpian tanto
         # responder como marcar-atendido), no en el timestamp del último
