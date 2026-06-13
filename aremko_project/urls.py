@@ -71,6 +71,7 @@ urlpatterns = [
     path('api/whatsapp/conversation/', whatsapp_api_views.conversation, name='whatsapp_conversation'),
     path('api/whatsapp/conversations/', whatsapp_api_views.conversations, name='whatsapp_conversations'),
     path('api/whatsapp/conversations/<str:phone>/marcar-atendido/', whatsapp_api_views.marcar_atendido, name='whatsapp_marcar_atendido'),
+    path('api/whatsapp/conversations/<str:phone>/editar-nombre/', whatsapp_api_views.editar_nombre, name='whatsapp_editar_nombre'),
     # Campaña de plantillas Meta (Vuelta a Casa): Django decide, Go envía.
     path('api/whatsapp/pending-template-sends', whatsapp_api_views.pending_template_sends, name='whatsapp_pending_template_sends'),
     path('api/whatsapp/mark-template-sent', whatsapp_api_views.mark_template_sent, name='whatsapp_mark_template_sent'),

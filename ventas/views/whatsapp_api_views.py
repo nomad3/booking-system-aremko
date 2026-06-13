@@ -591,6 +591,57 @@ def marcar_atendido(request, phone):
     })
 
 
+@csrf_exempt
+def editar_nombre(request, phone):
+    """POST /api/whatsapp/conversations/<phone>/editar-nombre/ — corrige el
+    Cliente.nombre desde la bandeja (los auto-creados traen el nombre de perfil
+    de WhatsApp o 'WhatsApp <tel>', que a menudo no es el real). Body: {nombre}.
+    Auditado en MovimientoCliente. Mismo guard luna-key que el resto de /whatsapp/.
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    phone = (phone or '').strip()
+    if not phone:
+        return JsonResponse({'ok': False, 'error': 'phone requerido'}, status=400)
+
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, UnicodeDecodeError):
+        data = {}
+    nombre = (data.get('nombre') or '').strip()
+    if not nombre:
+        return JsonResponse({'ok': False, 'error': 'nombre requerido'}, status=400)
+    nombre = nombre[:100]
+
+    cliente = _match_or_create_cliente(phone)
+    if cliente is None:
+        return JsonResponse({'ok': False, 'error': 'No se pudo resolver el cliente por teléfono'}, status=404)
+
+    anterior = cliente.nombre or ''
+    if nombre != anterior:
+        cliente.nombre = nombre
+        cliente.save(update_fields=['nombre'])
+        try:
+            from ..models import MovimientoCliente
+            MovimientoCliente.objects.create(
+                cliente=cliente,
+                tipo_movimiento='edicion_nombre',
+                comentarios=f"Nombre corregido desde la bandeja WhatsApp: '{anterior}' → '{nombre}'",
+            )
+        except Exception:
+            pass  # la auditoría no debe bloquear la corrección
+
+    return JsonResponse({
+        'ok': True,
+        'cliente_id': cliente.id,
+        'cliente_nombre': cliente.nombre,
+    })
+
+
 # ============================================================================
 # Campaña de plantillas Meta (Operación Vuelta a Casa) — Django decide, Go envía.
 # Django arma la bandeja (ContactoWhatsApp salva 1) y resuelve los params; Go
