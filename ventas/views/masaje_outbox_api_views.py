@@ -15,7 +15,9 @@ Rutas:
 """
 
 import json
+from collections import defaultdict
 
+from django.db.models import Count
 from django.http import JsonResponse, HttpResponse, Http404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -102,7 +104,74 @@ def _bloqueo_de(seg):
     }
 
 
-def _serialize(seg, include_preview=False, bloqueo=None):
+def _contexto_batch(segs):
+    """Precalcula con POCAS queries lo que _serialize hacía por item (N+1):
+    - visitas_por_cliente: {cliente_id: numero_visitas}  (1 query, era 1 COUNT/item)
+    - contexto_por_seg: {seg_id: (servicio_nombre, fecha_visita_iso)}  (2 queries,
+      era mapear_participante_a_linea + fallback por item = ~2 queries/item).
+    Replica en memoria la lógica de slots de mapear_participante_a_linea."""
+    from ..models import VentaReserva, ReservaServicio, ParticipanteMasajeReserva
+
+    cliente_ids, reserva_ids = set(), set()
+    for s in segs:
+        c = _cliente_de(s)
+        if c:
+            cliente_ids.add(c.id)
+        p = s.participante if s.participante_id else None
+        r_id = (p.reserva_id if p else None) or s.reserva_id
+        if r_id:
+            reserva_ids.add(r_id)
+
+    # Visitas por cliente: 1 sola query agregada (antes: 1 COUNT por item).
+    visitas = {}
+    if cliente_ids:
+        for row in (VentaReserva.objects.filter(cliente_id__in=cliente_ids)
+                    .values('cliente_id').annotate(c=Count('id'))):
+            visitas[row['cliente_id']] = row['c']
+
+    # Líneas de masaje y participantes de todas las reservas de la página.
+    lineas_por_reserva = defaultdict(list)
+    parts_por_reserva = defaultdict(list)
+    if reserva_ids:
+        for ls in (ReservaServicio.objects
+                   .filter(venta_reserva_id__in=reserva_ids,
+                           servicio__tipo_servicio='masaje', cantidad_personas__gte=1)
+                   .select_related('servicio').order_by('id')):
+            lineas_por_reserva[ls.venta_reserva_id].append(ls)
+        for pp in (ParticipanteMasajeReserva.objects
+                   .filter(reserva_id__in=reserva_ids).order_by('id')):
+            parts_por_reserva[pp.reserva_id].append(pp)
+
+    contexto = {}
+    for s in segs:
+        p = s.participante if s.participante_id else None
+        r_id = (p.reserva_id if p else None) or s.reserva_id
+        lineas = lineas_por_reserva.get(r_id, [])
+        linea = None
+        if p is not None and lineas:
+            slots = []
+            for ls in lineas:
+                slots.extend([ls] * (ls.cantidad_personas or 1))
+            participantes = sorted(
+                parts_por_reserva.get(r_id, []),
+                key=lambda x: (0 if x.tipo_participante == 'comprador' else 1, x.id),
+            )
+            idx = next((i for i, pp in enumerate(participantes) if pp.id == p.id), None)
+            if idx is not None and slots:
+                linea = slots[idx] if idx < len(slots) else slots[-1]
+        if linea is None and lineas:
+            linea = lineas[0]  # fallback: primera línea de masaje de la reserva
+        if linea is not None:
+            contexto[s.id] = (
+                linea.servicio.nombre if linea.servicio_id else None,
+                linea.fecha_agendamiento.isoformat() if linea.fecha_agendamiento else None,
+            )
+        else:
+            contexto[s.id] = (None, None)
+    return visitas, contexto
+
+
+def _serialize(seg, include_preview=False, bloqueo=None, visitas=None, contexto=None):
     p = seg.participante if seg.participante_id else None
     cliente = _cliente_de(seg)
     nombre, email = _destinatario(seg)
@@ -129,9 +198,16 @@ def _serialize(seg, include_preview=False, bloqueo=None):
     # Teléfono (Cliente.telefono ya viene normalizado E.164; participante como respaldo)
     telefono = ((cliente.telefono if cliente else '') or (p.telefono if p else '') or '').strip()
 
-    # Contexto de la reserva
-    servicio, fecha_visita = _contexto_reserva(seg)
-    num_visitas = cliente.numero_visitas() if cliente else 0
+    # Contexto de la reserva. En la lista viene precalculado (batch, sin N+1);
+    # en los endpoints de un solo seguimiento cae al cálculo por item.
+    if contexto is not None and seg.id in contexto:
+        servicio, fecha_visita = contexto[seg.id]
+    else:
+        servicio, fecha_visita = _contexto_reserva(seg)
+    if visitas is not None:
+        num_visitas = visitas.get(cliente.id, 0) if cliente else 0
+    else:
+        num_visitas = cliente.numero_visitas() if cliente else 0
 
     data = {
         'id': seg.id,
@@ -201,14 +277,19 @@ def outbox_list(request):
 
     venc = list(base.filter(fecha_programada__lte=ahora).order_by('fecha_programada')[:limit])
     bloqueos = svc.calcular_bloqueos(venc, ahora=ahora)
-    para_enviar = [_serialize(s, include_preview=True, bloqueo=bloqueos.get(s.id))
+    visitas, contexto = _contexto_batch(venc)
+    # include_preview=False: el HTML se sirve por item en /preview/<id>/ (iframe del
+    # modal "Ver"). Renderizarlo aquí por cada vencido era O(N) y causaba el timeout.
+    para_enviar = [_serialize(s, bloqueo=bloqueos.get(s.id), visitas=visitas, contexto=contexto)
                    for s in venc]
 
     programados = []
     if incluir_prog:
         fut = list(base.filter(fecha_programada__gt=ahora).order_by('fecha_programada')[:limit])
         bloq_fut = svc.calcular_bloqueos(fut, ahora=ahora)
-        programados = [_serialize(s, bloqueo=bloq_fut.get(s.id)) for s in fut]
+        visitas_f, contexto_f = _contexto_batch(fut)
+        programados = [_serialize(s, bloqueo=bloq_fut.get(s.id), visitas=visitas_f, contexto=contexto_f)
+                       for s in fut]
 
     return JsonResponse({
         'ok': True,
