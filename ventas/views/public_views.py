@@ -261,7 +261,7 @@ def productos_view(request):
         canonical_url = request.path
 
     # WhatsApp business number - CAMBIAR AL NÚMERO REAL DE AREMKO
-    whatsapp_number = "56912345678"  # TODO: Actualizar con el número real
+    whatsapp_number = "56957902525"  # WhatsApp oficial Aremko
 
     context = {
         'productos': productos,
