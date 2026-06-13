@@ -323,6 +323,13 @@
                 </small>
             </div>
 
+            {% if comanda.venta_reserva.comentarios %}
+            <div class="notas-comanda" style="white-space: pre-line; background: #FFF8E1; border-left: 4px solid #FB8C00;">
+                📝 <strong>Comentario reserva:</strong>
+{{ comanda.venta_reserva.comentarios }}
+            </div>
+            {% endif %}
+
             {% if comanda.notas_generales %}
             <div class="notas-comanda">
                 📝 {{ comanda.notas_generales }}

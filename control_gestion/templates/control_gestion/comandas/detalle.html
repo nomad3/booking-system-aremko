@@ -30,6 +30,12 @@
                     <th>Reserva:</th>
                     <td>#{{ comanda.venta_reserva.id }}</td>
                 </tr>
+                {% if comanda.venta_reserva.comentarios %}
+                <tr>
+                    <th style="color: #E65100;">📝 Comentario reserva:</th>
+                    <td style="white-space: pre-line; background: #FFF8E1; border-left: 4px solid #FB8C00; padding: 8px 10px; border-radius: 4px;">{{ comanda.venta_reserva.comentarios }}</td>
+                </tr>
+                {% endif %}
                 <tr>
                     <th>Fecha/Hora Solicitud:</th>
                     <td>{{ comanda.fecha_solicitud|date:"d/m/Y H:i" }}</td>

@@ -110,6 +110,13 @@
         {% endif %}
     </div>
 
+    {% if comanda.venta_reserva.comentarios %}
+    <div class="notas" style="white-space: pre-line; border: 2px solid #000; padding: 6px;">
+        <strong>COMENTARIO RESERVA:</strong><br>
+        {{ comanda.venta_reserva.comentarios }}
+    </div>
+    {% endif %}
+
     {% if comanda.notas_generales %}
     <div class="notas">
         <strong>NOTAS:</strong><br>
