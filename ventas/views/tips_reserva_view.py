@@ -2,6 +2,7 @@
 Vista para generar tips de reserva (post-pago)
 """
 
+import re
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse
@@ -279,4 +280,11 @@ def _generar_texto_tips(reserva, config):
     if config.contacto_whatsapp:
         lineas.append(f"Cualquier consulta, escríbenos por WhatsApp: {config.contacto_whatsapp}")
 
-    return '\n'.join(lineas)
+    texto = '\n'.join(lineas)
+    # Compactar para WhatsApp (límite Meta = 4096 chars): los separadores de 60
+    # caracteres (━×60) sumaban cientos de chars y los emojis de cada sección ya
+    # delimitan visualmente. Se quitan y se colapsan las líneas en blanco múltiples.
+    # No se elimina contenido de los tips, solo el relleno estructural.
+    texto = texto.replace("━" * 60, "")
+    texto = re.sub(r'\n{3,}', '\n\n', texto)
+    return texto.strip()
