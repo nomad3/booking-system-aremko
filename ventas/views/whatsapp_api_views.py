@@ -177,10 +177,14 @@ def inbound(request):
 
     cliente = _match_or_create_cliente(phone, contact_name)
 
+    # Una reacción (❤️, 👍, …) no exige respuesta del operador → no la pone en
+    # la cola de pendientes. El resto de los entrantes sí. (H-005)
+    requiere = msg_type != 'reaction'
+
     msg = WhatsAppMessage.objects.create(
         cliente=cliente, direction='in', wa_message_id=wa_id, phone=phone[:20],
         body=body, msg_type=msg_type, timestamp=ts, status='received',
-        contact_name=contact_name, requiere_atencion=True,
+        contact_name=contact_name, requiere_atencion=requiere,
     )
 
     # Bandeja OVC: marcar el contacto del cliente como "respondió" (respuesta pendiente
@@ -501,23 +505,23 @@ def conversations(request):
     )
 
     def _pendiente(a):
-        tiene_in_sin_responder = a['last_in'] is not None and (
-            a['last_out'] is None or a['last_in'] > a['last_out']
-        )
-        return tiene_in_sin_responder or a['req'] > 0
+        # El pendiente se basa SOLO en requiere_atencion (lo limpian tanto
+        # responder como marcar-atendido), no en el timestamp del último
+        # mensaje: así "marcar como leído" saca la conversación aunque el
+        # último mensaje sea entrante. (H-005)
+        return a['req'] > 0
 
     if solo_pendientes:
         agg = [a for a in agg if _pendiente(a)]
 
     page = agg[:limit]
     phones = [a['phone'] for a in page]
-    last_out_map = {a['phone']: a['last_out'] for a in page}
 
     # Una sola pasada por los mensajes de los teléfonos de esta página:
-    # último mensaje, cliente (primer no-nulo) y conteo exacto de "sin responder".
+    # último mensaje y cliente (primer no-nulo). El badge "sin responder" usa
+    # el flag requiere_atencion (campo `req` del agregado), no el timestamp.
     last_msg = {}
     cliente_map = {}
-    sin_resp = {p: 0 for p in phones}
     if phones:
         for m in (
             WhatsAppMessage.objects
@@ -529,9 +533,6 @@ def conversations(request):
                 last_msg[m.phone] = m
             if m.phone not in cliente_map and m.cliente_id:
                 cliente_map[m.phone] = m.cliente
-            lo = last_out_map.get(m.phone)
-            if m.direction == 'in' and (lo is None or m.timestamp > lo):
-                sin_resp[m.phone] += 1
 
     conversations_out = []
     for a in page:
@@ -552,7 +553,7 @@ def conversations(request):
             'ultimo_mensaje': preview,
             'ultimo_direction': (m.direction if m else None),
             'ultimo_timestamp': a['ultimo_ts'].isoformat() if a['ultimo_ts'] else None,
-            'sin_responder': sin_resp.get(phone, 0),
+            'sin_responder': a['req'],
             'requiere_atencion': a['req'] > 0,
             'total_mensajes': a['total'],
         })
