@@ -213,6 +213,7 @@ INSTALLED_APPS = [
     'destino_puerto_varas',  # DPV: catálogo turístico + motor de recomendación + lead capture
     'kits.apps.KitsConfig',  # Productos compuestos (Bill of Materials)
     'aremko_blog.apps.AremkoBlogConfig',  # Blog editorial aremko.cl (DPV-SEO-002 #6 mirror, app aislada)
+    'whatsapp_agent.apps.WhatsappAgentConfig',  # Agente IA WhatsApp (H-007, app aislada drift-safe)
 
     # Aplicaciones de terceros
     'rest_framework',

@@ -462,7 +462,23 @@ def conversation(request):
             'mime_type': m.mime_type or None,
             'filename': m.original_filename or None,
         } for m in recientes],
+        # H-007 F1: borrador sugerido por el agente IA para el último entrante sin
+        # responder (null si el agente está apagado, no hay pendiente, o ?sugerencia=0).
+        'sugerencia_agente': _sugerencia_agente(phone, request),
     })
+
+
+def _sugerencia_agente(phone, request):
+    """Genera (lazy) o recupera el borrador del agente IA. Nunca rompe la vista."""
+    if not _truthy(request.GET.get('sugerencia', '1')):
+        return None
+    try:
+        from whatsapp_agent.agent import generar_sugerencia, sugerencia_to_dict
+        return sugerencia_to_dict(generar_sugerencia(phone))
+    except Exception:  # noqa: BLE001 — el agente es opcional; jamás tumbar la conversación
+        import logging
+        logging.getLogger(__name__).exception('Agente WA: fallo generando sugerencia para %s', phone)
+        return None
 
 
 def _truthy(value):
@@ -647,6 +663,76 @@ def editar_nombre(request, phone):
         'cliente_id': cliente.id,
         'cliente_nombre': cliente.nombre,
     })
+
+
+# ============================================================================
+# Agente IA WhatsApp (H-007) — config singleton editable desde aremko-cli.
+# ============================================================================
+
+@csrf_exempt
+def agente_config(request):
+    """GET/POST /api/whatsapp/agente/config — lee o actualiza la config del agente.
+
+    GET  → {activo, modo, persona_tono, link_reserva, model_name, modelo_efectivo,
+            temperature, max_tokens, history_window, pausa_horas_tras_humano, prompt_version}
+    POST → actualiza los campos enviados (subconjunto permitido). luna-key.
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+
+    from whatsapp_agent.agent import config_to_dict, get_config
+    config = get_config()
+
+    if request.method == 'GET':
+        return JsonResponse({'ok': True, 'config': config_to_dict(config)})
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+
+    cambios = []
+    # Campos de texto / selección.
+    if 'activo' in data:
+        config.activo = _truthy(data.get('activo'))
+        cambios.append('activo')
+    if 'modo' in data:
+        modo = (data.get('modo') or '').strip()
+        validos = {c[0] for c in config.MODO_CHOICES}
+        if modo not in validos:
+            return JsonResponse({'ok': False, 'error': f'modo inválido (use uno de {sorted(validos)})'}, status=400)
+        config.modo = modo
+        cambios.append('modo')
+    if 'persona_tono' in data:
+        config.persona_tono = (data.get('persona_tono') or '').strip()
+        cambios.append('persona_tono')
+    if 'link_reserva' in data:
+        config.link_reserva = (data.get('link_reserva') or '').strip()[:300]
+        cambios.append('link_reserva')
+    if 'model_name' in data:
+        config.model_name = (data.get('model_name') or '').strip()[:120]
+        cambios.append('model_name')
+    # Campos numéricos (validación suave; ignora valores no parseables).
+    for campo, lo, hi in (('temperature', 0.0, 2.0), ('max_tokens', 1, 4000),
+                          ('history_window', 0, 50), ('pausa_horas_tras_humano', 0, 168)):
+        if campo in data:
+            try:
+                val = float(data.get(campo)) if campo == 'temperature' else int(data.get(campo))
+            except (TypeError, ValueError):
+                return JsonResponse({'ok': False, 'error': f'{campo} inválido'}, status=400)
+            if not (lo <= val <= hi):
+                return JsonResponse({'ok': False, 'error': f'{campo} fuera de rango [{lo}, {hi}]'}, status=400)
+            setattr(config, campo, val)
+            cambios.append(campo)
+
+    if cambios:
+        config.save()
+
+    return JsonResponse({'ok': True, 'actualizado': cambios, 'config': config_to_dict(config)})
 
 
 # ============================================================================
