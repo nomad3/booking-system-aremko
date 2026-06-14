@@ -974,10 +974,10 @@ def _resolver_params(contacto, hoy):
 
 
 def pending_template_sends(request):
-    """GET /api/whatsapp/pending-template-sends?limit=N — contactos salva 1
-    pendientes elegibles para envío automático por plantilla Meta.
+    """GET /api/whatsapp/pending-template-sends?limit=N — contactos APROBADOS
+    listos para envío por plantilla Meta (H-012: gate de aprobación).
 
-    Elegible = estado='pendiente', salva=1, y el script tiene meta_template_name.
+    Elegible = estado='aprobado' (Deborah aprobó) y el script tiene meta_template_name.
     Orden: prioridad ASC (más urgente primero), luego fecha_sugerido ASC.
     """
     err = _check_luna_key(request)
@@ -993,7 +993,7 @@ def pending_template_sends(request):
 
     qs = (
         ContactoWhatsApp.objects
-        .filter(estado='pendiente', salva=1)
+        .filter(estado='aprobado')
         .exclude(script__meta_template_name='')
         .exclude(script__meta_template_name__isnull=True)
         .select_related('cliente', 'script')
@@ -1015,6 +1015,125 @@ def pending_template_sends(request):
         })
 
     return JsonResponse({'count': len(items), 'pending': items})
+
+
+# ============================================================================
+# H-012 — Bandeja de envíos por plantilla: aprobación antes de enviar.
+# El cron diario deja ContactoWhatsApp en estado='pendiente' (= por aprobar).
+# Deborah aprueba → estado='aprobado' → pending-template-sends los envía por Cloud API.
+# ============================================================================
+
+def _envio_por_aprobar_dict(c):
+    cli = c.cliente
+    return {
+        'contacto_id': c.id,
+        'cliente_id': cli.id if cli else None,
+        'cliente_nombre': (cli.nombre if cli else '') or '',
+        'phone': ((cli.telefono or '').strip() if cli else ''),
+        'motivo': c.eje_valor_snapshot or (c.script.estado_valor_target if c.script_id else ''),
+        'script_id': c.script.script_id if c.script_id else '',
+        'plantilla': c.script.meta_template_name if c.script_id else '',
+        'preview': c.mensaje_renderizado or '',
+        'salva': c.salva,
+        'prioridad': c.prioridad,
+        'fecha_sugerido': c.fecha_sugerido.isoformat() if c.fecha_sugerido else None,
+    }
+
+
+def bandeja_envios_por_aprobar(request):
+    """GET /api/whatsapp/bandeja-envios?estado=por_aprobar — envíos de plantilla a aprobar.
+
+    Lista los `ContactoWhatsApp` pendientes cuyo script tiene plantilla Meta (los que
+    SÍ se pueden enviar). Agrupa por motivo en el cliente; acá van planos con su motivo.
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+    try:
+        limit = min(max(int(request.GET.get('limit', 200)), 1), 500)
+    except (ValueError, TypeError):
+        limit = 200
+    qs = (
+        ContactoWhatsApp.objects
+        .filter(estado='pendiente')
+        .exclude(script__meta_template_name='')
+        .exclude(script__meta_template_name__isnull=True)
+        .select_related('cliente', 'script')
+        .order_by('prioridad', 'fecha_sugerido', 'id')[:limit]
+    )
+    items = [_envio_por_aprobar_dict(c) for c in qs if c.cliente and (c.cliente.telefono or '').strip()]
+    return JsonResponse({'ok': True, 'count': len(items), 'envios': items})
+
+
+@csrf_exempt
+def bandeja_envio_aprobar(request, contacto_id):
+    """POST /api/whatsapp/bandeja-envios/<id>/aprobar — marca un envío como aprobado."""
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    c = ContactoWhatsApp.objects.filter(id=contacto_id).select_related('script').first()
+    if not c:
+        return JsonResponse({'ok': False, 'error': 'no encontrado'}, status=404)
+    if c.estado != 'pendiente':
+        return JsonResponse({'ok': False, 'error': f'estado actual: {c.estado}'}, status=409)
+    if not (c.script_id and c.script.meta_template_name):
+        return JsonResponse({'ok': False, 'error': 'el script no tiene plantilla Meta asignada'}, status=400)
+    c.estado = 'aprobado'
+    c.save(update_fields=['estado'])
+    return JsonResponse({'ok': True, 'contacto_id': c.id, 'estado': c.estado})
+
+
+@csrf_exempt
+def bandeja_envio_descartar(request, contacto_id):
+    """POST /api/whatsapp/bandeja-envios/<id>/descartar — no enviar este envío."""
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    c = ContactoWhatsApp.objects.filter(id=contacto_id).first()
+    if not c:
+        return JsonResponse({'ok': False, 'error': 'no encontrado'}, status=404)
+    if c.estado != 'pendiente':
+        return JsonResponse({'ok': False, 'error': f'estado actual: {c.estado}'}, status=409)
+    c.estado = 'descartado'
+    c.save(update_fields=['estado'])
+    return JsonResponse({'ok': True, 'contacto_id': c.id, 'estado': c.estado})
+
+
+@csrf_exempt
+def bandeja_envios_aprobar_lote(request):
+    """POST /api/whatsapp/bandeja-envios/aprobar-lote — aprueba un lote.
+
+    Body: {ids:[...]}  o  {motivo:"<eje_valor>"} (aprueba todos los pendientes de ese
+    motivo con plantilla). Devuelve cuántos se aprobaron.
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+
+    qs = (ContactoWhatsApp.objects.filter(estado='pendiente')
+          .exclude(script__meta_template_name='')
+          .exclude(script__meta_template_name__isnull=True))
+    ids = data.get('ids')
+    motivo = (data.get('motivo') or '').strip()
+    if ids:
+        qs = qs.filter(id__in=ids)
+    elif motivo:
+        qs = qs.filter(eje_valor_snapshot=motivo)
+    else:
+        return JsonResponse({'ok': False, 'error': 'indica ids[] o motivo'}, status=400)
+
+    aprobados = qs.update(estado='aprobado')
+    return JsonResponse({'ok': True, 'aprobados': aprobados})
 
 
 @csrf_exempt

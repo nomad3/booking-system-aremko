@@ -5885,12 +5885,14 @@ class ScriptWhatsAppAdmin(admin.ModelAdmin):
                 "<code>{fecha_limite}</code>."
             ),
         }),
-        ('Plantilla Meta (Cloud API — envío automático salva 1)', {
+        ('Plantilla Meta (Cloud API — H-012: se envía tras aprobación en la bandeja)', {
             'fields': ('meta_template_name', 'meta_language', 'meta_variables_orden'),
             'description': (
-                "Para que este script se envíe AUTOMÁTICAMENTE por la Cloud API "
-                "(solo salva 1): poné el <b>nombre exacto</b> de la plantilla aprobada "
-                "en Meta. Vacío = no se envía automático (solo bandeja manual).<br>"
+                "Poné el <b>nombre exacto</b> de la plantilla aprobada en Meta (ej. una "
+                "<code>vac_*</code>) que calce con el cuerpo de este script. Con plantilla, los "
+                "contactos de este script aparecen en la bandeja \"Envíos por aprobar\"; Deborah "
+                "aprueba y recién ahí se envían por Cloud API. Vacío = no se puede enviar por "
+                "plantilla (solo quedaría en la bandeja sin opción de envío).<br>"
                 "<code>meta_variables_orden</code> = lista JSON con los placeholders "
                 "en el orden de las variables de la plantilla "
                 "(<code>{{1}}</code>, <code>{{2}}</code>…). "

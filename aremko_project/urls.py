@@ -80,6 +80,11 @@ urlpatterns = [
     path('api/whatsapp/agente/sugerencias-aprendizaje/<int:sug_id>/aprobar', whatsapp_api_views.agente_sugerencia_aprobar, name='whatsapp_agente_sugerencia_aprobar'),
     path('api/whatsapp/agente/sugerencias-aprendizaje/<int:sug_id>/descartar', whatsapp_api_views.agente_sugerencia_descartar, name='whatsapp_agente_sugerencia_descartar'),
     # Campaña de plantillas Meta (Vuelta a Casa): Django decide, Go envía.
+    # H-012: bandeja de envíos por plantilla — aprobación antes de enviar.
+    path('api/whatsapp/bandeja-envios', whatsapp_api_views.bandeja_envios_por_aprobar, name='whatsapp_bandeja_envios'),
+    path('api/whatsapp/bandeja-envios/aprobar-lote', whatsapp_api_views.bandeja_envios_aprobar_lote, name='whatsapp_bandeja_envios_aprobar_lote'),
+    path('api/whatsapp/bandeja-envios/<int:contacto_id>/aprobar', whatsapp_api_views.bandeja_envio_aprobar, name='whatsapp_bandeja_envio_aprobar'),
+    path('api/whatsapp/bandeja-envios/<int:contacto_id>/descartar', whatsapp_api_views.bandeja_envio_descartar, name='whatsapp_bandeja_envio_descartar'),
     path('api/whatsapp/pending-template-sends', whatsapp_api_views.pending_template_sends, name='whatsapp_pending_template_sends'),
     path('api/whatsapp/mark-template-sent', whatsapp_api_views.mark_template_sent, name='whatsapp_mark_template_sent'),
     path('api/whatsapp/mark-template-failed', whatsapp_api_views.mark_template_failed, name='whatsapp_mark_template_failed'),

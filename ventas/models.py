@@ -6948,7 +6948,8 @@ class ContactoWhatsApp(models.Model):
     """
 
     ESTADO_CHOICES = [
-        ('pendiente', 'Pendiente'),
+        ('pendiente', 'Pendiente (por aprobar)'),
+        ('aprobado', 'Aprobado (listo para enviar por plantilla)'),  # H-012
         ('enviado', 'Enviado'),
         ('omitido', 'Omitido (sin enviar)'),
         ('no_aplica', 'No aplica'),
