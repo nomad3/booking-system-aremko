@@ -39,7 +39,38 @@ lectura). Indexado por `created_at`/`editado` para las métricas de la parte 3.
 
 ---
 
-## Parte 2 ⭐ — Clasificar + proponer (siguiente, el corazón)
+## Parte 2 ⭐ — Clasificar + proponer → 🟢 IMPLEMENTADO (Django) 2026-06-14
+
+El agente clasifica cada corrección de Deborah y propone la acción en su lugar.
+
+**Cómo corre (no bloquea nada):** un comando `procesar_aprendizaje` toma los
+`AgenteFeedback` editados sin procesar, clasifica (LLM determinista, temp 0, compara
+borrador vs enviado + catálogo vivo + conocimiento actual) y crea una
+`SugerenciaAprendizaje` SOLO si es accionable (`hecho_catalogo` o `regla`); `tono`/
+`puntual` se marcan procesados sin generar ruido. Conviene correrlo por cron (como los
+otros) o manual. Si el LLM falla, NO marca procesado (reintenta luego).
+
+**Contratos (tu lado):**
+- `GET /api/whatsapp/agente/sugerencias-aprendizaje?estado=pendiente` →
+  `{ok, count, sugerencias:[{id, phone, tipo, estado, texto_propuesto, ref_catalogo,
+  motivo, borrador, enviado, destino, aprueba, created_at}]}`. `destino` y `aprueba` ya
+  vienen listos para mostrar ("Conocimiento del agente" / "Catálogo (aplica Jorge)" ;
+  "Jorge" para precios).
+- `POST .../sugerencias-aprendizaje/<id>/aprobar` (body opcional `{texto}` para editar
+  antes de aprobar) → aplica según tipo: `regla` se agrega al `conocimiento` del agente;
+  `hecho_catalogo` queda marcada para que Jorge aplique el cambio en el admin (MVP: no
+  auto-edita el catálogo por el drift AR-034). → `{ok, estado, aplicado}`.
+- `POST .../sugerencias-aprendizaje/<id>/descartar` → `{ok, estado}`.
+
+**Tu UI:** sección "🧠 El agente aprendió algo" con la lista de pendientes (muestra qué
+corrigió Deborah, el `tipo`, el `destino`, quién aprueba) + Aprobar / Editar / Descartar.
+
+**Activar:** deploy + `migrate whatsapp_agent` (0006, 1 tabla) + correr
+`procesar_aprendizaje` (cron/manual). Validación Django: 15/15 tests + check + smoke.
+
+---
+
+## (Plan original parte 2, para referencia)
 
 Plan propuesto (avísame y calzo nombres):
 - Modelo `SugerenciaAprendizaje` (`tipo` ∈ {hecho_catalogo, regla, tono, puntual},
