@@ -134,7 +134,7 @@ def test_build_system_prompt():
     # Sin conocimiento → no aparece el bloque 0.
     assert 'AUTORIDAD MÁXIMA' not in sp
     # Sin fecha_hoy → no aparece el bloque 7 de disponibilidad.
-    assert '# 7. DISPONIBILIDAD' not in sp
+    assert '# 7.' not in sp
 
 
 def test_build_system_prompt_con_disponibilidad():
@@ -142,10 +142,10 @@ def test_build_system_prompt_con_disponibilidad():
         'Asistente Aremko.', 'SERVICIOS PUBLICADOS:\n• Tina — $140.000',
         'https://www.aremko.cl/', fecha_hoy='2026-06-14 (domingo)',
     )
-    assert '# 7. DISPONIBILIDAD' in sp
+    assert '# 7.' in sp and 'DISPONIBILIDAD' in sp
     assert '2026-06-14 (domingo)' in sp
     assert 'consultar_disponibilidad' in sp
-    assert 'NUNCA inventes horarios' in sp
+    assert 'por noche' in sp  # cabañas no en horas
 
 
 def test_build_system_prompt_con_conocimiento():

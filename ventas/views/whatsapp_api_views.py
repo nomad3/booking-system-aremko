@@ -816,6 +816,40 @@ def agente_feedback(request):
         return JsonResponse({'ok': False}, status=200)
 
 
+@csrf_exempt
+def agente_procesar_aprendizaje(request):
+    """POST /api/whatsapp/agente/procesar-aprendizaje — clasifica el feedback editado (H-013).
+
+    Procesa un lote acotado (~50) de `AgenteFeedback` editados sin procesar y crea las
+    `SugerenciaAprendizaje` accionables. Idempotente; pensado para un botón manual. Si
+    queda backlog, se vuelve a llamar. Devuelve conteos.
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    try:
+        from whatsapp_agent.aprendizaje import procesar_pendientes
+        try:
+            data = json.loads(request.body or b'{}')
+        except (ValueError, UnicodeDecodeError):
+            data = {}
+        limite = data.get('limite') or 50
+        res = procesar_pendientes(limite)
+        return JsonResponse({
+            'ok': True,
+            'procesados': res['procesados'],
+            'creadas': res['creadas'],
+            'errores': res['errores'],
+            'resumen': res['detalle'],
+        })
+    except Exception:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).exception('Agente: error procesando aprendizaje')
+        return JsonResponse({'ok': False, 'error': 'error procesando aprendizaje'}, status=500)
+
+
 def _sugerencia_aprendizaje_dict(s):
     return {
         'id': s.id, 'phone': s.phone, 'tipo': s.tipo, 'estado': s.estado,

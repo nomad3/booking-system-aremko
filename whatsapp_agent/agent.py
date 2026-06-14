@@ -32,21 +32,22 @@ _TOOLS = [{
     'function': {
         'name': 'consultar_disponibilidad',
         'description': (
-            'Consulta los horarios libres REALES de servicios (tinas/masajes/cabañas) para una '
-            'fecha y cantidad de personas. Úsala solo cuando ya tienes la fecha y la cantidad de '
-            'personas. Devuelve los servicios principales con cupo, sus horarios libres, y el '
-            'precio YA CALCULADO: usa `precio_total` (el total para esa cantidad de personas) — no '
-            'lo recalcules; `precio_por_persona` es el unitario por si quieres aclararlo.'
+            'Consulta servicios (tinas/masajes/cabañas) con su PRECIO TOTAL ya calculado y, si das '
+            'fecha, sus HORARIOS libres. Úsala SIEMPRE para responder precio o disponibilidad — NO '
+            'calcules precios tú. Para una pregunta de solo precio ("¿cuánto vale para 2?"), llama '
+            'con `personas` y SIN `fecha`. Para disponibilidad ("¿hay el sábado?"), incluye `fecha`. '
+            'Devuelve por servicio: `precio_total` (úsalo tal cual), `precio_por_persona`, '
+            '`duracion_texto` (ej. "4 h" o "por noche") y `slots_libres`.'
         ),
         'parameters': {
             'type': 'object',
             'properties': {
-                'fecha': {'type': 'string', 'description': 'Fecha en formato YYYY-MM-DD'},
                 'personas': {'type': 'integer', 'description': 'Cantidad de personas'},
+                'fecha': {'type': 'string', 'description': 'Fecha YYYY-MM-DD (omitir si es solo precio)'},
                 'tipo': {'type': 'string', 'enum': ['tina', 'masaje', 'cabana'],
                          'description': 'Tipo de servicio (opcional; omitir para todos)'},
             },
-            'required': ['fecha', 'personas'],
+            'required': ['personas'],
         },
     },
 }]

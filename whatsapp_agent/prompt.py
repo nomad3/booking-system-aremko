@@ -39,17 +39,18 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
     bloque_disponibilidad = ''
     if fecha_hoy:
         bloque_disponibilidad = (
-            '\n\n# 7. DISPONIBILIDAD Y FECHAS\n'
-            f'Hoy es {fecha_hoy}. Cuando el cliente pregunte por disponibilidad o quiera reservar:\n'
-            '- Necesitas la FECHA y la CANTIDAD DE PERSONAS. Si falta alguna, pregúntala primero (no asumas).\n'
-            '- Con ambas, usa la herramienta `consultar_disponibilidad` y ofrece los horarios que devuelva '
-            '(resuelve "el sábado", "mañana", etc. a una fecha YYYY-MM-DD usando la fecha de hoy).\n'
-            '- NUNCA inventes horarios ni disponibilidad. Si la herramienta no devuelve servicios, dilo con '
-            'amabilidad y ofrece coordinar con una persona.\n'
-            '- La herramienta ya filtra por capacidad y excluye complementos: ofrece SOLO lo que devuelve.\n'
-            '- PRECIO: usa `precio_total` (ya calculado para esa cantidad de personas), NO lo recalcules. '
-            'Si `es_por_persona`, puedes aclarar "(X por persona)". Ej: 4 personas en tina de $25.000 '
-            'por persona → di "$100.000 ($25.000 por persona)".'
+            '\n\n# 7. PRECIOS Y DISPONIBILIDAD (usa la herramienta, NO calcules tú)\n'
+            f'Hoy es {fecha_hoy}. Para responder PRECIO o DISPONIBILIDAD usa SIEMPRE la herramienta '
+            '`consultar_disponibilidad` — nunca inventes ni hagas aritmética de precios.\n'
+            '- Necesitas la CANTIDAD DE PERSONAS (el precio depende de ella). Si no la sabes, pregúntala.\n'
+            '- Pregunta de SOLO PRECIO ("¿cuánto vale para 2?"): llama la herramienta con `personas` y SIN fecha.\n'
+            '- Pregunta de DISPONIBILIDAD ("¿hay el sábado?"): incluye `fecha` (resuelve "el sábado"/"mañana" '
+            'a YYYY-MM-DD con la fecha de hoy). Si no devuelve servicios, dilo y ofrece coordinar con una persona.\n'
+            '- PRECIO: di `precio_total` TAL CUAL (ya es el total para esa cantidad), y aclara "(X por persona)". '
+            'Ej: tina de $25.000 por persona para 4 → "$100.000 ($25.000 por persona)".\n'
+            '- DURACIÓN: usa `duracion_texto` tal cual (ej. "4 h" para tinas/masajes, "por noche" para cabañas). '
+            'Las cabañas NUNCA se expresan en horas.\n'
+            '- La herramienta ya filtra capacidad y excluye complementos: ofrece SOLO lo que devuelve.'
         )
 
     # H-009a: bloque de conocimiento/correcciones — autoridad máxima. Va PRIMERO y

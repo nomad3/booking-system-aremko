@@ -84,6 +84,46 @@ def parse_clasificacion(texto):
     }
 
 
+def procesar_pendientes(limite=50):
+    """Clasifica el feedback editado sin procesar y crea las sugerencias accionables.
+
+    Lo usan el comando `procesar_aprendizaje` y el endpoint (H-013). Idempotente:
+    marca `procesado=True` salvo en error del LLM (para reintentar). Lote acotado.
+    Devuelve {procesados, creadas, errores, detalle:[...]}.
+    """
+    from .agent import get_config
+    from .models import AgenteFeedback, SugerenciaAprendizaje
+
+    config = get_config()
+    pendientes = list(
+        AgenteFeedback.objects.filter(editado=True, procesado=False)
+        .order_by('created_at')[:max(1, int(limite or 50))]
+    )
+    procesados = creadas = errores = 0
+    detalle = []
+    for fb in pendientes:
+        d = clasificar(config, fb.borrador, fb.enviado)
+        if d.get('error'):
+            errores += 1
+            detalle.append({'feedback_id': fb.id, 'estado': 'error', 'error': d['error']})
+            continue  # NO marcar procesado → se reintenta
+        if d['tipo'] in TIPOS_ACCIONABLES:
+            SugerenciaAprendizaje.objects.create(
+                feedback=fb, phone=fb.phone, tipo=d['tipo'],
+                texto_propuesto=d['texto_propuesto'], ref_catalogo=d['ref_catalogo'],
+                motivo=d['motivo'], borrador=fb.borrador, enviado=fb.enviado,
+                modelo=d.get('modelo', ''),
+            )
+            creadas += 1
+            detalle.append({'feedback_id': fb.id, 'tipo': d['tipo'], 'texto': d['texto_propuesto'][:120]})
+        else:
+            detalle.append({'feedback_id': fb.id, 'tipo': d['tipo']})
+        fb.procesado = True
+        fb.save(update_fields=['procesado'])
+        procesados += 1
+    return {'procesados': procesados, 'creadas': creadas, 'errores': errores, 'detalle': detalle}
+
+
 def clasificar(config, borrador, enviado):
     """Clasifica una corrección vía LLM. Devuelve dict (+'modelo','error'). No lanza."""
     from . import grounding

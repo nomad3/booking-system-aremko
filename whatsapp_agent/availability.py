@@ -27,20 +27,27 @@ def _parse_fecha(fecha):
         return None
 
 
-def disponibilidad(fecha, personas=1, tipo=None):
-    """Servicios publicados que admiten `personas` y tienen horarios libres en `fecha`.
+def disponibilidad(fecha=None, personas=1, tipo=None):
+    """Servicios publicados que admiten `personas`, con precio total y horarios libres.
+
+    Con `fecha` (YYYY-MM-DD) → calcula horarios libres ese día (modo disponibilidad).
+    Sin `fecha` → modo SOLO PRECIO: lista los servicios que aplican por capacidad con su
+    precio total, sin horarios (para preguntas de precio sin fecha; H-011 refinamiento).
 
     Returns dict:
-      { 'fecha', 'personas', 'tipo', 'servicios': [
-            {nombre, precio, capacidad_minima, capacidad_maxima, duracion_min, slots_libres:[...]}
+      { 'fecha', 'personas', 'tipo', 'solo_precio', 'servicios': [
+            {nombre, precio_por_persona, es_por_persona, precio_total,
+             capacidad_minima, capacidad_maxima, duracion_texto, slots_libres:[...]|null}
         ], 'error'? }
     """
     from ventas.models import Servicio, ServicioBloqueo, ServicioSlotBloqueo
     from ventas.calendar_utils import verificar_disponibilidad
     from ventas.views.calendario_matriz_view import extraer_slots_para_fecha
 
-    f = _parse_fecha(fecha)
-    if f is None:
+    from .grounding import formatear_duracion
+
+    f = _parse_fecha(fecha) if fecha not in (None, '') else None
+    if fecha not in (None, '') and f is None:
         return {'error': 'fecha inválida (usa formato YYYY-MM-DD)', 'servicios': []}
 
     try:
@@ -66,40 +73,43 @@ def disponibilidad(fecha, personas=1, tipo=None):
 
     servicios = []
     for s in qs:
-        # Día completo bloqueado (mantención/reparación).
-        if ServicioBloqueo.servicio_bloqueado_en_fecha(s.id, f):
-            continue
-        slots = extraer_slots_para_fecha(s.slots_disponibles, f) or []
-        libres = []
-        for hora in slots:
-            if ServicioSlotBloqueo.slot_bloqueado(s.id, f, hora):
+        libres = None
+        if f is not None:
+            # Modo disponibilidad: horarios libres ese día.
+            if ServicioBloqueo.servicio_bloqueado_en_fecha(s.id, f):
                 continue
-            try:
-                if verificar_disponibilidad(s, f, hora, personas):
-                    libres.append(hora)
-            except Exception:  # noqa: BLE001 — un slot con error no debe tumbar la consulta
-                logger.exception('disponibilidad: error verificando %s %s %s', s.id, f, hora)
-        if libres:
-            # Precio POR PERSONA en todos los servicios (tinas, masajes y cabañas):
-            # total = base × personas. (Confirmado por Jorge 2026-06-14: tina $25k/pers,
-            # cabaña $45k/pers.) Si algún servicio fuera tarifa plana, marcarlo aparte.
-            es_por_persona = True
-            precio_pp = int(s.precio_base)
-            precio_total = precio_pp * personas
-            servicios.append({
-                'nombre': s.nombre,
-                'precio_por_persona': precio_pp,
-                'es_por_persona': es_por_persona,
-                'precio_total': precio_total,
-                'capacidad_minima': s.capacidad_minima,
-                'capacidad_maxima': s.capacidad_maxima,
-                'duracion_min': s.duracion,
-                'slots_libres': libres,
-            })
+            slots = extraer_slots_para_fecha(s.slots_disponibles, f) or []
+            libres = []
+            for hora in slots:
+                if ServicioSlotBloqueo.slot_bloqueado(s.id, f, hora):
+                    continue
+                try:
+                    if verificar_disponibilidad(s, f, hora, personas):
+                        libres.append(hora)
+                except Exception:  # noqa: BLE001 — un slot con error no debe tumbar la consulta
+                    logger.exception('disponibilidad: error verificando %s %s %s', s.id, f, hora)
+            if not libres:
+                continue  # sin horarios ese día → no se ofrece
+
+        # Precio POR PERSONA en TODOS los servicios (tina/masaje/cabaña): total = base × personas.
+        precio_pp = int(s.precio_base)
+        # Duración: cabañas se expresan "por noche", no en horas (H-011 refinamiento).
+        duracion_texto = 'por noche' if s.tipo_servicio == 'cabana' else formatear_duracion(s.duracion)
+        servicios.append({
+            'nombre': s.nombre,
+            'precio_por_persona': precio_pp,
+            'es_por_persona': True,
+            'precio_total': precio_pp * personas,
+            'capacidad_minima': s.capacidad_minima,
+            'capacidad_maxima': s.capacidad_maxima,
+            'duracion_texto': duracion_texto,
+            'slots_libres': libres,
+        })
 
     return {
-        'fecha': f.isoformat(),
+        'fecha': f.isoformat() if f else None,
         'personas': personas,
         'tipo': tipo or 'todos',
+        'solo_precio': f is None,
         'servicios': servicios,
     }

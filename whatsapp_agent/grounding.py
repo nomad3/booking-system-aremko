@@ -66,10 +66,14 @@ def formatear_servicios(servicios):
         if not nombre:
             continue
         partes = [f'• {nombre}']
-        dur = formatear_duracion(s.get('duracion'))
-        if dur:
-            partes.append(f'({dur})')
-        partes.append('— ' + formatear_precio(s.get('precio_base')))
+        # Cabañas se expresan "por noche", no en horas (H-011 refinamiento).
+        if s.get('tipo_servicio') == 'cabana':
+            partes.append('(por noche)')
+        else:
+            dur = formatear_duracion(s.get('duracion'))
+            if dur:
+                partes.append(f'({dur})')
+        partes.append('— ' + formatear_precio(s.get('precio_base')) + ' por persona')
         # Capacidad (dato estructurado ya en BD): clave para tinas/cabañas.
         cap = formatear_capacidad(s.get('capacidad_minima'), s.get('capacidad_maxima'))
         if cap:
