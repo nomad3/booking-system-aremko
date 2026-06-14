@@ -200,7 +200,26 @@ def inbound(request):
         # atender el entrante (queda como requiere_atencion en WhatsAppMessage).
         'requiere_atencion_sin_contacto': bool(cliente and not contacto),
         'ventana_24h_hasta': _ventana_24h(ts),
+        # H-008: si el "mensaje de ausencia" está activo, directiva para que el Go de
+        # aremko-cli auto-responda la frase fija (con guard anti-spam). null si no
+        # aplica. Solo para entrantes de texto (no reacciones).
+        'responder_ausencia': _directiva_ausencia(phone, msg_type),
     })
+
+
+def _directiva_ausencia(phone, msg_type):
+    """Devuelve {'mensaje': texto} si toca auto-responder ausencia, o None. Nunca rompe el inbound."""
+    if msg_type == 'reaction':
+        return None
+    try:
+        from whatsapp_agent.agent import get_config
+        from whatsapp_agent.ausencia import evaluar_ausencia
+        mensaje = evaluar_ausencia(get_config(), phone)
+        return {'mensaje': mensaje} if mensaje else None
+    except Exception:  # noqa: BLE001 — la ausencia es opcional; jamás tumbar el inbound
+        import logging
+        logging.getLogger(__name__).exception('Ausencia: fallo evaluando para %s', phone)
+        return None
 
 
 # Tipos de mensaje con adjunto que aceptamos.
@@ -325,21 +344,27 @@ def outbound(request):
         body=body, msg_type='text', timestamp=ts, status='sent',
     )
 
-    _outbound_side_effects(cliente, phone, ts)
+    # H-008: el mensaje de ausencia se persiste pero NO debe sacar la conversación de
+    # "pendientes" (Deborah debe verlas al volver). El Go lo manda con no_marcar_atendido.
+    marcar = not _truthy(data.get('no_marcar_atendido'))
+    _outbound_side_effects(cliente, phone, ts, marcar_atendido=marcar)
 
     return JsonResponse({'ok': True, 'message_id': msg.id,
                          'cliente_id': cliente.id if cliente else None})
 
 
-def _outbound_side_effects(cliente, phone, ts):
+def _outbound_side_effects(cliente, phone, ts, marcar_atendido=True):
     """Efectos comunes de un saliente: registrar último contacto (anti-saturación
-    de la bandeja) y limpiar la cola de pendientes (responder = atender)."""
+    de la bandeja) y, salvo `marcar_atendido=False`, limpiar la cola de pendientes
+    (responder = atender)."""
     if cliente:
         try:
             cliente.ultimo_contacto_outbound = ts.date()
             cliente.save(update_fields=['ultimo_contacto_outbound'])
         except Exception:
             pass
+    if not marcar_atendido:
+        return
     try:
         WhatsAppMessage.objects.filter(
             phone=phone[:20], direction='in', requiere_atencion=True,
@@ -721,9 +746,17 @@ def agente_config(request):
     if 'model_name' in data:
         config.model_name = (data.get('model_name') or '').strip()[:120]
         cambios.append('model_name')
+    # Mensaje de ausencia (H-008).
+    if 'ausencia_activa' in data:
+        config.ausencia_activa = _truthy(data.get('ausencia_activa'))
+        cambios.append('ausencia_activa')
+    if 'ausencia_mensaje' in data:
+        config.ausencia_mensaje = (data.get('ausencia_mensaje') or '').strip()
+        cambios.append('ausencia_mensaje')
     # Campos numéricos (validación suave; ignora valores no parseables).
     for campo, lo, hi in (('temperature', 0.0, 2.0), ('max_tokens', 1, 4000),
-                          ('history_window', 0, 50), ('pausa_horas_tras_humano', 0, 168)):
+                          ('history_window', 0, 50), ('pausa_horas_tras_humano', 0, 168),
+                          ('ausencia_anti_spam_horas', 0, 168)):
         if campo in data:
             try:
                 val = float(data.get(campo)) if campo == 'temperature' else int(data.get(campo))

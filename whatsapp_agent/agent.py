@@ -48,6 +48,9 @@ def config_to_dict(config):
         'max_tokens': config.max_tokens,
         'history_window': config.history_window,
         'pausa_horas_tras_humano': config.pausa_horas_tras_humano,
+        'ausencia_activa': config.ausencia_activa,
+        'ausencia_mensaje': config.ausencia_mensaje,
+        'ausencia_anti_spam_horas': config.ausencia_anti_spam_horas,
         'prompt_version': prompt_mod.PROMPT_VERSION,
     }
 
@@ -204,6 +207,10 @@ def generar_sugerencia(phone, *, forzar=False):
     """
     config = get_config()
     if not config.activo:
+        return None
+    # Precedencia del mensaje de ausencia (H-008): si está activo, no se sugiere
+    # borrador (la ausencia auto-responde por su cuenta en el inbound).
+    if config.ausencia_activa:
         return None
 
     entrante = _entrante_a_responder(phone)

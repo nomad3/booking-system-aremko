@@ -1,7 +1,7 @@
 from django.contrib import admin
 from solo.admin import SingletonModelAdmin
 
-from .models import SugerenciaAgenteWhatsApp, WhatsAppAgentConfig
+from .models import AusenciaEnviada, SugerenciaAgenteWhatsApp, WhatsAppAgentConfig
 
 
 @admin.register(WhatsAppAgentConfig)
@@ -14,6 +14,11 @@ class WhatsAppAgentConfigAdmin(SingletonModelAdmin):
         ('Voz y derivación', {
             'fields': ('persona_tono', 'link_reserva'),
         }),
+        ('Mensaje de ausencia', {
+            'fields': ('ausencia_activa', 'ausencia_mensaje', 'ausencia_anti_spam_horas'),
+            'description': 'Si se activa, a cada cliente que escribe se le responde la frase fija '
+                           'y NO se genera borrador del agente (precedencia).',
+        }),
         ('Modelo (avanzado)', {
             'fields': ('model_name', 'temperature', 'max_tokens', 'history_window',
                        'pausa_horas_tras_humano'),
@@ -21,6 +26,16 @@ class WhatsAppAgentConfigAdmin(SingletonModelAdmin):
         }),
     )
     readonly_fields = ('updated_at',)
+
+
+@admin.register(AusenciaEnviada)
+class AusenciaEnviadaAdmin(admin.ModelAdmin):
+    list_display = ('phone', 'ultimo_envio')
+    search_fields = ('phone',)
+    readonly_fields = ('phone', 'ultimo_envio')
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(SugerenciaAgenteWhatsApp)

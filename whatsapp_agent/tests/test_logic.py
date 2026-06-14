@@ -7,7 +7,9 @@ Correr desde la raíz del repo:
     python -m whatsapp_agent.tests.test_logic
 """
 
-from whatsapp_agent import escalation, grounding, prompt
+from datetime import datetime, timedelta
+
+from whatsapp_agent import ausencia, escalation, grounding, prompt
 
 
 def test_formatear_precio():
@@ -115,6 +117,20 @@ def test_build_user_prompt():
     up2 = prompt.build_user_prompt('', 'hola')
     assert 'CONVERSACIÓN RECIENTE' not in up2  # sin historial no se incluye el bloque
     assert 'hola' in up2
+
+
+def test_ausencia_debe_enviar():
+    ahora = datetime(2026, 6, 13, 12, 0, 0)
+    # Sin envío previo → siempre.
+    assert ausencia.debe_enviar(None, ahora, 6) is True
+    # Ventana 0 → siempre (responder a cada mensaje).
+    assert ausencia.debe_enviar(ahora - timedelta(minutes=1), ahora, 0) is True
+    # Dentro de la ventana → no.
+    assert ausencia.debe_enviar(ahora - timedelta(hours=2), ahora, 6) is False
+    # Justo en el borde → sí.
+    assert ausencia.debe_enviar(ahora - timedelta(hours=6), ahora, 6) is True
+    # Pasada la ventana → sí.
+    assert ausencia.debe_enviar(ahora - timedelta(hours=8), ahora, 6) is True
 
 
 def _run():

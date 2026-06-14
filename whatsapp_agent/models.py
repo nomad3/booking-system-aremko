@@ -68,6 +68,28 @@ class WhatsAppAgentConfig(SingletonModel):
         help_text='Horas que el agente se calla en un chat después de que un humano respondió ahí.',
     )
 
+    # --- Mensaje de ausencia (H-008) — independiente del agente IA ---
+    ausencia_activa = models.BooleanField(
+        default=False,
+        verbose_name='Mensaje de ausencia activo',
+        help_text='Si está activo, a cada cliente que escribe se le responde una frase fija '
+                  'y NO se genera borrador del agente (la ausencia tiene precedencia).',
+    )
+    ausencia_mensaje = models.TextField(
+        default=(
+            '¡Hola! 🌿 Gracias por escribir a Aremko Spa Boutique. En este momento no estamos '
+            'atendiendo por este chat. Puedes reservar y pagar online —masajes, tinas calientes '
+            'y alojamiento— en www.aremko.cl, disponible las 24 horas. Apenas retomemos la '
+            'atención te respondemos por aquí. ¡Gracias por tu paciencia! 🙏'
+        ),
+        help_text='Frase fija que se auto-responde cuando la ausencia está activa.',
+    )
+    ausencia_anti_spam_horas = models.PositiveSmallIntegerField(
+        default=6,
+        help_text='No repetir la frase de ausencia a la misma conversación dentro de estas horas '
+                  '(0 = responder a cada mensaje).',
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -117,3 +139,21 @@ class SugerenciaAgenteWhatsApp(models.Model):
     def __str__(self):
         tag = 'ESCALAR' if self.escalar else 'BORRADOR'
         return f'[{tag}] {self.phone} · {self.created_at:%Y-%m-%d %H:%M}'
+
+
+class AusenciaEnviada(models.Model):
+    """Última vez que se envió el mensaje de ausencia a una conversación (anti-spam).
+
+    Una fila por teléfono; se actualiza cada vez que el inbound dispara la frase de
+    ausencia, para no repetirla dentro de la ventana `ausencia_anti_spam_horas`.
+    """
+
+    phone = models.CharField(max_length=20, unique=True, db_index=True)
+    ultimo_envio = models.DateTimeField()
+
+    class Meta:
+        verbose_name = 'Ausencia enviada'
+        verbose_name_plural = 'Ausencias enviadas'
+
+    def __str__(self):
+        return f'{self.phone} · {self.ultimo_envio:%Y-%m-%d %H:%M}'
