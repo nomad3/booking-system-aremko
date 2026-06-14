@@ -97,6 +97,17 @@ class WhatsAppAgentConfig(SingletonModel):
                   '(0 = responder a cada mensaje).',
     )
 
+    # H-011: servicios que son COMPLEMENTO (niño, tina fría, decoraciones) — se agregan
+    # a una reserva, no se ofrecen como opción principal. Vive acá (M2M en la app del
+    # agente) para NO tocar la tabla Servicio (evita outage + drift AR-034).
+    servicios_complementarios = models.ManyToManyField(
+        'ventas.Servicio', blank=True, related_name='+',
+        verbose_name='Servicios complementarios (no se ofrecen como principales)',
+        help_text='Tinas/servicios que se AGREGAN a una reserva (ej. tina de niño, tina fría, '
+                  'decoraciones), no se arriendan solos. El agente NO los ofrece como opción '
+                  'principal ni los lista en disponibilidad.',
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -105,6 +116,13 @@ class WhatsAppAgentConfig(SingletonModel):
     def __str__(self):
         estado = 'ON' if self.activo else 'OFF'
         return f'Agente WhatsApp [{estado} · {self.modo}]'
+
+    def ids_complementarios(self):
+        """IDs de servicios marcados como complemento (no se ofrecen como principales)."""
+        try:
+            return set(self.servicios_complementarios.values_list('id', flat=True))
+        except Exception:  # noqa: BLE001 — si la tabla M2M aún no migró, no romper
+            return set()
 
 
 class SugerenciaAgenteWhatsApp(models.Model):

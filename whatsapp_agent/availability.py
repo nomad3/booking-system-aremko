@@ -50,11 +50,14 @@ def disponibilidad(fecha, personas=1, tipo=None):
     if personas < 1:
         personas = 1
 
+    from .models import WhatsAppAgentConfig
+    comp_ids = WhatsAppAgentConfig.get_solo().ids_complementarios()
+
     qs = Servicio.objects.filter(
         publicado_web=True, activo=True,
         capacidad_minima__lte=personas,
         capacidad_maxima__gte=personas,
-    )
+    ).exclude(id__in=comp_ids)  # H-011: no ofrecer complementos como principales
     if tipo:
         tipo = str(tipo).strip().lower()
         if tipo in TIPOS_VALIDOS:

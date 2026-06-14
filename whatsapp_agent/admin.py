@@ -26,6 +26,12 @@ class WhatsAppAgentConfigAdmin(SingletonModelAdmin):
             'description': 'Si se activa, a cada cliente que escribe se le responde la frase fija '
                            'y NO se genera borrador del agente (precedencia).',
         }),
+        ('Servicios complementarios (no se ofrecen como principales)', {
+            'fields': ('servicios_complementarios',),
+            'description': 'Mueve a la derecha las tinas/servicios que son COMPLEMENTO (niño, '
+                           'tina fría, decoraciones): se agregan a una reserva pero el agente NO '
+                           'los ofrece solos ni los lista en disponibilidad.',
+        }),
         ('Modelo (avanzado)', {
             'fields': ('model_name', 'temperature', 'max_tokens', 'history_window',
                        'pausa_horas_tras_humano'),
@@ -33,6 +39,7 @@ class WhatsAppAgentConfigAdmin(SingletonModelAdmin):
         }),
     )
     readonly_fields = ('updated_at',)
+    filter_horizontal = ('servicios_complementarios',)
 
 
 @admin.register(AgenteFeedback)

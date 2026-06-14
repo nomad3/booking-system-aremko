@@ -127,9 +127,13 @@ def catalogo_vivo():
     """
     from ventas.models import Servicio, Producto
 
+    from .models import WhatsAppAgentConfig
+    comp_ids = WhatsAppAgentConfig.get_solo().ids_complementarios()
+
     servicios = list(
         Servicio.objects
         .filter(publicado_web=True, activo=True)
+        .exclude(id__in=comp_ids)  # H-011: no listar complementos como ofrecibles
         .order_by('tipo_servicio', 'nombre')
         .values('nombre', 'precio_base', 'duracion', 'descripcion_web', 'tipo_servicio',
                 'capacidad_minima', 'capacidad_maxima', 'informacion_adicional')
