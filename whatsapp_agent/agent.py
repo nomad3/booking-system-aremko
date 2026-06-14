@@ -24,6 +24,55 @@ from .models import SugerenciaAgenteWhatsApp, WhatsAppAgentConfig
 logger = logging.getLogger(__name__)
 
 
+_DIAS_ES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+
+# Herramienta de disponibilidad para el agente (H-011 Fase A paso 2).
+_TOOLS = [{
+    'type': 'function',
+    'function': {
+        'name': 'consultar_disponibilidad',
+        'description': (
+            'Consulta los horarios libres REALES de servicios (tinas/masajes/cabañas) para una '
+            'fecha y cantidad de personas. Úsala solo cuando ya tienes la fecha y la cantidad de '
+            'personas. Devuelve los servicios principales con cupo y sus horarios libres ese día.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'fecha': {'type': 'string', 'description': 'Fecha en formato YYYY-MM-DD'},
+                'personas': {'type': 'integer', 'description': 'Cantidad de personas'},
+                'tipo': {'type': 'string', 'enum': ['tina', 'masaje', 'cabana'],
+                         'description': 'Tipo de servicio (opcional; omitir para todos)'},
+            },
+            'required': ['fecha', 'personas'],
+        },
+    },
+}]
+
+
+def _tool_executor(name, args):
+    """Ejecuta las tools del agente. Solo lectura; nunca escribe reservas."""
+    if name == 'consultar_disponibilidad':
+        from .availability import disponibilidad
+        try:
+            return disponibilidad(
+                (args or {}).get('fecha'),
+                (args or {}).get('personas', 1),
+                (args or {}).get('tipo'),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception('Agente WA: tool disponibilidad falló: %s', exc)
+            return {'error': 'no se pudo consultar disponibilidad'}
+    return {'error': f'herramienta desconocida: {name}'}
+
+
+def _fecha_hoy_texto():
+    """'2026-06-14 (domingo)' en hora de Chile, para que el LLM resuelva 'el sábado'."""
+    from django.utils import timezone
+    hoy = timezone.localtime(timezone.now())
+    return f'{hoy.strftime("%Y-%m-%d")} ({_DIAS_ES[hoy.weekday()]})'
+
+
 def get_config():
     return WhatsAppAgentConfig.get_solo()
 
@@ -161,17 +210,26 @@ def _producir_borrador(config, mensaje, historial=''):
         return _borrador_escala('no se pudo cargar el catálogo', error=str(exc)[:200])
 
     system_prompt = prompt_mod.build_system_prompt(
-        config.persona_tono, catalogo, config.link_reserva, config.conocimiento)
+        config.persona_tono, catalogo, config.link_reserva, config.conocimiento,
+        fecha_hoy=_fecha_hoy_texto())
     user_prompt = prompt_mod.build_user_prompt(historial, mensaje)
     modelo = _modelo_efectivo(config)
 
-    # 3) Llamada al LLM (el provider nunca lanza; igual lo blindamos).
+    # 3) Llamada al LLM con tool-calling (disponibilidad). El provider nunca lanza;
+    #    igual lo blindamos. Si el modelo no llama la tool, responde texto directo.
     try:
         from destino_puerto_varas.services.llm.openrouter_provider import OpenRouterProvider
         provider = OpenRouterProvider()
-        resultado = provider.generate(
-            system_prompt=system_prompt, user_prompt=user_prompt, model=modelo,
-            max_tokens=config.max_tokens, temperature=float(config.temperature),
+        resultado = provider.generate_with_tools(
+            messages=[
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_prompt},
+            ],
+            tools=_TOOLS,
+            tool_executor=_tool_executor,
+            model=modelo,
+            max_tokens=config.max_tokens,
+            temperature=float(config.temperature),
         )
     except Exception as exc:  # noqa: BLE001
         logger.exception('Agente WA: provider lanzó excepción: %s', exc)

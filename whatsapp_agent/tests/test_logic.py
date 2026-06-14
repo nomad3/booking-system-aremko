@@ -133,6 +133,19 @@ def test_build_system_prompt():
     assert '{LINK_RESERVA}' not in sp  # placeholder del few-shot reemplazado
     # Sin conocimiento → no aparece el bloque 0.
     assert 'AUTORIDAD MÁXIMA' not in sp
+    # Sin fecha_hoy → no aparece el bloque 7 de disponibilidad.
+    assert '# 7. DISPONIBILIDAD' not in sp
+
+
+def test_build_system_prompt_con_disponibilidad():
+    sp = prompt.build_system_prompt(
+        'Asistente Aremko.', 'SERVICIOS PUBLICADOS:\n• Tina — $140.000',
+        'https://www.aremko.cl/', fecha_hoy='2026-06-14 (domingo)',
+    )
+    assert '# 7. DISPONIBILIDAD' in sp
+    assert '2026-06-14 (domingo)' in sp
+    assert 'consultar_disponibilidad' in sp
+    assert 'NUNCA inventes horarios' in sp
 
 
 def test_build_system_prompt_con_conocimiento():
