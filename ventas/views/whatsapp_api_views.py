@@ -816,6 +816,106 @@ def agente_feedback(request):
         return JsonResponse({'ok': False}, status=200)
 
 
+def _sugerencia_aprendizaje_dict(s):
+    return {
+        'id': s.id, 'phone': s.phone, 'tipo': s.tipo, 'estado': s.estado,
+        'texto_propuesto': s.texto_propuesto, 'ref_catalogo': s.ref_catalogo,
+        'motivo': s.motivo, 'borrador': s.borrador, 'enviado': s.enviado,
+        'destino': ('Conocimiento del agente' if s.tipo == 'regla'
+                    else 'Catálogo (aplica Jorge a mano)' if s.tipo == 'hecho_catalogo'
+                    else '—'),
+        'aprueba': 'Jorge' if s.tipo == 'hecho_catalogo' else 'Deborah/Jorge',
+        'created_at': s.created_at.isoformat(),
+    }
+
+
+@csrf_exempt
+def agente_sugerencias_aprendizaje(request):
+    """GET /api/whatsapp/agente/sugerencias-aprendizaje — pendientes (H-010 p2). luna-key."""
+    err = _check_luna_key(request)
+    if err:
+        return err
+    from whatsapp_agent.models import SugerenciaAprendizaje
+    estado = (request.GET.get('estado') or 'pendiente').strip()
+    qs = SugerenciaAprendizaje.objects.all()
+    if estado != 'todas':
+        qs = qs.filter(estado=estado)
+    try:
+        limite = min(max(int(request.GET.get('limit', 100)), 1), 500)
+    except (ValueError, TypeError):
+        limite = 100
+    items = [_sugerencia_aprendizaje_dict(s) for s in qs[:limite]]
+    return JsonResponse({'ok': True, 'sugerencias': items, 'count': len(items)})
+
+
+@csrf_exempt
+def agente_sugerencia_aprobar(request, sug_id):
+    """POST /api/whatsapp/agente/sugerencias-aprendizaje/<id>/aprobar — aplica según tipo.
+
+    Body opcional {texto} para editar el texto antes de aprobar. `regla` se agrega al
+    Conocimiento; `hecho_catalogo` queda marcada para que Jorge aplique el cambio a mano
+    en el admin (MVP: no auto-edita el catálogo por el drift AR-034).
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    from django.utils import timezone
+    from whatsapp_agent.agent import get_config
+    from whatsapp_agent.models import SugerenciaAprendizaje
+
+    sug = SugerenciaAprendizaje.objects.filter(id=sug_id).first()
+    if not sug:
+        return JsonResponse({'ok': False, 'error': 'no encontrada'}, status=404)
+    if sug.estado != 'pendiente':
+        return JsonResponse({'ok': False, 'error': f'ya está {sug.estado}'}, status=409)
+
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, UnicodeDecodeError):
+        data = {}
+    texto = (data.get('texto') or sug.texto_propuesto or '').strip()
+
+    if sug.tipo == 'regla' and texto:
+        config = get_config()
+        actual = (config.conocimiento or '').strip()
+        config.conocimiento = (actual + '\n' + texto).strip() if actual else texto
+        config.save(update_fields=['conocimiento'])
+        sug.aplicado_info = 'Agregada al Conocimiento del agente'
+    elif sug.tipo == 'hecho_catalogo':
+        sug.aplicado_info = f'Marcada para aplicar en el catálogo: {sug.ref_catalogo or texto}'.strip()
+    else:
+        sug.aplicado_info = 'Aprobada'
+
+    sug.texto_propuesto = texto
+    sug.estado = 'aprobada'
+    sug.resuelto_at = timezone.now()
+    sug.save(update_fields=['texto_propuesto', 'estado', 'aplicado_info', 'resuelto_at'])
+    return JsonResponse({'ok': True, 'estado': sug.estado, 'aplicado': sug.aplicado_info})
+
+
+@csrf_exempt
+def agente_sugerencia_descartar(request, sug_id):
+    """POST /api/whatsapp/agente/sugerencias-aprendizaje/<id>/descartar. luna-key."""
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    from django.utils import timezone
+    from whatsapp_agent.models import SugerenciaAprendizaje
+    sug = SugerenciaAprendizaje.objects.filter(id=sug_id).first()
+    if not sug:
+        return JsonResponse({'ok': False, 'error': 'no encontrada'}, status=404)
+    if sug.estado != 'pendiente':
+        return JsonResponse({'ok': False, 'error': f'ya está {sug.estado}'}, status=409)
+    sug.estado = 'descartada'
+    sug.resuelto_at = timezone.now()
+    sug.save(update_fields=['estado', 'resuelto_at'])
+    return JsonResponse({'ok': True, 'estado': sug.estado})
+
+
 # ============================================================================
 # Campaña de plantillas Meta (Operación Vuelta a Casa) — Django decide, Go envía.
 # Django arma la bandeja (ContactoWhatsApp salva 1) y resuelve los params; Go

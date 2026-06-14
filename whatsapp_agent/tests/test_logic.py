@@ -9,7 +9,7 @@ Correr desde la raíz del repo:
 
 from datetime import datetime, timedelta
 
-from whatsapp_agent import ausencia, escalation, grounding, prompt
+from whatsapp_agent import aprendizaje, ausencia, escalation, grounding, prompt
 
 
 def test_formatear_precio():
@@ -189,6 +189,32 @@ def test_ausencia_debe_enviar():
     assert ausencia.debe_enviar(ahora - timedelta(hours=6), ahora, 6) is True
     # Pasada la ventana → sí.
     assert ausencia.debe_enviar(ahora - timedelta(hours=8), ahora, 6) is True
+
+
+def test_parse_clasificacion():
+    # JSON limpio.
+    d = aprendizaje.parse_clasificacion('{"tipo":"regla","texto_propuesto":"Solo relax online","ref_catalogo":"","motivo":"política"}')
+    assert d['tipo'] == 'regla' and d['texto_propuesto'] == 'Solo relax online'
+    # JSON con texto alrededor (el modelo a veces explica).
+    d = aprendizaje.parse_clasificacion('Claro:\n{"tipo":"hecho_catalogo","texto_propuesto":"Calbuco a 30000","ref_catalogo":"Tina Calbuco · precio · 30000"}\nListo')
+    assert d['tipo'] == 'hecho_catalogo' and '30000' in d['ref_catalogo']
+    # tipo inválido → puntual.
+    d = aprendizaje.parse_clasificacion('{"tipo":"otracosa","texto_propuesto":"x"}')
+    assert d['tipo'] == 'puntual'
+    # basura → puntual sin romper.
+    d = aprendizaje.parse_clasificacion('no es json')
+    assert d['tipo'] == 'puntual' and d['texto_propuesto'] == ''
+    d = aprendizaje.parse_clasificacion('')
+    assert d['tipo'] == 'puntual'
+
+
+def test_clasificador_prompts():
+    sys = aprendizaje.build_clasificador_system('SERVICIOS:\n• Tina — $25.000', 'Regla previa')
+    assert 'hecho_catalogo' in sys and 'regla' in sys and 'Tina — $25.000' in sys
+    assert 'Regla previa' in sys
+    usr = aprendizaje.build_clasificador_user('borrador X', 'enviado Y')
+    assert 'borrador X' in usr and 'enviado Y' in usr
+    assert aprendizaje.TIPOS_ACCIONABLES == {'hecho_catalogo', 'regla'}
 
 
 def _run():

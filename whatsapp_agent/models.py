@@ -199,6 +199,59 @@ class AgenteFeedback(models.Model):
         return f'[{tag}] {self.phone} · {self.created_at:%Y-%m-%d %H:%M}'
 
 
+class SugerenciaAprendizaje(models.Model):
+    """Corrección de Deborah clasificada por el agente, propuesta para aprobar (H-010 p2).
+
+    El clasificador compara borrador vs enviado (+ catálogo) y rutea la corrección a
+    su lugar correcto. Un humano la aprueba con un clic (precios → Jorge). Solo se
+    crean para `hecho_catalogo` y `regla` (lo puntual/typo no genera ruido).
+    """
+
+    TIPO_CHOICES = [
+        ('hecho_catalogo', 'Hecho de catálogo (precio/disponibilidad) — aprueba Jorge'),
+        ('regla', 'Regla/política → Conocimiento del agente'),
+        ('tono', 'Tono/redacción'),
+        ('puntual', 'Puntual / typo (no se propone)'),
+    ]
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('aprobada', 'Aprobada'),
+        ('descartada', 'Descartada'),
+    ]
+
+    feedback = models.ForeignKey(
+        'AgenteFeedback', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='sugerencias',
+    )
+    phone = models.CharField(max_length=20, db_index=True, blank=True)
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, db_index=True)
+    texto_propuesto = models.TextField(
+        blank=True,
+        help_text='Para `regla`: la línea a agregar al Conocimiento. Para `hecho_catalogo`: '
+                  'descripción del cambio sugerido al catálogo.',
+    )
+    ref_catalogo = models.CharField(
+        max_length=200, blank=True,
+        help_text='Para hecho_catalogo: ítem/campo/valor sugerido (ej. "Tina Calbuco · precio · 30000").',
+    )
+    motivo = models.CharField(max_length=300, blank=True, help_text='Por qué se clasificó así.')
+    borrador = models.TextField(blank=True)
+    enviado = models.TextField(blank=True)
+    estado = models.CharField(max_length=12, choices=ESTADO_CHOICES, default='pendiente', db_index=True)
+    aplicado_info = models.CharField(max_length=300, blank=True, help_text='Qué pasó al aprobar.')
+    modelo = models.CharField(max_length=120, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    resuelto_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Sugerencia de aprendizaje'
+        verbose_name_plural = 'Sugerencias de aprendizaje'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'[{self.tipo}/{self.estado}] {self.phone} · {self.created_at:%Y-%m-%d %H:%M}'
+
+
 class AusenciaEnviada(models.Model):
     """Última vez que se envió el mensaje de ausencia a una conversación (anti-spam).
 

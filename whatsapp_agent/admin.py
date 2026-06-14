@@ -2,7 +2,8 @@ from django.contrib import admin
 from solo.admin import SingletonModelAdmin
 
 from .models import (
-    AgenteFeedback, AusenciaEnviada, SugerenciaAgenteWhatsApp, WhatsAppAgentConfig,
+    AgenteFeedback, AusenciaEnviada, SugerenciaAgenteWhatsApp, SugerenciaAprendizaje,
+    WhatsAppAgentConfig,
 )
 
 
@@ -55,6 +56,16 @@ class AgenteFeedbackAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(SugerenciaAprendizaje)
+class SugerenciaAprendizajeAdmin(admin.ModelAdmin):
+    """Correcciones clasificadas (H-010 p2). Editable el estado para aprobar/descartar a mano."""
+    list_display = ('created_at', 'phone', 'tipo', 'estado', 'texto_propuesto')
+    list_filter = ('estado', 'tipo')
+    search_fields = ('phone', 'texto_propuesto', 'ref_catalogo', 'borrador', 'enviado')
+    readonly_fields = ('feedback', 'phone', 'tipo', 'ref_catalogo', 'motivo', 'borrador',
+                       'enviado', 'modelo', 'created_at', 'resuelto_at', 'aplicado_info')
 
 
 @admin.register(AusenciaEnviada)
