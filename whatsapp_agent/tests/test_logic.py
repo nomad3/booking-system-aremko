@@ -23,7 +23,8 @@ def test_formatear_precio():
 def test_construir_catalogo_texto():
     servicios = [
         {'nombre': 'Tina caliente', 'precio_base': 140000, 'duracion': 120,
-         'descripcion_web': 'Tina junto al río.'},
+         'descripcion_web': 'Tina junto al río.', 'capacidad_minima': 1, 'capacidad_maxima': 4,
+         'informacion_adicional': 'Bata y toallas'},
         {'nombre': 'Masaje relajación', 'precio_base': 45000, 'duracion': 60,
          'descripcion_web': ''},
         {'nombre': '', 'precio_base': 999, 'duracion': 1},  # se ignora (sin nombre)
@@ -37,11 +38,22 @@ def test_construir_catalogo_texto():
     assert '$140.000' in texto
     assert '(120 min)' in texto
     assert 'Tina junto al río.' in texto
+    assert 'para 1 a 4 personas' in texto  # capacidad inyectada (H-009b)
+    assert 'Incluye/nota: Bata y toallas' in texto
     assert 'Masaje relajación' in texto
     assert '999' not in texto  # el servicio sin nombre no aparece
     assert 'PRODUCTOS DISPONIBLES' in texto
     assert 'Tabla de quesos' in texto
     assert '$18.000' in texto
+
+
+def test_formatear_capacidad():
+    assert grounding.formatear_capacidad(1, 4) == 'para 1 a 4 personas'
+    assert grounding.formatear_capacidad(2, 2) == 'para hasta 2 personas'
+    assert grounding.formatear_capacidad(1, 1) == ''   # capacidad 1 no aporta
+    assert grounding.formatear_capacidad(None, None) == ''
+    assert grounding.formatear_capacidad(1, None) == ''
+    assert grounding.formatear_capacidad('x', 'y') == ''
 
 
 def test_catalogo_sin_servicios():

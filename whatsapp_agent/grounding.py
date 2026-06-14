@@ -25,8 +25,23 @@ def _recortar(texto, limite=160):
     return texto[:limite].rstrip() + '…'
 
 
+def formatear_capacidad(cap_min, cap_max):
+    """'para 1 a 4 personas' / 'para 2 personas' / '' (si es 1 sola, no aporta)."""
+    try:
+        lo = int(cap_min) if cap_min is not None else None
+        hi = int(cap_max) if cap_max is not None else None
+    except (TypeError, ValueError):
+        return ''
+    if not hi or hi <= 1:
+        return ''  # capacidad 1 (default) no agrega contexto
+    if lo and lo != hi:
+        return f'para {lo} a {hi} personas'
+    return f'para hasta {hi} personas'
+
+
 def formatear_servicios(servicios):
-    """servicios: iterable de dicts con nombre/precio_base/duracion/descripcion_web/tipo_servicio."""
+    """servicios: dicts con nombre/precio_base/duracion/descripcion_web/capacidad_minima/
+    capacidad_maxima/informacion_adicional."""
     lineas = []
     for s in servicios:
         nombre = (s.get('nombre') or '').strip()
@@ -37,10 +52,17 @@ def formatear_servicios(servicios):
         if dur:
             partes.append(f'({dur} min)')
         partes.append('— ' + formatear_precio(s.get('precio_base')))
+        # Capacidad (dato estructurado ya en BD): clave para tinas/cabañas.
+        cap = formatear_capacidad(s.get('capacidad_minima'), s.get('capacidad_maxima'))
+        if cap:
+            partes.append(cap)
         linea = ' '.join(partes)
         desc = _recortar(s.get('descripcion_web'), 140)
         if desc:
             linea += f'. {desc}'
+        incluye = _recortar(s.get('informacion_adicional'), 140)
+        if incluye:
+            linea += f' Incluye/nota: {incluye}'
         lineas.append(linea)
     return lineas
 
@@ -91,7 +113,8 @@ def catalogo_vivo():
         Servicio.objects
         .filter(publicado_web=True, activo=True)
         .order_by('tipo_servicio', 'nombre')
-        .values('nombre', 'precio_base', 'duracion', 'descripcion_web', 'tipo_servicio')
+        .values('nombre', 'precio_base', 'duracion', 'descripcion_web', 'tipo_servicio',
+                'capacidad_minima', 'capacidad_maxima', 'informacion_adicional')
     )
     productos = list(
         Producto.objects
