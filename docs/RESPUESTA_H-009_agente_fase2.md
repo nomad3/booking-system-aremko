@@ -53,7 +53,24 @@ aclara que es por persona y la capacidad. Cargar "no ofrecer Cacao" → no lo of
 
 ---
 
-## Partes (b), (c), (d) — pendientes (orden b→c→d)
+## Parte (b) — Catálogo rico → 🟢 IMPLEMENTADO (Django), sin migración
+
+**Decisión de Jorge:** `publicado_web` (+ stock>0 en productos) es la **única fuente de
+verdad** de lo que el agente ofrece. **NO se agrega flag `ofrecible_agente`** — si algo
+no se debe ofrecer, se despublica. (El stock ya se respetaba desde la Fase 1.)
+
+**Qué cambió (solo grounding, sin tocar modelos de ventas → cero riesgo AR-034):**
+- El catálogo inyectado ahora incluye, por servicio, la **capacidad** ("para 1 a 4
+  personas", desde `capacidad_minima/maxima` que YA existían) y **qué incluye / nota**
+  (`informacion_adicional`). Esto arregla el caso Calbuco a nivel de dato estructurado.
+- El **"por persona"** se cubre con la regla de `conocimiento` (H-009a). Si más adelante
+  quieres una **unidad de precio estructurada por ítem**, se agrega como campo aparte
+  (con cuidado por el drift); por ahora no hace falta.
+
+**Tu lado (aremko-cli):** nada — el agente ya devuelve mejores borradores; se ve solo en
+las sugerencias. (Editar capacidad/incluye se hace en el admin de Servicio que Jorge usa.)
+
+## Partes (c), (d) — pendientes (orden c→d)
 
 - **(b) Catálogo rico + `ofrecible_agente`:** unidad de precio (por persona), capacidad
   (mín/máx), incluye, y flag por producto/servicio para excluir ítems de raíz. Requiere
