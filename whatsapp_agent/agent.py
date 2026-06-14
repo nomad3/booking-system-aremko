@@ -218,8 +218,11 @@ def generar_sugerencia(phone, *, forzar=False):
         if existente is not None:
             return existente
 
-    # Pausa por conversación (un humano ya está atendiendo este chat).
-    if _conversacion_pausada(phone, config.pausa_horas_tras_humano):
+    # Pausa por conversación: SOLO en modos auto (para no pisar a un humano que
+    # está atendiendo, ya que ahí el agente SÍ enviaría). En modo borrador no
+    # aplica: sugerir es inofensivo y útil aunque haya un saliente reciente (el
+    # agente no manda nada; aremko-cli solo precarga el cajón si está vacío).
+    if config.modo != 'borrador' and _conversacion_pausada(phone, config.pausa_horas_tras_humano):
         return None
 
     historial = _historial_texto(phone, entrante.timestamp, config.history_window)

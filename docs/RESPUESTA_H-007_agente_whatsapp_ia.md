@@ -110,8 +110,10 @@ manda con tu flujo de reply existente (no cambia el outbound).
   formato / few-shot), versionado (`prompt_version`).
 - **Escalamiento**: heurística por palabras clave **antes** de gastar tokens (pide
   humano, reclamo, sentimiento negativo) + el modelo puede marcar `[ESCALAR: motivo]`.
-- **Pausa por conversación**: si hay un saliente humano en las últimas `pausa_horas`
-  (default 12), el agente se calla en ese chat.
+- **Pausa por conversación** (solo modos AUTO): si hay un saliente humano en las
+  últimas `pausa_horas` (default 12), el agente se calla en ese chat. **En modo
+  `borrador` NO aplica** — sugerir es inofensivo (no envía), así que siempre se ofrece
+  un borrador aunque haya un saliente reciente.
 - **Resistencia a prompt injection**: el mensaje del cliente va envuelto como DATOS;
   el system prompt ordena ignorar instrucciones embebidas.
 - **Defensa en profundidad**: salida truncada a ≤1000 chars (muy por debajo de los
