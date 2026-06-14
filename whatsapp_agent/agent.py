@@ -131,6 +131,71 @@ def _guardar(entrante, *, texto='', escalar=False, motivo='', modo='', modelo=''
     return sug
 
 
+def _borrador_escala(motivo, *, error='', modelo='', tokens=(0, 0, 0)):
+    return {
+        'escalar': True, 'motivo': motivo, 'texto': '', 'modelo': modelo, 'error': error,
+        'input_tokens': tokens[0], 'output_tokens': tokens[1], 'latency_ms': tokens[2],
+    }
+
+
+def _producir_borrador(config, mensaje, historial=''):
+    """Genera el borrador para un texto de cliente. SIN DB y SIN gate de `activo`.
+
+    Devuelve un dict {escalar, motivo, texto, modelo, error, *tokens}. Lo usan
+    tanto el flujo en vivo (`generar_sugerencia`) como el comando de prueba.
+    """
+    # 1) Heurística de escalamiento antes de gastar tokens.
+    motivo_pre = escalation.pre_escalar(mensaje)
+    if motivo_pre:
+        return _borrador_escala(motivo_pre)
+
+    # 2) Catálogo vivo (grounding).
+    try:
+        catalogo = grounding.catalogo_vivo()
+    except Exception as exc:  # noqa: BLE001 — nunca romper por el catálogo
+        logger.exception('Agente WA: error armando catálogo: %s', exc)
+        return _borrador_escala('no se pudo cargar el catálogo', error=str(exc)[:200])
+
+    system_prompt = prompt_mod.build_system_prompt(
+        config.persona_tono, catalogo, config.link_reserva)
+    user_prompt = prompt_mod.build_user_prompt(historial, mensaje)
+    modelo = _modelo_efectivo(config)
+
+    # 3) Llamada al LLM (el provider nunca lanza; igual lo blindamos).
+    try:
+        from destino_puerto_varas.services.llm.openrouter_provider import OpenRouterProvider
+        provider = OpenRouterProvider()
+        resultado = provider.generate(
+            system_prompt=system_prompt, user_prompt=user_prompt, model=modelo,
+            max_tokens=config.max_tokens, temperature=float(config.temperature),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception('Agente WA: provider lanzó excepción: %s', exc)
+        return _borrador_escala('modelo no disponible', error=str(exc)[:200], modelo=modelo)
+
+    tokens = (resultado.input_tokens, resultado.output_tokens, resultado.latency_ms)
+
+    # 4) Fallback seguro: si el LLM falló, deriva a humano (no inventamos).
+    if not resultado.ok:
+        return _borrador_escala('modelo no disponible', error=resultado.error[:200],
+                                modelo=modelo, tokens=tokens)
+
+    # 5) ¿El LLM decidió escalar?
+    escalar, motivo_llm, texto_limpio = escalation.parse_escalada(resultado.text)
+    if escalar:
+        return _borrador_escala(motivo_llm, modelo=modelo, tokens=tokens)
+
+    texto = escalation.sanear_salida(texto_limpio)
+    if not texto:
+        return _borrador_escala('respuesta vacía del modelo', error='empty_output',
+                                modelo=modelo, tokens=tokens)
+
+    return {
+        'escalar': False, 'motivo': '', 'texto': texto, 'modelo': modelo, 'error': '',
+        'input_tokens': tokens[0], 'output_tokens': tokens[1], 'latency_ms': tokens[2],
+    }
+
+
 def generar_sugerencia(phone, *, forzar=False):
     """Devuelve la SugerenciaAgenteWhatsApp para el último entrante sin responder.
 
@@ -157,61 +222,11 @@ def generar_sugerencia(phone, *, forzar=False):
     if _conversacion_pausada(phone, config.pausa_horas_tras_humano):
         return None
 
-    # Heurística de escalamiento antes de gastar tokens.
-    motivo_pre = escalation.pre_escalar(entrante.body)
-    if motivo_pre:
-        return _guardar(entrante, escalar=True, motivo=motivo_pre, modo=config.modo)
-
-    # Construir prompts con catálogo vivo + contexto.
-    try:
-        catalogo = grounding.catalogo_vivo()
-    except Exception as exc:  # noqa: BLE001 — nunca romper por el catálogo
-        logger.exception('Agente WA: error armando catálogo: %s', exc)
-        return _guardar(entrante, escalar=True, motivo='no se pudo cargar el catálogo',
-                        modo=config.modo, error=str(exc)[:200])
-
-    system_prompt = prompt_mod.build_system_prompt(
-        config.persona_tono, catalogo, config.link_reserva)
     historial = _historial_texto(phone, entrante.timestamp, config.history_window)
-    user_prompt = prompt_mod.build_user_prompt(historial, entrante.body)
-
-    modelo = _modelo_efectivo(config)
-    try:
-        from destino_puerto_varas.services.llm.openrouter_provider import OpenRouterProvider
-        provider = OpenRouterProvider()
-        resultado = provider.generate(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            model=modelo,
-            max_tokens=config.max_tokens,
-            temperature=float(config.temperature),
-        )
-    except Exception as exc:  # noqa: BLE001 — el provider no debería lanzar, pero por si acaso
-        logger.exception('Agente WA: provider lanzó excepción: %s', exc)
-        return _guardar(entrante, escalar=True, motivo='modelo no disponible',
-                        modo=config.modo, modelo=modelo, error=str(exc)[:200])
-
-    # Fallback seguro: si el LLM falló, deriva a humano (no inventamos).
-    if not resultado.ok:
-        return _guardar(entrante, escalar=True, motivo='modelo no disponible',
-                        modo=config.modo, modelo=modelo, error=resultado.error[:200],
-                        input_tokens=resultado.input_tokens, output_tokens=resultado.output_tokens,
-                        latency_ms=resultado.latency_ms)
-
-    # ¿El LLM decidió escalar?
-    escalar, motivo_llm, texto_limpio = escalation.parse_escalada(resultado.text)
-    if escalar:
-        return _guardar(entrante, escalar=True, motivo=motivo_llm, modo=config.modo,
-                        modelo=modelo, input_tokens=resultado.input_tokens,
-                        output_tokens=resultado.output_tokens, latency_ms=resultado.latency_ms)
-
-    texto = escalation.sanear_salida(texto_limpio)
-    if not texto:
-        return _guardar(entrante, escalar=True, motivo='respuesta vacía del modelo',
-                        modo=config.modo, modelo=modelo, error='empty_output',
-                        input_tokens=resultado.input_tokens, output_tokens=resultado.output_tokens,
-                        latency_ms=resultado.latency_ms)
-
-    return _guardar(entrante, texto=texto, modo=config.modo, modelo=modelo,
-                    input_tokens=resultado.input_tokens, output_tokens=resultado.output_tokens,
-                    latency_ms=resultado.latency_ms)
+    d = _producir_borrador(config, entrante.body, historial)
+    return _guardar(
+        entrante, texto=d['texto'], escalar=d['escalar'], motivo=d['motivo'],
+        modo=config.modo, modelo=d['modelo'], error=d['error'],
+        input_tokens=d['input_tokens'], output_tokens=d['output_tokens'],
+        latency_ms=d['latency_ms'],
+    )

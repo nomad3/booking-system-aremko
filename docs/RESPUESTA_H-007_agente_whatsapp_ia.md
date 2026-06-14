@@ -20,12 +20,14 @@ la conversación; **no envía nada** (eso lo hace Deborah desde tu UI). Arranca
    el modelo en su config editable. Así que `model_name`/`temperature` quedaron en el
    form del agente (con fallback a `DPV_LLM_MODEL` de env si lo dejas vacío). Encaja
    mejor con el criterio de Jorge ("IA = formularios, no env") y te da más control.
-2. **La sugerencia se genera *lazy* al pedir la conversación, no en el inbound.**
-   Generarla en el webhook inbound metía latencia de LLM en el hot-path de Meta (1
-   worker Gunicorn). En su lugar, `GET /api/whatsapp/conversation/?phone=` la genera
-   (o recupera de cache) cuando abres el chat. Cuesta LLM **solo** en chats que se
-   abren, y el inbound queda intacto. Cacheada por `wa_message_id` (no regenera al
-   reabrir). Si no la quieres en una llamada puntual, pasa `?sugerencia=0`.
+2. **La sugerencia se genera *lazy* al pedir la conversación, no en el inbound, y
+   es OPT-IN.** Generarla en el webhook inbound metía latencia de LLM en el hot-path
+   de Meta (1 worker Gunicorn). En su lugar, `GET /api/whatsapp/conversation/?phone=`
+   la genera (o recupera de cache) **solo si pasas `?sugerencia=1`** (default = NO
+   genera). Así prender el agente no dispara gasto de LLM en cada apertura de chat de
+   tu bandeja actual hasta que conectes el parámetro a propósito. Cacheada por
+   `wa_message_id` (no regenera al reabrir). **Acción tu lado: agregar `&sugerencia=1`
+   a la llamada de detalle de conversación cuando quieras el borrador.**
 
 Si prefieres otra forma (p.ej. un endpoint dedicado `GET /api/whatsapp/agente/sugerencia`),
 avísame y lo agrego — el núcleo ya está, es solo exponerlo distinto.
@@ -69,7 +71,8 @@ Valida `modo` (enum) y rangos numéricos (`temperature` 0–2, `max_tokens` 1–
 toggle `activo`, selector `modo`, textarea `persona_tono`, campo `link_reserva`,
 `model_name` (avanzado) y muestra `modelo_efectivo` como read-only.
 
-### 2) Borrador en el detalle — `GET /api/whatsapp/conversation/?phone=<E164>`
+### 2) Borrador en el detalle — `GET /api/whatsapp/conversation/?phone=<E164>&sugerencia=1`
+**Opt-in:** sin `sugerencia=1`, `sugerencia_agente` vuelve `null` (no genera ni gasta LLM).
 La respuesta existente suma una clave:
 ```json
 {
@@ -124,10 +127,16 @@ manda con tu flujo de reply existente (no cambia el outbound).
    (auto-migraciones están off). Crea 2 tablas nuevas; no toca nada existente.
    *Hasta que corra, `sugerencia_agente` simplemente vuelve `null` (está en try/except,
    no rompe la conversación).*
-3. **Prender el agente** desde el admin Django (`Configuración Agente WhatsApp` →
-   `activo=True`, modo `borrador`) — o vía `POST .../agente/config`.
-4. **Probar con el número de prueba de Meta** antes que con clientes reales.
-5. **Tu lado**: precargar el cajón con `sugerencia_agente.texto` + etiqueta IA.
+3. **Probar el borrador SIN prender nada** (comando de prueba, desde el Shell de
+   Render): `python manage.py probar_agente_wa --mensaje "Hola, hacen masajes?"`
+   o `--phone <número de prueba>`. Genera el borrador con catálogo + LLM reales y lo
+   imprime; no envía nada ni requiere `activo=True`. Es el "probar con el número de
+   prueba de Meta" del brief, sin exponerlo a clientes.
+4. **Prender el agente** desde el admin Django (`Configuración Agente WhatsApp` →
+   `activo=True`, modo `borrador`) — o vía `POST .../agente/config`. (Con opt-in, esto
+   es inofensivo hasta que tu lado pida `?sugerencia=1`.)
+5. **Tu lado**: llamar a la conversación con `&sugerencia=1` y precargar el cajón con
+   `sugerencia_agente.texto` + etiqueta IA.
 
 ## Validación hecha (Django)
 

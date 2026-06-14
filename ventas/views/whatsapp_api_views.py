@@ -469,8 +469,13 @@ def conversation(request):
 
 
 def _sugerencia_agente(phone, request):
-    """Genera (lazy) o recupera el borrador del agente IA. Nunca rompe la vista."""
-    if not _truthy(request.GET.get('sugerencia', '1')):
+    """Genera (lazy) o recupera el borrador del agente IA. Nunca rompe la vista.
+
+    Opt-in: solo se genera si el caller pide `?sugerencia=1`. Así prender el
+    agente no dispara gasto de LLM en cada apertura de chat de la bandeja actual
+    hasta que aremko-cli conecte el parámetro explícitamente.
+    """
+    if not _truthy(request.GET.get('sugerencia', '0')):
         return None
     try:
         from whatsapp_agent.agent import generar_sugerencia, sugerencia_to_dict
