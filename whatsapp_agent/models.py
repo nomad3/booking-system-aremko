@@ -148,6 +148,39 @@ class SugerenciaAgenteWhatsApp(models.Model):
         return f'[{tag}] {self.phone} · {self.created_at:%Y-%m-%d %H:%M}'
 
 
+class AgenteFeedback(models.Model):
+    """Delta entre el borrador propuesto por el agente y lo que Deborah envió (H-010 parte 1).
+
+    Base del motor de aprendizaje: si `editado=True`, la corrección alimenta la
+    clasificación (parte 2) y las métricas de evolución (parte 3, `pct_sin_editar`).
+    Fire-and-forget: lo reporta aremko-cli tras un envío que tenía borrador.
+    """
+
+    phone = models.CharField(max_length=20, db_index=True)
+    wa_message_id = models.CharField(
+        max_length=128, db_index=True, blank=True,
+        help_text='Referencia del mensaje/borrador (el entrante que se respondía).',
+    )
+    borrador = models.TextField(blank=True, help_text='Lo que el agente propuso.')
+    enviado = models.TextField(blank=True, help_text='Lo que Deborah realmente envió.')
+    editado = models.BooleanField(
+        default=False, db_index=True,
+        help_text='True si lo enviado difiere del borrador (hubo corrección).',
+    )
+    # Parte 2: se marcará cuando el clasificador ya procesó este feedback.
+    procesado = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Feedback del agente'
+        verbose_name_plural = 'Feedback del agente'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        tag = 'EDITADO' if self.editado else 'SIN EDITAR'
+        return f'[{tag}] {self.phone} · {self.created_at:%Y-%m-%d %H:%M}'
+
+
 class AusenciaEnviada(models.Model):
     """Última vez que se envió el mensaje de ausencia a una conversación (anti-spam).
 

@@ -74,6 +74,7 @@ urlpatterns = [
     path('api/whatsapp/conversations/<str:phone>/editar-nombre/', whatsapp_api_views.editar_nombre, name='whatsapp_editar_nombre'),
     # Agente IA WhatsApp (H-007): config singleton editable desde aremko-cli.
     path('api/whatsapp/agente/config', whatsapp_api_views.agente_config, name='whatsapp_agente_config'),
+    path('api/whatsapp/agente/feedback', whatsapp_api_views.agente_feedback, name='whatsapp_agente_feedback'),
     # Campaña de plantillas Meta (Vuelta a Casa): Django decide, Go envía.
     path('api/whatsapp/pending-template-sends', whatsapp_api_views.pending_template_sends, name='whatsapp_pending_template_sends'),
     path('api/whatsapp/mark-template-sent', whatsapp_api_views.mark_template_sent, name='whatsapp_mark_template_sent'),

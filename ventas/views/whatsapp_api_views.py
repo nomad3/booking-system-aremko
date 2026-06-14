@@ -776,6 +776,46 @@ def agente_config(request):
     return JsonResponse({'ok': True, 'actualizado': cambios, 'config': config_to_dict(config)})
 
 
+@csrf_exempt
+def agente_feedback(request):
+    """POST /api/whatsapp/agente/feedback — captura el delta borrador-vs-enviado (H-010 parte 1).
+
+    Body: {phone, wa_message_id, borrador, enviado, editado:bool} → {ok}. Lo reporta
+    aremko-cli tras un envío que tenía borrador. Fire-and-forget: nunca debe romper
+    el flujo de aremko-cli, así que ante cualquier problema responde igual.
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+
+    try:
+        from whatsapp_agent.models import AgenteFeedback
+        borrador = data.get('borrador') or ''
+        enviado = data.get('enviado') or ''
+        if 'editado' in data:
+            editado = _truthy(data.get('editado'))
+        else:
+            editado = borrador.strip() != enviado.strip()
+        fb = AgenteFeedback.objects.create(
+            phone=(data.get('phone') or '')[:20],
+            wa_message_id=(data.get('wa_message_id') or '')[:128],
+            borrador=borrador,
+            enviado=enviado,
+            editado=editado,
+        )
+        return JsonResponse({'ok': True, 'feedback_id': fb.id, 'editado': editado})
+    except Exception:  # noqa: BLE001 — fire-and-forget: no romper el envío de aremko-cli
+        import logging
+        logging.getLogger(__name__).exception('Agente feedback: no se pudo guardar')
+        return JsonResponse({'ok': False}, status=200)
+
+
 # ============================================================================
 # Campaña de plantillas Meta (Operación Vuelta a Casa) — Django decide, Go envía.
 # Django arma la bandeja (ContactoWhatsApp salva 1) y resuelve los params; Go

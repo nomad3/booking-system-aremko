@@ -1,7 +1,9 @@
 from django.contrib import admin
 from solo.admin import SingletonModelAdmin
 
-from .models import AusenciaEnviada, SugerenciaAgenteWhatsApp, WhatsAppAgentConfig
+from .models import (
+    AgenteFeedback, AusenciaEnviada, SugerenciaAgenteWhatsApp, WhatsAppAgentConfig,
+)
 
 
 @admin.register(WhatsAppAgentConfig)
@@ -31,6 +33,21 @@ class WhatsAppAgentConfigAdmin(SingletonModelAdmin):
         }),
     )
     readonly_fields = ('updated_at',)
+
+
+@admin.register(AgenteFeedback)
+class AgenteFeedbackAdmin(admin.ModelAdmin):
+    """Solo lectura: delta borrador-vs-enviado (motor de aprendizaje H-010)."""
+    list_display = ('created_at', 'phone', 'editado', 'procesado')
+    list_filter = ('editado', 'procesado')
+    search_fields = ('phone', 'wa_message_id', 'borrador', 'enviado')
+    readonly_fields = [f.name for f in AgenteFeedback._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(AusenciaEnviada)
