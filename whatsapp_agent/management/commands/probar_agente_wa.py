@@ -23,12 +23,28 @@ class Command(BaseCommand):
                             help='Usa el último entrante real sin responder de este teléfono.')
         parser.add_argument('--historial', type=str, default='',
                             help='Contexto previo opcional (solo con --mensaje).')
+        parser.add_argument('--catalogo', action='store_true',
+                            help='Imprime el catálogo EXACTO que recibe el agente y termina (diagnóstico).')
+        parser.add_argument('--filtro', type=str, default='',
+                            help='Con --catalogo: muestra solo las líneas que contienen este texto.')
 
     def handle(self, *args, **opts):
         from whatsapp_agent.agent import (
             _producir_borrador, _historial_texto, _entrante_a_responder,
             _modelo_efectivo, get_config,
         )
+
+        # Diagnóstico: ver el catálogo vivo tal cual lo recibe el agente.
+        if opts.get('catalogo'):
+            from whatsapp_agent import grounding
+            texto = grounding.catalogo_vivo()
+            filtro = (opts.get('filtro') or '').strip().lower()
+            if filtro:
+                lineas = [ln for ln in texto.splitlines() if filtro in ln.lower()]
+                texto = '\n'.join(lineas) if lineas else f'(sin líneas que contengan "{filtro}")'
+            self.stdout.write(self.style.MIGRATE_HEADING('— Catálogo que recibe el agente —'))
+            self.stdout.write(texto)
+            return
 
         mensaje = (opts.get('mensaje') or '').strip()
         phone = (opts.get('phone') or '').strip()

@@ -25,8 +25,24 @@ def _recortar(texto, limite=160):
     return texto[:limite].rstrip() + '…'
 
 
+def formatear_duracion(minutos):
+    """240 -> '4 h' · 90 -> '1 h 30 min' · 45 -> '45 min' · 0/None -> ''."""
+    try:
+        m = int(minutos)
+    except (TypeError, ValueError):
+        return ''
+    if m <= 0:
+        return ''
+    h, mm = divmod(m, 60)
+    if h and mm:
+        return f'{h} h {mm} min'
+    if h:
+        return f'{h} h'
+    return f'{mm} min'
+
+
 def formatear_capacidad(cap_min, cap_max):
-    """'para 1 a 4 personas' / 'para 2 personas' / '' (si es 1 sola, no aporta)."""
+    """'para 1 a 4 personas' / 'para 4 personas' (min==max) / '' (capacidad 1)."""
     try:
         lo = int(cap_min) if cap_min is not None else None
         hi = int(cap_max) if cap_max is not None else None
@@ -34,9 +50,11 @@ def formatear_capacidad(cap_min, cap_max):
         return ''
     if not hi or hi <= 1:
         return ''  # capacidad 1 (default) no agrega contexto
-    if lo and lo != hi:
-        return f'para {lo} a {hi} personas'
-    return f'para hasta {hi} personas'
+    if lo and lo > 1 and lo == hi:
+        return f'para {hi} personas'          # cupo fijo (ej. tina para 4)
+    if lo and lo >= 1 and lo != hi:
+        return f'para {lo} a {hi} personas'    # rango
+    return f'para hasta {hi} personas'         # min desconocido
 
 
 def formatear_servicios(servicios):
@@ -48,9 +66,9 @@ def formatear_servicios(servicios):
         if not nombre:
             continue
         partes = [f'• {nombre}']
-        dur = s.get('duracion')
+        dur = formatear_duracion(s.get('duracion'))
         if dur:
-            partes.append(f'({dur} min)')
+            partes.append(f'({dur})')
         partes.append('— ' + formatear_precio(s.get('precio_base')))
         # Capacidad (dato estructurado ya en BD): clave para tinas/cabañas.
         cap = formatear_capacidad(s.get('capacidad_minima'), s.get('capacidad_maxima'))

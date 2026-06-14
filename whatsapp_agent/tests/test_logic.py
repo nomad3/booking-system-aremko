@@ -36,7 +36,7 @@ def test_construir_catalogo_texto():
     assert 'SERVICIOS PUBLICADOS' in texto
     assert 'Tina caliente' in texto
     assert '$140.000' in texto
-    assert '(120 min)' in texto
+    assert '(2 h)' in texto  # duración formateada en horas (H-009b)
     assert 'Tina junto al río.' in texto
     assert 'para 1 a 4 personas' in texto  # capacidad inyectada (H-009b)
     assert 'Incluye/nota: Bata y toallas' in texto
@@ -49,11 +49,24 @@ def test_construir_catalogo_texto():
 
 def test_formatear_capacidad():
     assert grounding.formatear_capacidad(1, 4) == 'para 1 a 4 personas'
-    assert grounding.formatear_capacidad(2, 2) == 'para hasta 2 personas'
+    assert grounding.formatear_capacidad(4, 4) == 'para 4 personas'   # cupo fijo
+    assert grounding.formatear_capacidad(2, 2) == 'para 2 personas'
+    assert grounding.formatear_capacidad(None, 4) == 'para hasta 4 personas'  # min desconocido
     assert grounding.formatear_capacidad(1, 1) == ''   # capacidad 1 no aporta
     assert grounding.formatear_capacidad(None, None) == ''
     assert grounding.formatear_capacidad(1, None) == ''
     assert grounding.formatear_capacidad('x', 'y') == ''
+
+
+def test_formatear_duracion():
+    assert grounding.formatear_duracion(240) == '4 h'
+    assert grounding.formatear_duracion(120) == '2 h'
+    assert grounding.formatear_duracion(90) == '1 h 30 min'
+    assert grounding.formatear_duracion(45) == '45 min'
+    assert grounding.formatear_duracion(60) == '1 h'
+    assert grounding.formatear_duracion(0) == ''
+    assert grounding.formatear_duracion(None) == ''
+    assert grounding.formatear_duracion('x') == ''
 
 
 def test_catalogo_sin_servicios():
