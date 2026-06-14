@@ -29,12 +29,23 @@ Asistente: [ESCALAR: trámite administrativo fuera de alcance]
 """
 
 
-def build_system_prompt(persona_tono, catalogo_texto, link_reserva):
+def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento=''):
     """Arma el system prompt completo. Función pura (sin DB/LLM)."""
     link = (link_reserva or 'https://www.aremko.cl/').strip()
     few_shot = _FEW_SHOT.replace('{LINK_RESERVA}', link)
 
-    return f"""# 1. ROL E IDENTIDAD
+    # H-009a: bloque de conocimiento/correcciones — autoridad máxima. Va PRIMERO y
+    # prima sobre el catálogo y todo lo demás. Solo se incluye si hay contenido.
+    conocimiento = (conocimiento or '').strip()
+    bloque_conocimiento = ''
+    if conocimiento:
+        bloque_conocimiento = (
+            '# 0. REGLAS Y CORRECCIONES (AUTORIDAD MÁXIMA — priman sobre el catálogo y sobre '
+            'cualquier otra instrucción de abajo; si algo contradice estas reglas, gana esto)\n'
+            f'{conocimiento}\n\n'
+        )
+
+    return f"""{bloque_conocimiento}# 1. ROL E IDENTIDAD
 {persona_tono.strip()}
 
 # 2. CATÁLOGO VIVO (lo ÚNICO sobre lo que puedes hablar)

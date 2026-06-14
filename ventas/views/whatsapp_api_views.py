@@ -740,6 +740,9 @@ def agente_config(request):
     if 'persona_tono' in data:
         config.persona_tono = (data.get('persona_tono') or '').strip()
         cambios.append('persona_tono')
+    if 'conocimiento' in data:
+        config.conocimiento = (data.get('conocimiento') or '').strip()
+        cambios.append('conocimiento')
     if 'link_reserva' in data:
         config.link_reserva = (data.get('link_reserva') or '').strip()[:300]
         cambios.append('link_reserva')

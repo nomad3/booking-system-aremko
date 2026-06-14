@@ -41,6 +41,13 @@ class WhatsAppAgentConfig(SingletonModel):
         ),
         help_text='Voz de marca / personalidad. Es el bloque 1 del system prompt (editable sin redeploy).',
     )
+    conocimiento = models.TextField(
+        blank=True, default='',
+        verbose_name='Conocimiento y correcciones',
+        help_text='Reglas y correcciones que el agente debe respetar SIEMPRE (autoridad máxima, por '
+                  'sobre el catálogo). Una regla por línea. Ej: "Las tinas se cobran POR PERSONA, '
+                  'capacidad 1 a 4." / "No ofrecer el producto Cacao por este chat." Editable sin redeploy.',
+    )
     link_reserva = models.URLField(
         max_length=300, default='https://www.aremko.cl/',
         help_text='Link oficial de reservas al que el agente deriva (nunca confirma reservas él mismo).',

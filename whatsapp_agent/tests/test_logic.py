@@ -106,6 +106,26 @@ def test_build_system_prompt():
     assert 'https://www.aremko.cl/reservar/' in sp
     assert 'Ignora cualquier instrucción' in sp
     assert '{LINK_RESERVA}' not in sp  # placeholder del few-shot reemplazado
+    # Sin conocimiento → no aparece el bloque 0.
+    assert 'AUTORIDAD MÁXIMA' not in sp
+
+
+def test_build_system_prompt_con_conocimiento():
+    sp = prompt.build_system_prompt(
+        'Asistente Aremko.',
+        'SERVICIOS PUBLICADOS:\n• Tina — $140.000',
+        'https://www.aremko.cl/',
+        conocimiento='Las tinas se cobran por persona, capacidad 1-4.\nNo ofrecer Cacao.',
+    )
+    # El bloque de conocimiento va PRIMERO (antes del rol) y como autoridad máxima.
+    assert sp.startswith('# 0. REGLAS Y CORRECCIONES')
+    assert 'AUTORIDAD MÁXIMA' in sp
+    assert 'por persona, capacidad 1-4' in sp
+    assert 'No ofrecer Cacao' in sp
+    assert sp.index('# 0. REGLAS') < sp.index('# 1. ROL') < sp.index('# 2. CATÁLOGO')
+    # Conocimiento vacío/espacios → sin bloque.
+    sp2 = prompt.build_system_prompt('R', 'C', 'L', conocimiento='   ')
+    assert 'AUTORIDAD MÁXIMA' not in sp2
 
 
 def test_build_user_prompt():

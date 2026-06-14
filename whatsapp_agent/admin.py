@@ -14,6 +14,11 @@ class WhatsAppAgentConfigAdmin(SingletonModelAdmin):
         ('Voz y derivación', {
             'fields': ('persona_tono', 'link_reserva'),
         }),
+        ('Conocimiento y correcciones (autoridad máxima)', {
+            'fields': ('conocimiento',),
+            'description': 'Reglas que el agente respeta SIEMPRE, por sobre el catálogo. Una por línea. '
+                           'Ej: "Las tinas se cobran por persona, capacidad 1-4." / "No ofrecer Cacao."',
+        }),
         ('Mensaje de ausencia', {
             'fields': ('ausencia_activa', 'ausencia_mensaje', 'ausencia_anti_spam_horas'),
             'description': 'Si se activa, a cada cliente que escribe se le responde la frase fija '

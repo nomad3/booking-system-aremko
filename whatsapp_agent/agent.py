@@ -41,6 +41,7 @@ def config_to_dict(config):
         'activo': config.activo,
         'modo': config.modo,
         'persona_tono': config.persona_tono,
+        'conocimiento': config.conocimiento,
         'link_reserva': config.link_reserva,
         'model_name': config.model_name,
         'modelo_efectivo': _modelo_efectivo(config),
@@ -160,7 +161,7 @@ def _producir_borrador(config, mensaje, historial=''):
         return _borrador_escala('no se pudo cargar el catálogo', error=str(exc)[:200])
 
     system_prompt = prompt_mod.build_system_prompt(
-        config.persona_tono, catalogo, config.link_reserva)
+        config.persona_tono, catalogo, config.link_reserva, config.conocimiento)
     user_prompt = prompt_mod.build_user_prompt(historial, mensaje)
     modelo = _modelo_efectivo(config)
 
