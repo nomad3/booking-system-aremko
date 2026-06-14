@@ -80,9 +80,16 @@ def disponibilidad(fecha, personas=1, tipo=None):
             except Exception:  # noqa: BLE001 — un slot con error no debe tumbar la consulta
                 logger.exception('disponibilidad: error verificando %s %s %s', s.id, f, hora)
         if libres:
+            # Precio: tinas y masajes se cobran POR PERSONA → total = base × personas.
+            # Cabañas/otros se cobran por la unidad (no se multiplica).
+            es_por_persona = s.tipo_servicio in ('tina', 'masaje')
+            precio_pp = int(s.precio_base)
+            precio_total = precio_pp * personas if es_por_persona else precio_pp
             servicios.append({
                 'nombre': s.nombre,
-                'precio': int(s.precio_base),
+                'precio_por_persona': precio_pp,
+                'es_por_persona': es_por_persona,
+                'precio_total': precio_total,
                 'capacidad_minima': s.capacidad_minima,
                 'capacidad_maxima': s.capacidad_maxima,
                 'duracion_min': s.duracion,

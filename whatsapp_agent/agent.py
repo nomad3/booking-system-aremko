@@ -34,7 +34,9 @@ _TOOLS = [{
         'description': (
             'Consulta los horarios libres REALES de servicios (tinas/masajes/cabañas) para una '
             'fecha y cantidad de personas. Úsala solo cuando ya tienes la fecha y la cantidad de '
-            'personas. Devuelve los servicios principales con cupo y sus horarios libres ese día.'
+            'personas. Devuelve los servicios principales con cupo, sus horarios libres, y el '
+            'precio YA CALCULADO: usa `precio_total` (el total para esa cantidad de personas) — no '
+            'lo recalcules; `precio_por_persona` es el unitario por si quieres aclararlo.'
         ),
         'parameters': {
             'type': 'object',

@@ -39,5 +39,10 @@ class Command(BaseCommand):
             cap = (f"{s['capacidad_minima']}-{s['capacidad_maxima']} pers"
                    if s['capacidad_minima'] != s['capacidad_maxima']
                    else f"{s['capacidad_maxima']} pers")
-            self.stdout.write(self.style.SUCCESS(f"  • {s['nombre']} (${s['precio']:,} · {cap})".replace(',', '.')))
+            if s['es_por_persona']:
+                precio = (f"${s['precio_total']:,} total (${s['precio_por_persona']:,} x persona)"
+                          .replace(',', '.'))
+            else:
+                precio = f"${s['precio_total']:,}".replace(',', '.')
+            self.stdout.write(self.style.SUCCESS(f"  • {s['nombre']} ({precio} · {cap})"))
             self.stdout.write(f"      horarios libres: {', '.join(s['slots_libres'])}")

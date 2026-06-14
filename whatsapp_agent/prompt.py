@@ -46,7 +46,10 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
             '(resuelve "el sábado", "mañana", etc. a una fecha YYYY-MM-DD usando la fecha de hoy).\n'
             '- NUNCA inventes horarios ni disponibilidad. Si la herramienta no devuelve servicios, dilo con '
             'amabilidad y ofrece coordinar con una persona.\n'
-            '- La herramienta ya filtra por capacidad y excluye complementos: ofrece SOLO lo que devuelve.'
+            '- La herramienta ya filtra por capacidad y excluye complementos: ofrece SOLO lo que devuelve.\n'
+            '- PRECIO: usa `precio_total` (ya calculado para esa cantidad de personas), NO lo recalcules. '
+            'Si `es_por_persona`, puedes aclarar "(X por persona)". Ej: 4 personas en tina de $25.000 '
+            'por persona → di "$100.000 ($25.000 por persona)".'
         )
 
     # H-009a: bloque de conocimiento/correcciones — autoridad máxima. Va PRIMERO y
