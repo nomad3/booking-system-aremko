@@ -51,6 +51,19 @@ def _hay_masaje_agendado_hoy(f):
             .exists())
 
 
+def _es_masaje_agendable(servicio):
+    """Solo el Masaje de Relajación/Descontracturante es auto-agendable por el agente.
+
+    Los demás masajes (piedras calientes, drenaje linfático, etc.) están en la web pero son
+    "consulta por WhatsApp" → NO se ofrecen para reservar; si el cliente los pide, el agente
+    deriva a una persona (regla de prompt). Solo afecta a servicios tipo masaje.
+    """
+    if (servicio.tipo_servicio or '') != 'masaje':
+        return True
+    n = (servicio.nombre or '').lower()
+    return 'relaj' in n or 'descontractura' in n
+
+
 def disponibilidad(fecha=None, personas=1, tipo=None):
     """Servicios publicados que admiten `personas`, con precio total y horarios libres.
 
@@ -104,6 +117,8 @@ def disponibilidad(fecha=None, personas=1, tipo=None):
 
     servicios = []
     for s in qs:
+        if not _es_masaje_agendable(s):
+            continue  # masaje no auto-agendable (consulta por WhatsApp) → no se ofrece
         libres = None
         if f is not None:
             # Modo disponibilidad: horarios libres ese día.
