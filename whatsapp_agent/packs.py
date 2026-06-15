@@ -111,6 +111,11 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2):
             if t_ini is None:
                 continue
             compat = _slots_compatibles(slots_masaje, t_ini, t_dur, masaje_dur)
+            # Excluir los slots que YA tienen un masaje agendado: ahí la masajista está
+            # ocupada (un masaje nuevo necesitaría otra masajista en el mismo momento).
+            # El clustering pega el nuevo al más cercano LIBRE de esos agendados.
+            agendados_set = set(agendados)
+            compat = [s for s in compat if s not in agendados_set]
             m_slot = elegir_slot_masaje(compat, agendados, t_ini)
             if m_slot is not None:
                 elegido = (t, t_slot, t_ini, t_dur, m_slot)

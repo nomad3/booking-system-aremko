@@ -242,6 +242,16 @@ def test_elegir_slot_masaje_clustering():
     assert packs.elegir_slot_masaje([], [1200], 870) is None
 
 
+def test_clustering_excluye_slot_ocupado():
+    # Caso real: masaje ya agendado a las 18:00 (1080). La tina termina 16:00; los slots
+    # compatibles después incluirían 18:00, pero ahí la masajista está ocupada → se excluye,
+    # y el nuevo masaje se pega al más cercano LIBRE → 16:45 (1005), no el 18:00.
+    compat = [1005, 1080, 1155]   # 16:45, 18:00, 19:15
+    agendados = [1080]            # 18:00 ocupado
+    candidatos = [s for s in compat if s not in set(agendados)]
+    assert packs.elegir_slot_masaje(candidatos, agendados, tina_ini_min=840) == 1005  # 16:45
+
+
 def _run():
     fns = [v for k, v in sorted(globals().items()) if k.startswith('test_') and callable(v)]
     fallos = 0
