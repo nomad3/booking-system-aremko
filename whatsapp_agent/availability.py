@@ -12,9 +12,15 @@ igual que el grounding. Capacidad estricta por `capacidad_minima/maxima`.
 import logging
 from datetime import datetime
 
+from django.utils import timezone
+
 logger = logging.getLogger(__name__)
 
 TIPOS_VALIDOS = {'tina', 'masaje', 'cabana', 'otro'}
+
+# Las masajistas vienen desde la ciudad (~1h). Para HOY, si todavía no hay masajistas
+# trabajando, no se puede ofrecer un masaje antes de que alcancen a llegar.
+TRAVEL_MASAJISTA_MIN = 60
 
 
 def _parse_fecha(fecha):
@@ -25,6 +31,24 @@ def _parse_fecha(fecha):
         return datetime.strptime(str(fecha).strip(), '%Y-%m-%d').date()
     except (ValueError, TypeError):
         return None
+
+
+def _hhmm_min(s):
+    """'14:30' -> 870 ; None/inválido -> None."""
+    try:
+        h, m = str(s).strip().split(':')
+        return int(h) * 60 + int(m)
+    except (ValueError, AttributeError):
+        return None
+
+
+def _hay_masaje_agendado_hoy(f):
+    """True si ya hay al menos un masaje agendado (no cancelado) ese día → masajistas en sitio."""
+    from ventas.models import ReservaServicio
+    return (ReservaServicio.objects
+            .filter(servicio__tipo_servicio='masaje', fecha_agendamiento=f)
+            .exclude(venta_reserva__estado_pago='cancelado')
+            .exists())
 
 
 def disponibilidad(fecha=None, personas=1, tipo=None):
@@ -71,6 +95,13 @@ def disponibilidad(fecha=None, personas=1, tipo=None):
             qs = qs.filter(tipo_servicio=tipo)
     qs = qs.order_by('tipo_servicio', 'nombre')
 
+    # Piso horario para HOY: nunca ofrecer horas pasadas. Se calcula una vez.
+    ahora = timezone.localtime()
+    es_hoy = (f == ahora.date()) if f is not None else False
+    ahora_min = (ahora.hour * 60 + ahora.minute) if es_hoy else None
+    # Para masajes hoy, si aún no hay masajistas en sitio, sumar el viaje (~1h).
+    masaje_en_sitio = _hay_masaje_agendado_hoy(f) if es_hoy else False
+
     servicios = []
     for s in qs:
         libres = None
@@ -78,9 +109,20 @@ def disponibilidad(fecha=None, personas=1, tipo=None):
             # Modo disponibilidad: horarios libres ese día.
             if ServicioBloqueo.servicio_bloqueado_en_fecha(s.id, f):
                 continue
+            # Piso: hoy no se ofrecen horas pasadas; masaje sin masajistas en sitio
+            # exige el tiempo de viaje (clientes vienen de otra ciudad).
+            piso_min = None
+            if es_hoy:
+                piso_min = ahora_min
+                if s.tipo_servicio == 'masaje' and not masaje_en_sitio:
+                    piso_min = ahora_min + TRAVEL_MASAJISTA_MIN
             slots = extraer_slots_para_fecha(s.slots_disponibles, f) or []
             libres = []
             for hora in slots:
+                if piso_min is not None:
+                    hm = _hhmm_min(hora)
+                    if hm is not None and hm < piso_min:
+                        continue  # hora pasada (o sin margen de viaje) → no ofrecer
                 if ServicioSlotBloqueo.slot_bloqueado(s.id, f, hora):
                     continue
                 try:
