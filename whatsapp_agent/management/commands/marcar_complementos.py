@@ -28,12 +28,16 @@ class Command(BaseCommand):
         from whatsapp_agent.models import WhatsAppAgentConfig
 
         candidatos = (
-            Servicio.objects.filter(publicado_web=True)
-            .filter(
-                Q(precio_base=0)
+            Servicio.objects.filter(
+                # Cortesía gratis publicada (ej. Tina Agua Fría Yates $0).
+                Q(publicado_web=True, precio_base=0)
+                # Por NOMBRE (capta complementos aunque NO estén publicados, ej. ambientaciones
+                # internas): niño, yates, ambientación, decoración.
                 | Q(nombre__icontains='niño') | Q(nombre__icontains='nino')
                 | Q(nombre__icontains='yates')
-                | Q(categoria__nombre__iexact='Ambientaciones')
+                | Q(nombre__icontains='ambientaci') | Q(nombre__icontains='decoraci')
+                # Por CATEGORÍA (cualquier "Ambientaciones…").
+                | Q(categoria__nombre__icontains='ambientaci')
             )
             .order_by('categoria__nombre', 'nombre')
         )
