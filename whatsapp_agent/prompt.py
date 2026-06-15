@@ -53,8 +53,11 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
             '- La herramienta ya filtra capacidad y excluye complementos: ofrece SOLO lo que devuelve.\n'
             '- PACK TINA + MASAJE: si el cliente quiere tina Y masaje el mismo día, usa '
             '`consultar_disponibilidad_pack` (fecha + personas) y ofrece el itinerario que devuelve tal '
-            'cual (tina a una hora, masaje a otra, ya sin solaparse). Si dice que no se pudo encajar el '
-            'masaje, ofrece la tina y coordinar el masaje con una persona. No inventes horarios.'
+            'cual (tina a una hora, masaje a otra, ya sin solaparse). PRECIO: si `hay_descuento`, muestra '
+            'AMBOS — el precio real (`precio_total`) Y el precio con descuento (`precio_con_descuento`) — '
+            'para que el cliente vea el ahorro (ej. "normal $150.000, con pack $115.000"). Si no hay '
+            'descuento, usa `precio_total`. Usa los montos TAL CUAL, no recalcules. Si no se pudo encajar '
+            'el masaje, ofrece la tina y coordinar el masaje con una persona. No inventes horarios.'
         )
 
     # H-009a: bloque de conocimiento/correcciones — autoridad máxima. Va PRIMERO y

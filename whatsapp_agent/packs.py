@@ -135,7 +135,34 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2):
         }
 
     t, t_slot, t_ini, t_dur, m_slot = elegido
-    masaje_total = (masajes_serv[0]['precio_por_persona'] if masajes_serv else 0) * personas
+    m0 = masajes_serv[0] if masajes_serv else None
+    masaje_pp = (m0['precio_por_persona'] if m0 else 0)
+    masaje_total = masaje_pp * personas
+    precio_total = t['precio_total'] + masaje_total
+
+    # Descuento del pack (PackDescuento): se arma un carrito (1 tina para el grupo + 1 masaje
+    # por persona = N instancias, que es lo que pide el pack tina+masaje) y se consulta el motor.
+    descuento = 0
+    try:
+        from ventas.services.pack_descuento_service import PackDescuentoService
+        cart = [{
+            'id': t['servicio_id'], 'nombre': t['nombre'], 'precio': float(t['precio_por_persona']),
+            'fecha': f.isoformat(), 'hora': t_slot, 'cantidad_personas': personas, 'tipo_servicio': 'tina',
+        }]
+        if m0:
+            for _ in range(max(1, personas)):
+                cart.append({
+                    'id': m0['servicio_id'], 'nombre': m0['nombre'], 'precio': float(masaje_pp),
+                    'fecha': f.isoformat(), 'hora': min_a_hhmm(m_slot), 'cantidad_personas': 1,
+                    'tipo_servicio': 'masaje',
+                })
+        packs_ap = PackDescuentoService.detectar_packs_aplicables(cart)
+        descuento = int(sum(float(p.get('descuento') or 0) for p in packs_ap))
+    except Exception:  # noqa: BLE001 — el descuento es opcional; nunca romper la composición
+        logger.exception('Pack: no se pudo calcular el descuento')
+        descuento = 0
+
+    precio_con_descuento = max(0, precio_total - descuento)
 
     return {
         'fecha': f.isoformat(),
@@ -150,11 +177,16 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2):
         'masaje': {
             'hora': min_a_hhmm(m_slot),
             'cantidad': personas,
+            'descripcion': f'{personas} masaje(s), uno por persona',
             'paralelo_o_secuencial': 'según masajistas disponibles ese día',
             'precio_total': masaje_total,
         },
         'orden': 'masaje antes de la tina' if m_slot < t_ini else 'masaje después de la tina',
-        'clustering': bool(agendados),  # True = se pegó a un masaje ya agendado
-        'precio_total_estimado': t['precio_total'] + masaje_total,
-        'nota_precio': 'sin contar PackDescuento (si aplica, el total baja)',
+        'clustering': bool(agendados),
+        # Precios YA calculados (no recalcular en el modelo):
+        'precio_total': precio_total,                 # precio real (sin descuento)
+        'descuento_pack': descuento,                  # 0 si no aplica
+        'precio_con_descuento': precio_con_descuento,  # lo que paga si aplica el pack
+        'precio_por_persona_con_descuento': precio_con_descuento // max(1, personas),
+        'hay_descuento': descuento > 0,
     }

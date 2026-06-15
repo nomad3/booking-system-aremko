@@ -45,6 +45,11 @@ class Command(BaseCommand):
         self.stdout.write(f"  Orden: {res['orden']}"
                           + ("  (pegado a un masaje ya agendado)" if res['clustering']
                              else "  (sin masajes ese día → pegado a la tina)"))
-        self.stdout.write(self.style.MIGRATE_HEADING(
-            f"  Total estimado: ${res['precio_total_estimado']:,}".replace(',', '.')
-            + f"  ({res['nota_precio']})"))
+        total = f"${res['precio_total']:,}".replace(',', '.')
+        if res.get('hay_descuento'):
+            con = f"${res['precio_con_descuento']:,}".replace(',', '.')
+            desc = f"${res['descuento_pack']:,}".replace(',', '.')
+            self.stdout.write(self.style.MIGRATE_HEADING(
+                f"  Precio normal: {total}  →  con pack: {con}  (ahorro {desc})"))
+        else:
+            self.stdout.write(self.style.MIGRATE_HEADING(f"  Total: {total}  (sin descuento de pack aplicable)"))
