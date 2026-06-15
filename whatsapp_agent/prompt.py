@@ -5,7 +5,7 @@ El catálogo se inyecta en el bloque 2 (grounding). El mensaje del cliente va en
 el user prompt envuelto como DATOS (resistencia a prompt injection).
 """
 
-PROMPT_VERSION = 'f1-2026-06-13'
+PROMPT_VERSION = 'f2-2026-06-15'
 
 # Bloque 6: few-shot. 3 buenas respuestas + 2 derivaciones.
 _FEW_SHOT = """EJEMPLOS DE BUENAS RESPUESTAS:
@@ -71,7 +71,14 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
             'Si el resultado trae `nota_upsell` (texto no vacío), DEBES incluir ese aviso al final de tu '
             'mensaje (es que el descuento aplica dom-jue): di el precio normal y ofrece cotizar un día '
             'entre semana. Si el cliente acepta, vuelve a llamar la herramienta con esa fecha para darle '
-            'el precio con descuento REAL (no lo inventes). Usa los montos TAL CUAL, no recalcules. Si '
+            'el precio con descuento REAL (no lo inventes). Usa los montos TAL CUAL, no recalcules. '
+            'PROHIBIDO mostrar un descuento que NO venga en el resultado de ESTA llamada para ESA '
+            'fecha: si la opción no trae `hay_descuento: true`, el precio es `precio_total` (SIN '
+            'descuento), aunque en mensajes anteriores hayas mostrado un descuento para OTRO día (el '
+            'descuento depende del día, p.ej. fin de semana es precio normal). Si el cliente cambia '
+            'de fecha, vuelve a llamar la herramienta con la nueva fecha y usa SOLO ese resultado — '
+            'nunca arrastres precios del historial ni asumas que el descuento de un día aplica a otro. '
+            'Si '
             'solo viene 1 opción, ofrécela. Si `opciones` viene vacía, ofrece la tina y coordinar el '
             'masaje con una persona. No inventes horarios.'
         )
