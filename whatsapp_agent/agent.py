@@ -55,11 +55,13 @@ _TOOLS = [{
     'function': {
         'name': 'consultar_disponibilidad_pack',
         'description': (
-            'Propone un itinerario de TINA + MASAJE el mismo día (pack). Úsala cuando el '
-            'cliente quiere tina Y masaje juntos. Devuelve la tina y el masaje con sus horarios '
-            'YA compuestos (sin solaparse; el masaje queda cerca de los masajes ya reservados ese '
-            'día). Ofrece el itinerario tal cual; el precio total no incluye descuento de pack '
-            '(si aplica, el total baja — puedes mencionarlo). Requiere fecha y personas.'
+            'Propone itinerarios de TINA + MASAJE el mismo día (pack). Úsala cuando el '
+            'cliente quiere tina Y masaje juntos. Devuelve `opciones` (hasta 2: una "con '
+            'hidromasaje" de mayor valor y otra "sin hidromasaje" más económica), cada una con '
+            'la tina y el masaje YA compuestos (sin solaparse; el masaje queda cerca de los '
+            'masajes ya reservados ese día) y con precio real y precio con descuento de pack '
+            '(`hay_descuento`/`precio_con_descuento`). Ofrece las opciones tal cual. Requiere '
+            'fecha y personas.'
         ),
         'parameters': {
             'type': 'object',

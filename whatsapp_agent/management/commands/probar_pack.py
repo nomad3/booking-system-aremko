@@ -23,33 +23,33 @@ class Command(BaseCommand):
         if res.get('error'):
             raise CommandError(res['error'])
 
+        def clp(n):
+            return f"${n:,}".replace(',', '.')
+
         self.stdout.write(self.style.MIGRATE_HEADING(
             f"— Pack Tina + Masaje · {res.get('fecha')} · {res.get('personas')} persona(s) —"))
 
-        tina = res.get('tina')
-        masaje = res.get('masaje')
-        if not tina:
-            self.stdout.write(self.style.WARNING(f"  {res.get('nota', 'sin tina')}"))
-            return
-        if not masaje:
-            self.stdout.write(self.style.WARNING(f"  Tina: {tina['nombre']} (horarios: {tina.get('horarios')})"))
-            self.stdout.write(self.style.WARNING(f"  {res.get('nota', 'sin masaje')}"))
+        opciones = res.get('opciones') or []
+        if not opciones:
+            self.stdout.write(self.style.WARNING(f"  {res.get('nota', 'sin opciones')}"))
             return
 
-        self.stdout.write(self.style.SUCCESS(
-            f"  🛁 Tina: {tina['nombre']} a las {tina['hora']} ({tina['duracion_texto']}) "
-            f"· ${tina['precio_total']:,}".replace(',', '.')))
-        self.stdout.write(self.style.SUCCESS(
-            f"  💆 Masaje: a las {masaje['hora']} (x{masaje['cantidad']}) "
-            f"· ${masaje['precio_total']:,}".replace(',', '.')))
-        self.stdout.write(f"  Orden: {res['orden']}"
-                          + ("  (pegado a un masaje ya agendado)" if res['clustering']
-                             else "  (sin masajes ese día → pegado a la tina)"))
-        total = f"${res['precio_total']:,}".replace(',', '.')
-        if res.get('hay_descuento'):
-            con = f"${res['precio_con_descuento']:,}".replace(',', '.')
-            desc = f"${res['descuento_pack']:,}".replace(',', '.')
-            self.stdout.write(self.style.MIGRATE_HEADING(
-                f"  Precio normal: {total}  →  con pack: {con}  (ahorro {desc})"))
-        else:
-            self.stdout.write(self.style.MIGRATE_HEADING(f"  Total: {total}  (sin descuento de pack aplicable)"))
+        for op in opciones:
+            tina, masaje = op['tina'], op['masaje']
+            self.stdout.write(self.style.HTTP_INFO(f"\n  ▸ Opción {op['etiqueta'].upper()}"))
+            self.stdout.write(self.style.SUCCESS(
+                f"    🛁 Tina: {tina['nombre']} a las {tina['hora']} ({tina['duracion_texto']}) "
+                f"· {clp(tina['precio_total'])}"))
+            self.stdout.write(self.style.SUCCESS(
+                f"    💆 Masaje: {masaje['nombre']} a las {masaje['hora']} (x{masaje['cantidad']}) "
+                f"· {clp(masaje['precio_total'])}"))
+            self.stdout.write(f"    Orden: {op['orden']}"
+                              + ("  (pegado a un masaje ya agendado)" if op['clustering']
+                                 else "  (sin masajes ese día → pegado a la tina)"))
+            if op.get('hay_descuento'):
+                self.stdout.write(self.style.MIGRATE_HEADING(
+                    f"    Precio normal: {clp(op['precio_total'])}  →  con pack: "
+                    f"{clp(op['precio_con_descuento'])}  (ahorro {clp(op['descuento_pack'])})"))
+            else:
+                self.stdout.write(self.style.MIGRATE_HEADING(
+                    f"    Total: {clp(op['precio_total'])}  (sin descuento de pack aplicable)"))

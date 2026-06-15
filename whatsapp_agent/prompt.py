@@ -52,12 +52,14 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
             'Las cabañas NUNCA se expresan en horas.\n'
             '- La herramienta ya filtra capacidad y excluye complementos: ofrece SOLO lo que devuelve.\n'
             '- PACK TINA + MASAJE: si el cliente quiere tina Y masaje el mismo día, usa '
-            '`consultar_disponibilidad_pack` (fecha + personas) y ofrece el itinerario que devuelve tal '
-            'cual (tina a una hora, masaje a otra, ya sin solaparse). PRECIO: si `hay_descuento`, muestra '
-            'AMBOS — el precio real (`precio_total`) Y el precio con descuento (`precio_con_descuento`) — '
-            'para que el cliente vea el ahorro (ej. "normal $150.000, con pack $115.000"). Si no hay '
-            'descuento, usa `precio_total`. Usa los montos TAL CUAL, no recalcules. Si no se pudo encajar '
-            'el masaje, ofrece la tina y coordinar el masaje con una persona. No inventes horarios.'
+            '`consultar_disponibilidad_pack` (fecha + personas). Devuelve `opciones` (hasta 2): una '
+            '"con hidromasaje" (gama mayor) y otra "sin hidromasaje" (más económica). OFRECE LAS DOS '
+            'para que el cliente elija, indicando la `etiqueta`, la tina (`tina.nombre` a `tina.hora`) y '
+            'el masaje (`masaje.hora`). PRECIO por opción: si `hay_descuento`, muestra AMBOS — el precio '
+            'real (`precio_total`) Y el precio con descuento (`precio_con_descuento`) — para que vea el '
+            'ahorro (ej. "normal $150.000, con pack $115.000"). Si no hay descuento, usa `precio_total`. '
+            'Usa los montos TAL CUAL, no recalcules. Si solo viene 1 opción, ofrécela. Si `opciones` '
+            'viene vacía, ofrece la tina y coordinar el masaje con una persona. No inventes horarios.'
         )
 
     # H-009a: bloque de conocimiento/correcciones — autoridad máxima. Va PRIMERO y
