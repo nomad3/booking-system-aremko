@@ -67,14 +67,13 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
             'para que el cliente elija, indicando la `etiqueta`, la tina (`tina.nombre` a `tina.hora`) y '
             'el masaje (`masaje.hora`). PRECIO por opción: si `hay_descuento`, muestra AMBOS — el precio '
             'real (`precio_total`) Y el precio con descuento (`precio_con_descuento`) — para que vea el '
-            'ahorro (ej. "normal $150.000, con pack $115.000"). Si NINGUNA opción trae descuento '
-            '(p.ej. fin de semana), di el precio normal (`precio_total`) y AGREGA que el descuento de '
-            'pack aplica de DOMINGO A JUEVES, ofreciendo cotizar un día entre semana si le sirve (ej. '
-            '"para el sábado el valor es $140.000; si pudieras venir entre domingo y jueves, el mismo '
-            'pack tiene descuento — ¿te cotizo un día de esos?"). Si dice que sí, vuelve a llamar la '
-            'herramienta con esa fecha entre semana para darle el precio con descuento REAL (no lo '
-            'inventes). Usa los montos TAL CUAL, no recalcules. Si solo viene 1 opción, ofrécela. Si '
-            '`opciones` viene vacía, ofrece la tina y coordinar el masaje con una persona. No inventes horarios.'
+            'ahorro (ej. "normal $150.000, con pack $115.000"). Si no hay descuento, usa `precio_total`. '
+            'Si el resultado trae `nota_upsell` (texto no vacío), DEBES incluir ese aviso al final de tu '
+            'mensaje (es que el descuento aplica dom-jue): di el precio normal y ofrece cotizar un día '
+            'entre semana. Si el cliente acepta, vuelve a llamar la herramienta con esa fecha para darle '
+            'el precio con descuento REAL (no lo inventes). Usa los montos TAL CUAL, no recalcules. Si '
+            'solo viene 1 opción, ofrécela. Si `opciones` viene vacía, ofrece la tina y coordinar el '
+            'masaje con una persona. No inventes horarios.'
         )
 
     # H-009a: bloque de conocimiento/correcciones — autoridad máxima. Va PRIMERO y

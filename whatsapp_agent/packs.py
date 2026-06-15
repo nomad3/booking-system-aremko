@@ -241,4 +241,14 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2):
     if not opciones:
         nota = ('hay tinas pero no se pudo encajar el masaje sin solapar; '
                 'ofrecer la tina y coordinar el masaje con una persona')
-    return {'fecha': f.isoformat(), 'personas': personas, 'opciones': opciones, 'nota': nota}
+
+    # Upsell determinístico: si NINGUNA opción trae descuento (p.ej. fin de semana, el pack
+    # es dom-jue), el código entrega el texto listo para que Luna lo incluya tal cual (más
+    # confiable que pedírselo al modelo con una condición).
+    nota_upsell = ''
+    if opciones and not any(o['hay_descuento'] for o in opciones):
+        nota_upsell = ('Este día queda a precio normal; el descuento de pack aplica de '
+                       'domingo a jueves. Ofrece cotizar un día entre semana para que vea el ahorro.')
+
+    return {'fecha': f.isoformat(), 'personas': personas, 'opciones': opciones,
+            'nota': nota, 'nota_upsell': nota_upsell}
