@@ -50,6 +50,26 @@ _TOOLS = [{
             'required': ['personas'],
         },
     },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'consultar_disponibilidad_pack',
+        'description': (
+            'Propone un itinerario de TINA + MASAJE el mismo día (pack). Úsala cuando el '
+            'cliente quiere tina Y masaje juntos. Devuelve la tina y el masaje con sus horarios '
+            'YA compuestos (sin solaparse; el masaje queda cerca de los masajes ya reservados ese '
+            'día). Ofrece el itinerario tal cual; el precio total no incluye descuento de pack '
+            '(si aplica, el total baja — puedes mencionarlo). Requiere fecha y personas.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'fecha': {'type': 'string', 'description': 'Fecha YYYY-MM-DD'},
+                'personas': {'type': 'integer', 'description': 'Cantidad de personas'},
+            },
+            'required': ['fecha', 'personas'],
+        },
+    },
 }]
 
 
@@ -66,6 +86,16 @@ def _tool_executor(name, args):
         except Exception as exc:  # noqa: BLE001
             logger.exception('Agente WA: tool disponibilidad falló: %s', exc)
             return {'error': 'no se pudo consultar disponibilidad'}
+    if name == 'consultar_disponibilidad_pack':
+        from .packs import disponibilidad_pack_tina_masaje
+        try:
+            return disponibilidad_pack_tina_masaje(
+                (args or {}).get('fecha'),
+                (args or {}).get('personas', 2),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception('Agente WA: tool pack falló: %s', exc)
+            return {'error': 'no se pudo componer el pack'}
     return {'error': f'herramienta desconocida: {name}'}
 
 

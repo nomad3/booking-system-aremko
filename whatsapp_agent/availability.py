@@ -97,12 +97,15 @@ def disponibilidad(fecha=None, personas=1, tipo=None):
         duracion_texto = 'por noche' if s.tipo_servicio == 'cabana' else formatear_duracion(s.duracion)
         servicios.append({
             'nombre': s.nombre,
+            'servicio_id': s.id,
             'precio_por_persona': precio_pp,
             'es_por_persona': True,
             'precio_total': precio_pp * personas,
             'capacidad_minima': s.capacidad_minima,
             'capacidad_maxima': s.capacidad_maxima,
             'duracion_texto': duracion_texto,
+            'duracion_min': s.duracion or 0,
+            'tipo': s.tipo_servicio,
             'slots_libres': libres,
         })
 

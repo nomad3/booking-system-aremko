@@ -50,7 +50,11 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
             'Ej: tina de $25.000 por persona para 4 → "$100.000 ($25.000 por persona)".\n'
             '- DURACIÓN: usa `duracion_texto` tal cual (ej. "4 h" para tinas/masajes, "por noche" para cabañas). '
             'Las cabañas NUNCA se expresan en horas.\n'
-            '- La herramienta ya filtra capacidad y excluye complementos: ofrece SOLO lo que devuelve.'
+            '- La herramienta ya filtra capacidad y excluye complementos: ofrece SOLO lo que devuelve.\n'
+            '- PACK TINA + MASAJE: si el cliente quiere tina Y masaje el mismo día, usa '
+            '`consultar_disponibilidad_pack` (fecha + personas) y ofrece el itinerario que devuelve tal '
+            'cual (tina a una hora, masaje a otra, ya sin solaparse). Si dice que no se pudo encajar el '
+            'masaje, ofrece la tina y coordinar el masaje con una persona. No inventes horarios.'
         )
 
     # H-009a: bloque de conocimiento/correcciones — autoridad máxima. Va PRIMERO y

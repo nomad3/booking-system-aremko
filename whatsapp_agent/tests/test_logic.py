@@ -9,7 +9,7 @@ Correr desde la raíz del repo:
 
 from datetime import datetime, timedelta
 
-from whatsapp_agent import aprendizaje, ausencia, escalation, grounding, prompt
+from whatsapp_agent import aprendizaje, ausencia, escalation, grounding, packs, prompt
 
 
 def test_formatear_precio():
@@ -215,6 +215,31 @@ def test_clasificador_prompts():
     usr = aprendizaje.build_clasificador_user('borrador X', 'enviado Y')
     assert 'borrador X' in usr and 'enviado Y' in usr
     assert aprendizaje.TIPOS_ACCIONABLES == {'hecho_catalogo', 'regla'}
+
+
+def test_pack_horarios():
+    assert packs.hhmm_a_min('14:30') == 870
+    assert packs.hhmm_a_min('00:00') == 0
+    assert packs.hhmm_a_min('basura') is None
+    assert packs.min_a_hhmm(870) == '14:30'
+    assert packs.min_a_hhmm(0) == '00:00'
+    # no_solapan: tina 14:30 (240min) vs masaje a las 13:00 (60min) → no solapan (masaje antes)
+    assert packs.no_solapan(870, 240, 780, 60) is True   # masaje 13:00-14:00, tina 14:30-18:30
+    # masaje a las 15:00 (dentro de la tina) → solapan
+    assert packs.no_solapan(870, 240, 900, 60) is False
+    # masaje a las 19:00 (después de la tina 14:30-18:30) → no solapan
+    assert packs.no_solapan(870, 240, 1140, 60) is True
+
+
+def test_elegir_slot_masaje_clustering():
+    # Con masajes agendados → el candidato más cercano a alguno de ellos.
+    candidatos = [780, 1140, 1230]  # 13:00, 19:00, 20:30
+    agendados = [1200]              # 20:00 ya agendado
+    assert packs.elegir_slot_masaje(candidatos, agendados, tina_ini_min=870) == 1230  # 20:30, el más cercano a 20:00
+    # Sin masajes agendados → el más cercano al inicio de la tina (pegado).
+    assert packs.elegir_slot_masaje(candidatos, [], tina_ini_min=870) == 780  # 13:00, el más cercano a 14:30
+    # Sin candidatos → None.
+    assert packs.elegir_slot_masaje([], [1200], 870) is None
 
 
 def _run():
