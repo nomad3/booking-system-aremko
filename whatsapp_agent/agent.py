@@ -226,7 +226,38 @@ def _borrador_escala(motivo, *, error='', modelo='', tokens=(0, 0, 0)):
     }
 
 
-def _producir_borrador(config, mensaje, historial=''):
+def _contexto_saludo(entrante):
+    """(estado_saludo, nombre) determinístico para un entrante. Tolerante a fallos.
+
+    estado: 'primer_contacto' / 'regreso' / 'en_conversacion' (ver prompt.clasificar_saludo).
+    nombre: nombre de pila usable (cliente conocido o perfil de WhatsApp), o '' si no hay.
+    """
+    try:
+        from ventas.models import WhatsAppMessage
+        previo = (
+            WhatsAppMessage.objects
+            .filter(phone=entrante.phone, timestamp__lt=entrante.timestamp)
+            .exclude(msg_type='reaction')
+            .order_by('-timestamp')
+            .values_list('timestamp', flat=True)
+            .first()
+        )
+        hay_previos = previo is not None
+        dias = (entrante.timestamp - previo).days if hay_previos else None
+        estado = prompt_mod.clasificar_saludo(hay_previos, dias)
+
+        nombre = ''
+        if getattr(entrante, 'cliente_id', None):
+            nombre = prompt_mod.saneo_nombre(getattr(entrante.cliente, 'nombre', ''))
+        if not nombre:
+            nombre = prompt_mod.saneo_nombre(getattr(entrante, 'contact_name', ''))
+        return estado, nombre
+    except Exception:  # noqa: BLE001 — el saludo nunca debe tumbar el borrador
+        logger.exception('Agente WA: no se pudo calcular el contexto de saludo')
+        return '', ''
+
+
+def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_nombre=''):
     """Genera el borrador para un texto de cliente. SIN DB y SIN gate de `activo`.
 
     Devuelve un dict {escalar, motivo, texto, modelo, error, *tokens}. Lo usan
@@ -246,7 +277,7 @@ def _producir_borrador(config, mensaje, historial=''):
 
     system_prompt = prompt_mod.build_system_prompt(
         config.persona_tono, catalogo, config.link_reserva, config.conocimiento,
-        fecha_hoy=_fecha_hoy_texto())
+        fecha_hoy=_fecha_hoy_texto(), saludo_estado=saludo_estado, saludo_nombre=saludo_nombre)
     user_prompt = prompt_mod.build_user_prompt(historial, mensaje)
     modelo = _modelo_efectivo(config)
 
@@ -327,7 +358,9 @@ def generar_sugerencia(phone, *, forzar=False):
         return None
 
     historial = _historial_texto(phone, entrante.timestamp, config.history_window)
-    d = _producir_borrador(config, entrante.body, historial)
+    saludo_estado, saludo_nombre = _contexto_saludo(entrante)
+    d = _producir_borrador(config, entrante.body, historial,
+                           saludo_estado=saludo_estado, saludo_nombre=saludo_nombre)
     return _guardar(
         entrante, texto=d['texto'], escalar=d['escalar'], motivo=d['motivo'],
         modo=config.modo, modelo=d['modelo'], error=d['error'],

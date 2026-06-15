@@ -23,6 +23,10 @@ class Command(BaseCommand):
                             help='Usa el último entrante real sin responder de este teléfono.')
         parser.add_argument('--historial', type=str, default='',
                             help='Contexto previo opcional (solo con --mensaje).')
+        parser.add_argument('--saludo', type=str, default='',
+                            help='Simula el estado de saludo: primer_contacto | regreso | en_conversacion.')
+        parser.add_argument('--nombre', type=str, default='',
+                            help='Simula el nombre del cliente para el saludo (con --mensaje).')
         parser.add_argument('--catalogo', action='store_true',
                             help='Imprime el catálogo EXACTO que recibe el agente y termina (diagnóstico).')
         parser.add_argument('--filtro', type=str, default='',
@@ -31,7 +35,7 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         from whatsapp_agent.agent import (
             _producir_borrador, _historial_texto, _entrante_a_responder,
-            _modelo_efectivo, get_config,
+            _contexto_saludo, _modelo_efectivo, get_config,
         )
 
         # Diagnóstico: ver el catálogo vivo tal cual lo recibe el agente.
@@ -54,12 +58,18 @@ class Command(BaseCommand):
             raise CommandError('Indica --mensaje "texto" o --phone <numero>.')
 
         config = get_config()
+        saludo_estado = (opts.get('saludo') or '').strip()
+        saludo_nombre = (opts.get('nombre') or '').strip()
         if phone and not mensaje:
             entrante = _entrante_a_responder(phone)
             if entrante is None:
                 raise CommandError(f'No hay entrante de texto sin responder para {phone}.')
             mensaje = entrante.body or ''
             historial = _historial_texto(phone, entrante.timestamp, config.history_window)
+            # Contexto real del saludo, salvo que se fuerce por flag.
+            real_estado, real_nombre = _contexto_saludo(entrante)
+            saludo_estado = saludo_estado or real_estado
+            saludo_nombre = saludo_nombre or real_nombre
 
         self.stdout.write(self.style.MIGRATE_HEADING('— Config del agente —'))
         self.stdout.write(f'  activo={config.activo} · modo={config.modo} · '
@@ -69,8 +79,12 @@ class Command(BaseCommand):
         if historial.strip():
             self.stdout.write(self.style.MIGRATE_HEADING('— Historial —'))
             self.stdout.write('  ' + historial.replace('\n', '\n  '))
+        if saludo_estado or saludo_nombre:
+            self.stdout.write(self.style.MIGRATE_HEADING('— Saludo —'))
+            self.stdout.write(f'  estado={saludo_estado or "—"} · nombre={saludo_nombre or "—"}')
 
-        d = _producir_borrador(config, mensaje, historial)
+        d = _producir_borrador(config, mensaje, historial,
+                               saludo_estado=saludo_estado, saludo_nombre=saludo_nombre)
 
         self.stdout.write(self.style.MIGRATE_HEADING('— Resultado —'))
         if d['escalar']:

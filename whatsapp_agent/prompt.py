@@ -5,7 +5,82 @@ El catálogo se inyecta en el bloque 2 (grounding). El mensaje del cliente va en
 el user prompt envuelto como DATOS (resistencia a prompt injection).
 """
 
-PROMPT_VERSION = 'f2-2026-06-15'
+PROMPT_VERSION = 'f3-2026-06-15'
+
+# Días sin escribir tras los cuales un cliente que vuelve se trata como "regreso"
+# (saludo de reencuentro) en vez de conversación en curso.
+REGRESO_DIAS = 30
+
+# Nombres placeholder que NO se deben usar como nombre de pila en el saludo.
+_NOMBRES_INVALIDOS = {
+    'cliente', 'clienta', 'anonimo', 'anónimo', 'desconocido', 'sin', 'nombre',
+    'na', 'test', 'prueba', 'whatsapp', 'usuario',
+}
+
+
+def saneo_nombre(raw):
+    """Extrae un nombre de pila usable de `raw` (cliente.nombre o perfil de WhatsApp).
+
+    Toma el primer token, deja solo letras (descarta emojis, dígitos, símbolos) y lo
+    capitaliza. Devuelve '' si no parece un nombre real (muy corto o placeholder),
+    para caer a un saludo sin nombre.
+    """
+    raw = (raw or '').strip()
+    if not raw:
+        return ''
+    token = raw.split()[0]
+    limpio = ''.join(ch for ch in token if ch.isalpha())
+    if len(limpio) < 2 or limpio.lower() in _NOMBRES_INVALIDOS:
+        return ''
+    return limpio[:1].upper() + limpio[1:].lower()
+
+
+def clasificar_saludo(hay_previos, dias_desde_ultimo):
+    """Estado del saludo a partir de señales del historial (función pura).
+
+    - 'primer_contacto': el cliente nunca había escrito.
+    - 'regreso': ya había escrito, pero hace >= REGRESO_DIAS días.
+    - 'en_conversacion': escribió hace poco → no re-presentarse.
+    """
+    if not hay_previos:
+        return 'primer_contacto'
+    if dias_desde_ultimo is not None and dias_desde_ultimo >= REGRESO_DIAS:
+        return 'regreso'
+    return 'en_conversacion'
+
+
+def bloque_saludo(estado, nombre=''):
+    """Bloque de instrucción de saludo según el estado (texto, o '' si no aplica).
+
+    El CÓDIGO decide el estado y el nombre; el modelo solo redacta. Así Luna se
+    presenta UNA vez en el primer contacto, saluda con calidez a quien vuelve tras
+    mucho tiempo, y NO re-saluda en una conversación en curso.
+    """
+    estado = (estado or '').strip()
+    nombre = (nombre or '').strip()
+    voc = f', {nombre}' if nombre else ''           # vocativo en el ejemplo
+    por_nombre = f' Dirígete a él por su nombre («{nombre}»).' if nombre else ''
+
+    if estado == 'primer_contacto':
+        ej = f'¡Hola{voc}! 🌿 Te saluda Luna, tu asistente en Aremko Spa Boutique.'
+        return ('\n\n# 1b. SALUDO (primer contacto)\n'
+                'Es la PRIMERA vez que este cliente escribe. Empieza presentándote UNA sola '
+                f'vez, cálida y breve, con tu nombre y tu rol.{por_nombre} '
+                f'Ejemplo: «{ej}» Luego responde su consulta y NO vuelvas a presentarte.')
+
+    if estado == 'regreso':
+        ej = f'¡Hola{voc}! 🌿 Te saluda Luna, de Aremko. ¡Qué gusto tenerte de vuelta!'
+        return ('\n\n# 1b. SALUDO (cliente que vuelve)\n'
+                'Este cliente ya había escrito hace tiempo y vuelve ahora. Salúdalo con '
+                'calidez de reencuentro y preséntate de forma BREVE (solo tu nombre, sin el '
+                f'rol completo).{por_nombre} Ejemplo: «{ej}» Luego atiende su consulta.')
+
+    if estado == 'en_conversacion':
+        return ('\n\n# 1b. SALUDO\n'
+                'Conversación en curso: NO te presentes ni saludes de nuevo. Responde directo '
+                'al mensaje del cliente.')
+
+    return ''
 
 # Bloque 6: few-shot. 3 buenas respuestas + 2 derivaciones.
 _FEW_SHOT = """EJEMPLOS DE BUENAS RESPUESTAS:
@@ -29,10 +104,15 @@ Asistente: [ESCALAR: trámite administrativo fuera de alcance]
 """
 
 
-def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento='', fecha_hoy=''):
+def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento='', fecha_hoy='',
+                        saludo_estado='', saludo_nombre=''):
     """Arma el system prompt completo. Función pura (sin DB/LLM)."""
     link = (link_reserva or 'https://www.aremko.cl/').strip()
     few_shot = _FEW_SHOT.replace('{LINK_RESERVA}', link)
+
+    # Bloque de saludo (H-016): el código decide primer_contacto/regreso/en_conversacion
+    # y el nombre; el modelo solo redacta. Va pegado al rol (es sobre la identidad).
+    bloque_de_saludo = bloque_saludo(saludo_estado, saludo_nombre)
 
     # H-011: bloque de disponibilidad (solo si se pasa la fecha de hoy → hay tool).
     fecha_hoy = (fecha_hoy or '').strip()
@@ -95,7 +175,7 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
         )
 
     return f"""{bloque_conocimiento}# 1. ROL E IDENTIDAD
-{persona_tono.strip()}
+{persona_tono.strip()}{bloque_de_saludo}
 
 # 2. CATÁLOGO VIVO (lo ÚNICO sobre lo que puedes hablar)
 Estos son los servicios y productos que Aremko ofrece HOY. Precios en pesos chilenos (CLP).

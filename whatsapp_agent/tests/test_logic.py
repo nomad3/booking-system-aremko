@@ -166,6 +166,60 @@ def test_build_system_prompt_con_conocimiento():
     assert 'AUTORIDAD MÁXIMA' not in sp2
 
 
+def test_saneo_nombre():
+    assert prompt.saneo_nombre('Jorge Aguilera') == 'Jorge'
+    assert prompt.saneo_nombre('JORGE') == 'Jorge'
+    assert prompt.saneo_nombre('Jorgito🔥') == 'Jorgito'   # emoji fuera
+    assert prompt.saneo_nombre('  maría josé ') == 'María'
+    assert prompt.saneo_nombre('🔥🔥') == ''               # solo emojis → sin nombre
+    assert prompt.saneo_nombre('') == ''
+    assert prompt.saneo_nombre(None) == ''
+    assert prompt.saneo_nombre('A') == ''                  # muy corto
+    assert prompt.saneo_nombre('Cliente') == ''            # placeholder
+    assert prompt.saneo_nombre('123') == ''                # sin letras
+
+
+def test_clasificar_saludo():
+    assert prompt.clasificar_saludo(False, None) == 'primer_contacto'
+    assert prompt.clasificar_saludo(True, 0) == 'en_conversacion'
+    assert prompt.clasificar_saludo(True, 5) == 'en_conversacion'
+    assert prompt.clasificar_saludo(True, prompt.REGRESO_DIAS) == 'regreso'   # borde inclusivo
+    assert prompt.clasificar_saludo(True, 90) == 'regreso'
+    assert prompt.clasificar_saludo(True, None) == 'en_conversacion'          # sin gap conocido
+
+
+def test_bloque_saludo():
+    b = prompt.bloque_saludo('primer_contacto', 'Jorge')
+    assert 'primer contacto' in b.lower()
+    assert 'Jorge' in b and 'tu asistente en Aremko Spa Boutique' in b
+    # Sin nombre: presentación genérica, sin la cláusula de dirigirse por su nombre.
+    b0 = prompt.bloque_saludo('primer_contacto', '')
+    assert 'Te saluda Luna' in b0 and 'por su nombre' not in b0
+    # Regreso: reencuentro, presentación breve.
+    br = prompt.bloque_saludo('regreso', 'María')
+    assert 'vuelve' in br.lower() and 'de vuelta' in br and 'María' in br
+    # En conversación: NO re-saludar.
+    bc = prompt.bloque_saludo('en_conversacion', 'Jorge')
+    assert 'NO te presentes' in bc
+    # Estado desconocido → vacío.
+    assert prompt.bloque_saludo('', 'Jorge') == ''
+    assert prompt.bloque_saludo('otra_cosa', '') == ''
+
+
+def test_build_system_prompt_con_saludo():
+    sp = prompt.build_system_prompt(
+        'Asistente Aremko.', 'SERVICIOS PUBLICADOS:\n• Tina — $140.000',
+        'https://www.aremko.cl/', saludo_estado='primer_contacto', saludo_nombre='Jorge',
+    )
+    assert '# 1b. SALUDO' in sp
+    assert 'Jorge' in sp
+    # El saludo va pegado al rol, antes del catálogo.
+    assert sp.index('# 1b. SALUDO') < sp.index('# 2. CATÁLOGO')
+    # Sin estado → no aparece el bloque de saludo.
+    sp2 = prompt.build_system_prompt('R', 'C', 'L')
+    assert '# 1b. SALUDO' not in sp2
+
+
 def test_build_user_prompt():
     up = prompt.build_user_prompt('[Cliente]: hola\n[Aremko]: hola!', 'cuánto vale la tina?')
     assert 'CONVERSACIÓN RECIENTE' in up
