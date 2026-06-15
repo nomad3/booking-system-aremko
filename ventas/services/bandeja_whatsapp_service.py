@@ -410,9 +410,16 @@ def obtener_ultimo_servicio_nombre(cliente_id: int) -> str:
     """
     from ventas.models import ReservaServicio
 
+    # H-014: el último servicio del mensaje debe ser el PRINCIPAL, nunca un
+    # complemento (tina de niño, tina fría, decoración). Excluye la lista de
+    # complementos del agente (M2M de whatsapp_agent; sin tocar Servicio).
+    from whatsapp_agent.models import WhatsAppAgentConfig
+    comp = WhatsAppAgentConfig.get_solo().ids_complementarios()
+
     rs = (
         ReservaServicio.objects
         .filter(venta_reserva__cliente_id=cliente_id)
+        .exclude(servicio_id__in=comp)
         .select_related('servicio')
         .order_by('-fecha_agendamiento', '-id')
         .first()

@@ -336,9 +336,15 @@ class Command(BaseCommand):
         if cliente_ids_filtro is not None:
             rs_filter['venta_reserva__cliente_id__in'] = cliente_ids_filtro
 
+        # H-014: los servicios COMPLEMENTARIOS (tinas de niño, tina fría, decoraciones)
+        # NO son una preferencia independiente del cliente → excluirlos del mix para que
+        # pct_tinas/masajes/cabañas (y el estilo + servicio_recomendado) reflejen lo principal.
+        from whatsapp_agent.models import WhatsAppAgentConfig
+        comp = WhatsAppAgentConfig.get_solo().ids_complementarios()
+
         rs_qs = ReservaServicio.objects.filter(**rs_filter).exclude(
             venta_reserva__estado_pago='cancelado',
-        ).values(
+        ).exclude(servicio_id__in=comp).values(
             'venta_reserva_id',
             'venta_reserva__cliente_id',
             'venta_reserva__fecha_creacion',
