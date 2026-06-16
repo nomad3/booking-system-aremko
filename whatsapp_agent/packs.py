@@ -61,6 +61,31 @@ def _slots_compatibles(slots_masaje_min, tina_ini_min, tina_dur, masaje_dur):
             if no_solapan(tina_ini_min, tina_dur, s, masaje_dur)]
 
 
+# Combo cabaña + tina (Nivel 2): la tina del día del alojamiento NUNCA antes de las
+# 16:00, y la regla fundamental (Jorge) es ofrecer el horario MÁS TARDE disponible.
+TINA_PISO_CABANA_MIN = 16 * 60  # 16:00
+
+
+def elegir_tina_mas_tarde(tinas_serv, piso_min=TINA_PISO_CABANA_MIN):
+    """(tina_dict, 'HH:MM') de la tina disponible en el horario MÁS TARDE >= piso_min.
+
+    Regla fundamental del combo cabaña+tina: prioridad al horario más tarde, con o sin
+    hidromasaje. Empate de hora -> la más económica (precio_total), luego nombre, para
+    ser determinístico. Devuelve (None, None) si ninguna tina tiene slot >= piso_min.
+    """
+    candidatos = []  # (slot_min, precio_total, nombre, tina, 'HH:MM')
+    for t in (tinas_serv or []):
+        for s in (t.get('slots_libres') or []):
+            m = hhmm_a_min(s)
+            if m is not None and m >= piso_min:
+                candidatos.append((m, t.get('precio_total') or 0, t.get('nombre') or '', t, s))
+    if not candidatos:
+        return None, None
+    candidatos.sort(key=lambda c: (-c[0], c[1], c[2]))  # hora desc, precio asc, nombre asc
+    mejor = candidatos[0]
+    return mejor[3], mejor[4]
+
+
 # ---------------------------------------------------------------------------
 # Composición (DB)
 # ---------------------------------------------------------------------------
@@ -252,3 +277,124 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2):
 
     return {'fecha': f.isoformat(), 'personas': personas, 'opciones': opciones,
             'nota': nota, 'nota_upsell': nota_upsell}
+
+
+# ---------------------------------------------------------------------------
+# Nivel 2: Cabaña + Tina (1 noche, 2 personas)
+# ---------------------------------------------------------------------------
+
+def _desayuno_de_cabana(cabana_nombre):
+    """Servicio de desayuno NOMINAL de la cabaña: 'Cabaña Torre' -> 'Desayuno Torre'.
+
+    Los desayunos se venden con el nombre de la cabaña (Jorge). Los nominales están
+    despublicados (no salen en el catálogo suelto), así que se buscan por nombre, no por
+    `publicado_web`. Precio plano $20.000 para dos. Devuelve dict o None.
+    """
+    from ventas.models import Servicio
+    token = (cabana_nombre or '').split()[-1].strip() if cabana_nombre else ''
+    if not token:
+        return None
+    try:
+        d = (Servicio.objects.filter(activo=True, tipo_servicio='otro', nombre__icontains='desayuno')
+             .filter(nombre__icontains=token).first()
+             or Servicio.objects.filter(activo=True, nombre__iexact='Desayuno').first())
+    except Exception:  # noqa: BLE001 — el desayuno es opcional; nunca romper la composición
+        logger.exception('Pack cabaña: no se pudo resolver el desayuno de %s', cabana_nombre)
+        return None
+    if not d:
+        return None
+    return {'servicio_id': d.id, 'nombre': d.nombre, 'precio_total': int(d.precio_base), 'hora': '10:00'}
+
+
+def _descuento_pack_cabana(cabana, tina, f, cabana_hora, tina_hora, personas):
+    """Descuento (int CLP) del PackDescuento para 1 cabaña + 1 tina (ambas para `personas`).
+
+    El pack de alojamiento se valida por tipo (no por servicios específicos) y exige
+    >= 2 personas en cabaña y >= 2 en tina, misma fecha. Devuelve 0 si no aplica.
+    """
+    try:
+        from ventas.services.pack_descuento_service import PackDescuentoService
+        cart = [
+            {'id': cabana['servicio_id'], 'nombre': cabana['nombre'],
+             'precio': float(cabana['precio_por_persona']), 'fecha': f.isoformat(),
+             'hora': cabana_hora, 'cantidad_personas': personas, 'tipo_servicio': 'cabana'},
+            {'id': tina['servicio_id'], 'nombre': tina['nombre'],
+             'precio': float(tina['precio_por_persona']), 'fecha': f.isoformat(),
+             'hora': tina_hora, 'cantidad_personas': personas, 'tipo_servicio': 'tina'},
+        ]
+        packs_ap = PackDescuentoService.detectar_packs_aplicables(cart)
+        return int(sum(float(p.get('descuento') or 0) for p in packs_ap))
+    except Exception:  # noqa: BLE001 — el descuento es opcional; nunca romper la composición
+        logger.exception('Pack cabaña: no se pudo calcular el descuento')
+        return 0
+
+
+def disponibilidad_pack_cabana_tina(fecha, personas=2):
+    """Propone itinerarios Cabaña + Tina (1 noche, 2 personas) para `fecha`.
+
+    Lista las cabañas libres esa noche (todas para 2) y les acopla UNA tina en el horario
+    MÁS TARDE disponible >= 16:00 (regla fundamental). Cada opción trae precio real y precio
+    con descuento de pack (dom-jue). El desayuno ($20.000 para dos, día siguiente ~10:00) se
+    incluye por opción pero Luna solo lo ofrece si el cliente pregunta. 1 noche por ahora.
+    """
+    from .availability import disponibilidad, _parse_fecha
+
+    f = _parse_fecha(fecha) if fecha else None
+    if f is None:
+        return {'error': 'fecha inválida (usa YYYY-MM-DD)'}
+    personas = 2  # las cabañas son siempre para 2 (Jorge)
+
+    cabanas = disponibilidad(f, personas, 'cabana').get('servicios', [])
+    if not cabanas:
+        return {'fecha': f.isoformat(), 'personas': personas, 'opciones': [],
+                'nota': 'no hay cabañas libres esa noche para 2 personas'}
+
+    # Tina del día del alojamiento: la más tarde disponible >= 16:00 (con o sin hidromasaje).
+    tinas = disponibilidad(f, personas, 'tina').get('servicios', [])
+    tina, tina_hora = elegir_tina_mas_tarde(tinas)
+
+    opciones = []
+    for c in cabanas:
+        cabana_hora = (c.get('slots_libres') or ['16:00'])[0]   # check-in
+        cab_total = c['precio_total']
+        desayuno = _desayuno_de_cabana(c['nombre'])
+        op = {
+            'cabana': {'nombre': c['nombre'], 'hora_check_in': '16:00',
+                       'hora_check_out': '11:00 del día siguiente', 'precio_total': cab_total},
+            'desayuno': desayuno,            # solo ofrecer si el cliente pregunta
+        }
+        if tina is not None:
+            tina_total = tina['precio_total']
+            precio_total = cab_total + tina_total
+            descuento = _descuento_pack_cabana(c, tina, f, cabana_hora, tina_hora, personas)
+            op.update({
+                'tina': {'nombre': tina['nombre'], 'hora': tina_hora, 'precio_total': tina_total},
+                'precio_total': precio_total,
+                'descuento_pack': descuento,
+                'precio_con_descuento': max(0, precio_total - descuento),
+                'hay_descuento': descuento > 0,
+            })
+        else:
+            op.update({
+                'tina': None,
+                'precio_total': cab_total,
+                'descuento_pack': 0,
+                'precio_con_descuento': cab_total,
+                'hay_descuento': False,
+            })
+        opciones.append(op)
+
+    nota = ''
+    if tina is None:
+        nota = ('no hay tina disponible desde las 16:00 esa noche; ofrecer solo la cabaña '
+                'y coordinar la tina con una persona')
+
+    # Upsell determinístico: si hay combo (tina) pero ninguna opción trae descuento
+    # (fin de semana / martes cerrado), el código entrega el aviso listo para Luna.
+    nota_upsell = ''
+    if opciones and tina is not None and not any(o['hay_descuento'] for o in opciones):
+        nota_upsell = ('Este día queda a precio normal; el descuento del pack cabaña+tina aplica '
+                       'de domingo a jueves. Ofrece cotizar un día entre semana para que vea el ahorro.')
+
+    return {'fecha': f.isoformat(), 'personas': personas, 'tina_mas_tarde': tina_hora,
+            'opciones': opciones, 'nota': nota, 'nota_upsell': nota_upsell}

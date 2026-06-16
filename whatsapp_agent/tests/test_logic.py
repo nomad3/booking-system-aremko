@@ -306,6 +306,32 @@ def test_clustering_excluye_slot_ocupado():
     assert packs.elegir_slot_masaje(candidatos, agendados, tina_ini_min=840) == 1005  # 16:45
 
 
+def test_elegir_tina_mas_tarde():
+    # Réplica del caso real (2026-06-17): gana Hornopiren 19:30 sobre las de 19:00.
+    tinas = [
+        {'nombre': 'Tina Hidromasaje Llaima', 'precio_total': 70000, 'slots_libres': ['14:00', '16:30', '19:00']},
+        {'nombre': 'Tina Hidromasaje Puyehue', 'precio_total': 70000, 'slots_libres': ['14:00', '16:30', '19:00']},
+        {'nombre': 'Tina Hornopiren', 'precio_total': 50000, 'slots_libres': ['14:30', '17:00', '19:30']},
+    ]
+    tina, hora = packs.elegir_tina_mas_tarde(tinas)
+    assert hora == '19:30' and tina['nombre'] == 'Tina Hornopiren'
+    # Nunca antes de las 16:00: si solo hay slots tempranos → None.
+    tempranas = [{'nombre': 'X', 'precio_total': 10, 'slots_libres': ['10:00', '14:00', '15:59']}]
+    assert packs.elegir_tina_mas_tarde(tempranas) == (None, None)
+    # Justo 16:00 es válido (piso inclusivo).
+    borde = [{'nombre': 'Y', 'precio_total': 10, 'slots_libres': ['16:00']}]
+    assert packs.elegir_tina_mas_tarde(borde) == (borde[0], '16:00')
+    # Empate de hora → la más económica.
+    empate = [
+        {'nombre': 'Cara', 'precio_total': 90000, 'slots_libres': ['18:00']},
+        {'nombre': 'Barata', 'precio_total': 60000, 'slots_libres': ['18:00']},
+    ]
+    tina, hora = packs.elegir_tina_mas_tarde(empate)
+    assert hora == '18:00' and tina['nombre'] == 'Barata'
+    # Sin tinas → None.
+    assert packs.elegir_tina_mas_tarde([]) == (None, None)
+
+
 def _run():
     fns = [v for k, v in sorted(globals().items()) if k.startswith('test_') and callable(v)]
     fallos = 0

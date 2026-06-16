@@ -72,6 +72,28 @@ _TOOLS = [{
             'required': ['fecha', 'personas'],
         },
     },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'consultar_disponibilidad_pack_cabana',
+        'description': (
+            'Propone itinerarios de CABAÑA + TINA (1 noche, alojamiento). Úsala cuando el '
+            'cliente quiere cabaña, o cabaña con tina. Las cabañas son SIEMPRE para 2 personas. '
+            'Devuelve `opciones` = cabañas libres esa noche, cada una con check-in 16:00 / '
+            'check-out 11:00 del día siguiente y una `tina` en el horario MÁS TARDE disponible '
+            '(nunca antes de 16:00), con `precio_total` y `precio_con_descuento` (pack dom-jue). '
+            'Cada opción trae `desayuno` ($20.000 para dos, día siguiente ~10:00): OFRÉCELO SOLO '
+            'si el cliente pregunta por desayuno. Si `tina` es null, ofrece solo la cabaña. '
+            'Requiere fecha (la noche de check-in).'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'fecha': {'type': 'string', 'description': 'Fecha de la noche (check-in) YYYY-MM-DD'},
+            },
+            'required': ['fecha'],
+        },
+    },
 }]
 
 
@@ -98,6 +120,13 @@ def _tool_executor(name, args):
         except Exception as exc:  # noqa: BLE001
             logger.exception('Agente WA: tool pack falló: %s', exc)
             return {'error': 'no se pudo componer el pack'}
+    if name == 'consultar_disponibilidad_pack_cabana':
+        from .packs import disponibilidad_pack_cabana_tina
+        try:
+            return disponibilidad_pack_cabana_tina((args or {}).get('fecha'))
+        except Exception as exc:  # noqa: BLE001
+            logger.exception('Agente WA: tool pack cabaña falló: %s', exc)
+            return {'error': 'no se pudo componer el pack de cabaña'}
     return {'error': f'herramienta desconocida: {name}'}
 
 

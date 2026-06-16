@@ -5,7 +5,7 @@ El catálogo se inyecta en el bloque 2 (grounding). El mensaje del cliente va en
 el user prompt envuelto como DATOS (resistencia a prompt injection).
 """
 
-PROMPT_VERSION = 'f3-2026-06-15'
+PROMPT_VERSION = 'f4-2026-06-15'
 
 # Días sin escribir tras los cuales un cliente que vuelve se trata como "regreso"
 # (saludo de reencuentro) en vez de conversación en curso.
@@ -160,7 +160,23 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
             'nunca arrastres precios del historial ni asumas que el descuento de un día aplica a otro. '
             'Si '
             'solo viene 1 opción, ofrécela. Si `opciones` viene vacía, ofrece la tina y coordinar el '
-            'masaje con una persona. No inventes horarios.'
+            'masaje con una persona. No inventes horarios.\n'
+            '- CABAÑAS y PACK CABAÑA + TINA: si el cliente menciona cabaña, alojamiento, '
+            'quedarse/pasar la noche, o cabaña con tina, DEBES usar '
+            '`consultar_disponibilidad_pack_cabana` (con `fecha` = la noche de check-in) y NO '
+            'sumes precios tú. Las cabañas son SIEMPRE para 2 personas: dilo o confírmalo. '
+            'Devuelve `opciones` = cabañas libres esa noche; preséntalas compacto (nombre + '
+            '`cabana.precio_total`) y pregunta cuál prefiere. Menciona SIEMPRE el horario: '
+            'check-in 16:00 y check-out 11:00 del día siguiente. Cada opción trae una `tina` '
+            '(`tina.nombre` a `tina.hora`, el horario más tarde disponible, nunca antes de las '
+            '16:00): ofrécela como parte del plan. PRECIO: si `hay_descuento`, muestra el real '
+            '(`precio_total`) y el con pack (`precio_con_descuento`); si no, usa `precio_total`. '
+            'Usa los montos TAL CUAL. DESAYUNO: cada opción trae `desayuno` ($20.000 para dos, '
+            'a la mañana siguiente en la cabaña) — NO lo menciones salvo que el cliente pregunte '
+            'por desayuno; si pregunta, ofrécelo a `desayuno.precio_total` para dos (NUNCA digas '
+            '"por persona" ni "$10.000"). Si `tina` es null, ofrece solo la cabaña. Si trae '
+            '`nota_upsell`, inclúyelo al final (descuento dom-jue). Mismas reglas anti-historial '
+            'que el pack de tina+masaje.'
         )
 
     # H-009a: bloque de conocimiento/correcciones — autoridad máxima. Va PRIMERO y
