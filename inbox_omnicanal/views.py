@@ -49,8 +49,10 @@ def _media_label(msg_type, original_filename=''):
         return '🎤 Nota de voz'
     if t == 'sticker':
         return '🟢 Sticker'
-    if t in ('share', 'story_mention'):
-        return '📎 Adjunto de Instagram'
+    if t == 'story_mention':
+        return '📸 Te mencionó en una historia'
+    if t == 'share':
+        return '🔗 Compartió una publicación'
     if t == 'document':
         nombre = (original_filename or '').strip()
         return f'📄 {nombre}' if nombre else '📄 Documento'
