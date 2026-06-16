@@ -403,29 +403,36 @@ def buscar_script_refugio(cliente, eje_valor: str):
 
 
 def obtener_ultimo_servicio_nombre(cliente_id: int) -> str:
-    """Nombre del último servicio reservado por el cliente.
+    """Nombre del último servicio PRINCIPAL (tina/masaje/cabaña) reservado por el cliente.
 
-    Devuelve string vacío si no encuentra reservas (cliente Pre-sistema sin
-    VentaReserva); el SafeDict lo render como ''.
+    Para "tu primera visita a X" el servicio debe ser un PRINCIPAL real: NUNCA un
+    complemento (desayuno, decoración, tina de niño/fría), NUNCA un placeholder
+    ("Servicio Anulado") ni un servicio dado de baja. Devuelve '' si el cliente no tiene
+    ninguno (el SafeDict lo render vacío; el call-site cae a un genérico).
     """
     from ventas.models import ReservaServicio
 
-    # H-014: el último servicio del mensaje debe ser el PRINCIPAL, nunca un
-    # complemento (tina de niño, tina fría, decoración). Excluye la lista de
-    # complementos del agente (M2M de whatsapp_agent; sin tocar Servicio).
+    # Filtro en capas:
+    # 1) tipo principal (tina/masaje/cabana) → descarta 'otro' (desayunos, decoraciones,
+    #    productos, placeholders tipo "Servicio Anulado").
+    # 2) activo=True → descarta servicios dados de baja / anulados.
+    # 3) exclude(complementos del M2M del agente) → atrapa complementos que SON tipo 'tina'
+    #    (tina de niño/fría), que el filtro por tipo no descartaría.
     from whatsapp_agent.models import WhatsAppAgentConfig
     comp = WhatsAppAgentConfig.get_solo().ids_complementarios()
 
     rs = (
         ReservaServicio.objects
         .filter(venta_reserva__cliente_id=cliente_id)
+        .filter(servicio__tipo_servicio__in=('tina', 'masaje', 'cabana'))
+        .filter(servicio__activo=True)
         .exclude(servicio_id__in=comp)
         .select_related('servicio')
         .order_by('-fecha_agendamiento', '-id')
         .first()
     )
-    if rs and rs.servicio:
-        return rs.servicio.nombre or ''
+    if rs and rs.servicio and rs.servicio.nombre:
+        return rs.servicio.nombre
     return ''
 
 
@@ -637,7 +644,9 @@ def build_render_context(cliente, cliente_tax, hoy: date) -> SafeDict:
             str(cliente_tax.dias_desde_ultima_visita)
             if cliente_tax.dias_desde_ultima_visita is not None else ''
         ),
-        ultimo_servicio=obtener_ultimo_servicio_nombre(cliente.id),
+        # Fallback genérico si no hay servicio principal real → nunca dejar el mensaje
+        # cortado ("primera visita a  ").
+        ultimo_servicio=(obtener_ultimo_servicio_nombre(cliente.id) or 'nuestro spa'),
         compania_habitual=compania_habitual(cliente_tax.eje_contexto),
         servicio_recomendado=servicio_rec,
         sugerencia_dia=sugerencia_dia_val,
