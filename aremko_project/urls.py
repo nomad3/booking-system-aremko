@@ -11,6 +11,7 @@ from ventas.views import flow_views
 from ventas.views import masaje_views
 from ventas.views import masaje_outbox_api_views
 from ventas.views import whatsapp_api_views
+from inbox_omnicanal import views as inbox_views
 # Removed direct import of ventas.urls
 
 from django.contrib.sitemaps.views import sitemap
@@ -88,6 +89,14 @@ urlpatterns = [
     path('api/whatsapp/pending-template-sends', whatsapp_api_views.pending_template_sends, name='whatsapp_pending_template_sends'),
     path('api/whatsapp/mark-template-sent', whatsapp_api_views.mark_template_sent, name='whatsapp_mark_template_sent'),
     path('api/whatsapp/mark-template-failed', whatsapp_api_views.mark_template_failed, name='whatsapp_mark_template_failed'),
+
+    # Bandeja omnicanal (H-016): Instagram DM + reads channel-aware (WhatsApp + Instagram).
+    # Auth X-API-Key (LUNA_API_KEY). Conviven con /api/whatsapp/* legacy.
+    path('api/instagram/inbound', inbox_views.instagram_inbound, name='instagram_inbound'),
+    path('api/inbox/conversations/', inbox_views.conversations, name='inbox_conversations'),
+    path('api/inbox/conversation/', inbox_views.conversation, name='inbox_conversation'),
+    path('api/inbox/conversations/<str:canal>/<str:external_id>/marcar-atendido/',
+         inbox_views.marcar_atendido, name='inbox_marcar_atendido'),
 
     # Landing campaña "Refugio Aremko" (lanzamiento 15-jun-2026)
     # Alias raíz de la baja: TODOS los emails históricos llevan este link
