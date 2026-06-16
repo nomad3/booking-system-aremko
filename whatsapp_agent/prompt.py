@@ -110,7 +110,7 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
     link = (link_reserva or 'https://www.aremko.cl/').strip()
     few_shot = _FEW_SHOT.replace('{LINK_RESERVA}', link)
 
-    # Bloque de saludo (H-016): el código decide primer_contacto/regreso/en_conversacion
+    # Bloque de saludo adaptativo: el código decide primer_contacto/regreso/en_conversacion
     # y el nombre; el modelo solo redacta. Va pegado al rol (es sobre la identidad).
     bloque_de_saludo = bloque_saludo(saludo_estado, saludo_nombre)
 
