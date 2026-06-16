@@ -14,6 +14,9 @@ adjuntos = Fase 5. Aquí solo persistencia + reads channel-aware.
 
 import json
 import logging
+import mimetypes
+import os
+import uuid
 from datetime import datetime, timezone as dt_tz
 
 from django.conf import settings
@@ -29,6 +32,49 @@ logger = logging.getLogger(__name__)
 
 _MIN_TS = datetime.min.replace(tzinfo=dt_tz.utc)
 IG_ACCOUNT_ID = '17841400756478364'  # IG Business Account de Aremko (recipient en inbound)
+
+# Adjuntos (Fase 5), mismo esquema que WhatsApp.
+_MEDIA_TYPES = {'image', 'video', 'audio', 'voice', 'share', 'story_mention', 'sticker', 'document'}
+_MEDIA_MAX_BYTES_DEFAULT = 16 * 1024 * 1024  # 16 MB
+
+
+def _media_label(msg_type, original_filename=''):
+    """Etiqueta de preview para un adjunto sin texto (lista de conversaciones)."""
+    t = (msg_type or '').lower()
+    if t == 'image':
+        return '📷 Foto'
+    if t == 'video':
+        return '🎥 Video'
+    if t in ('audio', 'voice'):
+        return '🎤 Nota de voz'
+    if t == 'sticker':
+        return '🟢 Sticker'
+    if t in ('share', 'story_mention'):
+        return '📎 Adjunto de Instagram'
+    if t == 'document':
+        nombre = (original_filename or '').strip()
+        return f'📄 {nombre}' if nombre else '📄 Documento'
+    return ''
+
+
+def _guess_extension(original_filename, mime_type):
+    """Extensión del archivo: primero del nombre original, luego del mime_type."""
+    _, ext = os.path.splitext(original_filename or '')
+    if ext:
+        return ext[:12]
+    guessed = mimetypes.guess_extension((mime_type or '').split(';')[0].strip())
+    return guessed or ''
+
+
+def _media_url(request, m):
+    """URL absoluta del adjunto (el frontend vive en otro dominio). Cloudinary ya
+    devuelve absoluta; build_absolute_uri la deja igual."""
+    if not getattr(m, 'media_file', None):
+        return None
+    try:
+        return request.build_absolute_uri(m.media_file.url)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -147,6 +193,90 @@ def instagram_inbound(request):
     })
 
 
+@csrf_exempt
+def instagram_inbound_media(request):
+    """POST /api/instagram/inbound-media (multipart) — DM de Instagram con adjunto (Fase 5).
+
+    aremko-cli descarga los bytes del media temporal de IG (con el token) y los sube acá.
+    Guardamos el archivo (nombre UUID) en el mismo storage RAW de Cloudinary que WhatsApp.
+    Idempotente por ig_message_id; is_echo→saliente (limpia pendientes); conversación = IGSID
+    del cliente.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'método no permitido'}, status=405)
+    err = _check_luna_key(request)
+    if err:
+        return err
+
+    ig_message_id = (request.POST.get('ig_message_id') or '').strip()
+    from_igsid = (request.POST.get('from_igsid') or '').strip()
+    to_igsid = (request.POST.get('to_igsid') or '').strip()
+    if not ig_message_id or not from_igsid:
+        return JsonResponse({'error': 'ig_message_id y from_igsid son requeridos'}, status=400)
+
+    upload = request.FILES.get('file')
+    if not upload:
+        return JsonResponse({'error': "Falta el archivo 'file' (multipart/form-data)"}, status=400)
+
+    # Tope de tamaño: rechaza antes de subir a Cloudinary (mismo tope que WhatsApp).
+    max_bytes = int(getattr(settings, 'WHATSAPP_MEDIA_MAX_BYTES', _MEDIA_MAX_BYTES_DEFAULT))
+    size = getattr(upload, 'size', 0) or 0
+    if size > max_bytes:
+        return JsonResponse({
+            'error': 'Archivo demasiado grande', 'max_bytes': max_bytes,
+            'max_mb': round(max_bytes / (1024 * 1024), 1), 'size_bytes': size,
+        }, status=413)
+
+    is_echo = _truthy(request.POST.get('is_echo'))
+    direction = 'out' if is_echo else 'in'
+    external_id = external_id_conversacion(from_igsid, to_igsid, is_echo)
+    if not external_id:
+        return JsonResponse({'error': 'no se pudo determinar el IGSID del cliente'}, status=400)
+
+    msg_type = (request.POST.get('type') or 'document').lower()[:30]
+    if msg_type not in _MEDIA_TYPES:
+        msg_type = 'document'
+    caption = request.POST.get('caption') or ''
+    mime_type = (request.POST.get('mime_type') or getattr(upload, 'content_type', '') or '')[:120]
+    original_filename = (request.POST.get('filename') or getattr(upload, 'name', '') or '')[:255]
+    contact_name = (request.POST.get('contact_name') or '')[:200]
+    ts = _parse_ts(request.POST.get('timestamp'))
+
+    # Idempotencia por ig_message_id.
+    existing = ChannelMessage.objects.filter(external_message_id=ig_message_id).first()
+    if existing:
+        return JsonResponse({
+            'ok': True, 'duplicate': True, 'message_id': existing.id,
+            'canal': 'instagram', 'external_id': existing.external_id,
+            'media_url': _media_url(request, existing),
+        })
+
+    # Nombre con UUID + extensión (evita colisiones y el nombre del cliente).
+    ext = _guess_extension(original_filename, mime_type)
+    stored_name = f"{uuid.uuid4().hex}{ext}"
+
+    msg = ChannelMessage(
+        canal='instagram', external_id=external_id[:120], external_message_id=ig_message_id,
+        direction=direction, body=caption, msg_type=msg_type, timestamp=ts,
+        contact_name=contact_name, requiere_atencion=(direction == 'in'),
+        mime_type=mime_type, original_filename=original_filename,
+    )
+    msg.media_file.save(stored_name, upload, save=False)  # save=False: persistir una sola vez
+    msg.save()
+
+    pendientes_limpiados = 0
+    if direction == 'out':
+        pendientes_limpiados = _limpiar_pendientes_channel('instagram', msg.external_id)
+
+    return JsonResponse({
+        'ok': True, 'message_id': msg.id, 'canal': 'instagram',
+        'external_id': msg.external_id, 'direction': msg.direction,
+        'requiere_atencion': msg.requiere_atencion,
+        'pendientes_limpiados': pendientes_limpiados,
+        'media_url': _media_url(request, msg),
+    })
+
+
 # ---------------------------------------------------------------------------
 # Reads unificados (WhatsApp legacy + Instagram)
 # ---------------------------------------------------------------------------
@@ -224,7 +354,7 @@ def _detalle_instagram(external_ids):
     for ext, m in ultimos.items():
         cid = cliente_por_ext.get(ext)
         out[ext] = {
-            'preview': m.body or (m.msg_type if m.msg_type != 'text' else ''),
+            'preview': m.body or (_media_label(m.msg_type, m.original_filename) if m.media_file else ''),
             'direction': m.direction,
             'contact_name': nombre_por_ext.get(ext),
             'cliente_id': cid,
@@ -328,6 +458,9 @@ def conversation(request):
                 'type': m.msg_type,
                 'status': m.status or None,
                 'timestamp': m.timestamp.isoformat(),
+                'media_url': _media_url(request, m),
+                'mime_type': m.mime_type or None,
+                'filename': m.original_filename or None,
             } for m in msgs],
             # H-019: borrador de IA para IG, lazy (opt-in ?sugerencia=1), mismo shape que WA.
             'sugerencia_agente': (

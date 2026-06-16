@@ -14,6 +14,7 @@ crear dependencia de migración con `ventas`. Un DM de IG puede no matchear clie
 """
 
 from django.db import models
+from cloudinary_storage.storage import RawMediaCloudinaryStorage  # storage raw para adjuntos IG (pdf/audio/imagen/video)
 
 
 class ChannelMessage(models.Model):
@@ -37,6 +38,16 @@ class ChannelMessage(models.Model):
     # de migración con ventas). IG empieza sin cliente; se enriquece después.
     cliente_id = models.PositiveIntegerField(null=True, blank=True, db_index=True)
     requiere_atencion = models.BooleanField(default=False, db_index=True, help_text='Entrante sin atender por el operador.')
+    # Adjuntos (Fase 5). aremko-cli descarga los bytes del media temporal de IG (con el
+    # token) y los sube vía /api/instagram/inbound-media. Storage RAW (resource_type=raw)
+    # para servir cualquier tipo (imagen, audio, video) tal cual, igual que WhatsApp.
+    media_file = models.FileField(
+        upload_to='instagram/', storage=RawMediaCloudinaryStorage(),
+        null=True, blank=True, max_length=255,
+        help_text='Adjunto del DM (foto/audio/video). Nombre con UUID.',
+    )
+    mime_type = models.CharField(max_length=120, blank=True, help_text='Ej. image/jpeg, audio/ogg.')
+    original_filename = models.CharField(max_length=255, blank=True, help_text='Nombre original del archivo (si viene).')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
