@@ -57,7 +57,14 @@ class Command(BaseCommand):
 
                 agg = v._agg_instagram()
                 fila = next((a for a in agg if a['external_id'] == igsid), None)
-                self.stdout.write(self.style.SUCCESS(f'  Agregado: {fila}'))
+                self.stdout.write(self.style.SUCCESS(f'  Agregado: {fila}  (req=1 → entrante pendiente)'))
+
+                # Simula el efecto del eco (responder): debe sacar la conversación de pendientes.
+                limpiados = v._limpiar_pendientes_channel('instagram', igsid)
+                fila2 = next((a for a in v._agg_instagram() if a['external_id'] == igsid), None)
+                self.stdout.write(self.style.SUCCESS(
+                    f'  Tras responder (eco): pendientes_limpiados={limpiados} → req ahora '
+                    f'{fila2["req"] if fila2 else "?"}  (debe ser 0)'))
 
                 det = v._detalle_instagram([igsid]).get(igsid, {})
                 self.stdout.write(self.style.SUCCESS(f'  Detalle conversación: {det}'))

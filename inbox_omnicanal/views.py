@@ -58,6 +58,15 @@ def _parse_ts(value):
     return timezone.now()
 
 
+def _limpiar_pendientes_channel(canal, external_id):
+    """Saca de 'pendientes' una conversación de ChannelMessage: limpia `requiere_atencion`
+    de sus entrantes. Devuelve cuántos se limpiaron. Lo usan marcar-atendido y el eco de
+    salida (responder = la conversación deja de estar pendiente, paridad con WhatsApp)."""
+    return ChannelMessage.objects.filter(
+        canal=canal, external_id=external_id, direction='in', requiere_atencion=True,
+    ).update(requiere_atencion=False)
+
+
 def _nombres_clientes(cliente_ids):
     """{id: nombre} para un conjunto de ventas.Cliente.id (resuelto perezosamente)."""
     ids = {i for i in cliente_ids if i}
@@ -120,6 +129,12 @@ def instagram_inbound(request):
             requiere_atencion=(direction == 'in'),
         ),
     )
+    # Un saliente (eco = la cuenta respondió por IG) saca la conversación de pendientes,
+    # igual que el outbound de WhatsApp. Solo en el primer registro (idempotente).
+    pendientes_limpiados = 0
+    if created and obj.direction == 'out':
+        pendientes_limpiados = _limpiar_pendientes_channel('instagram', obj.external_id)
+
     return JsonResponse({
         'ok': True,
         'message_id': obj.id,
@@ -127,6 +142,7 @@ def instagram_inbound(request):
         'external_id': obj.external_id,
         'direction': obj.direction,
         'requiere_atencion': obj.requiere_atencion,
+        'pendientes_limpiados': pendientes_limpiados,
         'duplicate': (not created),
     })
 
@@ -359,10 +375,7 @@ def marcar_atendido(request, canal, external_id):
     canal = (canal or '').strip().lower()
     external_id = (external_id or '').strip()
     if canal == 'instagram':
-        actualizado = ChannelMessage.objects.filter(
-            canal='instagram', external_id=external_id,
-            direction='in', requiere_atencion=True,
-        ).update(requiere_atencion=False)
+        actualizado = _limpiar_pendientes_channel('instagram', external_id)
     elif canal == 'whatsapp':
         from ventas.models import WhatsAppMessage
         actualizado = WhatsAppMessage.objects.filter(
