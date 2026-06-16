@@ -5,7 +5,7 @@ El catálogo se inyecta en el bloque 2 (grounding). El mensaje del cliente va en
 el user prompt envuelto como DATOS (resistencia a prompt injection).
 """
 
-PROMPT_VERSION = 'f4-2026-06-15'
+PROMPT_VERSION = 'f5-2026-06-15'
 
 # Días sin escribir tras los cuales un cliente que vuelve se trata como "regreso"
 # (saludo de reencuentro) en vez de conversación en curso.
@@ -164,7 +164,8 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
             '- CABAÑAS y PACK CABAÑA + TINA: si el cliente menciona cabaña, alojamiento, '
             'quedarse/pasar la noche, o cabaña con tina, DEBES usar '
             '`consultar_disponibilidad_pack_cabana` (con `fecha` = la noche de check-in) y NO '
-            'sumes precios tú. Las cabañas son SIEMPRE para 2 personas: dilo o confírmalo. '
+            'sumes precios tú. Las cabañas son SIEMPRE para 2 personas: DEBES explicitarlo en tu '
+            'respuesta (ej. "para 2 personas"), aunque el cliente no lo haya mencionado. '
             'Devuelve `opciones` = cabañas libres esa noche; preséntalas compacto (nombre + '
             '`cabana.precio_total`) y pregunta cuál prefiere. Menciona SIEMPRE el horario: '
             'check-in 16:00 y check-out 11:00 del día siguiente. Cada opción trae una `tina` '
