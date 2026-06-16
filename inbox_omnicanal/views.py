@@ -329,7 +329,11 @@ def conversation(request):
                 'status': m.status or None,
                 'timestamp': m.timestamp.isoformat(),
             } for m in msgs],
-            'sugerencia_agente': None,  # IG sin agente todavía (fase aparte)
+            # H-019: borrador de IA para IG, lazy (opt-in ?sugerencia=1), mismo shape que WA.
+            'sugerencia_agente': (
+                _sugerencia_instagram(external_id)
+                if _truthy(request.GET.get('sugerencia', '0')) else None
+            ),
         })
 
     if canal == 'whatsapp':
@@ -354,6 +358,61 @@ def conversation(request):
         })
 
     return JsonResponse({'error': f'canal no soportado: {canal!r}'}, status=400)
+
+
+def _historial_instagram(external_id, antes_de_ts, window):
+    """Historial reciente de una conversación IG como texto, igual formato que WhatsApp."""
+    msgs = list(
+        ChannelMessage.objects
+        .filter(canal='instagram', external_id=external_id, timestamp__lt=antes_de_ts)
+        .order_by('-timestamp')[:window]
+    )
+    msgs.reverse()
+    lineas = []
+    for m in msgs:
+        cuerpo = (m.body or '').strip() or f'({m.msg_type})'
+        quien = 'Cliente' if m.direction == 'in' else 'Aremko'
+        lineas.append(f'[{quien}]: {cuerpo}')
+    return '\n'.join(lineas)
+
+
+def _sugerencia_instagram(external_id):
+    """Borrador del agente IA para una conversación de Instagram (H-019).
+
+    Reusa `whatsapp_agent._producir_borrador` (grounding/config/escalamiento; agnóstico
+    de teléfono). Devuelve el MISMO shape que WhatsApp, o None si: el agente está apagado,
+    no hay entrante IG pendiente, o algo falla. Lazy y sin caché (v1). El caller decide
+    cuándo pedirlo (`&sugerencia=1`).
+    """
+    try:
+        from whatsapp_agent.agent import _producir_borrador, get_config
+        config = get_config()
+        if not config.activo:
+            return None
+        entrante = (
+            ChannelMessage.objects
+            .filter(canal='instagram', external_id=external_id,
+                    direction='in', requiere_atencion=True)
+            .order_by('-timestamp')
+            .first()
+        )
+        if entrante is None:
+            return None
+        historial = _historial_instagram(external_id, entrante.timestamp, config.history_window)
+        d = _producir_borrador(config, entrante.body, historial)
+        return {
+            'texto': d['texto'],
+            'escalar': d['escalar'],
+            'motivo': d['motivo'],
+            'modo': config.modo,
+            'modelo': d['modelo'],
+            'error': d['error'],
+            'generada_at': timezone.now().isoformat(),
+            'responde_a': entrante.external_message_id,
+        }
+    except Exception:  # noqa: BLE001 — el agente es opcional; nunca tumbar el hilo
+        logger.exception('Inbox: fallo generando sugerencia IG para %s', external_id)
+        return None
 
 
 def _sugerencia_whatsapp(phone, request):

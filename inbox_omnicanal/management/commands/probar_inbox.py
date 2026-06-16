@@ -25,10 +25,28 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--simular', action='store_true',
                             help='Inserta un DM entrante + un eco de prueba y los muestra (rollback al final).')
+        parser.add_argument('--sugerencia', type=str, default='',
+                            help='IGSID de una conversación IG: genera y muestra el borrador del agente (H-019).')
 
     def handle(self, *args, **opts):
         from inbox_omnicanal.models import ChannelMessage
         from inbox_omnicanal import views as v
+
+        sug_igsid = (opts.get('sugerencia') or '').strip()
+        if sug_igsid:
+            self.stdout.write(self.style.MIGRATE_HEADING(f'— Borrador del agente IA para IGSID {sug_igsid} —'))
+            sug = v._sugerencia_instagram(sug_igsid)
+            if sug is None:
+                self.stdout.write(self.style.WARNING(
+                    '  None (agente apagado, sin entrante pendiente, o error). '
+                    'Revisa que la conversación tenga un entrante con requiere_atencion=True.'))
+            elif sug['escalar']:
+                self.stdout.write(self.style.WARNING(f"  ⚠️  ESCALAR — motivo: {sug['motivo']}"))
+            else:
+                self.stdout.write(self.style.SUCCESS('  ✨ Borrador sugerido:'))
+                self.stdout.write(f"  {sug['texto']}")
+                self.stdout.write(f"  modelo={sug['modelo']} · responde_a={sug['responde_a']}")
+            return
 
         self.stdout.write(self.style.MIGRATE_HEADING('— Estado actual (Instagram) —'))
         self.stdout.write(f'  mensajes IG en BD: {ChannelMessage.objects.filter(canal="instagram").count()}')
