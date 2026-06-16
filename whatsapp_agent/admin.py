@@ -33,6 +33,12 @@ class WhatsAppAgentConfigAdmin(SingletonModelAdmin):
                            'tina fría, decoraciones): se agregan a una reserva pero el agente NO '
                            'los ofrece solos ni los lista en disponibilidad.',
         }),
+        ('Costos / Métricas', {
+            'fields': ('tarifa_plantilla_clp',),
+            'description': 'Costo por mensaje de plantilla de marketing (WhatsApp), en CLP. Lo usa el '
+                           'tablero de Métricas para estimar el costo de las campañas (las respuestas '
+                           'del agente dentro de las 24h son gratis). 0 = sin configurar → costo nulo.',
+        }),
         ('Modelo (avanzado)', {
             'fields': ('model_name', 'temperature', 'max_tokens', 'history_window',
                        'pausa_horas_tras_humano'),

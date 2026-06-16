@@ -108,6 +108,16 @@ class WhatsAppAgentConfig(SingletonModel):
                   'principal ni los lista en disponibilidad.',
     )
 
+    # H-021: tarifa por mensaje de plantilla de marketing (WhatsApp), en CLP. Las `vac_*`
+    # son categoría marketing → Meta cobra por mensaje; las respuestas del agente dentro de
+    # la ventana de 24h son gratis. 0 = sin configurar → las métricas devuelven costo null.
+    tarifa_plantilla_clp = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Tarifa por plantilla de marketing (CLP)',
+        help_text='Costo por mensaje de plantilla de marketing (WhatsApp), en CLP. '
+                  '0 = sin configurar (el tablero de métricas muestra costo nulo).',
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

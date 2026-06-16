@@ -11,6 +11,7 @@ from ventas.views import flow_views
 from ventas.views import masaje_views
 from ventas.views import masaje_outbox_api_views
 from ventas.views import whatsapp_api_views
+from ventas.views import metrics_api_views
 from inbox_omnicanal import views as inbox_views
 # Removed direct import of ventas.urls
 
@@ -89,6 +90,12 @@ urlpatterns = [
     path('api/whatsapp/pending-template-sends', whatsapp_api_views.pending_template_sends, name='whatsapp_pending_template_sends'),
     path('api/whatsapp/mark-template-sent', whatsapp_api_views.mark_template_sent, name='whatsapp_mark_template_sent'),
     path('api/whatsapp/mark-template-failed', whatsapp_api_views.mark_template_failed, name='whatsapp_mark_template_failed'),
+
+    # Métricas / Tablero de Evolución (H-021): agregación read-only, series semanales. X-API-Key.
+    path('api/metrics/campanas', metrics_api_views.metrics_campanas, name='metrics_campanas'),
+    path('api/metrics/agente', metrics_api_views.metrics_agente, name='metrics_agente'),
+    path('api/metrics/canales', metrics_api_views.metrics_canales, name='metrics_canales'),
+    path('api/metrics/masajes', metrics_api_views.metrics_masajes, name='metrics_masajes'),
 
     # Bandeja omnicanal (H-016): Instagram DM + reads channel-aware (WhatsApp + Instagram).
     # Auth X-API-Key (LUNA_API_KEY). Conviven con /api/whatsapp/* legacy.
