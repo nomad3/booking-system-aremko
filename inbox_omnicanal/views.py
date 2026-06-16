@@ -209,10 +209,15 @@ def _detalle_instagram(external_ids):
         return out
     ultimos = {}
     cliente_por_ext = {}
+    nombre_por_ext = {}  # H-018: el nombre de la conversación = último contact_name NO vacío
     for m in (ChannelMessage.objects.filter(canal='instagram', external_id__in=external_ids)
               .order_by('external_id', '-timestamp')):
         if m.external_id not in ultimos:
             ultimos[m.external_id] = m
+        # Ordenado por -timestamp → el primer contact_name no vacío es el más reciente.
+        # Así un eco saliente sin nombre (la cuenta respondió) no esconde el del cliente.
+        if m.external_id not in nombre_por_ext and m.contact_name:
+            nombre_por_ext[m.external_id] = m.contact_name
         if m.external_id not in cliente_por_ext and m.cliente_id:
             cliente_por_ext[m.external_id] = m.cliente_id
     nombres = _nombres_clientes(cliente_por_ext.values())
@@ -221,7 +226,7 @@ def _detalle_instagram(external_ids):
         out[ext] = {
             'preview': m.body or (m.msg_type if m.msg_type != 'text' else ''),
             'direction': m.direction,
-            'contact_name': m.contact_name or None,
+            'contact_name': nombre_por_ext.get(ext),
             'cliente_id': cid,
             'cliente_nombre': nombres.get(cid),
         }

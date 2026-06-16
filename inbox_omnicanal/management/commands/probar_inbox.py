@@ -8,6 +8,8 @@ el modelo y las consultas contra el esquema real sin dejar basura en la BD.
   python manage.py probar_inbox --simular
 """
 
+from datetime import timedelta
+
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
@@ -39,17 +41,20 @@ class Command(BaseCommand):
         try:
             with transaction.atomic():
                 ahora = timezone.now()
+                # Entrante CON nombre del cliente.
                 ChannelMessage.objects.create(
                     canal='instagram', external_id=igsid,
                     external_message_id='TEST_MID_in_1', direction='in',
                     body='hola, ¿tienen tinas el sábado?', timestamp=ahora,
                     contact_name='@cliente_prueba', requiere_atencion=True,
                 )
+                # Eco (la cuenta respondió) MÁS RECIENTE y SIN nombre (caso real H-018):
+                # no debe esconder el nombre del cliente en la lista.
                 ChannelMessage.objects.create(
                     canal='instagram', external_id=igsid,
                     external_message_id='TEST_MID_echo_1', direction='out',
-                    body='¡Hola! Sí, te paso disponibilidad 🌿', timestamp=ahora,
-                    contact_name='@cliente_prueba', requiere_atencion=False,
+                    body='¡Hola! Sí, te paso disponibilidad 🌿', timestamp=ahora + timedelta(seconds=5),
+                    contact_name='', requiere_atencion=False,
                 )
 
                 self.stdout.write(self.style.MIGRATE_HEADING('\n— Simulación (rollback al final) —'))
@@ -68,6 +73,9 @@ class Command(BaseCommand):
 
                 det = v._detalle_instagram([igsid]).get(igsid, {})
                 self.stdout.write(self.style.SUCCESS(f'  Detalle conversación: {det}'))
+                self.stdout.write(self.style.SUCCESS(
+                    f'  H-018: nombre mostrado = {det.get("contact_name")!r}  '
+                    f'(debe ser "@cliente_prueba" pese a que el último mensaje es un eco sin nombre)'))
 
                 hilo = list(ChannelMessage.objects.filter(canal='instagram', external_id=igsid)
                             .order_by('timestamp'))
