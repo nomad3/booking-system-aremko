@@ -511,6 +511,35 @@ def _historial_instagram(external_id, antes_de_ts, window):
     return '\n'.join(lineas)
 
 
+def _contexto_saludo_instagram(external_id, entrante_timestamp):
+    """(estado_saludo, nombre) para una conversación de Instagram. Agnóstico de WhatsApp.
+
+    Busca el mensaje anterior más reciente (excluye reacciones). Devuelve ('', '') si falla.
+    """
+    try:
+        from whatsapp_agent.prompt import clasificar_saludo, saneo_nombre
+        previo = (
+            ChannelMessage.objects
+            .filter(canal='instagram', external_id=external_id, timestamp__lt=entrante_timestamp)
+            .exclude(msg_type='reaction')
+            .order_by('-timestamp')
+            .values_list('timestamp', flat=True)
+            .first()
+        )
+        hay_previos = previo is not None
+        dias = (entrante_timestamp - previo).days if hay_previos else None
+        estado = clasificar_saludo(hay_previos, dias)
+
+        nombre = saneo_nombre(ChannelMessage.objects
+                              .filter(canal='instagram', external_id=external_id)
+                              .values_list('contact_name', flat=True)
+                              .first() or '')
+        return estado, nombre
+    except Exception:  # noqa: BLE001 — el saludo nunca debe tumbar el borrador
+        logger.exception('Inbox IG: no se pudo calcular el contexto de saludo')
+        return '', ''
+
+
 def _sugerencia_instagram(external_id):
     """Borrador del agente IA para una conversación de Instagram (H-019).
 
@@ -534,7 +563,9 @@ def _sugerencia_instagram(external_id):
         if entrante is None:
             return None
         historial = _historial_instagram(external_id, entrante.timestamp, config.history_window)
-        d = _producir_borrador(config, entrante.body, historial)
+        saludo_estado, saludo_nombre = _contexto_saludo_instagram(external_id, entrante.timestamp)
+        d = _producir_borrador(config, entrante.body, historial,
+                               saludo_estado=saludo_estado, saludo_nombre=saludo_nombre)
         return {
             'texto': d['texto'],
             'escalar': d['escalar'],
