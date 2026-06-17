@@ -430,11 +430,54 @@ def _detalle_instagram(external_ids):
     return out
 
 
+def _agg_messenger():
+    """Una fila por PSID desde ChannelMessage (canal messenger)."""
+    from django.db.models import Max, Count, Q
+    filas = ChannelMessage.objects.filter(canal='messenger').values('external_id').annotate(
+        ultimo_ts=Max('timestamp'),
+        total=Count('id'),
+        req=Count('id', filter=Q(direction='in', requiere_atencion=True)),
+    )
+    return [{'canal': 'messenger', 'external_id': f['external_id'], 'ultimo_ts': f['ultimo_ts'],
+             'total': f['total'], 'req': f['req']} for f in filas]
+
+
+def _detalle_messenger(external_ids):
+    """{psid: {preview, direction, contact_name, cliente_id, cliente_nombre}} para la página."""
+    out = {}
+    if not external_ids:
+        return out
+    ultimos = {}
+    cliente_por_ext = {}
+    nombre_por_ext = {}  # H-023: el nombre de la conversación = último contact_name NO vacío
+    for m in (ChannelMessage.objects.filter(canal='messenger', external_id__in=external_ids)
+              .order_by('external_id', '-timestamp')):
+        if m.external_id not in ultimos:
+            ultimos[m.external_id] = m
+        # Ordenado por -timestamp → el primer contact_name no vacío es el más reciente.
+        # Así un eco saliente sin nombre (la página respondió) no esconde el del cliente.
+        if m.external_id not in nombre_por_ext and m.contact_name:
+            nombre_por_ext[m.external_id] = m.contact_name
+        if m.external_id not in cliente_por_ext and m.cliente_id:
+            cliente_por_ext[m.external_id] = m.cliente_id
+    nombres = _nombres_clientes(cliente_por_ext.values())
+    for ext, m in ultimos.items():
+        cid = cliente_por_ext.get(ext)
+        out[ext] = {
+            'preview': m.body or (_media_label(m.msg_type, m.original_filename) if m.media_file else ''),
+            'direction': m.direction,
+            'contact_name': nombre_por_ext.get(ext),
+            'cliente_id': cid,
+            'cliente_nombre': nombres.get(cid),
+        }
+    return out
+
+
 def conversations(request):
-    """GET /api/inbox/conversations/ — lista unificada WhatsApp + Instagram.
+    """GET /api/inbox/conversations/ — lista unificada WhatsApp + Instagram + Messenger.
 
     Una fila por conversación (canal, external_id). Orden: pendientes primero
-    (H-006) cruzando ambos canales, luego por recencia, ANTES del corte [:limit].
+    (H-006) cruzando todos los canales, luego por recencia, ANTES del corte [:limit].
     """
     err = _check_luna_key(request)
     if err:
@@ -452,6 +495,8 @@ def conversations(request):
         agg += _agg_whatsapp()
     if canal_filtro in ('', 'instagram'):
         agg += _agg_instagram()
+    if canal_filtro in ('', 'messenger'):
+        agg += _agg_messenger()
 
     agg.sort(key=lambda a: (a['req'] > 0, a['ultimo_ts'] or _MIN_TS), reverse=True)
     if solo_pendientes:
@@ -460,12 +505,19 @@ def conversations(request):
 
     wa_ids = [a['external_id'] for a in page if a['canal'] == 'whatsapp']
     ig_ids = [a['external_id'] for a in page if a['canal'] == 'instagram']
+    messenger_ids = [a['external_id'] for a in page if a['canal'] == 'messenger']
     det_wa = _detalle_whatsapp(wa_ids)
     det_ig = _detalle_instagram(ig_ids)
+    det_messenger = _detalle_messenger(messenger_ids)
 
     out = []
     for a in page:
-        det = (det_wa if a['canal'] == 'whatsapp' else det_ig).get(a['external_id'], {})
+        if a['canal'] == 'whatsapp':
+            det = det_wa.get(a['external_id'], {})
+        elif a['canal'] == 'instagram':
+            det = det_ig.get(a['external_id'], {})
+        else:  # messenger
+            det = det_messenger.get(a['external_id'], {})
         out.append({
             'canal': a['canal'],
             'external_id': a['external_id'],
@@ -534,6 +586,32 @@ def conversation(request):
                 _sugerencia_instagram(external_id)
                 if _truthy(request.GET.get('sugerencia', '0')) else None
             ),
+        })
+
+    if canal == 'messenger':
+        msgs = list(ChannelMessage.objects.filter(canal='messenger', external_id=external_id)
+                    .order_by('-timestamp')[:limit])
+        msgs.reverse()
+        cliente_id = next((m.cliente_id for m in msgs if m.cliente_id), None)
+        contact_name = next((m.contact_name for m in reversed(msgs) if m.contact_name), '')
+        return JsonResponse({
+            'canal': 'messenger',
+            'external_id': external_id,
+            'cliente_id': cliente_id,
+            'contact_name': contact_name or None,
+            'count': len(msgs),
+            'messages': [{
+                'external_message_id': m.external_message_id,
+                'canal': 'messenger',
+                'direction': m.direction,
+                'body': m.body,
+                'type': m.msg_type,
+                'status': m.status or None,
+                'timestamp': m.timestamp.isoformat(),
+                'media_url': _media_url(request, m),
+                'mime_type': m.mime_type or None,
+                'filename': m.original_filename or None,
+            } for m in msgs],
         })
 
     if canal == 'whatsapp':
