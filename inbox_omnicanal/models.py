@@ -1,16 +1,17 @@
-"""Persistencia de mensajes omnicanal (H-016).
+"""Persistencia de mensajes omnicanal (H-016+H-023).
 
 App AISLADA drift-safe (patrón `whatsapp_agent`): tabla nueva propia, sin FK que
 arrastre `ventas` (AR-034 deja `ventas` congelado). WhatsApp sigue viviendo en
-`ventas.WhatsAppMessage`; aquí entra Instagram (y futuros canales). El read de la
-bandeja UNE ambas fuentes.
+`ventas.WhatsAppMessage`; aquí entra Instagram (H-016), Messenger (H-023) y futuros canales.
+El read de la bandeja UNE todas las fuentes: /api/inbox/conversations lista unificado.
 
 Identidad de la conversación: `(canal, external_id)`.
-- Instagram → external_id = IGSID del cliente (el que NO es la cuenta de Aremko).
-- WhatsApp  → external_id = teléfono (si algún día se migra acá).
+- Instagram   → external_id = IGSID del cliente (el que NO es la cuenta de Aremko).
+- Messenger   → external_id = PSID del cliente (el que NO es la Página 555157687911449).
+- WhatsApp    → external_id = teléfono (si algún día se migra acá).
 
 El vínculo a `ventas.Cliente` es OPCIONAL y se guarda como id plano (sin FK) para no
-crear dependencia de migración con `ventas`. Un DM de IG puede no matchear cliente.
+crear dependencia de migración con `ventas`. Un DM de IG/Messenger puede no matchear cliente.
 """
 
 from django.db import models
@@ -18,7 +19,7 @@ from cloudinary_storage.storage import RawMediaCloudinaryStorage  # storage raw 
 
 
 class ChannelMessage(models.Model):
-    CANAL_CHOICES = [('whatsapp', 'WhatsApp'), ('instagram', 'Instagram')]
+    CANAL_CHOICES = [('whatsapp', 'WhatsApp'), ('instagram', 'Instagram'), ('messenger', 'Facebook Messenger')]
     DIRECTION_CHOICES = [('in', 'Entrante'), ('out', 'Saliente')]
 
     canal = models.CharField(max_length=20, choices=CANAL_CHOICES, db_index=True)

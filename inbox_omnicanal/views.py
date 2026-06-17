@@ -196,6 +196,71 @@ def instagram_inbound(request):
 
 
 @csrf_exempt
+def messenger_inbound(request):
+    """POST /api/messenger/inbound — persiste un mensaje de Facebook Messenger (H-023).
+
+    Conversación = (messenger, external_id) donde external_id es el PSID del CLIENTE
+    (el que no es la Página de Aremko: 555157687911449). `is_echo=true` = mensaje que
+    envió la propia página → saliente, no marca pendiente. Idempotente por `fb_message_id`.
+    Mirror exacto de H-016 Instagram, pero con canal='messenger' y campos renombrados.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'método no permitido'}, status=405)
+    err = _check_luna_key(request)
+    if err:
+        return err
+
+    try:
+        data = json.loads(request.body or '{}')
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    fb_message_id = (data.get('fb_message_id') or '').strip()
+    from_psid = (data.get('from_psid') or '').strip()
+    to_page_id = (data.get('to_page_id') or '').strip()
+    if not fb_message_id or not from_psid:
+        return JsonResponse({'error': 'fb_message_id y from_psid son requeridos'}, status=400)
+
+    is_echo = _truthy(data.get('is_echo'))
+    direction = 'out' if is_echo else 'in'
+    # La conversación se identifica por el PSID del cliente (no la Página 555157687911449).
+    # Esperamos que aremko-cli pase from_psid ≠ 555157687911449, pero validamos.
+    if from_psid == '555157687911449':
+        return JsonResponse({'error': 'PSID no puede ser la Página de Aremko'}, status=400)
+    external_id = from_psid  # El PSID del cliente es la identidad de la conversación
+
+    obj, created = ChannelMessage.objects.get_or_create(
+        external_message_id=fb_message_id,
+        defaults=dict(
+            canal='messenger',
+            external_id=external_id[:120],
+            direction=direction,
+            body=(data.get('text') or ''),
+            msg_type=(data.get('msg_type') or 'text'),
+            timestamp=_parse_ts(data.get('timestamp')),
+            contact_name=(data.get('contact_name') or '')[:200],
+            requiere_atencion=(direction == 'in'),
+        ),
+    )
+    # Un saliente (eco = la página respondió) saca la conversación de pendientes,
+    # igual que IG. Solo en el primer registro (idempotente).
+    pendientes_limpiados = 0
+    if created and obj.direction == 'out':
+        pendientes_limpiados = _limpiar_pendientes_channel('messenger', obj.external_id)
+
+    return JsonResponse({
+        'ok': True,
+        'message_id': obj.id,
+        'canal': 'messenger',
+        'external_id': obj.external_id,
+        'direction': obj.direction,
+        'requiere_atencion': obj.requiere_atencion,
+        'pendientes_limpiados': pendientes_limpiados,
+        'duplicate': (not created),
+    })
+
+
+@csrf_exempt
 def instagram_inbound_media(request):
     """POST /api/instagram/inbound-media (multipart) — DM de Instagram con adjunto (Fase 5).
 
