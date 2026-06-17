@@ -463,10 +463,12 @@ def _detalle_messenger(external_ids):
     nombres = _nombres_clientes(cliente_por_ext.values())
     for ext, m in ultimos.items():
         cid = cliente_por_ext.get(ext)
+        # Fallback: si no hay nombre, mostrar "Cliente Messenger #PSID"
+        nombre = nombre_por_ext.get(ext) or f'Cliente Messenger #{ext}'
         out[ext] = {
             'preview': m.body or (_media_label(m.msg_type, m.original_filename) if m.media_file else ''),
             'direction': m.direction,
-            'contact_name': nombre_por_ext.get(ext),
+            'contact_name': nombre,
             'cliente_id': cid,
             'cliente_nombre': nombres.get(cid),
         }
