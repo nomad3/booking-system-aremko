@@ -152,12 +152,16 @@ class VentaReservaViewSet(viewsets.ModelViewSet):
                 servicio_id = servicio_data.get('servicio')
                 fecha_agendamiento_str = servicio_data.get('fecha_agendamiento')
                 hora_inicio_str = servicio_data.get('hora_inicio') # Assuming time is passed
-                cantidad_personas = servicio_data.get('cantidad_personas', 1)
+                servicio = get_object_or_404(Servicio, id=servicio_id)
+                cantidad_personas = servicio_data.get('cantidad_personas')
+                if cantidad_personas is None:
+                    # Aplicar la lógica de cantidad por defecto según el tipo de servicio
+                    from .calendario_seleccion_view import obtener_personas_por_defecto
+                    cantidad_personas = obtener_personas_por_defecto(servicio.nombre)
 
                 if not servicio_id or not fecha_agendamiento_str or not hora_inicio_str:
                     raise ValidationError("Datos de servicio incompletos (se requiere 'servicio', 'fecha_agendamiento', 'hora_inicio').")
 
-                servicio = get_object_or_404(Servicio, id=servicio_id)
                 try:
                     fecha_agendamiento = datetime.strptime(fecha_agendamiento_str, '%Y-%m-%d').date()
                     # Assuming hora_inicio_str is HH:MM

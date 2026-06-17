@@ -187,6 +187,11 @@ def obtener_personas_por_defecto(nombre_servicio):
     if 'masaje' in nombre_lower:
         return 1
 
+    # Servicios de belleza/cuidado personal: 1 persona (manicura, pedicura, etc.)
+    servicios_1_persona = ['manicure', 'manicura', 'pedicure', 'pedicura']
+    if any(nombre in nombre_lower for nombre in servicios_1_persona):
+        return 1
+
     # Tinas específicas con 4 personas (sin hidromasaje en el nombre)
     if 'osorno' in nombre_lower or 'calbuco' in nombre_lower:
         return 4
