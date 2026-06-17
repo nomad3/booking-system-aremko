@@ -1,4 +1,4 @@
-"""Métricas / Tablero de Evolución (H-021) — endpoints de agregación read-only.
+"""Métricas / Tablero de Evolución (H-021+H-022) — endpoints de agregación read-only.
 
 Series semanales (ISO week) sobre data que YA existe, consumidas por aremko-cli para
 la página "Métricas / Evolución". Auth: header X-API-Key (LUNA_API_KEY), igual que
@@ -6,9 +6,17 @@ la página "Métricas / Evolución". Auth: header X-API-Key (LUNA_API_KEY), igua
 
 Rutas:
   GET /api/metrics/campanas?weeks=12  → funnel + ROI de la Bandeja de envíos (ContactoWhatsApp)
+  GET /api/metrics/campanas/reservas?semana=YYYY-Www → drill-down de VentaReserva atribuidas (H-022)
   GET /api/metrics/agente?weeks=12     → curva del agente IA (AgenteFeedback)
   GET /api/metrics/canales?weeks=12    → volumen WhatsApp vs Instagram + 1ª respuesta + backlog
   GET /api/metrics/masajes?weeks=12    → cobertura de seguimientos de masaje
+
+**Regla de Atribución (ContactoWhatsApp → VentaReserva):**
+Una reserva se atribuye a una campaña si:
+  - existe ContactoWhatsApp.reserva_atribuida_id
+  - la VentaReserva.fecha_reserva está dentro de 30 días después del ContactoWhatsApp.fecha_envio
+  - cliente (nombre o teléfono) y servicios principales coinciden
+  (implementado en ventas/services/crm_service.py:_atribuir_reserva_a_contacto)
 """
 
 from datetime import datetime, timedelta
@@ -74,7 +82,7 @@ def metrics_campanas(request):
     semanas = _semanas(weeks)
     desde = semanas[0][1]
     labels = [l for l, _ in semanas]
-    serie = {l: {'semana': l, 'enviados': 0, 'costo': None, 'respondieron': 0,
+    serie = {l: {'semana': l, 'generados': 0, 'aprobados': 0, 'enviados': 0, 'costo': None, 'respondieron': 0,
                  'reservaron': 0, 'ingreso': 0} for l in labels}
 
     from ..models import ContactoWhatsApp
@@ -95,6 +103,18 @@ def metrics_campanas(request):
         if c.reserva_atribuida_id:
             b['reservaron'] += 1
             b['ingreso'] += int(getattr(c.reserva_atribuida, 'total', 0) or 0)
+
+    # Agregar generados y aprobados por semana (fecha_sugerido)
+    for c in (ContactoWhatsApp.objects
+              .filter(fecha_sugerido__gte=desde)
+              .values('fecha_sugerido', 'estado')):
+        b = serie.get(_label_dt(c['fecha_sugerido']))
+        if not b:
+            continue
+        b['generados'] += 1
+        if c['estado'] in ['aprobado', 'enviado']:
+            b['aprobados'] += 1
+
     for l in labels:
         serie[l]['costo'] = (serie[l]['enviados'] * tarifa) if tarifa else None
 
@@ -311,3 +331,108 @@ def metrics_masajes(request):
                  'respuesta del cliente (solo el envío) → requiere un campo nuevo (Fase 2).'),
         'series': [serie[l] for l in labels],
     })
+
+
+# ---------------------------------------------------------------------------
+# 5) Campañas — drill-down de reservas atribuidas (H-022)
+# ---------------------------------------------------------------------------
+
+def metrics_campanas_reservas(request):
+    """GET /api/metrics/campanas/reservas?semana=YYYY-Www (opcional).
+
+    Retorna detalle de cada VentaReserva atribuida a una ContactoWhatsApp.
+    Si `semana` no se pasa, retorna TODAS las del período (últimas 12 semanas).
+
+    Shape:
+    {
+      "semana": "2026-W25",
+      "total_reservas": 3,
+      "total_ingreso": 138000,
+      "reservas": [
+        {
+          "venta_id": 123,
+          "cliente_nombre": "Jorge",
+          "fecha_reserva": "2026-06-20",
+          "fecha_atribucion": "2026-06-17",
+          "total": 46000,
+          "servicios": [
+            {"nombre": "Cabaña Arrayan", "cantidad": 1, "valor": 90000},
+            {"nombre": "Tina Tronador", "cantidad": 1, "valor": 25000}
+          ]
+        }
+      ]
+    }
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+
+    semana_filter = (request.GET.get('semana', '') or '').strip()
+    # Si se pasa semana, filtrar por esa. Sino, retornar del período.
+    weeks = _weeks_param(request, default=12, cap=52)
+    semanas = _semanas(weeks)
+    desde = semanas[0][1]
+
+    from ..models import ContactoWhatsApp, ReservaServicio
+
+    # Todas las reservas atribuidas en el período (o solo la semana especificada)
+    qs = (ContactoWhatsApp.objects
+          .filter(reserva_atribuida_id__isnull=False,
+                  reserva_atribuida__fecha_reserva__gte=desde)
+          .select_related('reserva_atribuida', 'reserva_atribuida__cliente'))
+
+    # Agrupar por semana de fecha_reserva (no fecha_envio)
+    by_semana = {}
+    for c in qs:
+        semana = _label_dt(c.reserva_atribuida.fecha_reserva)
+        if semana_filter and semana != semana_filter:
+            continue
+        if semana not in by_semana:
+            by_semana[semana] = {'reservas': [], 'total_ingreso': 0}
+
+        venta = c.reserva_atribuida
+        cliente_nombre = (venta.cliente.nombre if venta.cliente else '(sin cliente)').strip()
+
+        # Servicios de esta reserva
+        servicios = []
+        for rs in ReservaServicio.objects.filter(venta_reserva=venta):
+            servicios.append({
+                'nombre': rs.servicio.nombre,
+                'cantidad': rs.cantidad_personas,
+                'valor': int(rs.precio_unitario_venta or 0),
+            })
+
+        by_semana[semana]['reservas'].append({
+            'venta_id': venta.id,
+            'cliente_nombre': cliente_nombre,
+            'fecha_reserva': venta.fecha_reserva.isoformat(),
+            'fecha_atribucion': c.fecha_envio.date().isoformat(),  # cuándo se envió el ContactoWhatsApp
+            'total': int(venta.total or 0),
+            'servicios': servicios,
+        })
+        by_semana[semana]['total_ingreso'] += int(venta.total or 0)
+
+    # Formato de respuesta: una sola semana o el período completo
+    if semana_filter:
+        # Una semana específica
+        data = by_semana.get(semana_filter, {'reservas': [], 'total_ingreso': 0})
+        return JsonResponse({
+            'semana': semana_filter,
+            'total_reservas': len(data['reservas']),
+            'total_ingreso': data['total_ingreso'],
+            'reservas': data['reservas'],
+        })
+    else:
+        # Período completo: retornar las series
+        series = []
+        for semana in [_label(l) for l, _ in semanas]:
+            data = by_semana.get(semana, {'reservas': [], 'total_ingreso': 0})
+            series.append({
+                'semana': semana,
+                'total_reservas': len(data['reservas']),
+                'total_ingreso': data['total_ingreso'],
+            })
+        return JsonResponse({
+            'weeks': weeks,
+            'series': series,
+        })

@@ -91,8 +91,9 @@ urlpatterns = [
     path('api/whatsapp/mark-template-sent', whatsapp_api_views.mark_template_sent, name='whatsapp_mark_template_sent'),
     path('api/whatsapp/mark-template-failed', whatsapp_api_views.mark_template_failed, name='whatsapp_mark_template_failed'),
 
-    # Métricas / Tablero de Evolución (H-021): agregación read-only, series semanales. X-API-Key.
+    # Métricas / Tablero de Evolución (H-021+H-022): agregación read-only, series semanales. X-API-Key.
     path('api/metrics/campanas', metrics_api_views.metrics_campanas, name='metrics_campanas'),
+    path('api/metrics/campanas/reservas', metrics_api_views.metrics_campanas_reservas, name='metrics_campanas_reservas'),
     path('api/metrics/agente', metrics_api_views.metrics_agente, name='metrics_agente'),
     path('api/metrics/canales', metrics_api_views.metrics_canales, name='metrics_canales'),
     path('api/metrics/masajes', metrics_api_views.metrics_masajes, name='metrics_masajes'),
