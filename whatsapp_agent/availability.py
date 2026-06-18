@@ -10,13 +10,19 @@ igual que el grounding. Capacidad estricta por `capacidad_minima/maxima`.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 TIPOS_VALIDOS = {'tina', 'masaje', 'cabana', 'otro'}
+
+DIAS_SEMANA_ES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+MESES_ES = {
+    'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
+    'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12,
+}
 
 # Las masajistas vienen desde la ciudad (~1h). Para HOY, si todavía no hay masajistas
 # trabajando, no se puede ofrecer un masaje antes de que alcancen a llegar.
@@ -40,6 +46,80 @@ def _hhmm_min(s):
         return int(h) * 60 + int(m)
     except (ValueError, AttributeError):
         return None
+
+
+def resolver_fecha(expresion_cliente):
+    """Resuelve fecha de forma DETERMINÍSTICA (sin dejar al LLM calcular día de semana).
+
+    Acepta: "el sábado", "25 de junio", "el 25", "25", "próximo sábado", "este domingo", etc.
+    Devuelve: {
+        'fecha_iso': '2026-06-25' (YYYY-MM-DD),
+        'dia_semana': 'jueves' (minúscula),
+        'dia_numero': 4 (0=lunes, 6=domingo),
+        'ambiguo': False,
+        'error': None,
+    }
+
+    Si hay inconsistencia (cliente dice "domingo 25" pero el 25 es lunes) → ambiguo=True.
+    """
+    from django.utils import timezone as tz
+    from datetime import timedelta
+    import re
+
+    hoy = tz.localtime(tz.now()).date()
+    hoy_numero = hoy.weekday()  # 0=lunes, 6=domingo
+
+    expresion = (expresion_cliente or '').strip().lower()
+    if not expresion:
+        return {'error': 'expresión vacía', 'ambiguo': True}
+
+    # PATRÓN 1: Nombre de día ("sábado", "el sábado", "próximo sábado", "este sábado")
+    for i, dia_nombre in enumerate(DIAS_SEMANA_ES):
+        if dia_nombre in expresion:
+            dias_adelante = (i - hoy_numero) % 7
+            if dias_adelante == 0:
+                dias_adelante = 7  # "sábado" = próximo sábado, no hoy
+            fecha = hoy + timedelta(days=dias_adelante)
+            return {
+                'fecha_iso': fecha.isoformat(),
+                'dia_semana': DIAS_SEMANA_ES[fecha.weekday()],
+                'dia_numero': fecha.weekday(),
+                'ambiguo': False,
+                'error': None,
+            }
+
+    # PATRÓN 2: Número de día ("25", "el 25", "25 de junio")
+    match_numero = re.search(r'\b(\d{1,2})\b', expresion)
+    if match_numero:
+        dia_numero = int(match_numero.group(1))
+
+        # Si hay mes en la expresión, usarlo; si no, asumir mes actual
+        mes_numero = hoy.month
+        for mes_nombre, num_mes in MESES_ES.items():
+            if mes_nombre in expresion:
+                mes_numero = num_mes
+                break
+
+        try:
+            año = hoy.year if mes_numero >= hoy.month else hoy.year + 1
+            fecha = datetime(año, mes_numero, dia_numero).date()
+
+            # Validar que no esté en el pasado
+            if fecha < hoy:
+                fecha = datetime(hoy.year + 1, mes_numero, dia_numero).date()
+
+            return {
+                'fecha_iso': fecha.isoformat(),
+                'dia_semana': DIAS_SEMANA_ES[fecha.weekday()],
+                'dia_numero': fecha.weekday(),
+                'ambiguo': False,
+                'error': None,
+            }
+        except ValueError:
+            return {'error': f'fecha inválida (día {dia_numero} en mes {mes_numero})', 'ambiguo': True}
+
+    # Fallback: no se pudo resolver
+    return {'error': f'no se pudo resolver la fecha: "{expresion_cliente}"', 'ambiguo': True}
 
 
 def _hay_masaje_agendado_hoy(f):
