@@ -139,7 +139,7 @@ _TOOLS = [{
                 'nombre': {'type': 'string', 'description': 'Nombre del cliente (≥3 caracteres)'},
                 'email': {'type': 'string', 'description': 'Email válido (ej. juan@example.com)'},
                 'documento_identidad': {'type': 'string', 'description': 'RUT válido (formato: 12345678-9 o 12.345.678-9)'},
-                'region_id': {'type': 'integer', 'description': 'ID de región (opcional; Luna la pregunta si falta)'},
+                'region': {'type': 'string', 'description': 'Nombre de región (ej. "Los Lagos", "Región de Los Lagos"; H-028 FIX)'},
                 'servicio_id': {'type': 'integer', 'description': 'ID del servicio a reservar (REQUERIDO)'},
                 'fecha': {'type': 'string', 'description': 'Fecha YYYY-MM-DD (REQUERIDO)'},
                 'hora': {'type': 'string', 'description': 'Hora HH:MM (REQUERIDO)'},
@@ -200,13 +200,33 @@ def _tool_executor(name, args):
             # Normalizar teléfono para obtener external_id (placeholder: en WhatsApp es el phone del cliente)
             # Por ahora usamos un placeholder; en conversación real viene del contexto WhatsApp
             args = args or {}
+
+            # H-028 FIX: Luna pasa region (string), buscar region_id por nombre
+            region_id = None
+            region_nombre = args.get('region', '').strip()
+            if region_nombre:
+                from ventas.models import Region
+                try:
+                    # Buscar región por nombre (ej. "Los Lagos", "los lagos", etc.)
+                    region = Region.objects.filter(nombre__icontains=region_nombre).first()
+                    region_id = region.id if region else None
+                    if not region_id:
+                        return {
+                            'success': False,
+                            'error': 'region_not_found',
+                            'mensaje': f'Región "{region_nombre}" no encontrada'
+                        }
+                except Exception as e:
+                    logger.warning(f'Error buscando región "{region_nombre}": {e}')
+                    region_id = None
+
             # Construir payload compatible con preparar_reserva()
             cliente_data = {
                 'nombre': args.get('nombre', '').strip(),
                 'email': args.get('email', '').strip(),
                 'documento_identidad': args.get('documento_identidad', '').strip(),
-                'region_id': args.get('region_id'),
-                'comuna_id': args.get('comuna_id'),
+                'region_id': region_id,
+                'comuna_id': None,  # Opcional por ahora
             }
             servicios = [{
                 'servicio_id': args.get('servicio_id'),
