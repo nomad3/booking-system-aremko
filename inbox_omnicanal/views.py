@@ -853,9 +853,10 @@ def media_library(request):
     if err:
         return err
 
-    # Filtrar servicios: publicados, tipos válidos (omitir 'otro')
+    # Filtrar servicios: publicados + activos, tipos válidos (omitir 'otro')
     servicios = Servicio.objects.filter(
         publicado_web=True,
+        activo=True,
         tipo_servicio__in=['tina', 'cabana', 'masaje']
     ).order_by('tipo_servicio', 'nombre')
 
