@@ -93,6 +93,62 @@ def _check_luna_key(request):
     return None
 
 
+def _propuesta_reserva(canal, external_id):
+    """Obtiene la PropuestaReserva vigente para una conversación (H-028).
+
+    Devuelve:
+    {
+        "propuesta_id": "uuid-string",
+        "resumen": "2x Tina Hidromasaje (20-06-2026 14:00) = $180,000",
+        "total": 180000,
+        "servicios": [
+            {"servicio_nombre": "Tina Hidromasaje", "fecha": "2026-06-20", "hora": "14:00",
+             "cantidad_personas": 2, "subtotal": 180000}
+        ]
+    }
+    o null si no hay propuesta vigente.
+    """
+    try:
+        from whatsapp_agent.models import PropuestaReserva
+        propuesta = PropuestaReserva.objects.filter(
+            canal=canal, external_id=external_id, estado='pendiente'
+        ).order_by('-created_at').first()
+
+        if not propuesta or not propuesta.esta_vigente():
+            return None
+
+        # Construir shape con servicios
+        payload = propuesta.payload or {}
+        servicios_data = payload.get('servicios', [])
+        servicios_info = []
+
+        for srv_data in servicios_data:
+            from ventas.models import Servicio
+            try:
+                servicio = Servicio.objects.get(id=srv_data['servicio_id'])
+                personas = srv_data.get('cantidad_personas', 1)
+                subtotal = float(servicio.precio_base) * personas
+                servicios_info.append({
+                    'servicio_nombre': servicio.nombre,
+                    'fecha': srv_data['fecha'],
+                    'hora': srv_data['hora'],
+                    'cantidad_personas': personas,
+                    'subtotal': int(subtotal)
+                })
+            except Servicio.DoesNotExist:
+                pass
+
+        return {
+            'propuesta_id': propuesta.propuesta_id,
+            'resumen': propuesta.resumen_texto,
+            'total': int(propuesta.total),
+            'servicios': servicios_info
+        }
+    except Exception:  # noqa: BLE001
+        logger.exception(f'Error obteniendo propuesta_reserva para {canal}/{external_id}')
+        return None
+
+
 def _parse_ts(value):
     """Acepta epoch (seg) o ISO; devuelve datetime aware. Default: ahora."""
     if value in (None, ''):
@@ -658,11 +714,11 @@ def conversation(request):
                 'mime_type': m.mime_type or None,
                 'filename': m.original_filename or None,
             } for m in msgs],
-            # H-019: borrador de IA para IG, lazy (opt-in ?sugerencia=1), mismo shape que WA.
             'sugerencia_agente': (
                 _sugerencia_instagram(external_id)
                 if _truthy(request.GET.get('sugerencia', '0')) else None
             ),
+            'propuesta_reserva': _propuesta_reserva('instagram', external_id),  # H-028
         })
 
     if canal == 'messenger':
@@ -693,6 +749,7 @@ def conversation(request):
                 _sugerencia_messenger(external_id)
                 if _truthy(request.GET.get('sugerencia', '0')) else None
             ),
+            'propuesta_reserva': _propuesta_reserva('messenger', external_id),  # H-028
         })
 
     if canal == 'whatsapp':
@@ -714,6 +771,7 @@ def conversation(request):
                 'timestamp': m.timestamp.isoformat(),
             } for m in msgs],
             'sugerencia_agente': _sugerencia_whatsapp(external_id, request),
+            'propuesta_reserva': _propuesta_reserva('whatsapp', external_id),  # H-028
         })
 
     return JsonResponse({'error': f'canal no soportado: {canal!r}'}, status=400)
