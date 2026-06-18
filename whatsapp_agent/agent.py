@@ -30,7 +30,7 @@ _DIAS_ES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'do
 def _obtener_datos_cliente_por_phone(phone):
     """H-028 FIX: Obtiene datos del cliente existente por teléfono normalizado.
 
-    Si el cliente existe, devuelve {nombre, email, documento_identidad, region_nombre}.
+    Si el cliente existe, devuelve {nombre, email, documento_identidad, comuna_nombre}.
     Si faltan campos, devuelve None para esos campos (Luna los pide luego).
     Si el cliente NO existe, devuelve None.
     """
@@ -45,8 +45,8 @@ def _obtener_datos_cliente_por_phone(phone):
             'nombre': cliente.nombre if cliente.nombre else None,
             'email': cliente.email if cliente.email else None,
             'documento_identidad': cliente.documento_identidad if cliente.documento_identidad else None,
-            'region_id': cliente.region_id if cliente.region_id else None,
-            'region_nombre': cliente.region.nombre if cliente.region else None,
+            'comuna_id': cliente.comuna_id if cliente.comuna_id else None,
+            'comuna_nombre': cliente.comuna.nombre if cliente.comuna else None,
         }
     except Exception as e:
         logger.warning(f'Error obteniendo datos de cliente {phone}: {e}')
@@ -165,7 +165,7 @@ _TOOLS = [{
                 'nombre': {'type': 'string', 'description': 'Nombre del cliente (≥3 caracteres)'},
                 'email': {'type': 'string', 'description': 'Email válido (ej. juan@example.com)'},
                 'documento_identidad': {'type': 'string', 'description': 'RUT válido (formato: 12345678-9 o 12.345.678-9)'},
-                'region': {'type': 'string', 'description': 'Nombre de región (ej. "Los Lagos", "Región de Los Lagos"; H-028 FIX)'},
+                'comuna': {'type': 'string', 'description': 'Nombre de comuna (ej. "Puerto Varas", "Osorno"; H-028 FIX: región se deduce de comuna)'},
                 'servicio_id': {'type': 'integer', 'description': 'ID del servicio a reservar (REQUERIDO)'},
                 'fecha': {'type': 'string', 'description': 'Fecha YYYY-MM-DD (REQUERIDO)'},
                 'hora': {'type': 'string', 'description': 'Hora HH:MM (REQUERIDO)'},
@@ -227,24 +227,28 @@ def _tool_executor(name, args):
             # Por ahora usamos un placeholder; en conversación real viene del contexto WhatsApp
             args = args or {}
 
-            # H-028 FIX: Luna pasa region (string), buscar region_id por nombre
+            # H-028 FIX: Luna pasa comuna (string), deducir region_id de la comuna
             region_id = None
-            region_nombre = args.get('region', '').strip()
-            if region_nombre:
-                from ventas.models import Region
+            comuna_nombre = args.get('comuna', '').strip()
+            if comuna_nombre:
+                from ventas.models import Comuna
                 try:
-                    # Buscar región por nombre (ej. "Los Lagos", "los lagos", etc.)
-                    region = Region.objects.filter(nombre__icontains=region_nombre).first()
-                    region_id = region.id if region else None
-                    if not region_id:
+                    # Buscar comuna por nombre y deducir región
+                    comuna = Comuna.objects.filter(nombre__icontains=comuna_nombre).first()
+                    if not comuna:
                         return {
                             'success': False,
-                            'error': 'region_not_found',
-                            'mensaje': f'Región "{region_nombre}" no encontrada'
+                            'error': 'comuna_not_found',
+                            'mensaje': f'Comuna "{comuna_nombre}" no encontrada'
                         }
+                    region_id = comuna.region_id
                 except Exception as e:
-                    logger.warning(f'Error buscando región "{region_nombre}": {e}')
-                    region_id = None
+                    logger.warning(f'Error buscando comuna "{comuna_nombre}": {e}')
+                    return {
+                        'success': False,
+                        'error': 'internal_error',
+                        'mensaje': f'Error al buscar comuna: {str(e)[:100]}'
+                    }
 
             # Construir payload compatible con preparar_reserva()
             cliente_data = {

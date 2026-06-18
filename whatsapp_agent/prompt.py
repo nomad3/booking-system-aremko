@@ -230,7 +230,7 @@ NO existe nada fuera de esta lista; si no está aquí, no lo ofrecemos.
 - NUNCA inventes precios, promociones, disponibilidad, horarios ni servicios. Si no tienes el dato exacto, ofrécelo de forma general y deriva a una persona.
 - NUNCA confirmes un pago ni un cupo. No pidas ni manejes datos de tarjetas, claves ni pagos.
 - **RESOLVER FECHAS (H-028 BUG FIX — CRÍTICO):** Cuando el cliente mencione una fecha ("sábado", "25 de junio", "próximo domingo"), **pasa esa expresión directo a `consultar_disponibilidad`** (acepta tanto ISO como expresión). La herramienta resuelve internamente sin que tú calcules día de semana. **NUNCA calcules día de semana a mano.** En tus respuestas, USA SIEMPRE el `dia_semana` que devuelve la herramienta. Si es ambiguo (ej. "¿sábado 22 o domingo 21?"), re-pregunta en vez de inventar.
-- **PREPARAR RESERVA (H-028 gate de Deborah):** Cuando el cliente CONFIRMA que quiere reservar (dice "sí, quiero", "confirmo", "adelante"), y has confirmado: nombre, email, RUT válido, región (en texto, ej. "Los Lagos") + servicio+fecha+hora+personas → USA LA HERRAMIENTA `preparar_reserva()` con esos datos. PASA LA REGIÓN como STRING (ej. `region="los lagos"`), NO como ID. La propuesta va a Deborah para aprobación final. NO uses la herramienta si falta algún dato requerido.
+- **PREPARAR RESERVA (H-028 gate de Deborah):** Cuando el cliente CONFIRMA que quiere reservar (dice "sí, quiero", "confirmo", "adelante"), y has confirmado: nombre, email, RUT válido, comuna (en texto, ej. "Puerto Varas") + servicio+fecha+hora+personas → USA LA HERRAMIENTA `preparar_reserva()` con esos datos. PASA LA COMUNA como STRING (ej. `comuna="Puerto Varas"`), NO como ID. La región se deduce automáticamente de la comuna. La propuesta va a Deborah para aprobación final. NO uses la herramienta si falta algún dato requerido.
 
 # 4. CUÁNDO DERIVAR A UNA PERSONA
 Si ocurre cualquiera de estas, responde ÚNICAMENTE con el prefijo `[ESCALAR: motivo]` (sin texto adicional):
@@ -267,8 +267,8 @@ def build_user_prompt(historial_texto, mensaje_cliente, datos_cliente=None):
             datos_str_parts.append(f"Email: {datos_cliente['email']}")
         if datos_cliente.get('documento_identidad'):
             datos_str_parts.append(f"RUT: {datos_cliente['documento_identidad']}")
-        if datos_cliente.get('region_nombre'):
-            datos_str_parts.append(f"Región: {datos_cliente['region_nombre']}")
+        if datos_cliente.get('comuna_nombre'):
+            datos_str_parts.append(f"Comuna: {datos_cliente['comuna_nombre']}")
 
         if datos_str_parts:
             partes.append(
