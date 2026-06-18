@@ -21,6 +21,7 @@ from ventas.models import (
     ServicioBloqueo, ServicioSlotBloqueo,
     CategoriaServicio, Producto, ConfiguracionResumen
 )
+from ventas.views.whatsapp_api_views import _check_luna_key
 
 
 def get_available_slots_for_service(servicio, fecha):
@@ -650,17 +651,20 @@ def refugio_leads_list(request):
 
 
 @api_view(['GET'])
-@authentication_classes([])
 def resumen_reserva_json(request, reserva_id):
     """H-028: Obtener resumen de reserva para agente Luna.
 
     GET /api/v1/resumen-reserva/{reserva_id}/
+    Header: X-API-Key (LUNA_API_KEY)
 
-    Sin autenticación: Luna/agente puede acceder tras crear una reserva.
+    Auth: header X-API-Key (mismo patrón que /api/whatsapp/* y /api/refugio-leads/).
     Devuelve el texto completo del resumen listo para copiar/enviar por WhatsApp.
     """
+    auth_err = _check_luna_key(request)
+    if auth_err:
+        return auth_err
+
     from ventas.views.resumen_reserva_view import _generar_texto_resumen
-    from django.utils import timezone
 
     try:
         reserva = VentaReserva.objects.get(id=reserva_id)
