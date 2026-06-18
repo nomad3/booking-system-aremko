@@ -40,13 +40,20 @@ def _obtener_datos_cliente_por_phone(phone):
         if not cliente:
             return None
 
+        comuna_nombre = None
+        if cliente.comuna:
+            comuna_nombre = cliente.comuna.nombre
+            logger.info(f'[Cliente {phone}] comuna_id={cliente.comuna_id}, nombre="{comuna_nombre}"')
+        else:
+            logger.warning(f'[Cliente {phone}] Sin comuna asignada (comuna_id={cliente.comuna_id})')
+
         return {
             'id': cliente.id,
             'nombre': cliente.nombre if cliente.nombre else None,
             'email': cliente.email if cliente.email else None,
             'documento_identidad': cliente.documento_identidad if cliente.documento_identidad else None,
             'comuna_id': cliente.comuna_id if cliente.comuna_id else None,
-            'comuna_nombre': cliente.comuna.nombre if cliente.comuna else None,
+            'comuna_nombre': comuna_nombre,
         }
     except Exception as e:
         logger.warning(f'Error obteniendo datos de cliente {phone}: {e}')
