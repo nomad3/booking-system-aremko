@@ -345,8 +345,87 @@ def instagram_inbound_media(request):
     })
 
 
+@csrf_exempt
+def messenger_inbound_media(request):
+    """POST /api/messenger/inbound-media (multipart) — adjunto de Messenger (H-024).
+
+    aremko-cli descarga los bytes del media de Messenger y los sube acá.
+    Guardamos el archivo (nombre UUID) en Cloudinary RAW.
+    Idempotente por fb_message_id; is_echo→saliente; conversación = PSID del cliente.
+    Mirror exacto de H-020 IG adjuntos, pero con canal='messenger'.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'método no permitido'}, status=405)
+    err = _check_luna_key(request)
+    if err:
+        return err
+
+    fb_message_id = (request.POST.get('fb_message_id') or '').strip()
+    from_psid = (request.POST.get('from_psid') or '').strip()
+    to_page_id = (request.POST.get('to_page_id') or '').strip()
+    if not fb_message_id or not from_psid:
+        return JsonResponse({'error': 'fb_message_id y from_psid son requeridos'}, status=400)
+
+    try:
+        upload = request.FILES['file']
+        if upload.size > 16_777_216:  # 16 MB
+            return JsonResponse({'error': 'archivo muy grande (máx 16 MB)'}, status=413)
+    except KeyError:
+        return JsonResponse({'error': 'archivo requerido'}, status=400)
+
+    is_echo = _truthy(request.POST.get('is_echo'))
+    direction = 'out' if is_echo else 'in'
+    # Mismo criterio que /api/messenger/inbound: eco→to_page_id, entrante→from_psid
+    external_id = (to_page_id if is_echo else from_psid) or from_psid
+    if not external_id or external_id == '555157687911449':
+        return JsonResponse({'error': 'no se pudo determinar el PSID del cliente'}, status=400)
+
+    msg_type = (request.POST.get('type') or 'document').lower()[:30]
+    if msg_type not in _MEDIA_TYPES:
+        msg_type = 'document'
+    caption = request.POST.get('caption') or ''
+    mime_type = (request.POST.get('mime_type') or getattr(upload, 'content_type', '') or '')[:120]
+    original_filename = (request.POST.get('filename') or getattr(upload, 'name', '') or '')[:255]
+    contact_name = (request.POST.get('contact_name') or '')[:200]
+    ts = _parse_ts(request.POST.get('timestamp'))
+
+    # Idempotencia por fb_message_id.
+    existing = ChannelMessage.objects.filter(external_message_id=fb_message_id).first()
+    if existing:
+        return JsonResponse({
+            'ok': True, 'duplicate': True, 'message_id': existing.id,
+            'canal': 'messenger', 'external_id': existing.external_id,
+            'media_url': _media_url(request, existing),
+        })
+
+    # Nombre con UUID + extensión (evita colisiones y el nombre del cliente).
+    ext = _guess_extension(original_filename, mime_type)
+    stored_name = f"{uuid.uuid4().hex}{ext}"
+
+    msg = ChannelMessage(
+        canal='messenger', external_id=external_id[:120], external_message_id=fb_message_id,
+        direction=direction, body=caption, msg_type=msg_type, timestamp=ts,
+        contact_name=contact_name, requiere_atencion=(direction == 'in'),
+        mime_type=mime_type, original_filename=original_filename,
+    )
+    msg.media_file.save(stored_name, upload, save=False)  # save=False: persistir una sola vez
+    msg.save()
+
+    pendientes_limpiados = 0
+    if direction == 'out':
+        pendientes_limpiados = _limpiar_pendientes_channel('messenger', msg.external_id)
+
+    return JsonResponse({
+        'ok': True, 'message_id': msg.id, 'canal': 'messenger',
+        'external_id': msg.external_id, 'direction': msg.direction,
+        'requiere_atencion': msg.requiere_atencion,
+        'pendientes_limpiados': pendientes_limpiados,
+        'media_url': _media_url(request, msg),
+    })
+
+
 # ---------------------------------------------------------------------------
-# Reads unificados (WhatsApp legacy + Instagram)
+# Reads unificados (WhatsApp legacy + Instagram + Messenger)
 # ---------------------------------------------------------------------------
 
 def _agg_whatsapp():

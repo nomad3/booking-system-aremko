@@ -98,10 +98,12 @@ urlpatterns = [
     path('api/metrics/canales', metrics_api_views.metrics_canales, name='metrics_canales'),
     path('api/metrics/masajes', metrics_api_views.metrics_masajes, name='metrics_masajes'),
 
-    # Bandeja omnicanal (H-016+H-023): Instagram DM + Messenger + reads channel-aware (WhatsApp + Instagram + Messenger).
+    # Bandeja omnicanal (H-016+H-023+H-024): Instagram DM + Messenger + reads channel-aware (WhatsApp + Instagram + Messenger).
     # Auth X-API-Key (LUNA_API_KEY). Conviven con /api/whatsapp/* legacy.
     path('api/instagram/inbound', inbox_views.instagram_inbound, name='instagram_inbound'),
+    path('api/instagram/inbound-media', inbox_views.instagram_inbound_media, name='instagram_inbound_media'),
     path('api/messenger/inbound', inbox_views.messenger_inbound, name='messenger_inbound'),
+    path('api/messenger/inbound-media', inbox_views.messenger_inbound_media, name='messenger_inbound_media'),
     path('api/instagram/inbound-media', inbox_views.instagram_inbound_media, name='instagram_inbound_media'),
     path('api/inbox/conversations/', inbox_views.conversations, name='inbox_conversations'),
     path('api/inbox/conversation/', inbox_views.conversation, name='inbox_conversation'),
