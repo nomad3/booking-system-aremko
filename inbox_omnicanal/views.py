@@ -464,7 +464,7 @@ def _detalle_whatsapp(external_ids):
         if m.phone in out:
             continue
         cli = m.cliente if m.cliente_id else None
-        preview = m.body or (_media_label(m) if m.media_file else '')
+        preview = m.body or (_media_label(m.msg_type, getattr(m, 'original_filename', '')) if m.media_file else '')
         out[m.phone] = {
             'preview': preview, 'direction': m.direction,
             'contact_name': m.contact_name or None,
@@ -472,12 +472,6 @@ def _detalle_whatsapp(external_ids):
             'cliente_nombre': (cli.nombre if cli and cli.nombre else None),
         }
     return out
-
-
-def _media_label(m):
-    etiquetas = {'image': '📷 Foto', 'video': '🎥 Video', 'audio': '🎤 Audio', 'document': '📄 Documento'}
-    return etiquetas.get(m.msg_type, '📎 Adjunto')
-
 
 def _detalle_instagram(external_ids):
     """{igsid: {preview, direction, contact_name, cliente_id, cliente_nombre}} para la página."""
