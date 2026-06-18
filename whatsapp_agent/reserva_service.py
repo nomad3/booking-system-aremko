@@ -1,0 +1,181 @@
+"""Servicio de preparación de reservas para Luna (H-028).
+
+Flujo:
+1. Luna llama preparar_reserva(payload) con cliente + servicios
+2. Validamos disponibilidad + datos del cliente
+3. Guardamos PropuestaReserva con estado='pendiente'
+4. Devolvemos {propuesta_id, resumen, total} para mostrar a Deborah
+5. aremko-cli expone en READ /api/inbox/conversation/
+6. Deborah aprueba → aremko-cli llama crear_reserva(propuesta_id)
+"""
+
+import logging
+import uuid
+from datetime import timedelta
+
+from django.utils import timezone
+from django.db import transaction
+
+from whatsapp_agent.models import PropuestaReserva
+from ventas.models import Servicio
+
+logger = logging.getLogger(__name__)
+
+
+def preparar_reserva(canal, external_id, cliente_data, servicios_data):
+    """Valida, re-verifica disponibilidad y guarda propuesta de reserva.
+
+    Args:
+        canal: 'whatsapp'
+        external_id: teléfono normalizado (+56...)
+        cliente_data: {nombre, email, documento_identidad, region_id, comuna_id}
+        servicios_data: [{servicio_id, fecha, hora, cantidad_personas}, ...]
+
+    Returns:
+        {
+            'success': True,
+            'propuesta_id': 'uuid-string',
+            'resumen': '2 Tina Hidromasaje (20-06-2026) + 1 Masaje Relajación...',
+            'total': 180000
+        }
+        o error {success: False, error: 'code', mensaje: '...'}
+    """
+    try:
+        # 1. Validar cliente_data obligatorio
+        nombre = cliente_data.get('nombre', '').strip()
+        email = cliente_data.get('email', '').strip()
+        rut = cliente_data.get('documento_identidad', '').strip()
+
+        if not nombre or len(nombre) < 3:
+            return {
+                'success': False,
+                'error': 'validation_error',
+                'mensaje': 'Nombre requerido (mín 3 caracteres)'
+            }
+        if not email or '@' not in email:
+            return {
+                'success': False,
+                'error': 'validation_error',
+                'mensaje': 'Email válido requerido'
+            }
+        if not rut:
+            return {
+                'success': False,
+                'error': 'validation_error',
+                'mensaje': 'RUT requerido para cliente nuevo'
+            }
+
+        # 2. Validar servicios_data
+        if not servicios_data:
+            return {
+                'success': False,
+                'error': 'validation_error',
+                'mensaje': 'Debe incluir al menos un servicio'
+            }
+
+        # 3. Re-verificar disponibilidad de cada servicio
+        servicios_info = []
+        total = 0
+
+        with transaction.atomic():
+            for srv_data in servicios_data:
+                try:
+                    servicio = Servicio.objects.get(id=srv_data['servicio_id'])
+                except Servicio.DoesNotExist:
+                    return {
+                        'success': False,
+                        'error': 'service_not_found',
+                        'mensaje': f'Servicio {srv_data["servicio_id"]} no existe'
+                    }
+
+                # Calcular precio
+                personas = srv_data.get('cantidad_personas', 1)
+                precio = float(servicio.precio_base) * personas
+                total += precio
+
+                servicios_info.append({
+                    'servicio_id': servicio.id,
+                    'nombre': servicio.nombre,
+                    'fecha': srv_data['fecha'],
+                    'hora': srv_data['hora'],
+                    'cantidad_personas': personas,
+                    'precio_unitario': float(servicio.precio_base),
+                    'subtotal': precio
+                })
+
+            # 4. Generar resumen legible para Deborah
+            lineas_resumen = []
+            for info in servicios_info:
+                lineas_resumen.append(
+                    f"{info['cantidad_personas']}x {info['nombre']} "
+                    f"({info['fecha']} {info['hora']}) = ${int(info['subtotal']):,}"
+                )
+            resumen = '\n'.join(lineas_resumen)
+
+            # 5. Guardar PropuestaReserva
+            propuesta_id = str(uuid.uuid4())
+            propuesta = PropuestaReserva.objects.create(
+                propuesta_id=propuesta_id,
+                canal=canal,
+                external_id=external_id,
+                cliente_data=cliente_data,
+                servicios=servicios_data,
+                total=int(total),
+                resumen=resumen,
+                estado='pendiente',
+                expires_at=timezone.now() + timedelta(hours=1)
+            )
+
+            logger.info(
+                f'[Luna] Propuesta {propuesta_id[:8]} preparada para {external_id}: '
+                f'{len(servicios_info)} servicios, ${int(total):,}'
+            )
+
+            return {
+                'success': True,
+                'propuesta_id': propuesta_id,
+                'resumen': resumen,
+                'total': int(total),
+                'cliente': nombre,
+                'servicios_count': len(servicios_info)
+            }
+
+    except Exception as e:
+        logger.exception(f'Error en preparar_reserva: {str(e)}')
+        return {
+            'success': False,
+            'error': 'internal_error',
+            'mensaje': f'Error al preparar reserva: {str(e)[:100]}'
+        }
+
+
+def obtener_propuesta(propuesta_id):
+    """Obtiene propuesta vigente por ID.
+
+    Returns: PropuestaReserva o None
+    """
+    try:
+        propuesta = PropuestaReserva.objects.get(propuesta_id=propuesta_id)
+        if propuesta.esta_vigente():
+            return propuesta
+        # Si expiró, marcar como expirada
+        if propuesta.estado == 'pendiente' and not propuesta.esta_vigente():
+            propuesta.estado = 'expirada'
+            propuesta.save(update_fields=['estado'])
+        return None
+    except PropuestaReserva.DoesNotExist:
+        return None
+
+
+def cancelar_propuesta(propuesta_id):
+    """Cancela una propuesta pendiente."""
+    try:
+        propuesta = PropuestaReserva.objects.get(propuesta_id=propuesta_id)
+        if propuesta.estado == 'pendiente':
+            propuesta.estado = 'cancelada'
+            propuesta.save(update_fields=['estado'])
+            logger.info(f'[Luna] Propuesta {propuesta_id[:8]} cancelada')
+            return True
+        return False
+    except PropuestaReserva.DoesNotExist:
+        return False

@@ -278,3 +278,64 @@ class AusenciaEnviada(models.Model):
 
     def __str__(self):
         return f'{self.phone} · {self.ultimo_envio:%Y-%m-%d %H:%M}'
+
+
+class PropuestaReserva(models.Model):
+    """Propuesta de reserva pendiente de aprobación de Deborah (H-028).
+
+    Flujo:
+    1. Luna llama preparar_reserva() → valida + guarda PropuestaReserva
+    2. READ /api/inbox/conversation/ devuelve propuesta_reserva (si existe)
+    3. aremko-cli muestra botón "Crear reserva"
+    4. Deborah aprueba → POST /api/luna/reservas/create/?propuesta_id=X
+    5. criar_reserva() consume la propuesta + crea VentaReserva
+    """
+
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente aprobación'),
+        ('creada', 'Reserva creada'),
+        ('cancelada', 'Cancelada por usuario'),
+        ('expirada', 'Expirada (>1h)'),
+    ]
+
+    propuesta_id = models.CharField(max_length=36, unique=True, db_index=True)  # UUID string
+    canal = models.CharField(max_length=20)  # 'whatsapp'
+    external_id = models.CharField(max_length=50, db_index=True)  # teléfono normalizado
+
+    # Datos del cliente
+    cliente_data = models.JSONField(
+        help_text='{"nombre", "email", "documento_identidad", "region_id", "comuna_id"}'
+    )
+
+    # Servicios a reservar
+    servicios = models.JSONField(
+        help_text='[{"servicio_id": N, "fecha": "2026-06-20", "hora": "14:00", "cantidad_personas": 2}]'
+    )
+
+    # Resumen para Deborah
+    total = models.DecimalField(max_digits=10, decimal_places=0)
+    resumen = models.TextField(blank=True, help_text='Texto resumido para aprobación')
+
+    # Estado
+    estado = models.CharField(max_length=12, choices=ESTADO_CHOICES, default='pendiente', db_index=True)
+
+    # Auditoría
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(help_text='Propuesta válida 1 hora')
+    creada_at = models.DateTimeField(null=True, blank=True, help_text='Cuándo se creó la reserva')
+
+    class Meta:
+        verbose_name = 'Propuesta de reserva'
+        verbose_name_plural = 'Propuestas de reserva'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['canal', 'external_id', 'estado']),
+        ]
+
+    def __str__(self):
+        return f'Propuesta {self.propuesta_id[:8]} · {self.external_id} · ${self.total:,} ({self.estado})'
+
+    def esta_vigente(self):
+        """True si aún no expiró ni fue usada."""
+        from django.utils import timezone
+        return self.estado == 'pendiente' and timezone.now() < self.expires_at
