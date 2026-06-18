@@ -119,6 +119,33 @@ _TOOLS = [{
             'required': ['fecha_llegada', 'personas'],
         },
     },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'preparar_reserva',
+        'description': (
+            'GATE DE DEBORAH (H-028): Prepara una propuesta de reserva pendiente de aprobación '
+            'de Deborah. Úsala cuando el cliente CONFIRMA que quiere reservar (dice "sí, quiero", '
+            '"confirmo", "adelante"). La propuesta guarda cliente (nombre, email, RUT, región) + '
+            'servicios (tina/masaje/cabaña con fecha/hora/personas). Devuelve propuesta_id que '
+            'aremko-cli manda a Deborah para aprobación. SOLO cuando cliente está 100% seguro. '
+            'Requiere: nombre completo (≥3 caracteres), email válido, RUT válido (formato 12345678-9).'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'nombre': {'type': 'string', 'description': 'Nombre del cliente (≥3 caracteres)'},
+                'email': {'type': 'string', 'description': 'Email válido (ej. juan@example.com)'},
+                'documento_identidad': {'type': 'string', 'description': 'RUT válido (formato: 12345678-9 o 12.345.678-9)'},
+                'region_id': {'type': 'integer', 'description': 'ID de región (opcional; Luna la pregunta si falta)'},
+                'servicio_id': {'type': 'integer', 'description': 'ID del servicio a reservar (REQUERIDO)'},
+                'fecha': {'type': 'string', 'description': 'Fecha YYYY-MM-DD (REQUERIDO)'},
+                'hora': {'type': 'string', 'description': 'Hora HH:MM (REQUERIDO)'},
+                'cantidad_personas': {'type': 'integer', 'description': 'Cantidad de personas (1-2 para cabañas, 1-4 para tinas)'},
+            },
+            'required': ['nombre', 'email', 'documento_identidad', 'servicio_id', 'fecha', 'hora', 'cantidad_personas'],
+        },
+    },
 }]
 
 
@@ -164,6 +191,43 @@ def _tool_executor(name, args):
         except Exception as exc:  # noqa: BLE001
             logger.exception('Agente WA: tool alojamiento multinoche falló: %s', exc)
             return {'error': 'no se pudo consultar disponibilidad de alojamiento'}
+    if name == 'preparar_reserva':
+        from .reserva_service import preparar_reserva as servicio_preparar_reserva
+        from ventas.services.cliente_service import ClienteService
+        try:
+            # Normalizar teléfono para obtener external_id (placeholder: en WhatsApp es el phone del cliente)
+            # Por ahora usamos un placeholder; en conversación real viene del contexto WhatsApp
+            args = args or {}
+            # Construir payload compatible con preparar_reserva()
+            cliente_data = {
+                'nombre': args.get('nombre', '').strip(),
+                'email': args.get('email', '').strip(),
+                'documento_identidad': args.get('documento_identidad', '').strip(),
+                'region_id': args.get('region_id'),
+                'comuna_id': args.get('comuna_id'),
+            }
+            servicios = [{
+                'servicio_id': args.get('servicio_id'),
+                'fecha': args.get('fecha'),
+                'hora': args.get('hora'),
+                'cantidad_personas': args.get('cantidad_personas', 1),
+            }]
+            payload = {
+                'cliente': cliente_data,
+                'servicios': servicios,
+                'metodo_pago': 'pendiente',
+            }
+            # Usar phone de WhatsApp como external_id (en contexto real)
+            external_id = getattr(timezone.localtime(), 'phone', '+56912345678')  # placeholder
+            return servicio_preparar_reserva(
+                canal='whatsapp',
+                external_id=external_id,
+                payload=payload,
+                idempotency_key=None
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception('Agente WA: tool preparar_reserva falló: %s', exc)
+            return {'error': f'no se pudo preparar reserva: {str(exc)[:100]}'}
     return {'error': f'herramienta desconocida: {name}'}
 
 
