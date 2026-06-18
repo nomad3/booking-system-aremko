@@ -4,10 +4,13 @@ API Views para Luna (Agente AI de WhatsApp)
 Este módulo proporciona endpoints REST para que Luna pueda:
 - Validar disponibilidad de servicios
 - Crear reservas completas
-- Consultar regiones y comunas
+- Consultar regiones, comunas y clientes
+- Obtener resumen de reservas
+
+Rutas: GET/POST /api/luna/* (auth: X-API-Key)
 
 Autor: Claude Code
-Fecha: 2026-03-31
+Fecha: 2026-03-31, actualizado 2026-06-18 (H-028)
 """
 
 from rest_framework.decorators import api_view, authentication_classes
