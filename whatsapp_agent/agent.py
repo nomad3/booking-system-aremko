@@ -35,9 +35,11 @@ _TOOLS = [{
             'Consulta servicios (tinas/masajes/cabañas) con su PRECIO TOTAL ya calculado y, si das '
             'fecha, sus HORARIOS libres. Úsala SIEMPRE para responder precio o disponibilidad — NO '
             'calcules precios tú. Para una pregunta de solo precio ("¿cuánto vale para 2?"), llama '
-            'con `personas` y SIN `fecha`. Para disponibilidad ("¿hay el sábado?"), incluye `fecha`. '
-            'Devuelve por servicio: `precio_total` (úsalo tal cual), `precio_por_persona`, '
-            '`duracion_texto` (ej. "4 h" o "por noche") y `slots_libres`.'
+            'con `personas` y SIN `fecha`. Para disponibilidad ("¿hay el sábado?"), incluye `fecha` '
+            '(ACEPTA "el sábado", "25 de junio" O formato YYYY-MM-DD; la herramienta resuelve '
+            'internamente). Devuelve por servicio: `precio_total` (úsalo tal cual), `precio_por_persona`, '
+            '`duracion_texto` (ej. "4 h" o "por noche"), `dia_semana` (devuelto por la herramienta) '
+            'y `slots_libres`. USA SIEMPRE el `dia_semana` devuelto, NUNCA calcules tú.'
         ),
         'parameters': {
             'type': 'object',
