@@ -39,10 +39,10 @@ class WhatsAppAgentConfigAdmin(SingletonModelAdmin):
                            'tablero de Métricas para estimar el costo de las campañas (las respuestas '
                            'del agente dentro de las 24h son gratis). 0 = sin configurar → costo nulo.',
         }),
-        ('Modelo (avanzado)', {
+        ('Modelo y parámetros LLM', {
             'fields': ('model_name', 'temperature', 'max_tokens', 'history_window',
                        'pausa_horas_tras_humano'),
-            'classes': ('collapse',),
+            'description': 'model_name vacío = usa DPV_LLM_MODEL de env. Ej: anthropic/claude-haiku-4.5 o google/gemini-3.1-flash-tts-preview',
         }),
     )
     readonly_fields = ('updated_at',)
