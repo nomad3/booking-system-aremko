@@ -282,14 +282,17 @@ def _tool_executor(name, args):
             }
             # Usar phone de WhatsApp como external_id (en contexto real)
             external_id = getattr(timezone.localtime(), 'phone', '+56912345678')  # placeholder
-            return servicio_preparar_reserva(
+            resultado = servicio_preparar_reserva(
                 canal='whatsapp',
                 external_id=external_id,
                 payload=payload,
                 idempotency_key=None
             )
+            if not resultado.get('success'):
+                logger.error(f'[preparar_reserva FAILED] Error: {resultado.get("error")}, Mensaje: {resultado.get("mensaje")}')
+            return resultado
         except Exception as exc:  # noqa: BLE001
-            logger.exception('Agente WA: tool preparar_reserva falló: %s', exc)
+            logger.exception('Agente WA: tool preparar_reserva EXCEPCIÓN: %s', exc)
             return {'error': f'no se pudo preparar reserva: {str(exc)[:100]}'}
     return {'error': f'herramienta desconocida: {name}'}
 
