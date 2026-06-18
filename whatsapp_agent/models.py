@@ -315,6 +315,11 @@ class PropuestaReserva(models.Model):
         help_text='{"cliente": {...}, "servicios": [...], "metodo_pago": "..."}'
     )
 
+    # Datos del cliente (de la migración 0009, requerido para la validación)
+    cliente_data = models.JSONField(
+        help_text='{"nombre": ..., "email": ..., "documento_identidad": ..., "region_id": ...}'
+    )
+
     # Resumen para presentar a Deborah
     resumen_texto = models.TextField(blank=True, help_text='Resumen legible para aprobación')
     total = models.DecimalField(max_digits=10, decimal_places=0)
