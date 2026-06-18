@@ -234,8 +234,12 @@ def _tool_executor(name, args):
                 from ventas.models import Comuna
                 try:
                     # Buscar comuna por nombre y deducir región
+                    logger.info(f'[preparar_reserva] Buscando comuna: "{comuna_nombre}"')
                     comuna = Comuna.objects.filter(nombre__icontains=comuna_nombre).first()
                     if not comuna:
+                        # Debug: listar todas las comunas para verificar
+                        todas = list(Comuna.objects.values_list('nombre', flat=True)[:10])
+                        logger.warning(f'Comuna "{comuna_nombre}" no encontrada. Ejemplos en BD: {todas}')
                         return {
                             'success': False,
                             'error': 'comuna_not_found',
