@@ -224,10 +224,11 @@ def messenger_inbound(request):
     is_echo = _truthy(data.get('is_echo'))
     direction = 'out' if is_echo else 'in'
     # La conversación se identifica por el PSID del cliente (no la Página 555157687911449).
-    # Esperamos que aremko-cli pase from_psid ≠ 555157687911449, pero validamos.
-    if from_psid == '555157687911449':
-        return JsonResponse({'error': 'PSID no puede ser la Página de Aremko'}, status=400)
-    external_id = from_psid  # El PSID del cliente es la identidad de la conversación
+    # En un eco (message_echoes): sender=Página, recipient=cliente → external_id = to_page_id
+    # En un entrante: sender=cliente, recipient=Página → external_id = from_psid
+    external_id = (to_page_id if is_echo else from_psid) or from_psid
+    if not external_id or external_id == '555157687911449':
+        return JsonResponse({'error': 'no se pudo determinar el PSID del cliente'}, status=400)
 
     obj, created = ChannelMessage.objects.get_or_create(
         external_message_id=fb_message_id,
