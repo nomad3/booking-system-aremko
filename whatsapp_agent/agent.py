@@ -26,6 +26,32 @@ logger = logging.getLogger(__name__)
 
 _DIAS_ES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
 
+
+def _obtener_datos_cliente_por_phone(phone):
+    """H-028 FIX: Obtiene datos del cliente existente por teléfono normalizado.
+
+    Si el cliente existe, devuelve {nombre, email, documento_identidad, region_nombre}.
+    Si faltan campos, devuelve None para esos campos (Luna los pide luego).
+    Si el cliente NO existe, devuelve None.
+    """
+    try:
+        from ventas.models import Cliente
+        cliente = Cliente.objects.filter(telefono=phone).first()
+        if not cliente:
+            return None
+
+        return {
+            'id': cliente.id,
+            'nombre': cliente.nombre if cliente.nombre else None,
+            'email': cliente.email if cliente.email else None,
+            'documento_identidad': cliente.documento_identidad if cliente.documento_identidad else None,
+            'region_id': cliente.region_id if cliente.region_id else None,
+            'region_nombre': cliente.region.nombre if cliente.region else None,
+        }
+    except Exception as e:
+        logger.warning(f'Error obteniendo datos de cliente {phone}: {e}')
+        return None
+
 # Herramienta de disponibilidad para el agente (H-011 Fase A paso 2).
 _TOOLS = [{
     'type': 'function',
@@ -409,11 +435,14 @@ def _contexto_saludo(entrante):
         return '', ''
 
 
-def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_nombre=''):
+def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_nombre='', datos_cliente=None):
     """Genera el borrador para un texto de cliente. SIN DB y SIN gate de `activo`.
 
     Devuelve un dict {escalar, motivo, texto, modelo, error, *tokens}. Lo usan
     tanto el flujo en vivo (`generar_sugerencia`) como el comando de prueba.
+
+    datos_cliente: dict {nombre, email, documento_identidad, region_nombre} si el cliente
+                   existe en BD. Luna evita pedir lo que ya tiene.
     """
     # 1) Heurística de escalamiento antes de gastar tokens.
     motivo_pre = escalation.pre_escalar(mensaje)
@@ -430,7 +459,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
     system_prompt = prompt_mod.build_system_prompt(
         config.persona_tono, catalogo, config.link_reserva, config.conocimiento,
         fecha_hoy=_fecha_hoy_texto(), saludo_estado=saludo_estado, saludo_nombre=saludo_nombre)
-    user_prompt = prompt_mod.build_user_prompt(historial, mensaje)
+    user_prompt = prompt_mod.build_user_prompt(historial, mensaje, datos_cliente=datos_cliente)
     modelo = _modelo_efectivo(config)
 
     # 3) Llamada al LLM con tool-calling (disponibilidad). El provider nunca lanza;
@@ -511,8 +540,11 @@ def generar_sugerencia(phone, *, forzar=False):
 
     historial = _historial_texto(phone, entrante.timestamp, config.history_window)
     saludo_estado, saludo_nombre = _contexto_saludo(entrante)
+    # H-028 FIX: Obtener datos del cliente existente (si los hay)
+    datos_cliente = _obtener_datos_cliente_por_phone(phone)
     d = _producir_borrador(config, entrante.body, historial,
-                           saludo_estado=saludo_estado, saludo_nombre=saludo_nombre)
+                           saludo_estado=saludo_estado, saludo_nombre=saludo_nombre,
+                           datos_cliente=datos_cliente)
     return _guardar(
         entrante, texto=d['texto'], escalar=d['escalar'], motivo=d['motivo'],
         modo=config.modo, modelo=d['modelo'], error=d['error'],
