@@ -423,16 +423,16 @@ def metrics_campanas_reservas(request):
             'reservas': data['reservas'],
         })
     else:
-        # Período completo: retornar las series
-        series = []
-        for semana in [_label(l) for l, _ in semanas]:
-            data = by_semana.get(semana, {'reservas': [], 'total_ingreso': 0})
-            series.append({
-                'semana': semana,
-                'total_reservas': len(data['reservas']),
-                'total_ingreso': data['total_ingreso'],
-            })
+        # Período completo: retornar el detalle aplanado (todas las reservas del período)
+        todas = []
+        total_ingreso = 0
+        for semana, data in by_semana.items():
+            todas.extend(data['reservas'])
+            total_ingreso += data['total_ingreso']
+        todas.sort(key=lambda r: r['fecha_reserva'], reverse=True)
         return JsonResponse({
-            'weeks': weeks,
-            'series': series,
+            'semana': None,
+            'total_reservas': len(todas),
+            'total_ingreso': total_ingreso,
+            'reservas': todas,
         })
