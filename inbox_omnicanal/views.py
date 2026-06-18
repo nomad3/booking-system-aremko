@@ -689,6 +689,10 @@ def conversation(request):
                 'mime_type': m.mime_type or None,
                 'filename': m.original_filename or None,
             } for m in msgs],
+            'sugerencia_agente': (
+                _sugerencia_messenger(external_id)
+                if _truthy(request.GET.get('sugerencia', '0')) else None
+            ),
         })
 
     if canal == 'whatsapp':
@@ -798,6 +802,92 @@ def _sugerencia_instagram(external_id):
         }
     except Exception:  # noqa: BLE001 — el agente es opcional; nunca tumbar el hilo
         logger.exception('Inbox: fallo generando sugerencia IG para %s', external_id)
+        return None
+
+
+def _historial_messenger(external_id, antes_de_ts, window):
+    """Historial reciente de una conversación Messenger como texto, igual formato que WhatsApp."""
+    msgs = list(
+        ChannelMessage.objects
+        .filter(canal='messenger', external_id=external_id, timestamp__lt=antes_de_ts)
+        .order_by('-timestamp')[:window]
+    )
+    msgs.reverse()
+    lineas = []
+    for m in msgs:
+        cuerpo = (m.body or '').strip() or f'({m.msg_type})'
+        quien = 'Cliente' if m.direction == 'in' else 'Aremko'
+        lineas.append(f'[{quien}]: {cuerpo}')
+    return '\n'.join(lineas)
+
+
+def _contexto_saludo_messenger(external_id, entrante_timestamp):
+    """(estado_saludo, nombre) para una conversación de Messenger. Agnóstico de WhatsApp.
+
+    Busca el mensaje anterior más reciente (excluye reacciones). Devuelve ('', '') si falla.
+    """
+    try:
+        from whatsapp_agent.prompt import clasificar_saludo, saneo_nombre
+        previo = (
+            ChannelMessage.objects
+            .filter(canal='messenger', external_id=external_id, timestamp__lt=entrante_timestamp)
+            .exclude(msg_type='reaction')
+            .order_by('-timestamp')
+            .values_list('timestamp', flat=True)
+            .first()
+        )
+        hay_previos = previo is not None
+        dias = (entrante_timestamp - previo).days if hay_previos else None
+        estado = clasificar_saludo(hay_previos, dias)
+
+        nombre = saneo_nombre(ChannelMessage.objects
+                              .filter(canal='messenger', external_id=external_id)
+                              .values_list('contact_name', flat=True)
+                              .first() or '')
+        return estado, nombre
+    except Exception:  # noqa: BLE001 — el saludo nunca debe tumbar el borrador
+        logger.exception('Inbox Messenger: no se pudo calcular el contexto de saludo')
+        return '', ''
+
+
+def _sugerencia_messenger(external_id):
+    """Borrador del agente IA para una conversación de Messenger (H-026).
+
+    Reusa `whatsapp_agent._producir_borrador` (grounding/config/escalamiento; agnóstico
+    de teléfono). Devuelve el MISMO shape que WhatsApp, o None si: el agente está apagado,
+    no hay entrante Messenger pendiente, o algo falla. Lazy y sin caché (v1). El caller decide
+    cuándo pedirlo (`&sugerencia=1`).
+    """
+    try:
+        from whatsapp_agent.agent import _producir_borrador, get_config
+        config = get_config()
+        if not config.activo:
+            return None
+        entrante = (
+            ChannelMessage.objects
+            .filter(canal='messenger', external_id=external_id,
+                    direction='in', requiere_atencion=True)
+            .order_by('-timestamp')
+            .first()
+        )
+        if entrante is None:
+            return None
+        historial = _historial_messenger(external_id, entrante.timestamp, config.history_window)
+        saludo_estado, saludo_nombre = _contexto_saludo_messenger(external_id, entrante.timestamp)
+        d = _producir_borrador(config, entrante.body, historial,
+                               saludo_estado=saludo_estado, saludo_nombre=saludo_nombre)
+        return {
+            'texto': d['texto'],
+            'escalar': d['escalar'],
+            'motivo': d['motivo'],
+            'modo': config.modo,
+            'modelo': d['modelo'],
+            'error': d['error'],
+            'generada_at': timezone.now().isoformat(),
+            'responde_a': entrante.external_message_id,
+        }
+    except Exception:  # noqa: BLE001 — el agente es opcional; nunca tumbar el hilo
+        logger.exception('Inbox: fallo generando sugerencia Messenger para %s', external_id)
         return None
 
 
