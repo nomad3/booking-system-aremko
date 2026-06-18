@@ -108,7 +108,7 @@ def metrics_campanas(request):
     for c in (ContactoWhatsApp.objects
               .filter(fecha_sugerido__gte=desde)
               .values('fecha_sugerido', 'estado')):
-        b = serie.get(_label_dt(c['fecha_sugerido']))
+        b = serie.get(_label(c['fecha_sugerido']))
         if not b:
             continue
         b['generados'] += 1
