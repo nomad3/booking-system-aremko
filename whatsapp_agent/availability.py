@@ -166,6 +166,9 @@ def disponibilidad(fecha=None, personas=1, tipo=None):
             'slots_libres': libres,
         })
 
+    # Limitar a máximo 2 servicios para evitar que el LLM ofrezca demasiadas opciones
+    servicios = servicios[:2]
+
     return {
         'fecha': f.isoformat() if f else None,
         'personas': personas,
@@ -263,6 +266,9 @@ def disponibilidad_alojamiento_multinoche(fecha_llegada, personas=1, noches=None
                 'noches': noches,
                 'total_estadia': int(total_estadia) if total_estadia == int(total_estadia) else total_estadia,
             })
+
+        # Limitar a máximo 2 cabañas (las 2 más económicas, por total_estadia)
+        resultado = sorted(resultado, key=lambda x: x['total_estadia'])[:2]
 
         return {
             'fecha_llegada': f_llegada.isoformat(),

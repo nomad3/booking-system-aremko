@@ -267,6 +267,9 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2):
         nota = ('hay tinas pero no se pudo encajar el masaje sin solapar; '
                 'ofrecer la tina y coordinar el masaje con una persona')
 
+    # Limitar a máximo 2 opciones para evitar que Luna ofrezca demasiadas alternativas
+    opciones = opciones[:2]
+
     # Upsell determinístico: si NINGUNA opción trae descuento (p.ej. fin de semana, el pack
     # es dom-jue), el código entrega el texto listo para que Luna lo incluya tal cual (más
     # confiable que pedírselo al modelo con una condición).
@@ -383,6 +386,9 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
                 'hay_descuento': False,
             })
         opciones.append(op)
+
+    # Limitar a máximo 2 opciones para evitar que Luna ofrezca demasiadas alternativas
+    opciones = opciones[:2]
 
     nota = ''
     if tina is None:
