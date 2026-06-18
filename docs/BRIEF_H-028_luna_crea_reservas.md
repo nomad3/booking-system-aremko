@@ -18,9 +18,15 @@ Alojamiento/masaje/packs = fases siguientes.
    - Cliente NUEVO (nunca reservó) → pedir **nombre completo, mail, ciudad de residencia, RUT**.
 3. **Resumen + confirmación ANTES de crear:** Luna muestra nombre + celular, servicios con
    fecha y hora, cantidad y valor → solo con el "sí" del cliente se habilita la creación.
-4. **Pago vía el resumen existente:** DESPUÉS de crear la reserva, Django ya tiene **un botón
-   en la reserva que genera un resumen con los datos de pago**. Luna debe **traer ese resumen**
-   y entregarlo al cliente en la conversación para que pague.
+4. **Resumen de la reserva (con datos de pago por transferencia) — CORREGIDO:** NO es un "resumen
+   de pago" genérico ni un link de pago. Es el **resumen de la reserva creada** que genera **un
+   botón que YA existe en la reserva** en Django, y que incluye:
+   - el **número de reserva** (ej. 6037) + el **detalle** de lo reservado,
+   - el **banco / datos de transferencia**, indicando que paga la reserva 6037,
+   - el **mail** donde enviar el comprobante (de la reserva 6037),
+   - la indicación de mandar **foto de la transferencia por WhatsApp**.
+   Pago = **transferencia bancaria con comprobante** (no Flow/link). Luna debe **traer ese resumen
+   tal cual** (verbatim) y entregarlo al cliente en la conversación.
 
 ## Flujo end-to-end (v1 tinas)
 1. Cliente elige tina + fecha/hora/personas (reusa el flujo de disponibilidad H-011).
@@ -29,8 +35,9 @@ Alojamiento/masaje/packs = fases siguientes.
 3. Luna arma el **resumen** y pide confirmación al cliente.
 4. Cliente confirma → en la bandeja aparece **"Crear reserva"** → Deborah aprueba.
 5. Django **crea la reserva** (re-verifica disponibilidad, idempotente).
-6. Django **genera el resumen de pago** (botón existente) → aremko-cli lo postea en la
-   conversación (Luna se lo envía al cliente).
+6. Django **genera el resumen de la reserva** (botón existente: nº reserva + detalle + banco/
+   transferencia + mail comprobante + "foto por WhatsApp") → aremko-cli lo postea **verbatim** en
+   la conversación (Luna se lo envía al cliente para que transfiera).
 
 ## Arquitectura propuesta (a confirmar/ajustar por django)
 Para que el botón "Crear reserva" sepa QUÉ crear sin parsear texto libre de Luna:
@@ -52,8 +59,10 @@ Para que el botón "Crear reserva" sepa QUÉ crear sin parsear texto libre de Lu
 
 ## Preguntas para Django (de su modelo/código)
 1. **¿Cómo se crea hoy una reserva de tina** (qué función/endpoint usa el flujo web)? Para reusarlo.
-2. **El "botón que genera el resumen con datos de pago"**: ¿qué genera exactamente y cómo
-   exponerlo como endpoint/string para que Luna lo traiga? (¿incluye monto de abono + instrucciones/link de pago?)
+2. **El botón que genera el resumen de la reserva** (nº reserva + detalle + banco/transferencia +
+   mail comprobante + "foto por WhatsApp"): ¿cómo se llama esa función/template y cómo la exponemos
+   como endpoint/string para que aremko-cli/Luna la traiga verbatim para una reserva creada? (ej.
+   `GET /api/reserva/<id>/resumen` o que `crear_reserva` lo devuelva en la respuesta).
 3. ¿Conviene guardar la `propuesta` en una tabla nueva (app aislada, drift-safe) o hay un estado
    de pre-reserva ya disponible? (Si tabla nueva → migración manual en Shell de Render.)
 4. ¿`verificar_cliente` necesita endpoint nuevo o ya existe lookup por teléfono? (existe
