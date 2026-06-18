@@ -30,6 +30,7 @@ from ventas.models import (
     Servicio, Cliente, VentaReserva, ReservaServicio,
     ServicioBloqueo, ServicioSlotBloqueo, Region, Comuna
 )
+from whatsapp_agent.models import PropuestaReserva
 from ventas.services.cliente_service import ClienteService
 from ventas.services.pack_descuento_service import PackDescuentoService
 
@@ -631,31 +632,24 @@ def validar_disponibilidad(request):
 @authentication_classes([LunaAPIKeyAuthentication])
 def crear_reserva(request):
     """
-    Crea una reserva completa desde Luna.
+    Crea una reserva completa desde Luna (H-028: soporta propuesta_id o payload directo).
 
-    POST /api/luna/reservas/create
+    POST /api/luna/reservas/create/
+    Header: X-API-Key
 
-    Body:
-    {
-        "idempotency_key": "unique-id-from-luna",
-        "cliente": {
-            "nombre": "Juan Pérez",
-            "email": "juan@example.com",
-            "telefono": "+56912345678",
-            "documento_identidad": "12345678-9",
-            "region_id": 1,
-            "comuna_id": 10
-        },
-        "servicios": [
-            {
-                "servicio_id": 12,
-                "fecha": "2026-04-01",
-                "hora": "14:30",
-                "cantidad_personas": 2
-            }
-        ],
-        "metodo_pago": "pendiente",
-        "notas": "Cliente contactado via WhatsApp"
+    Flujo 1 — CON PROPUESTA (aprobación de Deborah):
+    Body: { "propuesta_id": "uuid-string" }
+    - Consume payload guardado en PropuestaReserva
+    - Re-verifica disponibilidad
+    - Marcar propuesta como estado='creada' + guardar reserva_id
+    - Idempotente: si propuesta ya está creada, devuelve reserva existente
+
+    Flujo 2 — PAYLOAD DIRECTO (backward compat, Luna sin propuesta):
+    Body: {
+        "idempotency_key": "unique-id-from-luna",  # opcional
+        "cliente": {...},
+        "servicios": [...],
+        "metodo_pago": "pendiente"  # opcional
     }
 
     Respuesta:
@@ -663,23 +657,64 @@ def crear_reserva(request):
         "success": true,
         "reserva": {
             "id": 1234,
-            "numero": "RES-2026-1234",
-            "cliente": {...},
-            "servicios": [...],
-            "total": 50000,
-            "estado_pago": "pendiente",
-            "url_detalle": "https://aremko.cl/reserva/1234/",
-            "instrucciones_pago": "..."
+            "numero": "RES-1234",
+            "total": 180000,
+            "estado_pago": "pendiente"
         }
     }
+
+    Para obtener el resumen completo con datos de pago:
+    GET /api/v1/resumen-reserva/{id}/ → resumen_texto
     """
     try:
-        # Extraer datos del request
-        idempotency_key = request.data.get('idempotency_key')
-        cliente_data = request.data.get('cliente', {})
-        servicios_data = request.data.get('servicios', [])
-        metodo_pago = request.data.get('metodo_pago', 'pendiente')
-        notas = request.data.get('notas', '')
+        from whatsapp_agent.models import PropuestaReserva
+        from whatsapp_agent.reserva_service import obtener_propuesta
+
+        # Detectar flujo: propuesta_id o payload directo
+        propuesta_id = request.data.get('propuesta_id', '').strip()
+
+        if propuesta_id:
+            # Flujo 1: CON PROPUESTA
+            propuesta = obtener_propuesta(propuesta_id)
+            if not propuesta:
+                return Response({
+                    'success': False,
+                    'error': 'propuesta_not_found',
+                    'mensaje': f'Propuesta {propuesta_id[:8]}... no existe o expiró'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Si propuesta ya fue creada, devolver la reserva existente (idempotencia)
+            if propuesta.estado == 'creada' and propuesta.reserva_id:
+                try:
+                    reserva_existente = VentaReserva.objects.get(id=propuesta.reserva_id)
+                    return Response({
+                        'success': True,
+                        'reserva': {
+                            'id': reserva_existente.id,
+                            'numero': f'RES-{reserva_existente.id}',
+                            'total': int(reserva_existente.total),
+                            'estado_pago': reserva_existente.estado_pago,
+                            'duplicada': True
+                        },
+                        'mensaje': f'Reserva ya fue creada desde propuesta {propuesta_id[:8]}'
+                    })
+                except VentaReserva.DoesNotExist:
+                    pass  # Propuesta dice creada pero reserva desapareció → proceder a crear
+
+            # Extraer datos del payload guardado en la propuesta
+            payload = propuesta.payload or {}
+            cliente_data = payload.get('cliente', {})
+            servicios_data = payload.get('servicios', [])
+            metodo_pago = payload.get('metodo_pago', 'pendiente')
+            notas = f'[Propuesta {propuesta_id[:8]}] Aprobada por Deborah'
+            idempotency_key = propuesta.idempotency_key or f'propuesta_{propuesta_id}'
+        else:
+            # Flujo 2: PAYLOAD DIRECTO
+            idempotency_key = request.data.get('idempotency_key')
+            cliente_data = request.data.get('cliente', {})
+            servicios_data = request.data.get('servicios', [])
+            metodo_pago = request.data.get('metodo_pago', 'pendiente')
+            notas = request.data.get('notas', '')
 
         # Validar campos requeridos
         if not idempotency_key:
@@ -858,11 +893,23 @@ def crear_reserva(request):
 
             logger.info(f'[Luna API] Reserva completada: Total ${venta_reserva.total} (descuentos: ${total_descuentos})')
 
-            # 6. Preparar respuesta minimalista (H-028: fuente de verdad = /api/v1/resumen-reserva/{id}/)
+            # 6. Si vino propuesta_id, marcar como creada + guardar reserva_id (H-028)
+            if propuesta_id:
+                try:
+                    propuesta = PropuestaReserva.objects.get(propuesta_id=propuesta_id)
+                    propuesta.estado = 'creada'
+                    propuesta.reserva_id = venta_reserva.id
+                    propuesta.creada_at = timezone.now()
+                    propuesta.save(update_fields=['estado', 'reserva_id', 'creada_at'])
+                    logger.info(f'[Luna API] Propuesta {propuesta_id[:8]} marcada como creada (reserva {venta_reserva.id})')
+                except PropuestaReserva.DoesNotExist:
+                    pass  # propuesta_id fue validado antes, no debería pasar
+
+            # 7. Preparar respuesta minimalista (H-028: fuente de verdad = /api/v1/resumen-reserva/{id}/)
             reserva_data = {
                 'id': venta_reserva.id,
                 'numero': f'RES-{venta_reserva.id}',
-                'total': float(venta_reserva.total),
+                'total': int(venta_reserva.total),
                 'estado_pago': venta_reserva.estado_pago,
                 # Luna consulta GET /api/v1/resumen-reserva/{id}/ para el texto completo con datos de pago
             }
