@@ -175,10 +175,15 @@ def disponibilidad(fecha=None, personas=1, tipo=None):
     }
 
 
-def disponibilidad_alojamiento_multinoche(fecha_llegada, fecha_salida, personas=1):
+def disponibilidad_alojamiento_multinoche(fecha_llegada, personas=1, noches=None, fecha_salida=None):
     """Disponibilidad de cabañas para estadías multi-noche (H-027).
 
-    Fechas en formato YYYY-MM-DD. Noches = desde fecha_llegada hasta fecha_salida − 1 día.
+    Parámetros:
+    - fecha_llegada: YYYY-MM-DD (check-in). REQUERIDO.
+    - personas: 1-2 (default 1).
+    - noches: entero ≥1. Si se pasa, calcula salida = llegada + noches días. PREFERIDO.
+    - fecha_salida: YYYY-MM-DD (alternativa si no se pasa noches). Si ambos, noches tiene precedencia.
+
     Solo cabañas: publicadas, activas, capacidad 1-2 personas, NO complementos.
     Devuelve cabañas LIBRES en TODAS las noches del rango.
 
@@ -186,17 +191,28 @@ def disponibilidad_alojamiento_multinoche(fecha_llegada, fecha_salida, personas=
         {nombre, total_por_noche, noches, total_estadia}  (SIN precio_por_persona)
     ], 'error'?}
     """
+    from datetime import timedelta
     from ventas.models import Servicio, ReservaServicio
-    from .grounding import calcular_precio_flat
 
     f_llegada = _parse_fecha(fecha_llegada)
-    f_salida = _parse_fecha(fecha_salida)
+    if f_llegada is None:
+        return {'error': 'fecha_llegada inválida (usa formato YYYY-MM-DD)', 'cabanas': []}
 
-    if f_llegada is None or f_salida is None:
-        return {'error': 'fechas inválidas (usa formato YYYY-MM-DD)', 'cabanas': []}
-
-    if f_salida <= f_llegada:
-        return {'error': 'fecha de salida debe ser posterior a llegada', 'cabanas': []}
+    # Calcular fecha de salida: preferir noches, fallback a fecha_salida
+    if noches is not None:
+        try:
+            noches = int(noches)
+            if noches < 1:
+                return {'error': 'noches debe ser ≥1', 'cabanas': []}
+            f_salida = f_llegada + timedelta(days=noches)
+        except (TypeError, ValueError):
+            return {'error': 'noches inválido (usa un número entero)', 'cabanas': []}
+    else:
+        f_salida = _parse_fecha(fecha_salida)
+        if f_salida is None:
+            return {'error': 'fecha_salida inválida (usa formato YYYY-MM-DD) o pasa noches', 'cabanas': []}
+        if f_salida <= f_llegada:
+            return {'error': 'fecha de salida debe ser posterior a llegada', 'cabanas': []}
 
     try:
         personas = int(personas)
