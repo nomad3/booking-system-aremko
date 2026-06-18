@@ -145,14 +145,16 @@ def _es_masaje_agendable(servicio):
 
 
 def disponibilidad(fecha=None, personas=1, tipo=None):
-    """Servicios publicados que admiten `personas`, con precio total y horarios libres.
+    """Servicios publicados que admiten `personas`, con precio total y horarios libres (H-028 BUG FIX).
 
-    Con `fecha` (YYYY-MM-DD) → calcula horarios libres ese día (modo disponibilidad).
-    Sin `fecha` → modo SOLO PRECIO: lista los servicios que aplican por capacidad con su
-    precio total, sin horarios (para preguntas de precio sin fecha; H-011 refinamiento).
+    Con `fecha` (YYYY-MM-DD O expresión como "el sábado") → calcula horarios libres ese día.
+    Sin `fecha` → modo SOLO PRECIO: lista los servicios que aplican por capacidad.
+
+    CAMBIO H-028: Si fecha es una expresión ("el sábado", "25 de junio"), resuelve internamente
+    con resolver_fecha() antes de consultar. Luna hace 1 sola tool-call.
 
     Returns dict:
-      { 'fecha', 'personas', 'tipo', 'solo_precio', 'servicios': [
+      { 'fecha', 'dia_semana', 'personas', 'tipo', 'solo_precio', 'servicios': [
             {nombre, precio_por_persona, es_por_persona, precio_total,
              capacidad_minima, capacidad_maxima, duracion_texto, slots_libres:[...]|null}
         ], 'error'? }
@@ -163,9 +165,23 @@ def disponibilidad(fecha=None, personas=1, tipo=None):
 
     from .grounding import formatear_duracion
 
-    f = _parse_fecha(fecha) if fecha not in (None, '') else None
+    # H-028: Si fecha parece ser una expresión (no ISO), resolver primero
+    f = None
+    dia_semana_str = None
+    if fecha not in (None, ''):
+        f = _parse_fecha(fecha)
+        if f is None:
+            # No es formato ISO → intentar resolver como expresión ("el sábado", "25 de junio")
+            resuelto = resolver_fecha(fecha)
+            if resuelto.get('error'):
+                return {'error': resuelto['error'], 'servicios': []}
+            f = _parse_fecha(resuelto['fecha_iso'])
+            dia_semana_str = resuelto.get('dia_semana')
+            if resuelto.get('ambiguo'):
+                return {'error': 'fecha ambigua — por favor especifica día y fecha (ej. "domingo 21 de junio")', 'servicios': []}
+
     if fecha not in (None, '') and f is None:
-        return {'error': 'fecha inválida (usa formato YYYY-MM-DD)', 'servicios': []}
+        return {'error': 'fecha inválida', 'servicios': []}
 
     try:
         personas = int(personas)
@@ -249,8 +265,13 @@ def disponibilidad(fecha=None, personas=1, tipo=None):
     # Limitar a máximo 2 servicios para evitar que el LLM ofrezca demasiadas opciones
     servicios = servicios[:2]
 
+    # Calcular dia_semana si no se había resuelto
+    if f and not dia_semana_str:
+        dia_semana_str = DIAS_SEMANA_ES[f.weekday()]
+
     return {
         'fecha': f.isoformat() if f else None,
+        'dia_semana': dia_semana_str,  # H-028: devuelve el día calculado en código
         'personas': personas,
         'tipo': tipo or 'todos',
         'solo_precio': f is None,

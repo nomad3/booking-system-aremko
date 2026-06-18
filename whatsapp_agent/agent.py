@@ -30,24 +30,6 @@ _DIAS_ES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'do
 _TOOLS = [{
     'type': 'function',
     'function': {
-        'name': 'resolver_fecha',
-        'description': (
-            'CRÍTICO (H-028 BUG FIX): Resuelve fechas de forma determinística sin que el LLM calcule día de semana. '
-            'Acepta lo que dice el cliente ("el sábado", "25 de junio", "próximo sábado") y devuelve '
-            '{fecha_iso, dia_semana, dia_numero, ambiguo}. SIEMPRE usa esto ANTES de consultar disponibilidad. '
-            'NUNCA calcules día de semana a mano; USA el que devuelve esta herramienta en tus respuestas.'
-        ),
-        'parameters': {
-            'type': 'object',
-            'properties': {
-                'expresion_cliente': {'type': 'string', 'description': 'Lo que dice el cliente sobre la fecha (ej. "el sábado", "25 de junio", "próximo domingo")'},
-            },
-            'required': ['expresion_cliente'],
-        },
-    },
-}, {
-    'type': 'function',
-    'function': {
         'name': 'consultar_disponibilidad',
         'description': (
             'Consulta servicios (tinas/masajes/cabañas) con su PRECIO TOTAL ya calculado y, si das '
@@ -169,13 +151,6 @@ _TOOLS = [{
 
 def _tool_executor(name, args):
     """Ejecuta las tools del agente. Solo lectura; nunca escribe reservas."""
-    if name == 'resolver_fecha':
-        from .availability import resolver_fecha
-        try:
-            return resolver_fecha((args or {}).get('expresion_cliente', ''))
-        except Exception as exc:  # noqa: BLE001
-            logger.exception('Agente WA: tool resolver_fecha falló: %s', exc)
-            return {'error': f'error resolviendo fecha: {str(exc)[:100]}', 'ambiguo': True}
     if name == 'consultar_disponibilidad':
         from .availability import disponibilidad
         try:
