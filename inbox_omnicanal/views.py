@@ -25,6 +25,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 
+from ventas.models import Servicio
 from .logic import truthy as _truthy, external_id_conversacion
 from .models import ChannelMessage
 
@@ -837,3 +838,63 @@ def marcar_atendido(request, canal, external_id):
         'success': True, 'canal': canal, 'external_id': external_id,
         'actualizado': bool(actualizado), 'mensajes_actualizados': actualizado,
     })
+
+
+@csrf_exempt
+def media_library(request):
+    """GET /api/inbox/media-library (H-025) — biblioteca de medios para bandeja.
+
+    Devuelve Servicios publicados (tina/cabana/masaje) con sus fotos y videos,
+    agrupados por tipo, para que aremko-cli los use en la galería del compositor.
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'método no permitido'}, status=405)
+    err = _check_luna_key(request)
+    if err:
+        return err
+
+    # Filtrar servicios: publicados, tipos válidos (omitir 'otro')
+    servicios = Servicio.objects.filter(
+        publicado_web=True,
+        tipo_servicio__in=['tina', 'cabana', 'masaje']
+    ).order_by('tipo_servicio', 'nombre')
+
+    # Agrupar por tipo_servicio
+    tipos_labels = {'tina': 'Tinas', 'cabana': 'Cabañas', 'masaje': 'Masajes'}
+    grupos_dict = {t: [] for t in ['tina', 'cabana', 'masaje']}
+
+    for servicio in servicios:
+        # Recopilar fotos (imagen, imagen_2, imagen_3)
+        fotos = []
+        for campo in ['imagen', 'imagen_2', 'imagen_3']:
+            img = getattr(servicio, campo, None)
+            if img and img.name:  # ImageField/FileField tienen .name cuando no están vacíos
+                fotos.append(img.url)
+
+        # Recopilar video (preferencia: video subido, luego video_url)
+        video = None
+        if servicio.video and servicio.video.name:
+            video = servicio.video.url
+        elif servicio.video_url:
+            video = servicio.video_url
+
+        # Solo incluir servicios con al menos una foto o video
+        if fotos or video:
+            grupos_dict[servicio.tipo_servicio].append({
+                'id': servicio.id,
+                'nombre': servicio.nombre,
+                'fotos': fotos,
+                'video': video,
+            })
+
+    # Construir respuesta agrupada
+    grupos = []
+    for tipo in ['tina', 'cabana', 'masaje']:
+        if grupos_dict[tipo]:  # Solo incluir tipos que tengan items
+            grupos.append({
+                'tipo': tipo,
+                'label': tipos_labels[tipo],
+                'items': grupos_dict[tipo],
+            })
+
+    return JsonResponse({'grupos': grupos})

@@ -109,6 +109,7 @@ urlpatterns = [
     path('api/inbox/conversation/', inbox_views.conversation, name='inbox_conversation'),
     path('api/inbox/conversations/<str:canal>/<str:external_id>/marcar-atendido/',
          inbox_views.marcar_atendido, name='inbox_marcar_atendido'),
+    path('api/inbox/media-library', inbox_views.media_library, name='inbox_media_library'),
 
     # Landing campaña "Refugio Aremko" (lanzamiento 15-jun-2026)
     # Alias raíz de la baja: TODOS los emails históricos llevan este link
