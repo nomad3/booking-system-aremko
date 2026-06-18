@@ -19,7 +19,7 @@ from .serializers import (
 from ventas.models import (
     Servicio, ReservaServicio, VentaReserva,
     ServicioBloqueo, ServicioSlotBloqueo,
-    CategoriaServicio, Producto
+    CategoriaServicio, Producto, ConfiguracionResumen
 )
 
 
@@ -647,3 +647,43 @@ def refugio_leads_list(request):
                               'los aporta aremko-cli (whatsapp_clicks_total=null aqui).'),
         },
     })
+
+
+@api_view(['GET'])
+@authentication_classes([])
+def resumen_reserva_json(request, reserva_id):
+    """H-028: Obtener resumen de reserva para agente Luna.
+
+    GET /api/v1/resumen-reserva/{reserva_id}/
+
+    Sin autenticación: Luna/agente puede acceder tras crear una reserva.
+    Devuelve el texto completo del resumen listo para copiar/enviar por WhatsApp.
+    """
+    from ventas.views.resumen_reserva_view import _generar_texto_resumen
+    from django.utils import timezone
+
+    try:
+        reserva = VentaReserva.objects.get(id=reserva_id)
+    except VentaReserva.DoesNotExist:
+        return Response(
+            {'error': f'Reserva {reserva_id} no existe'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    try:
+        config = ConfiguracionResumen.get_solo()
+        resumen_texto = _generar_texto_resumen(reserva, config)
+
+        return Response({
+            'ok': True,
+            'reserva_id': reserva.id,
+            'resumen_texto': resumen_texto,
+            'estado_pago': reserva.estado_pago,
+            'total': int(reserva.total),
+            'puede_cambiar': reserva.puede_cambiar_reserva() if hasattr(reserva, 'puede_cambiar_reserva') else None,
+        })
+    except Exception as e:
+        return Response(
+            {'error': f'Error al generar resumen: {str(e)[:200]}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

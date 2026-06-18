@@ -18,4 +18,7 @@ urlpatterns = [
     path('refugio-leads/summary/', views.refugio_leads_summary, name='refugio-leads-summary'),
     # H-002: listado de leads (formulario + WhatsApp [Refugio]) para CPL real y Etapa 4b.
     path('refugio-leads/', views.refugio_leads_list, name='refugio-leads-list'),
+
+    # H-028: Resumen de reserva para agente Luna
+    path('v1/resumen-reserva/<int:reserva_id>/', views.resumen_reserva_json, name='resumen-reserva-json'),
 ]
