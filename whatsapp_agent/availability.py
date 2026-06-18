@@ -173,3 +173,84 @@ def disponibilidad(fecha=None, personas=1, tipo=None):
         'solo_precio': f is None,
         'servicios': servicios,
     }
+
+
+def disponibilidad_alojamiento_multinoche(fecha_llegada, fecha_salida, personas=1):
+    """Disponibilidad de cabañas para estadías multi-noche (H-027).
+
+    Fechas en formato YYYY-MM-DD. Noches = desde fecha_llegada hasta fecha_salida − 1 día.
+    Solo cabañas: publicadas, activas, capacidad 1-2 personas, NO complementos.
+    Devuelve cabañas LIBRES en TODAS las noches del rango.
+
+    Respuesta: {'noches', 'fecha_llegada', 'fecha_salida', 'personas', 'cabanas': [
+        {nombre, total_por_noche, noches, total_estadia}  (SIN precio_por_persona)
+    ], 'error'?}
+    """
+    from ventas.models import Servicio, ReservaServicio
+    from .grounding import calcular_precio_flat
+
+    f_llegada = _parse_fecha(fecha_llegada)
+    f_salida = _parse_fecha(fecha_salida)
+
+    if f_llegada is None or f_salida is None:
+        return {'error': 'fechas inválidas (usa formato YYYY-MM-DD)', 'cabanas': []}
+
+    if f_salida <= f_llegada:
+        return {'error': 'fecha de salida debe ser posterior a llegada', 'cabanas': []}
+
+    try:
+        personas = int(personas)
+    except (TypeError, ValueError):
+        personas = 1
+    if personas < 1 or personas > 2:
+        return {'error': 'máximo 2 personas por cabaña', 'cabanas': []}
+
+    # Calcular noches del rango
+    delta = f_salida - f_llegada
+    noches = delta.days
+
+    # Obtener todas las cabañas candidatas
+    from .models import WhatsAppAgentConfig
+    comp_ids = WhatsAppAgentConfig.get_solo().ids_complementarios()
+
+    cabanas = Servicio.objects.filter(
+        tipo_servicio='cabana',
+        publicado_web=True,
+        activo=True,
+        capacidad_minima__lte=personas,
+        capacidad_maxima__gte=personas,
+    ).exclude(id__in=comp_ids).order_by('nombre')
+
+    # Para cada cabaña, verificar si está libre en TODAS las noches
+    resultado = []
+    for cabana in cabanas:
+        # Contar ocupaciones en cualquiera de las noches del rango
+        ocupadas_en_rango = ReservaServicio.objects.filter(
+            servicio=cabana,
+            fecha_agendamiento__gte=f_llegada,
+            fecha_agendamiento__lt=f_salida,  # hasta el día anterior a salida
+        ).count()
+
+        # Si está ocupada en alguna noche del rango, excluir
+        if ocupadas_en_rango > 0:
+            continue
+
+        # Cabaña libre: calcular precio
+        precio_base = float(cabana.precio_base)
+        total_por_noche = precio_base * personas  # SIN mostrar precio_por_persona
+        total_estadia = total_por_noche * noches
+
+        resultado.append({
+            'nombre': cabana.nombre,
+            'total_por_noche': int(total_por_noche) if total_por_noche == int(total_por_noche) else total_por_noche,
+            'noches': noches,
+            'total_estadia': int(total_estadia) if total_estadia == int(total_estadia) else total_estadia,
+        })
+
+    return {
+        'fecha_llegada': f_llegada.isoformat(),
+        'fecha_salida': f_salida.isoformat(),
+        'noches': noches,
+        'personas': personas,
+        'cabanas': resultado,
+    }

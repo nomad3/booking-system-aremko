@@ -94,6 +94,29 @@ _TOOLS = [{
             'required': ['fecha'],
         },
     },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'consultar_disponibilidad_alojamiento_multinoche',
+        'description': (
+            'Consulta cabañas libres para una estadía de VARIAS NOCHES (H-027). Máx 2 personas. '
+            'DESAMBIGUA PRIMERO: si el cliente dice "cabaña para el 23 y 24", confirma cuántas '
+            'noches son antes de llamar (ej. "¿1 noche [entrada 23, salida 24] o 2 noches '
+            '[entrada 23, salida 25]?"). Una vez claro, pasa `fecha_llegada` (check-in) y '
+            '`fecha_salida` (check-out). Devuelve cabañas libres en TODAS las noches del rango, '
+            'cada una con `total_por_noche` (tarifa plana) y `total_estadia`. Muestra solo los '
+            'totales, NUNCA el precio unitario por persona.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'fecha_llegada': {'type': 'string', 'description': 'Fecha check-in YYYY-MM-DD'},
+                'fecha_salida': {'type': 'string', 'description': 'Fecha check-out YYYY-MM-DD'},
+                'personas': {'type': 'integer', 'description': 'Cantidad de personas (1-2)'},
+            },
+            'required': ['fecha_llegada', 'fecha_salida', 'personas'],
+        },
+    },
 }]
 
 
@@ -127,6 +150,17 @@ def _tool_executor(name, args):
         except Exception as exc:  # noqa: BLE001
             logger.exception('Agente WA: tool pack cabaña falló: %s', exc)
             return {'error': 'no se pudo componer el pack de cabaña'}
+    if name == 'consultar_disponibilidad_alojamiento_multinoche':
+        from .availability import disponibilidad_alojamiento_multinoche
+        try:
+            return disponibilidad_alojamiento_multinoche(
+                (args or {}).get('fecha_llegada'),
+                (args or {}).get('fecha_salida'),
+                (args or {}).get('personas', 1),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception('Agente WA: tool alojamiento multinoche falló: %s', exc)
+            return {'error': 'no se pudo consultar disponibilidad de alojamiento'}
     return {'error': f'herramienta desconocida: {name}'}
 
 
