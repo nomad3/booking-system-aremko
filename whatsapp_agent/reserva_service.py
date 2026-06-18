@@ -22,25 +22,50 @@ from ventas.models import Servicio
 logger = logging.getLogger(__name__)
 
 
-def preparar_reserva(canal, external_id, cliente_data, servicios_data):
-    """Valida, re-verifica disponibilidad y guarda propuesta de reserva.
+def preparar_reserva(canal, external_id, payload, idempotency_key=None):
+    """Valida, re-verifica disponibilidad y guarda propuesta de reserva (idempotente).
 
     Args:
         canal: 'whatsapp'
         external_id: teléfono normalizado (+56...)
-        cliente_data: {nombre, email, documento_identidad, region_id, comuna_id}
-        servicios_data: [{servicio_id, fecha, hora, cantidad_personas}, ...]
+        payload: {
+            'cliente': {nombre, email, documento_identidad, region_id, comuna_id},
+            'servicios': [{servicio_id, fecha, hora, cantidad_personas}, ...],
+            'metodo_pago': 'pendiente'  (opcional)
+        }
+        idempotency_key: string opcional (si Luna reenvía, evita duplicados)
 
     Returns:
         {
             'success': True,
             'propuesta_id': 'uuid-string',
-            'resumen': '2 Tina Hidromasaje (20-06-2026) + 1 Masaje Relajación...',
-            'total': 180000
+            'resumen_texto': '2 Tina Hidromasaje (20-06-2026) + 1 Masaje Relajación...',
+            'total': 180000,
+            'cliente': 'Juan Pérez',
+            'servicios_count': 2
         }
         o error {success: False, error: 'code', mensaje: '...'}
     """
     try:
+        cliente_data = payload.get('cliente', {})
+        servicios_data = payload.get('servicios', [])
+
+        # Si tiene idempotency_key, buscar propuesta existente
+        if idempotency_key:
+            try:
+                propuesta = PropuestaReserva.objects.get(idempotency_key=idempotency_key)
+                if propuesta.esta_vigente():
+                    logger.info(f'[Luna] Propuesta duplicada (idempotent): {idempotency_key[:16]}')
+                    return {
+                        'success': True,
+                        'propuesta_id': propuesta.propuesta_id,
+                        'resumen_texto': propuesta.resumen_texto,
+                        'total': int(propuesta.total),
+                        'duplicada': True
+                    }
+            except PropuestaReserva.DoesNotExist:
+                pass
+
         # 1. Validar cliente_data obligatorio
         nombre = cliente_data.get('nombre', '').strip()
         email = cliente_data.get('email', '').strip()
@@ -110,18 +135,18 @@ def preparar_reserva(canal, external_id, cliente_data, servicios_data):
                     f"{info['cantidad_personas']}x {info['nombre']} "
                     f"({info['fecha']} {info['hora']}) = ${int(info['subtotal']):,}"
                 )
-            resumen = '\n'.join(lineas_resumen)
+            resumen_texto = '\n'.join(lineas_resumen)
 
             # 5. Guardar PropuestaReserva
             propuesta_id = str(uuid.uuid4())
             propuesta = PropuestaReserva.objects.create(
                 propuesta_id=propuesta_id,
+                idempotency_key=idempotency_key or '',
                 canal=canal,
                 external_id=external_id,
-                cliente_data=cliente_data,
-                servicios=servicios_data,
+                payload=payload,  # Guarda el payload completo para crear_reserva()
                 total=int(total),
-                resumen=resumen,
+                resumen_texto=resumen_texto,
                 estado='pendiente',
                 expires_at=timezone.now() + timedelta(hours=1)
             )
@@ -134,7 +159,7 @@ def preparar_reserva(canal, external_id, cliente_data, servicios_data):
             return {
                 'success': True,
                 'propuesta_id': propuesta_id,
-                'resumen': resumen,
+                'resumen_texto': resumen_texto,
                 'total': int(total),
                 'cliente': nombre,
                 'servicios_count': len(servicios_info)

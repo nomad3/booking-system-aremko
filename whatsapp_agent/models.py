@@ -284,45 +284,51 @@ class PropuestaReserva(models.Model):
     """Propuesta de reserva pendiente de aprobación de Deborah (H-028).
 
     Flujo:
-    1. Luna llama preparar_reserva() → valida + guarda PropuestaReserva
-    2. READ /api/inbox/conversation/ devuelve propuesta_reserva (si existe)
+    1. Luna llama preparar_reserva() → valida + guarda PropuestaReserva (estado=pendiente)
+    2. READ /api/inbox/conversation/ devuelve propuesta_reserva (si existe y vigente)
     3. aremko-cli muestra botón "Crear reserva"
     4. Deborah aprueba → POST /api/luna/reservas/create/?propuesta_id=X
-    5. criar_reserva() consume la propuesta + crea VentaReserva
+    5. crear_reserva(propuesta_id) consume la propuesta + crea VentaReserva + marca estado=creada
+
+    Durabilidad: tabla nueva (app aislada) sobrevive deploys/redeploys, no se pierde el cache.
+    Auditoría: todas las propuestas (creadas, descartadas, expiradas) quedan en BD.
     """
 
     ESTADO_CHOICES = [
-        ('pendiente', 'Pendiente aprobación'),
-        ('creada', 'Reserva creada'),
-        ('cancelada', 'Cancelada por usuario'),
-        ('expirada', 'Expirada (>1h)'),
+        ('pendiente', 'Pendiente aprobación de Deborah'),
+        ('creada', 'Reserva VentaReserva ya creada (idempotente)'),
+        ('descartada', 'Cancelada por usuario/cliente'),
+        ('expirada', 'Expirada sin ser aprobada'),
     ]
 
+    # Identificadores
     propuesta_id = models.CharField(max_length=36, unique=True, db_index=True)  # UUID string
+    idempotency_key = models.CharField(max_length=255, unique=True, db_index=True, blank=True,
+                                       help_text='Clave de idempotencia (Luna puede mandar varias veces)')
+
+    # Contexto de conversación
     canal = models.CharField(max_length=20)  # 'whatsapp'
     external_id = models.CharField(max_length=50, db_index=True)  # teléfono normalizado
 
-    # Datos del cliente
-    cliente_data = models.JSONField(
-        help_text='{"nombre", "email", "documento_identidad", "region_id", "comuna_id"}'
+    # Payload completo (compatible con crear_reserva())
+    payload = models.JSONField(
+        help_text='{"cliente": {...}, "servicios": [...], "metodo_pago": "..."}'
     )
 
-    # Servicios a reservar
-    servicios = models.JSONField(
-        help_text='[{"servicio_id": N, "fecha": "2026-06-20", "hora": "14:00", "cantidad_personas": 2}]'
-    )
-
-    # Resumen para Deborah
+    # Resumen para presentar a Deborah
+    resumen_texto = models.TextField(blank=True, help_text='Resumen legible para aprobación')
     total = models.DecimalField(max_digits=10, decimal_places=0)
-    resumen = models.TextField(blank=True, help_text='Texto resumido para aprobación')
 
-    # Estado
-    estado = models.CharField(max_length=12, choices=ESTADO_CHOICES, default='pendiente', db_index=True)
+    # Estado del ciclo de vida
+    estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default='pendiente', db_index=True)
 
-    # Auditoría
+    # Referencia a la reserva creada (se llena cuando estado='creada')
+    reserva_id = models.IntegerField(null=True, blank=True, help_text='VentaReserva.id si ya fue creada')
+
+    # Auditoría temporal
     created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField(help_text='Propuesta válida 1 hora')
-    creada_at = models.DateTimeField(null=True, blank=True, help_text='Cuándo se creó la reserva')
+    expires_at = models.DateTimeField(help_text='Propuesta vigente hasta esta hora')
+    creada_at = models.DateTimeField(null=True, blank=True, help_text='Cuándo se ejecutó crear_reserva()')
 
     class Meta:
         verbose_name = 'Propuesta de reserva'
@@ -330,12 +336,14 @@ class PropuestaReserva(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['canal', 'external_id', 'estado']),
+            models.Index(fields=['estado', 'expires_at']),
         ]
 
     def __str__(self):
-        return f'Propuesta {self.propuesta_id[:8]} · {self.external_id} · ${self.total:,} ({self.estado})'
+        estado_label = self.get_estado_display()
+        return f'Propuesta {self.propuesta_id[:8]} · {self.external_id} · ${self.total:,} ({estado_label})'
 
     def esta_vigente(self):
-        """True si aún no expiró ni fue usada."""
+        """True si es pendiente y no ha expirado."""
         from django.utils import timezone
         return self.estado == 'pendiente' and timezone.now() < self.expires_at
