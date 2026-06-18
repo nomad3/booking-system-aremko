@@ -254,6 +254,7 @@ urlpatterns = [
     path('api/luna/test/', luna_api_views.test_connection, name='luna_test'),
     path('api/luna/health/', luna_api_views.health_check, name='luna_health'),
     path('api/luna/regiones/', luna_api_views.listar_regiones, name='luna_regiones'),
+    path('api/luna/cliente/', luna_api_views.lookup_cliente, name='luna_lookup_cliente'),
     path('api/luna/reservas/validar/', luna_api_views.validar_disponibilidad, name='luna_validar_disponibilidad'),
     path('api/luna/reservas/create/', luna_api_views.crear_reserva, name='luna_crear_reserva'),
     path('api/luna/reservas/<int:reserva_id>/servicios/', luna_api_views.agregar_servicios_reserva, name='luna_agregar_servicios'),

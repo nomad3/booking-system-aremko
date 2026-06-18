@@ -177,7 +177,8 @@ def validar_datos_cliente(cliente_data: dict) -> tuple:
             'mensaje': mensaje
         })
 
-    # Validar RUT (opcional pero si viene debe ser válido)
+    # RUT: validar según contexto (se pasa cliente_es_nuevo en contexto externo)
+    # Por ahora: si viene, debe ser válido. Obligatoriedad se valida en crear_reserva()
     rut = cliente_data.get('documento_identidad', '').strip()
     if rut:
         es_valido, mensaje, rut_norm = validar_rut_chileno(rut)
@@ -226,14 +227,15 @@ class LunaAPIKeyAuthentication(BaseAuthentication):
     """
     Autenticación personalizada para Luna API usando API Key en header.
 
-    Header esperado: X-Luna-API-Key
+    Header esperado: X-API-Key (estandarizado con otros endpoints)
     """
 
     def authenticate(self, request):
-        api_key = request.META.get('HTTP_X_LUNA_API_KEY')
+        # request.headers es case-insensitive; respaldo vía META
+        api_key = request.headers.get('X-API-Key') or request.META.get('HTTP_X_API_KEY')
 
         if not api_key:
-            raise AuthenticationFailed('API Key no proporcionada. Use header X-Luna-API-Key.')
+            raise AuthenticationFailed('API Key no proporcionada. Use header X-API-Key.')
 
         expected_key = getattr(settings, 'LUNA_API_KEY', None)
 
@@ -749,6 +751,20 @@ def crear_reserva(request):
                 }
             )
 
+            # Para cliente NUEVO, RUT es obligatorio (H-028)
+            if created:
+                rut = cliente_data.get('documento_identidad', '').strip()
+                if not rut:
+                    return Response({
+                        'success': False,
+                        'error': 'validation_error',
+                        'mensaje': 'RUT es requerido para cliente nuevo',
+                        'errores': [{'campo': 'documento_identidad', 'mensaje': 'RUT es obligatorio'}]
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                # Si viene, ya fue validado en validar_datos_cliente()
+                cliente.documento_identidad = rut
+                cliente.save()
+
             # Actualizar datos si el cliente ya existía
             if not created:
                 cliente.nombre = cliente_data.get('nombre', cliente.nombre)
@@ -839,32 +855,13 @@ def crear_reserva(request):
 
             logger.info(f'[Luna API] Reserva completada: Total ${venta_reserva.total} (descuentos: ${total_descuentos})')
 
-            # 6. Preparar respuesta
+            # 6. Preparar respuesta minimalista (H-028: fuente de verdad = /api/v1/resumen-reserva/{id}/)
             reserva_data = {
                 'id': venta_reserva.id,
                 'numero': f'RES-{venta_reserva.id}',
-                'cliente': {
-                    'id': cliente.id,
-                    'nombre': cliente.nombre,
-                    'email': cliente.email,
-                    'telefono': cliente.telefono,
-                    'documento_identidad': cliente.documento_identidad
-                },
-                'servicios': servicios_creados,
                 'total': float(venta_reserva.total),
-                'pagado': float(venta_reserva.pagado),
-                'saldo_pendiente': float(venta_reserva.saldo_pendiente),
                 'estado_pago': venta_reserva.estado_pago,
-                'descuentos_aplicados': [
-                    {
-                        'pack_nombre': pack_info['pack'].nombre,
-                        'descuento': float(pack_info['descuento'])
-                    }
-                    for pack_info in packs_aplicables
-                ],
-                'total_descuentos': float(total_descuentos),
-                'fecha_creacion': venta_reserva.fecha_creacion.isoformat(),
-                'notas': notas
+                # Luna consulta GET /api/v1/resumen-reserva/{id}/ para el texto completo con datos de pago
             }
 
             # Guardar en cache por 24 horas (idempotencia)
@@ -873,7 +870,7 @@ def crear_reserva(request):
             return Response({
                 'success': True,
                 'reserva': reserva_data,
-                'mensaje': f'Reserva creada exitosamente: {venta_reserva.id}'
+                'mensaje': f'Reserva creada exitosamente: {venta_reserva.id}. Consulta GET /api/v1/resumen-reserva/{venta_reserva.id}/ para el resumen completo.'
             }, status=status.HTTP_201_CREATED)
 
     except Servicio.DoesNotExist as e:
@@ -1141,6 +1138,91 @@ def validar_disponibilidad_interna(servicios_data):
             'success': False,
             'errores': [{'error': 'internal_error', 'mensaje': str(e)}]
         }
+
+
+# ============================================================================
+# LOOKUP CLIENTE (H-028)
+# ============================================================================
+
+@api_view(['GET'])
+@authentication_classes([LunaAPIKeyAuthentication])
+def lookup_cliente(request):
+    """
+    Busca cliente por teléfono y devuelve datos + campos faltantes (H-028).
+
+    GET /api/luna/cliente/?telefono=+56912345678
+    Header: X-API-Key
+
+    Respuesta:
+    {
+        "existe": true,
+        "cliente_id": 123,
+        "nombre": "Juan Pérez",
+        "email": "juan@example.com",
+        "documento_identidad": "12345678-9",
+        "region": "Los Lagos",
+        "faltan": []  # campos vacíos que Luna debería pedir
+    }
+
+    Si no existe:
+    {
+        "existe": false,
+        "faltan": ["nombre", "email", "documento_identidad", "region"]
+    }
+    """
+    try:
+        telefono = request.query_params.get('telefono', '').strip()
+        if not telefono:
+            return Response({
+                'error': 'validation_error',
+                'mensaje': 'Parámetro telefono es requerido'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Normalizar teléfono
+        es_valido, mensaje, telefono_normalizado = validar_telefono_chileno(telefono)
+        if not es_valido:
+            return Response({
+                'error': 'validation_error',
+                'mensaje': f'Teléfono inválido: {mensaje}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Buscar cliente
+        try:
+            cliente = Cliente.objects.get(telefono=telefono_normalizado)
+            # Cliente existe: devolver datos + campos faltantes
+            faltan = []
+            if not cliente.nombre or len(cliente.nombre.strip()) < 3:
+                faltan.append('nombre')
+            if not cliente.email:
+                faltan.append('email')
+            if not cliente.documento_identidad:
+                faltan.append('documento_identidad')
+            if not cliente.region_id:
+                faltan.append('region')
+
+            return Response({
+                'existe': True,
+                'cliente_id': cliente.id,
+                'nombre': cliente.nombre,
+                'email': cliente.email,
+                'documento_identidad': cliente.documento_identidad,
+                'region': cliente.region.nombre if cliente.region else None,
+                'comuna': cliente.comuna.nombre if cliente.comuna else None,
+                'faltan': faltan
+            })
+        except Cliente.DoesNotExist:
+            # Cliente no existe: devolver lista de campos requeridos para nuevo
+            return Response({
+                'existe': False,
+                'faltan': ['nombre', 'email', 'documento_identidad', 'region']
+            })
+
+    except Exception as e:
+        logger.error(f'[Luna API] Error en lookup_cliente: {str(e)}', exc_info=True)
+        return Response({
+            'error': 'internal_error',
+            'mensaje': 'Error al buscar cliente'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ============================================================================
