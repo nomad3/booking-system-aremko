@@ -1229,6 +1229,108 @@ def lookup_cliente(request):
 
 
 # ============================================================================
+# PREPARAR RESERVA (H-028: Gate de Deborah)
+# ============================================================================
+
+@api_view(['POST'])
+@authentication_classes([LunaAPIKeyAuthentication])
+def preparar_reserva_endpoint(request):
+    """
+    Prepara una propuesta de reserva pendiente de aprobación de Deborah (H-028).
+
+    POST /api/luna/reservas/preparar/
+    Header: X-API-Key
+
+    Body:
+    {
+        "idempotency_key": "luna-msg-uuid",  # opcional, para idempotencia
+        "canal": "whatsapp",
+        "external_id": "+56912345678",  # teléfono normalizado
+        "payload": {
+            "cliente": {
+                "nombre": "Juan Pérez",
+                "email": "juan@example.com",
+                "documento_identidad": "12345678-9",
+                "region_id": 1,
+                "comuna_id": 10
+            },
+            "servicios": [
+                {
+                    "servicio_id": 12,
+                    "fecha": "2026-06-20",
+                    "hora": "14:00",
+                    "cantidad_personas": 2
+                }
+            ],
+            "metodo_pago": "pendiente"
+        }
+    }
+
+    Respuesta exitosa:
+    {
+        "success": true,
+        "propuesta_id": "uuid-string",
+        "resumen_texto": "2x Tina Hidromasaje (20-06-2026 14:00) = $180,000",
+        "total": 180000,
+        "cliente": "Juan Pérez",
+        "servicios_count": 1
+    }
+
+    Si es idempotente (Luna reenvía la misma propuesta):
+    {
+        "success": true,
+        "propuesta_id": "uuid-string",  # mismo que antes
+        "resumen_texto": "...",
+        "total": 180000,
+        "duplicada": true
+    }
+    """
+    try:
+        from whatsapp_agent.reserva_service import preparar_reserva as servicio_preparar_reserva
+
+        idempotency_key = request.data.get('idempotency_key', '').strip()
+        canal = request.data.get('canal', 'whatsapp').strip()
+        external_id = request.data.get('external_id', '').strip()
+        payload = request.data.get('payload', {})
+
+        # Validar datos requeridos
+        if not external_id:
+            return Response({
+                'success': False,
+                'error': 'validation_error',
+                'mensaje': 'external_id requerido (teléfono normalizado)'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if not payload:
+            return Response({
+                'success': False,
+                'error': 'validation_error',
+                'mensaje': 'payload requerido'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Llamar servicio
+        resultado = servicio_preparar_reserva(
+            canal=canal,
+            external_id=external_id,
+            payload=payload,
+            idempotency_key=idempotency_key if idempotency_key else None
+        )
+
+        if resultado['success']:
+            return Response(resultado, status=status.HTTP_201_CREATED)
+        else:
+            return Response(resultado, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        logger.error(f'[Luna API] Error en preparar_reserva_endpoint: {str(e)}', exc_info=True)
+        return Response({
+            'success': False,
+            'error': 'internal_error',
+            'mensaje': 'Error al preparar reserva'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================================================
 # HEALTH CHECK
 # ============================================================================
 
