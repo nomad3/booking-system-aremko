@@ -315,6 +315,7 @@ _TOOLS = [{
                 'email': {'type': 'string', 'description': 'Email del cliente (omitir si ya está en su ficha)'},
                 'documento_identidad': {'type': 'string', 'description': 'RUT del cliente (omitir si ya está en su ficha)'},
                 'comuna': {'type': 'string', 'description': 'Comuna del cliente, ej. "Puerto Varas" (omitir si ya está en su ficha)'},
+                'telefono': {'type': 'string', 'description': 'Teléfono del cliente. En WhatsApp OMÍTELO (se usa el de la conversación). En Instagram/Messenger SÍ pásalo.'},
             },
             'required': [],
         },
@@ -656,6 +657,8 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 cliente_data = {
                     'nombre': args.get('nombre', '').strip(),
                     'email': args.get('email', '').strip(),
+                    # En WhatsApp el teléfono es el external_id; crear_reserva lo exige.
+                    'telefono': (args.get('telefono') or (external_id if canal == 'whatsapp' else '')).strip(),
                     'documento_identidad': args.get('documento_identidad', '').strip(),
                     'region_id': region_id,
                     'comuna_id': None,  # Opcional por ahora
@@ -778,6 +781,11 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 email = (args.get('email') or ficha.get('email') or '').strip()
                 documento = (args.get('documento_identidad') or ficha.get('documento_identidad') or '').strip()
                 comuna_nombre = (args.get('comuna') or ficha.get('comuna_nombre') or '').strip()
+                # Teléfono: en WhatsApp es el external_id de la conversación; en IG/Messenger
+                # el cliente lo da explícito (external_id ahí es un PSID/IGSID, no un teléfono).
+                telefono = (args.get('telefono') or '').strip()
+                if not telefono and canal == 'whatsapp':
+                    telefono = external_id
 
                 # Deducir region_id de la comuna (igual que preparar_reserva).
                 region_id = None
@@ -796,7 +804,8 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
 
                 # Validar que tengamos los datos mínimos antes de crear la propuesta.
                 faltan = [k for k, v in (('nombre', nombre), ('email', email),
-                                         ('documento_identidad', documento), ('comuna', comuna_nombre)) if not v]
+                                         ('documento_identidad', documento), ('comuna', comuna_nombre),
+                                         ('telefono', telefono)) if not v]
                 if faltan:
                     return {
                         'success': False,
@@ -808,6 +817,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 cliente_data = {
                     'nombre': nombre,
                     'email': email,
+                    'telefono': telefono,
                     'documento_identidad': documento,
                     'region_id': region_id,
                     'comuna_id': comuna_id,
