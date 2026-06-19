@@ -1378,6 +1378,72 @@ def preparar_reserva_endpoint(request):
 
 
 # ============================================================================
+# ADMIN: LIMPIAR CONVERSACIÓN
+# ============================================================================
+
+@api_view(['POST'])
+def limpiar_conversacion_endpoint(request):
+    """
+    Limpia el historial de una conversación (testing/debug).
+
+    POST /api/luna/admin/limpiar-conversacion
+    Header: X-API-Key
+    Body: {
+        "phone": "+56958655810",  # default
+        "force": false
+    }
+
+    Returns: {success, mensaje, borrados}
+    """
+    err = _check_luna_key(request)
+    if err:
+        return err
+
+    try:
+        phone = (request.data.get('phone') or '+56958655810').strip()
+        force = request.data.get('force', False)
+
+        from ventas.models import WhatsAppMessage
+        from carrito_reservas.models import CarritoReserva
+
+        msg_count = WhatsAppMessage.objects.filter(phone=phone).count()
+        carrito_count = CarritoReserva.objects.filter(
+            canal='whatsapp',
+            external_id=phone
+        ).count()
+
+        if msg_count == 0 and carrito_count == 0:
+            return Response({
+                'success': False,
+                'error': 'nada_para_borrar',
+                'mensaje': f'No hay conversación para {phone}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Borrar
+        WhatsAppMessage.objects.filter(phone=phone).delete()
+        CarritoReserva.objects.filter(canal='whatsapp', external_id=phone).delete()
+
+        logger.info(f'[Admin] Limpiada conversación {phone}: {msg_count} msgs + {carrito_count} carritos')
+
+        return Response({
+            'success': True,
+            'mensaje': f'Conversación {phone} limpia',
+            'borrados': {
+                'mensajes': msg_count,
+                'carritos': carrito_count
+            }
+        })
+
+    except Exception as e:
+        logger.error(f'[Luna API] Error en limpiar_conversacion: {str(e)}', exc_info=True)
+        return Response({
+            'success': False,
+            'error': 'internal_error',
+            'mensaje': f'Error: {str(e)[:100]}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================================================
 # HEALTH CHECK
 # ============================================================================
 

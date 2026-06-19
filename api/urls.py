@@ -32,4 +32,7 @@ urlpatterns = [
     path('luna/reservas/preparar/', luna_api_views.preparar_reserva_endpoint, name='luna-preparar-reserva'),
     path('luna/reservas/create/', luna_api_views.crear_reserva, name='luna-crear-reserva'),
     path('luna/reservas/<int:reserva_id>/servicios/', luna_api_views.agregar_servicios_reserva, name='luna-agregar-servicios'),
+
+    # Admin endpoints (testing/debug)
+    path('luna/admin/limpiar-conversacion/', luna_api_views.limpiar_conversacion_endpoint, name='luna-limpiar-conversacion'),
 ]
