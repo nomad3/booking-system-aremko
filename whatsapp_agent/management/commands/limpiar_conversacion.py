@@ -11,6 +11,7 @@ Uso:
 from django.core.management.base import BaseCommand, CommandError
 from ventas.models import WhatsAppMessage
 from carrito_reservas.models import CarritoReserva
+from whatsapp_agent.models import PropuestaReserva
 import logging
 
 logger = logging.getLogger(__name__)
@@ -38,14 +39,18 @@ class Command(BaseCommand):
 
         self.stdout.write(f'🧹 Limpiando conversación: {phone}')
 
-        # Contar mensajes a borrar
+        # Contar a borrar
         msg_count = WhatsAppMessage.objects.filter(phone=phone).count()
         carrito_count = CarritoReserva.objects.filter(
             canal='whatsapp',
             external_id=phone
         ).count()
+        propuesta_count = PropuestaReserva.objects.filter(
+            canal='whatsapp',
+            external_id=phone
+        ).count()
 
-        if msg_count == 0 and carrito_count == 0:
+        if msg_count == 0 and carrito_count == 0 and propuesta_count == 0:
             self.stdout.write(self.style.WARNING(f'No hay conversación para {phone}'))
             return
 
@@ -55,6 +60,7 @@ class Command(BaseCommand):
                 f'\n⚠️  Se borrarán:\n'
                 f'   • {msg_count} mensajes WhatsApp\n'
                 f'   • {carrito_count} carrito(s)\n'
+                f'   • {propuesta_count} propuesta(s) de reserva\n'
             )
             confirm = input('¿Confirmar? (s/n): ').strip().lower()
             if confirm != 's':
@@ -72,5 +78,11 @@ class Command(BaseCommand):
             CarritoReserva.objects.filter(canal='whatsapp', external_id=phone).delete()
             self.stdout.write(self.style.SUCCESS(f'✅ Borrados {carrito_count} carrito(s)'))
             logger.info(f'[Limpiar] Borrados {carrito_count} carritos de {phone}')
+
+        # Borrar propuestas de reserva (alimentan el banner "Crear reserva")
+        if propuesta_count > 0:
+            PropuestaReserva.objects.filter(canal='whatsapp', external_id=phone).delete()
+            self.stdout.write(self.style.SUCCESS(f'✅ Borradas {propuesta_count} propuesta(s)'))
+            logger.info(f'[Limpiar] Borradas {propuesta_count} propuestas de {phone}')
 
         self.stdout.write(self.style.SUCCESS('\n✨ Conversación limpia. Luna comenzará con registro vacío.'))

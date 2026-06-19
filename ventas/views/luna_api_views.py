@@ -1402,14 +1402,21 @@ def limpiar_conversacion_endpoint(request):
 
         from ventas.models import WhatsAppMessage
         from carrito_reservas.models import CarritoReserva
+        from whatsapp_agent.models import PropuestaReserva
 
         msg_count = WhatsAppMessage.objects.filter(phone=phone).count()
         carrito_count = CarritoReserva.objects.filter(
             canal='whatsapp',
             external_id=phone
         ).count()
+        # PropuestaReserva alimenta el banner "Crear reserva"; si no se borra, el banner
+        # (incluso uno con error) persiste tras limpiar la conversación.
+        propuesta_count = PropuestaReserva.objects.filter(
+            canal='whatsapp',
+            external_id=phone
+        ).count()
 
-        if msg_count == 0 and carrito_count == 0:
+        if msg_count == 0 and carrito_count == 0 and propuesta_count == 0:
             return Response({
                 'success': False,
                 'error': 'nada_para_borrar',
@@ -1419,15 +1426,18 @@ def limpiar_conversacion_endpoint(request):
         # Borrar
         WhatsAppMessage.objects.filter(phone=phone).delete()
         CarritoReserva.objects.filter(canal='whatsapp', external_id=phone).delete()
+        PropuestaReserva.objects.filter(canal='whatsapp', external_id=phone).delete()
 
-        logger.info(f'[Admin] Limpiada conversación {phone}: {msg_count} msgs + {carrito_count} carritos')
+        logger.info(f'[Admin] Limpiada conversación {phone}: {msg_count} msgs + '
+                    f'{carrito_count} carritos + {propuesta_count} propuestas')
 
         return Response({
             'success': True,
             'mensaje': f'Conversación {phone} limpia',
             'borrados': {
                 'mensajes': msg_count,
-                'carritos': carrito_count
+                'carritos': carrito_count,
+                'propuestas': propuesta_count
             }
         })
 

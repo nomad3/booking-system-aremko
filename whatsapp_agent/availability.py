@@ -267,8 +267,20 @@ def disponibilidad(fecha=None, personas=1, tipo=None):
             'slots_libres': libres,
         })
 
-    # Limitar a máximo 2 servicios para evitar que el LLM ofrezca demasiadas opciones
-    servicios = servicios[:2]
+    # Limitar opciones para no abrumar al LLM, PERO con variedad de tipos:
+    # - Si el cliente pidió un tipo concreto (ej. "una tina"): hasta 2 de ese tipo.
+    # - Si es consulta general: 1 representante de CADA tipo disponible (tina + masaje +
+    #   cabaña), para no sesgar por orden alfabético (cabana<masaje<tina) y ofrecer las 3
+    #   categorías cuando todas calzan con la cantidad de personas.
+    if tipo:
+        servicios = servicios[:2]
+    else:
+        vistos, diversos = set(), []
+        for s in servicios:
+            if s['tipo'] not in vistos:
+                diversos.append(s)
+                vistos.add(s['tipo'])
+        servicios = diversos
 
     # Calcular dia_semana si no se había resuelto
     if f and not dia_semana_str:
