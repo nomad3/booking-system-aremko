@@ -184,119 +184,6 @@ _TOOLS = [{
 }]
 
 
-def _tool_executor(name, args):
-    """Ejecuta las tools del agente. Solo lectura; nunca escribe reservas."""
-    if name == 'consultar_disponibilidad':
-        from .availability import disponibilidad
-        try:
-            return disponibilidad(
-                (args or {}).get('fecha'),
-                (args or {}).get('personas', 1),
-                (args or {}).get('tipo'),
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.exception('Agente WA: tool disponibilidad falló: %s', exc)
-            return {'error': 'no se pudo consultar disponibilidad'}
-    if name == 'consultar_disponibilidad_pack':
-        from .packs import disponibilidad_pack_tina_masaje
-        try:
-            return disponibilidad_pack_tina_masaje(
-                (args or {}).get('fecha'),
-                (args or {}).get('personas', 2),
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.exception('Agente WA: tool pack falló: %s', exc)
-            return {'error': 'no se pudo componer el pack'}
-    if name == 'consultar_disponibilidad_pack_cabana':
-        from .packs import disponibilidad_pack_cabana_tina
-        try:
-            return disponibilidad_pack_cabana_tina((args or {}).get('fecha'))
-        except Exception as exc:  # noqa: BLE001
-            logger.exception('Agente WA: tool pack cabaña falló: %s', exc)
-            return {'error': 'no se pudo componer el pack de cabaña'}
-    if name == 'consultar_disponibilidad_alojamiento_multinoche':
-        from .availability import disponibilidad_alojamiento_multinoche
-        try:
-            return disponibilidad_alojamiento_multinoche(
-                (args or {}).get('fecha_llegada'),
-                (args or {}).get('personas', 1),
-                noches=(args or {}).get('noches'),
-                fecha_salida=(args or {}).get('fecha_salida'),
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.exception('Agente WA: tool alojamiento multinoche falló: %s', exc)
-            return {'error': 'no se pudo consultar disponibilidad de alojamiento'}
-    if name == 'preparar_reserva':
-        from .reserva_service import preparar_reserva as servicio_preparar_reserva
-        from ventas.services.cliente_service import ClienteService
-        try:
-            # Normalizar teléfono para obtener external_id (placeholder: en WhatsApp es el phone del cliente)
-            # Por ahora usamos un placeholder; en conversación real viene del contexto WhatsApp
-            args = args or {}
-
-            # H-028 FIX: Luna pasa comuna (string), deducir region_id de la comuna
-            region_id = None
-            comuna_nombre = args.get('comuna', '').strip()
-            if comuna_nombre:
-                from ventas.models import Comuna
-                try:
-                    # Buscar comuna por nombre y deducir región
-                    logger.info(f'[preparar_reserva] Buscando comuna: "{comuna_nombre}"')
-                    comuna = Comuna.objects.filter(nombre__icontains=comuna_nombre).first()
-                    if not comuna:
-                        # Debug: listar todas las comunas para verificar
-                        todas = list(Comuna.objects.values_list('nombre', flat=True)[:10])
-                        logger.warning(f'Comuna "{comuna_nombre}" no encontrada. Ejemplos en BD: {todas}')
-                        return {
-                            'success': False,
-                            'error': 'comuna_not_found',
-                            'mensaje': f'Comuna "{comuna_nombre}" no encontrada'
-                        }
-                    region_id = comuna.region_id
-                except Exception as e:
-                    logger.warning(f'Error buscando comuna "{comuna_nombre}": {e}')
-                    return {
-                        'success': False,
-                        'error': 'internal_error',
-                        'mensaje': f'Error al buscar comuna: {str(e)[:100]}'
-                    }
-
-            # Construir payload compatible con preparar_reserva()
-            cliente_data = {
-                'nombre': args.get('nombre', '').strip(),
-                'email': args.get('email', '').strip(),
-                'documento_identidad': args.get('documento_identidad', '').strip(),
-                'region_id': region_id,
-                'comuna_id': None,  # Opcional por ahora
-            }
-            servicios = [{
-                'servicio_id': args.get('servicio_id'),
-                'fecha': args.get('fecha'),
-                'hora': args.get('hora'),
-                'cantidad_personas': args.get('cantidad_personas', 1),
-            }]
-            payload = {
-                'cliente': cliente_data,
-                'servicios': servicios,
-                'metodo_pago': 'pendiente',
-            }
-            # Usar phone de WhatsApp como external_id (en contexto real)
-            external_id = getattr(timezone.localtime(), 'phone', '+56912345678')  # placeholder
-            resultado = servicio_preparar_reserva(
-                canal='whatsapp',
-                external_id=external_id,
-                payload=payload,
-                idempotency_key=None
-            )
-            if not resultado.get('success'):
-                logger.error(f'[preparar_reserva FAILED] Error: {resultado.get("error")}, Mensaje: {resultado.get("mensaje")}')
-            return resultado
-        except Exception as exc:  # noqa: BLE001
-            logger.exception('Agente WA: tool preparar_reserva EXCEPCIÓN: %s', exc)
-            return {'error': f'no se pudo preparar reserva: {str(exc)[:100]}'}
-    return {'error': f'herramienta desconocida: {name}'}
-
-
 def _fecha_hoy_texto():
     """'2026-06-14 (domingo)' en hora de Chile, para que el LLM resuelva 'el sábado'."""
     from django.utils import timezone
@@ -453,7 +340,7 @@ def _contexto_saludo(entrante):
         return '', ''
 
 
-def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_nombre='', datos_cliente=None):
+def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_nombre='', datos_cliente=None, phone='', canal='whatsapp'):
     """Genera el borrador para un texto de cliente. SIN DB y SIN gate de `activo`.
 
     Devuelve un dict {escalar, motivo, texto, modelo, error, *tokens}. Lo usan
@@ -461,6 +348,8 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
 
     datos_cliente: dict {nombre, email, documento_identidad, region_nombre} si el cliente
                    existe en BD. Luna evita pedir lo que ya tiene.
+    phone: E.164 teléfono del cliente (ej. +56958655810) para usar como external_id en PropuestaReserva
+    canal: 'whatsapp' o similar (para validación de propuestas)
     """
     # 1) Heurística de escalamiento antes de gastar tokens.
     motivo_pre = escalation.pre_escalar(mensaje)
@@ -482,6 +371,120 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
 
     # 3) Llamada al LLM con tool-calling (disponibilidad). El provider nunca lanza;
     #    igual lo blindamos. Si el modelo no llama la tool, responde texto directo.
+
+    # H-028 FIX: Crear closure de executor que capture el phone real para preparar_reserva
+    def _tool_executor_con_contexto(name, args):
+        """Ejecuta las tools del agente. Captura el phone del cliente para PropuestaReserva."""
+        if name == 'consultar_disponibilidad':
+            from .availability import disponibilidad
+            try:
+                return disponibilidad(
+                    (args or {}).get('fecha'),
+                    (args or {}).get('personas', 1),
+                    (args or {}).get('tipo'),
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool disponibilidad falló: %s', exc)
+                return {'error': 'no se pudo consultar disponibilidad'}
+        if name == 'consultar_disponibilidad_pack':
+            from .packs import disponibilidad_pack_tina_masaje
+            try:
+                return disponibilidad_pack_tina_masaje(
+                    (args or {}).get('fecha'),
+                    (args or {}).get('personas', 2),
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool pack falló: %s', exc)
+                return {'error': 'no se pudo componer el pack'}
+        if name == 'consultar_disponibilidad_pack_cabana':
+            from .packs import disponibilidad_pack_cabana_tina
+            try:
+                return disponibilidad_pack_cabana_tina((args or {}).get('fecha'))
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool pack cabaña falló: %s', exc)
+                return {'error': 'no se pudo componer el pack de cabaña'}
+        if name == 'consultar_disponibilidad_alojamiento_multinoche':
+            from .availability import disponibilidad_alojamiento_multinoche
+            try:
+                return disponibilidad_alojamiento_multinoche(
+                    (args or {}).get('fecha_llegada'),
+                    (args or {}).get('personas', 1),
+                    noches=(args or {}).get('noches'),
+                    fecha_salida=(args or {}).get('fecha_salida'),
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool alojamiento multinoche falló: %s', exc)
+                return {'error': 'no se pudo consultar disponibilidad de alojamiento'}
+        if name == 'preparar_reserva':
+            from .reserva_service import preparar_reserva as servicio_preparar_reserva
+            from ventas.services.cliente_service import ClienteService
+            try:
+                args = args or {}
+
+                # H-028 FIX: Usar el phone REAL del cliente (capturado en la closure)
+                external_id = phone if phone else '+56912345678'
+                logger.info(f'[preparar_reserva] Usando external_id={external_id} para PropuestaReserva')
+
+                # H-028 FIX: Luna pasa comuna (string), deducir region_id de la comuna
+                region_id = None
+                comuna_nombre = args.get('comuna', '').strip()
+                if comuna_nombre:
+                    from ventas.models import Comuna
+                    try:
+                        # Buscar comuna por nombre y deducir región
+                        logger.info(f'[preparar_reserva] Buscando comuna: "{comuna_nombre}"')
+                        comuna = Comuna.objects.filter(nombre__icontains=comuna_nombre).first()
+                        if not comuna:
+                            # Debug: listar todas las comunas para verificar
+                            todas = list(Comuna.objects.values_list('nombre', flat=True)[:10])
+                            logger.warning(f'Comuna "{comuna_nombre}" no encontrada. Ejemplos en BD: {todas}')
+                            return {
+                                'success': False,
+                                'error': 'comuna_not_found',
+                                'mensaje': f'Comuna "{comuna_nombre}" no encontrada'
+                            }
+                        region_id = comuna.region_id
+                    except Exception as e:
+                        logger.warning(f'Error buscando comuna "{comuna_nombre}": {e}')
+                        return {
+                            'success': False,
+                            'error': 'internal_error',
+                            'mensaje': f'Error al buscar comuna: {str(e)[:100]}'
+                        }
+
+                # Construir payload compatible con preparar_reserva()
+                cliente_data = {
+                    'nombre': args.get('nombre', '').strip(),
+                    'email': args.get('email', '').strip(),
+                    'documento_identidad': args.get('documento_identidad', '').strip(),
+                    'region_id': region_id,
+                    'comuna_id': None,  # Opcional por ahora
+                }
+                servicios = [{
+                    'servicio_id': args.get('servicio_id'),
+                    'fecha': args.get('fecha'),
+                    'hora': args.get('hora'),
+                    'cantidad_personas': args.get('cantidad_personas', 1),
+                }]
+                payload = {
+                    'cliente': cliente_data,
+                    'servicios': servicios,
+                    'metodo_pago': 'pendiente',
+                }
+                resultado = servicio_preparar_reserva(
+                    canal=canal,
+                    external_id=external_id,
+                    payload=payload,
+                    idempotency_key=None
+                )
+                if not resultado.get('success'):
+                    logger.error(f'[preparar_reserva FAILED] Error: {resultado.get("error")}, Mensaje: {resultado.get("mensaje")}')
+                return resultado
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool preparar_reserva EXCEPCIÓN: %s', exc)
+                return {'error': f'no se pudo preparar reserva: {str(exc)[:100]}'}
+        return {'error': f'herramienta desconocida: {name}'}
+
     try:
         from destino_puerto_varas.services.llm.openrouter_provider import OpenRouterProvider
         provider = OpenRouterProvider()
@@ -491,7 +494,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 {'role': 'user', 'content': user_prompt},
             ],
             tools=_TOOLS,
-            tool_executor=_tool_executor,
+            tool_executor=_tool_executor_con_contexto,
             model=modelo,
             max_tokens=config.max_tokens,
             temperature=float(config.temperature),
@@ -562,7 +565,7 @@ def generar_sugerencia(phone, *, forzar=False):
     datos_cliente = _obtener_datos_cliente_por_phone(phone)
     d = _producir_borrador(config, entrante.body, historial,
                            saludo_estado=saludo_estado, saludo_nombre=saludo_nombre,
-                           datos_cliente=datos_cliente)
+                           datos_cliente=datos_cliente, phone=phone, canal='whatsapp')
     return _guardar(
         entrante, texto=d['texto'], escalar=d['escalar'], motivo=d['motivo'],
         modo=config.modo, modelo=d['modelo'], error=d['error'],

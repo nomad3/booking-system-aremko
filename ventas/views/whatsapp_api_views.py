@@ -27,6 +27,7 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 
 from ..models import WhatsAppMessage, ContactoWhatsApp, Cliente
+from inbox_omnicanal.views import _propuesta_reserva  # H-028 FIX: agregar propuesta al endpoint
 
 
 def _check_luna_key(request):
@@ -490,6 +491,8 @@ def conversation(request):
         # H-007 F1: borrador sugerido por el agente IA para el último entrante sin
         # responder (null si el agente está apagado, no hay pendiente, o ?sugerencia=0).
         'sugerencia_agente': _sugerencia_agente(phone, request),
+        # H-028 FIX: propuesta de reserva vigente (null si no hay)
+        'propuesta_reserva': _propuesta_reserva('whatsapp', phone),
     })
 
 
