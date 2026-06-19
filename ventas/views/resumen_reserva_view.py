@@ -127,11 +127,21 @@ def _generar_texto_resumen(reserva, config):
             lineas.append(f"Gift Card ${int(giftcard.monto_inicial):,}{destinatario}")
         lineas.append("")
 
-    # Comentarios (información específica de la reserva)
+    # Comentarios (información específica de la reserva).
+    # Filtrar notas INTERNAS de auditoría (Luna/propuesta/aprobación de Deborah): se
+    # conservan en el admin pero NO deben aparecer en el texto que ve el cliente.
     if reserva.comentarios and reserva.comentarios.strip():
-        lineas.append("Notas importantes:")
-        lineas.append(reserva.comentarios)
-        lineas.append("")
+        notas_cliente = '\n'.join(
+            ln for ln in reserva.comentarios.splitlines()
+            if ln.strip()
+            and not ln.lstrip().startswith('[Luna')
+            and not ln.lstrip().startswith('[Propuesta')
+            and 'Aprobada por Deborah' not in ln
+        ).strip()
+        if notas_cliente:
+            lineas.append("Notas importantes:")
+            lineas.append(notas_cliente)
+            lineas.append("")
 
     lineas.append("")
 

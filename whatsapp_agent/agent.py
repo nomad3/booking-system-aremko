@@ -528,11 +528,19 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
         if name == 'consultar_disponibilidad':
             from .availability import disponibilidad
             try:
-                return disponibilidad(
-                    (args or {}).get('fecha'),
-                    (args or {}).get('personas', 1),
-                    (args or {}).get('tipo'),
-                )
+                args = args or {}
+                # NO defaultear a 1 persona: el precio es POR PERSONA, así que asumir 1
+                # daría total y disponibilidad mal. Si el cliente no dijo la cantidad,
+                # forzamos a Luna a preguntarla en vez de inventarla.
+                personas_raw = args.get('personas')
+                try:
+                    personas = int(personas_raw)
+                except (TypeError, ValueError):
+                    personas = 0
+                if personas < 1:
+                    return {'error': 'falta_personas',
+                            'mensaje': 'Antes de consultar disponibilidad, pregúntale al cliente para cuántas personas será. NO asumas 1.'}
+                return disponibilidad(args.get('fecha'), personas, args.get('tipo'))
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool disponibilidad falló: %s', exc)
                 return {'error': 'no se pudo consultar disponibilidad'}
@@ -716,13 +724,22 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                         logger.info('[agregar_servicio_carrito] override por nombre "%s": id %s → %s',
                                     nombre_servicio, servicio_id, matches[0])
                         servicio_id = matches[0]
+                # NO defaultear a 1 persona (el precio es POR PERSONA): exigir la cantidad
+                # real del cliente. Si falta, Luna debe preguntarla antes de agregar.
+                try:
+                    cantidad = int(args.get('cantidad_personas'))
+                except (TypeError, ValueError):
+                    cantidad = 0
+                if cantidad < 1:
+                    return {'success': False, 'error': 'falta_personas',
+                            'mensaje': 'Necesito saber para cuántas personas es. Pregúntale al cliente antes de agregar al carrito. NO asumas 1.'}
                 resultado = CarritoService.agregar_servicio(
                     canal=canal,
                     external_id=phone if phone else 'desconocido',
                     servicio_id=servicio_id,
                     fecha=args.get('fecha'),
                     hora=args.get('hora'),
-                    cantidad_personas=args.get('cantidad_personas', 1)
+                    cantidad_personas=cantidad
                 )
                 return resultado
             except Exception as exc:  # noqa: BLE001
