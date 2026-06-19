@@ -203,6 +203,75 @@ _TOOLS = [{
             'required': ['nombre', 'email', 'documento_identidad', 'servicio_id', 'fecha', 'hora', 'cantidad_personas'],
         },
     },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'agregar_servicio_carrito',
+        'description': (
+            'Agrega un servicio al carrito (H-029 FASE 2). Luna va acumulando servicios '
+            'hasta que el cliente dice "listo, voy a reservar/pagar". '
+            'El carrito calcula descuentos dinámicamente (PackDescuento). '
+            'Devuelve: {success, carrito: {items_count, total, items}}'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'servicio_id': {'type': 'integer', 'description': 'ID del servicio (tina/masaje/cabaña)'},
+                'fecha': {'type': 'string', 'description': 'Fecha YYYY-MM-DD'},
+                'hora': {'type': 'string', 'description': 'Hora HH:MM'},
+                'cantidad_personas': {'type': 'integer', 'description': 'Cantidad de personas'},
+            },
+            'required': ['servicio_id', 'fecha', 'hora', 'cantidad_personas'],
+        },
+    },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'agregar_producto_carrito',
+        'description': (
+            'Agrega un producto al carrito (tablas de queso, jugos, etc.). '
+            'H-029 FASE 2. Mezcla servicios + productos en el mismo carrito.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'producto_id': {'type': 'integer', 'description': 'ID del producto'},
+                'cantidad': {'type': 'integer', 'description': 'Cantidad a agregar'},
+            },
+            'required': ['producto_id', 'cantidad'],
+        },
+    },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'ver_carrito',
+        'description': (
+            'Obtiene el resumen del carrito actual. '
+            'Devuelve: items, subtotales, descuentos aplicados, total. '
+            'Usa esto para confirmar con el cliente antes de checkout.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {},
+            'required': [],
+        },
+    },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'quitar_item_carrito',
+        'description': (
+            'Quita un item del carrito por su índice. '
+            'H-029 FASE 2. Recalcula totales automáticamente.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'indice': {'type': 'integer', 'description': 'Índice del item a quitar (0-based)'},
+            },
+            'required': ['indice'],
+        },
+    },
 }]
 
 
@@ -560,6 +629,63 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool preparar_reserva EXCEPCIÓN: %s', exc)
                 return {'error': f'no se pudo preparar reserva: {str(exc)[:100]}'}
+        if name == 'agregar_servicio_carrito':
+            # H-029 FASE 2: agregar servicio al carrito
+            from carrito_reservas.services import CarritoService
+            try:
+                args = args or {}
+                resultado = CarritoService.agregar_servicio(
+                    canal=canal,
+                    external_id=phone if phone else 'desconocido',
+                    servicio_id=args.get('servicio_id'),
+                    fecha=args.get('fecha'),
+                    hora=args.get('hora'),
+                    cantidad_personas=args.get('cantidad_personas', 1)
+                )
+                return resultado
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool agregar_servicio_carrito falló: %s', exc)
+                return {'error': f'no se pudo agregar servicio: {str(exc)[:100]}'}
+        if name == 'agregar_producto_carrito':
+            # H-029 FASE 2: agregar producto al carrito
+            from carrito_reservas.services import CarritoService
+            try:
+                args = args or {}
+                resultado = CarritoService.agregar_producto(
+                    canal=canal,
+                    external_id=phone if phone else 'desconocido',
+                    producto_id=args.get('producto_id'),
+                    cantidad=args.get('cantidad', 1)
+                )
+                return resultado
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool agregar_producto_carrito falló: %s', exc)
+                return {'error': f'no se pudo agregar producto: {str(exc)[:100]}'}
+        if name == 'ver_carrito':
+            # H-029 FASE 2: ver carrito
+            from carrito_reservas.services import CarritoService
+            try:
+                return CarritoService.ver_carrito(
+                    canal=canal,
+                    external_id=phone if phone else 'desconocido'
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool ver_carrito falló: %s', exc)
+                return {'error': f'no se pudo obtener carrito: {str(exc)[:100]}'}
+        if name == 'quitar_item_carrito':
+            # H-029 FASE 2: quitar item del carrito
+            from carrito_reservas.services import CarritoService
+            try:
+                args = args or {}
+                resultado = CarritoService.quitar_item(
+                    canal=canal,
+                    external_id=phone if phone else 'desconocido',
+                    indice=args.get('indice', 0)
+                )
+                return resultado
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool quitar_item_carrito falló: %s', exc)
+                return {'error': f'no se pudo quitar item: {str(exc)[:100]}'}
         return {'error': f'herramienta desconocida: {name}'}
 
     try:
