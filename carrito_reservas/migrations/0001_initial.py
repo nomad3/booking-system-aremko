@@ -36,19 +36,19 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.AddIndex(
-            model_name='carrioreserva',
+            model_name='carritoreserva',
             index=models.Index(fields=['canal', 'external_id'], name='carrito_res_canal_external_idx'),
         ),
         migrations.AddIndex(
-            model_name='carrioreserva',
+            model_name='carritoreserva',
             index=models.Index(fields=['estado'], name='carrito_res_estado_idx'),
         ),
         migrations.AddIndex(
-            model_name='carrioreserva',
+            model_name='carritoreserva',
             index=models.Index(fields=['created_at'], name='carrito_res_created_at_idx'),
         ),
         migrations.AlterUniqueTogether(
-            name='carrioreserva',
+            name='carritoreserva',
             unique_together={('canal', 'external_id')},
         ),
     ]
