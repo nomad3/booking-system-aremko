@@ -157,6 +157,28 @@ _TOOLS = [{
 }, {
     'type': 'function',
     'function': {
+        'name': 'verificar_cliente',
+        'description': (
+            'Verifica si un cliente existe en la BD por teléfono y qué datos le faltan (H-028). '
+            'ÚSALA PRIMERO antes de preparar_reserva para saber si pedir nombre/email/RUT. '
+            'En WhatsApp: usa el teléfono de la conversación (NO pidas teléfono al cliente). '
+            'En Instagram/Messenger: PIDE el teléfono al cliente PRIMERO, luego llama esta tool. '
+            'Devuelve: {existe, cliente_id?, nombre?, email?, documento_identidad?, region?, faltan:[...]}. '
+            'Si existe y tiene todo → directo a preparar_reserva sin pedir más datos. '
+            'Si falta algo → pide SOLO lo que falta. '
+            'Si no existe → pide nombre + email + RUT + región.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'telefono': {'type': 'string', 'description': 'Teléfono del cliente (ej. +56912345678 o 912345678)'},
+            },
+            'required': ['telefono'],
+        },
+    },
+}, {
+    'type': 'function',
+    'function': {
         'name': 'preparar_reserva',
         'description': (
             'GATE DE DEBORAH (H-028): Prepara una propuesta de reserva pendiente de aprobación '
@@ -415,6 +437,61 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool alojamiento multinoche falló: %s', exc)
                 return {'error': 'no se pudo consultar disponibilidad de alojamiento'}
+        if name == 'verificar_cliente':
+            # H-028: verificar si cliente existe y qué datos le faltan
+            from django.conf import settings
+            try:
+                args = args or {}
+                telefono = (args.get('telefono') or '').strip()
+                if not telefono:
+                    return {
+                        'success': False,
+                        'error': 'telefono_requerido',
+                        'mensaje': 'Teléfono es requerido'
+                    }
+
+                # Llamar al endpoint lookup_cliente vía ClienteService
+                from ventas.services.cliente_service import ClienteService
+                try:
+                    cliente, telefono_normalizado = ClienteService.buscar_cliente_por_telefono(telefono)
+                except Exception:
+                    cliente = None
+                    telefono_normalizado = None
+
+                if cliente:
+                    # Cliente existe: devolver datos + campos faltantes
+                    faltan = []
+                    if not cliente.nombre or len(cliente.nombre.strip()) < 3:
+                        faltan.append('nombre')
+                    if not cliente.email:
+                        faltan.append('email')
+                    if not cliente.documento_identidad:
+                        faltan.append('documento_identidad')
+                    if not cliente.region_id:
+                        faltan.append('region')
+
+                    return {
+                        'existe': True,
+                        'cliente_id': cliente.id,
+                        'nombre': cliente.nombre,
+                        'email': cliente.email,
+                        'documento_identidad': cliente.documento_identidad,
+                        'region': cliente.region.nombre if cliente.region else None,
+                        'faltan': faltan
+                    }
+                else:
+                    # Cliente no existe: pedir todos los datos
+                    return {
+                        'existe': False,
+                        'faltan': ['nombre', 'email', 'documento_identidad', 'region']
+                    }
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool verificar_cliente falló: %s', exc)
+                return {
+                    'success': False,
+                    'error': 'internal_error',
+                    'mensaje': f'Error verificando cliente: {str(exc)[:100]}'
+                }
         if name == 'preparar_reserva':
             from .reserva_service import preparar_reserva as servicio_preparar_reserva
             from ventas.services.cliente_service import ClienteService
