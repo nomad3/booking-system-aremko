@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('ventas', '0124_alter_cliente_options'),
+        ('ventas', '0124_seguimiento_masaje_auditoria_outbox'),
     ]
 
     operations = [
