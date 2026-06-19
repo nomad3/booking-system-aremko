@@ -868,8 +868,8 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     'propuesta_id': resultado.get('propuesta_id'),
                     'total': total,
                     'mensaje': (
-                        f'¡Listo! Tu reserva quedó registrada (total ${total:,}). '
-                        f'En unos minutos te despachamos los detalles por este medio.'
+                        f'¡Perfecto! Estoy preparando tu reserva (total ${total:,}). '
+                        f'En un momento te confirmamos con los datos para el pago. 🌿'
                     ),
                 }
             except Exception as exc:  # noqa: BLE001
