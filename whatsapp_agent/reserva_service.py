@@ -150,7 +150,11 @@ def preparar_reserva(canal, external_id, payload, idempotency_key=None):
                 total=int(total),
                 resumen_texto=resumen_texto,
                 estado='pendiente',
-                expires_at=timezone.now() + timedelta(hours=1)
+                # TTL de 24h: Deborah revisa y aprueba más tarde (puede pasar >1h desde
+                # que Luna propone). La propuesta NO bloquea cupo (la disponibilidad cuenta
+                # ReservaServicio, no propuestas) y crear_reserva RE-VALIDA disponibilidad al
+                # aprobar, así que extender el TTL es seguro: no hay doble-booking.
+                expires_at=timezone.now() + timedelta(hours=24)
             )
 
             logger.info(
