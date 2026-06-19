@@ -332,3 +332,108 @@ class CarritoService:
         except Exception as exc:
             logger.exception(f'Error vaciando carrito: {exc}')
             return {'success': False, 'error': str(exc)[:100]}
+
+    @staticmethod
+    def checkout_carrito(canal, external_id):
+        """Inicia el checkout del carrito (H-029 FASE 2).
+
+        Marca el carrito como 'checkout' para que Luna sepa que debe:
+        1. Verificar datos del cliente (FASE 1)
+        2. Pedir lo que falta (nombre/email/RUT/región)
+        3. Mostrar resumen final
+        4. Confirmar
+        5. Llamar preparar_reserva con TODOS los items del carrito
+
+        Returns:
+            {
+                'success': bool,
+                'resumen': {
+                    'items_count': int,
+                    'servicios': [...],
+                    'productos': [...],
+                    'subtotal_servicios': float,
+                    'subtotal_productos': float,
+                    'descuentos': float,
+                    'total': float,
+                    'packs_aplicados': [...]
+                }
+            }
+        """
+        try:
+            carrito = CarritoReserva.obtener_o_crear(canal, external_id)
+
+            if not carrito.items:
+                return {
+                    'success': False,
+                    'error': 'carrito_vacio',
+                    'mensaje': 'El carrito está vacío. Agrega servicios o productos primero.'
+                }
+
+            # Marcar como checkout
+            carrito.marcar_como_checkout()
+
+            # Preparar resumen para Luna
+            servicios = [item for item in carrito.items if item.get('tipo') == 'servicio']
+            productos = [item for item in carrito.items if item.get('tipo') == 'producto']
+
+            resumen = {
+                'items_count': carrito.contar_items(),
+                'servicios': servicios,
+                'productos': productos,
+                'subtotal_servicios': float(carrito.subtotal_servicios),
+                'subtotal_productos': float(carrito.subtotal_productos),
+                'descuentos': float(carrito.descuento_combo),
+                'total': float(carrito.total),
+                'packs_aplicados': carrito.packs_aplicados,
+            }
+
+            logger.info(f'[Carrito] Checkout iniciado {canal}:{external_id} (${carrito.total})')
+
+            return {
+                'success': True,
+                'resumen': resumen
+            }
+
+        except Exception as exc:
+            logger.exception(f'Error en checkout: {exc}')
+            return {
+                'success': False,
+                'error': 'error_interno',
+                'mensaje': f'Error: {str(exc)[:100]}'
+            }
+
+    @staticmethod
+    def construir_payload_reserva_desde_carrito(carrito, cliente_data):
+        """Construye el payload para `preparar_reserva` con TODOS los items del carrito.
+
+        Usado cuando el cliente completa FASE 1 (recolección de datos) en checkout.
+
+        Args:
+            carrito: CarritoReserva
+            cliente_data: {nombre, email, documento_identidad, region_id, ...}
+
+        Returns:
+            {
+                'cliente': {...},
+                'servicios': [{servicio_id, fecha, hora, cantidad_personas}, ...],
+                'productos': [opcional, para futuras fases],
+                'metodo_pago': 'pendiente'
+            }
+        """
+        servicios = []
+        for item in carrito.items:
+            if item.get('tipo') == 'servicio':
+                servicios.append({
+                    'servicio_id': item.get('servicio_id'),
+                    'fecha': item.get('fecha'),
+                    'hora': item.get('hora'),
+                    'cantidad_personas': item.get('cantidad_personas', 1),
+                })
+
+        payload = {
+            'cliente': cliente_data,
+            'servicios': servicios,
+            'metodo_pago': 'pendiente',
+        }
+
+        return payload

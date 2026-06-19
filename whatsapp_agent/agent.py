@@ -272,6 +272,22 @@ _TOOLS = [{
             'required': ['indice'],
         },
     },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'checkout_carrito',
+        'description': (
+            'Inicia el CHECKOUT del carrito (H-029 FASE 2). '
+            'Úsala cuando el cliente dice "listo", "quiero reservar", "voy a pagar". '
+            'El carrito pasa a estado "checkout". Devuelve resumen final con descuentos. '
+            'DESPUÉS de esto: verificar_cliente → pedir datos que falten → confirmar → preparar_reserva.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {},
+            'required': [],
+        },
+    },
 }]
 
 
@@ -686,6 +702,18 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool quitar_item_carrito falló: %s', exc)
                 return {'error': f'no se pudo quitar item: {str(exc)[:100]}'}
+        if name == 'checkout_carrito':
+            # H-029 FASE 2: iniciar checkout
+            from carrito_reservas.services import CarritoService
+            try:
+                resultado = CarritoService.checkout_carrito(
+                    canal=canal,
+                    external_id=phone if phone else 'desconocido'
+                )
+                return resultado
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool checkout_carrito falló: %s', exc)
+                return {'error': f'no se pudo hacer checkout: {str(exc)[:100]}'}
         return {'error': f'herramienta desconocida: {name}'}
 
     try:
