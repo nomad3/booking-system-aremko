@@ -17,6 +17,10 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 TIPOS_VALIDOS = {'tina', 'masaje', 'cabana', 'otro'}
+# Servicios PRINCIPALES ofrecibles por Luna: SOLO tinas, masajes y alojamiento (cabañas).
+# Todo lo demás (desayuno, decoraciones, adicionales) es complemento y NO se ofrece como
+# principal, aunque esté publicado. Defensa en profundidad junto con ids_complementarios().
+TIPOS_PRINCIPALES = {'tina', 'masaje', 'cabana'}
 
 DIAS_SEMANA_ES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
 MESES_ES = {
@@ -195,6 +199,7 @@ def disponibilidad(fecha=None, personas=1, tipo=None):
 
     qs = Servicio.objects.filter(
         publicado_web=True, activo=True,
+        tipo_servicio__in=TIPOS_PRINCIPALES,  # SOLO tina/masaje/cabana (no desayuno ni 'otro')
         capacidad_minima__lte=personas,
         capacidad_maxima__gte=personas,
     ).exclude(id__in=comp_ids)  # H-011: no ofrecer complementos como principales
