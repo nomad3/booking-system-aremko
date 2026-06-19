@@ -146,6 +146,7 @@ def preparar_reserva(canal, external_id, payload, idempotency_key=None):
                 external_id=external_id,
                 payload=payload,  # Guarda el payload completo para crear_reserva()
                 cliente_data=cliente_data,  # H-028 FIX: llenar campo cliente_data (NOT NULL de 0009)
+                servicios=servicios_data,  # H-028 FIX: llenar campo servicios (NOT NULL de 0009)
                 total=int(total),
                 resumen_texto=resumen_texto,
                 estado='pendiente',

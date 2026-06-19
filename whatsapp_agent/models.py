@@ -320,6 +320,11 @@ class PropuestaReserva(models.Model):
         help_text='{"nombre": ..., "email": ..., "documento_identidad": ..., "region_id": ...}'
     )
 
+    # Servicios a reservar (de la migración 0009)
+    servicios = models.JSONField(
+        help_text='[{"servicio_id": ..., "fecha": ..., "hora": ..., "cantidad_personas": ...}, ...]'
+    )
+
     # Resumen para presentar a Deborah
     resumen_texto = models.TextField(blank=True, help_text='Resumen legible para aprobación')
     total = models.DecimalField(max_digits=10, decimal_places=0)
