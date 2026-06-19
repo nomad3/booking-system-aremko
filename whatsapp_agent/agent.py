@@ -67,8 +67,12 @@ _TOOLS = [{
         'description': (
             'Consulta servicios (tinas/masajes/cabañas) con su PRECIO TOTAL ya calculado y, si das '
             'fecha, sus HORARIOS libres. Úsala SIEMPRE para responder precio o disponibilidad — NO '
-            'calcules precios tú. Para una pregunta de solo precio ("¿cuánto vale para 2?"), llama '
-            'con `personas` y SIN `fecha`. Para disponibilidad ("¿hay el sábado?"), incluye `fecha` '
+            'calcules precios tú. ⚠️ `personas` es OBLIGATORIO y debe ser la cantidad EXACTA que el '
+            'cliente te dijo: si NO sabes cuántas personas son, NO llames esta herramienta — primero '
+            'PREGÚNTALE al cliente cuántas personas. NUNCA asumas 1. La cantidad filtra los servicios '
+            '(las cabañas y las tinas admiten máx 2 personas; con 3+ esos servicios NO aplican y la '
+            'herramienta no los devuelve). Para una pregunta de solo precio ("¿cuánto vale para 2?"), '
+            'llama con `personas` y SIN `fecha`. Para disponibilidad ("¿hay el sábado?"), incluye `fecha` '
             '(ACEPTA "el sábado", "25 de junio" O formato YYYY-MM-DD; la herramienta resuelve '
             'internamente). Devuelve por servicio: `precio_total` (úsalo tal cual), `precio_por_persona`, '
             '`duracion_texto` (ej. "4 h" o "por noche"), `dia_semana` (devuelto por la herramienta) '
@@ -77,7 +81,9 @@ _TOOLS = [{
         'parameters': {
             'type': 'object',
             'properties': {
-                'personas': {'type': 'integer', 'description': 'Cantidad de personas'},
+                'personas': {'type': 'integer',
+                             'description': 'Cantidad EXACTA de personas que dijo el cliente. NO la inventes '
+                                            'ni asumas 1: si no la sabes, pregunta antes de llamar.'},
                 'fecha': {'type': 'string', 'description': 'Fecha YYYY-MM-DD (omitir si es solo precio)'},
                 'tipo': {'type': 'string', 'enum': ['tina', 'masaje', 'cabana'],
                          'description': 'Tipo de servicio (opcional; omitir para todos)'},
