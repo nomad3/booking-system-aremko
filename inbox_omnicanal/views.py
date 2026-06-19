@@ -846,8 +846,10 @@ def _sugerencia_instagram(external_id):
             return None
         historial = _historial_instagram(external_id, entrante.timestamp, config.history_window)
         saludo_estado, saludo_nombre = _contexto_saludo_instagram(external_id, entrante.timestamp)
+        # H-028 FIX: pasar external_id (IGSID) como phone para que preparar_reserva use el canal correcto
         d = _producir_borrador(config, entrante.body, historial,
-                               saludo_estado=saludo_estado, saludo_nombre=saludo_nombre)
+                               saludo_estado=saludo_estado, saludo_nombre=saludo_nombre,
+                               phone=external_id, canal='instagram')
         return {
             'texto': d['texto'],
             'escalar': d['escalar'],
@@ -932,8 +934,10 @@ def _sugerencia_messenger(external_id):
             return None
         historial = _historial_messenger(external_id, entrante.timestamp, config.history_window)
         saludo_estado, saludo_nombre = _contexto_saludo_messenger(external_id, entrante.timestamp)
+        # H-028 FIX: pasar external_id (PSID) como phone para que preparar_reserva use el canal correcto
         d = _producir_borrador(config, entrante.body, historial,
-                               saludo_estado=saludo_estado, saludo_nombre=saludo_nombre)
+                               saludo_estado=saludo_estado, saludo_nombre=saludo_nombre,
+                               phone=external_id, canal='messenger')
         return {
             'texto': d['texto'],
             'escalar': d['escalar'],
