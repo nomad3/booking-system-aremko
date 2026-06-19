@@ -111,6 +111,11 @@ def validar_rut_chileno(rut: str) -> tuple:
     # Remover puntos y espacios
     rut_limpio = re.sub(r'[.\s]', '', rut).upper()
 
+    # Tolerar RUT sin guión (ej. "76048924" o "76048924K", como suele pasarlo el LLM):
+    # insertar el guión antes del dígito verificador.
+    if '-' not in rut_limpio and re.match(r'^\d{7,8}[0-9K]$', rut_limpio):
+        rut_limpio = rut_limpio[:-1] + '-' + rut_limpio[-1]
+
     # Debe tener formato 12345678-9 o 12345678-K
     if not re.match(r'^\d{7,8}-[0-9K]$', rut_limpio):
         return False, "RUT debe tener formato 12345678-9", ""
