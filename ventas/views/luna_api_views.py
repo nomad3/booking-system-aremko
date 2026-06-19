@@ -1382,6 +1382,7 @@ def preparar_reserva_endpoint(request):
 # ============================================================================
 
 @api_view(['POST'])
+@authentication_classes([LunaAPIKeyAuthentication])
 def limpiar_conversacion_endpoint(request):
     """
     Limpia el historial de una conversación (testing/debug).
@@ -1395,10 +1396,6 @@ def limpiar_conversacion_endpoint(request):
 
     Returns: {success, mensaje, borrados}
     """
-    err = _check_luna_key(request)
-    if err:
-        return err
-
     try:
         phone = (request.data.get('phone') or '+56958655810').strip()
         force = request.data.get('force', False)
