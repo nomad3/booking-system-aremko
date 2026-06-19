@@ -52,9 +52,10 @@ def cliente_acepta_email(cliente):
         return False
     return True
 
-# (tipo_email, offset desde que se completa la ficha, es_comercial)
-# El gracias va INMEDIATO para garantizar el orden gracias → resumen (el
-# resumen_bienestar se programa aparte, ver programar_resumen_bienestar).
+# (tipo_email, offset desde la FECHA DE LA VISITA, es_comercial)
+# La cadencia se ancla a la fecha de la visita (no a cuándo se completa la ficha,
+# que ocurre ANTES de la visita). gracias_visita usa offset 0 pero se le suma
+# GRACIAS_POST_VISITA para que salga DESPUÉS de la atención, nunca antes.
 CADENCIA = [
     ('gracias_visita',    timedelta(0),        False),
     ('seguimiento_7d',    timedelta(days=7),   True),
@@ -62,6 +63,40 @@ CADENCIA = [
     ('reactivacion_60d',  timedelta(days=60),  True),
     ('reactivacion_90d',  timedelta(days=90),  True),
 ]
+
+# El "gracias" debe salir después de la atención, no a la hora de inicio del masaje.
+GRACIAS_POST_VISITA = timedelta(hours=3)
+
+
+def _fecha_visita_masaje(reserva):
+    """Datetime aware de la visita: fecha_agendamiento + hora_inicio del
+    ReservaServicio de tipo masaje más temprano de la reserva. None si no hay."""
+    if reserva is None:
+        return None
+    rs = (reserva.reservaservicios
+          .filter(servicio__tipo_servicio='masaje')
+          .order_by('fecha_agendamiento', 'hora_inicio')
+          .first())
+    if rs is None or rs.fecha_agendamiento is None:
+        return None
+    from datetime import datetime, time
+    try:
+        h, m = map(int, (rs.hora_inicio or '00:00').split(':'))
+    except (ValueError, AttributeError):
+        h, m = 0, 0
+    naive = datetime.combine(rs.fecha_agendamiento, time(h, m))
+    return timezone.make_aware(naive) if timezone.is_naive(naive) else naive
+
+
+def fecha_programada_seguimiento(reserva, tipo_email, offset):
+    """Calcula la fecha_programada anclada a la visita. Si no hay servicio de
+    masaje datable, cae a ahora()+offset (comportamiento previo, no rompe)."""
+    base = _fecha_visita_masaje(reserva)
+    if base is None:
+        base = timezone.now()
+    if offset == timedelta(0):
+        return base + GRACIAS_POST_VISITA
+    return base + offset
 
 # Anti-saturación (R1): ventana mínima entre correos COMERCIALES al mismo
 # cliente. Los transaccionales (gracias_visita, resumen_bienestar) quedan
@@ -369,7 +404,6 @@ def programar_seguimientos_masaje(participante):
     consent_mkt = bool(getattr(ficha, 'consentimiento_marketing', False))
     nombre = ((participante.nombre or (cliente.nombre if cliente else '') or '')
               .strip().split(' ')[0])
-    ahora = timezone.now()
 
     creados = []
     for tipo, offset, comercial in CADENCIA:
@@ -385,7 +419,9 @@ def programar_seguimientos_masaje(participante):
             reserva=participante.reserva,
             cliente=cliente,
             tipo_email=tipo,
-            fecha_programada=ahora + offset,
+            # Anclar a la FECHA DE LA VISITA, no a now() (la ficha se completa antes
+            # de la visita → evita que un seguimiento quede "para enviar" antes de tiempo).
+            fecha_programada=fecha_programada_seguimiento(participante.reserva, tipo, offset),
             asunto=asunto,
             cuerpo=cuerpo,
             estado='pendiente',
