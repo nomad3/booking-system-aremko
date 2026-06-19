@@ -280,11 +280,36 @@ _TOOLS = [{
             'Inicia el CHECKOUT del carrito (H-029 FASE 2). '
             'Úsala cuando el cliente dice "listo", "quiero reservar", "voy a pagar". '
             'El carrito pasa a estado "checkout". Devuelve resumen final con descuentos. '
-            'DESPUÉS de esto: verificar_cliente → pedir datos que falten → confirmar → preparar_reserva.'
+            'DESPUÉS de esto: recolectá los datos del cliente que falten y llamá confirmar_reserva_carrito.'
         ),
         'parameters': {
             'type': 'object',
             'properties': {},
+            'required': [],
+        },
+    },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'confirmar_reserva_carrito',
+        'description': (
+            'CIERRA la reserva con TODOS los items del carrito (H-029 FASE 2). '
+            'Llamá esto SOLO después de checkout_carrito y de tener los datos del cliente. '
+            'Crea UNA propuesta de reserva con todos los servicios del carrito. '
+            'Para cliente EXISTENTE no hace falta repetir datos que ya están en su ficha; '
+            'pasá solo los que el cliente te dio en la conversación. '
+            'Devuelve {success, propuesta_id, mensaje, total}. '
+            'IMPORTANTE: NO digas al cliente que la reserva quedó registrada hasta que esta '
+            'herramienta devuelva success=true con propuesta_id; luego respondé usando el `mensaje`.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'nombre': {'type': 'string', 'description': 'Nombre del cliente (omitir si ya está en su ficha)'},
+                'email': {'type': 'string', 'description': 'Email del cliente (omitir si ya está en su ficha)'},
+                'documento_identidad': {'type': 'string', 'description': 'RUT del cliente (omitir si ya está en su ficha)'},
+                'comuna': {'type': 'string', 'description': 'Comuna del cliente, ej. "Puerto Varas" (omitir si ya está en su ficha)'},
+            },
             'required': [],
         },
     },
@@ -721,6 +746,95 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool checkout_carrito falló: %s', exc)
                 return {'error': f'no se pudo hacer checkout: {str(exc)[:100]}'}
+        if name == 'confirmar_reserva_carrito':
+            # H-029 FASE 2: colapsa checkout→verificar→preparar en UN paso determinístico.
+            # Crea UNA PropuestaReserva con TODOS los items del carrito, keyeada por el
+            # phone REAL del cliente (capturado en la closure, igual que preparar_reserva).
+            from carrito_reservas.models import CarritoReserva
+            from carrito_reservas.services import CarritoService
+            from .reserva_service import preparar_reserva as servicio_preparar_reserva
+            try:
+                args = args or {}
+                external_id = phone if phone else '+56912345678'
+
+                carrito = CarritoReserva.objects.filter(canal=canal, external_id=external_id).first()
+                if carrito is None or not carrito.items:
+                    return {
+                        'success': False,
+                        'error': 'carrito_vacio',
+                        'mensaje': 'No hay carrito con items para confirmar. Agregá servicios primero.'
+                    }
+
+                # Datos del cliente: lo que dio en la conversación (args) PRIORIZA, y se
+                # completa con la ficha del cliente existente (datos_cliente del scope).
+                ficha = datos_cliente or {}
+                nombre = (args.get('nombre') or ficha.get('nombre') or '').strip()
+                email = (args.get('email') or ficha.get('email') or '').strip()
+                documento = (args.get('documento_identidad') or ficha.get('documento_identidad') or '').strip()
+                comuna_nombre = (args.get('comuna') or ficha.get('comuna_nombre') or '').strip()
+
+                # Deducir region_id de la comuna (igual que preparar_reserva).
+                region_id = None
+                comuna_id = ficha.get('comuna_id')
+                if comuna_nombre:
+                    from ventas.models import Comuna
+                    comuna = Comuna.objects.filter(nombre__icontains=comuna_nombre).first()
+                    if not comuna:
+                        return {
+                            'success': False,
+                            'error': 'comuna_not_found',
+                            'mensaje': f'Comuna "{comuna_nombre}" no encontrada'
+                        }
+                    region_id = comuna.region_id
+                    comuna_id = comuna.id
+
+                # Validar que tengamos los datos mínimos antes de crear la propuesta.
+                faltan = [k for k, v in (('nombre', nombre), ('email', email),
+                                         ('documento_identidad', documento), ('comuna', comuna_nombre)) if not v]
+                if faltan:
+                    return {
+                        'success': False,
+                        'error': 'faltan_datos',
+                        'faltan': faltan,
+                        'mensaje': f'Faltan datos del cliente: {", ".join(faltan)}'
+                    }
+
+                cliente_data = {
+                    'nombre': nombre,
+                    'email': email,
+                    'documento_identidad': documento,
+                    'region_id': region_id,
+                    'comuna_id': comuna_id,
+                }
+                payload = CarritoService.construir_payload_reserva_desde_carrito(carrito, cliente_data)
+
+                # Idempotencia: si Luna reintenta, no se duplica la propuesta del mismo carrito.
+                resultado = servicio_preparar_reserva(
+                    canal=canal,
+                    external_id=external_id,
+                    payload=payload,
+                    idempotency_key=f'carrito-{carrito.id}',
+                )
+                if not resultado.get('success'):
+                    logger.error('[confirmar_reserva_carrito] preparar_reserva falló: %s', resultado)
+                    return resultado
+
+                logger.info('[confirmar_reserva_carrito] propuesta %s creada para %s ($%s)',
+                            resultado.get('propuesta_id', '')[:8], external_id, resultado.get('total'))
+                total = resultado.get('total', 0)
+                return {
+                    'success': True,
+                    'propuesta_id': resultado.get('propuesta_id'),
+                    'total': total,
+                    'mensaje': (
+                        f'¡Listo! Tu reserva quedó registrada (total ${total:,}). '
+                        f'En unos minutos te despachamos los detalles por este medio.'
+                    ),
+                }
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool confirmar_reserva_carrito falló: %s', exc)
+                return {'success': False, 'error': 'internal_error',
+                        'mensaje': f'no se pudo confirmar la reserva: {str(exc)[:100]}'}
         return {'error': f'herramienta desconocida: {name}'}
 
     try:
