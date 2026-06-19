@@ -217,12 +217,16 @@ _TOOLS = [{
             'Agrega un servicio al carrito (H-029 FASE 2). Luna va acumulando servicios '
             'hasta que el cliente dice "listo, voy a reservar/pagar". '
             'El carrito calcula descuentos dinámicamente (PackDescuento). '
-            'Devuelve: {success, carrito: {items_count, total, items}}'
+            'Devuelve: {success, carrito: {items_count, total, items}}. '
+            'IMPORTANTE: pasá SIEMPRE `nombre_servicio` con el nombre EXACTO que el cliente '
+            'nombró (ej. "Llaima", "Puntiagudo") además del `servicio_id`; el sistema usa el '
+            'nombre para confirmar el servicio correcto y evitar confundir servicios parecidos.'
         ),
         'parameters': {
             'type': 'object',
             'properties': {
                 'servicio_id': {'type': 'integer', 'description': 'ID del servicio (tina/masaje/cabaña)'},
+                'nombre_servicio': {'type': 'string', 'description': 'Nombre EXACTO del servicio que dijo el cliente, ej. "Llaima" (para confirmar el id correcto)'},
                 'fecha': {'type': 'string', 'description': 'Fecha YYYY-MM-DD'},
                 'hora': {'type': 'string', 'description': 'Hora HH:MM'},
                 'cantidad_personas': {'type': 'integer', 'description': 'Cantidad de personas'},
@@ -691,10 +695,27 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
             from carrito_reservas.services import CarritoService
             try:
                 args = args or {}
+                servicio_id = args.get('servicio_id')
+                # Override determinístico: si el LLM pasó el nombre que dijo el cliente y
+                # resuelve a UN único servicio principal, usar ESE id (evita que el modelo
+                # tome el id equivocado entre servicios parecidos, ej. "Llaima" vs "Puntiagudo").
+                nombre_servicio = (args.get('nombre_servicio') or '').strip()
+                if nombre_servicio:
+                    from ventas.models import Servicio
+                    from .availability import TIPOS_PRINCIPALES
+                    matches = list(Servicio.objects.filter(
+                        publicado_web=True, activo=True,
+                        tipo_servicio__in=TIPOS_PRINCIPALES,
+                        nombre__icontains=nombre_servicio,
+                    ).values_list('id', flat=True)[:2])
+                    if len(matches) == 1 and matches[0] != servicio_id:
+                        logger.info('[agregar_servicio_carrito] override por nombre "%s": id %s → %s',
+                                    nombre_servicio, servicio_id, matches[0])
+                        servicio_id = matches[0]
                 resultado = CarritoService.agregar_servicio(
                     canal=canal,
                     external_id=phone if phone else 'desconocido',
-                    servicio_id=args.get('servicio_id'),
+                    servicio_id=servicio_id,
                     fecha=args.get('fecha'),
                     hora=args.get('hora'),
                     cantidad_personas=args.get('cantidad_personas', 1)
