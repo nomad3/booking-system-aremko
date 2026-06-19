@@ -84,7 +84,7 @@ _TOOLS = [{
                 'personas': {'type': 'integer',
                              'description': 'Cantidad EXACTA de personas que dijo el cliente. NO la inventes '
                                             'ni asumas 1: si no la sabes, pregunta antes de llamar.'},
-                'fecha': {'type': 'string', 'description': 'Fecha YYYY-MM-DD (omitir si es solo precio)'},
+                'fecha': {'type': 'string', 'description': 'Pasá el TEXTO LITERAL del cliente tal cual ("próximo domingo", "el sábado", "25 de junio"). NO lo conviertas a YYYY-MM-DD ni calcules el día tú; la herramienta lo resuelve. Omitir si es solo precio.'},
                 'tipo': {'type': 'string', 'enum': ['tina', 'masaje', 'cabana'],
                          'description': 'Tipo de servicio (opcional; omitir para todos)'},
             },
@@ -571,6 +571,10 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
             try:
                 args = args or {}
                 telefono = (args.get('telefono') or '').strip()
+                # En WhatsApp el teléfono es el external_id de la conversación: Luna NO
+                # lo ve en el chat, así que lo usamos directo para no pedírselo al cliente.
+                if not telefono and canal == 'whatsapp':
+                    telefono = external_id
                 if not telefono:
                     return {
                         'success': False,
