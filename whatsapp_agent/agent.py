@@ -470,10 +470,17 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
         logger.exception('Agente WA: error armando catálogo: %s', exc)
         return _borrador_escala('no se pudo cargar el catálogo', error=str(exc)[:200])
 
-    system_prompt = prompt_mod.build_system_prompt(
-        config.persona_tono, catalogo, config.link_reserva, config.conocimiento,
-        fecha_hoy=_fecha_hoy_texto(), saludo_estado=saludo_estado, saludo_nombre=saludo_nombre)
-    user_prompt = prompt_mod.build_user_prompt(historial, mensaje, datos_cliente=datos_cliente)
+    # Armado de prompts. Un error aquí (ej. llave sin escapar en un f-string del
+    # prompt → NameError) NUNCA debe tragarse en null global: deriva a humano.
+    try:
+        system_prompt = prompt_mod.build_system_prompt(
+            config.persona_tono, catalogo, config.link_reserva, config.conocimiento,
+            fecha_hoy=_fecha_hoy_texto(), saludo_estado=saludo_estado, saludo_nombre=saludo_nombre)
+        user_prompt = prompt_mod.build_user_prompt(historial, mensaje, datos_cliente=datos_cliente)
+    except Exception as exc:  # noqa: BLE001 — nunca romper por el armado del prompt
+        logger.exception('Agente WA: error armando el prompt: %s', exc)
+        return _borrador_escala('no se pudo armar el prompt', error=str(exc)[:200])
+
     modelo = _modelo_efectivo(config)
 
     # 3) Llamada al LLM con tool-calling (disponibilidad). El provider nunca lanza;
