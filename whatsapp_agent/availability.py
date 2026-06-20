@@ -92,6 +92,22 @@ def resolver_fecha(expresion_cliente):
                 'error': None,
             }
 
+    # PATRÓN 1.5: Expresiones relativas ("hoy", "mañana", "pasado mañana").
+    # Van DESPUÉS de los nombres de día (para que "el sábado por la mañana" caiga en sábado)
+    # y ANTES del patrón numérico (para que "hoy a las 8" no tome el 8 como día del mes).
+    # "pasado mañana" se chequea antes que "mañana" porque lo contiene.
+    for palabra, delta in (('pasado mañana', 2), ('pasado manana', 2),
+                           ('mañana', 1), ('manana', 1), ('hoy', 0)):
+        if palabra in expresion:
+            fecha = hoy + timedelta(days=delta)
+            return {
+                'fecha_iso': fecha.isoformat(),
+                'dia_semana': DIAS_SEMANA_ES[fecha.weekday()],
+                'dia_numero': fecha.weekday(),
+                'ambiguo': False,
+                'error': None,
+            }
+
     # PATRÓN 2: Número de día ("25", "el 25", "25 de junio")
     match_numero = re.search(r'\b(\d{1,2})\b', expresion)
     if match_numero:
