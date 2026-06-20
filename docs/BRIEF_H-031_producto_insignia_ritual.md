@@ -5,17 +5,17 @@
 ## Oferta (cerrada por Jorge 2026-06-19)
 - Componentes (2 pax): cabaña/noche $90.000 + tina $50.000 + **masaje nocturno** $80.000 + desayuno $20.000.
 - **Precio del ritual: $240.000** (= la suma; sin descuento). La "capa de experiencia" (bienvenida sensorial, circuito térmico, recuerdo, desayuno gourmet) va incluida como valor agregado, NO baja el precio.
-- 2 personas (parejas). Horario/duración del masaje nocturno y capacidad por noche: **pendiente de Jorge** (se afina antes de Fase 1 productiva).
+- 2 personas (parejas). **Capacidad: 5 rituales por noche.** El masaje nocturno usa los horarios de los **slots de masaje existentes**.
 
 ## Outcome buscado
 1. Luna puede **ofrecer y armar "Noche de ritual junto al río"** como una experiencia de un clic (no pedir los 4 ítems por separado).
 2. Luna prepara la llegada capturando datos pre-visita (Foso del sistema digital de Aremko).
 
-## Fase 1 — El ritual como oferta agendable
-- Luna ofrece el ritual como **upsell** cuando un cliente pide cabaña o tina ("¿quieren vivir el ritual completo de los 5 sentidos junto al río? Incluye…").
-- Al aceptar, Luna arma la reserva con los 4 ítems (cabaña noche + tina + **masaje en horario nocturno** + desayuno) a $240.000 total, 2 pax.
-- **A definir por django el mecanismo:** ¿combo/pack predefinido?, ¿servicio compuesto?, ¿reusar `carrito_reservas` con un set fijo de ítems + nombre? Lo que mejor calce con lo ya construido en H-029.
-- ⚠️ Requisito: el **masaje nocturno** debe existir como servicio agendable en horario nocturno (Aremko es el único con masajes nocturnos + abierto hasta medianoche vie/sáb). Confirmar si ya existe el slot nocturno o hay que crearlo.
+## Fase 1 — El ritual como paquete de un clic (CERO ROCE)
+**Directriz de Jorge (importante):** se vende EL PAQUETE como una sola unidad. Luna lo agenda **completo de una** (cabaña + tina + masaje nocturno + desayuno) — **NADA de ir servicio por servicio**. Cero roce.
+- **Mecanismo:** reusar el MISMO que ya funciona y está configurado para **alojamiento + tina**; lo único que falta es **agregar el masaje en los horarios disponibles** (los horarios ya viven en los **slots de masaje**). No reinventar — usar los mismos criterios de alojamiento+tina.
+- Luna ofrece el ritual como upsell cuando piden cabaña o tina ("¿quieren vivir el ritual completo de los 5 sentidos junto al río?"). Al aceptar → agenda el **paquete entero** a $240.000, 2 pax, en una sola acción.
+- **Capacidad: 5 rituales por noche.**
 
 ## Fase 2 — Pre-llegada (24h antes, vía Luna/WhatsApp)
 Luna envía un mensaje de preparación y captura 3 cosas, que deben quedar **visibles para el staff** (bandeja o ficha de la reserva):
@@ -33,8 +33,8 @@ Texto sugerido del mensaje pre-llegada (editable):
 - Insumos físicos / operación (aromaterapia, batas, impresión del recuerdo, desayuno gourmet) → lado Jorge, no sistema.
 
 ## Preguntas abiertas para django
-1. ¿Mejor mecanismo para el "pack" (combo predefinido vs servicio compuesto vs carrito con ítems fijos)?
-2. ¿Existe ya el masaje nocturno como servicio agendable en horario nocturno?
+1. Para el paquete de un clic, ¿lo más limpio es **reusar el flujo de alojamiento+tina ya configurado + agregar masaje en sus slots**? (Jorge: *"los mismos criterios que ya funcionan para alojamiento y tina; solo falta agregar masajes en los horarios disponibles"*.)
+2. ¿El masaje ya es agendable dentro de ese flujo, o solo existe en los slots de masaje y hay que conectarlo?
 3. ¿Dónde quedan visibles para el staff las 3 capturas pre-llegada (foto/masaje/desayuno)? ¿bandeja, ficha de reserva, ambas?
 
-El diseño completo de la experiencia (5 sentidos, circuito térmico, recuerdo de madera, desayuno de la Patagonia) vive en el repo de estrategia de aremko-cli; lo comparto si necesitas más contexto. Pendiente de Jorge: horario/duración masaje nocturno + capacidad por noche.
+El diseño completo de la experiencia (5 sentidos, circuito térmico, recuerdo de madera, desayuno de la Patagonia) vive en el repo de estrategia de aremko-cli; lo comparto si necesitas más contexto. **Capacidad 5/noche y masaje en los slots existentes ya definidos por Jorge.**
