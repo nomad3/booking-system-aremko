@@ -1,0 +1,151 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+
+{# ──────────────────────────────────────────────────────────────────
+   Landing OCULTA — producto insignia "Noche de ritual junto al río"
+   (Plan Río / H-031). NO enlazada en el menú, NO en sitemap, noindex.
+   Visible solo con el link directo /ritual-del-rio/ hasta decidir
+   dónde colocarla. CTA único → WhatsApp (mecanismo de alto valor:
+   deseo → conversación → abono). Fotos: placeholders a reemplazar.
+   ────────────────────────────────────────────────────────────────── #}
+
+{% block title %}Noche de ritual junto al río · Aremko Spa Boutique{% endblock %}
+
+{% block meta_description %}
+<meta name="description" content="Una noche solo para los dos junto al río: masaje, tina caliente bajo las estrellas, cabaña y desayuno. Aremko Spa Boutique, Puerto Varas.">
+<meta name="robots" content="noindex, nofollow">
+{% endblock %}
+
+{% block extra_style %}
+<style>
+  .rr-wrap{max-width:920px;margin:0 auto;padding:0 18px;color:#2c2a27;font-family:inherit}
+  .rr-section{padding:38px 0}
+  .rr-hero{text-align:center}
+  .rr-photo{border-radius:16px;background:#ede7df;border:1px dashed #c9bfae;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    color:#8a7f6c;font-size:14px;min-height:260px}
+  .rr-badge{display:inline-block;background:#f6efe1;color:#8a5a1d;
+    font-size:13px;padding:6px 14px;border-radius:999px;margin:18px 0 12px;font-weight:500}
+  .rr-h1{font-size:30px;line-height:1.25;margin:6px 0 14px;font-weight:600}
+  .rr-lead{font-size:18px;line-height:1.7;color:#5f5a52;max-width:560px;margin:0 auto 26px}
+  .rr-cta{display:inline-flex;align-items:center;gap:9px;background:#0f6e56;color:#eafaf3;
+    text-decoration:none;font-size:18px;font-weight:600;padding:15px 30px;border-radius:12px}
+  .rr-cta:hover{background:#0c5b48;color:#fff}
+  .rr-cta-note{font-size:14px;color:#8a7f6c;margin:12px 0 0}
+  .rr-h2{font-size:24px;text-align:center;margin:0 0 22px;font-weight:600}
+  .rr-acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .rr-card{background:#fff;border:1px solid #ece6dc;border-radius:14px;padding:22px;text-align:center}
+  .rr-act-n{font-size:13px;letter-spacing:.08em;color:#b08a5a;text-transform:uppercase}
+  .rr-act-t{font-size:18px;font-weight:600;margin:6px 0 6px}
+  .rr-card p{color:#5f5a52;font-size:15px;line-height:1.6;margin:0}
+  .rr-offer{border:2px solid #0f6e56;border-radius:16px;padding:26px;background:#fcfbf8}
+  .rr-offer-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:16px}
+  .rr-price{font-size:30px;font-weight:600}
+  .rr-price small{display:block;font-size:14px;color:#5f5a52;font-weight:400}
+  .rr-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 22px;list-style:none;padding:0;margin:0}
+  .rr-list li{font-size:16px}
+  .rr-vs{display:flex;flex-direction:column;gap:9px}
+  .rr-vs-row{display:flex;gap:11px;align-items:center;background:#f4f0e9;border-radius:10px;padding:12px 16px;font-size:16px}
+  .rr-vs-win{background:#e4f3ee;color:#0f5b48}
+  .rr-guarantee{background:#e9f4ee;border-radius:16px;padding:24px;display:flex;gap:15px;align-items:flex-start}
+  .rr-guarantee .ico{font-size:30px;flex-shrink:0}
+  .rr-revs{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+  .rr-rev{background:#fff;border:1px solid #ece6dc;border-radius:14px;padding:22px}
+  .rr-rev .stars{color:#c8902a;letter-spacing:2px;margin-bottom:8px}
+  .rr-rev .q{font-style:italic;color:#5f5a52;line-height:1.6;margin:0 0 8px}
+  .rr-rev .who{font-size:14px;color:#8a7f6c}
+  .rr-final{text-align:center;background:#f4f0e9;border-radius:18px;padding:42px 22px}
+  @media(max-width:600px){.rr-h1{font-size:25px}.rr-lead{font-size:16px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rr-wrap">
+
+  <section class="rr-section rr-hero">
+    <div class="rr-photo">
+      <span style="font-size:30px">🛁</span>
+      <span>Foto/video: tina humeante junto al río, al atardecer</span>
+    </div>
+    <span class="rr-badge">🔥 Solo 5 parejas por noche</span>
+    <h1 class="rr-h1">Afuera, 4 grados.<br>Ustedes dos, en agua caliente, junto al río.</h1>
+    <p class="rr-lead">La noche de ritual junto al río: un masaje para soltar la semana, una tina
+      caliente bajo las estrellas y una cabaña tibia para no querer irse. Despiertan con desayuno.
+      Solo para los dos.</p>
+    <a class="rr-cta" href="{{ whatsapp_url }}">Reservar mi noche por WhatsApp</a>
+    <p class="rr-cta-note">Aseguras tu cupo con un abono. El resto lo coordinas.</p>
+  </section>
+
+  <section class="rr-section">
+    <h2 class="rr-h2">Un ritual de tres actos</h2>
+    <div class="rr-acts">
+      <div class="rr-card"><div class="rr-act-n">Acto 1</div><div class="rr-act-t">Masaje nocturno</div>
+        <p>Sueltan la semana antes de entrar al agua.</p></div>
+      <div class="rr-card"><div class="rr-act-n">Acto 2</div><div class="rr-act-t">Tina caliente</div>
+        <p>Bajo las estrellas, junto al río, mientras afuera hace frío.</p></div>
+      <div class="rr-card"><div class="rr-act-n">Acto 3</div><div class="rr-act-t">Cabaña y desayuno</div>
+        <p>Duermen abrazados y despiertan con el desayuno listo.</p></div>
+    </div>
+  </section>
+
+  <section class="rr-section">
+    <div class="rr-offer">
+      <div class="rr-offer-top">
+        <h2 style="margin:0;font-size:24px;font-weight:600">Todo incluido, para dos</h2>
+        <div class="rr-price">$240.000<small>la noche · 2 personas</small></div>
+      </div>
+      <ul class="rr-list">
+        <li>✓ Masaje nocturno para dos</li>
+        <li>✓ Tina caliente privada</li>
+        <li>✓ Cabaña para la noche</li>
+        <li>✓ Desayuno al despertar</li>
+        <li>🎁 Detalle de bienvenida al llegar</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rr-section">
+    <h2 class="rr-h2">Por qué no es lo mismo que cualquier escapada</h2>
+    <div class="rr-vs">
+      <div class="rr-vs-row">✕ &nbsp;Un hotel es frío e impersonal.</div>
+      <div class="rr-vs-row">✕ &nbsp;Las termas públicas están llenas, sin intimidad.</div>
+      <div class="rr-vs-row">✕ &nbsp;Una cabaña sola es solo dormir.</div>
+      <div class="rr-vs-row rr-vs-win">✓ &nbsp;El ritual del río es lo único en Puerto Varas que junta río, noche y todo resuelto para dos.</div>
+    </div>
+  </section>
+
+  <section class="rr-section">
+    <div class="rr-guarantee">
+      <div class="ico">🛡️</div>
+      <div>
+        <p style="font-weight:600;margin:0 0 5px;color:#0f5b48">Nuestra garantía</p>
+        <p style="margin:0;color:#0f5b48;line-height:1.7">Si la noche no resulta como la soñaron,
+          nos lo dicen antes de irse y lo arreglamos en el momento. Su tranquilidad es parte del ritual.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="rr-section">
+    <h2 class="rr-h2">Lo que dicen las parejas</h2>
+    <div class="rr-revs">
+      <div class="rr-rev"><div class="stars">★★★★★</div>
+        <p class="q">[Reseña real a conseguir antes de escalar la pauta]</p>
+        <p class="who">— Pareja de Puerto Montt</p></div>
+      <div class="rr-rev"><div class="stars">★★★★★</div>
+        <p class="q">[Reseña real a conseguir antes de escalar la pauta]</p>
+        <p class="who">— Pareja de Osorno</p></div>
+    </div>
+  </section>
+
+  <section class="rr-section">
+    <div class="rr-final">
+      <h2 style="margin:0 0 8px;font-size:26px;font-weight:600">Esta noche podría ser de ustedes</h2>
+      <p style="font-size:17px;color:#5f5a52;margin:0 0 22px">Quedan pocos cupos por noche.
+        Te coordinamos la fecha por WhatsApp.</p>
+      <a class="rr-cta" href="{{ whatsapp_url }}">Reservar mi noche por WhatsApp</a>
+      <p class="rr-cta-note">Aguas calientes junto al río · Aremko Spa Boutique, Puerto Varas</p>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

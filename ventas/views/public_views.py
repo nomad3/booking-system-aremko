@@ -765,6 +765,27 @@ def refugio_landing_view(request):
     return render(request, 'ventas/refugio_landing.html', context)
 
 
+def ritual_rio_landing_view(request):
+    """Landing OCULTA del producto insignia "Noche de ritual junto al río" (Plan Río / H-031).
+
+    NO enlazada en el menú, NO en el sitemap, con meta robots noindex,nofollow.
+    Visible solo con el link directo /ritual-del-rio/ hasta decidir dónde colocarla.
+    CTA único → WhatsApp (mecanismo de alto valor: deseo → conversación → abono).
+    """
+    try:
+        canonical_url = request.build_absolute_uri(request.path)
+    except Exception:
+        canonical_url = request.path
+    whatsapp_url = (
+        'https://wa.me/56957902525?text='
+        'Hola%2C%20quiero%20reservar%20la%20Noche%20de%20Ritual%20junto%20al%20r%C3%ADo'
+    )
+    return render(request, 'ventas/ritual_rio_landing.html', {
+        'canonical_url': canonical_url,
+        'whatsapp_url': whatsapp_url,
+    })
+
+
 def refugio_submit_view(request):
     """Procesa el formulario de la landing /refugio/.
 
