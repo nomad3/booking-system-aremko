@@ -180,3 +180,37 @@
 
 </div>
 {% endblock %}
+
+{% block extra_script %}
+<script>
+/* H-034 — Mide el clic al WhatsApp del Ritual como conversión en GA4.
+   Evento: click_whatsapp_ritual. Propaga UTM de la landing como parámetros
+   para atribuir el lead a la campaña. Acotado a GA4 (no contamina Google Ads). */
+(function () {
+  var p = new URLSearchParams(window.location.search);
+  var utm = {
+    campaign: p.get('utm_campaign') || '',
+    source:   p.get('utm_source')   || '',
+    medium:   p.get('utm_medium')   || ''
+  };
+  function track() {
+    try {
+      if (typeof gtag === 'function') {
+        gtag('event', 'click_whatsapp_ritual', {
+          send_to: 'G-T3K4CTD3HJ',
+          campaign: utm.campaign,
+          source: utm.source,
+          medium: utm.medium
+        });
+      }
+    } catch (e) { /* nunca bloquear la navegación a WhatsApp */ }
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    var btns = document.querySelectorAll('a.rr-cta');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener('click', track);
+    }
+  });
+})();
+</script>
+{% endblock %}
