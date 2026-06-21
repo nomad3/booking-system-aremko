@@ -198,9 +198,9 @@
       if (typeof gtag === 'function') {
         gtag('event', 'click_whatsapp_ritual', {
           send_to: 'G-T3K4CTD3HJ',
-          campaign: utm.campaign,
-          source: utm.source,
-          medium: utm.medium
+          ritual_campaign: utm.campaign,
+          ritual_source: utm.source,
+          ritual_medium: utm.medium
         });
       }
     } catch (e) { /* nunca bloquear la navegación a WhatsApp */ }
