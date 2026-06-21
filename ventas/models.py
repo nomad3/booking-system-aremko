@@ -4581,6 +4581,21 @@ class RitualRioLandingConfig(SingletonModel):
     resena3_texto = models.TextField(blank=True, default="", help_text="Texto de la reseña 3.")
     resena3_autor = models.CharField(max_length=120, blank=True, default="", help_text="Ej: Pareja de Puerto Varas.")
 
+    # Publicación / visibilidad (interruptores que el equipo prende desde el admin)
+    mostrar_en_menu = models.BooleanField(
+        default=False,
+        help_text="Mostrar 'Ritual del Río' en el menú de navegación del sitio."
+    )
+    mostrar_en_home = models.BooleanField(
+        default=False,
+        help_text="Mostrar un botón destacado del Ritual en la portada (home)."
+    )
+    indexar_en_google = models.BooleanField(
+        default=False,
+        help_text="Permitir que Google la indexe (quita noindex) y la agrega al sitemap. "
+                  "Déjalo apagado si aún es solo para campañas."
+    )
+
     class Meta:
         verbose_name = "Landing Ritual del Río"
         verbose_name_plural = "Landing Ritual del Río"

@@ -268,6 +268,7 @@ TEMPLATES = [
                 'ventas.context_processors.categorias_processor', # Add category processor
                 'ventas.context_processors.social_proof_processor', # AR-028: TA + Google badges
                 'ventas.context_processors.meta_pixel_processor', # Meta Pixel ID parametrizable
+                'ventas.context_processors.ritual_rio_processor', # Interruptores de visibilidad de la landing Ritual del Río
             ],
         },
     },

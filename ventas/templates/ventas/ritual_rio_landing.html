@@ -13,7 +13,7 @@
 
 {% block meta_description %}
 <meta name="description" content="Una noche solo para los dos junto al río: masaje, tina caliente bajo las estrellas, cabaña y desayuno. Aremko Spa Boutique, Puerto Varas.">
-<meta name="robots" content="noindex, nofollow">
+{% if config.indexar_en_google %}<meta name="robots" content="index, follow">{% else %}<meta name="robots" content="noindex, nofollow">{% endif %}
 {% endblock %}
 
 {% block extra_style %}

@@ -42,3 +42,18 @@ def meta_pixel_processor(request):
     """Inyecta META_PIXEL_ID en el contexto para base_public.html y descendientes."""
     from django.conf import settings
     return {'META_PIXEL_ID': getattr(settings, 'META_PIXEL_ID', '')}
+
+
+def ritual_rio_processor(request):
+    """Expone los interruptores de publicación de la landing del Ritual del Río
+    a TODAS las plantillas (para el enlace del menú y el botón del home).
+    Tolerante a fallos: si algo falla, no muestra nada (no rompe el sitio)."""
+    try:
+        from .models import RitualRioLandingConfig
+        cfg = RitualRioLandingConfig.get_solo()
+        return {
+            'ritual_rio_en_menu': bool(cfg.mostrar_en_menu),
+            'ritual_rio_en_home': bool(cfg.mostrar_en_home),
+        }
+    except Exception:
+        return {'ritual_rio_en_menu': False, 'ritual_rio_en_home': False}

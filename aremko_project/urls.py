@@ -22,6 +22,7 @@ from ventas.sitemaps import (
     CorporatePagesSitemap,
     CategoriaSitemap,
     RefugioLandingSitemap,
+    RitualRioLandingSitemap,
 )
 from aremko_blog.sitemaps import AremkoBlogIndexSitemap, AremkoBlogPostSitemap
 from django.views.generic import TemplateView
@@ -32,6 +33,7 @@ sitemaps = {
     'corporate': CorporatePagesSitemap,
     'categorias': CategoriaSitemap,
     'refugio': RefugioLandingSitemap,
+    'ritual': RitualRioLandingSitemap,
     'blog_index': AremkoBlogIndexSitemap,
     'blog_posts': AremkoBlogPostSitemap,
 }

@@ -70,6 +70,30 @@ class RefugioLandingSitemap(Sitemap):
         return reverse(item)
 
 
+class RitualRioLandingSitemap(Sitemap):
+    """Sitemap para la landing del producto insignia 'Noche de ritual junto al río'.
+
+    Solo se incluye si el equipo activó la indexación
+    (RitualRioLandingConfig.indexar_en_google=True).
+    """
+    changefreq = 'weekly'
+    priority = 0.9
+
+    def items(self):
+        # Import local para evitar ciclo en arranque
+        from .models import RitualRioLandingConfig
+        try:
+            config = RitualRioLandingConfig.get_solo()
+            if config.indexar_en_google:
+                return ['ritual_rio_landing']
+        except Exception:
+            pass
+        return []
+
+    def location(self, item):
+        return reverse(item)
+
+
 class CategoriaSitemap(Sitemap):
     """Sitemap dinámico para categorías de servicios individuales"""
     changefreq = 'weekly'

@@ -3372,6 +3372,11 @@ class ConfiguracionResumenAdmin(SingletonModelAdmin):
 class RitualRioLandingConfigAdmin(SingletonModelAdmin):
     """Imágenes y reseñas de la landing /ritual-del-rio/ (Singleton)."""
     fieldsets = (
+        ('Publicación (¿dónde se ve?)', {
+            'fields': ('mostrar_en_menu', 'mostrar_en_home', 'indexar_en_google'),
+            'description': 'Prende o apaga dónde aparece la landing. Todo apagado = oculta '
+                           '(solo accesible con el link directo, ideal para campañas).'
+        }),
         ('Foto principal (Hero)', {
             'fields': ('foto_hero',),
             'description': 'Lo primero que se ve. Foto de la tina humeante junto al río, al atardecer.'

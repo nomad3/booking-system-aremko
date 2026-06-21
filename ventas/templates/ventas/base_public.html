@@ -462,6 +462,13 @@
                             <i class="fas fa-leaf me-1"></i>Refugio
                         </a>
                     </li>
+                    {% if ritual_rio_en_menu %}
+                    <li class="nav-item">
+                        <a class="nav-link fw-bold" style="color: #0f6e56;" href="{% url 'ritual_rio_landing' %}">
+                            <i class="fas fa-moon me-1"></i>Ritual del Río
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link fw-bold text-warning" href="{% url 'ventas:giftcard_menu' %}">
                             <i class="fas fa-gift me-1"></i>GiftCards
