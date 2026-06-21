@@ -1,5 +1,6 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
+{% load ventas_extras %}
 
 {# ──────────────────────────────────────────────────────────────────
    Landing OCULTA — producto insignia "Noche de ritual junto al río"
@@ -70,7 +71,7 @@
   <section class="rr-section rr-hero">
     <div class="rr-photo">
       {% if config.foto_hero %}
-        <img src="{{ config.foto_hero.url }}" alt="Tina caliente junto al río, al atardecer">
+        <img src="{{ config.foto_hero|cuadrada:800 }}" alt="Tina caliente junto al río, al atardecer">
       {% else %}
         <span style="font-size:30px">🛁</span>
         <span>Foto/video: tina humeante junto al río, al atardecer</span>
@@ -89,15 +90,15 @@
     <h2 class="rr-h2">Un ritual de tres actos</h2>
     <div class="rr-acts">
       <div class="rr-card">
-        {% if config.foto_acto1 %}<img class="rr-act-img" src="{{ config.foto_acto1.url }}" alt="Masaje nocturno">{% endif %}
+        {% if config.foto_acto1 %}<img class="rr-act-img" src="{{ config.foto_acto1|cuadrada }}" alt="Masaje nocturno">{% endif %}
         <div class="rr-act-n">Acto 1</div><div class="rr-act-t">Masaje nocturno</div>
         <p>Sueltan la semana antes de entrar al agua.</p></div>
       <div class="rr-card">
-        {% if config.foto_acto2 %}<img class="rr-act-img" src="{{ config.foto_acto2.url }}" alt="Tina caliente bajo las estrellas">{% endif %}
+        {% if config.foto_acto2 %}<img class="rr-act-img" src="{{ config.foto_acto2|cuadrada }}" alt="Tina caliente bajo las estrellas">{% endif %}
         <div class="rr-act-n">Acto 2</div><div class="rr-act-t">Tina caliente</div>
         <p>Bajo las estrellas, junto al río, mientras afuera hace frío.</p></div>
       <div class="rr-card">
-        {% if config.foto_acto3 %}<img class="rr-act-img" src="{{ config.foto_acto3.url }}" alt="Cabaña y desayuno">{% endif %}
+        {% if config.foto_acto3 %}<img class="rr-act-img" src="{{ config.foto_acto3|cuadrada }}" alt="Cabaña y desayuno">{% endif %}
         <div class="rr-act-n">Acto 3</div><div class="rr-act-t">Cabaña y desayuno</div>
         <p>Duermen abrazados y despiertan con el desayuno listo.</p></div>
     </div>
@@ -148,7 +149,7 @@
           {% if texto %}
             <div class="rr-rev">
               <div class="rr-rev-head">
-                {% if foto %}<img class="rr-rev-face" src="{{ foto.url }}" alt="{{ autor }}">{% endif %}
+                {% if foto %}<img class="rr-rev-face" src="{{ foto|cuadrada:120 }}" alt="{{ autor }}">{% endif %}
                 <div class="stars">★★★★★</div>
               </div>
               <p class="q">{{ texto }}</p>

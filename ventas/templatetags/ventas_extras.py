@@ -307,3 +307,28 @@ def has_group(user, group_name):
         return bool(user) and user.is_authenticated and user.groups.filter(name=group_name).exists()
     except Exception:
         return False
+
+
+@register.filter
+def cuadrada(image_field, size=600):
+    """Devuelve la URL de una imagen de Cloudinary recortada a cuadrado inteligente.
+
+    Inserta una transformación Cloudinary (c_fill, ar_1:1, g_auto) que recorta a
+    cuadrado enfocando el sujeto, más q_auto/f_auto para optimizar peso y formato.
+    Así cualquier foto subida desde el admin luce cuadrada sin recortarla a mano.
+    Si la imagen no es de Cloudinary, devuelve la URL original sin tocar.
+
+    Uso: {{ config.foto_hero|cuadrada }}  o  {{ config.foto_acto1|cuadrada:800 }}
+    """
+    try:
+        url = image_field.url if hasattr(image_field, 'url') else str(image_field)
+    except Exception:
+        return ''
+    if not url or '/upload/' not in url:
+        return url
+    try:
+        size = int(size)
+    except (ValueError, TypeError):
+        size = 600
+    transf = f'c_fill,ar_1:1,g_auto,q_auto,f_auto,w_{size}'
+    return url.replace('/upload/', f'/upload/{transf}/', 1)
