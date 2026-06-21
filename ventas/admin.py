@@ -51,6 +51,8 @@ from .models import (
     DocumentoSistemaCache,
     # Tips Post-Pago
     ConfiguracionTips,
+    # Landing Ritual del Río (imágenes editables)
+    RitualRioLandingConfig,
     # Sistema de Pagos a Masajistas
     PagoMasajista, DetalleServicioPago,
     # Sistema de Comandas
@@ -3362,6 +3364,30 @@ class ConfiguracionResumenAdmin(SingletonModelAdmin):
         }),
         ('Despedida', {
             'fields': ('despedida',)
+        }),
+    )
+
+
+@admin.register(RitualRioLandingConfig)
+class RitualRioLandingConfigAdmin(SingletonModelAdmin):
+    """Imágenes y reseñas de la landing /ritual-del-rio/ (Singleton)."""
+    fieldsets = (
+        ('Foto principal (Hero)', {
+            'fields': ('foto_hero',),
+            'description': 'Lo primero que se ve. Foto de la tina humeante junto al río, al atardecer.'
+        }),
+        ('Las 3 escenas del ritual', {
+            'fields': ('foto_acto1', 'foto_acto2', 'foto_acto3'),
+        }),
+        ('Reseña 1', {
+            'fields': ('resena1_foto', 'resena1_texto', 'resena1_autor'),
+            'description': 'Si dejas el texto vacío, esta reseña no aparece en la landing.'
+        }),
+        ('Reseña 2', {
+            'fields': ('resena2_foto', 'resena2_texto', 'resena2_autor'),
+        }),
+        ('Reseña 3', {
+            'fields': ('resena3_foto', 'resena3_texto', 'resena3_autor'),
         }),
     )
 

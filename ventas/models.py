@@ -4535,6 +4535,60 @@ Gracias por elegir Aremko Spa para tu relax.""",
         return self.cotizacion_cierre.strip() or COTIZACION_CIERRE_DEFAULT
 
 
+class RitualRioLandingConfig(SingletonModel):
+    """
+    Imágenes editables de la landing del producto insignia
+    "Noche de ritual junto al río" (/ritual-del-rio/).
+    Singleton: una sola instancia, editable desde el admin.
+    Las fotos se suben a Cloudinary (storage del proyecto). Si un campo
+    queda vacío, la plantilla muestra el placeholder de respaldo.
+    """
+    # Hero (foto principal, lo primero que se ve)
+    foto_hero = models.ImageField(
+        upload_to='ritual_rio/', blank=True, null=True,
+        help_text="Foto/video principal: tina humeante junto al río, al atardecer."
+    )
+    # Las 3 escenas del ritual
+    foto_acto1 = models.ImageField(
+        upload_to='ritual_rio/', blank=True, null=True,
+        help_text="Acto 1 — Masaje nocturno."
+    )
+    foto_acto2 = models.ImageField(
+        upload_to='ritual_rio/', blank=True, null=True,
+        help_text="Acto 2 — Tina caliente / circuito térmico bajo las estrellas."
+    )
+    foto_acto3 = models.ImageField(
+        upload_to='ritual_rio/', blank=True, null=True,
+        help_text="Acto 3 — Cabaña y desayuno al despertar."
+    )
+    # Reseñas con foto (3). Si texto vacío, la reseña no se muestra.
+    resena1_foto = models.ImageField(
+        upload_to='ritual_rio/resenas/', blank=True, null=True,
+        help_text="Foto de la pareja (reseña 1)."
+    )
+    resena1_texto = models.TextField(blank=True, default="", help_text="Texto de la reseña 1.")
+    resena1_autor = models.CharField(max_length=120, blank=True, default="", help_text="Ej: Pareja de Puerto Montt.")
+    resena2_foto = models.ImageField(
+        upload_to='ritual_rio/resenas/', blank=True, null=True,
+        help_text="Foto de la pareja (reseña 2)."
+    )
+    resena2_texto = models.TextField(blank=True, default="", help_text="Texto de la reseña 2.")
+    resena2_autor = models.CharField(max_length=120, blank=True, default="", help_text="Ej: Pareja de Osorno.")
+    resena3_foto = models.ImageField(
+        upload_to='ritual_rio/resenas/', blank=True, null=True,
+        help_text="Foto de la pareja (reseña 3)."
+    )
+    resena3_texto = models.TextField(blank=True, default="", help_text="Texto de la reseña 3.")
+    resena3_autor = models.CharField(max_length=120, blank=True, default="", help_text="Ej: Pareja de Puerto Varas.")
+
+    class Meta:
+        verbose_name = "Landing Ritual del Río"
+        verbose_name_plural = "Landing Ritual del Río"
+
+    def __str__(self):
+        return "Landing Ritual del Río"
+
+
 class ConfiguracionTips(SingletonModel):
     """
     Configuración para generar tips post-pago (enviados después del pago).

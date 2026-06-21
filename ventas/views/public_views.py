@@ -780,9 +780,23 @@ def ritual_rio_landing_view(request):
         'https://wa.me/56957902525?text='
         'Hola%2C%20quiero%20reservar%20la%20Noche%20de%20Ritual%20junto%20al%20r%C3%ADo'
     )
+    try:
+        from ventas.models import RitualRioLandingConfig
+        config = RitualRioLandingConfig.get_solo()
+    except Exception:
+        config = None
+    resenas = []
+    if config:
+        resenas = [
+            (config.resena1_foto, config.resena1_texto, config.resena1_autor),
+            (config.resena2_foto, config.resena2_texto, config.resena2_autor),
+            (config.resena3_foto, config.resena3_texto, config.resena3_autor),
+        ]
     return render(request, 'ventas/ritual_rio_landing.html', {
         'canonical_url': canonical_url,
         'whatsapp_url': whatsapp_url,
+        'config': config,
+        'resenas': resenas,
     })
 
 

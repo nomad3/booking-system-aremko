@@ -23,7 +23,11 @@
   .rr-hero{text-align:center}
   .rr-photo{border-radius:16px;background:#ede7df;border:1px dashed #c9bfae;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
-    color:#8a7f6c;font-size:14px;min-height:260px}
+    color:#8a7f6c;font-size:14px;min-height:260px;overflow:hidden}
+  .rr-photo img{width:100%;height:100%;min-height:260px;object-fit:cover;display:block}
+  .rr-act-img{width:100%;height:150px;object-fit:cover;border-radius:10px;margin-bottom:12px;display:block}
+  .rr-rev-head{display:flex;align-items:center;gap:11px;margin-bottom:10px}
+  .rr-rev-face{width:46px;height:46px;border-radius:50%;object-fit:cover;flex-shrink:0}
   .rr-badge{display:inline-block;background:#f6efe1;color:#8a5a1d;
     font-size:13px;padding:6px 14px;border-radius:999px;margin:18px 0 12px;font-weight:500}
   .rr-h1{font-size:30px;line-height:1.25;margin:6px 0 14px;font-weight:600}
@@ -64,8 +68,12 @@
 
   <section class="rr-section rr-hero">
     <div class="rr-photo">
-      <span style="font-size:30px">🛁</span>
-      <span>Foto/video: tina humeante junto al río, al atardecer</span>
+      {% if config.foto_hero %}
+        <img src="{{ config.foto_hero.url }}" alt="Tina caliente junto al río, al atardecer">
+      {% else %}
+        <span style="font-size:30px">🛁</span>
+        <span>Foto/video: tina humeante junto al río, al atardecer</span>
+      {% endif %}
     </div>
     <span class="rr-badge">🔥 Solo 5 parejas por noche</span>
     <h1 class="rr-h1">Afuera, 4 grados.<br>Ustedes dos, en agua caliente, junto al río.</h1>
@@ -79,11 +87,17 @@
   <section class="rr-section">
     <h2 class="rr-h2">Un ritual de tres actos</h2>
     <div class="rr-acts">
-      <div class="rr-card"><div class="rr-act-n">Acto 1</div><div class="rr-act-t">Masaje nocturno</div>
+      <div class="rr-card">
+        {% if config.foto_acto1 %}<img class="rr-act-img" src="{{ config.foto_acto1.url }}" alt="Masaje nocturno">{% endif %}
+        <div class="rr-act-n">Acto 1</div><div class="rr-act-t">Masaje nocturno</div>
         <p>Sueltan la semana antes de entrar al agua.</p></div>
-      <div class="rr-card"><div class="rr-act-n">Acto 2</div><div class="rr-act-t">Tina caliente</div>
+      <div class="rr-card">
+        {% if config.foto_acto2 %}<img class="rr-act-img" src="{{ config.foto_acto2.url }}" alt="Tina caliente bajo las estrellas">{% endif %}
+        <div class="rr-act-n">Acto 2</div><div class="rr-act-t">Tina caliente</div>
         <p>Bajo las estrellas, junto al río, mientras afuera hace frío.</p></div>
-      <div class="rr-card"><div class="rr-act-n">Acto 3</div><div class="rr-act-t">Cabaña y desayuno</div>
+      <div class="rr-card">
+        {% if config.foto_acto3 %}<img class="rr-act-img" src="{{ config.foto_acto3.url }}" alt="Cabaña y desayuno">{% endif %}
+        <div class="rr-act-n">Acto 3</div><div class="rr-act-t">Cabaña y desayuno</div>
         <p>Duermen abrazados y despiertan con el desayuno listo.</p></div>
     </div>
   </section>
@@ -128,12 +142,27 @@
   <section class="rr-section">
     <h2 class="rr-h2">Lo que dicen las parejas</h2>
     <div class="rr-revs">
-      <div class="rr-rev"><div class="stars">★★★★★</div>
-        <p class="q">[Reseña real a conseguir antes de escalar la pauta]</p>
-        <p class="who">— Pareja de Puerto Montt</p></div>
-      <div class="rr-rev"><div class="stars">★★★★★</div>
-        <p class="q">[Reseña real a conseguir antes de escalar la pauta]</p>
-        <p class="who">— Pareja de Osorno</p></div>
+      {% if config.resena1_texto or config.resena2_texto or config.resena3_texto %}
+        {% for foto, texto, autor in resenas %}
+          {% if texto %}
+            <div class="rr-rev">
+              <div class="rr-rev-head">
+                {% if foto %}<img class="rr-rev-face" src="{{ foto.url }}" alt="{{ autor }}">{% endif %}
+                <div class="stars">★★★★★</div>
+              </div>
+              <p class="q">{{ texto }}</p>
+              <p class="who">— {{ autor }}</p>
+            </div>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        <div class="rr-rev"><div class="stars">★★★★★</div>
+          <p class="q">[Reseña real a conseguir antes de escalar la pauta]</p>
+          <p class="who">— Pareja de Puerto Montt</p></div>
+        <div class="rr-rev"><div class="stars">★★★★★</div>
+          <p class="q">[Reseña real a conseguir antes de escalar la pauta]</p>
+          <p class="who">— Pareja de Osorno</p></div>
+      {% endif %}
     </div>
   </section>
 
