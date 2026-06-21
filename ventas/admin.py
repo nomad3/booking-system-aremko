@@ -3374,27 +3374,21 @@ class ConfiguracionTipsAdmin(SingletonModelAdmin):
         }),
         ('WiFi - Cabañas', {
             'fields': ('wifi_torre', 'wifi_tepa', 'wifi_acantilado', 'wifi_laurel', 'wifi_arrayan'),
-            'classes': ('collapse',)
         }),
         ('WiFi - Otras Áreas', {
             'fields': ('wifi_tinas', 'wifi_tinajas', 'wifi_masajes'),
-            'classes': ('collapse',)
         }),
         ('Normas (Solo Cabañas)', {
             'fields': ('norma_mascotas', 'norma_cocinar', 'norma_fumar', 'norma_danos'),
-            'classes': ('collapse',)
         }),
         ('Check-out (Solo Cabañas)', {
             'fields': ('checkout_semana', 'checkout_finde'),
-            'classes': ('collapse',)
         }),
         ('Tips Tinas/Masajes', {
             'fields': ('recordatorio_toallas', 'tip_puntualidad', 'info_vestidores', 'ropa_masaje', 'menores_edad'),
-            'classes': ('collapse',)
         }),
         ('Uso de Tinas', {
             'fields': ('uso_tinas_alternancia', 'uso_tinas_prohibiciones', 'recomendacion_ducha_masaje', 'prohibicion_vasos'),
-            'classes': ('collapse',)
         }),
         ('Seguridad', {
             'fields': ('seguridad_pasarelas',)
@@ -3405,11 +3399,9 @@ class ConfiguracionTipsAdmin(SingletonModelAdmin):
                 'horario_recepcion_semana', 'horario_recepcion_finde', 'horario_recepcion_domingo',
                 'horario_cafeteria_semana', 'horario_cafeteria_finde'
             ),
-            'classes': ('collapse',)
         }),
         ('Cafetería', {
             'fields': ('productos_cafeteria', 'menu_cafe'),
-            'classes': ('collapse',)
         }),
         ('Ubicación', {
             'fields': ('direccion', 'como_llegar', 'link_google_maps')
