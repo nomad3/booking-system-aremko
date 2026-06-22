@@ -66,13 +66,13 @@ def construir_briefing(persona):
     try:
         from costos_web.models import ServicioWeb
         hoy = date.today()
-        limite = hoy + timedelta(days=7)
+        limite = hoy + timedelta(days=30)
         vencen = list(ServicioWeb.objects.filter(
             activo=True, proxima_fecha_pago__isnull=False, proxima_fecha_pago__lte=limite
         ).order_by('proxima_fecha_pago'))
         if vencen:
             hay_contenido = True
-            lineas.append('\n💳 *Pagos que vencen pronto:*')
+            lineas.append('\n💳 *Pagos próximos (30 días):*')
             for s in vencen:
                 d = (s.proxima_fecha_pago - hoy).days
                 cuando = 'VENCIDO' if d < 0 else ('hoy' if d == 0 else f'en {d} días')
