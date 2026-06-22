@@ -473,6 +473,18 @@ def conversation(request):
     recientes = list(WhatsAppMessage.objects.filter(filtro).order_by('-timestamp')[:limit])
     recientes.reverse()
 
+    # H-037 (Luna Interna): si el número es staff whitelisted y el último entrante
+    # es un inicio de turno ("empezando el día"/saludo), la sugerencia es el briefing
+    # DETERMINÍSTICO y se marca responde_auto=true para que aremko-cli lo envíe solo
+    # (sin el cajón de aprobación). Para clientes, todo sigue igual (responde_auto=false).
+    sug_briefing = _briefing_staff(phone, recientes)
+    if sug_briefing is not None:
+        sugerencia = sug_briefing
+        responde_auto = True
+    else:
+        sugerencia = _sugerencia_agente(phone, request)
+        responde_auto = False
+
     return JsonResponse({
         'phone': phone,
         'cliente_id': cliente.id if cliente else None,
@@ -490,7 +502,9 @@ def conversation(request):
         } for m in recientes],
         # H-007 F1: borrador sugerido por el agente IA para el último entrante sin
         # responder (null si el agente está apagado, no hay pendiente, o ?sugerencia=0).
-        'sugerencia_agente': _sugerencia_agente(phone, request),
+        'sugerencia_agente': sugerencia,
+        # H-037: si true, aremko-cli envía la sugerencia AUTOMÁTICAMENTE (staff), sin cajón.
+        'responde_auto': responde_auto,
         # H-028 FIX: propuesta de reserva vigente (null si no hay)
         'propuesta_reserva': _propuesta_reserva('whatsapp', phone),
     })
@@ -511,6 +525,56 @@ def _sugerencia_agente(phone, request):
     except Exception:  # noqa: BLE001 — el agente es opcional; jamás tumbar la conversación
         import logging
         logging.getLogger(__name__).exception('Agente WA: fallo generando sugerencia para %s', phone)
+        return None
+
+
+def _es_inicio_turno(texto):
+    """True si el texto del staff es un saludo de inicio de turno (determinístico)."""
+    import unicodedata
+    t = unicodedata.normalize('NFKD', (texto or '').lower()).encode('ascii', 'ignore').decode().strip()
+    if not t:
+        return False
+    triggers = (
+        'empezando el dia', 'empezando mi dia', 'empezando la jornada', 'empezando el turno',
+        'buenos dias', 'buenas tardes', 'buenas noches', 'buen dia',
+        'inicio turno', 'inicio de turno', 'inicio mi turno', 'iniciando turno', 'inicio jornada',
+        'comienzo turno', 'comenzando turno', 'empiezo turno', 'empezar turno',
+        'comenzando el dia', 'comienzo el dia', 'partiendo el dia', 'partiendo la jornada',
+        'llegue', 'ya llegue', 'aca estoy', 'presente',
+    )
+    return any(trig in t for trig in triggers)
+
+
+def _briefing_staff(phone, recientes):
+    """Luna Interna (H-037): si `phone` es staff whitelisted con responde_auto y el
+    ÚLTIMO mensaje del hilo es un entrante de inicio de turno SIN responder, devuelve
+    el briefing del día con el formato de `sugerencia_agente`. Si no, None.
+
+    Idempotencia: solo dispara cuando el último mensaje es entrante; una vez que
+    aremko-cli envía y postea el saliente, el último pasa a 'out' → no se re-dispara.
+    """
+    try:
+        from personal_operativo.services import buscar_personal, construir_briefing
+        persona = buscar_personal(phone)
+        if not persona or not persona.responde_auto or not recientes:
+            return None
+        ultimo = recientes[-1]
+        if ultimo.direction != 'in' or not _es_inicio_turno(ultimo.body or ''):
+            return None
+        from django.utils import timezone
+        return {
+            'texto': construir_briefing(persona),
+            'escalar': False,
+            'motivo': None,
+            'modo': 'interno',
+            'modelo': 'briefing',
+            'error': None,
+            'generada_at': timezone.now().isoformat(),
+            'responde_a': ultimo.wa_message_id,
+        }
+    except Exception:  # noqa: BLE001 — jamás tumbar la conversación
+        import logging
+        logging.getLogger(__name__).exception('Briefing staff falló para %s', phone)
         return None
 
 
