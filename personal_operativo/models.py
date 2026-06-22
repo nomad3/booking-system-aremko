@@ -47,6 +47,10 @@ class PersonalOperativo(models.Model):
         default=False,
         help_text='⚙️ INTERRUPTOR DE AUTONOMÍA: si está activo, Luna le responde AUTOMÁTICAMENTE '
                   '(sin pasar por la aprobación de Deborah). Solo para staff de confianza.')
+    recibe_avisos_operacion = models.BooleanField(
+        default=False,
+        help_text='📥 Recibe por WhatsApp los avisos de tareas de Recepción/Operación apenas se '
+                  'generan (el "recepcionista de turno"). Marca esto en quien esté cubriendo recepción.')
     activo = models.BooleanField(default=True)
     notas = models.TextField(blank=True, default='')
 
@@ -68,3 +72,41 @@ class PersonalOperativo(models.Model):
         if not u:
             return None
         return getattr(u, 'proveedor', None)
+
+
+class NotificacionStaff(models.Model):
+    """Cola de notificaciones salientes a staff por WhatsApp (Luna Interna · Fase 2).
+
+    Django ENCOLA acá (no tiene token de WhatsApp); aremko-cli DRENA esta cola
+    (poll), envía por la Cloud API y marca el estado. Durable y desacoplado: si
+    aremko-cli está caído un momento, la notificación queda pendiente y se envía
+    cuando vuelve. La dedup_key evita duplicados (ej. el signal disparado 2 veces).
+    """
+    ESTADOS = [
+        ('pendiente', 'Pendiente'),
+        ('enviada', 'Enviada'),
+        ('fallida', 'Fallida'),
+        ('descartada', 'Descartada'),
+    ]
+    telefono = models.CharField(max_length=20, db_index=True, help_text='Destinatario (E.164).')
+    texto = models.TextField()
+    estado = models.CharField(max_length=12, choices=ESTADOS, default='pendiente', db_index=True)
+    origen = models.CharField(max_length=40, blank=True, default='',
+                              help_text='Ej: task_creada, task_vencida.')
+    ref_tipo = models.CharField(max_length=20, blank=True, default='')
+    ref_id = models.CharField(max_length=40, blank=True, default='')
+    dedup_key = models.CharField(max_length=120, unique=True,
+                                 help_text='Evita duplicados (ej. task_creada:123:5).')
+    intentos = models.PositiveIntegerField(default=0)
+    error = models.TextField(blank=True, default='')
+    creada = models.DateTimeField(auto_now_add=True, db_index=True)
+    enviada_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Notificación a staff'
+        verbose_name_plural = 'Notificaciones a staff (Luna Interna)'
+        ordering = ['-creada']
+        indexes = [models.Index(fields=['estado', 'creada'])]
+
+    def __str__(self):
+        return f'[{self.estado}] {self.telefono} · {self.dedup_key}'

@@ -13,6 +13,7 @@ from ventas.views import masaje_outbox_api_views
 from ventas.views import whatsapp_api_views
 from ventas.views import metrics_api_views
 from inbox_omnicanal import views as inbox_views
+from personal_operativo import api_views as personal_operativo_api
 # Removed direct import of ventas.urls
 
 from django.contrib.sitemaps.views import sitemap
@@ -74,6 +75,9 @@ urlpatterns = [
     path('api/whatsapp/outbound-media', whatsapp_api_views.outbound_media, name='whatsapp_outbound_media'),
     path('api/whatsapp/conversation/', whatsapp_api_views.conversation, name='whatsapp_conversation'),
     path('api/whatsapp/conversations/', whatsapp_api_views.conversations, name='whatsapp_conversations'),
+    # Luna Interna · Fase 2: cola de notificaciones a staff (aremko-cli drena y envía)
+    path('api/staff/notificaciones', personal_operativo_api.notificaciones_pendientes, name='staff_notif_pendientes'),
+    path('api/staff/notificaciones/marcar', personal_operativo_api.marcar_notificaciones, name='staff_notif_marcar'),
     path('api/whatsapp/conversations/<str:phone>/marcar-atendido/', whatsapp_api_views.marcar_atendido, name='whatsapp_marcar_atendido'),
     path('api/whatsapp/conversations/<str:phone>/editar-nombre/', whatsapp_api_views.editar_nombre, name='whatsapp_editar_nombre'),
     # Agente IA WhatsApp (H-007): config singleton editable desde aremko-cli.

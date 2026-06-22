@@ -40,6 +40,48 @@ def responde_auto(telefono):
     return bool(p and p.responde_auto)
 
 
+def receptores_avisos_operacion():
+    """Personal activo que recibe los avisos de operación/recepción (el/los de turno)."""
+    from .models import PersonalOperativo
+    return list(PersonalOperativo.objects.filter(activo=True, recibe_avisos_operacion=True))
+
+
+def texto_alerta_tarea(task):
+    """Arma el texto WhatsApp de aviso para una tarea recién creada de control_gestion."""
+    area = ''
+    try:
+        area = task.get_swimlane_display()
+    except Exception:
+        area = getattr(task, 'swimlane', '') or ''
+    lineas = [f'🔔 *Nueva tarea · {area}*', (task.title or '').strip()]
+    # Hora límite si la tarea la trae
+    due = getattr(task, 'promise_due_at', None)
+    if due:
+        from django.utils import timezone
+        try:
+            due_local = timezone.localtime(due)
+            lineas.append(f'⏰ Lista antes de las {due_local:%H:%M}')
+        except Exception:
+            pass
+    ref = getattr(task, 'reservation_id', '') or ''
+    if ref:
+        lineas.append(f'📌 Reserva #{ref}')
+    lineas.append('Responde "ok" cuando la tengas controlada.')
+    return '\n'.join([l for l in lineas if l])
+
+
+def encolar_notificacion(telefono, texto, dedup_key, origen='', ref_tipo='', ref_id=''):
+    """Encola una notificación saliente (idempotente por dedup_key). Devuelve (obj, creada)."""
+    from .models import NotificacionStaff
+    return NotificacionStaff.objects.get_or_create(
+        dedup_key=dedup_key,
+        defaults={
+            'telefono': telefono, 'texto': texto, 'origen': origen,
+            'ref_tipo': ref_tipo, 'ref_id': str(ref_id),
+        },
+    )
+
+
 def _saludo():
     h = timezone.localtime().hour
     if h < 12:
