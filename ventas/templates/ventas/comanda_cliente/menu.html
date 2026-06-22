@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+{% load ventas_extras %}<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -212,7 +212,7 @@
             <div class="product-card" data-product-id="{{ producto.id }}">
                 <div class="product-content">
                     {% if producto.imagen %}
-                        <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}" class="product-image">
+                        <img src="{{ producto.imagen|optimizada:600 }}" alt="{{ producto.nombre }}" class="product-image">
                     {% else %}
                         <div class="product-image"></div>
                     {% endif %}

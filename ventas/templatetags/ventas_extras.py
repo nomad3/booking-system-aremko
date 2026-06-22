@@ -332,3 +332,28 @@ def cuadrada(image_field, size=600):
         size = 600
     transf = f'c_fill,ar_1:1,g_auto,q_auto,f_auto,w_{size}'
     return url.replace('/upload/', f'/upload/{transf}/', 1)
+
+
+@register.filter
+def optimizada(image_field, width=900):
+    """URL de una imagen de Cloudinary OPTIMIZADA para entrega web, SIN recortar.
+
+    Inserta `f_auto,q_auto,c_limit,w_<width>`: formato moderno (webp/avif),
+    calidad automática y límite de ancho (c_limit = solo achica si es más grande,
+    conserva proporción, no agranda ni recorta). Baja muchísimo el peso/ancho de
+    banda servido (las fotos full-res de ~1MB pasan a ~100-200KB) y acelera el sitio.
+    Si la imagen no es de Cloudinary, devuelve la URL original sin tocar.
+
+    Uso: {{ servicio.imagen|optimizada }}  o  {{ config.hero|optimizada:1600 }}
+    """
+    try:
+        url = image_field.url if hasattr(image_field, 'url') else str(image_field)
+    except Exception:
+        return ''
+    if not url or '/upload/' not in url:
+        return url
+    try:
+        width = int(width)
+    except (ValueError, TypeError):
+        width = 900
+    return url.replace('/upload/', f'/upload/f_auto,q_auto,c_limit,w_{width}/', 1)

@@ -1,8 +1,9 @@
 {% load humanize %}
+{% load ventas_extras %}
 <div class="col-lg-4 col-md-6 service-card" data-category="{{ servicio.categoria.id }}">
     <div class="card h-100">
         {% if servicio.imagen %}
-            <img src="{{ servicio.imagen.url }}" class="card-img-top" alt="{{ servicio.nombre }}" loading="lazy">
+            <img src="{{ servicio.imagen|optimizada:800 }}" class="card-img-top" alt="{{ servicio.nombre }}" loading="lazy">
         {% endif %}
         <div class="card-body">
             <h5 class="card-title">{{ servicio.nombre }}</h5>

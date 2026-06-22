@@ -1,5 +1,6 @@
 {% extends "ventas/base_public.html" %}
 {% load static humanize %}
+{% load ventas_extras %}
 
 {# ──────────────────────────────────────────────────────────────────
    Landing "Refugio Aremko" — campaña 15-jun-2026
@@ -432,7 +433,7 @@
             <div class="carousel-inner">
                 {% for img in imagenes %}
                 <div class="carousel-item{% if forloop.first %} active{% endif %}">
-                    <img src="{{ img.imagen.url }}" alt="{{ img.alt_text|default:'Refugio Aremko' }}"
+                    <img src="{{ img.imagen|optimizada:1200 }}" alt="{{ img.alt_text|default:'Refugio Aremko' }}"
                          class="d-block w-100 refugio-carousel-img" loading="lazy">
                 </div>
                 {% endfor %}
