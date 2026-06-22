@@ -217,6 +217,7 @@ INSTALLED_APPS = [
     'inbox_omnicanal.apps.InboxOmnicanalConfig',  # Bandeja omnicanal: Instagram DM (H-016, app aislada drift-safe)
     'carrito_reservas.apps.CarritoReservasConfig',  # Carrito multi-servicio (H-029 FASE 2, app aislada drift-safe)
     'costos_web.apps.CostosWebConfig',  # Tablero de costos de servicios web (solo superusuarios, app aislada drift-safe)
+    'personal_operativo.apps.PersonalOperativoConfig',  # Whitelist de staff para Luna Interna (H-037, app aislada drift-safe)
 
     # Aplicaciones de terceros
     'rest_framework',
