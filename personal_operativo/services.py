@@ -132,20 +132,35 @@ def construir_briefing(persona):
     except Exception:
         pass
 
-    # --- Tareas pendientes del usuario (control_gestion) ---
+    # --- Tareas del usuario (control_gestion) ---
+    # Convención del módulo (vista mi-día): solo las del DÍA, no las de días anteriores.
+    # Sumamos las ATRASADAS (vencidas sin terminar), que un recepcionista sí necesita ver.
     try:
         if persona and persona.usuario_id:
+            from django.db.models import Q
+            from django.utils import timezone
             from control_gestion.models import Tarea
+            ahora = timezone.localtime()
+            hoy = ahora.date()
             pend = (Tarea.objects.filter(owner_id=persona.usuario_id)
-                    .exclude(state='DONE').order_by('promise_due_at'))
+                    .exclude(state='DONE')
+                    .filter(Q(promise_due_at__date__lte=hoy)
+                            | Q(promise_due_at__isnull=True, created_at__date=hoy))
+                    .order_by('promise_due_at'))
+            items = list(pend[:8])
             n = pend.count()
-            if n:
+            if items:
                 hay_contenido = True
-                lineas.append(f'\n✅ *Tus tareas pendientes ({n}):*')
-                for t in pend[:5]:
-                    lineas.append(f'• {t.title}')
-                if n > 5:
-                    lineas.append(f'• …y {n - 5} más')
+                lineas.append(f'\n✅ *Tus tareas de hoy ({n}):*')
+                for t in items:
+                    due = getattr(t, 'promise_due_at', None)
+                    marca = ''
+                    if due:
+                        due_l = timezone.localtime(due)
+                        marca = ' ⚠️ atrasada' if due_l < ahora else f' ({due_l:%H:%M})'
+                    lineas.append(f'• {t.title}{marca}')
+                if n > len(items):
+                    lineas.append(f'• …y {n - len(items)} más')
     except Exception:
         pass
 
