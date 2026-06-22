@@ -679,6 +679,12 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     'region_id': region_id,
                     'comuna_id': None,  # Opcional por ahora
                 }
+                # Defensa en código: no crear reserva con una hora alucinada que no
+                # corresponde a un slot real (ej. 16:30).
+                from .availability import validar_hora_es_slot
+                err_hora = validar_hora_es_slot(args.get('servicio_id'), args.get('fecha'), args.get('hora'))
+                if err_hora:
+                    return {'success': False, **err_hora}
                 servicios = [{
                     'servicio_id': args.get('servicio_id'),
                     'fecha': args.get('fecha'),
@@ -733,6 +739,12 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 if cantidad < 1:
                     return {'success': False, 'error': 'falta_personas',
                             'mensaje': 'Necesito saber para cuántas personas es. Pregúntale al cliente antes de agregar al carrito. NO asumas 1.'}
+                # Defensa en código: el modelo liviano a veces inventa una hora que no
+                # es un slot real (ej. 16:30). No agregar al carrito si la hora no existe.
+                from .availability import validar_hora_es_slot
+                err_hora = validar_hora_es_slot(servicio_id, args.get('fecha'), args.get('hora'))
+                if err_hora:
+                    return {'success': False, **err_hora}
                 resultado = CarritoService.agregar_servicio(
                     canal=canal,
                     external_id=phone if phone else 'desconocido',

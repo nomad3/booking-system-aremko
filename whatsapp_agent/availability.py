@@ -142,6 +142,64 @@ def resolver_fecha(expresion_cliente):
     return {'error': f'no se pudo resolver la fecha: "{expresion_cliente}"', 'ambiguo': True}
 
 
+def validar_hora_es_slot(servicio_id, fecha, hora):
+    """Defensa en código contra horas ALUCINADAS por el modelo liviano.
+
+    El modelo a veces propone una hora que NO existe como slot (ej. 16:30).
+    Este validador comprueba que `hora` sea uno de los slots REALES configurados
+    para ese servicio en esa fecha (reusa `extraer_slots_para_fecha`).
+
+    Devuelve:
+      - None  → la hora es válida, o no se puede validar (sin servicio, sin fecha
+                resoluble, o sin slots configurados) → no bloquear.
+      - dict  → {'error': 'hora_invalida', 'mensaje': ...} si la hora NO está
+                entre los slots configurados → el handler debe abortar y pedir
+                a Luna que ofrezca SOLO los horarios reales.
+    """
+    import datetime as _dt
+    from ventas.models import Servicio
+    from ventas.views.calendario_matriz_view import extraer_slots_para_fecha
+    try:
+        serv = Servicio.objects.filter(id=servicio_id).first()
+        if serv is None:
+            return None  # el servicio inexistente lo maneja otra validación
+
+        f = (str(fecha) if fecha is not None else '').strip()
+        fecha_date = None
+        try:
+            fecha_date = _dt.date.fromisoformat(f[:10])
+        except ValueError:
+            r = resolver_fecha(f)
+            if r and r.get('fecha_iso'):
+                try:
+                    fecha_date = _dt.date.fromisoformat(r['fecha_iso'])
+                except ValueError:
+                    fecha_date = None
+        if fecha_date is None:
+            return None  # sin fecha resoluble no se puede validar el slot
+
+        slots = extraer_slots_para_fecha(serv.slots_disponibles, fecha_date) or []
+        slots_min = {_hhmm_min(x) for x in slots if _hhmm_min(x) is not None}
+        if not slots_min:
+            return None  # servicio sin slots configurados → no se valida acá
+
+        if _hhmm_min(hora) in slots_min:
+            return None  # OK: es un slot real
+
+        slots_txt = ', '.join(sorted((str(x) for x in slots), key=lambda x: _hhmm_min(x) or 0))
+        return {
+            'error': 'hora_invalida',
+            'mensaje': (
+                f'La hora "{hora}" NO es un horario disponible para {serv.nombre}. '
+                f'Los únicos horarios reales ese día son: {slots_txt}. '
+                f'Ofrece SOLO esos horarios (usa consultar_disponibilidad) y NUNCA inventes una hora.'
+            ),
+        }
+    except Exception:  # noqa: BLE001 — un error del validador no debe tumbar la reserva
+        logger.exception('[validar_hora_es_slot] error validando %s %s %s', servicio_id, fecha, hora)
+        return None
+
+
 def _hay_masaje_agendado_hoy(f):
     """True si ya hay al menos un masaje agendado (no cancelado) ese día → masajistas en sitio."""
     from ventas.models import ReservaServicio
