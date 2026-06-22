@@ -205,6 +205,11 @@ def inbound(request):
         # aremko-cli auto-responda la frase fija (con guard anti-spam). null si no
         # aplica. Solo para entrantes de texto (no reacciones).
         'responder_ausencia': _directiva_ausencia(phone, msg_type),
+        # H-037 (Luna Interna): si el entrante es de staff whitelisted y es un inicio
+        # de turno → directiva {responde_auto, texto, sugerencia_id} para que Go envíe
+        # el briefing SOLO (sin cajón). null si no aplica. Solo cálculo determinístico
+        # (NO genera el borrador LLM del cliente → cero costo extra en entrantes).
+        'responder_briefing': _directiva_briefing_staff(phone, body, msg_type, wa_id),
     })
 
 
@@ -220,6 +225,37 @@ def _directiva_ausencia(phone, msg_type):
     except Exception:  # noqa: BLE001 — la ausencia es opcional; jamás tumbar el inbound
         import logging
         logging.getLogger(__name__).exception('Ausencia: fallo evaluando para %s', phone)
+        return None
+
+
+def _directiva_briefing_staff(phone, body, msg_type, wa_id):
+    """H-037 (Luna Interna): directiva de auto-respuesta para el webhook de aremko-cli.
+
+    Si el entrante es de un número STAFF whitelisted (PersonalOperativo.responde_auto)
+    y es un inicio de turno ("empezando el día"/saludo) → devuelve
+    {'responde_auto': True, 'texto': <briefing>, 'sugerencia_id': wa_id} para que Go lo
+    envíe SOLO (sin cajón). None en cualquier otro caso (cliente, o staff sin trigger).
+
+    Determinístico: NO invoca el LLM → no genera borradores de cliente anticipados ni
+    gasto extra. Nunca rompe el inbound.
+    """
+    if msg_type == 'reaction':
+        return None
+    try:
+        if not _es_inicio_turno(body or ''):
+            return None
+        from personal_operativo.services import buscar_personal, construir_briefing
+        persona = buscar_personal(phone)
+        if not persona or not persona.responde_auto:
+            return None
+        return {
+            'responde_auto': True,
+            'texto': construir_briefing(persona),
+            'sugerencia_id': wa_id,
+        }
+    except Exception:  # noqa: BLE001 — jamás tumbar el inbound
+        import logging
+        logging.getLogger(__name__).exception('Briefing staff (inbound) falló para %s', phone)
         return None
 
 
