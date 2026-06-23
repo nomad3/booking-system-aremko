@@ -26,21 +26,29 @@ Leí `whatsapp_agent/packs.py`, `availability.py`, `agent.py` y el flujo de carr
 - **`disponibilidad(fecha, 2, 'masaje')`** — ya devuelve slots de masaje. Clave que descubrí: la restricción "masajista en sitio" (`masaje_en_sitio`) **SOLO aplica a HOY** (`es_hoy`). Para fechas futuras (el ritual se reserva con antelación) el masaje se ofrece normal. Y `_es_masaje_agendable` ya habilita justo el masaje de **Relajación/Descontracturante** (el del ritual).
 - **`confirmar_reserva_carrito` → `PropuestaReserva` → banner "Crear reserva" → `crear_reserva`** (H-028/H-029) — el "un clic" de cierre YA está resuelto: arma UNA propuesta con TODOS los ítems. Reusar entero.
 
-### Las 3 piezas nuevas (todas en Django)
-1. **`disponibilidad_ritual(fecha)`** (nueva en `packs.py`) — extiende `disponibilidad_pack_cabana_tina` con la pata de masaje: además de cabaña+tina, pide `disponibilidad(f, 2, 'masaje')` y arma **1 itinerario** si las 3 patas están libres esa noche. Si falta una → "no disponible esa fecha, te ofrezco estas otras". **Secuencia (decisión Jorge 2026-06-22): la función elige el combo que CALCE** — cualquier par tina+masaje de esa noche que no se solape; NO forzar la tina-más-tarde. Solo validar que el slot de tina y el de masaje no choquen y formen una tarde coherente (check-in 16:00 → los 2 servicios en sus slots → noche → desayuno ~10:00).
-2. **Capacidad 5/noche SIN modelo nuevo** — el cuello más angosto es el masajista. Si el servicio "masaje nocturno" se configura con **5 slots/noche**, la disponibilidad del ritual queda **topada en 5 automáticamente** (reusa la lógica de slots que ya cuenta `ReservaServicio`). No hace falta flag ni tabla nueva.
-3. **`confirmar_ritual(fecha)`** (nueva tool, `agent.py`) — un solo tool determinístico: arma el carrito con los **4 ítems en los slots elegidos** (cabaña@16:00 + tina@slot + masaje@slot + desayuno) → `confirmar_reserva_carrito` → 1 propuesta → banner. Cero roce: Luna ofrece "el Ritual del Río para el [fecha], $240.000 para 2" y con un "sí" agenda todo.
+### ⚠️ REGLAS REALES (corrección de Jorge vía Django, 2026-06-23) — más simple, CERO servicio nuevo
+Descartado lo de "crear servicio masaje nocturno + 5 slots + capacidad 5". Se reusa TODO lo existente:
 
-### Precio (decisión Jorge 2026-06-22): **$240.000 PLANO todos los días**
-- NO aplicar el descuento de pack dom-jue (`_descuento_pack_cabana`) al ritual — es producto insignia de precio fijo.
-- $240k = la suma natural de los 4 ítems a precio real (90+50+80+20, para 2). Si se cargan los 4 al carrito a su precio, el total da $240k **sin lógica de precio especial** — solo hay que **saltar el descuento dom-jue** en este camino.
+1. **`disponibilidad_ritual(fecha)`** (nueva en `packs.py`) — extiende `disponibilidad_pack_cabana_tina` con la pata de masaje. Reglas:
+   - **CABAÑA:** asignar una cabaña disponible que **NO sea "Torre"**. Solo si no queda **ninguna otra** → usar Torre (Torre es **$10.000 más cara** que el resto). Después, la lógica cabaña+tina existente (`disponibilidad_pack_cabana_tina`).
+   - **MASAJE:** reusar un **slot de masaje EXISTENTE para 2** — el sistema ya agenda "bloques de 2 masajes" porque hay **≥2 masajistas/día** — filtrado a **horario ≥16:00** (hora de check-in de cabañas). O sea `disponibilidad(fecha, 2, 'masaje')` + filtro ≥16:00. **NADA de servicio "masaje nocturno" nuevo ni slots nuevos.**
+   - Arma **1 itinerario** si las 3 patas calzan esa noche; si falta una → "no disponible esa fecha, te ofrezco estas otras".
+   - **Secuencia:** la función elige el combo tina+masaje que CALCE (cualquier par que no se solape, ambos ≥16:00). No forzar tina-más-tarde.
+   - **Capacidad:** la limita naturalmente la disponibilidad de slots de masaje para 2 que ya existe — **sin tope artificial de 5 ni config nueva**.
+2. **`confirmar_ritual(fecha)`** (nueva tool, `agent.py`) — un solo tool determinístico: arma el carrito con los ítems en los slots elegidos (cabaña + tina@slot + masaje@slot + desayuno) → `confirmar_reserva_carrito` → 1 propuesta → banner. Cero roce: Luna ofrece "el Ritual del Río para el [fecha], $240.000 para 2" y con un "sí" agenda todo.
+
+### Precio (decisión Jorge): **$240.000 PLANO siempre**
+- NO aplicar el descuento de pack dom-jue (`_descuento_pack_cabana`) — producto insignia de precio fijo.
+- $240k = suma de los ítems a precio real (cabaña no-Torre 90 + tina 50 + masaje 80 + desayuno 20, para 2).
+- **Si la cabaña asignada es Torre (+$10.000):** `confirmar_ritual` agrega además la **línea existente "Descuento de servicios"** (un servicio con `precio_base = -$1`) con **cantidad = 10000** → **-$10.000** → el total vuelve a **$240k**. (Es el mismo "Descuento_Servicios" que ya se filtra de los avisos de operación en H-038.)
 
 ### Prompt de Luna
 - Ofrecer el ritual como **1 unidad** (upsell al pedir cabaña/tina). Al aceptar → **una sola** llamada a `confirmar_ritual`. Prohibir ir servicio por servicio (cero roce). Mismo grounding duro de H-033 (solo lo que devuelve la tool).
 
-### Config/datos a confirmar en Django (no código)
-- ¿Cuál es el servicio "masaje nocturno" del ritual (Relajación) y ya tiene **slots nocturnos** cargados con **capacidad 5/noche**? (Jorge: los horarios ya viven en los slots de masaje.)
-- Que el precio del masaje para 2 sea $80.000 (40k pp) para que la suma cuadre en $240k.
+### Consideración del cierre (aremko-cli) para Django
+- **El cierre de un clic no cambia de mi lado:** el banner "Crear reserva" lee `propuesta_reserva` de `/api/whatsapp/conversation/`; `crear_reserva` ya acepta cualquier 2xx (201 ok); idempotencia por `idempotency_key`/external_id. No toco nada.
+- **PERO el resumen que ve el CLIENTE:** hoy el cajón lista los ítems de la propuesta. Para el ritual conviene que el cliente vea **"Noche de ritual junto al río — $240.000 (2 pax)"** como UNA unidad, **no** el desglose (cabaña Torre $100k + tina + masaje + desayuno + "Descuento de servicios -$10.000"). Una línea negativa de descuento + una Torre más cara puede confundir o revelar mecánica interna. → Que Django decida si el resumen al cliente muestra **título de paquete + total** ocultando las líneas internas (igual que ya filtra `[Luna]`/`Descuento_Servicios`).
+- **`confirmar_ritual` idempotente** (1 propuesta por conversación, como el carrito) para que el banner no se duplique.
 
 ---
 
