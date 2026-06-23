@@ -94,6 +94,30 @@ _TOOLS = [{
 }, {
     'type': 'function',
     'function': {
+        'name': 'consultar_disponibilidad_combo',
+        'description': (
+            'ENRUTADOR — úsala SIEMPRE que el cliente quiera reservar o ver disponibilidad de '
+            'UNO O VARIOS servicios. Junta en `servicios` TODO lo que mencionó (alojamiento/cabaña, '
+            'tina, masaje) y el sistema elige solo el paquete correcto y arma el itinerario COMPLETO. '
+            'Si pide alojamiento + tina + masaje = es el Ritual del Río (aunque no lo nombre): se '
+            'devuelve como 1 unidad a $240.000. NUNCA ofrezcas servicio por servicio ni omitas uno '
+            'que el cliente pidió; tú solo listas lo que pidió, el código arma la rama. El campo '
+            '`rama` te dice qué se armó. Para el Ritual (rama="ritual") preséntalo como 1 paquete.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'servicios': {'type': 'array', 'items': {'type': 'string'},
+                              'description': 'Lo que mencionó el cliente: "alojamiento"/"cabaña", "tina", "masaje" (en cualquier orden, los que dijo).'},
+                'fecha': {'type': 'string', 'description': 'PASÁ EL TEXTO LITERAL del cliente ("este sabado", "próximo lunes", "25 de junio"); NO calcules el día ni lo conviertas a YYYY-MM-DD, la herramienta lo resuelve.'},
+                'personas': {'type': 'integer', 'description': 'Cantidad EXACTA de personas que dijo el cliente. NO asumas 1; si no la sabes, pregunta antes.'},
+            },
+            'required': ['servicios', 'fecha', 'personas'],
+        },
+    },
+}, {
+    'type': 'function',
+    'function': {
         'name': 'consultar_disponibilidad_pack',
         'description': (
             'Propone itinerarios de TINA + MASAJE el mismo día (pack). Úsala cuando el '
@@ -556,6 +580,22 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 return disponibilidad(args.get('fecha'), personas, args.get('tipo'))
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool disponibilidad falló: %s', exc)
+                return {'error': 'no se pudo consultar disponibilidad'}
+        if name == 'consultar_disponibilidad_combo':
+            # H-031: enrutador determinístico — Luna lista los servicios, el código elige la rama.
+            from .packs import router_disponibilidad
+            try:
+                args = args or {}
+                try:
+                    personas = int(args.get('personas'))
+                except (TypeError, ValueError):
+                    personas = 0
+                if personas < 1:
+                    return {'error': 'falta_personas',
+                            'mensaje': 'Antes de consultar, pregúntale al cliente para cuántas personas será. NO asumas 1.'}
+                return router_disponibilidad(args.get('servicios'), args.get('fecha'), personas)
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool combo falló: %s', exc)
                 return {'error': 'no se pudo consultar disponibilidad'}
         if name == 'consultar_disponibilidad_pack':
             from .packs import disponibilidad_pack_tina_masaje

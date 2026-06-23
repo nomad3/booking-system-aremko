@@ -415,6 +415,55 @@ RITUAL_MASAJE_PISO_MIN = 16 * 60      # masaje a partir de las 16:00 (check-in c
 RITUAL_DESCUENTO_PREMIUM = 10000      # descuento por cada componente premium (Torre / tina hidromasaje)
 
 
+def _normalizar_servicios(servicios):
+    """De la lista que dijo el cliente a un set de tipos: alojamiento / tina / masaje."""
+    from .availability import _sin_acentos
+    s = set()
+    for item in (servicios or []):
+        t = _sin_acentos(str(item))
+        if 'aloj' in t or 'cabana' in t:
+            s.add('alojamiento')
+        if 'tina' in t or 'tinaj' in t or 'hidromasaje' in t:
+            s.add('tina')
+        if 'masaj' in t:
+            s.add('masaje')
+    return s
+
+
+def router_disponibilidad(servicios, fecha, personas=2):
+    """ENRUTADOR determinístico (H-031): según los servicios que mencionó el cliente,
+    elige la rama del árbol y arma el itinerario COMPLETO. Evita que Luna ofrezca a
+    medias (ej. omitir el masaje) o elija mal la herramienta — Luna solo lista lo que
+    pidió el cliente, el código decide la rama.
+    """
+    from .availability import disponibilidad
+    s = _normalizar_servicios(servicios)
+    aloj, tina, masaje = 'alojamiento' in s, 'tina' in s, 'masaje' in s
+
+    if aloj and tina and masaje:                       # 🌙 Ritual del Río (desayuno incluido)
+        return dict(disponibilidad_ritual(fecha), rama='ritual')
+    if aloj and tina:                                  # Alojamiento + Tina (+desayuno)
+        return dict(disponibilidad_pack_cabana_tina(fecha), rama='alojamiento_tina')
+    if aloj and masaje:                                # Alojamiento + Masaje (gap): ofrece ambos + sugiere Ritual
+        return {
+            'rama': 'alojamiento_masaje',
+            'cabanas': disponibilidad(fecha, personas, 'cabana'),
+            'masajes': disponibilidad(fecha, personas, 'masaje'),
+            'sugerencia': 'Si suma una tina, queda el Ritual del Río completo '
+                          '(alojamiento + tina + masaje + desayuno) por $240.000.',
+        }
+    if aloj:                                           # Cabaña sola (+desayuno)
+        return dict(disponibilidad(fecha, personas, 'cabana'), rama='alojamiento')
+    if tina and masaje:                                # Tina + Masaje
+        return dict(disponibilidad_pack_tina_masaje(fecha, personas), rama='tina_masaje')
+    if tina:                                           # Tina sola
+        return dict(disponibilidad(fecha, personas, 'tina'), rama='tina')
+    if masaje:                                          # Masaje solo
+        return dict(disponibilidad(fecha, personas, 'masaje'), rama='masaje')
+    return {'rama': None,
+            'error': 'No identifiqué los servicios. Pregunta si busca alojamiento, tina y/o masaje.'}
+
+
 def _es_cabana_torre(nombre):
     return 'torre' in (nombre or '').lower()
 
