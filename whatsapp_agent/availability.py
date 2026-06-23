@@ -368,7 +368,13 @@ def disponibilidad(fecha=None, personas=1, tipo=None):
     # - Si es consulta general: 1 representante de CADA tipo disponible (tina + masaje +
     #   cabaña), para no sesgar por orden alfabético (cabana<masaje<tina) y ofrecer las 3
     #   categorías cuando todas calzan con la cantidad de personas.
-    if tipo:
+    if tipo == 'tina':
+        # Variedad de tina: ofrecer 1 SIN hidromasaje + 1 CON, para que el cliente elija
+        # (estándar más económica vs hidromasaje premium). Si solo hay de un tipo, las 2 primeras.
+        con_h = [s for s in servicios if 'hidromasaje' in (s.get('nombre') or '').lower()]
+        sin_h = [s for s in servicios if 'hidromasaje' not in (s.get('nombre') or '').lower()]
+        servicios = [sin_h[0], con_h[0]] if (con_h and sin_h) else servicios[:2]
+    elif tipo:
         servicios = servicios[:2]
     else:
         vistos, diversos = set(), []
