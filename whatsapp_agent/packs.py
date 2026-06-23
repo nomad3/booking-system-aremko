@@ -410,6 +410,7 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
 
 RITUAL_PRECIO_PLANO = 240000          # precio único, todos los días
 RITUAL_MASAJE_PISO_MIN = 16 * 60      # masaje a partir de las 16:00 (check-in cabañas)
+RITUAL_DESCUENTO_PREMIUM = 10000      # descuento por cada componente premium (Torre / tina hidromasaje)
 
 
 def _es_cabana_torre(nombre):
@@ -438,6 +439,23 @@ def _elegir_masaje_ritual(masajes):
     return None, None
 
 
+def _es_tina_hidromasaje(nombre):
+    return 'hidromasaje' in (nombre or '').lower()
+
+
+def _elegir_tina_ritual(tinas):
+    """Prefiere una tina ESTÁNDAR (sin hidromasaje, para no gatillar descuento); si
+    solo hay hidromasaje, la usa. Dentro del tipo elegido, la más tarde >=16:00.
+    Devuelve (tina, hora, es_hidromasaje)."""
+    estandar = [t for t in tinas if not _es_tina_hidromasaje(t.get('nombre', ''))]
+    hidro = [t for t in tinas if _es_tina_hidromasaje(t.get('nombre', ''))]
+    for grupo, es_hidro in ((estandar, False), (hidro, True)):
+        t, hora = elegir_tina_mas_tarde(grupo)
+        if t is not None:
+            return t, hora, es_hidro
+    return None, None, False
+
+
 def disponibilidad_ritual(fecha):
     """Itinerario ÚNICO del Ritual del Río para `fecha` (2 personas, 1 noche).
 
@@ -464,7 +482,7 @@ def disponibilidad_ritual(fecha):
                 'nota': 'no hay cabañas libres esa noche para el ritual; ofrece otra fecha'}
 
     tinas = disponibilidad(f, personas, 'tina').get('servicios', [])
-    tina, tina_hora = elegir_tina_mas_tarde(tinas)
+    tina, tina_hora, es_hidromasaje = _elegir_tina_ritual(tinas)
     if tina is None:
         return {'fecha': f.isoformat(), 'disponible': False,
                 'nota': 'no hay tina disponible desde las 16:00 esa noche; ofrece otra fecha'}
@@ -475,19 +493,28 @@ def disponibilidad_ritual(fecha):
         return {'fecha': f.isoformat(), 'disponible': False,
                 'nota': 'no hay masaje para 2 disponible desde las 16:00 esa noche; ofrece otra fecha'}
 
+    # Descuento para mantener el total en $240.000: $10k por cada componente premium
+    # (cabaña Torre y/o tina hidromasaje). confirmar_ritual lo aplica con la línea
+    # "Descuento de servicios" (cantidad = monto del descuento).
+    premium = int(es_torre) + int(es_hidromasaje)
+    descuento = premium * RITUAL_DESCUENTO_PREMIUM
+
     return {
         'fecha': f.isoformat(),
         'disponible': True,
         'personas': personas,
         'precio_total': RITUAL_PRECIO_PLANO,
         'es_torre': es_torre,
+        'es_hidromasaje': es_hidromasaje,
+        'descuento': descuento,
         'itinerario': {
             'cabana': {'servicio_id': cabana.get('servicio_id'), 'nombre': cabana['nombre'],
                        'hora_check_in': '16:00', 'es_torre': es_torre},
-            'tina': {'servicio_id': tina.get('servicio_id'), 'nombre': tina['nombre'], 'hora': tina_hora},
+            'tina': {'servicio_id': tina.get('servicio_id'), 'nombre': tina['nombre'],
+                     'hora': tina_hora, 'es_hidromasaje': es_hidromasaje},
             'masaje': {'servicio_id': masaje.get('servicio_id'), 'nombre': masaje['nombre'], 'hora': masaje_hora},
             'desayuno': _desayuno_de_cabana(cabana['nombre']),
         },
-        'nota_torre': ('Solo quedaba la cabaña Torre; el descuento mantiene el total en $240.000.'
-                       if es_torre else ''),
+        'nota_descuento': (f'Componentes premium ({premium}): descuento de ${descuento:,.0f} para '
+                           f'mantener el total en $240.000.' if descuento else ''),
     }
