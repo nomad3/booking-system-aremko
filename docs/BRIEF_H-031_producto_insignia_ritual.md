@@ -17,6 +17,33 @@
 - Luna ofrece el ritual como upsell cuando piden cabaña o tina ("¿quieren vivir el ritual completo de los 5 sentidos junto al río?"). Al aceptar → agenda el **paquete entero** a $240.000, 2 pax, en una sola acción.
 - **Capacidad: 5 rituales por noche.**
 
+## Fase 1 — Diseño técnico (aremko-cli, 2026-06-22, tras leer el código Django)
+
+Leí `whatsapp_agent/packs.py`, `availability.py`, `agent.py` y el flujo de carrito (`carrito_reservas` + `reserva_service.py`). **~80% ya existe; el "un clic" es ensamblar, no construir.** Propuesta concreta:
+
+### Lo que se reutiliza tal cual (no tocar)
+- **`disponibilidad_pack_cabana_tina(fecha)`** (`packs.py`) — ya coordina **cabaña + tina** misma noche (cabañas libres 2 pax + tina acoplada + check-in 16:00/out 11:00 + desayuno). **Es la base del ritual; solo le falta la 3ª pata.**
+- **`disponibilidad(fecha, 2, 'masaje')`** — ya devuelve slots de masaje. Clave que descubrí: la restricción "masajista en sitio" (`masaje_en_sitio`) **SOLO aplica a HOY** (`es_hoy`). Para fechas futuras (el ritual se reserva con antelación) el masaje se ofrece normal. Y `_es_masaje_agendable` ya habilita justo el masaje de **Relajación/Descontracturante** (el del ritual).
+- **`confirmar_reserva_carrito` → `PropuestaReserva` → banner "Crear reserva" → `crear_reserva`** (H-028/H-029) — el "un clic" de cierre YA está resuelto: arma UNA propuesta con TODOS los ítems. Reusar entero.
+
+### Las 3 piezas nuevas (todas en Django)
+1. **`disponibilidad_ritual(fecha)`** (nueva en `packs.py`) — extiende `disponibilidad_pack_cabana_tina` con la pata de masaje: además de cabaña+tina, pide `disponibilidad(f, 2, 'masaje')` y arma **1 itinerario** si las 3 patas están libres esa noche. Si falta una → "no disponible esa fecha, te ofrezco estas otras". **Secuencia (decisión Jorge 2026-06-22): la función elige el combo que CALCE** — cualquier par tina+masaje de esa noche que no se solape; NO forzar la tina-más-tarde. Solo validar que el slot de tina y el de masaje no choquen y formen una tarde coherente (check-in 16:00 → los 2 servicios en sus slots → noche → desayuno ~10:00).
+2. **Capacidad 5/noche SIN modelo nuevo** — el cuello más angosto es el masajista. Si el servicio "masaje nocturno" se configura con **5 slots/noche**, la disponibilidad del ritual queda **topada en 5 automáticamente** (reusa la lógica de slots que ya cuenta `ReservaServicio`). No hace falta flag ni tabla nueva.
+3. **`confirmar_ritual(fecha)`** (nueva tool, `agent.py`) — un solo tool determinístico: arma el carrito con los **4 ítems en los slots elegidos** (cabaña@16:00 + tina@slot + masaje@slot + desayuno) → `confirmar_reserva_carrito` → 1 propuesta → banner. Cero roce: Luna ofrece "el Ritual del Río para el [fecha], $240.000 para 2" y con un "sí" agenda todo.
+
+### Precio (decisión Jorge 2026-06-22): **$240.000 PLANO todos los días**
+- NO aplicar el descuento de pack dom-jue (`_descuento_pack_cabana`) al ritual — es producto insignia de precio fijo.
+- $240k = la suma natural de los 4 ítems a precio real (90+50+80+20, para 2). Si se cargan los 4 al carrito a su precio, el total da $240k **sin lógica de precio especial** — solo hay que **saltar el descuento dom-jue** en este camino.
+
+### Prompt de Luna
+- Ofrecer el ritual como **1 unidad** (upsell al pedir cabaña/tina). Al aceptar → **una sola** llamada a `confirmar_ritual`. Prohibir ir servicio por servicio (cero roce). Mismo grounding duro de H-033 (solo lo que devuelve la tool).
+
+### Config/datos a confirmar en Django (no código)
+- ¿Cuál es el servicio "masaje nocturno" del ritual (Relajación) y ya tiene **slots nocturnos** cargados con **capacidad 5/noche**? (Jorge: los horarios ya viven en los slots de masaje.)
+- Que el precio del masaje para 2 sea $80.000 (40k pp) para que la suma cuadre en $240k.
+
+---
+
 ## Fase 2 — Pre-llegada (24h antes, vía Luna/WhatsApp)
 Luna envía un mensaje de preparación y captura 3 cosas, que deben quedar **visibles para el staff** (bandeja o ficha de la reserva):
 - **(a) Foto de la pareja** → para imprimirla y montarla como recuerdo en la cabaña.
@@ -33,8 +60,8 @@ Texto sugerido del mensaje pre-llegada (editable):
 - Insumos físicos / operación (aromaterapia, batas, impresión del recuerdo, desayuno gourmet) → lado Jorge, no sistema.
 
 ## Preguntas abiertas para django
-1. Para el paquete de un clic, ¿lo más limpio es **reusar el flujo de alojamiento+tina ya configurado + agregar masaje en sus slots**? (Jorge: *"los mismos criterios que ya funcionan para alojamiento y tina; solo falta agregar masajes en los horarios disponibles"*.)
-2. ¿El masaje ya es agendable dentro de ese flujo, o solo existe en los slots de masaje y hay que conectarlo?
-3. ¿Dónde quedan visibles para el staff las 3 capturas pre-llegada (foto/masaje/desayuno)? ¿bandeja, ficha de reserva, ambas?
+1. ~~¿Reusar el flujo alojamiento+tina + agregar masaje?~~ **RESUELTO:** sí — ver "Fase 1 · Diseño técnico". `disponibilidad_ritual` extiende `disponibilidad_pack_cabana_tina` con la pata de masaje.
+2. ~~¿El masaje ya es agendable?~~ **RESUELTO (leyendo código):** sí para fechas futuras (`_es_masaje_agendable` habilita Relajación/Descontracturante; la traba `masaje_en_sitio` solo aplica a HOY). Falta confirmar que el servicio de masaje nocturno tenga **slots nocturnos + capacidad 5/noche** cargados (config, no código).
+3. **(sigue abierta)** ¿Dónde quedan visibles para el staff las 3 capturas pre-llegada (foto/masaje/desayuno)? ¿bandeja, ficha de reserva, ambas? — es de la **Fase 2**, no bloquea la Fase 1.
 
 El diseño completo de la experiencia (5 sentidos, circuito térmico, recuerdo de madera, desayuno de la Patagonia) vive en el repo de estrategia de aremko-cli; lo comparto si necesitas más contexto. **Capacidad 5/noche y masaje en los slots existentes ya definidos por Jorge.**
