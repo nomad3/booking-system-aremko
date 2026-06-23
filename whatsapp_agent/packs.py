@@ -337,8 +337,8 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
 
     Lista las cabañas libres esa noche (todas para 2) y les acopla UNA tina en el horario
     MÁS TARDE disponible >= 16:00 (regla fundamental). Cada opción trae precio real y precio
-    con descuento de pack (dom-jue). El desayuno ($20.000 para dos, día siguiente ~10:00) se
-    incluye por opción pero Luna solo lo ofrece si el cliente pregunta. 1 noche por ahora.
+    con descuento de pack (dom-jue). El desayuno ($20.000 para dos, día siguiente ~10:00) va
+    INCLUIDO en el `precio_total` del paquete y se menciona como incluido. 1 noche por ahora.
     """
     from .availability import disponibilidad, _parse_fecha
 
@@ -361,14 +361,16 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
         cabana_hora = (c.get('slots_libres') or ['16:00'])[0]   # check-in
         cab_total = c['precio_total']
         desayuno = _desayuno_de_cabana(c['nombre'])
+        desayuno_total = int(desayuno['precio_total']) if desayuno else 0
         op = {
             'cabana': {'nombre': c['nombre'], 'hora_check_in': '16:00',
                        'hora_check_out': '11:00 del día siguiente', 'precio_total': cab_total},
-            'desayuno': desayuno,            # solo ofrecer si el cliente pregunta
+            'desayuno': desayuno,            # INCLUIDO en el precio del paquete (no es opcional)
+            'desayuno_incluido': True,
         }
         if tina is not None:
             tina_total = tina['precio_total']
-            precio_total = cab_total + tina_total
+            precio_total = cab_total + tina_total + desayuno_total
             descuento = _descuento_pack_cabana(c, tina, f, cabana_hora, tina_hora, personas)
             op.update({
                 'tina': {'nombre': tina['nombre'], 'hora': tina_hora, 'precio_total': tina_total},
@@ -380,9 +382,9 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
         else:
             op.update({
                 'tina': None,
-                'precio_total': cab_total,
+                'precio_total': cab_total + desayuno_total,
                 'descuento_pack': 0,
-                'precio_con_descuento': cab_total,
+                'precio_con_descuento': cab_total + desayuno_total,
                 'hay_descuento': False,
             })
         opciones.append(op)

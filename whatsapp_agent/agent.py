@@ -123,8 +123,9 @@ _TOOLS = [{
             'Devuelve `opciones` = cabañas libres esa noche, cada una con check-in 16:00 / '
             'check-out 11:00 del día siguiente y una `tina` en el horario MÁS TARDE disponible '
             '(nunca antes de 16:00), con `precio_total` y `precio_con_descuento` (pack dom-jue). '
-            'Cada opción trae `desayuno` ($20.000 para dos, día siguiente ~10:00): OFRÉCELO SOLO '
-            'si el cliente pregunta por desayuno. Si `tina` es null, ofrece solo la cabaña. '
+            'El `desayuno` ($20.000 para dos, día siguiente ~10:00) va INCLUIDO en el `precio_total`: '
+            'menciónalo como parte del paquete ("incluye desayuno para dos"), NO como un extra opcional. '
+            'Si `tina` es null, ofrece solo la cabaña (también con desayuno incluido). '
             'Requiere fecha (la noche de check-in).'
         ),
         'parameters': {
