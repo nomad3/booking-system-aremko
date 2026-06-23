@@ -404,3 +404,90 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
 
     return {'fecha': f.isoformat(), 'personas': personas, 'tina_mas_tarde': tina_hora,
             'opciones': opciones, 'nota': nota, 'nota_upsell': nota_upsell}
+
+
+# ── Ritual del Río (H-031 Fase 1): cabaña + tina + masaje + desayuno, 1 unidad ──
+
+RITUAL_PRECIO_PLANO = 240000          # precio único, todos los días
+RITUAL_MASAJE_PISO_MIN = 16 * 60      # masaje a partir de las 16:00 (check-in cabañas)
+
+
+def _es_cabana_torre(nombre):
+    return 'torre' in (nombre or '').lower()
+
+
+def _elegir_cabana_ritual(cabanas):
+    """Prefiere una cabaña que NO sea Torre; usa Torre solo si es la única opción.
+    Devuelve (cabana, es_torre) o (None, False)."""
+    no_torre = [c for c in cabanas if not _es_cabana_torre(c.get('nombre', ''))]
+    if no_torre:
+        return no_torre[0], False
+    if cabanas:
+        return cabanas[0], True   # solo quedaba Torre
+    return None, False
+
+
+def _elegir_masaje_ritual(masajes):
+    """Devuelve (masaje, hora) de un masaje para 2 con slot a partir de las 16:00."""
+    from .availability import _hhmm_min
+    for m in masajes:
+        slots = [s for s in (m.get('slots_libres') or [])
+                 if (_hhmm_min(s) or 0) >= RITUAL_MASAJE_PISO_MIN]
+        if slots:
+            return m, sorted(slots, key=lambda s: _hhmm_min(s) or 0)[0]
+    return None, None
+
+
+def disponibilidad_ritual(fecha):
+    """Itinerario ÚNICO del Ritual del Río para `fecha` (2 personas, 1 noche).
+
+    Reusa la disponibilidad existente, sin servicios ni slots nuevos:
+      - Cabaña: una disponible que NO sea Torre; Torre solo como última opción.
+      - Tina: la más tarde disponible >= 16:00 (lógica cabaña+tina).
+      - Masaje para 2: un slot existente a partir de las 16:00.
+      - Desayuno: el de esa cabaña.
+    Precio $240.000 PLANO. Si toca Torre (+$10k), `confirmar_ritual` agrega el
+    descuento de $10.000 para mantener el total. Devuelve disponible=False (con
+    nota para ofrecer otra fecha) si falta cualquiera de las 3 patas.
+    """
+    from .availability import disponibilidad, _parse_fecha
+
+    f = _parse_fecha(fecha) if fecha else None
+    if f is None:
+        return {'error': 'fecha inválida (usa YYYY-MM-DD)'}
+    personas = 2
+
+    cabanas = disponibilidad(f, personas, 'cabana').get('servicios', [])
+    cabana, es_torre = _elegir_cabana_ritual(cabanas)
+    if cabana is None:
+        return {'fecha': f.isoformat(), 'disponible': False,
+                'nota': 'no hay cabañas libres esa noche para el ritual; ofrece otra fecha'}
+
+    tinas = disponibilidad(f, personas, 'tina').get('servicios', [])
+    tina, tina_hora = elegir_tina_mas_tarde(tinas)
+    if tina is None:
+        return {'fecha': f.isoformat(), 'disponible': False,
+                'nota': 'no hay tina disponible desde las 16:00 esa noche; ofrece otra fecha'}
+
+    masajes = disponibilidad(f, personas, 'masaje').get('servicios', [])
+    masaje, masaje_hora = _elegir_masaje_ritual(masajes)
+    if masaje is None:
+        return {'fecha': f.isoformat(), 'disponible': False,
+                'nota': 'no hay masaje para 2 disponible desde las 16:00 esa noche; ofrece otra fecha'}
+
+    return {
+        'fecha': f.isoformat(),
+        'disponible': True,
+        'personas': personas,
+        'precio_total': RITUAL_PRECIO_PLANO,
+        'es_torre': es_torre,
+        'itinerario': {
+            'cabana': {'servicio_id': cabana.get('servicio_id'), 'nombre': cabana['nombre'],
+                       'hora_check_in': '16:00', 'es_torre': es_torre},
+            'tina': {'servicio_id': tina.get('servicio_id'), 'nombre': tina['nombre'], 'hora': tina_hora},
+            'masaje': {'servicio_id': masaje.get('servicio_id'), 'nombre': masaje['nombre'], 'hora': masaje_hora},
+            'desayuno': _desayuno_de_cabana(cabana['nombre']),
+        },
+        'nota_torre': ('Solo quedaba la cabaña Torre; el descuento mantiene el total en $240.000.'
+                       if es_torre else ''),
+    }
