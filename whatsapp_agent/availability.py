@@ -34,13 +34,28 @@ TRAVEL_MASAJISTA_MIN = 60
 
 
 def _parse_fecha(fecha):
-    """Acepta date o 'YYYY-MM-DD'. Devuelve date o None."""
+    """Acepta date, 'YYYY-MM-DD', o una EXPRESIÓN del cliente ("próximo lunes",
+    "el sábado", "25 de junio"). El texto se resuelve de forma DETERMINÍSTICA con
+    `resolver_fecha` — NUNCA se deja que el LLM calcule el día. Devuelve date o None.
+    """
     if hasattr(fecha, 'year') and hasattr(fecha, 'month'):
         return fecha
-    try:
-        return datetime.strptime(str(fecha).strip(), '%Y-%m-%d').date()
-    except (ValueError, TypeError):
+    s = str(fecha).strip()
+    if not s:
         return None
+    # 1) ISO directo
+    try:
+        return datetime.strptime(s, '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        pass
+    # 2) Expresión en lenguaje natural → resolver_fecha (determinístico)
+    try:
+        r = resolver_fecha(s)
+        if r and r.get('fecha_iso'):
+            return datetime.strptime(r['fecha_iso'], '%Y-%m-%d').date()
+    except Exception:  # noqa: BLE001 — si no se puede resolver, devolver None
+        pass
+    return None
 
 
 def _hhmm_min(s):

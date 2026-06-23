@@ -107,7 +107,7 @@ _TOOLS = [{
         'parameters': {
             'type': 'object',
             'properties': {
-                'fecha': {'type': 'string', 'description': 'Fecha YYYY-MM-DD'},
+                'fecha': {'type': 'string', 'description': 'PASÁ EL TEXTO LITERAL del cliente ("próximo lunes", "el sábado", "25 de junio"); NO calcules el día ni lo conviertas a YYYY-MM-DD, la herramienta lo resuelve.'},
                 'personas': {'type': 'integer', 'description': 'Cantidad de personas'},
             },
             'required': ['fecha', 'personas'],
@@ -130,7 +130,7 @@ _TOOLS = [{
         'parameters': {
             'type': 'object',
             'properties': {
-                'fecha': {'type': 'string', 'description': 'Fecha de la noche (check-in) YYYY-MM-DD'},
+                'fecha': {'type': 'string', 'description': 'La noche (check-in). PASÁ EL TEXTO LITERAL del cliente ("próximo lunes", "el sábado", "25 de junio"); NO calcules el día ni lo conviertas a YYYY-MM-DD, la herramienta lo resuelve.'},
             },
             'required': ['fecha'],
         },
@@ -145,17 +145,17 @@ _TOOLS = [{
             'noches son (ej. "¿1 noche [entrada 23, salida 24] o 2 noches [entrada 23, salida 25]?"). '
             'Una vez claro, pasa `fecha_llegada` (check-in) + `noches` (entero ≥1, PREFERIDO). '
             'Alternativa si solo tienes fechas: `fecha_salida` (check-out). '
-            'Ejemplo: cliente "2 noches desde el sábado 27" → fecha_llegada="2026-06-27", noches=2. '
+            'Ejemplo: cliente "2 noches desde el sábado 27" → fecha_llegada="sábado 27" (TEXTO LITERAL, NO lo conviertas a fecha), noches=2. '
             'Devuelve cabañas libres en TODAS las noches del rango, cada una con `total_por_noche` '
             '(tarifa plana) y `total_estadia`. Muestra solo los totales, NUNCA el precio unitario por persona.'
         ),
         'parameters': {
             'type': 'object',
             'properties': {
-                'fecha_llegada': {'type': 'string', 'description': 'Fecha check-in YYYY-MM-DD (REQUERIDO)'},
+                'fecha_llegada': {'type': 'string', 'description': 'Check-in (REQUERIDO). PASÁ EL TEXTO LITERAL del cliente ("próximo lunes", "el sábado 27"); NO calcules el día ni lo conviertas a YYYY-MM-DD, la herramienta lo resuelve.'},
                 'noches': {'type': 'integer', 'description': 'Número de noches (entero ≥1). PREFERIDO sobre fecha_salida.'},
                 'personas': {'type': 'integer', 'description': 'Cantidad de personas (1-2)'},
-                'fecha_salida': {'type': 'string', 'description': 'Fecha check-out YYYY-MM-DD (alternativa si no tienes noches)'},
+                'fecha_salida': {'type': 'string', 'description': 'Check-out (alternativa si no tienes noches). PASÁ EL TEXTO LITERAL del cliente; NO calcules el día.'},
             },
             'required': ['fecha_llegada', 'personas'],
         },
@@ -202,7 +202,7 @@ _TOOLS = [{
                 'documento_identidad': {'type': 'string', 'description': 'RUT válido (formato: 12345678-9 o 12.345.678-9)'},
                 'comuna': {'type': 'string', 'description': 'Nombre de comuna (ej. "Puerto Varas", "Osorno"; H-028 FIX: región se deduce de comuna)'},
                 'servicio_id': {'type': 'integer', 'description': 'ID del servicio a reservar (REQUERIDO)'},
-                'fecha': {'type': 'string', 'description': 'Fecha YYYY-MM-DD (REQUERIDO)'},
+                'fecha': {'type': 'string', 'description': 'REQUERIDO. PASÁ EL TEXTO LITERAL del cliente ("próximo lunes", "el sábado", "25 de junio"); NO calcules el día ni lo conviertas a YYYY-MM-DD, la herramienta lo resuelve.'},
                 'hora': {'type': 'string', 'description': 'Hora HH:MM (REQUERIDO)'},
                 'cantidad_personas': {'type': 'integer', 'description': 'Cantidad de personas (1-2 para cabañas, 1-4 para tinas)'},
             },
@@ -227,7 +227,7 @@ _TOOLS = [{
             'properties': {
                 'servicio_id': {'type': 'integer', 'description': 'ID del servicio (tina/masaje/cabaña)'},
                 'nombre_servicio': {'type': 'string', 'description': 'Nombre EXACTO del servicio que dijo el cliente, ej. "Llaima" (para confirmar el id correcto)'},
-                'fecha': {'type': 'string', 'description': 'Fecha YYYY-MM-DD'},
+                'fecha': {'type': 'string', 'description': 'PASÁ EL TEXTO LITERAL del cliente ("próximo lunes", "el sábado", "25 de junio"); NO calcules el día ni lo conviertas a YYYY-MM-DD, la herramienta lo resuelve.'},
                 'hora': {'type': 'string', 'description': 'Hora HH:MM'},
                 'cantidad_personas': {'type': 'integer', 'description': 'Cantidad de personas'},
             },
@@ -364,6 +364,18 @@ def config_to_dict(config):
         'ausencia_anti_spam_horas': config.ausencia_anti_spam_horas,
         'prompt_version': prompt_mod.PROMPT_VERSION,
     }
+
+
+def _fecha_iso(valor):
+    """Resuelve la fecha (texto del cliente o ISO) a 'YYYY-MM-DD' de forma determinística.
+    Si no se puede resolver, devuelve el valor tal cual (no empeora el comportamiento).
+    Evita que el carrito/reserva guarde texto como "próximo lunes" sin resolver."""
+    try:
+        from .availability import _parse_fecha
+        d = _parse_fecha(valor)
+        return d.isoformat() if d else valor
+    except Exception:  # noqa: BLE001
+        return valor
 
 
 def sugerencia_to_dict(sug):
@@ -687,7 +699,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     return {'success': False, **err_hora}
                 servicios = [{
                     'servicio_id': args.get('servicio_id'),
-                    'fecha': args.get('fecha'),
+                    'fecha': _fecha_iso(args.get('fecha')),
                     'hora': args.get('hora'),
                     'cantidad_personas': args.get('cantidad_personas', 1),
                 }]
@@ -749,7 +761,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     canal=canal,
                     external_id=phone if phone else 'desconocido',
                     servicio_id=servicio_id,
-                    fecha=args.get('fecha'),
+                    fecha=_fecha_iso(args.get('fecha')),
                     hora=args.get('hora'),
                     cantidad_personas=cantidad
                 )
