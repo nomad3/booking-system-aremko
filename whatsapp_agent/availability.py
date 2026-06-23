@@ -67,6 +67,13 @@ def _hhmm_min(s):
         return None
 
 
+def _sin_acentos(s):
+    """Quita tildes y baja a minúsculas, para matchear como escriben los clientes
+    ("sabado", "miercoles") contra los nombres con tilde ("sábado", "miércoles")."""
+    import unicodedata
+    return unicodedata.normalize('NFKD', str(s or '')).encode('ascii', 'ignore').decode().lower()
+
+
 def resolver_fecha(expresion_cliente):
     """Resuelve fecha de forma DETERMINÍSTICA (sin dejar al LLM calcular día de semana).
 
@@ -91,10 +98,11 @@ def resolver_fecha(expresion_cliente):
     expresion = (expresion_cliente or '').strip().lower()
     if not expresion:
         return {'error': 'expresión vacía', 'ambiguo': True}
+    expr_norm = _sin_acentos(expresion)  # match insensible a tildes ("sabado" = "sábado")
 
     # PATRÓN 1: Nombre de día ("sábado", "el sábado", "próximo sábado", "este sábado")
     for i, dia_nombre in enumerate(DIAS_SEMANA_ES):
-        if dia_nombre in expresion:
+        if _sin_acentos(dia_nombre) in expr_norm:
             dias_adelante = (i - hoy_numero) % 7
             if dias_adelante == 0:
                 dias_adelante = 7  # "sábado" = próximo sábado, no hoy
@@ -111,9 +119,8 @@ def resolver_fecha(expresion_cliente):
     # Van DESPUÉS de los nombres de día (para que "el sábado por la mañana" caiga en sábado)
     # y ANTES del patrón numérico (para que "hoy a las 8" no tome el 8 como día del mes).
     # "pasado mañana" se chequea antes que "mañana" porque lo contiene.
-    for palabra, delta in (('pasado mañana', 2), ('pasado manana', 2),
-                           ('mañana', 1), ('manana', 1), ('hoy', 0)):
-        if palabra in expresion:
+    for palabra, delta in (('pasado manana', 2), ('manana', 1), ('hoy', 0)):
+        if palabra in expr_norm:
             fecha = hoy + timedelta(days=delta)
             return {
                 'fecha_iso': fecha.isoformat(),
@@ -124,14 +131,14 @@ def resolver_fecha(expresion_cliente):
             }
 
     # PATRÓN 2: Número de día ("25", "el 25", "25 de junio")
-    match_numero = re.search(r'\b(\d{1,2})\b', expresion)
+    match_numero = re.search(r'\b(\d{1,2})\b', expr_norm)
     if match_numero:
         dia_numero = int(match_numero.group(1))
 
         # Si hay mes en la expresión, usarlo; si no, asumir mes actual
         mes_numero = hoy.month
         for mes_nombre, num_mes in MESES_ES.items():
-            if mes_nombre in expresion:
+            if _sin_acentos(mes_nombre) in expr_norm:
                 mes_numero = num_mes
                 break
 
