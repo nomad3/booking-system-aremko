@@ -1427,6 +1427,29 @@ def verificar_ritual_view(request):
             aviso = (f'<p style="font-size:1.3em;color:{color}"><b>TOTAL RITUAL: '
                      f'${total:,}</b> &nbsp; {marca}</p>')
 
+        # Diagnóstico: qué cabañas/tinas hay realmente disponibles ese día (para ver si la
+        # Torre / la hidromasaje siquiera entran al pool del Ritual).
+        diag = ''
+        if not r.get('error'):
+            try:
+                from whatsapp_agent.availability import disponibilidad, _parse_fecha
+                f = _parse_fecha(fecha)
+                if f is not None:
+                    cabs = disponibilidad(f, 2, 'cabana').get('servicios', [])
+                    tns = disponibilidad(f, 2, 'tina').get('servicios', [])
+                    cab_li = ', '.join(escape(c.get('nombre', '')) for c in cabs) or '(ninguna)'
+                    hay_torre = any('torre' in (c.get('nombre', '') or '').lower() for c in cabs)
+                    hay_hidro = any('hidromasaje' in (t.get('nombre', '') or '').lower() for t in tns)
+                    diag = (
+                        '<div style="margin-top:14px;font-size:.9em;color:#555">'
+                        f'<b>Diagnóstico ({escape(str(f))}):</b><br>'
+                        f'Cabañas disponibles para 2: {cab_li}<br>'
+                        f'¿Hay Torre disponible? <b>{"sí" if hay_torre else "NO"}</b> · '
+                        f'¿Hay tina hidromasaje? <b>{"sí" if hay_hidro else "NO"}</b>'
+                        '</div>')
+            except Exception as exc:  # noqa: BLE001
+                diag = f'<div style="color:#c0392b">Diag error: {escape(str(exc)[:120])}</div>'
+
         html = f"""<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Verificar Ritual del Río</title></head>
@@ -1447,6 +1470,7 @@ def verificar_ritual_view(request):
 </table>
 <hr>
 {aviso}
+{diag}
 <p style="color:#888;font-size:.85em">Solo lectura — no crea ninguna reserva. El desayuno va
 incluido en la cabaña. El descuento clava el total en ${RITUAL_PRECIO_PLANO:,}.</p>
 </body></html>"""
