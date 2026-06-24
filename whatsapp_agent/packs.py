@@ -15,6 +15,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# Buffer máximo (min) entre tina y masaje según el cliente (Jorge, 2026-06-24):
+#   - Cliente de CIUDAD (solo tina+masaje, sin alojamiento): espera en el lugar, sin
+#     dónde estar → buffer corto, mismo bloque horario.
+#   - Huésped (Ritual / con cabaña): espera en su cabaña → tolera buffers amplios; eso
+#     lo resuelve `disponibilidad_ritual` por otra ruta, no esta función.
+BUFFER_CIUDAD_MAX = 45   # tina+masaje sin alojamiento: nunca dejar al cliente esperando más
+
+
 # ---------------------------------------------------------------------------
 # Helpers puros de horario / clustering
 # ---------------------------------------------------------------------------
@@ -143,13 +151,19 @@ def _descuento_pack(tina, masaje_id, masaje_nombre, masaje_pp, f, tina_hora, mas
         return 0
 
 
+def _gap_min(tina_ini, tina_dur, masaje_ini, masaje_dur):
+    """Minutos de espera entre tina y masaje (van pegados → 0). Asume que no se solapan."""
+    return max(masaje_ini - (tina_ini + tina_dur), tina_ini - (masaje_ini + masaje_dur))
+
+
 def _componer_opcion(tinas_grupo, etiqueta, f, personas, agendados, masaje_por_id,
-                     union_slots, masaje_generico):
+                     union_slots, masaje_generico, buffer_max=None):
     """Compone UNA opción (tina + masaje) para un grupo de tinas (con o sin hidromasaje).
 
     Para cada tina del grupo busca el masaje de SU pack (para que aplique el descuento) y, si
     ese masaje tiene cupo, encaja un slot compatible (clustering, sin solapar). Si la tina no
     tiene pack o su masaje no tiene cupo, cae al masaje genérico disponible (sin descuento).
+    `buffer_max` (min) acota la espera entre tina y masaje (cliente de ciudad); None = sin tope.
     Devuelve el dict de la opción, o None si ninguna tina del grupo encaja.
     """
     agendados_set = set(agendados)
@@ -180,6 +194,10 @@ def _componer_opcion(tinas_grupo, etiqueta, f, personas, agendados, masaje_por_i
             compat = _slots_compatibles(slots_masaje, t_ini, t_dur, masaje_dur)
             # Excluir slots con masaje ya agendado (la masajista ya está ocupada ahí).
             compat = [s for s in compat if s not in agendados_set]
+            # Cliente de ciudad: descartar masajes lejos de la tina (no lo hagas esperar).
+            if buffer_max is not None:
+                compat = [s for s in compat
+                          if _gap_min(t_ini, t_dur, s, masaje_dur) <= buffer_max]
             m_slot = elegir_slot_masaje(compat, agendados, t_ini)
             if m_slot is None:
                 continue
@@ -212,13 +230,16 @@ def _componer_opcion(tinas_grupo, etiqueta, f, personas, agendados, masaje_por_i
     return None
 
 
-def disponibilidad_pack_tina_masaje(fecha, personas=2):
+def disponibilidad_pack_tina_masaje(fecha, personas=2, buffer_max=BUFFER_CIUDAD_MAX):
     """Propone itinerarios Tina + Masaje para `fecha` y `personas`.
 
     Devuelve DOS alternativas para que el cliente elija sin una pregunta extra (Jorge):
     una tina CON hidromasaje (gama mayor) + masaje y otra SIN hidromasaje (más económica) +
     masaje. Cada opción usa el masaje de su pack para que el descuento aplique, y trae precio
     real y precio con descuento. None/errores si no se puede componer.
+
+    Es el caso CIUDAD (sin alojamiento): `buffer_max` (min) acota la espera entre tina y
+    masaje para no dejar al cliente esperando en el lugar; los huéspedes van por el Ritual.
     """
     from .availability import disponibilidad, _parse_fecha
 
@@ -258,13 +279,17 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2):
     opciones = []
     for grupo, etiqueta in ((con, 'con hidromasaje'), (sin, 'sin hidromasaje')):
         op = _componer_opcion(grupo, etiqueta, f, personas, agendados,
-                              masaje_por_id, union_slots, masaje_generico)
+                              masaje_por_id, union_slots, masaje_generico,
+                              buffer_max=buffer_max)
         if op:
             opciones.append(op)
 
     nota = ''
     if not opciones:
-        nota = ('hay tinas pero no se pudo encajar el masaje sin solapar; '
+        nota = ('no quedó un masaje cerca de la tina (a menos de {}min) sin solapar; '
+                'ofrecer la tina y coordinar el masaje con una persona, o proponer otro día'
+                .format(buffer_max) if buffer_max is not None else
+                'hay tinas pero no se pudo encajar el masaje sin solapar; '
                 'ofrecer la tina y coordinar el masaje con una persona')
 
     # Limitar a máximo 2 opciones para evitar que Luna ofrezca demasiadas alternativas
