@@ -1440,12 +1440,27 @@ def verificar_ritual_view(request):
                     cab_li = ', '.join(escape(c.get('nombre', '')) for c in cabs) or '(ninguna)'
                     hay_torre = any('torre' in (c.get('nombre', '') or '').lower() for c in cabs)
                     hay_hidro = any('hidromasaje' in (t.get('nombre', '') or '').lower() for t in tns)
+                    # Catálogo completo de cabañas activas (independiente del día): para ver si la
+                    # Torre EXISTE y es apta para 2, o si simplemente está ocupada ese día.
+                    cat = Servicio.objects.filter(tipo_servicio='cabana', activo=True).order_by('nombre')
+                    cat_li = ' · '.join(
+                        f'{escape(c.nombre)} [cap {c.capacidad_minima}-{c.capacidad_maxima}'
+                        f'{", web" if c.publicado_web else ", NO-web"}'
+                        f'{", TORRE" if "torre" in (c.nombre or "").lower() else ""}]'
+                        for c in cat) or '(ninguna)'
+                    torre_cat = cat.filter(nombre__icontains='torre')
+                    torre_apta = any(c.capacidad_minima <= 2 <= c.capacidad_maxima and c.publicado_web
+                                     for c in torre_cat)
                     diag = (
                         '<div style="margin-top:14px;font-size:.9em;color:#555">'
                         f'<b>Diagnóstico ({escape(str(f))}):</b><br>'
-                        f'Cabañas disponibles para 2: {cab_li}<br>'
-                        f'¿Hay Torre disponible? <b>{"sí" if hay_torre else "NO"}</b> · '
+                        f'Cabañas disponibles ese día para 2: {cab_li}<br>'
+                        f'¿Hay Torre disponible ese día? <b>{"sí" if hay_torre else "NO"}</b> · '
                         f'¿Hay tina hidromasaje? <b>{"sí" if hay_hidro else "NO"}</b>'
+                        '<br><br><b>Catálogo de cabañas (activas):</b><br>'
+                        f'{cat_li}<br>'
+                        f'Torre en catálogo: <b>{"sí" if torre_cat.exists() else "NO existe"}</b>'
+                        f'{" · apta para 2+web: <b>" + ("sí" if torre_apta else "NO") + "</b>" if torre_cat.exists() else ""}'
                         '</div>')
             except Exception as exc:  # noqa: BLE001
                 diag = f'<div style="color:#c0392b">Diag error: {escape(str(exc)[:120])}</div>'
