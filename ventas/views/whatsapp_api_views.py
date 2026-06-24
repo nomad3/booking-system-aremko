@@ -1498,3 +1498,88 @@ jueves y ${RITUAL_PRECIO_PLANO:,} viernes y sábado.</p>
         return HttpResponse(html)
 
     return _inner(request)
+
+
+# ---------------------------------------------------------------------------
+# Verificación del Refugio Aremko (página HTML, login de staff)
+# ---------------------------------------------------------------------------
+# Igual que la del Ritual: muestra el desglose del Refugio (2 noches misma cabaña +
+# 2 tinas + 1 masaje + desayuno) y avisa si el total cuadra en $290.000. Solo lectura.
+
+def verificar_refugio_view(request):
+    """Página staff: desglose de precios del Refugio Aremko para una fecha de llegada."""
+    from django.contrib.admin.views.decorators import staff_member_required
+    from django.http import HttpResponse
+    from django.utils.html import escape
+    from whatsapp_agent.packs import construir_servicios_refugio, REFUGIO_PRECIO_PLANO
+    from ..models import Servicio
+
+    @staff_member_required
+    def _inner(request):
+        fecha = (request.GET.get('fecha') or 'el próximo viernes').strip()
+        forzar = (request.GET.get('forzar') or '').strip().lower()
+        preferir_premium = forzar in ('premium', 'torre', 'hidromasaje', '1', 'si', 'sí')
+        r = construir_servicios_refugio(fecha, preferir_premium=preferir_premium)
+
+        filas = ''
+        aviso = ''
+        if r.get('error'):
+            aviso = f'<p style="color:#c0392b">Error: {escape(str(r["error"]))}</p>'
+        elif not r.get('disponible'):
+            aviso = (f'<p style="color:#e67e22">No disponible para "{escape(fecha)}" '
+                     f'({escape(str(r.get("fecha","")))}): {escape(str(r.get("nota","")))}</p>')
+        else:
+            def _serv(sid):
+                return Servicio.objects.filter(id=sid).first()
+            for s in r['servicios']:
+                serv = _serv(s['servicio_id'])
+                if not serv:
+                    continue
+                pb = int(serv.precio_base)
+                cant = s['cantidad_personas']
+                sub = pb * cant
+                es_desc = pb < 0
+                etq = escape(serv.nombre) + f' <span style="color:#888">({escape(s["fecha"])})</span>'
+                color = ';color:#e67e22' if es_desc else ''
+                filas += (f'<tr style="{color[1:] if color else ""}"><td>{etq}</td>'
+                          f'<td style="text-align:right">${pb:,}</td>'
+                          f'<td style="text-align:center">× {cant:,}</td>'
+                          f'<td style="text-align:right">${sub:,}</td></tr>')
+            total = r['total']
+            objetivo = r.get('objetivo', REFUGIO_PRECIO_PLANO)
+            ok = total == objetivo
+            color = '#27ae60' if ok else '#c0392b'
+            marca = '✅ OK' if ok else f'❌ debería ser ${objetivo:,}'
+            aviso = (f'<p style="font-size:1.3em;color:{color}"><b>TOTAL REFUGIO (2 noches): '
+                     f'${total:,}</b> &nbsp; {marca}</p>'
+                     f'<p style="color:#666">Suma cruda ${r.get("suma_componentes",0):,} − '
+                     f'descuento ${r.get("descuento",0):,}. Llegada {escape(str(r.get("fecha","")))}, '
+                     f'salida {escape(str(r.get("fecha_salida","")))}.</p>')
+
+        html = f"""<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verificar Refugio Aremko</title></head>
+<body style="font-family:system-ui,Arial,sans-serif;max-width:680px;margin:20px auto;padding:0 14px">
+<h2>🏡 Refugio Aremko — verificación de precio</h2>
+<form method="get" style="margin-bottom:16px">
+  <label>Fecha de llegada:
+    <input name="fecha" value="{escape(fecha)}" style="padding:6px;width:55%">
+  </label>
+  <div style="margin:8px 0">
+    <label><input type="checkbox" name="forzar" value="premium"
+      {'checked' if preferir_premium else ''}> Forzar premium (Torre + hidromasaje)</label>
+  </div>
+  <button type="submit" style="padding:6px 12px">Ver</button>
+</form>
+<table style="width:100%;border-collapse:collapse" border="0" cellpadding="6">
+{filas}
+</table>
+<hr>
+{aviso}
+<p style="color:#888;font-size:.85em">Solo lectura — no crea ninguna reserva. 2 noches en la misma
+cabaña + tina caliente cada día + 1 masaje (primera noche) + desayuno incluido. El descuento clava
+el total en ${REFUGIO_PRECIO_PLANO:,}.</p>
+</body></html>"""
+        return HttpResponse(html)
+
+    return _inner(request)
