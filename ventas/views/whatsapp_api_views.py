@@ -1356,3 +1356,93 @@ def mark_template_failed(request):
         'contacto_id': contacto.id,
         'estado': contacto.estado,
     })
+
+
+# ---------------------------------------------------------------------------
+# Verificación del Ritual del Río (página HTML, login de staff)
+# ---------------------------------------------------------------------------
+# Pensada para revisar desde el celular SIN Render Shell: muestra el desglose de
+# precios del Ritual para una fecha y avisa si el total cuadra en $240.000.
+
+def verificar_ritual_view(request):
+    """Página staff: desglose de precios del Ritual del Río para una fecha.
+
+    GET ?fecha=<texto o YYYY-MM-DD>  (default: "el próximo miércoles").
+    Solo lectura — no crea ninguna reserva.
+    """
+    from django.contrib.admin.views.decorators import staff_member_required
+    from django.http import HttpResponse
+    from django.utils.html import escape
+    from whatsapp_agent.packs import construir_servicios_ritual, RITUAL_PRECIO_PLANO
+    from ..models import Servicio
+
+    @staff_member_required
+    def _inner(request):
+        fecha = (request.GET.get('fecha') or 'el próximo miércoles').strip()
+        r = construir_servicios_ritual(fecha)
+
+        filas = ''
+        aviso = ''
+        total = None
+        if r.get('error'):
+            aviso = f'<p style="color:#c0392b">Error: {escape(str(r["error"]))}</p>'
+        elif not r.get('disponible'):
+            aviso = (f'<p style="color:#e67e22">No disponible para "{escape(fecha)}" '
+                     f'({escape(str(r.get("fecha","")))}): {escape(str(r.get("nota","")))}</p>')
+        else:
+            it = r['itinerario']
+            personas = r.get('personas', 2)
+            nombres = {
+                'cabana': ('Cabaña (incluye desayuno)', it['cabana']['nombre']),
+                'tina': ('Tina', it['tina']['nombre']),
+                'masaje': ('Masaje', it['masaje']['nombre']),
+            }
+            def _pb(sid):
+                s = Servicio.objects.filter(id=sid).first()
+                return int(s.precio_base) if s else 0
+            for clave in ('cabana', 'tina', 'masaje'):
+                etq, nom = nombres[clave]
+                pb = _pb(it[clave]['servicio_id'])
+                sub = pb * personas
+                filas += (f'<tr><td>{escape(etq)}: {escape(nom)}</td>'
+                          f'<td style="text-align:right">${pb:,}</td>'
+                          f'<td style="text-align:center">× {personas}</td>'
+                          f'<td style="text-align:right">${sub:,}</td></tr>')
+            if r.get('descuento'):
+                prem = []
+                if r.get('es_torre'):
+                    prem.append('cabaña Torre')
+                if r.get('es_hidromasaje'):
+                    prem.append('tina hidromasaje')
+                filas += (f'<tr style="color:#e67e22"><td>Descuento premium '
+                          f'({escape(", ".join(prem))})</td><td></td><td></td>'
+                          f'<td style="text-align:right">-${r["descuento"]:,}</td></tr>')
+            total = r['total']
+            ok = total == RITUAL_PRECIO_PLANO
+            color = '#27ae60' if ok else '#c0392b'
+            marca = '✅ OK' if ok else f'❌ debería ser ${RITUAL_PRECIO_PLANO:,}'
+            aviso = (f'<p style="font-size:1.3em;color:{color}"><b>TOTAL RITUAL: '
+                     f'${total:,}</b> &nbsp; {marca}</p>')
+
+        html = f"""<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verificar Ritual del Río</title></head>
+<body style="font-family:system-ui,Arial,sans-serif;max-width:680px;margin:20px auto;padding:0 14px">
+<h2>🌙 Ritual del Río — verificación de precio</h2>
+<form method="get" style="margin-bottom:16px">
+  <label>Fecha:
+    <input name="fecha" value="{escape(fecha)}" style="padding:6px;width:60%">
+  </label>
+  <button type="submit" style="padding:6px 12px">Ver</button>
+</form>
+<table style="width:100%;border-collapse:collapse" border="0" cellpadding="6">
+{filas}
+</table>
+<hr>
+{aviso}
+<p style="color:#888;font-size:.85em">Solo lectura — no crea ninguna reserva. El desayuno va
+incluido en la cabaña. El descuento clava el total en ${RITUAL_PRECIO_PLANO:,}.</p>
+</body></html>"""
+        return HttpResponse(html)
+
+    return _inner(request)

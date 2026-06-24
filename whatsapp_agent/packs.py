@@ -594,3 +594,79 @@ def disponibilidad_ritual(fecha):
         'nota_descuento': (f'Componentes premium ({premium}): descuento de ${descuento:,.0f} para '
                            f'mantener el total en $240.000.' if descuento else ''),
     }
+
+
+def _servicio_descuento():
+    """El Servicio 'Descuento de servicios' (precio_base negativo, normalmente -1) que se usa
+    como línea de ajuste para clavar totales. Devuelve el Servicio o None."""
+    from ventas.models import Servicio
+    return (Servicio.objects.filter(nombre__icontains='descuento de servicios').first()
+            or Servicio.objects.filter(nombre__icontains='descuento').order_by('id').first())
+
+
+def construir_servicios_ritual(fecha):
+    """Arma la lista de servicios del Ritual para `preparar_reserva`, clavando el total en
+    $240.000 (H-031 pieza 3, escritura).
+
+    Reusa `disponibilidad_ritual` (misma cabaña/tina/masaje que se le ofreció al cliente) y
+    devuelve servicios=[{servicio_id, fecha, hora, cantidad_personas}, ...] listos para la
+    propuesta. El desayuno YA va incluido en el precio de la cabaña (Jorge), así que NO es una
+    línea aparte. El descuento se calcula como (suma_componentes − $240.000) y se aplica con la
+    línea 'Descuento de servicios' (precio_base negativo), de modo que el total quede SIEMPRE en
+    $240.000 sin depender de cuánto sume cada componente premium.
+
+    Devuelve dict con servicios + total, o {'disponible': False, ...} / {'error': ...}.
+    """
+    from ventas.models import Servicio
+
+    r = disponibilidad_ritual(fecha)
+    if r.get('error'):
+        return {'error': r['error']}
+    if not r.get('disponible'):
+        return {'disponible': False, 'fecha': r.get('fecha'), 'nota': r.get('nota')}
+
+    it = r['itinerario']
+    f_iso = r['fecha']
+    personas = r.get('personas', 2)
+    cab, tina, masaje = it['cabana'], it['tina'], it['masaje']
+
+    def _pb(servicio_id):
+        s = Servicio.objects.filter(id=servicio_id).first()
+        return int(s.precio_base) if s else 0
+
+    # Cabaña (incluye desayuno) + tina + masaje, todos para `personas`.
+    servicios = [
+        {'servicio_id': cab['servicio_id'], 'fecha': f_iso,
+         'hora': cab.get('hora_check_in', '16:00'), 'cantidad_personas': personas},
+        {'servicio_id': tina['servicio_id'], 'fecha': f_iso,
+         'hora': tina['hora'], 'cantidad_personas': personas},
+        {'servicio_id': masaje['servicio_id'], 'fecha': f_iso,
+         'hora': masaje['hora'], 'cantidad_personas': personas},
+    ]
+    suma = sum(_pb(s['servicio_id']) * s['cantidad_personas'] for s in servicios)
+    descuento = max(0, suma - RITUAL_PRECIO_PLANO)
+
+    if descuento:
+        ds = _servicio_descuento()
+        if ds is None:
+            return {'error': 'no existe el servicio "Descuento de servicios" para clavar el total'}
+        pb = int(ds.precio_base)
+        if pb >= 0:
+            return {'error': f'el servicio de descuento tiene precio_base {pb} (debería ser negativo)'}
+        # cantidad tal que precio_base * cantidad = -descuento (con precio_base -1 → cantidad=descuento)
+        cantidad = round(descuento / abs(pb))
+        servicios.append({'servicio_id': ds.id, 'fecha': f_iso,
+                          'hora': cab.get('hora_check_in', '16:00'), 'cantidad_personas': cantidad})
+
+    return {
+        'disponible': True,
+        'fecha': f_iso,
+        'personas': personas,
+        'servicios': servicios,
+        'suma_componentes': suma,
+        'descuento': descuento,
+        'total': suma - descuento,            # = RITUAL_PRECIO_PLANO ($240.000)
+        'itinerario': it,
+        'es_torre': r.get('es_torre'),
+        'es_hidromasaje': r.get('es_hidromasaje'),
+    }

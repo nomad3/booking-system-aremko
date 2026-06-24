@@ -349,6 +349,33 @@ _TOOLS = [{
             'required': [],
         },
     },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'confirmar_ritual',
+        'description': (
+            'CIERRA el Ritual del Río (H-031): cabaña + tina + masaje + desayuno como UNA '
+            'unidad por $240.000. Llamá esto cuando el cliente CONFIRMA que quiere reservar el '
+            'Ritual (después de haberle ofrecido el itinerario con consultar_disponibilidad_combo). '
+            'NO uses el carrito ni confirmar_reserva_carrito para el Ritual: esta tool arma sola '
+            'las 4 patas, el desayuno (incluido en la cabaña) y el descuento para clavar el total '
+            'en $240.000, y crea UNA propuesta para Deborah. Devuelve {success, propuesta_id, total}. '
+            'Para cliente EXISTENTE no repitas datos que ya están en su ficha; pasá solo los que '
+            'el cliente te dio. NO digas que quedó reservado hasta recibir success=true.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'fecha': {'type': 'string', 'description': 'REQUERIDO. PASÁ EL TEXTO LITERAL del cliente ("este sábado", "el próximo miércoles", "1 de julio"); NO lo conviertas a YYYY-MM-DD, la herramienta lo resuelve.'},
+                'nombre': {'type': 'string', 'description': 'Nombre del cliente (omitir si ya está en su ficha)'},
+                'email': {'type': 'string', 'description': 'Email del cliente (omitir si ya está en su ficha)'},
+                'documento_identidad': {'type': 'string', 'description': 'RUT del cliente (omitir si ya está en su ficha)'},
+                'comuna': {'type': 'string', 'description': 'Comuna del cliente, ej. "Puerto Varas" (omitir si ya está en su ficha)'},
+                'telefono': {'type': 'string', 'description': 'Teléfono del cliente. En WhatsApp OMÍTELO (se usa el de la conversación). En Instagram/Messenger SÍ pásalo.'},
+            },
+            'required': ['fecha'],
+        },
+    },
 }]
 
 
@@ -958,6 +985,91 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 logger.exception('Agente WA: tool confirmar_reserva_carrito falló: %s', exc)
                 return {'success': False, 'error': 'internal_error',
                         'mensaje': f'no se pudo confirmar la reserva: {str(exc)[:100]}'}
+        if name == 'confirmar_ritual':
+            # H-031 pieza 3: crea UNA propuesta del Ritual del Río (cabaña+tina+masaje+desayuno)
+            # clavada en $240.000, sin pasar por el carrito. Mismo camino de cliente/propuesta
+            # que confirmar_reserva_carrito, pero los servicios los arma construir_servicios_ritual.
+            from .reserva_service import preparar_reserva as servicio_preparar_reserva
+            from .packs import construir_servicios_ritual
+            try:
+                args = args or {}
+                external_id = phone if phone else '+56912345678'
+
+                fecha = (args.get('fecha') or '').strip()
+                if not fecha:
+                    return {'success': False, 'error': 'falta_fecha',
+                            'mensaje': 'Indicá la fecha del Ritual.'}
+
+                armado = construir_servicios_ritual(fecha)
+                if armado.get('error'):
+                    return {'success': False, 'error': 'ritual_error', 'mensaje': armado['error']}
+                if not armado.get('disponible'):
+                    return {'success': False, 'error': 'ritual_no_disponible',
+                            'mensaje': (armado.get('nota')
+                                        or 'No hay disponibilidad para el Ritual esa fecha; ofrecé otra.')}
+
+                # Datos del cliente: lo de la conversación (args) prioriza, completa con la ficha.
+                ficha = datos_cliente or {}
+                nombre = (args.get('nombre') or ficha.get('nombre') or '').strip()
+                email = (args.get('email') or ficha.get('email') or '').strip()
+                documento = (args.get('documento_identidad') or ficha.get('documento_identidad') or '').strip()
+                comuna_nombre = (args.get('comuna') or ficha.get('comuna_nombre') or '').strip()
+                telefono = (args.get('telefono') or '').strip()
+                if not telefono and canal == 'whatsapp':
+                    telefono = external_id
+
+                region_id = None
+                comuna_id = ficha.get('comuna_id')
+                if comuna_nombre:
+                    from ventas.models import Comuna
+                    comuna = Comuna.objects.filter(nombre__icontains=comuna_nombre).first()
+                    if not comuna:
+                        return {'success': False, 'error': 'comuna_not_found',
+                                'mensaje': f'Comuna "{comuna_nombre}" no encontrada'}
+                    region_id = comuna.region_id
+                    comuna_id = comuna.id
+
+                faltan = [k for k, v in (('nombre', nombre), ('email', email),
+                                         ('documento_identidad', documento), ('comuna', comuna_nombre),
+                                         ('telefono', telefono)) if not v]
+                if faltan:
+                    return {'success': False, 'error': 'faltan_datos', 'faltan': faltan,
+                            'mensaje': f'Faltan datos del cliente: {", ".join(faltan)}'}
+
+                cliente_data = {
+                    'nombre': nombre, 'email': email, 'telefono': telefono,
+                    'documento_identidad': documento, 'region_id': region_id, 'comuna_id': comuna_id,
+                }
+                payload = {'cliente': cliente_data, 'servicios': armado['servicios'],
+                           'metodo_pago': 'pendiente', 'es_ritual': True}
+
+                resultado = servicio_preparar_reserva(
+                    canal=canal,
+                    external_id=external_id,
+                    payload=payload,
+                    idempotency_key=f'ritual-{external_id}-{armado["fecha"]}',
+                )
+                if not resultado.get('success'):
+                    logger.error('[confirmar_ritual] preparar_reserva falló: %s', resultado)
+                    return resultado
+
+                total = resultado.get('total', 0)
+                logger.info('[confirmar_ritual] propuesta %s creada para %s ($%s, descuento $%s)',
+                            resultado.get('propuesta_id', '')[:8], external_id, total,
+                            armado.get('descuento'))
+                return {
+                    'success': True,
+                    'propuesta_id': resultado.get('propuesta_id'),
+                    'total': total,
+                    'mensaje': (
+                        f'¡Perfecto! Estoy preparando tu Ritual del Río (total ${total:,}). '
+                        'En un momento te confirmamos con los datos para el pago. 🌿🌙'
+                    ),
+                }
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool confirmar_ritual falló: %s', exc)
+                return {'success': False, 'error': 'internal_error',
+                        'mensaje': f'no se pudo confirmar el Ritual: {str(exc)[:100]}'}
         return {'error': f'herramienta desconocida: {name}'}
 
     try:

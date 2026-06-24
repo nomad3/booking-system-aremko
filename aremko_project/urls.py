@@ -87,6 +87,8 @@ urlpatterns = [
     path('api/whatsapp/agente/sugerencias-aprendizaje', whatsapp_api_views.agente_sugerencias_aprendizaje, name='whatsapp_agente_sugerencias'),
     path('api/whatsapp/agente/sugerencias-aprendizaje/<int:sug_id>/aprobar', whatsapp_api_views.agente_sugerencia_aprobar, name='whatsapp_agente_sugerencia_aprobar'),
     path('api/whatsapp/agente/sugerencias-aprendizaje/<int:sug_id>/descartar', whatsapp_api_views.agente_sugerencia_descartar, name='whatsapp_agente_sugerencia_descartar'),
+    # Verificación del Ritual del Río (página HTML, login de staff; revisar desde el celular).
+    path('whatsapp/verificar-ritual/', whatsapp_api_views.verificar_ritual_view, name='whatsapp_verificar_ritual'),
     # Campaña de plantillas Meta (Vuelta a Casa): Django decide, Go envía.
     # H-012: bandeja de envíos por plantilla — aprobación antes de enviar.
     path('api/whatsapp/bandeja-envios', whatsapp_api_views.bandeja_envios_por_aprobar, name='whatsapp_bandeja_envios'),
