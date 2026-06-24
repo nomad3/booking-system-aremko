@@ -1379,7 +1379,10 @@ def verificar_ritual_view(request):
     @staff_member_required
     def _inner(request):
         fecha = (request.GET.get('fecha') or 'el próximo miércoles').strip()
-        r = construir_servicios_ritual(fecha)
+        # ?forzar=premium → fuerza Torre + hidromasaje (para ver la línea de descuento).
+        forzar = (request.GET.get('forzar') or '').strip().lower()
+        preferir_premium = forzar in ('premium', 'torre', 'hidromasaje', '1', 'si', 'sí')
+        r = construir_servicios_ritual(fecha, preferir_premium=preferir_premium)
 
         filas = ''
         aviso = ''
@@ -1431,8 +1434,12 @@ def verificar_ritual_view(request):
 <h2>🌙 Ritual del Río — verificación de precio</h2>
 <form method="get" style="margin-bottom:16px">
   <label>Fecha:
-    <input name="fecha" value="{escape(fecha)}" style="padding:6px;width:60%">
+    <input name="fecha" value="{escape(fecha)}" style="padding:6px;width:55%">
   </label>
+  <div style="margin:8px 0">
+    <label><input type="checkbox" name="forzar" value="premium"
+      {'checked' if preferir_premium else ''}> Forzar premium (Torre + hidromasaje, para ver el descuento)</label>
+  </div>
   <button type="submit" style="padding:6px 12px">Ver</button>
 </form>
 <table style="width:100%;border-collapse:collapse" border="0" cellpadding="6">

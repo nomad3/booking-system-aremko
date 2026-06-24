@@ -493,10 +493,14 @@ def _es_cabana_torre(nombre):
     return 'torre' in (nombre or '').lower()
 
 
-def _elegir_cabana_ritual(cabanas):
-    """Prefiere una cabaña que NO sea Torre; usa Torre solo si es la única opción.
+def _elegir_cabana_ritual(cabanas, preferir_torre=False):
+    """Prefiere una cabaña que NO sea Torre (protege margen); usa Torre solo si es la única
+    opción. Con `preferir_torre=True` (solo para verificación/forzado) elige Torre si hay.
     Devuelve (cabana, es_torre) o (None, False)."""
+    torre = [c for c in cabanas if _es_cabana_torre(c.get('nombre', ''))]
     no_torre = [c for c in cabanas if not _es_cabana_torre(c.get('nombre', ''))]
+    if preferir_torre and torre:
+        return torre[0], True
     if no_torre:
         return no_torre[0], False
     if cabanas:
@@ -519,20 +523,22 @@ def _es_tina_hidromasaje(nombre):
     return 'hidromasaje' in (nombre or '').lower()
 
 
-def _elegir_tina_ritual(tinas):
+def _elegir_tina_ritual(tinas, preferir_hidromasaje=False):
     """Prefiere una tina ESTÁNDAR (sin hidromasaje, para no gatillar descuento); si
-    solo hay hidromasaje, la usa. Dentro del tipo elegido, la más tarde >=16:00.
+    solo hay hidromasaje, la usa. Con `preferir_hidromasaje=True` (solo verificación/forzado)
+    elige hidromasaje si hay. Dentro del tipo elegido, la más tarde >=16:00.
     Devuelve (tina, hora, es_hidromasaje)."""
     estandar = [t for t in tinas if not _es_tina_hidromasaje(t.get('nombre', ''))]
     hidro = [t for t in tinas if _es_tina_hidromasaje(t.get('nombre', ''))]
-    for grupo, es_hidro in ((estandar, False), (hidro, True)):
+    orden = ((hidro, True), (estandar, False)) if preferir_hidromasaje else ((estandar, False), (hidro, True))
+    for grupo, es_hidro in orden:
         t, hora = elegir_tina_mas_tarde(grupo)
         if t is not None:
             return t, hora, es_hidro
     return None, None, False
 
 
-def disponibilidad_ritual(fecha):
+def disponibilidad_ritual(fecha, preferir_premium=False):
     """Itinerario ÚNICO del Ritual del Río para `fecha` (2 personas, 1 noche).
 
     Reusa la disponibilidad existente, sin servicios ni slots nuevos:
@@ -540,9 +546,12 @@ def disponibilidad_ritual(fecha):
       - Tina: la más tarde disponible >= 16:00 (lógica cabaña+tina).
       - Masaje para 2: un slot existente a partir de las 16:00.
       - Desayuno: el de esa cabaña.
-    Precio $240.000 PLANO. Si toca Torre (+$10k), `confirmar_ritual` agrega el
-    descuento de $10.000 para mantener el total. Devuelve disponible=False (con
-    nota para ofrecer otra fecha) si falta cualquiera de las 3 patas.
+    Precio $240.000 PLANO. Si toca Torre y/o hidromasaje (+$10k c/u), `confirmar_ritual`
+    aplica el descuento para mantener el total. Devuelve disponible=False (con nota para
+    ofrecer otra fecha) si falta cualquiera de las 3 patas.
+
+    `preferir_premium=True` fuerza Torre + hidromasaje SI hay (solo para verificación del
+    descuento; el flujo normal de Luna usa False = lo más barato, para proteger margen).
     """
     from .availability import disponibilidad, _parse_fecha
 
@@ -552,13 +561,13 @@ def disponibilidad_ritual(fecha):
     personas = 2
 
     cabanas = disponibilidad(f, personas, 'cabana').get('servicios', [])
-    cabana, es_torre = _elegir_cabana_ritual(cabanas)
+    cabana, es_torre = _elegir_cabana_ritual(cabanas, preferir_torre=preferir_premium)
     if cabana is None:
         return {'fecha': f.isoformat(), 'disponible': False,
                 'nota': 'no hay cabañas libres esa noche para el ritual; ofrece otra fecha'}
 
     tinas = disponibilidad(f, personas, 'tina').get('servicios', [])
-    tina, tina_hora, es_hidromasaje = _elegir_tina_ritual(tinas)
+    tina, tina_hora, es_hidromasaje = _elegir_tina_ritual(tinas, preferir_hidromasaje=preferir_premium)
     if tina is None:
         return {'fecha': f.isoformat(), 'disponible': False,
                 'nota': 'no hay tina disponible desde las 16:00 esa noche; ofrece otra fecha'}
@@ -604,9 +613,10 @@ def _servicio_descuento():
             or Servicio.objects.filter(nombre__icontains='descuento').order_by('id').first())
 
 
-def construir_servicios_ritual(fecha):
+def construir_servicios_ritual(fecha, preferir_premium=False):
     """Arma la lista de servicios del Ritual para `preparar_reserva`, clavando el total en
-    $240.000 (H-031 pieza 3, escritura).
+    $240.000 (H-031 pieza 3, escritura). `preferir_premium` solo para verificación (fuerza
+    Torre+hidromasaje si hay, para ver la línea de descuento); el flujo normal usa False.
 
     Reusa `disponibilidad_ritual` (misma cabaña/tina/masaje que se le ofreció al cliente) y
     devuelve servicios=[{servicio_id, fecha, hora, cantidad_personas}, ...] listos para la
@@ -619,7 +629,7 @@ def construir_servicios_ritual(fecha):
     """
     from ventas.models import Servicio
 
-    r = disponibilidad_ritual(fecha)
+    r = disponibilidad_ritual(fecha, preferir_premium=preferir_premium)
     if r.get('error'):
         return {'error': r['error']}
     if not r.get('disponible'):
