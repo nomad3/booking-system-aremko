@@ -12,7 +12,7 @@ Uso:
 """
 from django.core.management.base import BaseCommand
 
-RITUAL_OBJETIVO = 240000
+# El objetivo real depende del día (dom-jue vs vie-sáb); lo entrega disponibilidad_ritual.
 
 
 class Command(BaseCommand):
@@ -81,26 +81,31 @@ class Command(BaseCommand):
         descuento = r.get('descuento', 0)
         es_torre = r.get('es_torre')
         es_hidro = r.get('es_hidromasaje')
+        es_domjue = r.get('es_domjue')
+        objetivo = r.get('precio_total', 0)   # objetivo del día (210k dom-jue / 240k vie-sáb)
         self.stdout.write('  ' + '-' * 70)
         self.stdout.write(f'  {"Suma componentes":<45} {"":>14} = ${suma:>9,}')
         if descuento:
-            premium = []
+            motivos = []
+            if es_domjue:
+                motivos.append('domingo a jueves')
             if es_torre:
-                premium.append('cabaña Torre')
+                motivos.append('cabaña Torre')
             if es_hidro:
-                premium.append('tina hidromasaje')
+                motivos.append('tina hidromasaje')
             self.stdout.write(self.style.WARNING(
-                f'  {"Descuento premium (" + ", ".join(premium) + ")":<45} {"":>14} = -${descuento:>8,}'))
+                f'  {"Descuento (" + ", ".join(motivos) + ")":<45} {"":>14} = -${descuento:>8,}'))
         final = suma - descuento
         self.stdout.write('  ' + '=' * 70)
 
-        ok = final == RITUAL_OBJETIVO
+        dia_txt = 'domingo a jueves' if es_domjue else 'viernes/sábado'
+        ok = final == objetivo
         estilo = self.style.SUCCESS if ok else self.style.ERROR
-        marca = '✅ OK' if ok else f'❌ DEBERÍA SER ${RITUAL_OBJETIVO:,}'
+        marca = f'✅ OK ({dia_txt})' if ok else f'❌ DEBERÍA SER ${objetivo:,}'
         self.stdout.write(estilo(f'  {"TOTAL RITUAL":<45} {"":>14} = ${final:>9,}   {marca}'))
 
         if not ok:
             self.stdout.write(self.style.ERROR(
-                f'\n  ⚠️  Descuadre de ${final - RITUAL_OBJETIVO:+,}. Revisar precio_base de los '
-                'componentes o la lógica de descuento ANTES de construir confirmar_ritual.'))
+                f'\n  ⚠️  Descuadre de ${final - objetivo:+,}. Revisar precio_base de los '
+                'componentes o la lógica de descuento.'))
         self.stdout.write('')

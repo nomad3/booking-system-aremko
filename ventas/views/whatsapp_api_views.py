@@ -1373,7 +1373,8 @@ def verificar_ritual_view(request):
     from django.contrib.admin.views.decorators import staff_member_required
     from django.http import HttpResponse
     from django.utils.html import escape
-    from whatsapp_agent.packs import construir_servicios_ritual, RITUAL_PRECIO_PLANO
+    from whatsapp_agent.packs import (construir_servicios_ritual, RITUAL_PRECIO_PLANO,
+                                      RITUAL_PRECIO_DOMJUE)
     from ..models import Servicio
 
     @staff_member_required
@@ -1412,18 +1413,22 @@ def verificar_ritual_view(request):
                           f'<td style="text-align:center">× {personas}</td>'
                           f'<td style="text-align:right">${sub:,}</td></tr>')
             if r.get('descuento'):
-                prem = []
+                motivos = []
+                if r.get('es_domjue'):
+                    motivos.append('domingo a jueves')
                 if r.get('es_torre'):
-                    prem.append('cabaña Torre')
+                    motivos.append('cabaña Torre')
                 if r.get('es_hidromasaje'):
-                    prem.append('tina hidromasaje')
-                filas += (f'<tr style="color:#e67e22"><td>Descuento premium '
-                          f'({escape(", ".join(prem))})</td><td></td><td></td>'
+                    motivos.append('tina hidromasaje')
+                filas += (f'<tr style="color:#e67e22"><td>Descuento '
+                          f'({escape(", ".join(motivos))})</td><td></td><td></td>'
                           f'<td style="text-align:right">-${r["descuento"]:,}</td></tr>')
             total = r['total']
-            ok = total == RITUAL_PRECIO_PLANO
+            objetivo = r.get('objetivo', RITUAL_PRECIO_PLANO)
+            ok = total == objetivo
             color = '#27ae60' if ok else '#c0392b'
-            marca = '✅ OK' if ok else f'❌ debería ser ${RITUAL_PRECIO_PLANO:,}'
+            etiqueta_dia = 'domingo a jueves' if r.get('es_domjue') else 'viernes/sábado'
+            marca = f'✅ OK ({etiqueta_dia})' if ok else f'❌ debería ser ${objetivo:,}'
             aviso = (f'<p style="font-size:1.3em;color:{color}"><b>TOTAL RITUAL: '
                      f'${total:,}</b> &nbsp; {marca}</p>')
 
@@ -1487,7 +1492,8 @@ def verificar_ritual_view(request):
 {aviso}
 {diag}
 <p style="color:#888;font-size:.85em">Solo lectura — no crea ninguna reserva. El desayuno va
-incluido en la cabaña. El descuento clava el total en ${RITUAL_PRECIO_PLANO:,}.</p>
+incluido en la cabaña. El descuento clava el total en ${RITUAL_PRECIO_DOMJUE:,} de domingo a
+jueves y ${RITUAL_PRECIO_PLANO:,} viernes y sábado.</p>
 </body></html>"""
         return HttpResponse(html)
 

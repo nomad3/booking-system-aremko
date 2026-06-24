@@ -435,9 +435,18 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
 
 # ── Ritual del Río (H-031 Fase 1): cabaña + tina + masaje + desayuno, 1 unidad ──
 
-RITUAL_PRECIO_PLANO = 240000          # precio único, todos los días
+RITUAL_PRECIO_PLANO = 240000          # precio normal (viernes y sábado)
+RITUAL_PRECIO_DOMJUE = 210000         # precio promocional domingo a jueves
+RITUAL_DIAS_DOMJUE = (0, 1, 3, 4)     # 0=Dom..6=Sáb (esquema PackDescuento); Mar(2) cerrado, Vie/Sáb normal
 RITUAL_MASAJE_PISO_MIN = 16 * 60      # masaje a partir de las 16:00 (check-in cabañas)
 RITUAL_DESCUENTO_PREMIUM = 10000      # descuento por cada componente premium (Torre / tina hidromasaje)
+
+
+def _precio_objetivo_ritual(f):
+    """Precio objetivo del Ritual según el día: $210.000 dom-jue, $240.000 viernes/sábado.
+    El descuento dom-jue (vs el precio normal) lo absorbe la línea 'Descuento de servicios'."""
+    dia = (f.weekday() + 1) % 7        # 0=Dom..6=Sáb, igual que PackDescuento
+    return RITUAL_PRECIO_DOMJUE if dia in RITUAL_DIAS_DOMJUE else RITUAL_PRECIO_PLANO
 
 
 def _normalizar_servicios(servicios):
@@ -580,17 +589,22 @@ def disponibilidad_ritual(fecha, preferir_premium=False):
         return {'fecha': f.isoformat(), 'disponible': False,
                 'nota': 'no hay masaje para 2 disponible desde las 16:00 esa noche; ofrece otra fecha'}
 
-    # Descuento para mantener el total en $240.000: $10k por cada componente premium
-    # (cabaña Torre y/o tina hidromasaje). confirmar_ritual lo aplica con la línea
-    # "Descuento de servicios" (cantidad = monto del descuento).
-    premium = int(es_torre) + int(es_hidromasaje)
-    descuento = premium * RITUAL_DESCUENTO_PREMIUM
+    # Precio objetivo del día ($210k dom-jue, $240k vie/sáb). El descuento es lo que haya que
+    # restar de la suma de componentes para llegar al objetivo (incluye el ahorro dom-jue y el
+    # extra de cualquier componente premium). confirmar_ritual lo aplica con la línea
+    # "Descuento de servicios" (precio_base negativo, cantidad = monto del descuento).
+    objetivo = _precio_objetivo_ritual(f)
+    suma = ((cabana.get('precio_total') or 0) + (tina.get('precio_total') or 0)
+            + (masaje.get('precio_total') or 0))
+    descuento = max(0, int(suma) - objetivo)
+    es_domjue = objetivo == RITUAL_PRECIO_DOMJUE
 
     return {
         'fecha': f.isoformat(),
         'disponible': True,
         'personas': personas,
-        'precio_total': RITUAL_PRECIO_PLANO,
+        'precio_total': objetivo,
+        'es_domjue': es_domjue,
         'es_torre': es_torre,
         'es_hidromasaje': es_hidromasaje,
         'descuento': descuento,
@@ -602,8 +616,8 @@ def disponibilidad_ritual(fecha, preferir_premium=False):
             'masaje': {'servicio_id': masaje.get('servicio_id'), 'nombre': masaje['nombre'], 'hora': masaje_hora},
             'desayuno': _desayuno_de_cabana(cabana['nombre']),
         },
-        'nota_descuento': (f'Componentes premium ({premium}): descuento de ${descuento:,.0f} para '
-                           f'mantener el total en $240.000.' if descuento else ''),
+        'nota_descuento': (f'Precio domingo a jueves ${objetivo:,.0f} (promoción).'
+                           if es_domjue else f'Precio fin de semana ${objetivo:,.0f}.'),
     }
 
 
@@ -616,16 +630,17 @@ def _servicio_descuento():
 
 
 def construir_servicios_ritual(fecha, preferir_premium=False):
-    """Arma la lista de servicios del Ritual para `preparar_reserva`, clavando el total en
-    $240.000 (H-031 pieza 3, escritura). `preferir_premium` solo para verificación (fuerza
-    Torre+hidromasaje si hay, para ver la línea de descuento); el flujo normal usa False.
+    """Arma la lista de servicios del Ritual para `preparar_reserva`, clavando el total en el
+    precio objetivo del día ($210.000 dom-jue / $240.000 vie-sáb) (H-031 pieza 3, escritura).
+    `preferir_premium` solo para verificación (fuerza Torre+hidromasaje si hay, para ver la
+    línea de descuento); el flujo normal usa False.
 
     Reusa `disponibilidad_ritual` (misma cabaña/tina/masaje que se le ofreció al cliente) y
     devuelve servicios=[{servicio_id, fecha, hora, cantidad_personas}, ...] listos para la
     propuesta. El desayuno YA va incluido en el precio de la cabaña (Jorge), así que NO es una
-    línea aparte. El descuento se calcula como (suma_componentes − $240.000) y se aplica con la
+    línea aparte. El descuento se calcula como (suma_componentes − objetivo) y se aplica con la
     línea 'Descuento de servicios' (precio_base negativo), de modo que el total quede SIEMPRE en
-    $240.000 sin depender de cuánto sume cada componente premium.
+    el objetivo del día sin depender de cuánto sume cada componente premium.
 
     Devuelve dict con servicios + total, o {'disponible': False, ...} / {'error': ...}.
     """
@@ -655,8 +670,10 @@ def construir_servicios_ritual(fecha, preferir_premium=False):
         {'servicio_id': masaje['servicio_id'], 'fecha': f_iso,
          'hora': masaje['hora'], 'cantidad_personas': personas},
     ]
+    from .availability import _parse_fecha
+    objetivo = _precio_objetivo_ritual(_parse_fecha(f_iso))
     suma = sum(_pb(s['servicio_id']) * s['cantidad_personas'] for s in servicios)
-    descuento = max(0, suma - RITUAL_PRECIO_PLANO)
+    descuento = max(0, suma - objetivo)
 
     if descuento:
         ds = _servicio_descuento()
@@ -677,7 +694,9 @@ def construir_servicios_ritual(fecha, preferir_premium=False):
         'servicios': servicios,
         'suma_componentes': suma,
         'descuento': descuento,
-        'total': suma - descuento,            # = RITUAL_PRECIO_PLANO ($240.000)
+        'total': suma - descuento,            # = objetivo ($210k dom-jue / $240k vie-sáb)
+        'objetivo': objetivo,
+        'es_domjue': r.get('es_domjue'),
         'itinerario': it,
         'es_torre': r.get('es_torre'),
         'es_hidromasaje': r.get('es_hidromasaje'),
