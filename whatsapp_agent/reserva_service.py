@@ -49,6 +49,7 @@ def preparar_reserva(canal, external_id, payload, idempotency_key=None):
     try:
         cliente_data = payload.get('cliente', {})
         servicios_data = payload.get('servicios', [])
+        productos_data = payload.get('productos', [])  # tablas, jugos, etc. (opcional)
 
         # Si tiene idempotency_key, buscar propuesta existente
         if idempotency_key:
@@ -128,12 +129,39 @@ def preparar_reserva(canal, external_id, payload, idempotency_key=None):
                     'subtotal': precio
                 })
 
+            # 3b. Productos (tablas, jugos, etc.): suman al total, no tienen fecha/hora.
+            from ventas.models import Producto
+            productos_info = []
+            for prod_data in productos_data:
+                try:
+                    producto = Producto.objects.get(id=prod_data['producto_id'])
+                except Producto.DoesNotExist:
+                    return {
+                        'success': False,
+                        'error': 'product_not_found',
+                        'mensaje': f'Producto {prod_data.get("producto_id")} no existe'
+                    }
+                cant = int(prod_data.get('cantidad', 1) or 1)
+                sub_prod = float(producto.precio_base) * cant
+                total += sub_prod
+                productos_info.append({
+                    'producto_id': producto.id,
+                    'nombre': producto.nombre,
+                    'cantidad': cant,
+                    'precio_unitario': float(producto.precio_base),
+                    'subtotal': sub_prod,
+                })
+
             # 4. Generar resumen legible para Deborah
             lineas_resumen = []
             for info in servicios_info:
                 lineas_resumen.append(
                     f"{info['cantidad_personas']}x {info['nombre']} "
                     f"({info['fecha']} {info['hora']}) = ${int(info['subtotal']):,}"
+                )
+            for info in productos_info:
+                lineas_resumen.append(
+                    f"{info['cantidad']}x {info['nombre']} = ${int(info['subtotal']):,}"
                 )
             resumen_texto = '\n'.join(lineas_resumen)
 

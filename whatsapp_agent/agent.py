@@ -264,16 +264,20 @@ _TOOLS = [{
     'function': {
         'name': 'agregar_producto_carrito',
         'description': (
-            'Agrega un producto al carrito (tablas de queso, jugos, etc.). '
-            'H-029 FASE 2. Mezcla servicios + productos en el mismo carrito.'
+            'Agrega un producto al carrito (tablas de quesos/jamones, jugos, etc.). '
+            'H-029 FASE 2. Mezcla servicios + productos en el mismo carrito. '
+            'IMPORTANTE: pasá SIEMPRE `nombre_producto` con el nombre EXACTO del producto del '
+            'catálogo (ej. "Tabla Mixta de Quesos y Jamones"); el sistema resuelve el id por '
+            'nombre (el catálogo no trae ids).'
         ),
         'parameters': {
             'type': 'object',
             'properties': {
-                'producto_id': {'type': 'integer', 'description': 'ID del producto'},
-                'cantidad': {'type': 'integer', 'description': 'Cantidad a agregar'},
+                'nombre_producto': {'type': 'string', 'description': 'Nombre EXACTO del producto del catálogo (ej. "Tabla Mixta de Quesos y Jamones"). REQUERIDO.'},
+                'producto_id': {'type': 'integer', 'description': 'ID del producto (opcional; normalmente no lo tenés, pasá nombre_producto)'},
+                'cantidad': {'type': 'integer', 'description': 'Cantidad a agregar (default 1)'},
             },
-            'required': ['producto_id', 'cantidad'],
+            'required': ['nombre_producto', 'cantidad'],
         },
     },
 }, {
@@ -887,10 +891,29 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
             from carrito_reservas.services import CarritoService
             try:
                 args = args or {}
+                producto_id = args.get('producto_id')
+                # El catálogo que ve Luna NO trae ids de producto (solo nombre/precio), así que
+                # casi siempre llega solo el nombre. Resolver el id por nombre (match único
+                # publicado y activo). Igual que el override por nombre de los servicios.
+                nombre_producto = (args.get('nombre_producto') or '').strip()
+                if nombre_producto:
+                    from ventas.models import Producto
+                    matches = list(Producto.objects.filter(
+                        publicado_web=True, cantidad_disponible__gt=0,
+                        nombre__icontains=nombre_producto,
+                    ).values_list('id', flat=True)[:2])
+                    if len(matches) == 1:
+                        producto_id = matches[0]
+                    elif len(matches) > 1:
+                        return {'success': False, 'error': 'producto_ambiguo',
+                                'mensaje': f'Hay varios productos que coinciden con "{nombre_producto}"; pedí al cliente que precise cuál.'}
+                if not producto_id:
+                    return {'success': False, 'error': 'producto_no_resuelto',
+                            'mensaje': f'No encontré el producto "{nombre_producto}" en el catálogo disponible.'}
                 resultado = CarritoService.agregar_producto(
                     canal=canal,
                     external_id=phone if phone else 'desconocido',
-                    producto_id=args.get('producto_id'),
+                    producto_id=producto_id,
                     cantidad=args.get('cantidad', 1)
                 )
                 return resultado

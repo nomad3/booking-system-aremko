@@ -127,29 +127,31 @@ class CarritoService:
                     'mensaje': f'Producto {producto_id} no existe'
                 }
 
-            # Validar que está publicado y tiene stock
-            if not producto.publicado_web or not producto.activo:
+            # Validar que está publicado (Producto NO tiene campo `activo`; la baja se hace
+            # con publicado_web / cantidad_disponible).
+            if not producto.publicado_web:
                 return {
                     'success': False,
                     'error': 'producto_no_disponible',
                     'mensaje': f'{producto.nombre} no está disponible'
                 }
 
-            if producto.stock_actual < cantidad:
+            # Stock real del producto = cantidad_disponible (no existe `stock_actual`).
+            if producto.cantidad_disponible < cantidad:
                 return {
                     'success': False,
                     'error': 'stock_insuficiente',
-                    'mensaje': f'Solo hay {producto.stock_actual} en stock'
+                    'mensaje': f'Solo hay {producto.cantidad_disponible} en stock'
                 }
 
-            # Crear item
+            # Crear item (el precio del producto es `precio_base`; no hay precio_venta/precio_costo).
             item = {
                 'tipo': 'producto',
                 'producto_id': producto.id,
                 'nombre': producto.nombre,
                 'cantidad': cantidad,
-                'precio_unitario': float(producto.precio_venta or producto.precio_costo),
-                'subtotal': float(producto.precio_venta or producto.precio_costo) * cantidad,
+                'precio_unitario': float(producto.precio_base),
+                'subtotal': float(producto.precio_base) * cantidad,
             }
 
             # Agregar al carrito
@@ -421,6 +423,7 @@ class CarritoService:
             }
         """
         servicios = []
+        productos = []
         for item in carrito.items:
             if item.get('tipo') == 'servicio':
                 servicios.append({
@@ -429,10 +432,16 @@ class CarritoService:
                     'hora': item.get('hora'),
                     'cantidad_personas': item.get('cantidad_personas', 1),
                 })
+            elif item.get('tipo') == 'producto':
+                productos.append({
+                    'producto_id': item.get('producto_id'),
+                    'cantidad': item.get('cantidad', 1),
+                })
 
         payload = {
             'cliente': cliente_data,
             'servicios': servicios,
+            'productos': productos,   # tablas, jugos, etc. (se descontaba inventario al crear)
             'metodo_pago': 'pendiente',
         }
 

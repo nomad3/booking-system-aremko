@@ -28,7 +28,8 @@ import logging
 
 from ventas.models import (
     Servicio, Cliente, VentaReserva, ReservaServicio,
-    ServicioBloqueo, ServicioSlotBloqueo, Region, Comuna
+    ServicioBloqueo, ServicioSlotBloqueo, Region, Comuna,
+    Producto, ReservaProducto, Comanda, DetalleComanda
 )
 from whatsapp_agent.models import PropuestaReserva
 from ventas.services.cliente_service import ClienteService
@@ -710,6 +711,7 @@ def crear_reserva(request):
             payload = propuesta.payload or {}
             cliente_data = payload.get('cliente', {})
             servicios_data = payload.get('servicios', [])
+            productos_data = payload.get('productos', [])  # tablas, jugos, etc.
             metodo_pago = payload.get('metodo_pago', 'pendiente')
             notas = f'[Propuesta {propuesta_id[:8]}] Aprobada por Deborah'
             idempotency_key = propuesta.idempotency_key or f'propuesta_{propuesta_id}'
@@ -718,6 +720,7 @@ def crear_reserva(request):
             idempotency_key = request.data.get('idempotency_key')
             cliente_data = request.data.get('cliente', {})
             servicios_data = request.data.get('servicios', [])
+            productos_data = request.data.get('productos', [])
             metodo_pago = request.data.get('metodo_pago', 'pendiente')
             notas = request.data.get('notas', '')
 
@@ -872,6 +875,45 @@ def crear_reserva(request):
                     'precio_unitario': float(precio_unitario),
                     'subtotal': float(subtotal)
                 })
+
+            # 3b. Productos (tablas, jugos, etc.): NO se descuenta inventario al crear.
+            # Se crea una Comanda con fecha_entrega_objetivo = fecha del PRIMER servicio, y
+            # ReservaProducto SIN fecha_entrega (NULL). El inventario se descuenta recién en
+            # esa fecha vía comanda.entregar_inventario() (cron `procesar_entregas_comandas_vencidas`
+            # o entrega manual). Así una reserva de hoy para dentro de 30 días descuenta en 30 días.
+            if productos_data:
+                # Fecha objetivo = primer servicio (por fecha, luego hora).
+                serv_orden = sorted(
+                    servicios_data, key=lambda s: (s['fecha'], s.get('hora') or '00:00'))
+                primero = serv_orden[0]
+                try:
+                    naive_obj = datetime.strptime(
+                        f"{primero['fecha']} {primero.get('hora') or '12:00'}", '%Y-%m-%d %H:%M')
+                except (ValueError, KeyError):
+                    naive_obj = datetime.strptime(f"{primero['fecha']} 12:00", '%Y-%m-%d %H:%M')
+                fecha_entrega_objetivo = timezone.make_aware(naive_obj)
+
+                comanda = Comanda.objects.create(
+                    venta_reserva=venta_reserva,
+                    estado='pendiente',
+                    creada_por_cliente=True,
+                    fecha_entrega_objetivo=fecha_entrega_objetivo,
+                    notas_generales='[Luna WhatsApp] Productos agregados en la reserva',
+                )
+                for prod_data in productos_data:
+                    try:
+                        producto = Producto.objects.get(id=prod_data['producto_id'])
+                    except Producto.DoesNotExist:
+                        continue  # un producto inexistente no debe tumbar la reserva
+                    cant = int(prod_data.get('cantidad', 1) or 1)
+                    # Línea de cocina (comanda) + línea de facturación (ReservaProducto sin fecha).
+                    DetalleComanda.objects.create(
+                        comanda=comanda, producto=producto, cantidad=cant,
+                        precio_unitario=producto.precio_base)
+                    ReservaProducto.objects.create(
+                        venta_reserva=venta_reserva, producto=producto, cantidad=cant,
+                        precio_unitario_venta=producto.precio_base)  # fecha_entrega = NULL
+                    total_estimado += float(producto.precio_base) * cant
 
             # 4. Aplicar descuentos
             cart_items = []
