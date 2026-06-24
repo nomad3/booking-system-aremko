@@ -701,3 +701,160 @@ def construir_servicios_ritual(fecha, preferir_premium=False):
         'es_torre': r.get('es_torre'),
         'es_hidromasaje': r.get('es_hidromasaje'),
     }
+
+
+# ── Refugio Aremko: el Ritual del Río en estadía de 2 NOCHES (misma cabaña) ──
+# Noche 1 = el Ritual (cabaña + tina + masaje + desayuno). Noche 2 = la misma cabaña
+# (+ desayuno). UNA sola tina y UN solo masaje en toda la estadía. Precio PLANO todos
+# los días (incluye desayuno). El descuento clava el total como en el Ritual.
+
+REFUGIO_PRECIO_PLANO = 290000   # 2 noches, misma cabaña, plano todos los días
+REFUGIO_NOCHES = 2
+
+
+def disponibilidad_refugio(fecha, preferir_premium=False):
+    """Itinerario del Refugio Aremko para `fecha` de llegada (2 personas, 2 noches).
+
+    Reusa lo del Ritual + la disponibilidad multinoche: una cabaña libre las DOS noches
+    seguidas (misma cabaña), tina y masaje la PRIMERA noche (≥16:00), desayuno incluido
+    ambas mañanas. Precio $290.000 plano. `preferir_premium` solo para verificación.
+    Devuelve itinerario único o disponible=False (con nota para ofrecer otra fecha).
+    """
+    from datetime import timedelta
+    from .availability import disponibilidad, _parse_fecha
+
+    f1 = _parse_fecha(fecha) if fecha else None
+    if f1 is None:
+        return {'error': 'fecha inválida (usa YYYY-MM-DD)'}
+    personas = 2
+    f2 = f1 + timedelta(days=1)            # segunda noche
+    f_salida = f1 + timedelta(days=REFUGIO_NOCHES)
+
+    # Cabañas libres AMBAS noches (misma cabaña): intersección por servicio_id, sin tope.
+    cab1 = disponibilidad(f1, personas, 'cabana', limite=None).get('servicios', [])
+    cab2 = disponibilidad(f2, personas, 'cabana', limite=None).get('servicios', [])
+    ids2 = {c.get('servicio_id') for c in cab2}
+    ambas = [c for c in cab1 if c.get('servicio_id') in ids2]
+    cabana, es_torre = _elegir_cabana_ritual(ambas, preferir_torre=preferir_premium)
+    if cabana is None:
+        return {'fecha': f1.isoformat(), 'disponible': False,
+                'nota': 'no hay una cabaña libre las 2 noches seguidas; ofrece otra fecha'}
+
+    # UNA tina CADA día (las dos noches) + UN masaje la primera noche.
+    tinas1 = disponibilidad(f1, personas, 'tina', limite=None).get('servicios', [])
+    tina1, tina1_hora, es_hidro1 = _elegir_tina_ritual(tinas1, preferir_hidromasaje=preferir_premium)
+    if tina1 is None:
+        return {'fecha': f1.isoformat(), 'disponible': False,
+                'nota': 'no hay tina disponible la primera noche; ofrece otra fecha'}
+    tinas2 = disponibilidad(f2, personas, 'tina', limite=None).get('servicios', [])
+    tina2, tina2_hora, es_hidro2 = _elegir_tina_ritual(tinas2, preferir_hidromasaje=preferir_premium)
+    if tina2 is None:
+        return {'fecha': f1.isoformat(), 'disponible': False,
+                'nota': 'no hay tina disponible la segunda noche; ofrece otra fecha'}
+
+    masajes = disponibilidad(f1, personas, 'masaje').get('servicios', [])
+    masaje, masaje_hora = _elegir_masaje_ritual(masajes)
+    if masaje is None:
+        return {'fecha': f1.isoformat(), 'disponible': False,
+                'nota': 'no hay masaje para 2 la primera noche; ofrece otra fecha'}
+
+    # Suma cruda: 2 noches de cabaña + 2 tinas (una por día) + 1 masaje. Descuento la lleva a $290.000.
+    suma = (2 * (cabana.get('precio_total') or 0) + (tina1.get('precio_total') or 0)
+            + (tina2.get('precio_total') or 0) + (masaje.get('precio_total') or 0))
+    descuento = max(0, int(suma) - REFUGIO_PRECIO_PLANO)
+
+    return {
+        'fecha': f1.isoformat(),
+        'fecha_salida': f_salida.isoformat(),
+        'disponible': True,
+        'personas': personas,
+        'noches': REFUGIO_NOCHES,
+        'precio_total': REFUGIO_PRECIO_PLANO,
+        'descuento': descuento,
+        'es_torre': es_torre,
+        'es_hidromasaje': es_hidro1 or es_hidro2,
+        'itinerario': {
+            'cabana': {'servicio_id': cabana.get('servicio_id'), 'nombre': cabana['nombre'],
+                       'hora_check_in': '16:00', 'noches': REFUGIO_NOCHES, 'es_torre': es_torre},
+            'tina': {'servicio_id': tina1.get('servicio_id'), 'nombre': tina1['nombre'],
+                     'hora': tina1_hora, 'noche': 1, 'fecha': f1.isoformat(), 'es_hidromasaje': es_hidro1},
+            'tina2': {'servicio_id': tina2.get('servicio_id'), 'nombre': tina2['nombre'],
+                      'hora': tina2_hora, 'noche': 2, 'fecha': f2.isoformat(), 'es_hidromasaje': es_hidro2},
+            'masaje': {'servicio_id': masaje.get('servicio_id'), 'nombre': masaje['nombre'], 'hora': masaje_hora},
+            'desayuno': _desayuno_de_cabana(cabana['nombre']),
+        },
+        'nota': (f'2 noches en {cabana["nombre"]} (llegada {f1.isoformat()}, '
+                 f'salida {f_salida.isoformat()}); tina caliente cada día, masaje la primera noche.'),
+    }
+
+
+def construir_servicios_refugio(fecha, preferir_premium=False):
+    """Arma la lista de servicios del Refugio para `preparar_reserva`, clavando el total en
+    $290.000. La cabaña va DOS veces (noche 1 y noche 2, MISMO servicio_id) + 1 tina + 1 masaje
+    la primera noche. El desayuno va incluido en la cabaña. El descuento = (suma − $290.000)
+    con la línea 'Descuento de servicios'. Devuelve servicios listos o disponible=False/error.
+    """
+    from datetime import timedelta
+    from ventas.models import Servicio
+    from .availability import _parse_fecha
+
+    r = disponibilidad_refugio(fecha, preferir_premium=preferir_premium)
+    if r.get('error'):
+        return {'error': r['error']}
+    if not r.get('disponible'):
+        return {'disponible': False, 'fecha': r.get('fecha'), 'nota': r.get('nota')}
+
+    it = r['itinerario']
+    f1 = _parse_fecha(r['fecha'])
+    f2 = f1 + timedelta(days=1)
+    personas = r.get('personas', 2)
+    cab, tina, tina2, masaje = it['cabana'], it['tina'], it['tina2'], it['masaje']
+
+    def _pb(servicio_id):
+        s = Servicio.objects.filter(id=servicio_id).first()
+        return int(s.precio_base) if s else 0
+
+    servicios = [
+        # MISMA cabaña las 2 noches (mismo servicio_id, fechas consecutivas).
+        {'servicio_id': cab['servicio_id'], 'fecha': f1.isoformat(),
+         'hora': '16:00', 'cantidad_personas': personas},
+        {'servicio_id': cab['servicio_id'], 'fecha': f2.isoformat(),
+         'hora': '16:00', 'cantidad_personas': personas},
+        # Una tina caliente CADA día.
+        {'servicio_id': tina['servicio_id'], 'fecha': f1.isoformat(),
+         'hora': tina['hora'], 'cantidad_personas': personas},
+        {'servicio_id': tina2['servicio_id'], 'fecha': f2.isoformat(),
+         'hora': tina2['hora'], 'cantidad_personas': personas},
+        # Un masaje para 2, la primera noche.
+        {'servicio_id': masaje['servicio_id'], 'fecha': f1.isoformat(),
+         'hora': masaje['hora'], 'cantidad_personas': personas},
+    ]
+    suma = sum(_pb(s['servicio_id']) * s['cantidad_personas'] for s in servicios)
+    descuento = max(0, suma - REFUGIO_PRECIO_PLANO)
+
+    if descuento:
+        ds = _servicio_descuento()
+        if ds is None:
+            return {'error': 'no existe el servicio "Descuento de servicios" para clavar el total'}
+        pb = int(ds.precio_base)
+        if pb >= 0:
+            return {'error': f'el servicio de descuento tiene precio_base {pb} (debería ser negativo)'}
+        cantidad = round(descuento / abs(pb))
+        servicios.append({'servicio_id': ds.id, 'fecha': f1.isoformat(),
+                          'hora': '16:00', 'cantidad_personas': cantidad})
+
+    return {
+        'disponible': True,
+        'fecha': r['fecha'],
+        'fecha_salida': r.get('fecha_salida'),
+        'personas': personas,
+        'noches': REFUGIO_NOCHES,
+        'servicios': servicios,
+        'suma_componentes': suma,
+        'descuento': descuento,
+        'total': suma - descuento,            # = REFUGIO_PRECIO_PLANO ($290.000)
+        'objetivo': REFUGIO_PRECIO_PLANO,
+        'itinerario': it,
+        'es_torre': r.get('es_torre'),
+        'es_hidromasaje': r.get('es_hidromasaje'),
+    }
