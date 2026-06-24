@@ -1556,6 +1556,30 @@ def verificar_refugio_view(request):
                      f'descuento ${r.get("descuento",0):,}. Llegada {escape(str(r.get("fecha","")))}, '
                      f'salida {escape(str(r.get("fecha_salida","")))}.</p>')
 
+        # Diagnóstico: cabañas libres cada noche y la intersección (las que sirven para el Refugio).
+        diag = ''
+        if not r.get('error'):
+            try:
+                from datetime import timedelta
+                from whatsapp_agent.availability import disponibilidad, _parse_fecha
+                f1 = _parse_fecha(fecha)
+                if f1 is not None:
+                    f2 = f1 + timedelta(days=1)
+                    c1 = disponibilidad(f1, 2, 'cabana', limite=None).get('servicios', [])
+                    c2 = disponibilidad(f2, 2, 'cabana', limite=None).get('servicios', [])
+                    n1 = {c.get('nombre', '') for c in c1}
+                    n2 = {c.get('nombre', '') for c in c2}
+                    ambas = sorted(n1 & n2)
+                    diag = (
+                        '<div style="margin-top:14px;font-size:.9em;color:#555">'
+                        f'<b>Diagnóstico de cabañas (misma cabaña 2 noches):</b><br>'
+                        f'Noche 1 ({escape(str(f1))}): {escape(", ".join(sorted(n1)) or "(ninguna)")}<br>'
+                        f'Noche 2 ({escape(str(f2))}): {escape(", ".join(sorted(n2)) or "(ninguna)")}<br>'
+                        f'<b>Libres LAS DOS noches: {escape(", ".join(ambas) or "NINGUNA")}</b>'
+                        '</div>')
+            except Exception as exc:  # noqa: BLE001
+                diag = f'<div style="color:#c0392b">Diag error: {escape(str(exc)[:120])}</div>'
+
         html = f"""<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Verificar Refugio Aremko</title></head>
@@ -1576,6 +1600,7 @@ def verificar_refugio_view(request):
 </table>
 <hr>
 {aviso}
+{diag}
 <p style="color:#888;font-size:.85em">Solo lectura — no crea ninguna reserva. 2 noches en la misma
 cabaña + tina caliente cada día + 1 masaje (primera noche) + desayuno incluido. El descuento clava
 el total en ${REFUGIO_PRECIO_PLANO:,}.</p>
