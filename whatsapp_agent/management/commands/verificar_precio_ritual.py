@@ -52,6 +52,8 @@ class Command(BaseCommand):
             except Servicio.DoesNotExist:
                 return None
 
+        # El desayuno YA está incorporado en el precio de la cabaña (Jorge, 2026-06-24):
+        # NO se suma como línea aparte (sería doble conteo). Solo cabaña + tina + masaje.
         for clave, pers in (('cabana', personas), ('tina', personas), ('masaje', personas)):
             comp = it.get(clave) or {}
             s = _serv(comp.get('servicio_id'))
@@ -61,16 +63,20 @@ class Command(BaseCommand):
             pb = int(s.precio_base)
             sub = pb * pers
             suma += sub
-            filas.append((f'{clave.capitalize()}: {s.nombre}', pb, pers, sub))
-
-        desayuno = it.get('desayuno')
-        if desayuno:
-            pb = int(desayuno.get('precio_total', 0))
-            suma += pb
-            filas.append((f'Desayuno: {desayuno.get("nombre")}', pb, 1, pb))
+            etq = clave.capitalize() + (' (incluye desayuno)' if clave == 'cabana' else '')
+            filas.append((f'{etq}: {s.nombre}', pb, pers, sub))
 
         for nombre, pb, pers, sub in filas:
             self.stdout.write(f'  {nombre:<45} ${pb:>8,} × {pers} = ${sub:>9,}')
+
+        # Informativo: si todavía existe un servicio "Desayuno X" con precio > 0, avisar
+        # (con el cambio de Jorge debería estar en $0 o despublicado para no duplicar).
+        desayuno = it.get('desayuno')
+        if desayuno and int(desayuno.get('precio_total', 0)) > 0:
+            self.stdout.write(self.style.WARNING(
+                f'  ⚠️  Ojo: existe "{desayuno.get("nombre")}" con valor '
+                f'${int(desayuno["precio_total"]):,} aparte. Como el desayuno ya está en la '
+                'cabaña, NO se suma aquí; revisar que no se cuele en otra parte.'))
 
         descuento = r.get('descuento', 0)
         es_torre = r.get('es_torre')
