@@ -1435,8 +1435,8 @@ def verificar_ritual_view(request):
                 from whatsapp_agent.availability import disponibilidad, _parse_fecha
                 f = _parse_fecha(fecha)
                 if f is not None:
-                    cabs = disponibilidad(f, 2, 'cabana').get('servicios', [])
-                    tns = disponibilidad(f, 2, 'tina').get('servicios', [])
+                    cabs = disponibilidad(f, 2, 'cabana', limite=None).get('servicios', [])
+                    tns = disponibilidad(f, 2, 'tina', limite=None).get('servicios', [])
                     cab_li = ', '.join(escape(c.get('nombre', '')) for c in cabs) or '(ninguna)'
                     hay_torre = any('torre' in (c.get('nombre', '') or '').lower() for c in cabs)
                     hay_hidro = any('hidromasaje' in (t.get('nombre', '') or '').lower() for t in tns)

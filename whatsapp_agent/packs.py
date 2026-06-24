@@ -560,7 +560,9 @@ def disponibilidad_ritual(fecha, preferir_premium=False):
         return {'error': 'fecha inválida (usa YYYY-MM-DD)'}
     personas = 2
 
-    cabanas = disponibilidad(f, personas, 'cabana').get('servicios', [])
+    # limite=None: ver TODAS las cabañas libres (el tope alfabético de 2 dejaba "Torre"
+    # —última alfabéticamente— siempre fuera, así que nunca se podía elegir como último recurso).
+    cabanas = disponibilidad(f, personas, 'cabana', limite=None).get('servicios', [])
     cabana, es_torre = _elegir_cabana_ritual(cabanas, preferir_torre=preferir_premium)
     if cabana is None:
         return {'fecha': f.isoformat(), 'disponible': False,

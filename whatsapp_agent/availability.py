@@ -244,7 +244,7 @@ def _es_masaje_agendable(servicio):
     return 'relaj' in n or 'descontractura' in n
 
 
-def disponibilidad(fecha=None, personas=1, tipo=None):
+def disponibilidad(fecha=None, personas=1, tipo=None, limite=2):
     """Servicios publicados que admiten `personas`, con precio total y horarios libres (H-028 BUG FIX).
 
     Con `fecha` (YYYY-MM-DD O expresión como "el sábado") → calcula horarios libres ese día.
@@ -364,18 +364,22 @@ def disponibilidad(fecha=None, personas=1, tipo=None):
         })
 
     # Limitar opciones para no abrumar al LLM, PERO con variedad de tipos:
-    # - Si el cliente pidió un tipo concreto (ej. "una tina"): hasta 2 de ese tipo.
+    # - Si el cliente pidió un tipo concreto (ej. "una tina"): hasta `limite` de ese tipo.
     # - Si es consulta general: 1 representante de CADA tipo disponible (tina + masaje +
     #   cabaña), para no sesgar por orden alfabético (cabana<masaje<tina) y ofrecer las 3
     #   categorías cuando todas calzan con la cantidad de personas.
-    if tipo == 'tina':
+    # `limite=None` desactiva el tope (lo usa el Ritual para ver TODAS las cabañas libres y
+    # poder elegir Torre como último recurso; con tope alfabético "Torre" nunca aparecía).
+    if limite is None:
+        pass  # sin tope: devolver todos los servicios que calzan
+    elif tipo == 'tina':
         # Variedad de tina: ofrecer 1 SIN hidromasaje + 1 CON, para que el cliente elija
         # (estándar más económica vs hidromasaje premium). Si solo hay de un tipo, las 2 primeras.
         con_h = [s for s in servicios if 'hidromasaje' in (s.get('nombre') or '').lower()]
         sin_h = [s for s in servicios if 'hidromasaje' not in (s.get('nombre') or '').lower()]
-        servicios = [sin_h[0], con_h[0]] if (con_h and sin_h) else servicios[:2]
+        servicios = [sin_h[0], con_h[0]] if (con_h and sin_h) else servicios[:limite]
     elif tipo:
-        servicios = servicios[:2]
+        servicios = servicios[:limite]
     else:
         vistos, diversos = set(), []
         for s in servicios:
