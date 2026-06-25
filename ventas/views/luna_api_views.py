@@ -913,7 +913,8 @@ def crear_reserva(request):
                     ReservaProducto.objects.create(
                         venta_reserva=venta_reserva, producto=producto, cantidad=cant,
                         precio_unitario_venta=producto.precio_base)  # fecha_entrega = NULL
-                    total_estimado += float(producto.precio_base) * cant
+                    # precio_base es Decimal y total_estimado es Decimal: NO mezclar con float.
+                    total_estimado += producto.precio_base * cant
 
             # 4. Aplicar descuentos
             cart_items = []
