@@ -916,23 +916,11 @@ def crear_reserva(request):
                     # precio_base es Decimal y total_estimado es Decimal: NO mezclar con float.
                     total_estimado += producto.precio_base * cant
 
-            # 4. Aplicar descuentos
-            cart_items = []
-            for servicio_data in servicios_data:
-                servicio = Servicio.objects.get(id=servicio_data['servicio_id'])
-                cart_items.append({
-                    'id': servicio.id,
-                    'nombre': servicio.nombre,
-                    'precio': float(servicio.precio_base),
-                    'fecha': servicio_data['fecha'],
-                    'hora': servicio_data['hora'],
-                    'cantidad_personas': servicio_data['cantidad_personas'],
-                    'tipo_servicio': servicio.tipo_servicio,
-                    'subtotal': float(servicio.precio_base * servicio_data['cantidad_personas'])
-                })
-
-            packs_aplicables = PackDescuentoService.detectar_packs_aplicables(cart_items)
-            total_descuentos = sum(pack_info['descuento'] for pack_info in packs_aplicables)
+            # 4. Aplicar descuentos. Fuente ÚNICA: PackDescuentoService.descuento_para_servicios,
+            # que arma el carrito como espera el motor (masajes divididos por persona). Antes este
+            # camino armaba 1 masaje × N personas y el motor (que cuenta masajes por ÍTEM, exige >=2)
+            # NO detectaba el pack tina+masaje → la reserva se creaba a precio completo.
+            total_descuentos = PackDescuentoService.descuento_para_servicios(servicios_data)
 
             # 5. Actualizar total de VentaReserva
             venta_reserva.total = total_estimado - total_descuentos

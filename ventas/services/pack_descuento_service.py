@@ -12,6 +12,47 @@ class PackDescuentoService:
     """Servicio para detectar y aplicar descuentos por packs"""
 
     @staticmethod
+    def descuento_para_servicios(servicios_data: List[Dict]) -> int:
+        """Descuento total (int CLP) para una lista de servicios
+        [{servicio_id, cantidad_personas, fecha, hora}, ...].
+
+        Arma el carrito como lo ESPERA el motor de packs: la regla del pack tina+masaje cuenta
+        MASAJES POR ÍTEM (no por personas) y exige >=2, así que los masajes se dividen en 1 ítem
+        por persona (igual que la oferta `disponibilidad_pack_tina_masaje`). Tinas/cabañas van como
+        1 ítem con sus personas. Es la fuente ÚNICA de verdad del descuento para la propuesta, la
+        cotización y la creación de la reserva (antes cada una armaba el carrito distinto y solo la
+        oferta lo hacía bien → el descuento no se aplicaba en la reserva).
+        """
+        cart = []
+        for sd in (servicios_data or []):
+            s = Servicio.objects.filter(id=sd.get('servicio_id')).first()
+            if s is None:
+                continue
+            nombre = (s.nombre or '').lower()
+            if 'descuento' in nombre:
+                continue  # la línea de ajuste no participa en la detección del pack
+            per = int(sd.get('cantidad_personas') or 1)
+            base = {
+                'id': s.id, 'nombre': s.nombre, 'precio': float(s.precio_base),
+                'fecha': sd.get('fecha'), 'hora': sd.get('hora'),
+                'tipo_servicio': s.tipo_servicio,
+            }
+            es_masaje = any(w in nombre for w in
+                            ('masaje', 'relajación', 'relajacion', 'descontracturante'))
+            if es_masaje and per > 1:
+                for _ in range(per):
+                    cart.append({**base, 'cantidad_personas': 1,
+                                 'subtotal': float(s.precio_base)})
+            else:
+                cart.append({**base, 'cantidad_personas': per,
+                             'subtotal': float(s.precio_base) * per})
+        try:
+            packs = PackDescuentoService.detectar_packs_aplicables(cart)
+            return int(sum(float(p.get('descuento') or 0) for p in packs))
+        except Exception:
+            return 0
+
+    @staticmethod
     def detectar_packs_aplicables(cart_items: List[Dict]) -> List[Dict]:
         """
         Detecta qué packs de descuento aplican para los items del carrito

@@ -256,25 +256,12 @@ def _tipos_desde_payload(servicios_data):
 
 
 def _descuento_pack_de_payload(servicios_data):
-    """Descuento del pack (CLP) para los servicios de la propuesta, con el MISMO motor que
-    usa crear_reserva (PackDescuentoService). Así la cotización muestra el precio final real."""
-    from ..models import Servicio
+    """Descuento del pack (CLP) para los servicios de la propuesta. Fuente única:
+    PackDescuentoService.descuento_para_servicios (arma el carrito como espera el motor —
+    masajes por persona— igual que la propuesta y la creación de la reserva)."""
     from ..services.pack_descuento_service import PackDescuentoService
-    cart = []
-    for sd in (servicios_data or []):
-        s = Servicio.objects.filter(id=sd.get('servicio_id')).first()
-        if s is None:
-            continue
-        personas = int(sd.get('cantidad_personas') or 1)
-        cart.append({
-            'id': s.id, 'nombre': s.nombre, 'precio': float(s.precio_base),
-            'fecha': sd.get('fecha'), 'hora': sd.get('hora'),
-            'cantidad_personas': personas, 'tipo_servicio': s.tipo_servicio,
-            'subtotal': float(s.precio_base) * personas,
-        })
     try:
-        packs = PackDescuentoService.detectar_packs_aplicables(cart)
-        return int(sum(float(p.get('descuento') or 0) for p in packs))
+        return PackDescuentoService.descuento_para_servicios(servicios_data)
     except Exception:  # noqa: BLE001 — sin descuento si el motor falla
         logger.exception('[cotización] no se pudo calcular el descuento de pack')
         return 0

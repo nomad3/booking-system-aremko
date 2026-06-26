@@ -152,28 +152,15 @@ def preparar_reserva(canal, external_id, payload, idempotency_key=None):
                     'subtotal': sub_prod,
                 })
 
-            # 3c. Descuento de pack (MISMO motor que crear_reserva) para que el total de la
-            # propuesta = el de la reserva final (banner y mensaje de Luna muestran el real).
-            # Solo si los servicios NO traen ya una línea de "descuento": el Ritual/Refugio la
-            # traen en el payload → NO se debe doble-descontar.
+            # 3c. Descuento de pack (fuente ÚNICA: PackDescuentoService.descuento_para_servicios,
+            # que arma el carrito como espera el motor —masajes por persona—). Así el total de la
+            # propuesta = el de la reserva final (banner y mensaje de Luna muestran el real). Solo si
+            # los servicios NO traen ya una línea de "descuento" (Ritual/Refugio la traen → no doble).
             descuento_pack = 0
             if not any('descuento' in (i['nombre'] or '').lower() for i in servicios_info):
                 from ventas.services.pack_descuento_service import PackDescuentoService
-                cart_pack = []
-                for srv in servicios_data:
-                    sobj = Servicio.objects.filter(id=srv['servicio_id']).first()
-                    if sobj is None:
-                        continue
-                    per = srv.get('cantidad_personas', 1)
-                    cart_pack.append({
-                        'id': sobj.id, 'nombre': sobj.nombre, 'precio': float(sobj.precio_base),
-                        'fecha': srv['fecha'], 'hora': srv['hora'], 'cantidad_personas': per,
-                        'tipo_servicio': sobj.tipo_servicio,
-                        'subtotal': float(sobj.precio_base) * per,
-                    })
                 try:
-                    packs_ap = PackDescuentoService.detectar_packs_aplicables(cart_pack)
-                    descuento_pack = int(sum(float(p.get('descuento') or 0) for p in packs_ap))
+                    descuento_pack = PackDescuentoService.descuento_para_servicios(servicios_data)
                 except Exception:  # noqa: BLE001 — sin descuento si el motor falla
                     logger.exception('[Luna] no se pudo calcular el descuento de pack en preparar_reserva')
                     descuento_pack = 0
