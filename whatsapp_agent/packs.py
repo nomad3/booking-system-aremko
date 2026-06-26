@@ -378,7 +378,8 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
                 'nota': 'no hay cabañas libres esa noche para 2 personas'}
 
     # Tina del día del alojamiento: la más tarde disponible >= 16:00 (con o sin hidromasaje).
-    tinas = disponibilidad(f, personas, 'tina').get('servicios', [])
+    # limite=None: el tope de 2 podía dejar fuera las tinas con slot >=16:00 (mismo bug del Ritual).
+    tinas = disponibilidad(f, personas, 'tina', limite=None).get('servicios', [])
     tina, tina_hora = elegir_tina_mas_tarde(tinas)
 
     opciones = []
@@ -577,13 +578,17 @@ def disponibilidad_ritual(fecha, preferir_premium=False):
         return {'fecha': f.isoformat(), 'disponible': False,
                 'nota': 'no hay cabañas libres esa noche para el ritual; ofrece otra fecha'}
 
-    tinas = disponibilidad(f, personas, 'tina').get('servicios', [])
+    # limite=None: ver TODAS las tinas libres. El tope de 2 (1 sin + 1 con hidromasaje,
+    # alfabético) dejaba fuera las que SÍ tienen slot >=16:00 (p.ej. Puntiagudo/Tronador) y
+    # podía elegir 2 cuyos únicos slots eran <16:00 → falso "no hay tina desde las 16:00".
+    tinas = disponibilidad(f, personas, 'tina', limite=None).get('servicios', [])
     tina, tina_hora, es_hidromasaje = _elegir_tina_ritual(tinas, preferir_hidromasaje=preferir_premium)
     if tina is None:
         return {'fecha': f.isoformat(), 'disponible': False,
                 'nota': 'no hay tina disponible desde las 16:00 esa noche; ofrece otra fecha'}
 
-    masajes = disponibilidad(f, personas, 'masaje').get('servicios', [])
+    # limite=None por la misma razón: el filtro >=16:00 del masaje debe ver todos los masajes.
+    masajes = disponibilidad(f, personas, 'masaje', limite=None).get('servicios', [])
     masaje, masaje_hora = _elegir_masaje_ritual(masajes)
     if masaje is None:
         return {'fecha': f.isoformat(), 'disponible': False,
@@ -752,7 +757,7 @@ def disponibilidad_refugio(fecha, preferir_premium=False):
         return {'fecha': f1.isoformat(), 'disponible': False,
                 'nota': 'no hay tina disponible la segunda noche; ofrece otra fecha'}
 
-    masajes = disponibilidad(f1, personas, 'masaje').get('servicios', [])
+    masajes = disponibilidad(f1, personas, 'masaje', limite=None).get('servicios', [])
     masaje, masaje_hora = _elegir_masaje_ritual(masajes)
     if masaje is None:
         return {'fecha': f1.isoformat(), 'disponible': False,
