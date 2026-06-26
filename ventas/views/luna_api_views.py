@@ -580,19 +580,9 @@ def validar_disponibilidad(request):
                 'mensaje': f'{len(errores_validacion)} servicio(s) con errores de validación'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Calcular descuentos aplicables usando PackDescuentoService
-        cart_items = []
-        for item in disponibilidad_items:
-            cart_items.append({
-                'id': item['servicio_id'],
-                'nombre': item['servicio_nombre'],
-                'precio': item['precio_estimado'],
-                'fecha': item['fecha'],
-                'hora': item['hora'],
-                'cantidad_personas': item['cantidad_personas'],
-                'tipo_servicio': item['servicio_tipo'],
-                'subtotal': item['precio_estimado']
-            })
+        # Calcular descuentos. Carrito vía construir_cart (masajes por persona) para que el motor
+        # detecte el pack tina+masaje (cuenta masajes por ítem, exige >=2).
+        cart_items = PackDescuentoService.construir_cart(disponibilidad_items)
 
         # Calcular descuentos
         packs_aplicables = []
@@ -1094,8 +1084,10 @@ def agregar_servicios_reserva(request, reserva_id):
                     'subtotal': float(rs.calcular_precio())
                 })
 
-            # Calcular nuevo total con descuentos
-            packs_aplicables = PackDescuentoService.detectar_packs_aplicables(todos_servicios)
+            # Calcular nuevo total con descuentos. El descuento se detecta con el carrito armado
+            # por construir_cart (masajes por persona); el subtotal usa los precios congelados.
+            packs_aplicables = PackDescuentoService.detectar_packs_aplicables(
+                PackDescuentoService.construir_cart(todos_servicios))
             total_descuentos = sum(pack_info['descuento'] for pack_info in packs_aplicables)
 
             # Calcular subtotal de todos los servicios
