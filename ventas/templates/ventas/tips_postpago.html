@@ -157,12 +157,13 @@
         </div>
 
         <p style="color: #666; margin-bottom: 15px;">
-            <strong>Instrucciones:</strong> Revisa y edita el texto si es necesario, luego cópialo para enviarlo por WhatsApp o email al cliente después del pago.
+            <strong>Instrucciones:</strong> Revisa y edita el texto si es necesario, luego cópialo para enviarlo por WhatsApp, Instagram o Messenger al cliente después del pago.
+            Instagram y Messenger rechazan mensajes de más de {{ limite_instagram }} caracteres.
         </p>
 
         <textarea id="textoTips" rows="30">{{ texto_tips }}</textarea>
 
-        <div id="contadorChars" style="margin-top: 6px; font-size: 13px; font-weight: 600;"></div>
+        <div id="contadorChars" style="margin-top: 8px; font-size: 13px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center;"></div>
 
         <div id="successMessage" class="success-message">
             ✓ Texto copiado al portapapeles
@@ -210,19 +211,25 @@
             }, 3000);
         }
 
-        // Contador de caracteres con aviso del límite de WhatsApp (4096).
-        const LIMITE_WA = 4096;
+        // Contador de caracteres con semáforo por canal (Instagram/Messenger ≤2000, WhatsApp ≤4096).
+        const LIMITES = [
+            { nombre: 'Instagram', max: {{ limite_instagram }} },
+            { nombre: 'Messenger', max: {{ limite_messenger }} },
+            { nombre: 'WhatsApp',  max: {{ limite_whatsapp }} },
+        ];
+        function badge(nombre, n, max) {
+            const cabe = n <= max;
+            const color = cabe ? '#2e7d32' : '#c62828';
+            const icono = cabe ? '✓' : '⚠️';
+            const detalle = cabe ? `${n}/${max}` : `${n}/${max} (+${n - max})`;
+            return `<span style="color:${color}; font-weight:600;">${icono} ${nombre}: ${detalle}</span>`;
+        }
         function actualizarContador() {
             const ta = document.getElementById('textoTips');
             const cont = document.getElementById('contadorChars');
             const n = ta.value.length;
-            if (n > LIMITE_WA) {
-                cont.style.color = '#c62828';
-                cont.textContent = `⚠️ ${n} / ${LIMITE_WA} caracteres — se pasa del límite de WhatsApp (${n - LIMITE_WA} de más). Recorta antes de enviar o envíalo en 2 mensajes.`;
-            } else {
-                cont.style.color = '#2e7d32';
-                cont.textContent = `✓ ${n} / ${LIMITE_WA} caracteres — cabe en un mensaje de WhatsApp.`;
-            }
+            cont.innerHTML = `<span style="color:#555;">${n} caracteres</span>` +
+                LIMITES.map(l => badge(l.nombre, n, l.max)).join('');
         }
         document.getElementById('textoTips').addEventListener('input', actualizarContador);
         actualizarContador();
