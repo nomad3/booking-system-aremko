@@ -115,7 +115,7 @@ def ficha_reserva_cliente(request, token):
         logger.exception('[ficha] no se pudieron generar los tips de la reserva %s', venta.id)
         tips_texto = ''
 
-    tipos_venta = set(
+    tipos_venta = list(
         venta.reservaservicios.select_related('servicio')
         .values_list('servicio__tipo_servicio', flat=True))
     context = {
@@ -237,22 +237,30 @@ def _lineas_desde_payload(servicios_data):
 
 
 def _experiencia_nombre(tipos):
-    """Nombre de la EXPERIENCIA según los tipos de servicio, para que el cliente vea una
-    experiencia identificable y no 'dos servicios'. Por ahora: tina + masaje = 'Pausa junto
-    al río' (pack de ciudad). Devuelve None si no calza un pack con nombre."""
-    principales = set(tipos) & {'tina', 'masaje', 'cabana'}
-    if principales == {'tina', 'masaje'}:
+    """Nombre de la EXPERIENCIA según los tipos de servicio (lista, con duplicados), para que el
+    cliente vea una experiencia identificable y no 'servicios sueltos':
+    - tina + masaje (sin cabaña)            → 'Pausa junto al río'
+    - cabaña + tina + masaje, 1 noche       → 'Ritual del Río'
+    - cabaña + tina + masaje, 2+ noches     → 'Refugio Aremko'
+    Devuelve None si no calza un producto con nombre."""
+    tipos = list(tipos)
+    presentes = set(tipos) & {'tina', 'masaje', 'cabana'}
+    if presentes == {'tina', 'masaje'}:
         return 'Pausa junto al río'
+    if presentes == {'cabana', 'tina', 'masaje'}:
+        noches_cabana = sum(1 for t in tipos if t == 'cabana')
+        return 'Refugio Aremko' if noches_cabana >= 2 else 'Ritual del Río'
     return None
 
 
 def _tipos_desde_payload(servicios_data):
-    """Set de tipo_servicio de los servicios del payload (para nombrar la experiencia)."""
+    """Lista de tipo_servicio de los servicios del payload (con duplicados, p.ej. cabaña 2 veces
+    en el Refugio → para distinguir Ritual de Refugio)."""
     from ..models import Servicio
     ids = [sd.get('servicio_id') for sd in (servicios_data or []) if sd.get('servicio_id')]
-    return set(
-        Servicio.objects.filter(id__in=ids).values_list('tipo_servicio', flat=True)
-    )
+    tipo_por_id = dict(Servicio.objects.filter(id__in=ids).values_list('id', 'tipo_servicio'))
+    return [tipo_por_id[sd['servicio_id']] for sd in (servicios_data or [])
+            if sd.get('servicio_id') in tipo_por_id]
 
 
 def _descuento_pack_de_payload(servicios_data):
