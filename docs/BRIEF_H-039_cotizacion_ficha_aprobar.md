@@ -60,13 +60,23 @@ aprobar, la reserva se crea **automáticamente** y el cliente pasa a su Ficha.
    esto esté en prod (queda obsoleto).
 
 ### B. aremko-cli (agente aremko-cli)
-1. El cajón muestra, cuando hay una `PropuestaReserva` lista, un **borrador con el link de
-   cotización** para que Deborah lo revise y envíe (hoy muestra el banner "Crear reserva").
+> Lado Django de la cotización + Aprobar YA está en prod y validado (oferta→propuesta→cotización→
+> Aprobar→Ficha, con descuento de pack consistente en los 4). Falta el lado del cajón:
+1. El cajón muestra, cuando hay una `PropuestaReserva` lista (estado `pendiente`), un **borrador
+   con el link de cotización** para que Deborah lo revise y envíe (hoy muestra el banner "Crear
+   reserva"). El link se obtiene con `ventas.views.ficha_reserva_view.url_cotizacion(propuesta_id)`
+   → `https://www.aremko.cl/ventas/propuesta/<token-firmado>/` (token = `signing.dumps(propuesta_id)`,
+   no adivinable). Interino: hay link clickeable en el admin de `PropuestaReserva` ("🌙 Cotización").
 2. Tras el Aprobar del cliente (la reserva ya se creó sola), el banner pasa a **"Revisar y enviar
-   Ficha"** (mostrar resumen de la reserva creada + botón para enviar el link de la Ficha). Esto
-   es la Fase 2 del proyecto (link de Ficha al cajón).
-3. Cosmético: la línea de descuento en el banner muestra `Descuento_Servicios · 30000p` →
-   mostrarla limpia ("Descuento · −$30.000").
+   Ficha"** (mostrar resumen de la reserva creada + botón para enviar el link de la Ficha). El link
+   de la Ficha: `url_ficha_reserva(reserva_id)` → `.../ventas/reserva/<token>/`. Esto es la Fase 2
+   del proyecto (link de Ficha al cajón).
+3. **Línea de descuento en el banner:** ahora `preparar_reserva` deja el total de la propuesta YA
+   con el descuento del pack (ej. tina+masaje queda en $110.000, no $130.000) y agrega al
+   `propuesta.resumen_texto` una línea `Descuento pack = -$X`. El banner muestra el TOTAL correcto
+   pero las líneas estructuradas (tina + masaje) suman el bruto → conviene mostrar la **línea de
+   descuento explícita** (leer `resumen_texto` o exponer el descuento) para que cuadre. (Y el caso
+   Ritual: la línea cruda `Descuento_Servicios · 30000p` → mostrarla limpia "Descuento · −$30.000".)
 
 ## Reuso confirmado (no reinventar)
 - `crear_reserva` ya es **idempotente** y consume `propuesta_id` → `PropuestaReserva` tiene
@@ -75,5 +85,10 @@ aprobar, la reserva se crea **automáticamente** y el cliente pasa a su Ficha.
 - `token_para_reserva` / patrón `signing` ya en `ficha_reserva_view.py`.
 
 ## Estado
-- **Django**: 🟧 EN PROGRESO (este brief; arrancar por A1 refactor + A2/A3 página+Aprobar).
-- **aremko-cli**: ⬜ PENDIENTE (B1–B3), depende de A para los links.
+- **Django**: ✅ HECHO y validado en prod — cotización `propuesta/<token>/` + Aprobar (reusa
+  `crear_reserva`), descuento de pack consistente (propuesta/cotización/reserva, vía
+  `PackDescuentoService.construir_cart`), "Pausa junto al río", #3 (no filtra `propuesta_id` ni
+  "confirmada"). Pendiente menor Django: pregunta de consentimiento en prompt de Luna ("¿te envío
+  la cotización?") + retirar el cotizador de texto viejo (`cotizacion_reserva_view`).
+- **aremko-cli**: ⬜ PENDIENTE (B1–B3) — cajón con link de cotización + banner "Revisar y enviar
+  Ficha" + línea de descuento explícita.
