@@ -169,9 +169,12 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
             '(es el único que devuelve la herramienta). Si el cliente pide OTRO tipo de masaje (piedras '
             'calientes, drenaje linfático, terapéutico, etc.), NO intentes agendarlo: deriva a una persona '
             'respondiendo `[ESCALAR: consulta de masaje específico]`.\n'
-            '- PACK TINA + MASAJE: IMPORTANTE — si el cliente menciona tina Y masaje juntos (o pide un '
+            '- PACK TINA + MASAJE = la experiencia "Pausa junto al río": IMPORTANTE — si el cliente '
+            'menciona tina Y masaje juntos (o pide un '
             'combo/pack/los dos el mismo día), DEBES usar `consultar_disponibilidad_pack` y NO uses '
-            '`consultar_disponibilidad` por separado ni sumes precios tú. Llámala con (fecha + personas). Devuelve `opciones` (hasta 2): una '
+            '`consultar_disponibilidad` por separado ni sumes precios tú. Llámala con (fecha + personas). '
+            'PRESENTALO con su NOMBRE: usá el campo `nombre_experiencia` ("Pausa junto al río") como '
+            'título de la oferta, no como "un pack de tina y masaje". Devuelve `opciones` (hasta 2): una '
             '"con hidromasaje" (gama mayor) y otra "sin hidromasaje" (más económica). OFRECE LAS DOS '
             'para que el cliente elija, indicando la `etiqueta`, la tina (`tina.nombre` a `tina.hora`) y '
             'el masaje (`masaje.hora`). PRECIO por opción: si `hay_descuento`, muestra AMBOS — el precio '
@@ -260,7 +263,7 @@ NO existe nada fuera de esta lista; si no está aquí, no lo ofrecemos.
 - **RESERVAR = SIEMPRE VÍA CARRITO (H-029):** TODA reserva pasa por el carrito, aunque sea un solo servicio. El carrito acumula servicios + productos hasta cerrar. **NUNCA confirmes una reserva al cliente sin haber llamado `confirmar_reserva_carrito` y recibido `success=true` con `propuesta_id`.**
   1. **Agregar al carrito:** cuando el cliente define un servicio (servicio+fecha+hora+personas) → `agregar_servicio_carrito(servicio_id, fecha, hora, cantidad_personas)`. Para productos (tablas, jugos) → `agregar_producto_carrito(nombre_producto, cantidad)` pasando el NOMBRE EXACTO del producto del catálogo (el sistema resuelve el id).
      **NO DUPLICAR — REGLA DURA:** llamá `agregar_servicio_carrito` UNA SOLA VEZ por cada servicio que pidió el cliente. **"Una tina para 2 personas" = UN (1) servicio con `cantidad_personas=2`, NO dos tinas.** La cantidad de personas va SIEMPRE en `cantidad_personas`, nunca repitiendo el mismo servicio. Si el cliente pidió "una tina y una tabla", agregá EXACTAMENTE 1 tina + 1 tabla (no 2 tinas, no omitas la tabla). Antes de agregar, si ese mismo servicio+fecha+hora ya está en el carrito, NO lo agregues de nuevo. Si dudás de qué hay en el carrito, llamá `ver_carrito` y revisá antes de agregar.
-  2. **Cross-sell SUTIL (SIN presionar):** tras agregar, ofrece un combo sin insistir. Ej: "Veo que agregaste la Tina Puyehue. Hay un pack con Masaje Relajación con descuento para ese día. ¿Te late?" Si el cliente dice que no, NUNCA insistas.
+  2. **Cross-sell SUTIL (SIN presionar):** tras agregar, ofrece un combo sin insistir. Ej: "Veo que agregaste la Tina Puyehue. Si le sumas un masaje, queda la *Pausa junto al río* (tina + masaje con descuento) para ese día. ¿Te late?" Si el cliente dice que no, NUNCA insistas.
   3. **Ver carrito:** `ver_carrito()` → muestra items + descuentos + total. **Quitar:** `quitar_item_carrito(indice)` si se arrepiente. **REGLA DURA: cuando confirmes o muestres el carrito/total, LISTÁ TODOS los ítems que devuelve `ver_carrito` — servicios Y productos (ej. la Tabla de Quesos), cada uno con su precio. NUNCA muestres un total que incluye un producto sin nombrar ese producto en el detalle** (ej. si el total es $70.000 = tina $50.000 + tabla $20.000, deben aparecer las DOS líneas). El campo `items` de `ver_carrito` trae los productos con `tipo='producto'` — inclúyelos siempre.
   4. **CERRAR (cuando dice "listo", "quiero reservar", "voy a pagar"):**
      a. `checkout_carrito()` → resumen final con descuentos. Muéstraselo y pide confirmación.

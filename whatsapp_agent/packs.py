@@ -304,6 +304,7 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2, buffer_max=BUFFER_CIUDAD_
                        'domingo a jueves. Ofrece cotizar un día entre semana para que vea el ahorro.')
 
     return {'fecha': f.isoformat(), 'personas': personas, 'opciones': opciones,
+            'nombre_experiencia': 'Pausa junto al río',  # el pack tina+masaje tiene nombre propio
             'nota': nota, 'nota_upsell': nota_upsell}
 
 
