@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Reserva {{ numero }} · Aremko</title>
+  <style>
+    :root{
+      --bg:#F2E8D8; --surface:#FFFDF9; --ink:#2E2A24; --muted:#7C736A; --hint:#A99F90;
+      --line:#EADFCD; --line2:#DBCDB4; --brand:#BC5630;
+      --pen-bg:#F6E6C6; --pen-fg:#8A5A12;
+      --par-bg:#DEE6EF; --par-fg:#2C597F;
+      --pag-bg:#E2EAD6; --pag-fg:#436327;
+      --can-bg:#F2DAD7; --can-fg:#9A3B2E;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+      line-height:1.5;padding:16px}
+    .wrap{max-width:440px;margin:0 auto}
+    .card{background:var(--surface);border:0.5px solid var(--line2);border-radius:18px;overflow:hidden}
+    .hd{padding:16px 18px;border-bottom:0.5px solid var(--line)}
+    .brand{color:var(--brand);font-size:18px;font-weight:600}
+    .brand-sub{color:var(--hint);font-size:12px}
+    .bd{padding:16px 18px}
+    .topline{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .resv{font-size:17px;font-weight:600}
+    .badge{font-size:12px;font-weight:600;padding:4px 11px;border-radius:999px;white-space:nowrap}
+    .b-pen{background:var(--pen-bg);color:var(--pen-fg)}
+    .b-par{background:var(--par-bg);color:var(--par-fg)}
+    .b-pag{background:var(--pag-bg);color:var(--pag-fg)}
+    .b-can{background:var(--can-bg);color:var(--can-fg)}
+    .saldo{color:var(--muted);font-size:13px;margin-top:4px}
+    details{border:0.5px solid var(--line);border-radius:14px;margin-top:12px;background:var(--surface);overflow:hidden}
+    summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:14px}
+    summary::-webkit-details-marker{display:none}
+    .ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+    .i-srv{background:var(--par-bg);color:var(--par-fg)}
+    .i-tip{background:var(--pen-bg);color:var(--pen-fg)}
+    .i-com{background:var(--pag-bg);color:var(--pag-fg)}
+    .s-tt{font-size:15px;font-weight:600}
+    .s-sub{font-size:12px;color:var(--hint)}
+    .chev{margin-left:auto;color:var(--hint);transition:transform .2s}
+    details[open] .chev{transform:rotate(180deg)}
+    .acc-bd{padding:0 16px 16px 16px}
+    .row{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:6px 0;border-top:0.5px solid var(--line)}
+    .row:first-child{border-top:none}
+    .row .sub{color:var(--hint);font-size:12px}
+    .row.desc{color:var(--pag-fg)}
+    .totes{display:flex;justify-content:space-between;font-weight:600;font-size:15px;padding-top:10px;margin-top:6px;border-top:0.5px solid var(--line2)}
+    .saldo-row{display:flex;justify-content:space-between;font-size:14px;padding-top:6px}
+    .tips{white-space:pre-wrap;font-size:13.5px;color:var(--ink);margin:0}
+    .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+      text-decoration:none;font-size:15px;font-weight:600;padding:14px;border-radius:10px;
+      background:var(--brand);color:#fff;border:none;cursor:pointer}
+    .com-note{font-size:12px;color:var(--hint);text-align:center;margin-top:8px}
+    .com-lock{background:var(--bg);border:0.5px dashed var(--line2);border-radius:10px;
+      padding:14px;text-align:center;color:var(--muted);font-size:13.5px}
+    .foot{text-align:center;color:var(--hint);font-size:12px;margin-top:16px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="hd">
+        <div class="brand">Aremko</div>
+        <div class="brand-sub">Spa boutique · aguas calientes junto al río</div>
+      </div>
+      <div class="bd">
+        <div class="topline">
+          <div class="resv">Reserva {{ numero }}</div>
+          <span class="badge b-{{ estado_cls }}">{{ estado_label }}</span>
+        </div>
+        {% if saldo > 0 %}
+          <div class="saldo">Saldo a pagar: {{ saldo_str }} · abonado {{ pagado_str }}</div>
+        {% else %}
+          <div class="saldo">Saldo $0</div>
+        {% endif %}
+
+        <details open>
+          <summary>
+            <span class="ic i-srv">🧖</span>
+            <span><span class="s-tt">Servicios contratados</span><br><span class="s-sub">Todo lo que incluye tu reserva</span></span>
+            <span class="chev">▾</span>
+          </summary>
+          <div class="acc-bd">
+            {% for l in lineas %}
+              <div class="row {% if l.es_descuento %}desc{% endif %}">
+                <span>{{ l.nombre }}{% if l.fecha %} <span class="sub">· {{ l.fecha|date:"d/m" }}{% if l.hora %} {{ l.hora }}{% endif %}</span>{% elif l.es_producto %} <span class="sub">· x{{ l.cantidad }}</span>{% endif %}</span>
+                <span>{{ l.monto_str }}</span>
+              </div>
+            {% empty %}
+              <div class="row">Sin servicios cargados aún.</div>
+            {% endfor %}
+            <div class="totes"><span>Total</span><span>{{ total_str }}</span></div>
+            {% if saldo > 0 %}<div class="saldo-row"><span>Saldo a pagar</span><span>{{ saldo_str }}</span></div>{% endif %}
+          </div>
+        </details>
+
+        <details>
+          <summary>
+            <span class="ic i-tip">📋</span>
+            <span><span class="s-tt">Tips</span><br><span class="s-sub">Wifi, cómo llegar, normas y check-out</span></span>
+            <span class="chev">▾</span>
+          </summary>
+          <div class="acc-bd">
+            {% if tips_texto %}<p class="tips">{{ tips_texto }}</p>{% else %}<p class="tips">Pronto verás aquí la información de tu visita.</p>{% endif %}
+          </div>
+        </details>
+
+        <details>
+          <summary>
+            <span class="ic i-com">🛎️</span>
+            <span><span class="s-tt">Comanda digital</span><br><span class="s-sub">Pide tablas, jugos y más desde tu tina o cabaña</span></span>
+            <span class="chev">▾</span>
+          </summary>
+          <div class="acc-bd">
+            {% if comanda_bloqueada %}
+              <div class="com-lock">Tu visita ya finalizó (checkout). La comanda está cerrada.</div>
+            {% else %}
+              <p style="font-size:13.5px;color:var(--muted);margin:0 0 12px">Haz tus pedidos sin moverte. Se suman a tu cuenta y pagas en el checkout.</p>
+              <a class="btn" href="{{ comanda_url }}">Abrir comanda</a>
+              <div class="com-note">Disponible hasta tu check-out</div>
+            {% endif %}
+          </div>
+        </details>
+
+      </div>
+    </div>
+    <div class="foot">Aremko Spa · Puerto Varas</div>
+  </div>
+</body>
+</html>

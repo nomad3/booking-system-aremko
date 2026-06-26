@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, cotizacion_reserva_view, cotizacion_view, eliminar_reservas_no_pagadas_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple, inventario_view, agenda_operativa_view, luna_api_views, agenda_masajes_view, ficha_masajista_view
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, cotizacion_reserva_view, cotizacion_view, eliminar_reservas_no_pagadas_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple, inventario_view, agenda_operativa_view, luna_api_views, agenda_masajes_view, ficha_masajista_view, ficha_reserva_view
 )
 from . import api # Keep api module import as is
 from . import views_comandas_cliente # Import comandas de clientes views
@@ -167,6 +167,10 @@ urlpatterns = [
     path('api/comanda/<str:token>/checkout/', views_comandas_cliente.comanda_cliente_finalizar, name='comanda_cliente_finalizar_api'),
     path('api/comanda/<str:token>/status/<int:pedido_id>/', views_comandas_cliente.comanda_cliente_status, name='comanda_cliente_status_api'),
     path('api/comanda/<str:token>/confirm/', views_comandas_cliente.comanda_cliente_pago_confirmacion, name='comanda_cliente_pago_confirmacion_api'),
+
+    # Ficha de Reserva del cliente (Reserva-cliente-digital) — token firmado, solo lectura
+    path('reserva/<str:token>/', ficha_reserva_view.ficha_reserva_cliente, name='ficha_reserva_cliente'),
+    path('reserva/<str:token>/comanda/', ficha_reserva_view.ficha_comanda, name='ficha_reserva_comanda'),
     path('api/comanda/<str:token>/return/', views_comandas_cliente.comanda_cliente_pago_retorno, name='comanda_cliente_pago_retorno_api'),
 
     # --- Remarketing/Automation API URLs ---

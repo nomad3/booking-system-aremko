@@ -473,6 +473,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         'productos_y_cantidades', 'total_servicios',
         'total_productos', 'total', 'pagado', 'saldo_pendiente',
         'generar_cotizacion_link', 'generar_resumen_link', 'generar_tips_link',
+        'ficha_cliente_link',
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
@@ -826,6 +827,16 @@ class VentaReservaAdmin(admin.ModelAdmin):
         url = reverse('ventas:generar_tips_postpago', args=[obj.id])
         return format_html('<a class="button" href="{}" target="_blank">💡 Tips</a>', url)
     generar_tips_link.short_description = 'Tips'
+
+    def ficha_cliente_link(self, obj):
+        """Link a la Ficha de Reserva del cliente (Reserva-cliente-digital), token firmado."""
+        from django.utils.html import format_html
+        from ventas.views.ficha_reserva_view import url_ficha_reserva
+        if not obj or not obj.pk:
+            return '-'
+        url = url_ficha_reserva(obj.pk)
+        return format_html('<a class="button" href="{}" target="_blank">🌙 Ficha</a>', url)
+    ficha_cliente_link.short_description = 'Ficha cliente'
 
     def agregar_comanda_button(self, obj):
         """Botón para agregar comanda — abre el mismo menú que usa el cliente."""
