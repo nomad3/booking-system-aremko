@@ -75,12 +75,15 @@ def _lineas_servicios(venta):
         cant = rs.cantidad_personas or 1
         subtotal = int(precio) * cant
         nombre = rs.servicio.nombre
+        es_descuento = subtotal < 0 or 'descuento' in (nombre or '').lower()
         lineas.append({
-            'nombre': nombre,
-            'fecha': rs.fecha_agendamiento,
-            'hora': rs.hora_inicio,
+            # La línea de ajuste se muestra limpia ("Descuento"), sin el nombre crudo
+            # ("Descuento_Servicios") ni su fecha/hora de relleno.
+            'nombre': 'Descuento' if es_descuento else nombre,
+            'fecha': None if es_descuento else rs.fecha_agendamiento,
+            'hora': None if es_descuento else rs.hora_inicio,
             'monto_str': _clp(subtotal),
-            'es_descuento': subtotal < 0 or 'descuento' in (nombre or '').lower(),
+            'es_descuento': es_descuento,
         })
     for rp in venta.reservaproductos.select_related('producto').all():
         precio = rp.precio_unitario_venta if rp.precio_unitario_venta is not None else (rp.producto.precio_base or 0)
