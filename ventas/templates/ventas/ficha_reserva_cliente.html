@@ -81,7 +81,7 @@
           <div class="topline">
             <div class="resv">Tu cotización</div>
           </div>
-          <div class="saldo">{% if cliente_nombre %}{{ cliente_nombre }}, esta{% else %}Esta{% endif %} es la propuesta de tu Ritual junto al río.</div>
+          <div class="saldo">{% if cliente_nombre %}{{ cliente_nombre }}, esta{% else %}Esta{% endif %} es la propuesta para tu visita a Aremko.</div>
         {% else %}
           <div class="topline">
             <div class="resv">Reserva {{ numero }}</div>
@@ -101,7 +101,7 @@
         <details open>
           <summary>
             <span class="ic i-srv">🧖</span>
-            <span><span class="s-tt">{% if es_cotizacion %}Servicios{% else %}Servicios contratados{% endif %}</span><br><span class="s-sub">Todo lo que incluye tu Ritual</span></span>
+            <span><span class="s-tt">{% if es_cotizacion %}Servicios{% else %}Servicios contratados{% endif %}</span><br><span class="s-sub">{% if es_cotizacion %}Lo que incluye tu propuesta{% else %}Todo lo que incluye tu reserva{% endif %}</span></span>
             <span class="chev">▾</span>
           </summary>
           <div class="acc-bd">

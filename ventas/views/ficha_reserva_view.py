@@ -226,9 +226,52 @@ def _lineas_desde_payload(servicios_data):
             'fecha': fecha,
             'hora': None if es_descuento else sd.get('hora'),
             'monto_str': _clp(subtotal),
+            'subtotal_num': subtotal,
             'es_descuento': es_descuento,
         })
     return lineas
+
+
+def _descuento_pack_de_payload(servicios_data):
+    """Descuento del pack (CLP) para los servicios de la propuesta, con el MISMO motor que
+    usa crear_reserva (PackDescuentoService). Así la cotización muestra el precio final real."""
+    from ..models import Servicio
+    from ..services.pack_descuento_service import PackDescuentoService
+    cart = []
+    for sd in (servicios_data or []):
+        s = Servicio.objects.filter(id=sd.get('servicio_id')).first()
+        if s is None:
+            continue
+        personas = int(sd.get('cantidad_personas') or 1)
+        cart.append({
+            'id': s.id, 'nombre': s.nombre, 'precio': float(s.precio_base),
+            'fecha': sd.get('fecha'), 'hora': sd.get('hora'),
+            'cantidad_personas': personas, 'tipo_servicio': s.tipo_servicio,
+            'subtotal': float(s.precio_base) * personas,
+        })
+    try:
+        packs = PackDescuentoService.detectar_packs_aplicables(cart)
+        return int(sum(float(p.get('descuento') or 0) for p in packs))
+    except Exception:  # noqa: BLE001 — sin descuento si el motor falla
+        logger.exception('[cotización] no se pudo calcular el descuento de pack')
+        return 0
+
+
+def _cotizacion_lineas_total(propuesta):
+    """Líneas + total de la cotización. Si los servicios NO traen ya una línea de descuento
+    (caso pack de ciudad), aplica el descuento del pack para que el total = el de la reserva
+    final. El Ritual/Refugio ya traen su línea de descuento en el payload → no se duplica."""
+    servicios_data = (propuesta.payload or {}).get('servicios', [])
+    lineas = _lineas_desde_payload(servicios_data)
+    if not any(l['es_descuento'] for l in lineas):
+        descuento = _descuento_pack_de_payload(servicios_data)
+        if descuento > 0:
+            lineas.append({
+                'nombre': 'Descuento', 'fecha': None, 'hora': None,
+                'monto_str': _clp(-descuento), 'subtotal_num': -descuento, 'es_descuento': True,
+            })
+    total = sum(l.get('subtotal_num', 0) for l in lineas)
+    return lineas, _clp(total)
 
 
 def cotizacion_cliente(request, token):
@@ -243,11 +286,12 @@ def cotizacion_cliente(request, token):
 
     payload = propuesta.payload or {}
     cliente_data = payload.get('cliente', {}) or {}
+    lineas, total_str = _cotizacion_lineas_total(propuesta)
     context = {
         'es_cotizacion': True,
         'cliente_nombre': (cliente_data.get('nombre') or '').split(' ')[0],
-        'lineas': _lineas_desde_payload(payload.get('servicios', [])),
-        'total_str': _clp(propuesta.total),
+        'lineas': lineas,
+        'total_str': total_str,
         'vigente': propuesta.esta_vigente(),
         'aprobar_url': reverse('ventas:aprobar_cotizacion', kwargs={'token': token}),
     }
@@ -293,10 +337,11 @@ def aprobar_cotizacion(request, token):
 
     logger.error('[cotización] Aprobar falló para propuesta %s: %s',
                  propuesta.propuesta_id[:8], data.get('mensaje'))
+    lineas, total_str = _cotizacion_lineas_total(propuesta)
     return render(request, 'ventas/ficha_reserva_cliente.html', {
         'es_cotizacion': True,
         'error_aprobar': data.get('mensaje') or 'No se pudo crear la reserva. Te contactamos a la brevedad.',
-        'lineas': _lineas_desde_payload((propuesta.payload or {}).get('servicios', [])),
-        'total_str': _clp(propuesta.total),
+        'lineas': lineas,
+        'total_str': total_str,
         'aprobar_url': aprobar_url,
     }, status=400)
