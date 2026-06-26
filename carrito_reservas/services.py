@@ -61,7 +61,39 @@ class CarritoService:
                     'mensaje': f'{servicio.nombre} no está disponible'
                 }
 
-            # Crear item
+            precio_unitario = float(servicio.precio_base)
+            subtotal = precio_unitario * cantidad_personas
+
+            # DEDUP EN CÓDIGO: un mismo servicio en el mismo (fecha, hora) es UNA línea.
+            # El LLM a veces repite agregar_servicio (la regla anti-duplicado del prompt es
+            # probabilística → así se infló a $500k con tinas/masajes repetidos). Acá se fuerza:
+            # si ya existe esa combinación, se ACTUALIZA la cantidad/subtotal en vez de duplicar.
+            existente = next(
+                (it for it in carrito.items
+                 if it.get('tipo') == 'servicio'
+                 and it.get('servicio_id') == servicio.id
+                 and it.get('fecha') == fecha
+                 and it.get('hora') == hora),
+                None,
+            )
+            if existente is not None:
+                existente['cantidad_personas'] = cantidad_personas
+                existente['precio_unitario'] = precio_unitario
+                existente['subtotal'] = subtotal
+                carrito.save(update_fields=['items', 'updated_at'])
+                CarritoService._recalcular_totales(carrito)
+                logger.info(
+                    f'[Carrito] Servicio {servicio.nombre} ya estaba ({fecha} {hora}); '
+                    f'actualizado (NO duplicado) en {canal}:{external_id} (total: ${carrito.total})'
+                )
+                return {
+                    'success': True,
+                    'carrito': carrito,
+                    'error': None,
+                    'mensaje': f'✅ {servicio.nombre} actualizado en el carrito'
+                }
+
+            # Crear item (no existía esa combinación servicio+fecha+hora)
             item = {
                 'tipo': 'servicio',
                 'servicio_id': servicio.id,
@@ -69,8 +101,8 @@ class CarritoService:
                 'fecha': fecha,
                 'hora': hora,
                 'cantidad_personas': cantidad_personas,
-                'precio_unitario': float(servicio.precio_base),
-                'subtotal': float(servicio.precio_base) * cantidad_personas,
+                'precio_unitario': precio_unitario,
+                'subtotal': subtotal,
             }
 
             # Agregar al carrito
