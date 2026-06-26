@@ -439,8 +439,16 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
 RITUAL_PRECIO_PLANO = 240000          # precio normal (viernes y sábado)
 RITUAL_PRECIO_DOMJUE = 210000         # precio promocional domingo a jueves
 RITUAL_DIAS_DOMJUE = (0, 1, 3, 4)     # 0=Dom..6=Sáb (esquema PackDescuento); Mar(2) cerrado, Vie/Sáb normal
-RITUAL_MASAJE_PISO_MIN = 16 * 60      # masaje a partir de las 16:00 (check-in cabañas)
 RITUAL_DESCUENTO_PREMIUM = 10000      # descuento por cada componente premium (Torre / tina hidromasaje)
+
+# Horarios de masaje RESERVADOS al Programa Ritual/Refugio (Jorge, 2026-06-26). El masaje de
+# estos programas SOLO puede caer en uno de estos 4 horarios; el resto de los slots del Masaje
+# queda libre para el arriendo de ciudad (tina+masaje). La "hora río" (15:30) es la ancla por
+# defecto: es ANTES del check-in (16:00) a propósito —el cliente llega un poco antes, se hace el
+# masaje y luego se instala en la cabaña.
+PROGRAMA_MASAJE_SLOTS = ('15:30', '18:00', '20:30', '21:45')
+PROGRAMA_MASAJE_SLOTS_MIN = frozenset({15 * 60 + 30, 18 * 60, 20 * 60 + 30, 21 * 60 + 45})
+RITUAL_MASAJE_HORA_RIO_MIN = 15 * 60 + 30   # 15:30 — ancla cuando no hay otro masaje al que pegarse
 
 
 def _precio_objetivo_ritual(f):
@@ -518,14 +526,36 @@ def _elegir_cabana_ritual(cabanas, preferir_torre=False):
     return None, False
 
 
-def _elegir_masaje_ritual(masajes):
-    """Devuelve (masaje, hora) de un masaje para 2 con slot a partir de las 16:00."""
-    from .availability import _hhmm_min
+def _masajes_agendados_min(f):
+    """Horas (en minutos) de los masajes ya agendados ese día (no cancelados), para compactar
+    la jornada de la masajista (clustering)."""
+    from ventas.models import ReservaServicio
+    horas = (ReservaServicio.objects
+             .filter(servicio__tipo_servicio='masaje', fecha_agendamiento=f)
+             .exclude(venta_reserva__estado_pago='cancelado')
+             .values_list('hora_inicio', flat=True))
+    return [m for m in (hhmm_a_min(h) for h in horas) if m is not None]
+
+
+def _elegir_masaje_ritual(masajes, f):
+    """Devuelve (masaje, hora) del masaje del Programa Ritual/Refugio.
+
+    El masaje SOLO puede caer en uno de los horarios del programa (PROGRAMA_MASAJE_SLOTS) que
+    esté LIBRE ese día. Entre los libres elige por proximidad a un masaje ya agendado (clustering,
+    para compactar a la masajista); si no hay ninguno agendado, ancla a la "hora río" (15:30).
+    Manda el programa: nunca sale de esos 4 horarios. Devuelve (None, None) si ninguno está libre.
+    """
+    agendados = _masajes_agendados_min(f)
     for m in masajes:
-        slots = [s for s in (m.get('slots_libres') or [])
-                 if (_hhmm_min(s) or 0) >= RITUAL_MASAJE_PISO_MIN]
-        if slots:
-            return m, sorted(slots, key=lambda s: _hhmm_min(s) or 0)[0]
+        libres = sorted({hhmm_a_min(s) for s in (m.get('slots_libres') or [])
+                         if hhmm_a_min(s) in PROGRAMA_MASAJE_SLOTS_MIN})
+        if not libres:
+            continue
+        if agendados:
+            elegido = min(libres, key=lambda c: min(abs(c - x) for x in agendados))
+        else:
+            elegido = min(libres, key=lambda c: abs(c - RITUAL_MASAJE_HORA_RIO_MIN))
+        return m, min_a_hhmm(elegido)
     return None, None
 
 
@@ -587,12 +617,14 @@ def disponibilidad_ritual(fecha, preferir_premium=False):
         return {'fecha': f.isoformat(), 'disponible': False,
                 'nota': 'no hay tina disponible desde las 16:00 esa noche; ofrece otra fecha'}
 
-    # limite=None por la misma razón: el filtro >=16:00 del masaje debe ver todos los masajes.
+    # limite=None: el filtro de horarios del programa (15:30/18:00/20:30/21:45) debe ver todos
+    # los masajes, no solo 2.
     masajes = disponibilidad(f, personas, 'masaje', limite=None).get('servicios', [])
-    masaje, masaje_hora = _elegir_masaje_ritual(masajes)
+    masaje, masaje_hora = _elegir_masaje_ritual(masajes, f)
     if masaje is None:
         return {'fecha': f.isoformat(), 'disponible': False,
-                'nota': 'no hay masaje para 2 disponible desde las 16:00 esa noche; ofrece otra fecha'}
+                'nota': 'no hay masaje para 2 en los horarios del programa (15:30/18:00/20:30/21:45) '
+                        'esa noche; ofrece otra fecha'}
 
     # Precio objetivo del día ($210k dom-jue, $240k vie/sáb). El descuento es lo que haya que
     # restar de la suma de componentes para llegar al objetivo (incluye el ahorro dom-jue y el
@@ -758,10 +790,11 @@ def disponibilidad_refugio(fecha, preferir_premium=False):
                 'nota': 'no hay tina disponible la segunda noche; ofrece otra fecha'}
 
     masajes = disponibilidad(f1, personas, 'masaje', limite=None).get('servicios', [])
-    masaje, masaje_hora = _elegir_masaje_ritual(masajes)
+    masaje, masaje_hora = _elegir_masaje_ritual(masajes, f1)
     if masaje is None:
         return {'fecha': f1.isoformat(), 'disponible': False,
-                'nota': 'no hay masaje para 2 la primera noche; ofrece otra fecha'}
+                'nota': 'no hay masaje para 2 la primera noche en los horarios del programa '
+                        '(15:30/18:00/20:30/21:45); ofrece otra fecha'}
 
     # Suma cruda: 2 noches de cabaña + 2 tinas (una por día) + 1 masaje. Descuento la lleva a $290.000.
     suma = (2 * (cabana.get('precio_total') or 0) + (tina1.get('precio_total') or 0)

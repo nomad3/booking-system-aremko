@@ -1404,11 +1404,17 @@ def verificar_ritual_view(request):
             def _pb(sid):
                 s = Servicio.objects.filter(id=sid).first()
                 return int(s.precio_base) if s else 0
+            horas = {
+                'cabana': it['cabana'].get('hora_check_in', '16:00'),
+                'tina': it['tina'].get('hora', ''),
+                'masaje': it['masaje'].get('hora', ''),
+            }
             for clave in ('cabana', 'tina', 'masaje'):
                 etq, nom = nombres[clave]
+                hora_txt = f' — {escape(str(horas[clave]))}' if horas[clave] else ''
                 pb = _pb(it[clave]['servicio_id'])
                 sub = pb * personas
-                filas += (f'<tr><td>{escape(etq)}: {escape(nom)}</td>'
+                filas += (f'<tr><td>{escape(etq)}: {escape(nom)}{hora_txt}</td>'
                           f'<td style="text-align:right">${pb:,}</td>'
                           f'<td style="text-align:center">× {personas}</td>'
                           f'<td style="text-align:right">${sub:,}</td></tr>')
@@ -1456,6 +1462,24 @@ def verificar_ritual_view(request):
                     torre_cat = cat.filter(nombre__icontains='torre')
                     torre_apta = any(c.capacidad_minima <= 2 <= c.capacidad_maxima and c.publicado_web
                                      for c in torre_cat)
+                    # Horarios de masaje del Programa: cuáles de los 4 (15:30/18:00/20:30/21:45)
+                    # están libres ese día. Si la lista sale vacía, falta configurarlos como slots
+                    # del servicio Masaje en el admin (verificar_disponibilidad exige slot configurado).
+                    from whatsapp_agent.packs import PROGRAMA_MASAJE_SLOTS, PROGRAMA_MASAJE_SLOTS_MIN
+                    from whatsapp_agent.availability import _hhmm_min
+                    msj = disponibilidad(f, 2, 'masaje', limite=None).get('servicios', [])
+                    slots_masaje_libres = sorted(
+                        {s for m in msj for s in (m.get('slots_libres') or [])},
+                        key=lambda s: _hhmm_min(s) or 0)
+                    prog_libres = [s for s in PROGRAMA_MASAJE_SLOTS
+                                   if any(_hhmm_min(x) == _hhmm_min(s) for x in slots_masaje_libres)]
+                    prog_txt = (', '.join(prog_libres) if prog_libres
+                                else '(NINGUNO — ¿faltan configurar como slots del Masaje?)')
+                    todos_txt = ', '.join(escape(s) for s in slots_masaje_libres) or '(ninguno)'
+                    masaje_diag = (
+                        '<br><br><b>Masaje — horarios del Programa (15:30/18:00/20:30/21:45):</b><br>'
+                        f'Libres ese día: <b>{prog_txt}</b><br>'
+                        f'Todos los slots de masaje libres ese día: {todos_txt}')
                     diag = (
                         '<div style="margin-top:14px;font-size:.9em;color:#555">'
                         f'<b>Diagnóstico ({escape(str(f))}):</b><br>'
@@ -1466,6 +1490,7 @@ def verificar_ritual_view(request):
                         f'{cat_li}<br>'
                         f'Torre en catálogo: <b>{"sí" if torre_cat.exists() else "NO existe"}</b>'
                         f'{" · apta para 2+web: <b>" + ("sí" if torre_apta else "NO") + "</b>" if torre_cat.exists() else ""}'
+                        f'{masaje_diag}'
                         '</div>')
             except Exception as exc:  # noqa: BLE001
                 diag = f'<div style="color:#c0392b">Diag error: {escape(str(exc)[:120])}</div>'
