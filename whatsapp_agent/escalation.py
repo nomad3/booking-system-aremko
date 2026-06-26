@@ -55,13 +55,34 @@ def parse_escalada(texto):
     return False, '', crudo
 
 
+_UUID_RE = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+
+
+def _quitar_ids_internos(t):
+    """Quita el propuesta_id (UUID) que el modelo a veces filtra al cliente.
+    El `propuesta_id` es interno (lo usan Deborah/aremko-cli), NO va en el mensaje al cliente.
+    Determinístico en código porque la regla de prompt no siempre se respeta."""
+    # "(con la )?propuesta( ID|n.°)? : <uuid>"  y  "ID: <uuid>"
+    t = re.sub(r'(?i)\b(con\s+(la\s+)?)?propuesta\s*(id|n[°ºo.]*)?\s*:?\s*' + _UUID_RE, '', t)
+    t = re.sub(r'(?i)\bid\s*:?\s*' + _UUID_RE, '', t)
+    t = re.sub(_UUID_RE, '', t)  # cualquier UUID suelto restante
+    # Limpiar lo que pudo quedar huérfano al sacar el ID.
+    t = re.sub(r'\(\s*\)', '', t)          # paréntesis vacíos "()"
+    t = re.sub(r'[ \t]{2,}', ' ', t)       # espacios dobles
+    t = re.sub(r'\s+([.,;:])', r'\1', t)   # espacio antes de puntuación
+    t = re.sub(r',\s*([.;:])', r'\1', t)   # ", ." → "."
+    return t
+
+
 def sanear_salida(texto):
     """Limpia y acota el texto del modelo antes de exponerlo como borrador."""
     t = (texto or '').strip()
     if not t:
         return ''
+    # Quitar IDs internos (propuesta_id) que el modelo a veces copia al mensaje.
+    t = _quitar_ids_internos(t)
     # Colapsar 3+ saltos de línea a 2.
     t = re.sub(r'\n{3,}', '\n\n', t)
     if len(t) > MAX_SALIDA_CHARS:
         t = t[:MAX_SALIDA_CHARS].rstrip() + '…'
-    return t
+    return t.strip()

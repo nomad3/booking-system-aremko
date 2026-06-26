@@ -338,8 +338,11 @@ _TOOLS = [{
             'Para cliente EXISTENTE no hace falta repetir datos que ya están en su ficha; '
             'pasá solo los que el cliente te dio en la conversación. '
             'Devuelve {success, propuesta_id, mensaje, total}. '
-            'IMPORTANTE: NO digas al cliente que la reserva quedó registrada hasta que esta '
-            'herramienta devuelva success=true con propuesta_id; luego respondé usando el `mensaje`.'
+            'IMPORTANTE: cuando devuelva success=true, tu respuesta al cliente DEBE ser el campo '
+            '`mensaje` TAL CUAL (verbatim). El `propuesta_id` es INTERNO (para el equipo): NUNCA lo '
+            'menciones ni lo escribas al cliente. NO digas "tu reserva fue confirmada/registrada" — '
+            'todavía es una propuesta; el `mensaje` ya dice lo correcto ("estamos preparando tu '
+            'reserva, en un momento te enviamos los datos de pago").'
         ),
         'parameters': {
             'type': 'object',
