@@ -2,8 +2,8 @@ from django.contrib import admin
 from solo.admin import SingletonModelAdmin
 
 from .models import (
-    AgenteFeedback, AusenciaEnviada, SugerenciaAgenteWhatsApp, SugerenciaAprendizaje,
-    WhatsAppAgentConfig,
+    AgenteFeedback, AusenciaEnviada, PropuestaReserva, SugerenciaAgenteWhatsApp,
+    SugerenciaAprendizaje, WhatsAppAgentConfig,
 )
 
 
@@ -97,3 +97,25 @@ class SugerenciaAgenteWhatsAppAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(PropuestaReserva)
+class PropuestaReservaAdmin(admin.ModelAdmin):
+    """Propuestas de Luna. Link clickeable a la cotización del cliente (Fase 3)."""
+    list_display = ('propuesta_id_corto', 'external_id', 'total', 'estado', 'cotizacion_link', 'created_at')
+    list_filter = ('estado', 'canal')
+    search_fields = ('propuesta_id', 'external_id')
+    ordering = ('-id',)
+
+    def propuesta_id_corto(self, obj):
+        return (obj.propuesta_id or '')[:8]
+    propuesta_id_corto.short_description = 'Propuesta'
+
+    def cotizacion_link(self, obj):
+        from django.utils.html import format_html
+        from ventas.views.ficha_reserva_view import url_cotizacion
+        if not obj.propuesta_id or obj.estado != 'pendiente':
+            return '—'
+        url = url_cotizacion(obj.propuesta_id)
+        return format_html('<a class="button" href="{}" target="_blank">🌙 Cotización</a>', url)
+    cotizacion_link.short_description = 'Cotización cliente'
