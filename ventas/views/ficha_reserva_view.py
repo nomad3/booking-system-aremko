@@ -115,12 +115,16 @@ def ficha_reserva_cliente(request, token):
         logger.exception('[ficha] no se pudieron generar los tips de la reserva %s', venta.id)
         tips_texto = ''
 
+    tipos_venta = set(
+        venta.reservaservicios.select_related('servicio')
+        .values_list('servicio__tipo_servicio', flat=True))
     context = {
         'venta': venta,
         'numero': venta.id,
         'cliente': venta.cliente,
         'estado_label': estado_label,
         'estado_cls': estado_cls,
+        'experiencia_nombre': _experiencia_nombre(tipos_venta),
         'lineas': _lineas_servicios(venta),
         'total_str': _clp(venta.total),
         'pagado_str': _clp(venta.pagado),
@@ -232,6 +236,25 @@ def _lineas_desde_payload(servicios_data):
     return lineas
 
 
+def _experiencia_nombre(tipos):
+    """Nombre de la EXPERIENCIA según los tipos de servicio, para que el cliente vea una
+    experiencia identificable y no 'dos servicios'. Por ahora: tina + masaje = 'Pausa junto
+    al río' (pack de ciudad). Devuelve None si no calza un pack con nombre."""
+    principales = set(tipos) & {'tina', 'masaje', 'cabana'}
+    if principales == {'tina', 'masaje'}:
+        return 'Pausa junto al río'
+    return None
+
+
+def _tipos_desde_payload(servicios_data):
+    """Set de tipo_servicio de los servicios del payload (para nombrar la experiencia)."""
+    from ..models import Servicio
+    ids = [sd.get('servicio_id') for sd in (servicios_data or []) if sd.get('servicio_id')]
+    return set(
+        Servicio.objects.filter(id__in=ids).values_list('tipo_servicio', flat=True)
+    )
+
+
 def _descuento_pack_de_payload(servicios_data):
     """Descuento del pack (CLP) para los servicios de la propuesta, con el MISMO motor que
     usa crear_reserva (PackDescuentoService). Así la cotización muestra el precio final real."""
@@ -290,6 +313,7 @@ def cotizacion_cliente(request, token):
     context = {
         'es_cotizacion': True,
         'cliente_nombre': (cliente_data.get('nombre') or '').split(' ')[0],
+        'experiencia_nombre': _experiencia_nombre(_tipos_desde_payload(payload.get('servicios', []))),
         'lineas': lineas,
         'total_str': total_str,
         'vigente': propuesta.esta_vigente(),

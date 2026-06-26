@@ -100,8 +100,12 @@
 
         <details open>
           <summary>
-            <span class="ic i-srv">🧖</span>
-            <span><span class="s-tt">{% if es_cotizacion %}Servicios{% else %}Servicios contratados{% endif %}</span><br><span class="s-sub">{% if es_cotizacion %}Lo que incluye tu propuesta{% else %}Todo lo que incluye tu reserva{% endif %}</span></span>
+            <span class="ic i-srv">{% if experiencia_nombre %}🌊{% else %}🧖{% endif %}</span>
+            {% if experiencia_nombre %}
+              <span><span class="s-tt">{{ experiencia_nombre }}</span><br><span class="s-sub">Lo que incluye tu experiencia</span></span>
+            {% else %}
+              <span><span class="s-tt">{% if es_cotizacion %}Servicios{% else %}Servicios contratados{% endif %}</span><br><span class="s-sub">{% if es_cotizacion %}Lo que incluye tu propuesta{% else %}Todo lo que incluye tu reserva{% endif %}</span></span>
+            {% endif %}
             <span class="chev">▾</span>
           </summary>
           <div class="acc-bd">
