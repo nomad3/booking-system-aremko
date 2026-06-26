@@ -138,14 +138,50 @@ def _propuesta_reserva(canal, external_id):
             except Servicio.DoesNotExist:
                 pass
 
+        from ventas.views.ficha_reserva_view import url_cotizacion
         return {
             'propuesta_id': propuesta.propuesta_id,
+            'url_cotizacion': url_cotizacion(propuesta.propuesta_id),  # H-039 B1: link boutique para Deborah
             'resumen': propuesta.resumen_texto,
             'total': int(propuesta.total),
             'servicios': servicios_info
         }
     except Exception:  # noqa: BLE001
         logger.exception(f'Error obteniendo propuesta_reserva para {canal}/{external_id}')
+        return None
+
+
+def _reserva_creada(canal, external_id):
+    """H-039 B2: reserva recién creada (desde una propuesta aprobada por el cliente), para que el
+    cajón muestre el banner 'Revisar y enviar Ficha'. Devuelve None salvo que la ÚLTIMA propuesta
+    de esa conversación esté en estado='creada', con reserva, y sea reciente (<48h).
+    {reserva_id, numero, total, resumen, url_ficha}."""
+    try:
+        from datetime import timedelta
+        from whatsapp_agent.models import PropuestaReserva
+        from ventas.models import VentaReserva
+        from ventas.views.ficha_reserva_view import url_ficha_reserva
+
+        propuesta = (PropuestaReserva.objects
+                     .filter(canal=canal, external_id=external_id)
+                     .order_by('-created_at').first())
+        if not propuesta or propuesta.estado != 'creada' or not propuesta.reserva_id:
+            return None  # la última no es una reserva recién creada → nada que mostrar
+        cuando = getattr(propuesta, 'creada_at', None) or propuesta.created_at
+        if cuando and cuando < timezone.now() - timedelta(hours=48):
+            return None  # ya no es reciente
+        venta = VentaReserva.objects.filter(id=propuesta.reserva_id).first()
+        if venta is None:
+            return None
+        return {
+            'reserva_id': venta.id,
+            'numero': str(venta.id),
+            'total': int(venta.total or 0),
+            'resumen': propuesta.resumen_texto or '',
+            'url_ficha': url_ficha_reserva(venta.id),
+        }
+    except Exception:  # noqa: BLE001
+        logger.exception(f'Error obteniendo reserva_creada para {canal}/{external_id}')
         return None
 
 
@@ -719,6 +755,7 @@ def conversation(request):
                 if _truthy(request.GET.get('sugerencia', '0')) else None
             ),
             'propuesta_reserva': _propuesta_reserva('instagram', external_id),  # H-028
+            'reserva_creada': _reserva_creada('instagram', external_id),  # H-039 B2
         })
 
     if canal == 'messenger':
@@ -750,6 +787,7 @@ def conversation(request):
                 if _truthy(request.GET.get('sugerencia', '0')) else None
             ),
             'propuesta_reserva': _propuesta_reserva('messenger', external_id),  # H-028
+            'reserva_creada': _reserva_creada('messenger', external_id),  # H-039 B2
         })
 
     if canal == 'whatsapp':
@@ -772,6 +810,7 @@ def conversation(request):
             } for m in msgs],
             'sugerencia_agente': _sugerencia_whatsapp(external_id, request),
             'propuesta_reserva': _propuesta_reserva('whatsapp', external_id),  # H-028
+            'reserva_creada': _reserva_creada('whatsapp', external_id),  # H-039 B2
         })
 
     return JsonResponse({'error': f'canal no soportado: {canal!r}'}, status=400)
