@@ -1141,8 +1141,8 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     'propuesta_id': resultado.get('propuesta_id'),
                     'total': total,
                     'mensaje': (
-                        f'¡Perfecto! Estoy preparando tu Ritual del Río (total ${total:,}). '
-                        'En un momento te confirmamos con los datos para el pago. 🌿🌙'
+                        f'¡Perfecto! Te preparo la cotización de tu Ritual del Río (total ${total:,}) '
+                        'y te la enviamos en un momento para que la revises. 🌿🌙'
                     ),
                 }
             except Exception as exc:  # noqa: BLE001
@@ -1232,8 +1232,8 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     'propuesta_id': resultado.get('propuesta_id'),
                     'total': total,
                     'mensaje': (
-                        f'¡Perfecto! Estoy preparando tu Refugio Aremko (2 noches, total ${total:,}). '
-                        'En un momento te confirmamos con los datos para el pago. 🌿🌙'
+                        f'¡Perfecto! Te preparo la cotización de tu Refugio Aremko (2 noches, total '
+                        f'${total:,}) y te la enviamos en un momento para que la revises. 🌿🌙'
                     ),
                 }
             except Exception as exc:  # noqa: BLE001
