@@ -138,6 +138,24 @@ def _propuesta_reserva(canal, external_id):
             except Servicio.DoesNotExist:
                 pass
 
+        # H-040 #1: incluir PRODUCTOS (tabla/jugo) como líneas, para que el cajón los muestre y
+        # el cálculo del descuento (Σ líneas − total) cuadre cuando se sumó un producto.
+        from ventas.models import Producto
+        for prod_data in (payload.get('productos') or []):
+            try:
+                producto = Producto.objects.get(id=prod_data['producto_id'])
+            except Producto.DoesNotExist:
+                continue
+            cant = int(prod_data.get('cantidad', 1) or 1)
+            servicios_info.append({
+                'servicio_nombre': producto.nombre,
+                'fecha': None,
+                'hora': None,
+                'cantidad_personas': cant,
+                'subtotal': int(producto.precio_base) * cant,
+                'es_producto': True,
+            })
+
         from ventas.views.ficha_reserva_view import url_cotizacion
         return {
             'propuesta_id': propuesta.propuesta_id,

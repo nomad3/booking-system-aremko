@@ -224,6 +224,57 @@ def preparar_reserva(canal, external_id, payload, idempotency_key=None):
         }
 
 
+def agregar_producto_a_propuesta(canal, external_id, producto_id, cantidad=1):
+    """Si YA existe una propuesta vigente para esta conversación (Ritual/Refugio/pack ya
+    cotizado), suma el producto a ESA propuesta (payload + total + resumen) en vez de abrir
+    un carrito nuevo separado (H-040 #1: evita propuestas desincronizadas/pisadas).
+
+    Devuelve dict con actualizo_propuesta=True si actualizó, o None si NO hay propuesta vigente
+    (en ese caso el caller debe usar el carrito normal).
+    """
+    from ventas.models import Producto
+    propuesta = (PropuestaReserva.objects
+                 .filter(canal=canal, external_id=external_id, estado='pendiente')
+                 .order_by('-created_at').first())
+    if propuesta is None or not propuesta.esta_vigente():
+        return None  # no hay propuesta → el caller usa el carrito normal
+
+    try:
+        producto = Producto.objects.get(id=producto_id)
+    except Producto.DoesNotExist:
+        return {'success': False, 'error': 'producto_no_existe',
+                'mensaje': f'Producto {producto_id} no existe'}
+
+    cant = int(cantidad or 1)
+    payload = dict(propuesta.payload or {})
+    productos = list(payload.get('productos') or [])
+    for p in productos:
+        if p.get('producto_id') == producto.id:
+            p['cantidad'] = int(p.get('cantidad') or 1) + cant
+            break
+    else:
+        productos.append({'producto_id': producto.id, 'cantidad': cant})
+    payload['productos'] = productos
+    propuesta.payload = payload
+
+    sub = int(producto.precio_base) * cant
+    propuesta.total = int(propuesta.total or 0) + sub
+    linea = f"{cant}x {producto.nombre} = ${sub:,}"
+    propuesta.resumen_texto = ((propuesta.resumen_texto or '').rstrip() + '\n' + linea).strip()
+    propuesta.save(update_fields=['payload', 'total', 'resumen_texto'])
+
+    logger.info('[Luna] Producto %s x%s sumado a propuesta vigente %s (nuevo total $%s)',
+                producto.nombre, cant, propuesta.propuesta_id[:8], propuesta.total)
+    return {
+        'success': True,
+        'actualizo_propuesta': True,
+        'propuesta_id': propuesta.propuesta_id,
+        'total': int(propuesta.total),
+        'mensaje': (f'¡Listo! Sumé {producto.nombre} a tu cotización. '
+                    f'Nuevo total ${int(propuesta.total):,}. Te la enviamos para que la revises. 🌿'),
+    }
+
+
 def obtener_propuesta(propuesta_id):
     """Obtiene propuesta vigente por ID.
 
