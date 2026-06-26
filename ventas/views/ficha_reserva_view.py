@@ -267,12 +267,34 @@ def _descuento_pack_de_payload(servicios_data):
         return 0
 
 
+def _lineas_productos_payload(productos_data):
+    """Líneas de PRODUCTOS (tablas, jugos) de la propuesta, para que la cotización los muestre
+    y el total cuadre con propuesta.total (que ya los incluye)."""
+    from ..models import Producto
+    lineas = []
+    for pd in (productos_data or []):
+        p = Producto.objects.filter(id=pd.get('producto_id')).first()
+        if p is None:
+            continue
+        cant = int(pd.get('cantidad') or 1)
+        subtotal = int(p.precio_base or 0) * cant
+        lineas.append({
+            'nombre': p.nombre, 'fecha': None, 'hora': None,
+            'monto_str': _clp(subtotal), 'subtotal_num': subtotal,
+            'es_descuento': False, 'es_producto': True, 'cantidad': cant,
+        })
+    return lineas
+
+
 def _cotizacion_lineas_total(propuesta):
-    """Líneas + total de la cotización. Si los servicios NO traen ya una línea de descuento
-    (caso pack de ciudad), aplica el descuento del pack para que el total = el de la reserva
-    final. El Ritual/Refugio ya traen su línea de descuento en el payload → no se duplica."""
-    servicios_data = (propuesta.payload or {}).get('servicios', [])
+    """Líneas + total de la cotización (servicios + productos). Si los servicios NO traen ya una
+    línea de descuento (caso pack de ciudad), aplica el descuento del pack para que el total = el
+    de la reserva final. El Ritual/Refugio ya traen su línea de descuento en el payload → no se
+    duplica. Los productos suman al total (igual que en propuesta.total)."""
+    payload = propuesta.payload or {}
+    servicios_data = payload.get('servicios', [])
     lineas = _lineas_desde_payload(servicios_data)
+    lineas += _lineas_productos_payload(payload.get('productos', []))
     if not any(l['es_descuento'] for l in lineas):
         descuento = _descuento_pack_de_payload(servicios_data)
         if descuento > 0:
