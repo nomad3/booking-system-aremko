@@ -23,6 +23,7 @@ from .tips_reserva_view import _generar_texto_tips
 logger = logging.getLogger(__name__)
 
 FICHA_SALT = 'ficha-reserva-cliente-v1'
+COTIZACION_SALT = 'cotizacion-cliente-v1'
 
 def _clp(n):
     """Formatea un monto CLP con puntos de miles y signo: 210000 -> '$210.000', -30000 -> '−$30.000'."""
@@ -171,3 +172,131 @@ def ficha_comanda(request, token):
         return redirect('ventas:ficha_reserva_cliente', token=token)
     comanda = _obtener_o_crear_comanda(venta)
     return redirect(comanda.obtener_url_cliente())
+
+
+# ── Cotización del cliente (Fase 3): la Ficha en modo cotización + botón Aprobar ──
+
+def token_para_cotizacion(propuesta_id):
+    """Token firmado (no adivinable) para la cotización de una propuesta."""
+    return signing.dumps(str(propuesta_id), salt=COTIZACION_SALT)
+
+
+def url_cotizacion(propuesta_id):
+    """URL pública completa de la cotización (para el cajón / admin)."""
+    from django.urls import reverse
+    from django.conf import settings
+    base = getattr(settings, 'COMANDA_PUBLIC_BASE_URL', 'https://www.aremko.cl')
+    return f"{base}{reverse('ventas:cotizacion_cliente', kwargs={'token': token_para_cotizacion(propuesta_id)})}"
+
+
+def _propuesta_desde_token(token):
+    """PropuestaReserva desde el token firmado, o Http404."""
+    from whatsapp_agent.models import PropuestaReserva
+    try:
+        propuesta_id = signing.loads(token, salt=COTIZACION_SALT)
+    except signing.BadSignature:
+        raise Http404('Link inválido')
+    propuesta = PropuestaReserva.objects.filter(propuesta_id=propuesta_id).first()
+    if propuesta is None:
+        raise Http404('Cotización no encontrada')
+    return propuesta
+
+
+def _lineas_desde_payload(servicios_data):
+    """Líneas de la cotización a partir del payload de la propuesta (servicio_id → nombre/precio)."""
+    import datetime as _dt
+    from ..models import Servicio
+    lineas = []
+    for sd in (servicios_data or []):
+        s = Servicio.objects.filter(id=sd.get('servicio_id')).first()
+        if s is None:
+            continue
+        cant = int(sd.get('cantidad_personas') or 1)
+        subtotal = int(s.precio_base or 0) * cant
+        nombre = s.nombre
+        es_descuento = subtotal < 0 or 'descuento' in (nombre or '').lower()
+        fecha = None
+        if not es_descuento and sd.get('fecha'):
+            try:
+                fecha = _dt.datetime.strptime(sd['fecha'], '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                fecha = None
+        lineas.append({
+            'nombre': 'Descuento' if es_descuento else nombre,
+            'fecha': fecha,
+            'hora': None if es_descuento else sd.get('hora'),
+            'monto_str': _clp(subtotal),
+            'es_descuento': es_descuento,
+        })
+    return lineas
+
+
+def cotizacion_cliente(request, token):
+    """Cotización del cliente (Ficha en modo cotización + botón Aprobar)."""
+    from django.urls import reverse
+    propuesta = _propuesta_desde_token(token)
+
+    # Si la propuesta ya se transformó en reserva, mandamos directo a la Ficha.
+    if propuesta.estado == 'creada' and propuesta.reserva_id:
+        return redirect('ventas:ficha_reserva_cliente',
+                        token=token_para_reserva(propuesta.reserva_id))
+
+    payload = propuesta.payload or {}
+    cliente_data = payload.get('cliente', {}) or {}
+    context = {
+        'es_cotizacion': True,
+        'cliente_nombre': (cliente_data.get('nombre') or '').split(' ')[0],
+        'lineas': _lineas_desde_payload(payload.get('servicios', [])),
+        'total_str': _clp(propuesta.total),
+        'vigente': propuesta.esta_vigente(),
+        'aprobar_url': reverse('ventas:aprobar_cotizacion', kwargs={'token': token}),
+    }
+    return render(request, 'ventas/ficha_reserva_cliente.html', context)
+
+
+def aprobar_cotizacion(request, token):
+    """Botón Aprobar: crea la reserva REUSANDO el endpoint crear_reserva (idempotente,
+    el mismo que usa Deborah) y redirige a la Ficha. No modifica el camino de creación."""
+    from rest_framework.test import APIRequestFactory, force_authenticate
+    from django.contrib.auth import get_user_model
+    from django.urls import reverse
+    from .luna_api_views import crear_reserva
+
+    propuesta = _propuesta_desde_token(token)
+    aprobar_url = reverse('ventas:aprobar_cotizacion', kwargs={'token': token})
+
+    # Idempotente: si ya se creó, a la Ficha.
+    if propuesta.estado == 'creada' and propuesta.reserva_id:
+        return redirect('ventas:ficha_reserva_cliente',
+                        token=token_para_reserva(propuesta.reserva_id))
+
+    if request.method != 'POST':
+        return redirect('ventas:cotizacion_cliente', token=token)
+
+    # Llamada interna a crear_reserva con propuesta_id (bypass de la API key vía force_authenticate).
+    factory = APIRequestFactory()
+    api_req = factory.post('/api/luna/reservas/create/',
+                           {'propuesta_id': propuesta.propuesta_id}, format='json')
+    User = get_user_model()
+    sysuser = (User.objects.filter(username='Deborah').first()
+               or User.objects.filter(is_superuser=True).first())
+    if sysuser is not None:
+        force_authenticate(api_req, user=sysuser)
+    resp = crear_reserva(api_req)
+
+    data = getattr(resp, 'data', {}) or {}
+    if getattr(resp, 'status_code', 500) in (200, 201) and data.get('success'):
+        reserva_id = (data.get('reserva') or {}).get('id')
+        if reserva_id:
+            return redirect('ventas:ficha_reserva_cliente',
+                            token=token_para_reserva(reserva_id))
+
+    logger.error('[cotización] Aprobar falló para propuesta %s: %s',
+                 propuesta.propuesta_id[:8], data.get('mensaje'))
+    return render(request, 'ventas/ficha_reserva_cliente.html', {
+        'es_cotizacion': True,
+        'error_aprobar': data.get('mensaje') or 'No se pudo crear la reserva. Te contactamos a la brevedad.',
+        'lineas': _lineas_desde_payload((propuesta.payload or {}).get('servicios', [])),
+        'total_str': _clp(propuesta.total),
+        'aprobar_url': aprobar_url,
+    }, status=400)

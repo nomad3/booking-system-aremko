@@ -171,6 +171,11 @@ urlpatterns = [
     # Ficha de Reserva del cliente (Reserva-cliente-digital) — token firmado, solo lectura
     path('reserva/<str:token>/', ficha_reserva_view.ficha_reserva_cliente, name='ficha_reserva_cliente'),
     path('reserva/<str:token>/comanda/', ficha_reserva_view.ficha_comanda, name='ficha_reserva_comanda'),
+
+    # Cotización del cliente (Fase 3) — Ficha en modo cotización + botón Aprobar.
+    # Prefijo 'propuesta/' (no 'cotizacion/') para NO shadowear cotizacion/<int:numero>/ (formal).
+    path('propuesta/<str:token>/', ficha_reserva_view.cotizacion_cliente, name='cotizacion_cliente'),
+    path('propuesta/<str:token>/aprobar/', ficha_reserva_view.aprobar_cotizacion, name='aprobar_cotizacion'),
     path('api/comanda/<str:token>/return/', views_comandas_cliente.comanda_cliente_pago_retorno, name='comanda_cliente_pago_retorno_api'),
 
     # --- Remarketing/Automation API URLs ---

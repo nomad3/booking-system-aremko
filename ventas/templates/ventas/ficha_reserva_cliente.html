@@ -4,7 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>Reserva {{ numero }} · Aremko</title>
+  {% if es_cotizacion %}
+    <title>Tu cotización · Aremko</title>
+    <meta property="og:title" content="Tu cotización · Aremko Spa Boutique">
+    <meta property="og:description" content="Noche de ritual junto al río. Revisa tu propuesta y apruébala.">
+  {% else %}
+    <title>Reserva {{ numero }} · Aremko</title>
+    <meta property="og:title" content="Tu reserva en Aremko · Spa Boutique">
+    <meta property="og:description" content="Servicios, tips y comanda de tu visita junto al río.">
+  {% endif %}
+  <meta property="og:type" content="website">
   <style>
     :root{
       --bg:#F2E8D8; --surface:#FFFDF9; --ink:#2E2A24; --muted:#7C736A; --hint:#A99F90;
@@ -68,20 +77,31 @@
         <div class="brand-sub">Spa boutique · aguas calientes junto al río</div>
       </div>
       <div class="bd">
-        <div class="topline">
-          <div class="resv">Reserva {{ numero }}</div>
-          <span class="badge b-{{ estado_cls }}">{{ estado_label }}</span>
-        </div>
-        {% if saldo > 0 %}
-          <div class="saldo">Saldo a pagar: {{ saldo_str }} · abonado {{ pagado_str }}</div>
+        {% if es_cotizacion %}
+          <div class="topline">
+            <div class="resv">Tu cotización</div>
+          </div>
+          <div class="saldo">{% if cliente_nombre %}{{ cliente_nombre }}, esta{% else %}Esta{% endif %} es la propuesta de tu Ritual junto al río.</div>
         {% else %}
-          <div class="saldo">Saldo $0</div>
+          <div class="topline">
+            <div class="resv">Reserva {{ numero }}</div>
+            <span class="badge b-{{ estado_cls }}">{{ estado_label }}</span>
+          </div>
+          {% if saldo > 0 %}
+            <div class="saldo">Saldo a pagar: {{ saldo_str }} · abonado {{ pagado_str }}</div>
+          {% else %}
+            <div class="saldo">Saldo $0</div>
+          {% endif %}
+        {% endif %}
+
+        {% if error_aprobar %}
+          <div class="com-lock" style="border-color:var(--can-fg);color:var(--can-fg);margin-top:12px">{{ error_aprobar }}</div>
         {% endif %}
 
         <details open>
           <summary>
             <span class="ic i-srv">🧖</span>
-            <span><span class="s-tt">Servicios contratados</span><br><span class="s-sub">Todo lo que incluye tu reserva</span></span>
+            <span><span class="s-tt">{% if es_cotizacion %}Servicios{% else %}Servicios contratados{% endif %}</span><br><span class="s-sub">Todo lo que incluye tu Ritual</span></span>
             <span class="chev">▾</span>
           </summary>
           <div class="acc-bd">
@@ -98,6 +118,15 @@
           </div>
         </details>
 
+        {% if es_cotizacion %}
+          <form method="post" action="{{ aprobar_url }}" style="margin-top:14px">
+            {% csrf_token %}
+            <button type="submit" class="btn" style="background:#3D6B4A">Aprobar cotización</button>
+          </form>
+          <div class="com-note">Al aprobar, generamos tu reserva al instante.</div>
+        {% endif %}
+
+        {% if not es_cotizacion %}
         <details>
           <summary>
             <span class="ic i-tip">📋</span>
@@ -125,6 +154,7 @@
             {% endif %}
           </div>
         </details>
+        {% endif %}
 
       </div>
     </div>
