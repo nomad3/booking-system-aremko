@@ -1465,21 +1465,23 @@ def verificar_ritual_view(request):
                     # Horarios de masaje del Programa: cuáles de los 4 (15:30/18:00/20:30/21:45)
                     # están libres ese día. Si la lista sale vacía, falta configurarlos como slots
                     # del servicio Masaje en el admin (verificar_disponibilidad exige slot configurado).
-                    from whatsapp_agent.packs import PROGRAMA_MASAJE_SLOTS, PROGRAMA_MASAJE_SLOTS_MIN
+                    from whatsapp_agent.packs import PROGRAMA_MASAJE_SLOTS_MIN
                     from whatsapp_agent.availability import _hhmm_min
-                    msj = disponibilidad(f, 2, 'masaje', limite=None).get('servicios', [])
-                    slots_masaje_libres = sorted(
+                    # incluir_slots_programa=True para VER los 4 del programa (disponibilidad los
+                    # excluye por defecto). Para 2 personas (capacidad del masaje): un "1 de 2" no entra.
+                    msj = disponibilidad(f, 2, 'masaje', limite=None,
+                                         incluir_slots_programa=True).get('servicios', [])
+                    libres_all = sorted(
                         {s for m in msj for s in (m.get('slots_libres') or [])},
                         key=lambda s: _hhmm_min(s) or 0)
-                    prog_libres = [s for s in PROGRAMA_MASAJE_SLOTS
-                                   if any(_hhmm_min(x) == _hhmm_min(s) for x in slots_masaje_libres)]
-                    prog_txt = (', '.join(prog_libres) if prog_libres
-                                else '(NINGUNO — ¿faltan configurar como slots del Masaje?)')
-                    todos_txt = ', '.join(escape(s) for s in slots_masaje_libres) or '(ninguno)'
+                    prog_libres = [s for s in libres_all if _hhmm_min(s) in PROGRAMA_MASAJE_SLOTS_MIN]
+                    resto_libres = [s for s in libres_all if _hhmm_min(s) not in PROGRAMA_MASAJE_SLOTS_MIN]
+                    prog_txt = ', '.join(escape(s) for s in prog_libres) or '(NINGUNO libre para 2)'
+                    resto_txt = ', '.join(escape(s) for s in resto_libres) or '(ninguno)'
                     masaje_diag = (
                         '<br><br><b>Masaje — horarios del Programa (15:30/18:00/20:30/21:45):</b><br>'
-                        f'Libres ese día: <b>{prog_txt}</b><br>'
-                        f'Todos los slots de masaje libres ese día: {todos_txt}')
+                        f'Libres para el Ritual (2 pers.): <b>{prog_txt}</b><br>'
+                        f'Resto de slots (masaje solo / pack ciudad): {resto_txt}')
                     diag = (
                         '<div style="margin-top:14px;font-size:.9em;color:#555">'
                         f'<b>Diagnóstico ({escape(str(f))}):</b><br>'

@@ -32,6 +32,13 @@ MESES_ES = {
 # trabajando, no se puede ofrecer un masaje antes de que alcancen a llegar.
 TRAVEL_MASAJISTA_MIN = 60
 
+# Horarios de masaje RESERVADOS al Programa Ritual/Refugio (Jorge, 2026-06-26). De todos los
+# slots del Masaje, estos 4 quedan SOLO para el programa; el resto (11:45/13:00/14:15/16:45/
+# 19:15...) queda para masaje solo o pack tina+masaje (ciudad). Por eso disponibilidad() los
+# EXCLUYE por defecto en las ofertas de masaje; el programa pide incluir_slots_programa=True.
+MASAJE_SLOTS_PROGRAMA = ('15:30', '18:00', '20:30', '21:45')
+MASAJE_SLOTS_PROGRAMA_MIN = frozenset({15 * 60 + 30, 18 * 60, 20 * 60 + 30, 21 * 60 + 45})
+
 
 def _parse_fecha(fecha):
     """Acepta date, 'YYYY-MM-DD', o una EXPRESIÓN del cliente ("próximo lunes",
@@ -244,7 +251,7 @@ def _es_masaje_agendable(servicio):
     return 'relaj' in n or 'descontractura' in n
 
 
-def disponibilidad(fecha=None, personas=1, tipo=None, limite=2):
+def disponibilidad(fecha=None, personas=1, tipo=None, limite=2, incluir_slots_programa=False):
     """Servicios publicados que admiten `personas`, con precio total y horarios libres (H-028 BUG FIX).
 
     Con `fecha` (YYYY-MM-DD O expresión como "el sábado") → calcula horarios libres ese día.
@@ -342,6 +349,10 @@ def disponibilidad(fecha=None, personas=1, tipo=None, limite=2):
                         libres.append(hora)
                 except Exception:  # noqa: BLE001 — un slot con error no debe tumbar la consulta
                     logger.exception('disponibilidad: error verificando %s %s %s', s.id, f, hora)
+            # Los 4 horarios del Programa Ritual/Refugio quedan reservados: se excluyen de las
+            # ofertas de masaje (solo/ciudad) salvo que el programa pida incluirlos explícitamente.
+            if s.tipo_servicio == 'masaje' and not incluir_slots_programa:
+                libres = [h for h in libres if _hhmm_min(h) not in MASAJE_SLOTS_PROGRAMA_MIN]
             if not libres:
                 continue  # sin horarios ese día → no se ofrece
 

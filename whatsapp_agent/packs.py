@@ -443,11 +443,14 @@ RITUAL_DESCUENTO_PREMIUM = 10000      # descuento por cada componente premium (T
 
 # Horarios de masaje RESERVADOS al Programa Ritual/Refugio (Jorge, 2026-06-26). El masaje de
 # estos programas SOLO puede caer en uno de estos 4 horarios; el resto de los slots del Masaje
-# queda libre para el arriendo de ciudad (tina+masaje). La "hora río" (15:30) es la ancla por
-# defecto: es ANTES del check-in (16:00) a propósito —el cliente llega un poco antes, se hace el
-# masaje y luego se instala en la cabaña.
-PROGRAMA_MASAJE_SLOTS = ('15:30', '18:00', '20:30', '21:45')
-PROGRAMA_MASAJE_SLOTS_MIN = frozenset({15 * 60 + 30, 18 * 60, 20 * 60 + 30, 21 * 60 + 45})
+# queda libre para masaje solo o pack tina+masaje (ciudad). La "hora río" (15:30) es la ancla
+# por defecto: es ANTES del check-in (16:00) a propósito —el cliente llega un poco antes, se
+# hace el masaje y luego se instala en la cabaña. La constante canónica vive en availability.py
+# (allí disponibilidad() los excluye por defecto para ciudad/solo); acá solo se aliasan.
+from .availability import (
+    MASAJE_SLOTS_PROGRAMA as PROGRAMA_MASAJE_SLOTS,
+    MASAJE_SLOTS_PROGRAMA_MIN as PROGRAMA_MASAJE_SLOTS_MIN,
+)
 RITUAL_MASAJE_HORA_RIO_MIN = 15 * 60 + 30   # 15:30 — ancla cuando no hay otro masaje al que pegarse
 
 
@@ -617,9 +620,10 @@ def disponibilidad_ritual(fecha, preferir_premium=False):
         return {'fecha': f.isoformat(), 'disponible': False,
                 'nota': 'no hay tina disponible desde las 16:00 esa noche; ofrece otra fecha'}
 
-    # limite=None: el filtro de horarios del programa (15:30/18:00/20:30/21:45) debe ver todos
-    # los masajes, no solo 2.
-    masajes = disponibilidad(f, personas, 'masaje', limite=None).get('servicios', [])
+    # limite=None: ver todos los masajes. incluir_slots_programa=True: el programa SÍ puede usar
+    # los 4 horarios reservados (15:30/18:00/20:30/21:45), que para ciudad/solo están excluidos.
+    masajes = disponibilidad(f, personas, 'masaje', limite=None,
+                             incluir_slots_programa=True).get('servicios', [])
     masaje, masaje_hora = _elegir_masaje_ritual(masajes, f)
     if masaje is None:
         return {'fecha': f.isoformat(), 'disponible': False,
@@ -789,7 +793,8 @@ def disponibilidad_refugio(fecha, preferir_premium=False):
         return {'fecha': f1.isoformat(), 'disponible': False,
                 'nota': 'no hay tina disponible la segunda noche; ofrece otra fecha'}
 
-    masajes = disponibilidad(f1, personas, 'masaje', limite=None).get('servicios', [])
+    masajes = disponibilidad(f1, personas, 'masaje', limite=None,
+                             incluir_slots_programa=True).get('servicios', [])
     masaje, masaje_hora = _elegir_masaje_ritual(masajes, f1)
     if masaje is None:
         return {'fecha': f1.isoformat(), 'disponible': False,
