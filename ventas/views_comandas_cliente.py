@@ -105,6 +105,15 @@ def comanda_cliente_menu(request, token):
         .order_by('-fecha_solicitud')
     )
 
+    # URL de la Ficha del cliente, para el botón "Salir" de la comanda (volver a su reserva).
+    ficha_url = ''
+    try:
+        from ventas.views.ficha_reserva_view import url_ficha_reserva
+        if comanda.venta_reserva_id:
+            ficha_url = url_ficha_reserva(comanda.venta_reserva_id)
+    except Exception:  # noqa: BLE001 — si falla, el botón simplemente no se muestra
+        ficha_url = ''
+
     context = {
         'comanda': comanda,
         'productos': productos,
@@ -114,6 +123,7 @@ def comanda_cliente_menu(request, token):
         'vencimiento': comanda.fecha_vencimiento_link,
         'pedidos_anteriores': pedidos_anteriores,
         'cliente_nombre': comanda.venta_reserva.cliente.nombre if comanda.venta_reserva and comanda.venta_reserva.cliente else '',
+        'ficha_url': ficha_url,
     }
 
     return render(request, 'ventas/comanda_cliente/menu.html', context)

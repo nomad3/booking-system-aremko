@@ -16,10 +16,16 @@
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white; padding: 20px; text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,.1);
+            box-shadow: 0 2px 10px rgba(0,0,0,.1); position: relative;
         }
         .header h1 { font-size: 24px; margin-bottom: 5px; }
         .header p  { font-size: 14px; opacity: .9; }
+        .header-salir {
+            position: absolute; top: 14px; right: 14px;
+            background: rgba(255,255,255,.2); color: white; text-decoration: none;
+            padding: 6px 12px; border-radius: 16px; font-size: 12px; font-weight: 600;
+        }
+        .header-salir:active { background: rgba(255,255,255,.35); }
 
         .timer {
             background: rgba(255,255,255,.2); padding: 8px 16px;
@@ -178,6 +184,7 @@
 </head>
 <body>
     <div class="header">
+        {% if ficha_url %}<a class="header-salir" href="{{ ficha_url }}">&#10005; Salir</a>{% endif %}
         <h1>&#127807; Aremko Spa</h1>
         <p>Tu pedido personalizado{% if cliente_nombre %}, {{ cliente_nombre }}{% endif %}</p>
         <div class="timer">
@@ -252,6 +259,7 @@
 
     <script>
         const TOKEN = '{{ token }}';
+        const FICHA_URL = '{{ ficha_url|escapejs }}';
         const cart = {};
         const productos = {
             {% for producto in productos %}
@@ -391,6 +399,7 @@
                     '<div>' +
                         '<button class="overlay-btn" onclick="showOrderTracking(' + data.pedido_id + ', this.closest(\'.overlay\'))">Ver pedido</button>' +
                         '<button class="overlay-btn-outline" onclick="location.reload()">Hacer otro pedido</button>' +
+                        (FICHA_URL ? '<button class="overlay-btn-outline" onclick="window.location.href=FICHA_URL">Salir</button>' : '') +
                     '</div>' +
                 '</div>';
             document.body.appendChild(overlay);
