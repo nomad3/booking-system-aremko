@@ -74,6 +74,71 @@ def _quitar_ids_internos(t):
     return t
 
 
+_DIAS_CANON = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+_MESES_NUM = {
+    'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
+    'julio': 7, 'agosto': 8, 'septiembre': 9, 'setiembre': 9, 'octubre': 10,
+    'noviembre': 11, 'diciembre': 12,
+}
+
+
+def _sin_acento(s):
+    return (s.lower()
+            .replace('á', 'a').replace('é', 'e').replace('í', 'i')
+            .replace('ó', 'o').replace('ú', 'u'))
+
+
+# "sábado 28 de junio", "el domingo 28 de junio de 2026"
+_DIA_FECHA_RE = re.compile(
+    r'(?i)\b(lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|domingo)\b'
+    r'(\s+el)?\s+(\d{1,2})\s+de\s+'
+    r'(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)'
+    r'(?:\s+de\s+(\d{4}))?'
+)
+
+
+def _corregir_dia_semana(t):
+    """Corrige el nombre del día cuando NO calza con la fecha (N de mes).
+
+    El LLM a veces escribe "mañana, sábado 28 de junio" cuando el 28 es domingo:
+    mezcla el día de hoy con la fecha de mañana. El número+mes es el ancla real
+    (lo que el cliente/staff usan para agendar), así que recalculamos el día en
+    código y reemplazamos solo el nombre del día si está mal. Determinístico
+    porque la regla de prompt ("usa el dia_semana de la herramienta") no siempre
+    se respeta — y un día mal puesto genera overbooking.
+    """
+    from datetime import date as _date
+    try:
+        from django.utils import timezone
+        hoy = timezone.localtime(timezone.now()).date()
+    except Exception:  # noqa: BLE001
+        hoy = _date.today()
+
+    def _fix(m):
+        dia_txt, _el, num_txt, mes_txt, anio_txt = m.groups()
+        try:
+            num = int(num_txt)
+            mes = _MESES_NUM[_sin_acento(mes_txt)]
+            anio = int(anio_txt) if anio_txt else hoy.year
+            try:
+                f = _date(anio, mes, num)
+            except ValueError:
+                return m.group(0)  # fecha inválida (ej. 31 de febrero): no tocar
+            # Sin año explícito y la fecha ya pasó → asumir el próximo año (igual que resolver_fecha)
+            if not anio_txt and f < hoy:
+                f = _date(hoy.year + 1, mes, num)
+            correcto = _DIAS_CANON[f.weekday()]
+            if _sin_acento(correcto) == _sin_acento(dia_txt):
+                return m.group(0)  # ya está bien
+            # Preservar mayúscula inicial del día original
+            reemplazo = correcto.capitalize() if dia_txt[:1].isupper() else correcto
+            return m.group(0).replace(dia_txt, reemplazo, 1)
+        except Exception:  # noqa: BLE001 — nunca tumbar el borrador por esto
+            return m.group(0)
+
+    return _DIA_FECHA_RE.sub(_fix, t)
+
+
 def sanear_salida(texto):
     """Limpia y acota el texto del modelo antes de exponerlo como borrador."""
     t = (texto or '').strip()
@@ -81,6 +146,8 @@ def sanear_salida(texto):
         return ''
     # Quitar IDs internos (propuesta_id) que el modelo a veces copia al mensaje.
     t = _quitar_ids_internos(t)
+    # Corregir día de la semana que no calza con la fecha (evita overbooking).
+    t = _corregir_dia_semana(t)
     # Colapsar 3+ saltos de línea a 2.
     t = re.sub(r'\n{3,}', '\n\n', t)
     if len(t) > MAX_SALIDA_CHARS:
