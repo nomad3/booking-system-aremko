@@ -474,6 +474,29 @@ class CarritoService:
                     'cantidad': item.get('cantidad', 1),
                 })
 
+        # Descuento del pack como LÍNEA durable "Descuento de servicios" (precio negativo), igual
+        # que el Ritual/Refugio: así calcular_total() (que disparan los signals al guardar líneas o
+        # al crear una comanda) NO borra el descuento. Sin esto, crear_reserva seteaba venta.total a
+        # mano y el primer recálculo lo devolvía al precio SIN descuento (cliente cobrado de más:
+        # $160.000 en vez de $130.000). Con la línea, preparar_reserva y crear_reserva ya NO vuelven
+        # a restar el descuento (ambos detectan la línea) y el total queda clavado.
+        try:
+            descuento = PackDescuentoService.descuento_para_servicios(servicios)
+            if descuento and descuento > 0 and servicios:
+                from ventas.models import Servicio
+                ds = (Servicio.objects.filter(nombre__icontains='descuento de servicios').first()
+                      or Servicio.objects.filter(nombre__icontains='descuento').order_by('id').first())
+                if ds is not None and int(ds.precio_base) < 0:
+                    ref = servicios[0]
+                    servicios.append({
+                        'servicio_id': ds.id,
+                        'fecha': ref.get('fecha'),
+                        'hora': ref.get('hora'),
+                        'cantidad_personas': round(descuento / abs(int(ds.precio_base))),
+                    })
+        except Exception:  # noqa: BLE001 — si falla, la reserva se crea igual (sin la línea)
+            logger.exception('[Carrito] no se pudo agregar la línea de descuento al payload')
+
         payload = {
             'cliente': cliente_data,
             'servicios': servicios,

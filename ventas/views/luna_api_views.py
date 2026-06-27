@@ -910,7 +910,14 @@ def crear_reserva(request):
             # que arma el carrito como espera el motor (masajes divididos por persona). Antes este
             # camino armaba 1 masaje × N personas y el motor (que cuenta masajes por ÍTEM, exige >=2)
             # NO detectaba el pack tina+masaje → la reserva se creaba a precio completo.
-            total_descuentos = PackDescuentoService.descuento_para_servicios(servicios_data)
+            # PERO si los servicios YA traen una línea "Descuento de servicios" (precio negativo,
+            # como el Ritual/Refugio o el pack del carrito), NO se vuelve a restar: la línea ya
+            # descuenta y es DURABLE (calcular_total la suma; restar acá daría doble descuento, y
+            # un total seteado a mano lo borra cualquier signal que recalcule).
+            ya_tiene_linea_descuento = any(
+                'descuento' in (s.get('servicio_nombre') or '').lower() for s in servicios_creados)
+            total_descuentos = 0 if ya_tiene_linea_descuento else \
+                PackDescuentoService.descuento_para_servicios(servicios_data)
 
             # 5. Actualizar total de VentaReserva
             venta_reserva.total = total_estimado - total_descuentos
