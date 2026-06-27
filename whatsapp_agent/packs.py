@@ -181,11 +181,7 @@ def _componer_opcion(tinas_grupo, etiqueta, f, personas, agendados, masaje_por_i
             masaje_dur = m.get('duracion_min') or 0
             masaje_id, masaje_nombre, masaje_pp = m['servicio_id'], m['nombre'], m['precio_por_persona']
         else:
-            # Slots del PROPIO masaje genérico (no la unión de todos): el slot elegido debe
-            # pertenecer al servicio que se asigna (masaje_id), o luego la hora se rechaza como
-            # inválida al validarla contra ESE servicio. (union_slots quedó sin uso a propósito.)
-            slots_masaje = sorted({hhmm_a_min(s) for s in (masaje_generico.get('slots_libres') or [])
-                                   if hhmm_a_min(s) is not None})
+            slots_masaje = union_slots
             masaje_dur = masaje_generico.get('duracion_min') or 0
             masaje_id = masaje_generico['servicio_id']
             masaje_nombre = masaje_generico['nombre']
@@ -215,14 +211,14 @@ def _componer_opcion(tinas_grupo, etiqueta, f, personas, agendados, masaje_por_i
             return {
                 'etiqueta': etiqueta,
                 'tina': {
-                    'servicio_id': t['servicio_id'], 'nombre': t['nombre'], 'hora': t_slot,
+                    'nombre': t['nombre'], 'hora': t_slot,
                     'duracion_texto': t['duracion_texto'],
                     'precio_total': t['precio_total'],
                     'precio_por_persona': t['precio_por_persona'],
                 },
                 'masaje': {
-                    'servicio_id': masaje_id, 'nombre': masaje_nombre, 'hora': masaje_hora,
-                    'cantidad': personas, 'precio_total': masaje_total,
+                    'nombre': masaje_nombre, 'hora': masaje_hora, 'cantidad': personas,
+                    'precio_total': masaje_total,
                 },
                 'orden': 'masaje antes de la tina' if m_slot < t_ini else 'masaje después de la tina',
                 'clustering': bool(agendados),
