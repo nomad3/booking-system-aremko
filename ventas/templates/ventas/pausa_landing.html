@@ -1,0 +1,195 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+{% load ventas_extras %}
+
+{# ──────────────────────────────────────────────────────────────────
+   Landing "Pausa junto al río" (H-041) — experiencia de ENTRADA:
+   tina caliente + masaje en pareja, el MISMO día, sin alojamiento.
+   Destino de anuncios Google + Meta. INDEXABLE. CTA único → WhatsApp.
+   Reusa el molde del Ritual (ritual_rio_landing) y sus reseñas/fotos.
+   ────────────────────────────────────────────────────────────────── #}
+
+{% block title %}Pausa junto al río · tina + masaje en pareja · Aremko Spa Boutique{% endblock %}
+
+{% block meta_description %}
+<meta name="description" content="Tina caliente privada + masaje en pareja, el mismo día, junto al río. Medio día de spa en Puerto Varas, desde $110.000 para dos. Aremko Spa Boutique.">
+<meta name="robots" content="index, follow">
+{% endblock %}
+
+{% block extra_style %}
+<style>
+  .rr-wrap{max-width:920px;margin:0 auto;padding:0 18px;color:#2c2a27;font-family:inherit}
+  .rr-section{padding:38px 0}
+  .rr-hero{text-align:center}
+  .rr-photo{border-radius:16px;background:#ede7df;border:1px dashed #c9bfae;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    color:#8a7f6c;font-size:14px;overflow:hidden;
+    aspect-ratio:1/1;width:100%;max-width:460px;margin:0 auto}
+  .rr-photo img{width:100%;height:100%;object-fit:cover;display:block}
+  .rr-act-img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;margin-bottom:12px;display:block}
+  .rr-rev-head{display:flex;align-items:center;gap:11px;margin-bottom:10px}
+  .rr-rev-face{width:46px;height:46px;border-radius:50%;object-fit:cover;flex-shrink:0}
+  .rr-badge{display:inline-block;background:#f6efe1;color:#8a5a1d;
+    font-size:13px;padding:6px 14px;border-radius:999px;margin:18px 0 12px;font-weight:500}
+  .rr-h1{font-size:30px;line-height:1.25;margin:6px 0 14px;font-weight:600}
+  .rr-lead{font-size:18px;line-height:1.7;color:#5f5a52;max-width:560px;margin:0 auto 26px}
+  .rr-cta{display:inline-flex;align-items:center;gap:9px;background:#0f6e56;color:#eafaf3;
+    text-decoration:none;font-size:18px;font-weight:600;padding:15px 30px;border-radius:12px}
+  .rr-cta:hover{background:#0c5b48;color:#fff}
+  .rr-cta-note{font-size:14px;color:#8a7f6c;margin:12px 0 0}
+  .rr-h2{font-size:24px;text-align:center;margin:0 0 22px;font-weight:600}
+  .rr-acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .rr-card{background:#fff;border:1px solid #ece6dc;border-radius:14px;padding:22px;text-align:center}
+  .rr-act-n{font-size:13px;letter-spacing:.08em;color:#b08a5a;text-transform:uppercase}
+  .rr-act-t{font-size:18px;font-weight:600;margin:6px 0 6px}
+  .rr-card p{color:#5f5a52;font-size:15px;line-height:1.6;margin:0}
+  .rr-offer{border:2px solid #0f6e56;border-radius:16px;padding:26px;background:#fcfbf8}
+  .rr-offer-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:16px}
+  .rr-price{font-size:30px;font-weight:600}
+  .rr-price small{display:block;font-size:14px;color:#5f5a52;font-weight:400}
+  .rr-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 22px;list-style:none;padding:0;margin:0}
+  .rr-list li{font-size:16px}
+  .rr-vs{display:flex;flex-direction:column;gap:9px}
+  .rr-vs-row{display:flex;gap:11px;align-items:center;background:#f4f0e9;border-radius:10px;padding:12px 16px;font-size:16px}
+  .rr-vs-win{background:#e4f3ee;color:#0f5b48}
+  .rr-revs{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+  .rr-rev{background:#fff;border:1px solid #ece6dc;border-radius:14px;padding:22px}
+  .rr-rev .stars{color:#c8902a;letter-spacing:2px;margin-bottom:8px}
+  .rr-rev .q{font-style:italic;color:#5f5a52;line-height:1.6;margin:0 0 8px}
+  .rr-rev .who{font-size:14px;color:#8a7f6c}
+  .rr-final{text-align:center;background:#f4f0e9;border-radius:18px;padding:42px 22px}
+  @media(max-width:600px){.rr-h1{font-size:25px}.rr-lead{font-size:16px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rr-wrap">
+
+  <section class="rr-section rr-hero">
+    <div class="rr-photo">
+      {% if config.foto_hero %}
+        <img src="{{ config.foto_hero|cuadrada:800 }}" alt="Tina caliente humeante junto al río">
+      {% else %}
+        <span style="font-size:30px">♨️</span>
+        <span>Foto: tina caliente humeante junto al río</span>
+      {% endif %}
+    </div>
+    <span class="rr-badge">♨️ Medio día de spa junto al río</span>
+    <h1 class="rr-h1">Pausa junto al río</h1>
+    <p class="rr-lead"><strong>Tina caliente + masaje en pareja, en una sola tarde.</strong><br>
+      Unas horas para desconectar de verdad — sin viajar lejos ni quedarse a dormir. Llegan, se meten
+      a la tina caliente junto al río, reciben un masaje para los dos… y salen como nuevos.</p>
+    <a class="rr-cta" href="{{ whatsapp_url }}">Reserva por WhatsApp</a>
+    <p class="rr-cta-note">Desde ${{ precio_domjue }} para dos (domingo a jueves). El resto lo coordinas.</p>
+  </section>
+
+  <section class="rr-section">
+    <h2 class="rr-h2">Qué incluye</h2>
+    <div class="rr-acts">
+      <div class="rr-card">
+        {% if config.foto_acto2 %}<img class="rr-act-img" src="{{ config.foto_acto2|cuadrada }}" alt="Tina caliente privada">{% endif %}
+        <div class="rr-act-n">♨️</div><div class="rr-act-t">Tina caliente privada</div>
+        <p>Agua caliente junto al río, solo para ustedes.</p></div>
+      <div class="rr-card">
+        {% if config.foto_acto1 %}<img class="rr-act-img" src="{{ config.foto_acto1|cuadrada }}" alt="Masaje en pareja">{% endif %}
+        <div class="rr-act-n">💆</div><div class="rr-act-t">Masaje en pareja</div>
+        <p>Relajación o descontracturante, para los dos.</p></div>
+      <div class="rr-card">
+        <div class="rr-act-n">🌿</div><div class="rr-act-t">El río y el bosque</div>
+        <p>El sonido del río Pescado y el bosque nativo alrededor.</p></div>
+    </div>
+  </section>
+
+  <section class="rr-section">
+    <div class="rr-offer">
+      <div class="rr-offer-top">
+        <h2 style="margin:0;font-size:24px;font-weight:600">Pausa para dos</h2>
+        <div class="rr-price">${{ precio_domjue }}<small>domingo a jueves · 2 personas</small></div>
+        <div style="font-size:14px;opacity:0.75;margin-top:4px;text-align:right">${{ precio_finde }} viernes y sábado</div>
+      </div>
+      <ul class="rr-list">
+        <li>✓ Tina caliente privada junto al río</li>
+        <li>✓ Masaje en pareja (relajación o descontracturante)</li>
+        <li>✓ El sonido del río y el bosque nativo</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rr-section">
+    <h2 class="rr-h2">Por qué la Pausa</h2>
+    <div class="rr-vs">
+      <div class="rr-vs-row">✕ &nbsp;No necesitas un fin de semana entero ni gastar una fortuna para cortar la rutina.</div>
+      <div class="rr-vs-row">✕ &nbsp;No es una piscina temperada. No son las termas llenas de gente.</div>
+      <div class="rr-vs-row rr-vs-win">✓ &nbsp;Es medio día de spa real: agua caliente privada + manos expertas, junto al río, solo para ustedes — todo listo cuando llegan.</div>
+    </div>
+  </section>
+
+  <section class="rr-section">
+    <h2 class="rr-h2">Lo que dicen quienes ya vinieron</h2>
+    <div class="rr-revs">
+      {% if config.resena1_texto or config.resena2_texto or config.resena3_texto %}
+        {% for foto, texto, autor in resenas %}
+          {% if texto %}
+            <div class="rr-rev">
+              <div class="rr-rev-head">
+                {% if foto %}<img class="rr-rev-face" src="{{ foto|cuadrada:120 }}" alt="{{ autor }}">{% endif %}
+                <div class="stars">★★★★★</div>
+              </div>
+              <p class="q">{{ texto }}</p>
+              <p class="who">— {{ autor }}</p>
+            </div>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        <div class="rr-rev"><div class="stars">★★★★★</div>
+          <p class="q">Una tarde perfecta para desconectar; el agua caliente junto al río y el masaje, impecables.</p>
+          <p class="who">— Reseña Google 4,5★</p></div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="rr-section">
+    <div class="rr-final">
+      <h2 style="margin:0 0 8px;font-size:26px;font-weight:600">Aparta tu Pausa por WhatsApp 👇</h2>
+      <p style="font-size:17px;color:#5f5a52;margin:0 0 22px">Te coordinamos la fecha y la hora por WhatsApp.</p>
+      <a class="rr-cta" href="{{ whatsapp_url }}">Reserva por WhatsApp</a>
+      <p class="rr-cta-note">Aguas calientes junto al río · Aremko Spa Boutique, Puerto Varas</p>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+/* H-041 — Mide el clic al WhatsApp de la Pausa como conversión.
+   GA4: pausa_whatsapp_click (+ UTM de la landing). Meta Pixel: Lead. */
+(function () {
+  var p = new URLSearchParams(window.location.search);
+  var utm = {
+    campaign: p.get('utm_campaign') || '',
+    source:   p.get('utm_source')   || '',
+    medium:   p.get('utm_medium')   || ''
+  };
+  function track() {
+    try {
+      if (typeof gtag === 'function') {
+        gtag('event', 'pausa_whatsapp_click', {
+          send_to: 'G-T3K4CTD3HJ',
+          pausa_campaign: utm.campaign,
+          pausa_source: utm.source,
+          pausa_medium: utm.medium
+        });
+      }
+    } catch (e) { /* nunca bloquear la navegación a WhatsApp */ }
+    try { if (typeof fbq === 'function') { fbq('track', 'Lead', {content_name: 'Pausa junto al río'}); } } catch (e) {}
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    var btns = document.querySelectorAll('a.rr-cta');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener('click', track);
+    }
+  });
+})();
+</script>
+{% endblock %}

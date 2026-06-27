@@ -94,6 +94,19 @@ class RitualRioLandingSitemap(Sitemap):
         return reverse(item)
 
 
+class PausaLandingSitemap(Sitemap):
+    """Sitemap para la landing 'Pausa junto al río' (H-041). Indexable por diseño
+    (es el destino de los anuncios de Google + Meta)."""
+    changefreq = 'weekly'
+    priority = 0.8
+
+    def items(self):
+        return ['pausa_landing']
+
+    def location(self, item):
+        return reverse(item)
+
+
 class CategoriaSitemap(Sitemap):
     """Sitemap dinámico para categorías de servicios individuales"""
     changefreq = 'weekly'

@@ -800,6 +800,42 @@ def ritual_rio_landing_view(request):
     })
 
 
+def pausa_landing_view(request):
+    """Landing INDEXABLE de la "Pausa junto al río" (H-041): la experiencia de ENTRADA —
+    tina caliente + masaje en pareja, el MISMO día, sin alojamiento. Destino de los anuncios
+    de Google + Meta. CTA único → WhatsApp con medición (GA4 pausa_whatsapp_click + Meta Lead).
+    Reusa el molde del Ritual y su `RitualRioLandingConfig` (mismas reseñas/fotos reales).
+    """
+    try:
+        canonical_url = request.build_absolute_uri(request.path)
+    except Exception:
+        canonical_url = request.path
+    whatsapp_url = (
+        'https://wa.me/56957902525?text='
+        'Hola%2C%20quiero%20reservar%20la%20Pausa%20junto%20al%20r%C3%ADo'
+    )
+    try:
+        from ventas.models import RitualRioLandingConfig
+        config = RitualRioLandingConfig.get_solo()
+    except Exception:
+        config = None
+    resenas = []
+    if config:
+        resenas = [
+            (config.resena1_foto, config.resena1_texto, config.resena1_autor),
+            (config.resena2_foto, config.resena2_texto, config.resena2_autor),
+            (config.resena3_foto, config.resena3_texto, config.resena3_autor),
+        ]
+    return render(request, 'ventas/pausa_landing.html', {
+        'canonical_url': canonical_url,
+        'whatsapp_url': whatsapp_url,
+        'config': config,
+        'resenas': resenas,
+        'precio_domjue': '110.000',   # Pausa dom-jue, 2 personas (Jorge 2026-06-26)
+        'precio_finde': '130.000',    # Pausa vie-sáb, 2 personas
+    })
+
+
 def refugio_submit_view(request):
     """Procesa el formulario de la landing /refugio/.
 
