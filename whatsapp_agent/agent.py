@@ -846,11 +846,19 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
             try:
                 args = args or {}
                 servicio_id = args.get('servicio_id')
+                from .availability import validar_hora_es_slot
+                # Si el id que pasó el modelo YA es válido para esa hora, NO lo sobreescribas por
+                # nombre. Caso pack tina+masaje: el masaje del pack tiene un horario (ej. 19:15) que
+                # el masaje genérico no tiene; el override por nombre lo cambiaría al genérico y la
+                # hora se rechazaría como inválida → derivación innecesaria. El override sigue activo
+                # cuando el id es inválido para la hora (o no se pasó id).
+                id_ya_valido = bool(servicio_id) and validar_hora_es_slot(
+                    servicio_id, args.get('fecha'), args.get('hora')) is None
                 # Override determinístico: si el LLM pasó el nombre que dijo el cliente y
                 # resuelve a UN único servicio principal, usar ESE id (evita que el modelo
                 # tome el id equivocado entre servicios parecidos, ej. "Llaima" vs "Puntiagudo").
                 nombre_servicio = (args.get('nombre_servicio') or '').strip()
-                if nombre_servicio:
+                if nombre_servicio and not id_ya_valido:
                     from ventas.models import Servicio
                     from .availability import TIPOS_PRINCIPALES
                     matches = list(Servicio.objects.filter(
@@ -873,7 +881,6 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                             'mensaje': 'Necesito saber para cuántas personas es. Pregúntale al cliente antes de agregar al carrito. NO asumas 1.'}
                 # Defensa en código: el modelo liviano a veces inventa una hora que no
                 # es un slot real (ej. 16:30). No agregar al carrito si la hora no existe.
-                from .availability import validar_hora_es_slot
                 err_hora = validar_hora_es_slot(servicio_id, args.get('fecha'), args.get('hora'))
                 if err_hora:
                     return {'success': False, **err_hora}
