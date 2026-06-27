@@ -819,13 +819,13 @@ def pausa_landing_view(request):
         config = RitualRioLandingConfig.get_solo()
     except Exception:
         config = None
-    resenas = []
-    if config:
-        resenas = [
-            (config.resena1_foto, config.resena1_texto, config.resena1_autor),
-            (config.resena2_foto, config.resena2_texto, config.resena2_autor),
-            (config.resena3_foto, config.resena3_texto, config.resena3_autor),
-        ]
+    # Reseñas REALES de TripAdvisor, curadas para la Pausa: una de masaje, una de tina y una
+    # del lugar (extractos breves con atribución). Propias de esta landing (no las del Ritual).
+    resenas = [
+        (None, 'Los masajes descontracturantes fueron increíbles, combinados con técnicas quiroprácticas.', 'Nicolás · TripAdvisor'),
+        (None, 'Maravillosas tinas de agua caliente, temperatura perfecta, al borde del río.', 'Vanessa · Santiago'),
+        (None, 'El lugar es hermoso, las tinas al aire libre rodeadas de naturaleza; ideal para relajarse.', 'Cristina · TripAdvisor'),
+    ]
     return render(request, 'ventas/pausa_landing.html', {
         'canonical_url': canonical_url,
         'whatsapp_url': whatsapp_url,

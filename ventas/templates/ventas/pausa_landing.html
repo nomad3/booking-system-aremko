@@ -127,7 +127,7 @@
   <section class="rr-section">
     <h2 class="rr-h2">Lo que dicen quienes ya vinieron</h2>
     <div class="rr-revs">
-      {% if config.resena1_texto or config.resena2_texto or config.resena3_texto %}
+      {% if resenas %}
         {% for foto, texto, autor in resenas %}
           {% if texto %}
             <div class="rr-rev">
