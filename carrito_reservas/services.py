@@ -302,10 +302,14 @@ class CarritoService:
                 if packs:
                     for pack in packs:
                         descuento_combo += Decimal(str(pack.get('descuento', 0)))
+                        # packs_aplicados es un JSONField: los valores deben ser serializables.
+                        # pack['descuento'] viene como Decimal → int (un Decimal rompe carrito.save
+                        # con "Object of type Decimal is not JSON serializable"). pack_id/nombre a
+                        # tipos planos por las dudas.
                         packs_aplicados.append({
-                            'pack_id': pack.get('id'),
-                            'nombre': pack.get('nombre'),
-                            'descuento': pack.get('descuento')
+                            'pack_id': int(pack['id']) if pack.get('id') is not None else None,
+                            'nombre': str(pack.get('nombre') or ''),
+                            'descuento': int(pack.get('descuento') or 0),
                         })
             except Exception as exc:
                 logger.warning(f'Error detectando packs: {exc}')
