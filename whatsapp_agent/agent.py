@@ -913,6 +913,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 if not producto_id:
                     return {'success': False, 'error': 'producto_no_resuelto',
                             'mensaje': f'No encontré el producto "{nombre_producto}" en el catálogo disponible.'}
+                external_id = phone if phone else 'desconocido'
                 # H-040 #1: si ya hay una propuesta vigente (Ritual/Refugio/pack ya cotizado),
                 # sumar el producto a ESA propuesta (no abrir un carrito separado que la pisaría).
                 from .reserva_service import agregar_producto_a_propuesta
@@ -923,7 +924,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     return actualizado
                 resultado = CarritoService.agregar_producto(
                     canal=canal,
-                    external_id=phone if phone else 'desconocido',
+                    external_id=external_id,
                     producto_id=producto_id,
                     cantidad=args.get('cantidad', 1)
                 )
