@@ -293,8 +293,12 @@ class CarritoService:
 
         if servicios_items:
             try:
-                # Usar PackDescuentoService para detectar packs
-                packs = PackDescuentoService.detectar_packs_aplicables(servicios_items)
+                # Usar PackDescuentoService para detectar packs. construir_cart NORMALIZA los
+                # ítems como los espera el motor: clave 'id' (los del carrito traen 'servicio_id')
+                # y masajes divididos por persona. Sin esto, el match de servicios específicos
+                # fallaba (buscaba 'id') y el descuento del pack no se aplicaba en el checkout.
+                packs = PackDescuentoService.detectar_packs_aplicables(
+                    PackDescuentoService.construir_cart(servicios_items))
                 if packs:
                     for pack in packs:
                         descuento_combo += Decimal(str(pack.get('descuento', 0)))
