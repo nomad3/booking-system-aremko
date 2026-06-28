@@ -34,30 +34,26 @@
   .ar-btn-lg{padding:16px 34px;font-size:17px}
   .ar-btn-ghost{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.7)}
   .ar-btn-ghost:hover{background:rgba(255,255,255,.12)}
-  .ar-hero{position:relative;min-height:460px;display:flex;flex-direction:column;justify-content:flex-end}
+  .ar-hero{position:relative;min-height:480px;display:flex;flex-direction:column;justify-content:flex-end}
   .ar-hero-photo{position:absolute;inset:0;
-    background:
-     radial-gradient(120% 90% at 50% 18%, rgba(255,221,168,.55), rgba(255,221,168,0) 55%),
-     radial-gradient(90% 60% at 50% 92%, rgba(255,255,255,.32), rgba(255,255,255,0) 60%),
-     linear-gradient(180deg,#7d5a33 0%,#8c6b40 22%,#5f6b4d 52%,#39473b 78%,#222c25 100%);}
-  .ar-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(20,17,13,.72) 0%,rgba(20,17,13,.15) 45%,rgba(20,17,13,.25) 100%)}
-  .ar-cap{position:absolute;top:64px;right:18px;font-size:10.5px;color:rgba(255,255,255,.82);background:rgba(0,0,0,.28);padding:4px 9px;border-radius:20px;letter-spacing:.02em}
+    background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_1300,h_660,f_auto,q_auto/servicios/Tina_Tronador_en_aremko_avsqbj') center/cover no-repeat,
+     linear-gradient(180deg,#7d5a33,#39473b);}
+  .ar-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(20,17,13,.74) 0%,rgba(20,17,13,.18) 45%,rgba(20,17,13,.30) 100%)}
   .ar-hero-tx{position:relative;z-index:2;padding:40px 44px 46px;max-width:640px}
   .ar-badge{display:inline-block;background:rgba(255,250,240,.92);color:var(--badgetx);font-size:12px;font-weight:600;padding:6px 14px;border-radius:30px;margin-bottom:16px}
-  .ar-hero h1{font-size:60px;color:#fff;letter-spacing:.01em;text-shadow:0 2px 18px rgba(0,0,0,.35)}
-  .ar-lead{font-size:18px;color:#f0ebe2;max-width:520px;margin:16px 0 26px;text-shadow:0 1px 10px rgba(0,0,0,.3)}
+  .ar-hero h1{font-size:60px;color:#fff;letter-spacing:.01em;text-shadow:0 2px 18px rgba(0,0,0,.4)}
+  .ar-lead{font-size:18px;color:#f0ebe2;max-width:520px;margin:16px 0 26px;text-shadow:0 1px 10px rgba(0,0,0,.35)}
   .ar-cta-row{display:flex;gap:14px;flex-wrap:wrap}
   .ar-sec{padding:56px 44px}
   .ar-sec>.ar-kicker{text-align:center}
   .ar-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
   .ar-card{background:var(--cream);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
   .ar-card-feat{box-shadow:0 8px 26px rgba(40,30,15,.12);transform:translateY(-6px)}
-  .ar-ph{position:relative;height:150px;display:flex;align-items:flex-end;justify-content:center}
-  .ar-cap2{font-size:10px;color:rgba(255,255,255,.9);background:rgba(0,0,0,.22);padding:3px 8px;border-radius:14px;margin-bottom:8px}
-  .ar-tag{position:absolute;top:10px;left:10px;background:var(--rust);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px}
-  .ar-ph-pausa{background:radial-gradient(80% 80% at 30% 20%,rgba(255,255,255,.4),transparent),linear-gradient(135deg,#d99a5b,#3f8a7d)}
-  .ar-ph-ritual{background:radial-gradient(70% 70% at 70% 25%,rgba(255,210,140,.6),transparent),linear-gradient(135deg,#6b4a6e,#caa15c)}
-  .ar-ph-refugio{background:radial-gradient(70% 70% at 40% 25%,rgba(255,255,255,.35),transparent),linear-gradient(135deg,#4f7a55,#9fae74)}
+  .ar-ph{position:relative;height:160px}
+  .ar-tag{position:absolute;top:10px;left:10px;z-index:2;background:var(--rust);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;box-shadow:0 1px 6px rgba(0,0,0,.3)}
+  .ar-ph-pausa{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_760,h_340,f_auto,q_auto/categorias/masaje_para_2_en_aremko_k1ncnr') center/cover no-repeat,linear-gradient(135deg,#d99a5b,#3f8a7d)}
+  .ar-ph-ritual{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_760,h_340,f_auto,q_auto/categorias/alojamientos_hero') center/cover no-repeat,linear-gradient(135deg,#6b4a6e,#caa15c)}
+  .ar-ph-refugio{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_760,h_340,f_auto,q_auto/servicios/Cabana_Arrayan_en_aremko_w1tq5i') center/cover no-repeat,linear-gradient(135deg,#4f7a55,#9fae74)}
   .ar-card-b{padding:20px 20px 22px}
   .ar-card-b h3{font-size:24px;margin-bottom:6px}
   .ar-card-b .ar-muted{font-size:14.5px;min-height:42px}
@@ -73,7 +69,7 @@
   .ar-mini-i h4{font-size:21px;margin-bottom:4px}
   .ar-mini-i .ar-muted{font-size:14px}
   .ar-why{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center}
-  .ar-ph-why{height:280px;border-radius:14px;background:radial-gradient(80% 70% at 40% 30%,rgba(255,255,255,.4),transparent),linear-gradient(160deg,#5f7559,#8a967a 60%,#aeb59a)}
+  .ar-ph-why{height:300px;border-radius:14px;background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_900,h_640,f_auto,q_auto/refugio/galeria/mirador_glvugz') center/cover no-repeat,linear-gradient(160deg,#5f7559,#aeb59a)}
   .ar-ul{list-style:none;padding:0;margin:18px 0 0}
   .ar-ul li{display:flex;gap:12px;align-items:flex-start;font-size:16px;margin-bottom:14px;color:var(--ink2)}
   .ar-ul li strong{color:var(--ink)}
@@ -99,16 +95,14 @@
 </head>
 <body>
 <div class="ar-site">
-  <h2 class="ar-sr">Maqueta de una nueva home boutique para aremko.cl.</h2>
+  <h2 class="ar-sr">Maqueta de una nueva home boutique para aremko.cl con fotos reales.</h2>
   <header class="ar-nav">
     <div class="ar-logo">Aremko</div>
     <nav class="ar-links"><a>Experiencias</a><a>Tinas</a><a>Cabañas</a><a>Reseñas</a></nav>
     <a class="ar-btn ar-btn-sm">Reservar</a>
   </header>
   <section class="ar-hero">
-    <div class="ar-hero-photo" role="img" aria-label="Foto: tina caliente humeante junto al río al atardecer">
-      <span class="ar-cap">▢ foto real · tina humeante al atardecer junto al Río Pescado</span>
-    </div>
+    <div class="ar-hero-photo" role="img" aria-label="Tina caliente de madera en Aremko"></div>
     <div class="ar-hero-tx">
       <span class="ar-badge">Spa boutique · Puerto Varas</span>
       <h1>Aguas calientes<br>junto al río</h1>
@@ -124,7 +118,7 @@
     <h2 class="ar-h2">Elige tu pausa junto al río</h2>
     <div class="ar-cards">
       <article class="ar-card">
-        <div class="ar-ph ar-ph-pausa"><span class="ar-cap2">▢ foto · tina + masaje</span></div>
+        <div class="ar-ph ar-ph-pausa"></div>
         <div class="ar-card-b">
           <h3>Pausa junto al río</h3>
           <p class="ar-muted">Tina caliente + masaje en pareja, en una sola tarde. Sin quedarse a dormir.</p>
@@ -133,7 +127,7 @@
         </div>
       </article>
       <article class="ar-card ar-card-feat">
-        <div class="ar-ph ar-ph-ritual"><span class="ar-tag">El favorito</span><span class="ar-cap2">▢ foto · cabaña al anochecer</span></div>
+        <div class="ar-ph ar-ph-ritual"><span class="ar-tag">El favorito</span></div>
         <div class="ar-card-b">
           <h3>Ritual del Río</h3>
           <p class="ar-muted">Cabaña + tina + masaje nocturno + desayuno. Una noche para reconectar.</p>
@@ -142,7 +136,7 @@
         </div>
       </article>
       <article class="ar-card">
-        <div class="ar-ph ar-ph-refugio"><span class="ar-cap2">▢ foto · bosque al amanecer</span></div>
+        <div class="ar-ph ar-ph-refugio"></div>
         <div class="ar-card-b">
           <h3>Refugio Aremko</h3>
           <p class="ar-muted">Dos noches en la misma cabaña, con el ritual completo la primera noche.</p>
@@ -161,7 +155,7 @@
     </div>
   </section>
   <section class="ar-sec ar-why">
-    <div class="ar-ph ar-ph-why"><span class="ar-cap2">▢ foto · río y bosque con neblina</span></div>
+    <div class="ar-ph-why" role="img" aria-label="Bosque y entorno natural de Aremko"></div>
     <div class="ar-why-tx">
       <p class="ar-kicker">Por qué Aremko</p>
       <h2 class="ar-h2 ar-h2-l">No es una piscina temperada.<br>Es el río.</h2>
