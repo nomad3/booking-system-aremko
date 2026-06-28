@@ -935,6 +935,14 @@ def crear_reserva(request):
                     propuesta.creada_at = timezone.now()
                     propuesta.save(update_fields=['estado', 'reserva_id', 'creada_at'])
                     logger.info(f'[Luna API] Propuesta {propuesta_id[:8]} marcada como creada (reserva {venta_reserva.id})')
+                    # Vaciar el carrito de esa conversación: ya se convirtió en reserva. Si no, el
+                    # carrito queda "zombie" (marcar_como_creado no se llama en ningún lado) y
+                    # reaparece en la próxima conversación del mismo cliente / en el estado inyectado.
+                    try:
+                        from carrito_reservas.services import CarritoService
+                        CarritoService.vaciar_carrito(propuesta.canal, propuesta.external_id)
+                    except Exception:  # noqa: BLE001 — no romper la creación por limpiar el carrito
+                        logger.exception('[Luna API] no se pudo vaciar el carrito tras crear la reserva')
                 except PropuestaReserva.DoesNotExist:
                     pass  # propuesta_id fue validado antes, no debería pasar
 
