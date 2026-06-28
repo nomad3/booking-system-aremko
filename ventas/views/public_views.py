@@ -155,9 +155,10 @@ def homepage_view(request):
         'cta_button_text': cta_button_text,
         'canonical_url': canonical_url,
     }
-    # Preview del rediseño boutique: /?preview=boutique (mismo contexto/SEO; la home
-    # actual queda intacta hasta el swap). Ver docs/SEO_BASELINE_HOME.md.
-    template = 'ventas/homepage_boutique.html' if request.GET.get('preview') == 'boutique' else 'ventas/homepage.html'
+    # SWAP 2026-06-28: la home boutique es la oficial en /. La antigua queda en
+    # /?classic=1 (comparación + fallback). Rollback total = revertir este commit.
+    # Ver docs/SEO_BASELINE_HOME.md (baseline a comparar en GSC 2-4 semanas).
+    template = 'ventas/homepage.html' if request.GET.get('classic') == '1' else 'ventas/homepage_boutique.html'
     return render(request, template, context)
 
 
