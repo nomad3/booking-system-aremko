@@ -547,6 +547,61 @@ def _historial_texto(phone, antes_de_ts, window):
     return '\n'.join(lineas)
 
 
+def _estado_estructurado(canal, external_id):
+    """Estado EN CURSO de este cliente (carrito + cotización vigente) como texto compacto.
+
+    Se inyecta SIEMPRE en el prompt para que Luna no dependa de la ventana de mensajes ni de
+    "recordar": el carrito y la propuesta viven en la BD (fuente de verdad). Determinístico y
+    READ-ONLY (no crea carrito vacío). Devuelve '' si no hay nada en curso.
+
+    - Carrito: solo si tiene ítems y fue tocado hace < 24h (evita resucitar uno abandonado).
+    - Cotización: solo la pendiente vigente (TTL 24h en esta_vigente()).
+    """
+    if not external_id:
+        return ''
+    from django.utils import timezone
+    bloques = []
+    try:
+        from carrito_reservas.models import CarritoReserva
+        carrito = CarritoReserva.objects.filter(canal=canal, external_id=external_id).first()
+        reciente = (carrito is not None and carrito.updated_at is not None
+                    and carrito.updated_at >= timezone.now() - timezone.timedelta(hours=24))
+        if carrito and carrito.items and reciente:
+            lineas = []
+            for it in carrito.items:
+                if it.get('tipo') == 'producto':
+                    lineas.append(f"  - [producto] {it.get('nombre')} x{it.get('cantidad', 1)} "
+                                  f"= ${int(it.get('subtotal') or 0):,}")
+                else:
+                    lineas.append(f"  - [servicio_id {it.get('servicio_id')}] {it.get('nombre')} · "
+                                  f"{it.get('fecha')} {it.get('hora')} · "
+                                  f"{it.get('cantidad_personas')} pers = ${int(it.get('subtotal') or 0):,}")
+            if carrito.descuento_combo:
+                lineas.append(f"  - Descuento pack = -${int(carrito.descuento_combo):,}")
+            lineas.append(f"  TOTAL carrito: ${int(carrito.total or 0):,}")
+            bloques.append(
+                'CARRITO EN CURSO (ya agregado — NO lo vuelvas a preguntar ni a agregar; usá estos '
+                'servicio_id y horas TAL CUAL si necesitás referirte a ellos):\n' + '\n'.join(lineas))
+    except Exception:  # noqa: BLE001 — el estado es contexto, nunca debe tumbar el borrador
+        logger.exception('[estado] no se pudo leer el carrito de %s/%s', canal, external_id)
+    try:
+        from .models import PropuestaReserva
+        prop = (PropuestaReserva.objects
+                .filter(canal=canal, external_id=external_id, estado='pendiente')
+                .order_by('-created_at').first())
+        if prop is not None and prop.esta_vigente():
+            bloques.append(
+                f'COTIZACIÓN YA ENVIADA Y VIGENTE (total ${int(prop.total or 0):,}): el cliente ya la '
+                'tiene para aprobar. Si pide un cambio, ajustá sobre ESA; NO armes otra cotización '
+                'desde cero. NO digas que está "confirmada"/"reservada" hasta que la apruebe.')
+    except Exception:  # noqa: BLE001
+        logger.exception('[estado] no se pudo leer la propuesta de %s/%s', canal, external_id)
+    if not bloques:
+        return ''
+    return ('# ESTADO ACTUAL DE ESTE CLIENTE (fuente de verdad de la BD — úsalo SIEMPRE; '
+            'prima sobre lo que recuerdes del chat)\n' + '\n\n'.join(bloques))
+
+
 def _guardar(entrante, *, texto='', escalar=False, motivo='', modo='', modelo='',
              error='', input_tokens=0, output_tokens=0, latency_ms=0):
     """Crea/actualiza la sugerencia (cache por wa_message_id)."""
@@ -628,7 +683,11 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
         system_prompt = prompt_mod.build_system_prompt(
             config.persona_tono, catalogo, config.link_reserva, config.conocimiento,
             fecha_hoy=_fecha_hoy_texto(), saludo_estado=saludo_estado, saludo_nombre=saludo_nombre)
-        user_prompt = prompt_mod.build_user_prompt(historial, mensaje, datos_cliente=datos_cliente)
+        # Estado en curso (carrito + cotización vigente) leído de la BD, para que Luna no
+        # dependa de la ventana de mensajes ni de "recordar" lo ya armado.
+        estado_actual = _estado_estructurado(canal, phone)
+        user_prompt = prompt_mod.build_user_prompt(
+            historial, mensaje, datos_cliente=datos_cliente, estado_actual=estado_actual)
     except Exception as exc:  # noqa: BLE001 — nunca romper por el armado del prompt
         logger.exception('Agente WA: error armando el prompt: %s', exc)
         return _borrador_escala('no se pudo armar el prompt', error=str(exc)[:200])
