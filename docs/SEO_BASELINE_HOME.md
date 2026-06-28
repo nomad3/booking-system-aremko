@@ -34,6 +34,20 @@ al portar el nuevo diseño a la home real. Comparar contra esto al lanzar.
 9. **PSI ≥ actual** (medir antes/después).
 10. **Post-lanzamiento:** monitorear GSC 2–4 semanas; si baja, **revertir el template en 1 commit** (misma URL, swap reversible).
 
-## Lo que falta (lo aporta Jorge — sin acceso programático a GSC)
-- Exportar en **Search Console** → Rendimiento, filtrado a la página `https://www.aremko.cl/`: **top queries** (clics/impresiones/posición). Esa es la lista de keywords a proteger.
-- Correr **pagespeed.web.dev** (mobile) sobre la home → anotar score + LCP/CLS para el baseline de performance.
+## Keywords a PROTEGER (GSC, últimos 3 meses, capturado 2026-06-28)
+
+**Marca (seguras — la búsqueda de marca encuentra la home igual):** aremko (690 clics), aremko spa (197), aremko aguas calientes puerto varas (181), arenko/aremco (mal escrito).
+
+**⭐ Genéricas (NO perder el contenido que las posiciona):**
+| Query | Clics | Impresiones |
+|---|---|---|
+| masajes puerto varas | 86 | 571 |
+| tinajas puerto varas | 70 | 541 |
+| spa puerto varas | 32 | 542 |
+| masajes en puerto varas | 30 | 224 |
+| masaje puerto varas | 28 | 123 |
+
+→ La home rediseñada DEBE mantener texto/encabezados con: **"masajes (en) Puerto Varas", "tinajas/tinas (calientes) Puerto Varas", "spa Puerto Varas"**. Nota: la gente busca **"tinajas"** (con J) — conservar esa palabra, no solo "tinas".
+
+## Pendiente
+- **pagespeed.web.dev** (mobile) sobre la home → score + LCP/CLS para el baseline de performance (medir antes/después). API keyless sin cupo el 2026-06-28.
