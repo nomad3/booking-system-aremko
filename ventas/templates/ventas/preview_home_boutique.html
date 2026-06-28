@@ -49,11 +49,11 @@
   .ar-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
   .ar-card{background:var(--cream);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
   .ar-card-feat{box-shadow:0 8px 26px rgba(40,30,15,.12);transform:translateY(-6px)}
-  .ar-ph{position:relative;height:160px}
+  .ar-ph{position:relative;aspect-ratio:1/1}
   .ar-tag{position:absolute;top:10px;left:10px;z-index:2;background:var(--rust);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;box-shadow:0 1px 6px rgba(0,0,0,.3)}
-  .ar-ph-pausa{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_760,h_340,f_auto,q_auto/categorias/masaje_para_2_en_aremko_k1ncnr') center/cover no-repeat,linear-gradient(135deg,#d99a5b,#3f8a7d)}
-  .ar-ph-ritual{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_760,h_340,f_auto,q_auto/categorias/alojamientos_hero') center/cover no-repeat,linear-gradient(135deg,#6b4a6e,#caa15c)}
-  .ar-ph-refugio{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_760,h_340,f_auto,q_auto/servicios/cabana_torre_en_aremko_spa_yhvngd') center/cover no-repeat,linear-gradient(135deg,#4f7a55,#9fae74)}
+  .ar-ph-pausa{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_700,h_700,f_auto,q_auto/categorias/masaje_para_2_en_aremko_k1ncnr') center/cover no-repeat,linear-gradient(135deg,#d99a5b,#3f8a7d)}
+  .ar-ph-ritual{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_700,h_700,f_auto,q_auto/categorias/alojamientos_hero') center/cover no-repeat,linear-gradient(135deg,#6b4a6e,#caa15c)}
+  .ar-ph-refugio{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_700,h_700,f_auto,q_auto/servicios/cabana_torre_en_aremko_spa_yhvngd') center/cover no-repeat,linear-gradient(135deg,#4f7a55,#9fae74)}
   .ar-card-b{padding:20px 20px 22px}
   .ar-card-b h3{font-size:24px;margin-bottom:6px}
   .ar-card-b .ar-muted{font-size:14.5px;min-height:42px}
@@ -73,7 +73,7 @@
   .ar-ul{list-style:none;padding:0;margin:18px 0 0}
   .ar-ul li{display:flex;gap:12px;align-items:flex-start;font-size:16px;margin-bottom:14px;color:var(--ink2)}
   .ar-ul li strong{color:var(--ink)}
-  .ar-ul li span{font-size:18px;line-height:1.4}
+  .ar-ul li .ar-li-ico{font-size:18px;line-height:1.4;flex:0 0 auto}
   .ar-revs{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
   .ar-rev{background:var(--cream);border:1px solid var(--line);border-radius:14px;padding:22px}
   .ar-stars{color:var(--gold);letter-spacing:2px;margin-bottom:10px}
@@ -161,10 +161,10 @@
       <p class="ar-kicker">Por qué Aremko</p>
       <h2 class="ar-h2 ar-h2-l">No es una piscina temperada.<br>Es el río.</h2>
       <ul class="ar-ul">
-        <li><span>🌊</span> El murmullo constante del <strong>Río Pescado</strong> de fondo, no música de ascensor.</li>
-        <li><span>🔒</span> Privacidad total: la tina es solo para ustedes.</li>
-        <li><span>✨</span> El único <strong>3-en-1</strong> (cabaña + tina + masaje) de Puerto Varas.</li>
-        <li><span>🌲</span> Bosque nativo, no estacionamiento de termas llenas.</li>
+        <li><span class="ar-li-ico">🌊</span><span>El murmullo constante del <strong>Río Pescado</strong> de fondo, no música de ascensor.</span></li>
+        <li><span class="ar-li-ico">🔒</span><span>Privacidad total: la tina es solo para ustedes.</span></li>
+        <li><span class="ar-li-ico">✨</span><span>El único <strong>3-en-1</strong> (cabaña + tina + masaje) de Puerto Varas.</span></li>
+        <li><span class="ar-li-ico">🌲</span><span>Bosque nativo, no estacionamiento de termas llenas.</span></li>
       </ul>
     </div>
   </section>
