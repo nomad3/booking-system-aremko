@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#2c2a27">
+<title>Aremko — maqueta home boutique</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#e7e0d4}
+  .ar-site{
+    --iv:#f3ede3; --cream:#fffdf9; --ink:#2c2a27; --ink2:#6f685c; --green:#0f6e56; --greend:#0c5b48;
+    --rust:#a85a32; --gold:#c8902a; --badge:#f1e7d6; --badgetx:#8a5a1d; --line:#e8ddca;
+    font-family:'Inter',system-ui,sans-serif; color:var(--ink); background:var(--iv);
+    overflow:hidden; line-height:1.6; max-width:1060px; margin:0 auto; position:relative;
+  }
+  .ar-site *{box-sizing:border-box}
+  .ar-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .ar-site h1,.ar-site h2,.ar-site h3,.ar-site h4{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;margin:0;line-height:1.1}
+  .ar-muted{color:var(--ink2)}
+  .ar-kicker{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--rust);font-weight:600;margin:0 0 8px}
+  .ar-h2{font-size:34px;margin:0 0 26px;text-align:center}
+  .ar-h2-l{text-align:left}
+  .ar-nav{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:20px 30px}
+  .ar-logo{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:700;color:#fff;letter-spacing:.02em;text-shadow:0 1px 8px rgba(0,0,0,.4)}
+  .ar-links{display:flex;gap:26px}
+  .ar-links a{color:#f3eee6;font-size:14px;font-weight:500;text-decoration:none;opacity:.92;text-shadow:0 1px 6px rgba(0,0,0,.4)}
+  .ar-btn{display:inline-block;background:var(--green);color:#f2fbf7;text-decoration:none;font-weight:600;font-size:15px;padding:13px 26px;border-radius:10px;cursor:pointer;border:none;transition:background .2s}
+  .ar-btn:hover{background:var(--greend)}
+  .ar-btn-sm{padding:9px 18px;font-size:13px}
+  .ar-btn-lg{padding:16px 34px;font-size:17px}
+  .ar-btn-ghost{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.7)}
+  .ar-btn-ghost:hover{background:rgba(255,255,255,.12)}
+  .ar-hero{position:relative;min-height:460px;display:flex;flex-direction:column;justify-content:flex-end}
+  .ar-hero-photo{position:absolute;inset:0;
+    background:
+     radial-gradient(120% 90% at 50% 18%, rgba(255,221,168,.55), rgba(255,221,168,0) 55%),
+     radial-gradient(90% 60% at 50% 92%, rgba(255,255,255,.32), rgba(255,255,255,0) 60%),
+     linear-gradient(180deg,#7d5a33 0%,#8c6b40 22%,#5f6b4d 52%,#39473b 78%,#222c25 100%);}
+  .ar-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(20,17,13,.72) 0%,rgba(20,17,13,.15) 45%,rgba(20,17,13,.25) 100%)}
+  .ar-cap{position:absolute;top:64px;right:18px;font-size:10.5px;color:rgba(255,255,255,.82);background:rgba(0,0,0,.28);padding:4px 9px;border-radius:20px;letter-spacing:.02em}
+  .ar-hero-tx{position:relative;z-index:2;padding:40px 44px 46px;max-width:640px}
+  .ar-badge{display:inline-block;background:rgba(255,250,240,.92);color:var(--badgetx);font-size:12px;font-weight:600;padding:6px 14px;border-radius:30px;margin-bottom:16px}
+  .ar-hero h1{font-size:60px;color:#fff;letter-spacing:.01em;text-shadow:0 2px 18px rgba(0,0,0,.35)}
+  .ar-lead{font-size:18px;color:#f0ebe2;max-width:520px;margin:16px 0 26px;text-shadow:0 1px 10px rgba(0,0,0,.3)}
+  .ar-cta-row{display:flex;gap:14px;flex-wrap:wrap}
+  .ar-sec{padding:56px 44px}
+  .ar-sec>.ar-kicker{text-align:center}
+  .ar-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .ar-card{background:var(--cream);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .ar-card-feat{box-shadow:0 8px 26px rgba(40,30,15,.12);transform:translateY(-6px)}
+  .ar-ph{position:relative;height:150px;display:flex;align-items:flex-end;justify-content:center}
+  .ar-cap2{font-size:10px;color:rgba(255,255,255,.9);background:rgba(0,0,0,.22);padding:3px 8px;border-radius:14px;margin-bottom:8px}
+  .ar-tag{position:absolute;top:10px;left:10px;background:var(--rust);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px}
+  .ar-ph-pausa{background:radial-gradient(80% 80% at 30% 20%,rgba(255,255,255,.4),transparent),linear-gradient(135deg,#d99a5b,#3f8a7d)}
+  .ar-ph-ritual{background:radial-gradient(70% 70% at 70% 25%,rgba(255,210,140,.6),transparent),linear-gradient(135deg,#6b4a6e,#caa15c)}
+  .ar-ph-refugio{background:radial-gradient(70% 70% at 40% 25%,rgba(255,255,255,.35),transparent),linear-gradient(135deg,#4f7a55,#9fae74)}
+  .ar-card-b{padding:20px 20px 22px}
+  .ar-card-b h3{font-size:24px;margin-bottom:6px}
+  .ar-card-b .ar-muted{font-size:14.5px;min-height:42px}
+  .ar-price{display:flex;align-items:baseline;gap:8px;margin:14px 0 10px}
+  .ar-price strong{font-size:22px;color:var(--ink)}
+  .ar-price small{color:var(--ink2);font-size:12.5px}
+  .ar-link{color:var(--green);font-weight:600;font-size:14px;text-decoration:none;cursor:pointer}
+  .ar-link:hover{color:var(--greend)}
+  .ar-band{background:var(--cream);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .ar-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:760px;margin:0 auto}
+  .ar-mini-i{text-align:center}
+  .ar-ico{font-size:30px;margin-bottom:8px}
+  .ar-mini-i h4{font-size:21px;margin-bottom:4px}
+  .ar-mini-i .ar-muted{font-size:14px}
+  .ar-why{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center}
+  .ar-ph-why{height:280px;border-radius:14px;background:radial-gradient(80% 70% at 40% 30%,rgba(255,255,255,.4),transparent),linear-gradient(160deg,#5f7559,#8a967a 60%,#aeb59a)}
+  .ar-ul{list-style:none;padding:0;margin:18px 0 0}
+  .ar-ul li{display:flex;gap:12px;align-items:flex-start;font-size:16px;margin-bottom:14px;color:var(--ink2)}
+  .ar-ul li strong{color:var(--ink)}
+  .ar-ul li span{font-size:18px;line-height:1.4}
+  .ar-revs{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .ar-rev{background:var(--cream);border:1px solid var(--line);border-radius:14px;padding:22px}
+  .ar-stars{color:var(--gold);letter-spacing:2px;margin-bottom:10px}
+  .ar-rev p{font-style:italic;color:var(--ink2);font-size:15px;margin:0 0 10px}
+  .ar-who{font-size:13px;color:var(--ink2)}
+  .ar-final{text-align:center;padding:62px 44px;background:radial-gradient(60% 100% at 50% 0%,rgba(168,90,50,.08),transparent),var(--iv)}
+  .ar-center{text-align:center;margin:6px auto 24px;max-width:440px}
+  .ar-foot{text-align:center;padding:26px;background:#2c2a27;color:#cfc7b8;font-size:13px}
+  .ar-foot em{color:#e8ddca}
+  @media(max-width:760px){
+    .ar-site{max-width:100%}
+    .ar-links{display:none}
+    .ar-hero h1{font-size:40px}.ar-hero-tx{padding:32px 24px 36px}
+    .ar-sec{padding:40px 22px}.ar-h2{font-size:27px}
+    .ar-cards,.ar-mini,.ar-revs{grid-template-columns:1fr}
+    .ar-why{grid-template-columns:1fr}.ar-card-feat{transform:none}
+  }
+</style>
+</head>
+<body>
+<div class="ar-site">
+  <h2 class="ar-sr">Maqueta de una nueva home boutique para aremko.cl.</h2>
+  <header class="ar-nav">
+    <div class="ar-logo">Aremko</div>
+    <nav class="ar-links"><a>Experiencias</a><a>Tinas</a><a>Cabañas</a><a>Reseñas</a></nav>
+    <a class="ar-btn ar-btn-sm">Reservar</a>
+  </header>
+  <section class="ar-hero">
+    <div class="ar-hero-photo" role="img" aria-label="Foto: tina caliente humeante junto al río al atardecer">
+      <span class="ar-cap">▢ foto real · tina humeante al atardecer junto al Río Pescado</span>
+    </div>
+    <div class="ar-hero-tx">
+      <span class="ar-badge">Spa boutique · Puerto Varas</span>
+      <h1>Aguas calientes<br>junto al río</h1>
+      <p class="ar-lead">Tinas humeantes, masajes y cabañas en el bosque nativo, al sonido del Río Pescado. Una pausa de verdad, a 20 minutos de Puerto Varas.</p>
+      <div class="ar-cta-row">
+        <a class="ar-btn">Reservar por WhatsApp</a>
+        <a class="ar-btn ar-btn-ghost">Ver experiencias ↓</a>
+      </div>
+    </div>
+  </section>
+  <section class="ar-sec">
+    <p class="ar-kicker">Nuestras experiencias</p>
+    <h2 class="ar-h2">Elige tu pausa junto al río</h2>
+    <div class="ar-cards">
+      <article class="ar-card">
+        <div class="ar-ph ar-ph-pausa"><span class="ar-cap2">▢ foto · tina + masaje</span></div>
+        <div class="ar-card-b">
+          <h3>Pausa junto al río</h3>
+          <p class="ar-muted">Tina caliente + masaje en pareja, en una sola tarde. Sin quedarse a dormir.</p>
+          <div class="ar-price"><strong>$110.000</strong><small>para dos · dom–jue</small></div>
+          <a class="ar-link">Ver la Pausa →</a>
+        </div>
+      </article>
+      <article class="ar-card ar-card-feat">
+        <div class="ar-ph ar-ph-ritual"><span class="ar-tag">El favorito</span><span class="ar-cap2">▢ foto · cabaña al anochecer</span></div>
+        <div class="ar-card-b">
+          <h3>Ritual del Río</h3>
+          <p class="ar-muted">Cabaña + tina + masaje nocturno + desayuno. Una noche para reconectar.</p>
+          <div class="ar-price"><strong>$210.000</strong><small>para dos · 1 noche · dom–jue</small></div>
+          <a class="ar-link">Ver el Ritual →</a>
+        </div>
+      </article>
+      <article class="ar-card">
+        <div class="ar-ph ar-ph-refugio"><span class="ar-cap2">▢ foto · bosque al amanecer</span></div>
+        <div class="ar-card-b">
+          <h3>Refugio Aremko</h3>
+          <p class="ar-muted">Dos noches en la misma cabaña, con el ritual completo la primera noche.</p>
+          <div class="ar-price"><strong>$290.000</strong><small>para dos · 2 noches</small></div>
+          <a class="ar-link">Ver el Refugio →</a>
+        </div>
+      </article>
+    </div>
+  </section>
+  <section class="ar-sec ar-band">
+    <p class="ar-kicker">También por separado</p>
+    <div class="ar-mini">
+      <div class="ar-mini-i"><div class="ar-ico">♨️</div><h4>Tinas calientes</h4><p class="ar-muted">Agua caliente privada, junto al río.</p></div>
+      <div class="ar-mini-i"><div class="ar-ico">💆</div><h4>Masajes</h4><p class="ar-muted">Relajación y descontracturante.</p></div>
+      <div class="ar-mini-i"><div class="ar-ico">🛖</div><h4>Cabañas</h4><p class="ar-muted">Para dos, en el bosque nativo.</p></div>
+    </div>
+  </section>
+  <section class="ar-sec ar-why">
+    <div class="ar-ph ar-ph-why"><span class="ar-cap2">▢ foto · río y bosque con neblina</span></div>
+    <div class="ar-why-tx">
+      <p class="ar-kicker">Por qué Aremko</p>
+      <h2 class="ar-h2 ar-h2-l">No es una piscina temperada.<br>Es el río.</h2>
+      <ul class="ar-ul">
+        <li><span>🌊</span> El murmullo constante del <strong>Río Pescado</strong> de fondo, no música de ascensor.</li>
+        <li><span>🔒</span> Privacidad total: la tina es solo para ustedes.</li>
+        <li><span>✨</span> El único <strong>3-en-1</strong> (cabaña + tina + masaje) de Puerto Varas.</li>
+        <li><span>🌲</span> Bosque nativo, no estacionamiento de termas llenas.</li>
+      </ul>
+    </div>
+  </section>
+  <section class="ar-sec">
+    <p class="ar-kicker">Lo que dicen quienes ya vinieron</p>
+    <div class="ar-revs">
+      <div class="ar-rev"><div class="ar-stars">★★★★★</div><p>"El masaje y la tina junto al río, impecables. Salimos como nuevos."</p><span class="ar-who">— Nicolás · TripAdvisor</span></div>
+      <div class="ar-rev"><div class="ar-stars">★★★★★</div><p>"El lugar es un sueño, el sonido del río no se me olvida más."</p><span class="ar-who">— Vanessa · TripAdvisor</span></div>
+      <div class="ar-rev"><div class="ar-stars">★★★★★</div><p>"Atención cálida y un entorno que de verdad desconecta."</p><span class="ar-who">— Cristina · TripAdvisor</span></div>
+    </div>
+  </section>
+  <section class="ar-final">
+    <h2 class="ar-h2">Tu pausa junto al río te espera</h2>
+    <p class="ar-lead ar-center" style="color:var(--ink2);text-shadow:none">Te coordinamos la fecha y la hora por WhatsApp.</p>
+    <a class="ar-btn ar-btn-lg">Reserva por WhatsApp</a>
+  </section>
+  <footer class="ar-foot">Aremko Spa Boutique · Puerto Varas · <em>Aguas calientes junto al río</em></footer>
+</div>
+</body>
+</html>

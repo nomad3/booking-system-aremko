@@ -132,6 +132,8 @@ urlpatterns = [
     path('ritual-del-rio/', ritual_rio_landing_view, name='ritual_rio_landing'),
     # Landing INDEXABLE de la "Pausa junto al río" (H-041) — tina + masaje, destino de anuncios
     path('pausa-junto-al-rio/', pausa_landing_view, name='pausa_landing'),
+    # Preview de la maqueta de home boutique (NOINDEX, sin link en el menú) — para revisar el rediseño
+    path('preview-home-boutique/', TemplateView.as_view(template_name='ventas/preview_home_boutique.html'), name='preview_home_boutique'),
     # Tarjetas QR imprimibles para Google Reviews (asset operativo interno)
     path('tarjetas-qr-reviews/', tarjetas_qr_reviews_view, name='tarjetas_qr_reviews'),
     # Encuesta de satisfacción D+1 (Tarea 1.4 plan maestro - sistema VoC nativo)
