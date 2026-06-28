@@ -157,11 +157,63 @@
 {% endif %}
 {% endblock %}
 
+{# Menú boutique ordenado — SOLO en la home (override de los bloques de base_public).
+   Mismas URLs (cero impacto SEO); agrupa las 3 experiencias y los secundarios. #}
+{% block nav_items %}
+<li class="nav-item dropdown">
+  <a class="nav-link dropdown-toggle" href="#" id="navExp" role="button" data-bs-toggle="dropdown" aria-expanded="false">Experiencias</a>
+  <ul class="dropdown-menu" aria-labelledby="navExp">
+    <li><a class="dropdown-item" href="{% url 'pausa_landing' %}">Pausa junto al río</a></li>
+    <li><a class="dropdown-item" href="{% url 'ritual_rio_landing' %}">Ritual del Río</a></li>
+    <li><a class="dropdown-item" href="{% url 'refugio_landing' %}">Refugio Aremko</a></li>
+  </ul>
+</li>
+<li class="nav-item"><a class="nav-link" href="{% url 'tinas' %}">Tinajas</a></li>
+<li class="nav-item"><a class="nav-link" href="{% url 'masajes' %}">Masajes</a></li>
+<li class="nav-item"><a class="nav-link" href="{% url 'alojamientos' %}">Cabañas</a></li>
+<li class="nav-item"><a class="nav-link" href="{% url 'ventas:giftcard_menu' %}">Gift Cards</a></li>
+<li class="nav-item dropdown">
+  <a class="nav-link dropdown-toggle" href="#" id="navMas" role="button" data-bs-toggle="dropdown" aria-expanded="false">Más</a>
+  <ul class="dropdown-menu" aria-labelledby="navMas">
+    <li><a class="dropdown-item" href="{% url 'productos' %}">Productos</a></li>
+    <li><a class="dropdown-item" href="{% url 'aremko_blog:blog-list' %}">Blog</a></li>
+    <li><a class="dropdown-item" href="{% url 'empresas' %}">Empresas</a></li>
+    <li><a class="dropdown-item" href="{% url 'homepage' %}#contacto">Contacto</a></li>
+  </ul>
+</li>
+{% endblock nav_items %}
+
+{% block nav_extra %}
+<a class="btn ar-nav-cta me-3" href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20en%20Aremko">Reservar</a>
+<div class="cart-icon me-3" id="cartIconWrapper">
+  <a href="{% url 'ventas:cart' %}" class="text-decoration-none text-dark">
+    <i class="fas fa-shopping-cart"></i>
+    <span class="cart-count" id="cartCount">{{ request.session.cart.servicios|length|default:0 }}</span>
+  </a>
+</div>
+{% if user.is_authenticated %}
+<span class="navbar-text me-2 small">Hola, {{ user.username }}</span>
+<a href="{% url 'logout' %}" class="btn btn-outline-secondary btn-sm">Salir</a>
+{% if user.is_staff %}<a href="{% url 'admin:index' %}" class="btn btn-outline-primary btn-sm ms-2">Admin</a>{% endif %}
+{% endif %}
+{% endblock nav_extra %}
+
 {% block extra_style %}
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap');
 /* La home boutique ocupa todo el ancho del <main> (sin el py-4 ni container) */
 main.py-4{padding:0 !important;background:#f3ede3}
+/* Menú boutique (solo en la home): limpio + tipografía de marca */
+.navbar{box-shadow:0 1px 0 #eadfce !important}
+.navbar-brand span{font-family:'Cormorant Garamond',Georgia,serif;font-size:25px;font-weight:700;color:#a85a32;letter-spacing:.01em}
+.navbar .nav-link{font-family:'Inter',system-ui,sans-serif;color:#2c2a27;font-weight:500;font-size:15px}
+.navbar .nav-link:hover,.navbar .nav-link:focus{color:#0f6e56}
+.navbar .dropdown-menu{border:1px solid #e8ddca;border-radius:10px;box-shadow:0 8px 24px rgba(40,30,15,.12);font-family:'Inter',system-ui,sans-serif;padding:6px}
+.navbar .dropdown-item{border-radius:7px;padding:8px 12px;font-size:14.5px}
+.navbar .dropdown-item:hover{background:#f3ede3}
+.navbar .dropdown-item:active{background:#0f6e56;color:#fff}
+.ar-nav-cta{background:#0f6e56;color:#fff !important;font-weight:600;border-radius:9px;padding:9px 20px}
+.ar-nav-cta:hover{background:#0c5b48;color:#fff !important}
 .ar-site{
   --iv:#f3ede3; --cream:#fffdf9; --ink:#2c2a27; --ink2:#6f685c; --green:#0f6e56; --greend:#0c5b48;
   --rust:#a85a32; --gold:#c8902a; --badge:#f1e7d6; --badgetx:#8a5a1d; --line:#e8ddca;
