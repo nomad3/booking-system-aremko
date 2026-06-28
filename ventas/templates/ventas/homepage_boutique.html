@@ -1,0 +1,341 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+{% load humanize %}
+{% load ventas_extras %}
+
+{# ──────────────────────────────────────────────────────────────────
+   Home boutique (fase 1 del rediseño). Extiende base_public.html →
+   conserva title/meta/JSON-LD/canonical/OG/GA4/Ads/Pixel + la nav y el
+   footer del sitio (links + SEO). Solo cambia el CUERPO (block content)
+   y los estilos (block extra_style). Cabeza SEO = verbatim de homepage.html.
+   Ver docs/SEO_BASELINE_HOME.md (checklist de preservación).
+   ────────────────────────────────────────────────────────────────── #}
+
+{% block title %}Aremko Spa Boutique · Aguas calientes junto al Río Pescado · Puerto Varas{% endblock %}
+
+{% block meta_description %}
+<meta name="description"
+    content="Aremko Spa Boutique en Puerto Varas: aguas calientes privadas junto al Río Pescado, masajes y alojamiento en bosque nativo. Reserva tu tina online.">
+{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SpaOrSalon",
+      "@id": "{{ request.scheme }}://{{ request.get_host }}/#business",
+      "name": "Aremko Spa Puerto Varas",
+      "alternateName": "AREMKO Spa",
+      "url": "{{ request.scheme }}://{{ request.get_host }}",
+      "logo": "{{ request.scheme }}://{{ request.get_host }}/static/images/logo.png",
+      "image": [
+        "{{ request.scheme }}://{{ request.get_host }}/static/images/aremko-spa.jpg",
+        "{{ request.scheme }}://{{ request.get_host }}/static/images/tinajas-calientes.jpg"
+      ],
+      "description": "Spa boutique en Puerto Varas ofreciendo masajes relajantes, tinajas calientes privadas junto al Río Pescado y alojamiento confortable. Escapadas románticas y experiencias de wellness en el corazón de la Región de Los Lagos.",
+      "telephone": "+56-9-5790-2525",
+      "email": "ventas@aremko.cl",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Rio Pescado - Camino a Ensenada km 19, km 4",
+        "addressLocality": "Puerto Varas",
+        "addressRegion": "Región de Los Lagos",
+        "postalCode": "5550000",
+        "addressCountry": "CL"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "-41.277611",
+        "longitude": "-72.768611"
+      },
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday"
+          ],
+          "opens": "09:00",
+          "closes": "21:00"
+        }
+      ],
+      "priceRange": "$$-$$$",
+      "currenciesAccepted": "CLP",
+      "paymentAccepted": "Transferencia Bancaria, Mercado Pago, Flow",
+      "amenityFeature": [
+        { "@type": "LocationFeatureSpecification", "name": "Tinajas Calientes Privadas", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "Junto al Río Pescado", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "Alojamiento", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "Estacionamiento", "value": true }
+      ],
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Servicios de Spa y Alojamiento",
+        "itemListElement": [
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Masajes Relajantes", "description": "Masajes terapéuticos y relajantes con aceites esenciales" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Tinajas Calientes", "description": "Tinajas calientes privadas junto al Río Pescado" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Alojamiento en Cabañas", "description": "Cabañas equipadas para estadía confortable" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Paquetes Románticos", "description": "Experiencias especiales para parejas" } }
+        ]
+      },
+      "sameAs": [
+        "https://www.instagram.com/aremkospa",
+        "https://www.facebook.com/aremkospa"
+      ],
+      "areaServed": {
+        "@type": "GeoCircle",
+        "geoMidpoint": { "@type": "GeoCoordinates", "latitude": "-41.3190", "longitude": "-72.9797" },
+        "geoRadius": "100000"
+      },
+      "slogan": "Tu escapada de relax en Puerto Varas",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.5",
+        "reviewCount": "930",
+        "bestRating": "5",
+        "worstRating": "1"
+      },
+      "review": [
+        { "@type": "Review", "author": { "@type": "Person", "name": "Karina R" }, "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" }, "reviewBody": "Espectacular, se nota la vocación que tienen, no tengo palabras para describir sus masajes.", "publisher": { "@type": "Organization", "name": "Trip.com" } },
+        { "@type": "Review", "author": { "@type": "Person", "name": "pilarisl" }, "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" }, "reviewBody": "El lugar es precioso, en un entorno de bosques y Río Pescado... un lujo en Puerto Varas.", "publisher": { "@type": "Organization", "name": "Trip.com" } },
+        { "@type": "Review", "author": { "@type": "Person", "name": "CaroFR2015" }, "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" }, "reviewBody": "Hace meses no dormía tan bien y tanto.", "publisher": { "@type": "Organization", "name": "Trip.com" } }
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "{{ request.scheme }}://{{ request.get_host }}/#website",
+      "url": "{{ request.scheme }}://{{ request.get_host }}",
+      "name": "Aremko Spa Puerto Varas",
+      "description": "Sistema de reservas online para Aremko Spa",
+      "publisher": { "@id": "{{ request.scheme }}://{{ request.get_host }}/#business" },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": { "@type": "EntryPoint", "urlTemplate": "{{ request.scheme }}://{{ request.get_host }}/?q={search_term_string}" },
+        "query-input": "required name=search_term_string"
+      },
+      "inLanguage": "es-CL"
+    },
+    {
+      "@type": "TouristAttraction",
+      "name": "Aremko Spa Experience",
+      "description": "Experiencia única de spa y wellness en Puerto Varas con tinajas calientes, masajes y alojamiento",
+      "touristType": [ "Parejas", "Familias", "Turistas de Wellness" ],
+      "isAccessibleForFree": false,
+      "publicAccess": true,
+      "address": { "@type": "PostalAddress", "addressLocality": "Puerto Varas", "addressRegion": "Región de Los Lagos", "addressCountry": "CL" }
+    },
+    {
+      "@type": "LodgingBusiness",
+      "name": "Aremko Alojamiento",
+      "description": "Cabañas y alojamiento confortable integrado con servicios de spa",
+      "address": { "@type": "PostalAddress", "addressLocality": "Puerto Varas", "addressRegion": "Región de Los Lagos", "addressCountry": "CL" },
+      "checkinTime": "15:00",
+      "checkoutTime": "12:00",
+      "petsAllowed": "false",
+      "starRating": { "@type": "Rating", "ratingValue": "4.5" }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "{{ request.scheme }}://{{ request.get_host }}" }
+      ]
+    }
+  ]
+}
+</script>
+{% if productos_jsonld %}
+<script type="application/ld+json">
+{{ productos_jsonld|safe }}
+</script>
+{% endif %}
+{% endblock %}
+
+{% block extra_style %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+/* La home boutique ocupa todo el ancho del <main> (sin el py-4 ni container) */
+main.py-4{padding:0 !important;background:#f3ede3}
+.ar-site{
+  --iv:#f3ede3; --cream:#fffdf9; --ink:#2c2a27; --ink2:#6f685c; --green:#0f6e56; --greend:#0c5b48;
+  --rust:#a85a32; --gold:#c8902a; --badge:#f1e7d6; --badgetx:#8a5a1d; --line:#e8ddca;
+  font-family:'Inter',system-ui,sans-serif; color:var(--ink); line-height:1.6; background:var(--iv);
+}
+.ar-site *{box-sizing:border-box}
+.ar-in{max-width:1080px;margin:0 auto}
+.ar-site h1,.ar-site h2,.ar-site h3,.ar-site h4{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;margin:0;line-height:1.1}
+.ar-muted{color:var(--ink2)}
+.ar-kicker{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--rust);font-weight:600;margin:0 0 8px}
+.ar-h2{font-size:34px;text-align:center;margin:0 0 26px}
+.ar-h2-l{text-align:left}
+.ar-btn{display:inline-block;background:var(--green);color:#f2fbf7;text-decoration:none;font-weight:600;font-size:15px;padding:13px 26px;border-radius:10px;border:none;cursor:pointer;transition:background .2s}
+.ar-btn:hover{background:var(--greend);color:#fff}
+.ar-btn-lg{padding:16px 34px;font-size:17px}
+.ar-btn-ghost{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.7)}
+.ar-btn-ghost:hover{background:rgba(255,255,255,.12);color:#fff}
+/* HERO */
+.ar-hero{position:relative;min-height:560px;display:flex;flex-direction:column;justify-content:flex-end}
+.ar-hero-photo{position:absolute;inset:0;
+  background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_1600,h_900,e_brightness:-30,f_auto,q_auto/servicios/Tina_Tronador_en_aremko_avsqbj') center/cover no-repeat,
+   linear-gradient(180deg,#7d5a33,#39473b)}
+.ar-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(18,15,12,.80) 0%,rgba(18,15,12,.44) 50%,rgba(18,15,12,.54) 100%)}
+.ar-hero-tx{position:relative;z-index:2;width:100%;max-width:1080px;margin:0 auto;padding:54px 44px 56px}
+.ar-badge{display:inline-block;background:rgba(255,250,240,.92);color:var(--badgetx);font-size:12px;font-weight:600;padding:6px 14px;border-radius:30px;margin-bottom:16px}
+.ar-hero h1{font-size:58px;color:#fff;letter-spacing:.01em;text-shadow:0 2px 18px rgba(0,0,0,.4);max-width:620px}
+.ar-lead{font-size:18px;color:#f4efe7;max-width:540px;margin:16px 0 26px;text-shadow:0 1px 16px rgba(0,0,0,.6),0 0 2px rgba(0,0,0,.4)}
+.ar-cta-row{display:flex;gap:14px;flex-wrap:wrap}
+/* SECCIONES */
+.ar-sec{padding:60px 44px}
+.ar-sec>.ar-kicker{text-align:center}
+.ar-intro{max-width:680px;margin:0 auto 6px;text-align:center;font-size:17px;color:var(--ink2)}
+.ar-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.ar-card{background:var(--cream);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;text-decoration:none;color:inherit}
+.ar-card-feat{box-shadow:0 8px 26px rgba(40,30,15,.12)}
+.ar-ph{position:relative;aspect-ratio:1/1}
+.ar-tag{position:absolute;top:10px;left:10px;z-index:2;background:var(--rust);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;box-shadow:0 1px 6px rgba(0,0,0,.3)}
+.ar-ph-pausa{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_700,h_700,f_auto,q_auto/ritual_rio/masajepara2_crsgck') center/cover no-repeat,linear-gradient(135deg,#d99a5b,#3f8a7d)}
+.ar-ph-ritual{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_700,h_700,f_auto,q_auto/categorias/alojamientos_hero') center/cover no-repeat,linear-gradient(135deg,#6b4a6e,#caa15c)}
+.ar-ph-refugio{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_700,h_700,f_auto,q_auto/servicios/cabana_torre_en_aremko_spa_yhvngd') center/cover no-repeat,linear-gradient(135deg,#4f7a55,#9fae74)}
+.ar-card-b{padding:20px 20px 22px}
+.ar-card-b h3{font-size:24px;margin-bottom:6px}
+.ar-card-b .ar-muted{font-size:14.5px;min-height:42px}
+.ar-price{display:flex;align-items:baseline;gap:8px;margin:14px 0 10px}
+.ar-price strong{font-size:22px;color:var(--ink)}
+.ar-price small{color:var(--ink2);font-size:12.5px}
+.ar-link{color:var(--green);font-weight:600;font-size:14px}
+.ar-band{background:var(--cream);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.ar-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:760px;margin:0 auto}
+.ar-mini-i{text-align:center;text-decoration:none;color:inherit;display:block}
+.ar-ico{font-size:30px;margin-bottom:8px}
+.ar-mini-i h4{font-size:21px;margin-bottom:4px}
+.ar-mini-i .ar-muted{font-size:14px}
+.ar-why{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center}
+.ar-ph-why{height:300px;border-radius:14px;background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_900,h_640,f_auto,q_auto/refugio/galeria/mirador_glvugz') center/cover no-repeat,linear-gradient(160deg,#5f7559,#aeb59a)}
+.ar-ul{list-style:none;padding:0;margin:18px 0 0}
+.ar-ul li{display:flex;gap:12px;align-items:flex-start;font-size:16px;margin-bottom:14px;color:var(--ink2)}
+.ar-ul li strong{color:var(--ink)}
+.ar-li-ico{font-size:18px;line-height:1.4;flex:0 0 auto}
+.ar-revs{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.ar-rev{background:var(--cream);border:1px solid var(--line);border-radius:14px;padding:22px}
+.ar-stars{color:var(--gold);letter-spacing:2px;margin-bottom:10px}
+.ar-rev p{font-style:italic;color:var(--ink2);font-size:15px;margin:0 0 10px}
+.ar-who{font-size:13px;color:var(--ink2)}
+.ar-final{text-align:center;padding:64px 44px;background:radial-gradient(60% 100% at 50% 0%,rgba(168,90,50,.08),transparent),var(--iv)}
+.ar-center{text-align:center;margin:6px auto 24px;max-width:460px;color:var(--ink2)}
+@media(max-width:760px){
+  .ar-hero{min-height:auto}
+  .ar-hero h1{font-size:40px}.ar-hero-tx{padding:40px 22px 44px}
+  .ar-sec{padding:42px 22px}.ar-h2{font-size:27px}
+  .ar-cards,.ar-mini,.ar-revs{grid-template-columns:1fr}
+  .ar-why{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ar-site">
+
+  <section class="ar-hero">
+    <div class="ar-hero-photo" role="img" aria-label="Tina caliente humeante junto al Río Pescado en Aremko Spa, Puerto Varas"></div>
+    <div class="ar-hero-tx">
+      <span class="ar-badge">Spa boutique · Puerto Varas</span>
+      <h1>Aguas calientes junto al río</h1>
+      <p class="ar-lead">Tinas humeantes, masajes y cabañas en el bosque nativo, al sonido del Río Pescado. Una pausa de verdad, a 20 minutos de Puerto Varas.</p>
+      <div class="ar-cta-row">
+        <a class="ar-btn" href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20en%20Aremko">Reservar por WhatsApp</a>
+        <a class="ar-btn ar-btn-ghost" href="#experiencias">Ver experiencias ↓</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="ar-sec" id="experiencias">
+    <div class="ar-in">
+      <p class="ar-kicker">Nuestras experiencias</p>
+      <h2 class="ar-h2">Elige tu pausa junto al río</h2>
+      <p class="ar-intro">Spa boutique en Puerto Varas: tinajas calientes privadas junto al Río Pescado, masajes en pareja y alojamiento en cabañas dentro de bosque nativo.</p>
+      <div class="ar-cards">
+        <a class="ar-card" href="{% url 'pausa_landing' %}">
+          <div class="ar-ph ar-ph-pausa"></div>
+          <div class="ar-card-b">
+            <h3>Pausa junto al río</h3>
+            <p class="ar-muted">Tina caliente + masaje en pareja, en una sola tarde. Sin quedarse a dormir.</p>
+            <div class="ar-price"><strong>$110.000</strong><small>para dos · dom–jue</small></div>
+            <span class="ar-link">Ver la Pausa →</span>
+          </div>
+        </a>
+        <a class="ar-card ar-card-feat" href="{% url 'ritual_rio_landing' %}">
+          <div class="ar-ph ar-ph-ritual"><span class="ar-tag">El favorito</span></div>
+          <div class="ar-card-b">
+            <h3>Ritual del Río</h3>
+            <p class="ar-muted">Cabaña + tina + masaje nocturno + desayuno. Una noche para reconectar.</p>
+            <div class="ar-price"><strong>$210.000</strong><small>para dos · 1 noche · dom–jue</small></div>
+            <span class="ar-link">Ver el Ritual →</span>
+          </div>
+        </a>
+        <a class="ar-card" href="{% url 'refugio_landing' %}">
+          <div class="ar-ph ar-ph-refugio"></div>
+          <div class="ar-card-b">
+            <h3>Refugio Aremko</h3>
+            <p class="ar-muted">Dos noches en la misma cabaña, con el ritual completo la primera noche.</p>
+            <div class="ar-price"><strong>$290.000</strong><small>para dos · 2 noches</small></div>
+            <span class="ar-link">Ver el Refugio →</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="ar-sec ar-band">
+    <div class="ar-in">
+      <p class="ar-kicker">También por separado</p>
+      <div class="ar-mini">
+        <a class="ar-mini-i" href="{% url 'tinas' %}"><div class="ar-ico">♨️</div><h4>Tinas calientes</h4><p class="ar-muted">Tinajas calientes privadas en Puerto Varas, junto al río.</p></a>
+        <a class="ar-mini-i" href="{% url 'masajes' %}"><div class="ar-ico">💆</div><h4>Masajes</h4><p class="ar-muted">Masajes en Puerto Varas: relajación y descontracturante.</p></a>
+        <a class="ar-mini-i" href="{% url 'alojamientos' %}"><div class="ar-ico">🛖</div><h4>Cabañas</h4><p class="ar-muted">Alojamiento para dos, en el bosque nativo.</p></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="ar-sec">
+    <div class="ar-in ar-why">
+      <div class="ar-ph-why" role="img" aria-label="Río Pescado y bosque nativo en Aremko, Puerto Varas"></div>
+      <div class="ar-why-tx">
+        <p class="ar-kicker">Por qué Aremko</p>
+        <h2 class="ar-h2 ar-h2-l">No es una piscina temperada.<br>Es el río.</h2>
+        <ul class="ar-ul">
+          <li><span class="ar-li-ico">🌊</span><span>El murmullo constante del <strong>Río Pescado</strong> de fondo, no música de ascensor.</span></li>
+          <li><span class="ar-li-ico">🔒</span><span>Privacidad total: la tina es solo para ustedes.</span></li>
+          <li><span class="ar-li-ico">✨</span><span>El único <strong>3-en-1</strong> (cabaña + tina + masaje) de Puerto Varas.</span></li>
+          <li><span class="ar-li-ico">🌲</span><span>Bosque nativo, no estacionamiento de termas llenas.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="ar-sec">
+    <div class="ar-in">
+      <p class="ar-kicker">Lo que dicen quienes ya vinieron</p>
+      <div class="ar-revs">
+        <div class="ar-rev"><div class="ar-stars">★★★★★</div><p>"El masaje y la tina junto al río, impecables. Salimos como nuevos."</p><span class="ar-who">— Nicolás · TripAdvisor</span></div>
+        <div class="ar-rev"><div class="ar-stars">★★★★★</div><p>"El lugar es un sueño, el sonido del río no se me olvida más."</p><span class="ar-who">— Vanessa · TripAdvisor</span></div>
+        <div class="ar-rev"><div class="ar-stars">★★★★★</div><p>"Atención cálida y un entorno que de verdad desconecta."</p><span class="ar-who">— Cristina · TripAdvisor</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ar-final">
+    <div class="ar-in">
+      <h2 class="ar-h2">Tu pausa junto al río te espera</h2>
+      <p class="ar-center">Te coordinamos la fecha y la hora por WhatsApp.</p>
+      <a class="ar-btn ar-btn-lg" href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20en%20Aremko">Reserva por WhatsApp</a>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

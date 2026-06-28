@@ -155,7 +155,10 @@ def homepage_view(request):
         'cta_button_text': cta_button_text,
         'canonical_url': canonical_url,
     }
-    return render(request, 'ventas/homepage.html', context)
+    # Preview del rediseño boutique: /?preview=boutique (mismo contexto/SEO; la home
+    # actual queda intacta hasta el swap). Ver docs/SEO_BASELINE_HOME.md.
+    template = 'ventas/homepage_boutique.html' if request.GET.get('preview') == 'boutique' else 'ventas/homepage.html'
+    return render(request, template, context)
 
 
 def categoria_detail_view(request, categoria_id):
