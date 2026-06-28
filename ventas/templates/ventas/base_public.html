@@ -105,6 +105,20 @@
     <!-- Link to your custom modern CSS -->
     <link rel="stylesheet" href="{% static 'css/modern.css' %}">
 
+    <!-- Boutique: tipografía de marca + menú limpio (todo el sitio) -->
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+      .navbar{box-shadow:0 1px 0 #eadfce !important}
+      .navbar-brand span{font-family:'Cormorant Garamond',Georgia,serif;font-size:25px;font-weight:700;color:#a85a32;letter-spacing:.01em}
+      .navbar .nav-link{color:#2c2a27;font-weight:500;font-size:15px}
+      .navbar .nav-link:hover,.navbar .nav-link:focus{color:#0f6e56}
+      .navbar .dropdown-menu{border:1px solid #e8ddca;border-radius:10px;box-shadow:0 8px 24px rgba(40,30,15,.12);padding:6px}
+      .navbar .dropdown-item{border-radius:7px;padding:8px 12px;font-size:14.5px}
+      .navbar .dropdown-item:hover{background:#f3ede3}
+      .ar-nav-cta{background:#0f6e56;color:#fff !important;font-weight:600;border-radius:9px;padding:9px 20px}
+      .ar-nav-cta:hover{background:#0c5b48;color:#fff !important}
+    </style>
+
     <!-- Custom CSS (Inline styles - consider moving more to modern.css) -->
     <style>
         :root {
@@ -431,75 +445,44 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     {% block nav_items %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'tinas' %}">Tinajas</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'masajes' %}">Masajes</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'alojamientos' %}">Alojamientos</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'productos' %}">Productos</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'aremko_blog:blog-list' %}">Blog</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'homepage' %}#contacto">Contacto</a>
-                    </li>
+                    {# Menú boutique unificado (todo el sitio). Mismas URLs. #}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownEmpresas" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            Empresas
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarDropdownEmpresas">
-                            <li><a class="dropdown-item" href="{% url 'empresas' %}">Reuniones Corporativas</a></li>
-                            <li><a class="dropdown-item" href="{% url 'empresas_presentacion' %}">Convenio Empresarial</a></li>
+                        <a class="nav-link dropdown-toggle" href="#" id="navExp" role="button" data-bs-toggle="dropdown" aria-expanded="false">Experiencias</a>
+                        <ul class="dropdown-menu" aria-labelledby="navExp">
+                            <li><a class="dropdown-item" href="{% url 'pausa_landing' %}">Pausa junto al río</a></li>
+                            <li><a class="dropdown-item" href="{% url 'ritual_rio_landing' %}">Ritual del Río</a></li>
+                            <li><a class="dropdown-item" href="{% url 'refugio_landing' %}">Refugio Aremko</a></li>
                         </ul>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link fw-bold" style="color: #137a8c;" href="{% url 'pausa_landing' %}">
-                            <i class="fas fa-water me-1"></i>Pausa
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link fw-bold" style="color: #A0522D;" href="{% url 'refugio_landing' %}">
-                            <i class="fas fa-leaf me-1"></i>Refugio
-                        </a>
-                    </li>
-                    {% if ritual_rio_en_menu %}
-                    <li class="nav-item">
-                        <a class="nav-link fw-bold" style="color: #0f6e56;" href="{% url 'ritual_rio_landing' %}">
-                            <i class="fas fa-moon me-1"></i>Ritual del Río
-                        </a>
-                    </li>
-                    {% endif %}
-                    <li class="nav-item">
-                        <a class="nav-link fw-bold text-warning" href="{% url 'ventas:giftcard_menu' %}">
-                            <i class="fas fa-gift me-1"></i>GiftCards
-                        </a>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'tinas' %}">Tinajas</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'masajes' %}">Masajes</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'alojamientos' %}">Cabañas</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'ventas:giftcard_menu' %}">Gift Cards</a></li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navMas" role="button" data-bs-toggle="dropdown" aria-expanded="false">Más</a>
+                        <ul class="dropdown-menu" aria-labelledby="navMas">
+                            <li><a class="dropdown-item" href="{% url 'productos' %}">Productos</a></li>
+                            <li><a class="dropdown-item" href="{% url 'aremko_blog:blog-list' %}">Blog</a></li>
+                            <li><a class="dropdown-item" href="{% url 'empresas' %}">Empresas</a></li>
+                            <li><a class="dropdown-item" href="{% url 'empresas_presentacion' %}">Convenio Empresarial</a></li>
+                            <li><a class="dropdown-item" href="{% url 'homepage' %}#contacto">Contacto</a></li>
+                        </ul>
                     </li>
                     {% endblock nav_items %}
                 </ul>
                 <div class="d-flex align-items-center">
                     {% block nav_extra %}
-                    <div class="cart-icon me-4" id="cartIconWrapper">
+                    <a class="btn ar-nav-cta me-3" href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20en%20Aremko">Reservar</a>
+                    <div class="cart-icon me-3" id="cartIconWrapper">
                         <a href="{% url 'ventas:cart' %}" class="text-decoration-none text-dark">
                             <i class="fas fa-shopping-cart"></i>
-                            <span class="cart-count" id="cartCount">
-                                {{ request.session.cart.servicios|length|default:0 }}
-                            </span>
+                            <span class="cart-count" id="cartCount">{{ request.session.cart.servicios|length|default:0 }}</span>
                         </a>
-                        <!-- Cart Dropdown can be added here if needed globally, or kept page-specific -->
                     </div>
-
                     {% if user.is_authenticated %}
-                    <span class="navbar-text me-3">Hola, {{ user.username }}</span>
+                    <span class="navbar-text me-2 small">Hola, {{ user.username }}</span>
                     <a href="{% url 'logout' %}" class="btn btn-outline-secondary btn-sm">Salir</a>
-                    {% if user.is_staff %}
-                    <a href="{% url 'admin:index' %}" class="btn btn-outline-primary btn-sm ms-2">Admin</a>
-                    {% endif %}
+                    {% if user.is_staff %}<a href="{% url 'admin:index' %}" class="btn btn-outline-primary btn-sm ms-2">Admin</a>{% endif %}
                     {% endif %}
                     {% endblock nav_extra %}
                 </div>
