@@ -41,24 +41,35 @@
 <style>
 /* Hero Section */
 .productos-hero {
-    background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
-    padding: 100px 0 80px 0;
+    position: relative;
+    background: url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_1600,h_620,e_brightness:-25,f_auto,q_auto/productos/Tabla_de_quesos_en_Aremko_jqhebv') center/cover no-repeat, linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+    padding: 110px 0 90px 0;
     text-align: center;
-    color: white;
+    color: #fff;
     margin-bottom: 60px;
 }
+.productos-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(0deg, rgba(18,15,12,.68) 0%, rgba(18,15,12,.42) 100%);
+}
+.productos-hero .container { position: relative; z-index: 2; }
 
 .productos-hero h1 {
-    font-size: 3rem;
-    font-weight: 700;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 3.4rem;
+    font-weight: 600;
     margin-bottom: 20px;
+    text-shadow: 0 2px 18px rgba(0,0,0,.4);
 }
 
 .productos-hero p {
-    font-size: 1.3rem;
+    font-size: 1.25rem;
     max-width: 700px;
     margin: 0 auto;
-    opacity: 0.95;
+    color: #f0ebe2;
+    text-shadow: 0 1px 12px rgba(0,0,0,.4);
 }
 
 /* Product Grid */
