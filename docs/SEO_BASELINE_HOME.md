@@ -49,5 +49,16 @@ al portar el nuevo diseño a la home real. Comparar contra esto al lanzar.
 
 → La home rediseñada DEBE mantener texto/encabezados con: **"masajes (en) Puerto Varas", "tinajas/tinas (calientes) Puerto Varas", "spa Puerto Varas"**. Nota: la gente busca **"tinajas"** (con J) — conservar esa palabra, no solo "tinas".
 
-## Pendiente
-- **pagespeed.web.dev** (mobile) sobre la home → score + LCP/CLS para el baseline de performance (medir antes/después). API keyless sin cupo el 2026-06-28.
+## PageSpeed baseline (mobile, 2026-06-28)
+
+**Campo (CrUX, usuarios reales — lo que rankea): ✅ Core Web Vitals APROBADA**
+- LCP **2,4 s** · CLS **0** · FCP 2,2 s · TTFB 1,3 s · INP N/A
+
+**Lab (Lighthouse, Moto G Power / 4G lento — sintético, más duro):**
+- Rendimiento **51** · LCP 30,0 s · FCP 4,1 s · TBT 570 ms · CLS 0 · SI 4,1 s
+- Accesibilidad 87 · Recomendaciones 100 · **SEO 100** · Datos estructurados válidos
+
+**Lastres principales (los arregla el rediseño vía Cloudinary):**
+- Peso total **18,7 MB** · imágenes sin optimizar (−4.335 KiB) · render-blocking (−3.220 ms) · CSS sin usar 47 KiB · JS sin usar 295 KiB · imágenes sin width/height · >4 preconnects.
+
+**Metas al portar (no regresar nada):** mantener CWV aprobado + SEO 100; hero con `preload` + responsive (matar LCP 30s lab); `width/height` en imgs; recortar CSS/JS sin usar; ≤4 preconnects. El rediseño DEBE bajar drásticamente el peso (todo por Cloudinary f_auto/q_auto/responsive).
