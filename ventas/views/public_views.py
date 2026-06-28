@@ -215,10 +215,11 @@ def categoria_detail_view(request, categoria_id):
         'seo_content': seo_content,  # Pass SEO content to template
         'decoraciones': decoraciones,
     }
-    # Preview del restyle boutique de las páginas de servicio: ?preview=boutique
-    # (mismo motor de reservas; la página actual queda intacta hasta el swap).
-    template = ('ventas/category_detail_boutique.html'
-                if request.GET.get('preview') == 'boutique' else 'ventas/category_detail.html')
+    # SWAP 2026-06-28: páginas de servicio (tinas/masajes/cabañas) con skin boutique
+    # por defecto. La versión antigua en ?classic=1 (fallback). Motor de reservas
+    # idéntico. Rollback = revertir este commit.
+    template = ('ventas/category_detail.html'
+                if request.GET.get('classic') == '1' else 'ventas/category_detail_boutique.html')
     return render(request, template, context)
 
 
