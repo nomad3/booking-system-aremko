@@ -215,7 +215,11 @@ def categoria_detail_view(request, categoria_id):
         'seo_content': seo_content,  # Pass SEO content to template
         'decoraciones': decoraciones,
     }
-    return render(request, 'ventas/category_detail.html', context)
+    # Preview del restyle boutique de las páginas de servicio: ?preview=boutique
+    # (mismo motor de reservas; la página actual queda intacta hasta el swap).
+    template = ('ventas/category_detail_boutique.html'
+                if request.GET.get('preview') == 'boutique' else 'ventas/category_detail.html')
+    return render(request, template, context)
 
 
 def tinas_view(request):
