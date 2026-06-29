@@ -177,6 +177,7 @@ class OpenRouterProvider:
         total_output_tokens = 0
         total_latency_ms = 0
         tool_calls_executed = []
+        force_text = False  # se activa si el modelo devuelve vacío TRAS ejecutar tools (quirk)
 
         try:
             for iteration in range(max_iterations + 1):
@@ -193,8 +194,9 @@ class OpenRouterProvider:
                         "X-Title": settings.DPV_LLM_SITE_NAME,
                     },
                 }
-                # En la última iteración forzamos respuesta de texto (sin tools)
-                if not is_last_iteration:
+                # En la última iteración (o si forzamos texto por respuesta vacía) NO pasamos
+                # tools → el modelo se ve obligado a redactar texto.
+                if not is_last_iteration and not force_text:
                     kwargs["tools"] = tools
                     kwargs["tool_choice"] = "auto"
 
@@ -213,6 +215,13 @@ class OpenRouterProvider:
 
                 if not tool_calls or is_last_iteration:
                     text = (msg.content or "").strip()
+                    # Quirk (gemini-flash y otros): tras ejecutar tools devuelven un mensaje VACÍO
+                    # (sin content ni tool_calls) en vez del texto de cierre → la conversación
+                    # quedaba sin borrador. Si ya ejecutamos tools y el texto vino vacío, forzamos
+                    # UNA ronda más SIN tools para que el modelo redacte el cierre.
+                    if not text and tool_calls_executed and not is_last_iteration and not force_text:
+                        force_text = True
+                        continue
                     return LLMResult(
                         text=text,
                         model=model_effective,
