@@ -2,6 +2,7 @@
 {% load static %}
 {% load humanize %}
 {% load ventas_extras %}
+{% load l10n %}
 
 {# Menú boutique (mismo que la home) — override de base_public; mismas URLs. #}
 {% block nav_items %}
@@ -59,16 +60,11 @@
 {% endif %}
 {% endblock %}
 
-{% block extra_head %}
-<!-- Open Graph Tags -->
-<meta property="og:title" content="{% if seo_content and seo_content.meta_title %}{{ seo_content.meta_title }}{% else %}{{ categoria_actual.nombre }} | Aremko Spa Puerto Varas{% endif %}">
-<meta property="og:description" content="{% if seo_content and seo_content.meta_description %}{{ seo_content.meta_description }}{% else %}Experiencias únicas de {{ categoria_actual.nombre|lower }} en Puerto Varas{% endif %}">
-<meta property="og:type" content="website">
-<meta property="og:url" content="{{ canonical_url }}">
-{% if category_hero_image %}
-<meta property="og:image" content="{{ category_hero_image }}">
-{% endif %}
-
+{% block structured_data %}{% localize off %}
+{# JSON-LD de la categoría. Va en structured_data (base_public SÍ lo renderiza); antes
+   estaba en extra_head, bloque que base_public no imprime → no se mostraba (0 schema).
+   localize off: precios sin separador de miles (si no, rompen el JSON). Las OG las
+   provee base_public (meta_og); no se duplican acá. #}
 <!-- Schema.org JSON-LD -->
 {% if categoria_actual.id == 3 %}
 <!-- Schema específico para Alojamientos/Cabañas -->
@@ -194,18 +190,7 @@
 </script>
 {% endif %}
 
-<!-- Google Ads: Evento de conversión para página de Masajes -->
-{% if categoria_actual.id == 2 %}
-<script>
-    // Evento de page_view para rastrear visitas a la página de masajes
-    gtag('event', 'page_view', {
-        'send_to': 'AW-1767221019',
-        'page_title': '{{ categoria_actual.nombre }}',
-        'page_location': '{{ canonical_url }}'
-    });
-</script>
-{% endif %}
-{% endblock %}
+{% endlocalize %}{% endblock %}
 
 {% block extra_style %}
 <style>
