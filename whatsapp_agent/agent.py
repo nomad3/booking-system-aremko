@@ -936,9 +936,21 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 err_hora = validar_hora_es_slot(servicio_id, args.get('fecha'), args.get('hora'))
                 if err_hora:
                     return {'success': False, **err_hora}
+                external_id = phone if phone else 'desconocido'
+                # H-043: si ya hay una propuesta vigente (cotización ya armada), sumar el SERVICIO
+                # a ESA propuesta (recalcula total + descuento de pack) en vez de abrir un carrito
+                # separado que la dejaría desincronizada (el masaje agregado tras cotizar no llegaba
+                # al cajón). Espejo del camino de productos (H-040).
+                from .reserva_service import agregar_servicio_a_propuesta
+                actualizado = agregar_servicio_a_propuesta(
+                    canal=canal, external_id=external_id, servicio_id=servicio_id,
+                    fecha=_fecha_iso(args.get('fecha')), hora=args.get('hora'),
+                    cantidad_personas=cantidad)
+                if actualizado is not None:
+                    return actualizado
                 resultado = CarritoService.agregar_servicio(
                     canal=canal,
-                    external_id=phone if phone else 'desconocido',
+                    external_id=external_id,
                     servicio_id=servicio_id,
                     fecha=_fecha_iso(args.get('fecha')),
                     hora=args.get('hora'),

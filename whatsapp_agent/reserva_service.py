@@ -296,6 +296,68 @@ def agregar_producto_a_propuesta(canal, external_id, producto_id, cantidad=1):
     }
 
 
+def agregar_servicio_a_propuesta(canal, external_id, servicio_id, fecha, hora, cantidad_personas):
+    """Si YA existe una propuesta vigente, suma el SERVICIO a ESA propuesta en vez de abrir un
+    carrito separado que la dejaría desincronizada (caso real H-043: el masaje agregado tras armar
+    la cotización aparecía en el chat de Luna pero NO en el cajón → si se aprobaba, se perdía).
+    Espejo de agregar_producto_a_propuesta (H-040), pero recalcula TODO con `recalcular_propuesta`
+    (incluye el descuento de pack tina+masaje, que un servicio sí puede gatillar).
+
+    Devuelve dict con actualizo_propuesta=True si actualizó, o None si NO hay propuesta vigente
+    (en ese caso el caller debe usar el carrito normal).
+    """
+    propuesta = (PropuestaReserva.objects
+                 .filter(canal=canal, external_id=external_id, estado='pendiente')
+                 .order_by('-created_at').first())
+    if propuesta is None or not propuesta.esta_vigente():
+        return None  # no hay propuesta → el caller usa el carrito normal
+
+    personas = int(cantidad_personas or 1)
+    payload = dict(propuesta.payload or {})
+    servicios = list(payload.get('servicios') or [])
+    productos = list(payload.get('productos') or [])
+
+    # Dedup por slot (servicio_id + fecha + hora): si ese mismo servicio ya está en esa fecha/hora,
+    # se ACTUALIZA la cantidad de personas (no se duplica), igual que el carrito.
+    for s in servicios:
+        if (s.get('servicio_id') == servicio_id
+                and s.get('fecha') == fecha and s.get('hora') == hora):
+            s['cantidad_personas'] = personas
+            break
+    else:
+        servicios.append({
+            'servicio_id': servicio_id, 'fecha': fecha, 'hora': hora,
+            'cantidad_personas': personas,
+        })
+
+    # Recalcular TODO con la fuente única (total + descuento de pack + resumen).
+    try:
+        servicios_info, _productos_info, _descuento, total, resumen_texto = \
+            recalcular_propuesta(servicios, productos)
+    except _PropuestaCalcError as e:
+        return {'success': False, 'error': e.error, 'mensaje': e.mensaje}
+
+    payload['servicios'] = servicios
+    payload['productos'] = productos
+    propuesta.payload = payload
+    propuesta.servicios = servicios
+    propuesta.total = total
+    propuesta.resumen_texto = resumen_texto
+    propuesta.save(update_fields=['payload', 'servicios', 'total', 'resumen_texto'])
+
+    nombre_srv = next((i['nombre'] for i in servicios_info if i['servicio_id'] == servicio_id), 'el servicio')
+    logger.info('[Luna] Servicio %s (%s) sumado a propuesta vigente %s (nuevo total $%s)',
+                servicio_id, nombre_srv, propuesta.propuesta_id[:8], total)
+    return {
+        'success': True,
+        'actualizo_propuesta': True,
+        'propuesta_id': propuesta.propuesta_id,
+        'total': total,
+        'mensaje': (f'¡Listo! Sumé {nombre_srv} a tu cotización. '
+                    f'Nuevo total ${total:,}. Te la enviamos para que la revises. 🌿'),
+    }
+
+
 def obtener_propuesta(propuesta_id):
     """Obtiene propuesta vigente por ID.
 
