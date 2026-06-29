@@ -658,6 +658,32 @@ def _contexto_saludo(entrante):
         return '', ''
 
 
+def _cierre_fallback_tras_tools(tool_calls_executed):
+    """Cierre determinístico para cuando el modelo devuelve VACÍO pero YA ejecutó tools que
+    cambiaron el carrito/propuesta (quirk gemini-flash: ejecuta las tools y no redacta el cierre).
+    La acción NO se pierde (el carrito ya quedó armado); solo faltó el texto → damos uno para que la
+    conversación no se trabe. Devuelve '' si no hubo ninguna tool de carrito/propuesta exitosa
+    (en ese caso sí corresponde escalar a humano)."""
+    def _ok(res):
+        return isinstance(res, dict) and not res.get('error') and res.get('success', True) is not False
+
+    confirmo = agrego = False
+    for tc in (tool_calls_executed or []):
+        name, res = tc.get('name'), tc.get('result')
+        if not _ok(res):
+            continue
+        if name in ('confirmar_reserva_carrito', 'confirmar_ritual', 'confirmar_refugio'):
+            confirmo = True
+        elif name in ('agregar_servicio_carrito', 'agregar_producto_carrito', 'quitar_item_carrito'):
+            agrego = True
+    if confirmo:
+        return '¡Listo! Te preparé la cotización para que la revises. 🌿'
+    if agrego:
+        return ('¡Listo! Ya lo tengo en tu carrito. ¿Querés sumar algo más o te envío la '
+                'cotización para que la revises? 🌿')
+    return ''
+
+
 def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_nombre='', datos_cliente=None, phone='', canal='whatsapp'):
     """Genera el borrador para un texto de cliente. SIN DB y SIN gate de `activo`.
 
@@ -1350,6 +1376,15 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
 
     texto = escalation.sanear_salida(texto_limpio)
     if not texto:
+        # Quirk (gemini-flash): a veces devuelve VACÍO tras ejecutar tools (el force-text del
+        # provider intenta primero un cierre natural; si tampoco, caemos acá). Si esas tools
+        # cambiaron el carrito/propuesta con éxito, NO escalamos —la acción YA pasó— y damos un
+        # cierre determinístico para que la conversación no se trabe (H-047).
+        cierre = _cierre_fallback_tras_tools(resultado.tool_calls_executed)
+        if cierre:
+            logger.info('[Agente WA] modelo vacío tras tools → cierre determinístico')
+            return {'escalar': False, 'motivo': '', 'texto': cierre, 'modelo': modelo, 'error': '',
+                    'input_tokens': tokens[0], 'output_tokens': tokens[1], 'latency_ms': tokens[2]}
         return _borrador_escala('respuesta vacía del modelo', error='empty_output',
                                 modelo=modelo, tokens=tokens)
 
