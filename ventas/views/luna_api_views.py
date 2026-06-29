@@ -1420,6 +1420,78 @@ def preparar_reserva_endpoint(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['POST'])
+@authentication_classes([LunaAPIKeyAuthentication])
+def editar_propuesta_endpoint(request):
+    """Corrige una propuesta PENDIENTE antes de enviarla (Deborah ajusta cantidades / quita
+    líneas en el cajón de cotización). Reemplaza COMPLETAMENTE servicios + productos.
+
+    POST /api/luna/reservas/editar/
+    Header: X-API-Key
+    Body:
+    {
+        "propuesta_id": "uuid-string",
+        "servicios": [{"servicio_id": 12, "fecha": "2026-06-20", "hora": "14:00", "cantidad_personas": 2}, ...],
+        "productos": [{"producto_id": 5, "cantidad": 1}, ...]   # opcional
+    }
+    Respuesta: { "success": true, "propuesta_id": "...", "resumen_texto": "...", "total": 118000, ... }
+    """
+    try:
+        from whatsapp_agent.reserva_service import editar_propuesta
+
+        propuesta_id = (request.data.get('propuesta_id') or '').strip()
+        if not propuesta_id:
+            return Response({'success': False, 'error': 'validation_error',
+                             'mensaje': 'propuesta_id requerido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        servicios = request.data.get('servicios', None)
+        if servicios is None:
+            return Response({'success': False, 'error': 'validation_error',
+                             'mensaje': 'servicios requerido (lista COMPLETA final tras la edición)'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        productos = request.data.get('productos', []) or []
+
+        resultado = editar_propuesta(propuesta_id, servicios, productos)
+        ok = resultado.get('success')
+        return Response(resultado, status=status.HTTP_200_OK if ok else status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        logger.error(f'[Luna API] Error en editar_propuesta_endpoint: {str(e)}', exc_info=True)
+        return Response({'success': False, 'error': 'internal_error',
+                         'mensaje': 'Error al editar la propuesta'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@authentication_classes([LunaAPIKeyAuthentication])
+def descartar_propuesta_endpoint(request):
+    """Descarta/cierra una propuesta PENDIENTE (botón 'Cerrar' del cajón de cotización). Cambia
+    estado a 'descartada' → desaparece del cajón y la conversación sigue.
+
+    POST /api/luna/reservas/descartar/
+    Header: X-API-Key
+    Body: { "propuesta_id": "uuid-string" }
+    Respuesta: { "success": true, "propuesta_id": "...", "estado": "descartada" }
+    """
+    try:
+        from whatsapp_agent.reserva_service import cancelar_propuesta
+
+        propuesta_id = (request.data.get('propuesta_id') or '').strip()
+        if not propuesta_id:
+            return Response({'success': False, 'error': 'validation_error',
+                             'mensaje': 'propuesta_id requerido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if cancelar_propuesta(propuesta_id):
+            return Response({'success': True, 'propuesta_id': propuesta_id, 'estado': 'descartada'})
+        return Response({'success': False, 'error': 'no_descartable',
+                         'mensaje': 'La propuesta no existe o no está pendiente'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        logger.error(f'[Luna API] Error en descartar_propuesta_endpoint: {str(e)}', exc_info=True)
+        return Response({'success': False, 'error': 'internal_error',
+                         'mensaje': 'Error al descartar la propuesta'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 # ============================================================================
 # ADMIN: LIMPIAR CONVERSACIÓN
 # ============================================================================

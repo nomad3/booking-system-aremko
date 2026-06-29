@@ -22,6 +22,93 @@ from ventas.models import Servicio
 logger = logging.getLogger(__name__)
 
 
+class _PropuestaCalcError(Exception):
+    """Error de cálculo de propuesta (servicio/producto inexistente). Lleva código + mensaje
+    para que el caller devuelva el mismo shape de error que antes."""
+    def __init__(self, error, mensaje):
+        self.error = error
+        self.mensaje = mensaje
+        super().__init__(mensaje)
+
+
+def recalcular_propuesta(servicios_data, productos_data):
+    """FUENTE ÚNICA del cálculo de una propuesta. Dado servicios + productos (estructura del
+    payload), LEE los precios del catálogo (no confía en precios del input), aplica el descuento
+    de pack y arma líneas + total + resumen. La usan `preparar_reserva` (al crear) y
+    `editar_propuesta` (al corregir) para que el total que ve/edita Deborah sea SIEMPRE idéntico
+    al de la reserva final.
+
+    Lanza `_PropuestaCalcError` si un servicio/producto no existe.
+    Devuelve: (servicios_info, productos_info, descuento_pack, total_int, resumen_texto)
+    """
+    from ventas.models import Producto
+
+    servicios_info = []
+    total = 0
+    for srv_data in servicios_data:
+        try:
+            servicio = Servicio.objects.get(id=srv_data['servicio_id'])
+        except Servicio.DoesNotExist:
+            raise _PropuestaCalcError('service_not_found', f'Servicio {srv_data.get("servicio_id")} no existe')
+        personas = int(srv_data.get('cantidad_personas', 1) or 1)
+        precio = float(servicio.precio_base) * personas
+        total += precio
+        servicios_info.append({
+            'servicio_id': servicio.id,
+            'nombre': servicio.nombre,
+            'fecha': srv_data.get('fecha'),
+            'hora': srv_data.get('hora'),
+            'cantidad_personas': personas,
+            'precio_unitario': float(servicio.precio_base),
+            'subtotal': precio,
+        })
+
+    productos_info = []
+    for prod_data in productos_data:
+        try:
+            producto = Producto.objects.get(id=prod_data['producto_id'])
+        except Producto.DoesNotExist:
+            raise _PropuestaCalcError('product_not_found', f'Producto {prod_data.get("producto_id")} no existe')
+        cant = int(prod_data.get('cantidad', 1) or 1)
+        sub_prod = float(producto.precio_base) * cant
+        total += sub_prod
+        productos_info.append({
+            'producto_id': producto.id,
+            'nombre': producto.nombre,
+            'cantidad': cant,
+            'precio_unitario': float(producto.precio_base),
+            'subtotal': sub_prod,
+        })
+
+    # Descuento de pack (fuente única: PackDescuentoService.descuento_para_servicios). Solo si
+    # los servicios NO traen ya una línea "descuento" (Ritual/Refugio la traen → no doble).
+    descuento_pack = 0
+    if not any('descuento' in (i['nombre'] or '').lower() for i in servicios_info):
+        from ventas.services.pack_descuento_service import PackDescuentoService
+        try:
+            descuento_pack = PackDescuentoService.descuento_para_servicios(servicios_data)
+        except Exception:  # noqa: BLE001 — sin descuento si el motor falla
+            logger.exception('[Luna] no se pudo calcular el descuento de pack')
+            descuento_pack = 0
+    total = total - descuento_pack
+
+    lineas_resumen = []
+    for info in servicios_info:
+        lineas_resumen.append(
+            f"{info['cantidad_personas']}x {info['nombre']} "
+            f"({info['fecha']} {info['hora']}) = ${int(info['subtotal']):,}"
+        )
+    for info in productos_info:
+        lineas_resumen.append(
+            f"{info['cantidad']}x {info['nombre']} = ${int(info['subtotal']):,}"
+        )
+    if descuento_pack:
+        lineas_resumen.append(f"Descuento pack = -${descuento_pack:,}")
+    resumen_texto = '\n'.join(lineas_resumen)
+
+    return servicios_info, productos_info, descuento_pack, int(total), resumen_texto
+
+
 def preparar_reserva(canal, external_id, payload, idempotency_key=None):
     """Valida, re-verifica disponibilidad y guarda propuesta de reserva (idempotente).
 
@@ -99,87 +186,14 @@ def preparar_reserva(canal, external_id, payload, idempotency_key=None):
                 'mensaje': 'Debe incluir al menos un servicio'
             }
 
-        # 3. Re-verificar disponibilidad de cada servicio
-        servicios_info = []
-        total = 0
-
+        # 3. Calcular líneas + descuento + total + resumen (FUENTE ÚNICA recalcular_propuesta,
+        # compartida con editar_propuesta para que el total de la propuesta == el de la reserva).
         with transaction.atomic():
-            for srv_data in servicios_data:
-                try:
-                    servicio = Servicio.objects.get(id=srv_data['servicio_id'])
-                except Servicio.DoesNotExist:
-                    return {
-                        'success': False,
-                        'error': 'service_not_found',
-                        'mensaje': f'Servicio {srv_data["servicio_id"]} no existe'
-                    }
-
-                # Calcular precio
-                personas = srv_data.get('cantidad_personas', 1)
-                precio = float(servicio.precio_base) * personas
-                total += precio
-
-                servicios_info.append({
-                    'servicio_id': servicio.id,
-                    'nombre': servicio.nombre,
-                    'fecha': srv_data['fecha'],
-                    'hora': srv_data['hora'],
-                    'cantidad_personas': personas,
-                    'precio_unitario': float(servicio.precio_base),
-                    'subtotal': precio
-                })
-
-            # 3b. Productos (tablas, jugos, etc.): suman al total, no tienen fecha/hora.
-            from ventas.models import Producto
-            productos_info = []
-            for prod_data in productos_data:
-                try:
-                    producto = Producto.objects.get(id=prod_data['producto_id'])
-                except Producto.DoesNotExist:
-                    return {
-                        'success': False,
-                        'error': 'product_not_found',
-                        'mensaje': f'Producto {prod_data.get("producto_id")} no existe'
-                    }
-                cant = int(prod_data.get('cantidad', 1) or 1)
-                sub_prod = float(producto.precio_base) * cant
-                total += sub_prod
-                productos_info.append({
-                    'producto_id': producto.id,
-                    'nombre': producto.nombre,
-                    'cantidad': cant,
-                    'precio_unitario': float(producto.precio_base),
-                    'subtotal': sub_prod,
-                })
-
-            # 3c. Descuento de pack (fuente ÚNICA: PackDescuentoService.descuento_para_servicios,
-            # que arma el carrito como espera el motor —masajes por persona—). Así el total de la
-            # propuesta = el de la reserva final (banner y mensaje de Luna muestran el real). Solo si
-            # los servicios NO traen ya una línea de "descuento" (Ritual/Refugio la traen → no doble).
-            descuento_pack = 0
-            if not any('descuento' in (i['nombre'] or '').lower() for i in servicios_info):
-                from ventas.services.pack_descuento_service import PackDescuentoService
-                try:
-                    descuento_pack = PackDescuentoService.descuento_para_servicios(servicios_data)
-                except Exception:  # noqa: BLE001 — sin descuento si el motor falla
-                    logger.exception('[Luna] no se pudo calcular el descuento de pack en preparar_reserva')
-                    descuento_pack = 0
-            total = total - descuento_pack
-
-            # 4. Generar resumen legible para Deborah
-            lineas_resumen = []
-            for info in servicios_info:
-                lineas_resumen.append(
-                    f"{info['cantidad_personas']}x {info['nombre']} "
-                    f"({info['fecha']} {info['hora']}) = ${int(info['subtotal']):,}"
-                )
-            for info in productos_info:
-                lineas_resumen.append(
-                    f"{info['cantidad']}x {info['nombre']} = ${int(info['subtotal']):,}"
-                )
-            if descuento_pack:
-                lineas_resumen.append(f"Descuento pack = -${descuento_pack:,}")
-            resumen_texto = '\n'.join(lineas_resumen)
+            try:
+                servicios_info, productos_info, descuento_pack, total, resumen_texto = \
+                    recalcular_propuesta(servicios_data, productos_data)
+            except _PropuestaCalcError as e:
+                return {'success': False, 'error': e.error, 'mensaje': e.mensaje}
 
             # 5. Guardar PropuestaReserva
             propuesta_id = str(uuid.uuid4())
@@ -301,14 +315,80 @@ def obtener_propuesta(propuesta_id):
 
 
 def cancelar_propuesta(propuesta_id):
-    """Cancela una propuesta pendiente."""
+    """Descarta/cierra una propuesta pendiente (botón 'Cerrar' del cajón). 'descartada' es el
+    valor válido de ESTADO_CHOICES (antes seteaba 'cancelada', que no existe en el modelo)."""
     try:
         propuesta = PropuestaReserva.objects.get(propuesta_id=propuesta_id)
         if propuesta.estado == 'pendiente':
-            propuesta.estado = 'cancelada'
+            propuesta.estado = 'descartada'
             propuesta.save(update_fields=['estado'])
-            logger.info(f'[Luna] Propuesta {propuesta_id[:8]} cancelada')
+            logger.info(f'[Luna] Propuesta {propuesta_id[:8]} descartada')
             return True
         return False
     except PropuestaReserva.DoesNotExist:
         return False
+
+
+def editar_propuesta(propuesta_id, servicios_data, productos_data=None):
+    """Corrige una propuesta PENDIENTE antes de enviarla (Deborah ajusta cantidades / quita
+    líneas en el cajón). Reemplaza COMPLETAMENTE los servicios + productos del payload con las
+    listas recibidas, RE-LEE los precios del catálogo y recalcula total + resumen con la misma
+    lógica que preparar_reserva (recalcular_propuesta). Solo propuestas 'pendiente' y vigentes.
+
+    El payload es la fuente de verdad: lo lee el cajón (líneas) y crear_reserva (la VentaReserva),
+    así que al editarlo, la corrección llega hasta la reserva final.
+
+    Args:
+        propuesta_id: UUID de la propuesta
+        servicios_data: lista COMPLETA final [{servicio_id, fecha, hora, cantidad_personas}, ...]
+        productos_data: lista COMPLETA final [{producto_id, cantidad}, ...] (opcional)
+
+    Returns: dict {success, propuesta_id, resumen_texto, total, ...} o {success: False, error, mensaje}
+    """
+    productos_data = productos_data or []
+    try:
+        propuesta = PropuestaReserva.objects.get(propuesta_id=propuesta_id)
+    except PropuestaReserva.DoesNotExist:
+        return {'success': False, 'error': 'propuesta_not_found', 'mensaje': 'Propuesta no existe'}
+
+    if propuesta.estado != 'pendiente':
+        return {'success': False, 'error': 'no_editable',
+                'mensaje': f'La propuesta está {propuesta.get_estado_display()}; solo se editan las pendientes'}
+    if not propuesta.esta_vigente():
+        propuesta.estado = 'expirada'
+        propuesta.save(update_fields=['estado'])
+        return {'success': False, 'error': 'expirada', 'mensaje': 'La propuesta expiró'}
+
+    # No permitir vaciar la reserva (debe quedar al menos un servicio).
+    if not servicios_data:
+        return {'success': False, 'error': 'validation_error', 'mensaje': 'Debe quedar al menos un servicio'}
+
+    try:
+        with transaction.atomic():
+            servicios_info, productos_info, descuento_pack, total, resumen_texto = \
+                recalcular_propuesta(servicios_data, productos_data)
+
+            # Actualizar el payload (fuente de verdad) + campos espejo/display.
+            payload = dict(propuesta.payload or {})
+            payload['servicios'] = servicios_data
+            payload['productos'] = productos_data
+            propuesta.payload = payload
+            propuesta.servicios = servicios_data  # campo NOT NULL espejo de payload['servicios']
+            propuesta.total = total
+            propuesta.resumen_texto = resumen_texto
+            propuesta.save(update_fields=['payload', 'servicios', 'total', 'resumen_texto'])
+    except _PropuestaCalcError as e:
+        return {'success': False, 'error': e.error, 'mensaje': e.mensaje}
+
+    logger.info(
+        f'[Luna] Propuesta {propuesta_id[:8]} EDITADA por Deborah: '
+        f'{len(servicios_info)} servicios + {len(productos_info)} productos → total ${total:,}'
+    )
+    return {
+        'success': True,
+        'propuesta_id': propuesta_id,
+        'resumen_texto': resumen_texto,
+        'total': total,
+        'servicios_count': len(servicios_info),
+        'productos_count': len(productos_info),
+    }

@@ -30,6 +30,9 @@ urlpatterns = [
     path('luna/cliente/', luna_api_views.lookup_cliente, name='luna-lookup-cliente'),
     path('luna/reservas/validar/', luna_api_views.validar_disponibilidad, name='luna-validar-disponibilidad'),
     path('luna/reservas/preparar/', luna_api_views.preparar_reserva_endpoint, name='luna-preparar-reserva'),
+    # Cajón de cotización (aremko-cli): corregir antes de enviar / cerrar el borrador
+    path('luna/reservas/editar/', luna_api_views.editar_propuesta_endpoint, name='luna-editar-propuesta'),
+    path('luna/reservas/descartar/', luna_api_views.descartar_propuesta_endpoint, name='luna-descartar-propuesta'),
     path('luna/reservas/create/', luna_api_views.crear_reserva, name='luna-crear-reserva'),
     path('luna/reservas/<int:reserva_id>/servicios/', luna_api_views.agregar_servicios_reserva, name='luna-agregar-servicios'),
 
