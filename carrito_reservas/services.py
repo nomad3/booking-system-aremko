@@ -176,6 +176,33 @@ class CarritoService:
                     'mensaje': f'Solo hay {producto.cantidad_disponible} en stock'
                 }
 
+            # DEDUP EN CÓDIGO: un mismo producto = UNA sola línea. El LLM a veces re-agrega el
+            # mismo producto en cada confirmación ("Si"/"Ok") → carrito inflado (caso real:
+            # 2 tablas + 5 jugos = sobrecobro). Si ya existe ese producto, se ACTUALIZA la
+            # cantidad en vez de duplicar (igual que agregar_servicio). Para varias unidades,
+            # el LLM debe pasar `cantidad` en una sola llamada, no re-llamar.
+            existente = next(
+                (it for it in carrito.items
+                 if it.get('tipo') == 'producto' and it.get('producto_id') == producto.id),
+                None,
+            )
+            if existente is not None:
+                existente['cantidad'] = cantidad
+                existente['precio_unitario'] = float(producto.precio_base)
+                existente['subtotal'] = float(producto.precio_base) * cantidad
+                carrito.save(update_fields=['items', 'updated_at'])
+                CarritoService._recalcular_totales(carrito)
+                logger.info(
+                    f'[Carrito] Producto {producto.nombre} ya estaba ({canal}:{external_id}); '
+                    f'actualizado a x{cantidad} (NO duplicado) (total: ${carrito.total})'
+                )
+                return {
+                    'success': True,
+                    'carrito': carrito,
+                    'error': None,
+                    'mensaje': f'✅ {producto.nombre} actualizado en el carrito (x{cantidad})'
+                }
+
             # Crear item (el precio del producto es `precio_base`; no hay precio_venta/precio_costo).
             item = {
                 'tipo': 'producto',

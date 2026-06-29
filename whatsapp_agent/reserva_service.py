@@ -248,19 +248,26 @@ def agregar_producto_a_propuesta(canal, external_id, producto_id, cantidad=1):
     cant = int(cantidad or 1)
     payload = dict(propuesta.payload or {})
     productos = list(payload.get('productos') or [])
+    precio = int(producto.precio_base)
+    # OVERWRITE (no incrementar) si el producto ya está: evita inflar la cotización por
+    # re-adds espurios del LLM (consistente con el dedup del carrito). Para más unidades,
+    # el LLM debe pasar `cantidad`.
+    prev = 0
     for p in productos:
         if p.get('producto_id') == producto.id:
-            p['cantidad'] = int(p.get('cantidad') or 1) + cant
+            prev = int(p.get('cantidad') or 1)
+            p['cantidad'] = cant
             break
     else:
         productos.append({'producto_id': producto.id, 'cantidad': cant})
     payload['productos'] = productos
     propuesta.payload = payload
 
-    sub = int(producto.precio_base) * cant
-    propuesta.total = int(propuesta.total or 0) + sub
-    linea = f"{cant}x {producto.nombre} = ${sub:,}"
-    propuesta.resumen_texto = ((propuesta.resumen_texto or '').rstrip() + '\n' + linea).strip()
+    # Ajustar el total por el CAMBIO de cantidad (no volver a sumar lo que ya estaba).
+    propuesta.total = int(propuesta.total or 0) + precio * (cant - prev)
+    if not prev:  # línea de resumen solo la primera vez (no duplicar)
+        linea = f"{cant}x {producto.nombre} = ${precio * cant:,}"
+        propuesta.resumen_texto = ((propuesta.resumen_texto or '').rstrip() + '\n' + linea).strip()
     propuesta.save(update_fields=['payload', 'total', 'resumen_texto'])
 
     logger.info('[Luna] Producto %s x%s sumado a propuesta vigente %s (nuevo total $%s)',
