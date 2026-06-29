@@ -171,6 +171,72 @@ def _propuesta_reserva(canal, external_id):
         return None
 
 
+def _carrito_en_curso(canal, external_id):
+    """Carrito EN CURSO (Fase 1, H-046): lo que el cliente va armando con Luna ANTES de que exista
+    la cotización formal, para que la bandeja lo muestre llenándose en vivo (Deborah ve cómo el
+    cliente agrega/quita servicios y productos). READ-ONLY (no crea carrito vacío).
+
+    Devuelve None si:
+      - no hay carrito con ítems, o el carrito está viejo (tocado hace > 24h → no resucitar uno
+        abandonado), o
+      - ya existe una PropuestaReserva vigente → ahí manda la propuesta/cajón (UNA cosa viva a la
+        vez: antes de cotizar = carrito; después = propuesta).
+
+    Devuelve el MISMO shape de líneas que `_propuesta_reserva` para que el front reuse el cajón:
+    {'servicios': [...], 'total': int, 'editable': False}  (editable se habilita en Fase 2).
+    """
+    try:
+        from carrito_reservas.models import CarritoReserva
+        from whatsapp_agent.models import PropuestaReserva
+        from django.utils import timezone
+
+        # Si ya hay cotización vigente, esa manda (no mostrar el carrito en paralelo).
+        prop = (PropuestaReserva.objects
+                .filter(canal=canal, external_id=external_id, estado='pendiente')
+                .order_by('-created_at').first())
+        if prop is not None and prop.esta_vigente():
+            return None
+
+        carrito = CarritoReserva.objects.filter(canal=canal, external_id=external_id).first()
+        if carrito is None or not carrito.items:
+            return None
+        # Frescura: no mostrar carritos abandonados.
+        if carrito.updated_at is None or carrito.updated_at < timezone.now() - timezone.timedelta(hours=24):
+            return None
+
+        servicios = []
+        for it in carrito.items:
+            if it.get('tipo') == 'producto':
+                servicios.append({
+                    'producto_id': it.get('producto_id'),
+                    'servicio_nombre': it.get('nombre'),
+                    'fecha': None,
+                    'hora': None,
+                    'cantidad_personas': int(it.get('cantidad', 1) or 1),
+                    'subtotal': int(it.get('subtotal') or 0),
+                    'es_producto': True,
+                })
+            else:
+                servicios.append({
+                    'servicio_id': it.get('servicio_id'),
+                    'servicio_nombre': it.get('nombre'),
+                    'fecha': it.get('fecha'),
+                    'hora': it.get('hora'),
+                    'cantidad_personas': int(it.get('cantidad_personas', 1) or 1),
+                    'subtotal': int(it.get('subtotal') or 0),
+                })
+        if not servicios:
+            return None
+        return {
+            'servicios': servicios,
+            'total': int(carrito.total or 0),
+            'editable': False,  # Fase 1 = solo lectura; Fase 2 habilita editar + "pasar a cotización"
+        }
+    except Exception:  # noqa: BLE001 — es contexto, nunca debe tumbar la conversación
+        logger.exception(f'Error obteniendo carrito_en_curso para {canal}/{external_id}')
+        return None
+
+
 def _reserva_creada(canal, external_id):
     """H-039 B2: reserva recién creada (desde una propuesta aprobada por el cliente), para que el
     cajón muestre el banner 'Revisar y enviar Ficha'. Devuelve None salvo que la ÚLTIMA propuesta
@@ -776,6 +842,7 @@ def conversation(request):
             ),
             'propuesta_reserva': _propuesta_reserva('instagram', external_id),  # H-028
             'reserva_creada': _reserva_creada('instagram', external_id),  # H-039 B2
+            'carrito_en_curso': _carrito_en_curso('instagram', external_id),  # H-046 Fase 1
         })
 
     if canal == 'messenger':
@@ -808,6 +875,7 @@ def conversation(request):
             ),
             'propuesta_reserva': _propuesta_reserva('messenger', external_id),  # H-028
             'reserva_creada': _reserva_creada('messenger', external_id),  # H-039 B2
+            'carrito_en_curso': _carrito_en_curso('messenger', external_id),  # H-046 Fase 1
         })
 
     if canal == 'whatsapp':
@@ -831,6 +899,7 @@ def conversation(request):
             'sugerencia_agente': _sugerencia_whatsapp(external_id, request),
             'propuesta_reserva': _propuesta_reserva('whatsapp', external_id),  # H-028
             'reserva_creada': _reserva_creada('whatsapp', external_id),  # H-039 B2
+            'carrito_en_curso': _carrito_en_curso('whatsapp', external_id),  # H-046 Fase 1
         })
 
     return JsonResponse({'error': f'canal no soportado: {canal!r}'}, status=400)
