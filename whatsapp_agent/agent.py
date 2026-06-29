@@ -534,6 +534,10 @@ def _historial_texto(phone, antes_de_ts, window):
         WhatsAppMessage.objects
         .filter(phone=phone, timestamp__lt=antes_de_ts)
         .exclude(msg_type='reaction')
+        # H-045: si el número es TAMBIÉN staff, recibe avisos operativos (H-038 "🔔 Nueva tarea ·")
+        # en el mismo hilo. Esos avisos NO son parte de la conversación con el cliente y descarrilan
+        # al agente (modelo liviano) → se excluyen del contexto que lee Luna (siguen en la bandeja).
+        .exclude(direction='out', body__contains='Nueva tarea ·')
         .order_by('-timestamp')[:window]
     )
     msgs.reverse()
