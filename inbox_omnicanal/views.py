@@ -129,6 +129,7 @@ def _propuesta_reserva(canal, external_id):
                 personas = srv_data.get('cantidad_personas', 1)
                 subtotal = float(servicio.precio_base) * personas
                 servicios_info.append({
+                    'servicio_id': servicio.id,  # H-042: el cajón lo necesita para editar la cotización
                     'servicio_nombre': servicio.nombre,
                     'fecha': srv_data['fecha'],
                     'hora': srv_data['hora'],
@@ -148,10 +149,11 @@ def _propuesta_reserva(canal, external_id):
                 continue
             cant = int(prod_data.get('cantidad', 1) or 1)
             servicios_info.append({
+                'producto_id': producto.id,  # H-042: el cajón lo necesita para editar la cotización
                 'servicio_nombre': producto.nombre,
                 'fecha': None,
                 'hora': None,
-                'cantidad_personas': cant,
+                'cantidad_personas': cant,  # para PRODUCTOS, esta es la cantidad (no personas)
                 'subtotal': int(producto.precio_base) * cant,
                 'es_producto': True,
             })
