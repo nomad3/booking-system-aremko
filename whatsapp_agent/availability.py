@@ -81,6 +81,23 @@ def _sin_acentos(s):
     return unicodedata.normalize('NFKD', str(s or '')).encode('ascii', 'ignore').decode().lower()
 
 
+def _termino_relativo(expr_norm):
+    """Detecta un término RELATIVO de fecha en el texto (ya en minúsculas y sin tildes):
+    'hoy', 'mañana', 'pasado mañana'. Devuelve (display, delta_dias) o None.
+
+    OJO: 'mañana' cuenta como EL DÍA DE MAÑANA solo si NO es 'la mañana' (= la mañana del día,
+    ej. 'el sábado por la mañana') — por eso se excluye un 'manana' precedido por 'la '. Así
+    'el sábado por la mañana' resuelve a sábado, pero 'mañana domingo' detecta el relativo."""
+    import re
+    if 'pasado manana' in expr_norm:
+        return ('pasado mañana', 2)
+    if re.search(r'(?<!la )\bmanana\b', expr_norm):
+        return ('mañana', 1)
+    if re.search(r'\bhoy\b', expr_norm):
+        return ('hoy', 0)
+    return None
+
+
 def resolver_fecha(expresion_cliente):
     """Resuelve fecha de forma DETERMINÍSTICA (sin dejar al LLM calcular día de semana).
 
@@ -107,13 +124,35 @@ def resolver_fecha(expresion_cliente):
         return {'error': 'expresión vacía', 'ambiguo': True}
     expr_norm = _sin_acentos(expresion)  # match insensible a tildes ("sabado" = "sábado")
 
-    # PATRÓN 1: Nombre de día ("sábado", "el sábado", "próximo sábado", "este sábado")
+    # Término relativo (hoy/mañana/pasado mañana), excluyendo "la mañana" (parte del día).
+    rel = _termino_relativo(expr_norm)
+
+    # PATRÓN 1: Nombre de día ("sábado", "el sábado", "próximo sábado", "este domingo").
     for i, dia_nombre in enumerate(DIAS_SEMANA_ES):
         if _sin_acentos(dia_nombre) in expr_norm:
-            dias_adelante = (i - hoy_numero) % 7
-            if dias_adelante == 0:
-                dias_adelante = 7  # "sábado" = próximo sábado, no hoy
-            fecha = hoy + timedelta(days=dias_adelante)
+            if rel is not None:
+                # Vino día + término relativo ("mañana domingo", "hoy domingo"): MANDA el
+                # relativo y el nombre de día es chequeo de consistencia.
+                fecha_rel = hoy + timedelta(days=rel[1])
+                if fecha_rel.weekday() != i:
+                    # Contradicción ("mañana domingo" pero mañana NO es domingo): NO adivinar.
+                    # Devolver ambiguo con las DOS opciones para que Luna re-pregunte.
+                    prox = (i - hoy_numero) % 7 or 7
+                    fecha_dia = hoy + timedelta(days=prox)
+                    return {
+                        'fecha_iso': None,
+                        'ambiguo': True,
+                        'error': (f'fecha contradictoria: "{rel[0]}" es {DIAS_SEMANA_ES[fecha_rel.weekday()]} '
+                                  f'{fecha_rel.strftime("%d-%m")}, no {DIAS_SEMANA_ES[i]}. Pregúntale al cliente '
+                                  f'qué prefiere: {rel[0]} ({DIAS_SEMANA_ES[fecha_rel.weekday()]} '
+                                  f'{fecha_rel.strftime("%d-%m")}) o el {DIAS_SEMANA_ES[i]} {fecha_dia.strftime("%d-%m")}.'),
+                    }
+                fecha = fecha_rel  # coinciden (ej. "mañana lunes" y mañana ES lunes)
+            else:
+                dias_adelante = (i - hoy_numero) % 7
+                if dias_adelante == 0:
+                    dias_adelante = 7  # "sábado" = próximo sábado, no hoy
+                fecha = hoy + timedelta(days=dias_adelante)
             return {
                 'fecha_iso': fecha.isoformat(),
                 'dia_semana': DIAS_SEMANA_ES[fecha.weekday()],
@@ -122,20 +161,17 @@ def resolver_fecha(expresion_cliente):
                 'error': None,
             }
 
-    # PATRÓN 1.5: Expresiones relativas ("hoy", "mañana", "pasado mañana").
-    # Van DESPUÉS de los nombres de día (para que "el sábado por la mañana" caiga en sábado)
-    # y ANTES del patrón numérico (para que "hoy a las 8" no tome el 8 como día del mes).
-    # "pasado mañana" se chequea antes que "mañana" porque lo contiene.
-    for palabra, delta in (('pasado manana', 2), ('manana', 1), ('hoy', 0)):
-        if palabra in expr_norm:
-            fecha = hoy + timedelta(days=delta)
-            return {
-                'fecha_iso': fecha.isoformat(),
-                'dia_semana': DIAS_SEMANA_ES[fecha.weekday()],
-                'dia_numero': fecha.weekday(),
-                'ambiguo': False,
-                'error': None,
-            }
+    # PATRÓN 1.5: solo término relativo, SIN nombre de día ("hoy", "mañana", "pasado mañana").
+    # Va ANTES del patrón numérico (para que "hoy a las 8" no tome el 8 como día del mes).
+    if rel is not None:
+        fecha = hoy + timedelta(days=rel[1])
+        return {
+            'fecha_iso': fecha.isoformat(),
+            'dia_semana': DIAS_SEMANA_ES[fecha.weekday()],
+            'dia_numero': fecha.weekday(),
+            'ambiguo': False,
+            'error': None,
+        }
 
     # PATRÓN 2: Número de día ("25", "el 25", "25 de junio")
     match_numero = re.search(r'\b(\d{1,2})\b', expr_norm)
