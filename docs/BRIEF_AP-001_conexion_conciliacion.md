@@ -69,16 +69,28 @@ externo usamos la de automatización.)
 - **`Pago`** (ventas/models.py:1300): `venta_reserva` (FK), `monto` (CLP), `fecha_pago` (clave para el match), `metodo_pago` (choices: transferencia, mercadopago, flow, webpay, efectivo, giftcard… + bancos chilenos).
 - **NO existen** modelos de banco/cuenta/movimiento (se crearían solo si se elige la opción "completo").
 
-## 7. 🔑 Hallazgo: Mercado Pago ya tiene endpoints
-El repo YA tiene **`POST /ventas/api/mercadopago/create/`** y **`POST /payment/mercadopago/webhook/`**
-(ventas/urls.py). **Hay que verificar qué hacen** (¿integración real o stub?). Si el webhook MP
-funciona, los pagos por **link MP se concilian solos** → AgentProvision se enfoca en las
-**transferencias** (el grueso). Esto afina la fuente (§8.2).
+## 7. 🔑 Hallazgo: Mercado Pago ya tiene endpoints (VERIFICADO 2026-06-30)
+El repo YA tiene una integración **Mercado Pago "Link" real** (no stub):
+`ventas/views/mercadopago_views.py` + `ventas/services/mercadopago_service.py`.
+- **`create_mercadopago_payment`** crea una *preference* de Checkout Pro (`/checkout/preferences`)
+  con `external_reference = reserva_id` y `notification_url` al webhook. O sea: Aremko **genera un
+  link de pago para una reserva concreta** y el cliente paga ahí.
+- **`mercadopago_webhook`** recibe la notificación, consulta el pago en MP y, si está `approved`,
+  registra el `Pago` con `metodo_pago='mercadopago_link'`.
+- **Implicancia para la conciliación:** lo que pasa por este flujo (pago vía link generado por Aremko)
+  **se concilia solo** porque trae el `reserva_id` en `external_reference`. Lo que el **Conciliador**
+  debe resolver es el resto: **transferencias** que el cliente hace a la cuenta de Aremko (banco o MP
+  Cuenta Vista), que llegan **sin `reserva_id`** y hoy Deborah matchea a mano. Esas NO disparan este
+  webhook → su rastro es el **correo de aviso** ("Recibiste $X de [nombre]"). **→ Fuente = Gmail.**
+- ⚠️ **Bug detectado (aparte, flagueado):** el webhook hace `Pago.objects.create()` directo y **no
+  recalcula el saldo** (los signals de `Pago` retornan temprano si no es giftcard) → la reserva queda
+  `pendiente` aunque el pago MP haya llegado. Debe usar `reserva.registrar_pago(...)`. Arreglar antes
+  de activar MP Link en prod. (No bloquea AP-001.)
 
-## 8. Decisiones pendientes de Jorge (bloquean el arranque)
-1. **¿Dónde viven los movimientos bancarios?** (A) Lean: AgentProvision los tiene, Django solo recibe el pago aplicado + auditoría (recomendado para MVP). (B) Completo: Django guarda `MovimientoBancario` + `ReconciliacionLog`.
-2. **¿Fuente de los movimientos?** Gmail (¿MP/banco le manda a Aremko el correo "Recibiste $X de [nombre]"?) y/o el **webhook MP existente**. Define el conector de AgentProvision.
-3. **¿Arranque?** F0 (pasar la `AUTOMATION_API_KEY` + lecturas, modo dry-run) vs. primero revisar qué hacen los endpoints MP del §7.
+## 8. Decisiones (estado 2026-06-30)
+1. **¿Dónde viven los movimientos bancarios?** (A) Lean: AgentProvision los tiene, Django solo recibe el pago aplicado + auditoría (recomendado para MVP). (B) Completo: Django guarda `MovimientoBancario` + `ReconciliacionLog`. → **PENDIENTE (única que falta para construir PASO 2).**
+2. ~~**¿Fuente de los movimientos?**~~ **RESUELTO (§7):** **Gmail** (aviso de transferencia). El webhook MP solo cubre pagos por link generado por Aremko, que ya se autoconcilian.
+3. ~~**¿Arranque?**~~ **RESUELTO:** se hizo F0 primero. **PASO 1 (lectura) ya está VIVO en prod:** `GET /ventas/api/aremko-cli/recon/reservas-pendientes/` (commit `d4866ce`).
 
 ## 9. Plan por fases
 - **F0 — Conectar (dry-run):** AgentProvision recibe la `AUTOMATION_API_KEY` + usa las lecturas (clientes/reservas). Lee movimientos (Gmail/MP), **propone matches SIN escribir**. Cubre la "Demo de onboarding" del plan.
