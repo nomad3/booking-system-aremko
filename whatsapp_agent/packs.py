@@ -387,17 +387,20 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
     for c in cabanas:
         cabana_hora = (c.get('slots_libres') or ['16:00'])[0]   # check-in
         cab_total = c['precio_total']
+        # H-050: el desayuno YA viene INCLUIDO en el precio de la cabaña (cambió con los programas
+        # Ritual/Refugio: el desayuno dejó de ser un adicional; todas las cabañas lo incluyen). Se
+        # MENCIONA como incluido, pero NO se suma aparte — antes se duplicaba: cabaña $110k + tina
+        # $50k + desayuno $20k = $180k, cuando el valor real es $160k.
         desayuno = _desayuno_de_cabana(c['nombre'])
-        desayuno_total = int(desayuno['precio_total']) if desayuno else 0
         op = {
             'cabana': {'nombre': c['nombre'], 'hora_check_in': '16:00',
                        'hora_check_out': '11:00 del día siguiente', 'precio_total': cab_total},
-            'desayuno': desayuno,            # INCLUIDO en el precio del paquete (no es opcional)
+            'desayuno': desayuno,            # incluido en el precio de la cabaña (NO se suma aparte)
             'desayuno_incluido': True,
         }
         if tina is not None:
             tina_total = tina['precio_total']
-            precio_total = cab_total + tina_total + desayuno_total
+            precio_total = cab_total + tina_total   # desayuno YA incluido en cab_total
             descuento = _descuento_pack_cabana(c, tina, f, cabana_hora, tina_hora, personas)
             op.update({
                 'tina': {'nombre': tina['nombre'], 'hora': tina_hora, 'precio_total': tina_total},
@@ -409,9 +412,9 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
         else:
             op.update({
                 'tina': None,
-                'precio_total': cab_total + desayuno_total,
+                'precio_total': cab_total,        # desayuno YA incluido en cab_total
                 'descuento_pack': 0,
-                'precio_con_descuento': cab_total + desayuno_total,
+                'precio_con_descuento': cab_total,
                 'hay_descuento': False,
             })
         opciones.append(op)
