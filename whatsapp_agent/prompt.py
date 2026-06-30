@@ -221,7 +221,7 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
             '`cabana.precio_total`) y pregunta cuál prefiere. Menciona SIEMPRE el horario: '
             'check-in 16:00 y check-out 11:00 del día siguiente. Cada opción trae una `tina` '
             '(`tina.nombre` a `tina.hora`, el horario más tarde disponible, nunca antes de las '
-            '16:00): ofrécela como parte del plan. PRECIO: si `hay_descuento`, muestra el real '
+            '16:00): ofrécela como parte del plan **SALVO que el cliente pida SOLO la cabaña** (dijo "solo cabaña", "sin tina" o "no tinas"): en ese caso NO incluyas la tina ni la des por hecho — presentá ÚNICAMENTE `cabana.precio_total` (la cabaña sola, que YA incluye desayuno) y, si querés, ofrecé la tina como sugerencia OPCIONAL aparte ("¿te gustaría sumarle una tina caliente?"), nunca metida en el precio. PRECIO: si `hay_descuento`, muestra el real '
             '(`precio_total`) y el con pack (`precio_con_descuento`); si no, usa `precio_total`. '
             'Usa los montos TAL CUAL. DESAYUNO: va INCLUIDO en el `precio_total` del paquete — '
             'menciónalo como incluido ("incluye desayuno para dos, a la mañana siguiente en la '
