@@ -357,6 +357,7 @@ urlpatterns = [
     path('api/aremko-cli/health/', api_aremko_cli.health_check, name='aremko_cli_health'),
     # === CONCILIACIÓN BANCARIA (AP-001 · Tier-2 para AgentProvision; AUTOMATION_API_KEY) ===
     path('api/aremko-cli/recon/reservas-pendientes/', recon_api_views.recon_reservas_pendientes, name='recon_reservas_pendientes'),
+    path('api/aremko-cli/recon/aplicar-pago/', recon_api_views.recon_aplicar_pago, name='recon_aplicar_pago'),
     path('api/aremko-cli/bookings/stats/', api_aremko_cli.bookings_stats, name='aremko_cli_bookings_stats'),
     path('api/aremko-cli/bookings/daily/', api_aremko_cli.bookings_daily, name='aremko_cli_bookings_daily'),
     path('api/aremko-cli/bookings/by-family/', api_aremko_cli.bookings_by_family, name='aremko_cli_bookings_by_family'),
