@@ -427,12 +427,13 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
         nota = ('no hay tina disponible desde las 16:00 esa noche; ofrecer solo la cabaña '
                 'y coordinar la tina con una persona')
 
-    # Upsell determinístico: si hay combo (tina) pero ninguna opción trae descuento
-    # (fin de semana / martes cerrado), el código entrega el aviso listo para Luna.
+    # H-057 (Jorge, 2026-07-01): el PackDescuento "Alojamiento Cabaña+Tinas" (#9) quedó
+    # DESACTIVADO a propósito — cabaña+tina ahora es "suma de las partes, sin descuento
+    # adicional" (mismo criterio que Noche de Aguas Calientes). Con el pack apagado,
+    # `hay_descuento` es SIEMPRE False sin importar el día, así que el upsell "cotiza otro
+    # día para el ahorro" pasó a ser una promesa vacía en TODOS los casos — se elimina en vez
+    # de dejarlo (antes: avisaba "precio normal, el descuento aplica domingo a jueves").
     nota_upsell = ''
-    if opciones and tina is not None and not any(o['hay_descuento'] for o in opciones):
-        nota_upsell = ('Este día queda a precio normal; el descuento del pack cabaña+tina aplica '
-                       'de domingo a jueves. Ofrece cotizar un día entre semana para que vea el ahorro.')
 
     return {'fecha': f.isoformat(), 'personas': personas, 'tina_mas_tarde': tina_hora,
             'opciones': opciones, 'nota': nota, 'nota_upsell': nota_upsell}
