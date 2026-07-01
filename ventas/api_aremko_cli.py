@@ -2356,10 +2356,14 @@ def bookings_family_combinations_range(request):
 
     Igual que bookings_family_combinations pero SIN desglose mensual: agrega todo el
     rango [date_start, date_stop] en un solo bloque. Para el reporte diario de ads
-    (aremko-cli, H-053): el "retorno real" de cada programa.
-      - Pausa junto al río = tinas_masajes
-      - Ritual del Río     = cabanas_tinas_masajes
-    Buckets mutuamente excluyentes (cada VentaReserva cae en EXACTAMENTE uno).
+    (aremko-cli, H-053): el "retorno real" de cada PROGRAMA, sin intersección
+    (cada VentaReserva cae en EXACTAMENTE un bucket):
+      - Pausa junto al río = tinas_masajes            (solo tina+masaje, sin alojamiento)
+      - Ritual del Río     = cabanas_tinas_masajes_1n (cabaña 1 noche + tina + masaje)
+      - Refugio            = cabanas_tinas_masajes_2n (cabaña 2 noches + tina + masaje)
+    Diferencia con el mensual: acá `cabanas_tinas_masajes` se PARTE por nº de noches
+    (fechas distintas de cabaña) → Ritual (1) vs Refugio (2), que de otro modo caerían
+    juntos. `cabanas_tinas_masajes_otras` = cabaña+tina+masaje con otro nº de noches.
 
     Query params (OBLIGATORIOS):
         date_start, date_stop  (YYYY-MM-DD, inclusive ambos extremos)
@@ -2369,15 +2373,18 @@ def bookings_family_combinations_range(request):
           "date_start": "2026-06-21",
           "date_stop":  "2026-06-28",
           "combinations": {
-            "solo_tinas": {"count_reservas": N, "revenue": X}, ...
-            "tinas_masajes": {...}, "cabanas_tinas_masajes": {...}, "otros": {...}
+            "solo_tinas": {...}, "solo_masajes": {...}, "solo_cabanas": {...},
+            "tinas_masajes": {"count_reservas": N, "revenue": X},          // Pausa
+            "cabanas_tinas": {...}, "cabanas_masajes": {...},
+            "cabanas_tinas_masajes_1n": {...},                            // Ritual
+            "cabanas_tinas_masajes_2n": {...},                            // Refugio
+            "cabanas_tinas_masajes_otras": {...}, "otros": {...}
           },
           "total": {"count_reservas": N, "revenue": X}
         }
-    Reglas idénticas al mensual: reusa _classify_family_combo; excluye
-    estado_pago='cancelado'; agrupa por venta_reserva__fecha_creacion__date en
-    [date_start, date_stop]; revenue = todos los servicios de la reserva. Todos
-    los buckets vienen presentes (0 si no hay ventas).
+    Reglas (como el mensual): reusa _classify_family_combo; excluye estado_pago='cancelado';
+    agrupa por venta_reserva__fecha_creacion__date en [date_start, date_stop]; revenue =
+    todos los servicios de la reserva. Todos los buckets vienen presentes (0 si no hay ventas).
     """
     try:
         # Nota: parse_date(None) lanza TypeError (su except solo captura Value/Attribute),
@@ -2399,7 +2406,9 @@ def bookings_family_combinations_range(request):
         from django.db import connection, transaction
 
         # Una sola query: los ReservaServicio del rango con lo necesario para clasificar.
-        reservas_data = {}  # vid -> {'familias': set, 'revenue': float}
+        # noches_cabana = fechas DISTINTAS de alojamiento (cabaña) → separa Ritual (1 noche)
+        # de Refugio (2 noches), ambos con familias {cabana,tina,masaje}. Sin intersección.
+        reservas_data = {}  # vid -> {'familias': set, 'revenue': float, 'noches_cabana': set}
         with transaction.atomic():
             with connection.cursor() as cursor:
                 try:
@@ -2418,6 +2427,7 @@ def bookings_family_combinations_range(request):
                 'precio_unitario_venta',
                 'servicio__precio_base',
                 'cantidad_personas',
+                'fecha_agendamiento',
             )
 
             for row in servicios_qs:
@@ -2435,19 +2445,41 @@ def bookings_family_combinations_range(request):
                 rev = float(precio_unit) * cantidad
 
                 if vid not in reservas_data:
-                    reservas_data[vid] = {'familias': set(), 'revenue': 0.0}
+                    reservas_data[vid] = {'familias': set(), 'revenue': 0.0, 'noches_cabana': set()}
                 # Sólo familias core entran al set de clasificación.
                 if fam_plural in ('tinas', 'masajes', 'cabanas'):
                     reservas_data[vid]['familias'].add(fam_plural)
+                # Cada fecha de cabaña = una noche (Refugio agenda la MISMA cabaña 2 fechas).
+                if fam_plural == 'cabanas':
+                    reservas_data[vid]['noches_cabana'].add(row['fecha_agendamiento'])
                 # Revenue suma TODOS los servicios (incluso 'otros'), como el mensual.
                 reservas_data[vid]['revenue'] += rev
 
-        # Clasificar cada reserva y agregar en UN período (todos los buckets presentes).
-        combinations = {ck: {'count_reservas': 0, 'revenue': 0.0} for ck in COMBO_KEYS_FAMILY}
+        # Buckets del rango: los del mensual pero con cabana+tina+masaje PARTIDO por noches
+        # → Ritual (1) vs Refugio (2), sin intersección (cada reserva en 1 solo bucket).
+        range_combo_keys = [
+            'solo_tinas', 'solo_masajes', 'solo_cabanas',
+            'tinas_masajes',                       # Pausa junto al río
+            'cabanas_tinas', 'cabanas_masajes',
+            'cabanas_tinas_masajes_1n',            # Ritual del Río (1 noche)
+            'cabanas_tinas_masajes_2n',            # Refugio (2 noches)
+            'cabanas_tinas_masajes_otras',         # cabaña+tina+masaje con otro nº de noches
+            'otros',
+        ]
+        combinations = {ck: {'count_reservas': 0, 'revenue': 0.0} for ck in range_combo_keys}
         total_count = 0
         total_revenue = 0.0
         for _vid, d in reservas_data.items():
             combo = _classify_family_combo(d['familias'])
+            # Partir cabana+tina+masaje por nº de noches (fechas distintas de cabaña).
+            if combo == 'cabanas_tinas_masajes':
+                noches = len(d['noches_cabana'])
+                if noches == 1:
+                    combo = 'cabanas_tinas_masajes_1n'   # Ritual
+                elif noches == 2:
+                    combo = 'cabanas_tinas_masajes_2n'   # Refugio
+                else:
+                    combo = 'cabanas_tinas_masajes_otras'
             combinations[combo]['count_reservas'] += 1
             combinations[combo]['revenue'] += d['revenue']
             total_count += 1
