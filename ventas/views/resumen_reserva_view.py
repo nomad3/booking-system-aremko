@@ -82,6 +82,13 @@ def _generar_texto_resumen(reserva, config):
         servicios_ordenados = sorted(servicios, key=lambda s: (s.fecha_agendamiento, s.hora_inicio or ''))
 
         for servicio_reserva in servicios_ordenados:
+            # No listar la línea de ajuste de descuento como si fuera un servicio contratado:
+            # su `cantidad_personas` en realidad codifica el MONTO del descuento, no personas
+            # (bug real visto por clientes: "Descuento_Servicios (140000 personas)"). El
+            # descuento YA se muestra correctamente más abajo en "Descuento: -$X" (líneas
+            # 170-187) — misma condición que se usa ahí para no duplicarlo ni mostrarlo mal.
+            if servicio_reserva.servicio.precio_base == -1 and 'descuento' in servicio_reserva.servicio.nombre.lower():
+                continue
             nombre = servicio_reserva.servicio.nombre
             personas = servicio_reserva.cantidad_personas or 1
             fecha = servicio_reserva.fecha_agendamiento.strftime('%d/%m/%Y')
