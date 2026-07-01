@@ -773,6 +773,31 @@ def crear_reserva(request):
 
         # Iniciar transacción atómica
         with transaction.atomic():
+            # 0. Guard de CONCURRENCIA (doble click en el botón "Aprobar" del link al cliente):
+            # bloqueamos la fila de la propuesta y re-chequeamos BAJO LOCK. El check de arriba
+            # (línea ~683) es check-then-act y no resiste dos requests casi simultáneas: ambas
+            # lo pasan antes de que la primera marque estado='creada' → se crean 2 reservas
+            # (caso 6169/6170). Con el lock, la 2ª request espera a que la 1ª haga commit y,
+            # al ver estado='creada', devuelve la reserva existente en vez de duplicar.
+            if propuesta_id:
+                propuesta = PropuestaReserva.objects.select_for_update().get(propuesta_id=propuesta_id)
+                if propuesta.estado == 'creada' and propuesta.reserva_id:
+                    try:
+                        reserva_existente = VentaReserva.objects.get(id=propuesta.reserva_id)
+                        return Response({
+                            'success': True,
+                            'reserva': {
+                                'id': reserva_existente.id,
+                                'numero': f'RES-{reserva_existente.id}',
+                                'total': int(reserva_existente.total),
+                                'estado_pago': reserva_existente.estado_pago,
+                                'duplicada': True,
+                            },
+                            'mensaje': f'Reserva ya fue creada desde propuesta {propuesta_id[:8]}',
+                        })
+                    except VentaReserva.DoesNotExist:
+                        pass  # propuesta dice creada pero la reserva no está → proceder a crear
+
             # 1. Buscar o crear cliente
             telefono_normalizado = validar_telefono_chileno(cliente_data.get('telefono', ''))[2]
 

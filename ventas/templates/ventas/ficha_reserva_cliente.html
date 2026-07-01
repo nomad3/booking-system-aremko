@@ -123,7 +123,11 @@
         </details>
 
         {% if es_cotizacion %}
-          <form method="post" action="{{ aprobar_url }}" style="margin-top:14px">
+          <form method="post" action="{{ aprobar_url }}" style="margin-top:14px"
+                onsubmit="if(this.dataset.sent){return false;} this.dataset.sent='1';
+                          var b=this.querySelector('button[type=submit]');
+                          setTimeout(function(){ if(b){b.disabled=true; b.textContent='Generando tu reserva…';} },0);
+                          return true;">
             {% csrf_token %}
             <button type="submit" class="btn" style="background:#3D6B4A">Aprobar cotización</button>
           </form>
