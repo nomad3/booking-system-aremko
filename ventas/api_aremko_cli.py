@@ -2350,6 +2350,123 @@ def bookings_family_combinations(request):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+def bookings_family_combinations_range(request):
+    """
+    Ventas por combinación de familias en UN período (rango de fechas arbitrario).
+
+    Igual que bookings_family_combinations pero SIN desglose mensual: agrega todo el
+    rango [date_start, date_stop] en un solo bloque. Para el reporte diario de ads
+    (aremko-cli, H-053): el "retorno real" de cada programa.
+      - Pausa junto al río = tinas_masajes
+      - Ritual del Río     = cabanas_tinas_masajes
+    Buckets mutuamente excluyentes (cada VentaReserva cae en EXACTAMENTE uno).
+
+    Query params (OBLIGATORIOS):
+        date_start, date_stop  (YYYY-MM-DD, inclusive ambos extremos)
+
+    Response 200:
+        {
+          "date_start": "2026-06-21",
+          "date_stop":  "2026-06-28",
+          "combinations": {
+            "solo_tinas": {"count_reservas": N, "revenue": X}, ...
+            "tinas_masajes": {...}, "cabanas_tinas_masajes": {...}, "otros": {...}
+          },
+          "total": {"count_reservas": N, "revenue": X}
+        }
+    Reglas idénticas al mensual: reusa _classify_family_combo; excluye
+    estado_pago='cancelado'; agrupa por venta_reserva__fecha_creacion__date en
+    [date_start, date_stop]; revenue = todos los servicios de la reserva. Todos
+    los buckets vienen presentes (0 si no hay ventas).
+    """
+    try:
+        date_start = parse_date(request.GET.get('date_start'))
+        date_stop = parse_date(request.GET.get('date_stop'))
+        if date_start is None or date_stop is None:
+            return JsonResponse(
+                {'error': 'date_start y date_stop son obligatorios (YYYY-MM-DD)'}, status=400)
+        if date_start > date_stop:
+            return JsonResponse(
+                {'error': 'date_start no puede ser posterior a date_stop'}, status=400)
+
+        from django.db import connection, transaction
+
+        # Una sola query: los ReservaServicio del rango con lo necesario para clasificar.
+        reservas_data = {}  # vid -> {'familias': set, 'revenue': float}
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                try:
+                    cursor.execute("SET LOCAL statement_timeout = '8s'")
+                except Exception:
+                    pass  # SQLite en tests no soporta esto.
+
+            servicios_qs = ReservaServicio.objects.filter(
+                venta_reserva__fecha_creacion__date__gte=date_start,
+                venta_reserva__fecha_creacion__date__lte=date_stop,
+            ).exclude(
+                venta_reserva__estado_pago='cancelado',
+            ).values(
+                'venta_reserva_id',
+                'servicio__tipo_servicio',
+                'precio_unitario_venta',
+                'servicio__precio_base',
+                'cantidad_personas',
+            )
+
+            for row in servicios_qs:
+                vid = row['venta_reserva_id']
+                tipo = row['servicio__tipo_servicio'] or 'otro'
+                if tipo not in FAMILY_KEYS_OUTPUT_MONTHLY:
+                    tipo = 'otro'
+                fam_plural = FAMILY_KEYS_OUTPUT_MONTHLY[tipo]  # tinas/masajes/cabanas/otros
+
+                # Coalesce manual + cantidad_personas (mismo criterio que el mensual).
+                precio_unit = row['precio_unitario_venta']
+                if precio_unit is None:
+                    precio_unit = row['servicio__precio_base'] or 0
+                cantidad = row['cantidad_personas'] or 1
+                rev = float(precio_unit) * cantidad
+
+                if vid not in reservas_data:
+                    reservas_data[vid] = {'familias': set(), 'revenue': 0.0}
+                # Sólo familias core entran al set de clasificación.
+                if fam_plural in ('tinas', 'masajes', 'cabanas'):
+                    reservas_data[vid]['familias'].add(fam_plural)
+                # Revenue suma TODOS los servicios (incluso 'otros'), como el mensual.
+                reservas_data[vid]['revenue'] += rev
+
+        # Clasificar cada reserva y agregar en UN período (todos los buckets presentes).
+        combinations = {ck: {'count_reservas': 0, 'revenue': 0.0} for ck in COMBO_KEYS_FAMILY}
+        total_count = 0
+        total_revenue = 0.0
+        for _vid, d in reservas_data.items():
+            combo = _classify_family_combo(d['familias'])
+            combinations[combo]['count_reservas'] += 1
+            combinations[combo]['revenue'] += d['revenue']
+            total_count += 1
+            total_revenue += d['revenue']
+
+        for ck in combinations:
+            combinations[ck]['revenue'] = round(combinations[ck]['revenue'], 2)
+
+        logger.info(
+            f"aremko-cli: family_combinations_range {date_start}..{date_stop} "
+            f"reservas_total={total_count}"
+        )
+        return JsonResponse({
+            'date_start': date_start.isoformat(),
+            'date_stop': date_stop.isoformat(),
+            'combinations': combinations,
+            'total': {'count_reservas': total_count, 'revenue': round(total_revenue, 2)},
+        })
+
+    except Exception as e:
+        logger.error(f"Error in bookings_family_combinations_range: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
 def cliente_ficha(request, cliente_id):
     """
     Ficha 360 de un cliente para aremko-cli (dashboards de comercial / recepción).
