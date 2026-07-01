@@ -845,6 +845,62 @@ def pausa_landing_view(request):
     })
 
 
+def noche_aguas_calientes_landing_view(request):
+    """Landing INDEXABLE de la "Noche de Aguas Calientes" (H-055): cabaña 1 noche + tina
+    caliente, SIN masaje — para quien llega de tarde-noche (después del trabajo), duerme en
+    cabaña boutique y sale cuando quiere al día siguiente. La combinación YA se vendía de
+    forma genérica (Luna la cotiza hoy con `disponibilidad_pack_cabana_tina`); esta landing
+    le da nombre y visibilidad propia. Precio NO es plano (varía según cabaña/tina
+    disponibles) — se muestra "desde $X" calculado con los precios mínimos reales del
+    catálogo. CTA único → WhatsApp con medición (GA4 nac_whatsapp_click + Meta Lead).
+    Reusa el molde del Ritual y su `RitualRioLandingConfig` (foto_acto2=tina, foto_acto3=cabaña).
+    """
+    try:
+        canonical_url = request.build_absolute_uri(request.path)
+    except Exception:
+        canonical_url = request.path
+    whatsapp_url = (
+        'https://wa.me/56957902525?text='
+        'Hola%2C%20quiero%20reservar%20la%20Noche%20de%20Aguas%20Calientes'
+    )
+    try:
+        from ventas.models import RitualRioLandingConfig
+        config = RitualRioLandingConfig.get_solo()
+    except Exception:
+        config = None
+
+    # "Desde $X" real: cabaña más barata (ya incluye desayuno) + tina más barata del catálogo
+    # publicado. Dinámico (no hardcodeado como Ritual/Pausa) porque este programa NO es un
+    # paquete de precio plano — el precio real depende de qué quede disponible esa noche.
+    try:
+        precio_cabana_min = (
+            Servicio.objects.filter(activo=True, publicado_web=True, tipo_servicio='cabana')
+            .order_by('precio_base').values_list('precio_base', flat=True).first()
+        )
+        precio_tina_min = (
+            Servicio.objects.filter(activo=True, publicado_web=True, tipo_servicio='tina')
+            .order_by('precio_base').values_list('precio_base', flat=True).first()
+        )
+        precio_desde_num = int(precio_cabana_min or 110000) + int(precio_tina_min or 0)
+    except Exception:
+        precio_desde_num = 150000  # fallback defensivo, nunca debería usarse
+    precio_desde = f"{precio_desde_num:,}".replace(',', '.')
+
+    # Reseñas: aún no hay ninguna curada específica para esta combinación (cabaña+tina SIN
+    # masaje) — NO se fabrican testimonios. La plantilla muestra un placeholder honesto hasta
+    # que el equipo sume reseñas reales (mismo criterio defensivo que usa Ritual con reseñas
+    # vacías).
+    resenas = []
+
+    return render(request, 'ventas/noche_aguas_calientes_landing.html', {
+        'canonical_url': canonical_url,
+        'whatsapp_url': whatsapp_url,
+        'config': config,
+        'resenas': resenas,
+        'precio_desde': precio_desde,
+    })
+
+
 def refugio_submit_view(request):
     """Procesa el formulario de la landing /refugio/.
 

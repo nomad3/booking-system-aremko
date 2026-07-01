@@ -107,6 +107,20 @@ class PausaLandingSitemap(Sitemap):
         return reverse(item)
 
 
+class NocheAguasCalientesSitemap(Sitemap):
+    """Sitemap para la landing 'Noche de Aguas Calientes' (H-055): cabaña 1 noche + tina,
+    sin masaje. Indexable por diseño, igual que Pausa — no depende de campaña paga (a
+    diferencia de Ritual, que está oculta justo por eso)."""
+    changefreq = 'weekly'
+    priority = 0.8
+
+    def items(self):
+        return ['noche_aguas_calientes_landing']
+
+    def location(self, item):
+        return reverse(item)
+
+
 class CategoriaSitemap(Sitemap):
     """Sitemap dinámico para categorías de servicios individuales"""
     changefreq = 'weekly'
