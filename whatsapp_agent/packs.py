@@ -905,3 +905,40 @@ def construir_servicios_refugio(fecha, preferir_premium=False):
         'es_torre': r.get('es_torre'),
         'es_hidromasaje': r.get('es_hidromasaje'),
     }
+
+
+# --- Fichas de los 4 programas (H-056: Luna "consejera", no mostrador) -----------------
+# Función PURA (sin DB/LLM) para la tool `enviar_ficha_experiencia`: cuando el cliente pide
+# más detalle de UN programa, Luna manda el link de su landing — WhatsApp arma la vista
+# previa (foto + título) solo, sin adjuntar ningún archivo. Las 4 landings ya tienen fotos,
+# video del Mirador del Río Pescado, reseñas de TripAdvisor y meta tags Open Graph.
+_FICHAS_EXPERIENCIA = {
+    'ritual': {
+        'nombre': 'Ritual del Río',
+        'url': 'https://www.aremko.cl/ritual-del-rio/',
+        'resumen': 'cabaña 1 noche + tina + masaje + desayuno, desde $210.000',
+    },
+    'refugio': {
+        'nombre': 'Refugio Aremko',
+        'url': 'https://www.aremko.cl/refugio/',
+        'resumen': 'cabaña 2 noches + tina + masaje + desayuno, desde $270.000',
+    },
+    'pausa': {
+        'nombre': 'Pausa junto al río',
+        'url': 'https://www.aremko.cl/pausa-junto-al-rio/',
+        'resumen': 'tina + masaje el mismo día, sin alojamiento, desde $110.000',
+    },
+    'aguas_calientes': {
+        'nombre': 'Noche de Aguas Calientes',
+        'url': 'https://www.aremko.cl/noche-de-aguas-calientes/',
+        'resumen': 'cabaña + tina, sin masaje, desde $160.000',
+    },
+}
+
+
+def ficha_experiencia(programa):
+    """Devuelve {nombre, url, resumen} del programa ('ritual'/'refugio'/'pausa'/
+    'aguas_calientes'), o None si la clave no existe. Pura, sin efectos secundarios."""
+    clave = (programa or '').strip().lower()
+    ficha = _FICHAS_EXPERIENCIA.get(clave)
+    return dict(ficha) if ficha else None

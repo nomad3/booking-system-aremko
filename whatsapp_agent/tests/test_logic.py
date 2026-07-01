@@ -166,6 +166,20 @@ def test_build_system_prompt_con_conocimiento():
     assert 'AUTORIDAD MÁXIMA' not in sp2
 
 
+def test_build_system_prompt_con_descubrimiento():
+    sp = prompt.build_system_prompt(
+        'Asistente Aremko.', 'SERVICIOS PUBLICADOS:\n• Tina — $140.000',
+        'https://www.aremko.cl/',
+    )
+    assert '# 3b. DESCUBRIMIENTO' in sp
+    assert 'Ritual del Río' in sp and 'Refugio Aremko' in sp
+    assert 'Pausa junto al río' in sp and 'Noche de Aguas Calientes' in sp
+    assert 'PRESUPUESTO AJUSTADO' in sp
+    assert 'enviar_ficha_experiencia' in sp
+    # Va después de la sección 3 y antes de la 4 (no compite con la regla de escalar).
+    assert sp.index('# 3. REGLAS') < sp.index('# 3b. DESCUBRIMIENTO') < sp.index('# 4. CUÁNDO DERIVAR')
+
+
 def test_saneo_nombre():
     assert prompt.saneo_nombre('Jorge Aguilera') == 'Jorge'
     assert prompt.saneo_nombre('JORGE') == 'Jorge'
@@ -283,6 +297,20 @@ def test_pack_horarios():
     assert packs.no_solapan(870, 240, 900, 60) is False
     # masaje a las 19:00 (después de la tina 14:30-18:30) → no solapan
     assert packs.no_solapan(870, 240, 1140, 60) is True
+
+
+def test_ficha_experiencia():
+    f = packs.ficha_experiencia('ritual')
+    assert f['nombre'] == 'Ritual del Río'
+    assert f['url'] == 'https://www.aremko.cl/ritual-del-rio/'
+    for clave in ('refugio', 'pausa', 'aguas_calientes'):
+        f2 = packs.ficha_experiencia(clave)
+        assert f2 is not None and f2['url'].startswith('https://www.aremko.cl/')
+    # Case/espacios no importan; clave inválida → None.
+    assert packs.ficha_experiencia('  RITUAL ') is not None
+    assert packs.ficha_experiencia('no_existe') is None
+    assert packs.ficha_experiencia('') is None
+    assert packs.ficha_experiencia(None) is None
 
 
 def test_elegir_slot_masaje_clustering():

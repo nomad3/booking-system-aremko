@@ -428,6 +428,38 @@ _TOOLS = [{
             'required': ['fecha'],
         },
     },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'enviar_ficha_experiencia',
+        'description': (
+            'Devuelve el link de la landing (ficha completa con fotos, video y reseñas) de UNO de '
+            'los 4 programas boutique. Úsala cuando el cliente, tras ver el menú de programas o por '
+            'iniciativa propia, pide MÁS DETALLE de un programa en particular (ej. "cuéntame más del '
+            'Ritual", "mándame info de la Pausa", "quiero ver fotos del Refugio"). NO la uses para '
+            'cotizar precio o disponibilidad de una fecha concreta — para eso usa '
+            'consultar_disponibilidad_combo/pack/pack_cabana/refugio. Esta tool NO agenda ni cotiza, '
+            'solo entrega el link informativo; el mensaje de WhatsApp mostrará automáticamente una '
+            'vista previa con foto al pegar el link, así que no hace falta describir la experiencia '
+            'en tu texto.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'programa': {
+                    'type': 'string',
+                    'enum': ['ritual', 'refugio', 'pausa', 'aguas_calientes'],
+                    'description': (
+                        'Cuál de los 4 programas: "ritual" (Ritual del Río, cabaña 1 noche + tina + '
+                        'masaje + desayuno), "refugio" (Refugio Aremko, 2 noches), "pausa" (Pausa '
+                        'junto al río, tina + masaje sin alojamiento), "aguas_calientes" (Noche de '
+                        'Aguas Calientes, cabaña + tina sin masaje).'
+                    ),
+                },
+            },
+            'required': ['programa'],
+        },
+    },
 }]
 
 
@@ -1342,6 +1374,28 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 logger.exception('Agente WA: tool confirmar_refugio falló: %s', exc)
                 return {'success': False, 'error': 'internal_error',
                         'mensaje': f'no se pudo confirmar el Refugio: {str(exc)[:100]}'}
+        if name == 'enviar_ficha_experiencia':
+            try:
+                from .packs import ficha_experiencia
+                args = args or {}
+                clave = (args.get('programa') or '').strip().lower()
+                ficha = ficha_experiencia(clave)
+                if not ficha:
+                    return {'error': 'programa_invalido',
+                            'mensaje': f'Programa "{clave}" no reconocido; usa ritual/refugio/pausa/aguas_calientes.'}
+                return {
+                    'success': True,
+                    'nombre_experiencia': ficha['nombre'],
+                    'url': ficha['url'],
+                    'resumen': ficha['resumen'],
+                    'mensaje_sugerido': (
+                        f"Te dejo la ficha completa del {ficha['nombre']}: {ficha['url']} — ahí ves "
+                        'fotos, el detalle y el precio 🌿'
+                    ),
+                }
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool enviar_ficha_experiencia falló: %s', exc)
+                return {'error': f'no se pudo obtener la ficha: {str(exc)[:100]}'}
         return {'error': f'herramienta desconocida: {name}'}
 
     try:
