@@ -901,11 +901,18 @@ def noche_aguas_calientes_landing_view(request):
         precio_desde_num = 160000  # fallback defensivo (cabaña $110k + tina ~$50k), nunca debería usarse
     precio_desde = f"{int(precio_desde_num):,}".replace(',', '.')
 
-    # Reseñas: aún no hay ninguna curada específica para esta combinación (cabaña+tina SIN
-    # masaje) — NO se fabrican testimonios. La plantilla muestra un placeholder honesto hasta
-    # que el equipo sume reseñas reales (mismo criterio defensivo que usa Ritual con reseñas
-    # vacías).
-    resenas = []
+    # Reseñas REALES de TripAdvisor (Jorge, 2026-07-01), curadas para esta combinación
+    # (cabaña + tina, SIN masaje): las 3 son 5★, "viaje en pareja". Recortadas a la parte
+    # relevante (se omite, ej., la observación de Tamara sobre variedad de comida — no aporta
+    # a esta landing), sin agregar ni inventar nada.
+    resenas = [
+        (None, 'Las tinas son aún mejores de lo que te imaginas… la cabaña viene muy bien '
+               'equipada. Una experiencia totalmente distinta.', 'Daniel D · TripAdvisor'),
+        (None, 'El lugar es acogedor y se siente un ambiente muy agradable… una experiencia '
+               'muy positiva y totalmente recomendable.', 'Tamara A · TripAdvisor'),
+        (None, 'Una excelente opción para una escapada a celebrar un aniversario en pareja… '
+               'relajarse y dormir en una preciosa cabaña.', 'Juan Pablo D · TripAdvisor'),
+    ]
 
     return render(request, 'ventas/noche_aguas_calientes_landing.html', {
         'canonical_url': canonical_url,
