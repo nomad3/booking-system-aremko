@@ -869,21 +869,33 @@ def noche_aguas_calientes_landing_view(request):
     except Exception:
         config = None
 
-    # "Desde $X" real: cabaña más barata (ya incluye desayuno) + tina más barata del catálogo
-    # publicado. Dinámico (no hardcodeado como Ritual/Pausa) porque este programa NO es un
+    # "Desde $X" real: cabaña más barata (ya incluye desayuno) + tina más barata, AMBAS para 2
+    # personas. Dinámico (no hardcodeado como Ritual/Pausa) porque este programa NO es un
     # paquete de precio plano — el precio real depende de qué quede disponible esa noche.
+    # OJO: `precio_base` es POR PERSONA (igual que en toda la disponibilidad de Luna, ver
+    # whatsapp_agent/availability.py:396-404 `precio_total = precio_base * personas`) — NO es
+    # el precio final. Filtramos también por capacidad para 2 (capacidad_minima/maxima), igual
+    # que `disponibilidad()`, para no tomar una tina de grupo (ej. Calbuco, mín. 3-4) como si
+    # fuera para 2.
+    PERSONAS_DESDE = 2  # esta landing es "para dos", como Ritual/Refugio/Pausa
     try:
-        precio_cabana_min = (
-            Servicio.objects.filter(activo=True, publicado_web=True, tipo_servicio='cabana')
-            .order_by('precio_base').values_list('precio_base', flat=True).first()
+        precio_cabana_pp = (
+            Servicio.objects.filter(
+                activo=True, publicado_web=True, tipo_servicio='cabana',
+                capacidad_minima__lte=PERSONAS_DESDE, capacidad_maxima__gte=PERSONAS_DESDE,
+            ).order_by('precio_base').values_list('precio_base', flat=True).first()
         )
-        precio_tina_min = (
-            Servicio.objects.filter(activo=True, publicado_web=True, tipo_servicio='tina')
-            .order_by('precio_base').values_list('precio_base', flat=True).first()
+        precio_tina_pp = (
+            Servicio.objects.filter(
+                activo=True, publicado_web=True, tipo_servicio='tina',
+                capacidad_minima__lte=PERSONAS_DESDE, capacidad_maxima__gte=PERSONAS_DESDE,
+            ).order_by('precio_base').values_list('precio_base', flat=True).first()
         )
-        precio_desde_num = int(precio_cabana_min or 110000) + int(precio_tina_min or 0)
+        precio_cabana_pp = precio_cabana_pp if precio_cabana_pp is not None else 55000  # fallback = $110.000/2
+        precio_tina_pp = precio_tina_pp if precio_tina_pp is not None else 0
+        precio_desde_num = (int(precio_cabana_pp) + int(precio_tina_pp)) * PERSONAS_DESDE
     except Exception:
-        precio_desde_num = 150000  # fallback defensivo, nunca debería usarse
+        precio_desde_num = 160000  # fallback defensivo (cabaña $110k + tina ~$50k), nunca debería usarse
     precio_desde = f"{precio_desde_num:,}".replace(',', '.')
 
     # Reseñas: aún no hay ninguna curada específica para esta combinación (cabaña+tina SIN
