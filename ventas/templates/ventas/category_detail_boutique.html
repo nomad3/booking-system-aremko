@@ -61,10 +61,8 @@
 {% endblock %}
 
 {% block structured_data %}{% localize off %}
-{# JSON-LD de la categoría. Va en structured_data (base_public SÍ lo renderiza); antes
-   estaba en extra_head, bloque que base_public no imprime → no se mostraba (0 schema).
-   localize off: precios sin separador de miles (si no, rompen el JSON). Las OG las
-   provee base_public (meta_og); no se duplican acá. #}
+{# JSON-LD de la categoría. Va en structured_data (base_public SÍ lo renderiza); antes estaba en extra_head, bloque que base_public no imprime → no se mostraba (0 schema). #}
+{# localize off: precios sin separador de miles (si no, rompen el JSON). Las OG las provee base_public (meta_og); no se duplican acá. #}
 <!-- Schema.org JSON-LD -->
 {% if categoria_actual.id == 3 %}
 <!-- Schema específico para Alojamientos/Cabañas -->

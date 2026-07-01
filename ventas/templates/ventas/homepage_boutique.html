@@ -3,13 +3,10 @@
 {% load humanize %}
 {% load ventas_extras %}
 
-{# ──────────────────────────────────────────────────────────────────
-   Home boutique (fase 1 del rediseño). Extiende base_public.html →
-   conserva title/meta/JSON-LD/canonical/OG/GA4/Ads/Pixel + la nav y el
-   footer del sitio (links + SEO). Solo cambia el CUERPO (block content)
-   y los estilos (block extra_style). Cabeza SEO = verbatim de homepage.html.
-   Ver docs/SEO_BASELINE_HOME.md (checklist de preservación).
-   ────────────────────────────────────────────────────────────────── #}
+{# Home boutique (fase 1 del rediseño). Extiende base_public.html → conserva #}
+{# title/meta/JSON-LD/canonical/OG/GA4/Ads/Pixel + la nav y el footer del sitio (links + SEO). #}
+{# Solo cambia el CUERPO (block content) y los estilos (block extra_style). Cabeza SEO = #}
+{# verbatim de homepage.html. Ver docs/SEO_BASELINE_HOME.md (checklist de preservación). #}
 
 {% block title %}Aremko Spa Boutique · Aguas calientes junto al Río Pescado · Puerto Varas{% endblock %}
 
@@ -157,13 +154,14 @@
 {% endif %}
 {% endblock %}
 
-{# Menú boutique ordenado — SOLO en la home (override de los bloques de base_public).
-   Mismas URLs (cero impacto SEO); agrupa las 3 experiencias y los secundarios. #}
+{# Menú boutique ordenado — SOLO en la home (override de los bloques de base_public). #}
+{# Mismas URLs (cero impacto SEO); agrupa las experiencias y los secundarios. #}
 {% block nav_items %}
 <li class="nav-item dropdown">
   <a class="nav-link dropdown-toggle" href="#" id="navExp" role="button" data-bs-toggle="dropdown" aria-expanded="false">Experiencias</a>
   <ul class="dropdown-menu" aria-labelledby="navExp">
     <li><a class="dropdown-item" href="{% url 'pausa_landing' %}">Pausa junto al río</a></li>
+    <li><a class="dropdown-item" href="{% url 'noche_aguas_calientes_landing' %}">Noche de Aguas Calientes</a></li>
     <li><a class="dropdown-item" href="{% url 'ritual_rio_landing' %}">Ritual del Río</a></li>
     <li><a class="dropdown-item" href="{% url 'refugio_landing' %}">Refugio Aremko</a></li>
   </ul>
