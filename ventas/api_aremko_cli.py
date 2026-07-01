@@ -2380,11 +2380,18 @@ def bookings_family_combinations_range(request):
     los buckets vienen presentes (0 si no hay ventas).
     """
     try:
-        date_start = parse_date(request.GET.get('date_start'))
-        date_stop = parse_date(request.GET.get('date_stop'))
-        if date_start is None or date_stop is None:
+        # Nota: parse_date(None) lanza TypeError (su except solo captura Value/Attribute),
+        # así que primero validamos presencia del string y recién ahí parseamos.
+        date_start_str = request.GET.get('date_start')
+        date_stop_str = request.GET.get('date_stop')
+        if not date_start_str or not date_stop_str:
             return JsonResponse(
                 {'error': 'date_start y date_stop son obligatorios (YYYY-MM-DD)'}, status=400)
+        date_start = parse_date(date_start_str)
+        date_stop = parse_date(date_stop_str)
+        if date_start is None or date_stop is None:
+            return JsonResponse(
+                {'error': 'date_start/date_stop inválidos (formato YYYY-MM-DD)'}, status=400)
         if date_start > date_stop:
             return JsonResponse(
                 {'error': 'date_start no puede ser posterior a date_stop'}, status=400)
