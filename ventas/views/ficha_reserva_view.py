@@ -242,7 +242,9 @@ def _experiencia_nombre(tipos):
     - tina + masaje (sin cabaña)            → 'Pausa junto al río'
     - cabaña + tina + masaje, 1 noche       → 'Ritual del Río'
     - cabaña + tina + masaje, 2+ noches     → 'Refugio Aremko'
-    Devuelve None si no calza un producto con nombre."""
+    - cabaña + tina, SIN masaje, 1 noche    → 'Noche de Aguas Calientes' (H-057)
+    Devuelve None si no calza un producto con nombre (ej. cabaña+tina de 2+ noches sin
+    masaje, o servicios sueltos que no arman ninguno de los 4 programas)."""
     tipos = list(tipos)
     presentes = set(tipos) & {'tina', 'masaje', 'cabana'}
     if presentes == {'tina', 'masaje'}:
@@ -250,6 +252,9 @@ def _experiencia_nombre(tipos):
     if presentes == {'cabana', 'tina', 'masaje'}:
         noches_cabana = sum(1 for t in tipos if t == 'cabana')
         return 'Refugio Aremko' if noches_cabana >= 2 else 'Ritual del Río'
+    if presentes == {'cabana', 'tina'}:
+        noches_cabana = sum(1 for t in tipos if t == 'cabana')
+        return 'Noche de Aguas Calientes' if noches_cabana == 1 else None
     return None
 
 
