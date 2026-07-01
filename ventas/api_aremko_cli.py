@@ -2143,10 +2143,13 @@ def bookings_family_combinations(request):
                 "solo_masajes":          {...}, "solo_cabanas": {...},
                 "tinas_masajes":         {...}, "cabanas_tinas": {...},
                 "cabanas_masajes":       {...},
-                "cabanas_tinas_masajes": {...}, "otros": {...}
+                "cabanas_tinas_masajes": {...},    # combinado (compat) = _1n+_2n+_otras
+                "cabanas_tinas_masajes_1n": {...},  # Ritual del Río  (cabaña 1 noche)
+                "cabanas_tinas_masajes_2n": {...},  # Refugio         (cabaña 2 noches)
+                "cabanas_tinas_masajes_otras": {...}, "otros": {...}
               },
-              "total": {"count_reservas": N, "revenue": X}
-            },
+              "total": {"count_reservas": N, "revenue": X}   # NO incluye los _1n/_2n/_otras
+            },                                                 # (ya están en el combinado)
             ...
           ],
           "summary": {
@@ -2154,12 +2157,19 @@ def bookings_family_combinations(request):
             "total_revenue":  X,
             "share_by_combination": {
               "solo_tinas": {"pct_reservas": 38.5, "pct_revenue": 35.2}, ...
+              # NB: el desglose _1n/_2n/_otras NO tiene share/trend (solo en 'data' por mes);
+              # pedirlo si se necesita.
             },
             "trend_slope_pct_by_combination": {
               "solo_tinas": 12.5, ...   # % cambio último cuarto vs primer cuarto
             }
           }
         }
+
+    H-054 (2026-07-01): se agregó el desglose de `cabanas_tinas_masajes` por nº de noches
+    (fechas distintas de cabaña) → Ritual (_1n) vs Refugio (_2n), mismo criterio que
+    `bookings_family_combinations_range`. El combinado SE MANTIENE por compat; sub-buckets
+    NO se suman al total (ya están contenidos en el combinado, evita doble conteo).
     """
     try:
         # --- 1) Parsear/validar 'months' ---
@@ -2193,7 +2203,9 @@ def bookings_family_combinations(request):
 
         # --- 3) Una sola query: traer todos los ReservaServicio del rango con
         #        venta_reserva_id + fecha + tipo + precio para clasificar en Python ---
-        reservas_data = {}  # vid -> {'y_m': (y,m), 'familias': set, 'revenue': float}
+        # noches_cabana = fechas DISTINTAS de alojamiento → separa Ritual (1 noche) de
+        # Refugio (2 noches), igual criterio que family-combinations-range (H-053b).
+        reservas_data = {}  # vid -> {'y_m': (y,m), 'familias': set, 'revenue': float, 'noches_cabana': set}
         with transaction.atomic():
             with connection.cursor() as cursor:
                 try:
@@ -2213,6 +2225,7 @@ def bookings_family_combinations(request):
                 'precio_unitario_venta',
                 'servicio__precio_base',
                 'cantidad_personas',
+                'fecha_agendamiento',
             )
 
             for row in servicios_qs:
@@ -2240,16 +2253,24 @@ def bookings_family_combinations(request):
                         'y_m': y_m,
                         'familias': set(),
                         'revenue': 0.0,
+                        'noches_cabana': set(),
                     }
                 # Sólo familias core entran al set de clasificación.
                 if fam_plural in ('tinas', 'masajes', 'cabanas'):
                     reservas_data[vid]['familias'].add(fam_plural)
+                # Cada fecha de cabaña = una noche (Refugio agenda la MISMA cabaña 2 fechas).
+                if fam_plural == 'cabanas':
+                    reservas_data[vid]['noches_cabana'].add(row['fecha_agendamiento'])
                 # Revenue suma TODOS los servicios (incluso 'otros') para que
                 # el total cuadre con lo cobrado.
                 reservas_data[vid]['revenue'] += rev
 
         # --- 4) Clasificar cada reserva en una combo y bucketear por mes ---
         # buckets[(y, m, combo_key)] = {'count_reservas': N, 'revenue': X}
+        # Además del combo de 8 vías (compat), se agrega el desglose por noches de
+        # cabanas_tinas_masajes → _1n (Ritual) / _2n (Refugio) / _otras (H-054, consistencia
+        # con family-combinations-range). Van en el MISMO dict `buckets` bajo claves nuevas
+        # (no pisan nada); NO se suman al total (se derivan de 'cabanas_tinas_masajes').
         buckets = {}
         for vid, d in reservas_data.items():
             y, m = d['y_m']
@@ -2260,14 +2281,32 @@ def bookings_family_combinations(request):
                 'count_reservas': prev['count_reservas'] + 1,
                 'revenue': prev['revenue'] + d['revenue'],
             }
+            if combo == 'cabanas_tinas_masajes':
+                noches = len(d['noches_cabana'])
+                sub = ('cabanas_tinas_masajes_1n' if noches == 1 else
+                       'cabanas_tinas_masajes_2n' if noches == 2 else
+                       'cabanas_tinas_masajes_otras')
+                sub_key = (y, m, sub)
+                sub_prev = buckets.get(sub_key, {'count_reservas': 0, 'revenue': 0.0})
+                buckets[sub_key] = {
+                    'count_reservas': sub_prev['count_reservas'] + 1,
+                    'revenue': sub_prev['revenue'] + d['revenue'],
+                }
 
         # --- 5) Armar 'data' DESCENDENTE (mes actual primero) con todas las combos ---
+        SUB_COMBO_KEYS_NOCHES = [
+            'cabanas_tinas_masajes_1n',      # Ritual del Río (cabaña 1 noche)
+            'cabanas_tinas_masajes_2n',      # Refugio (cabaña 2 noches)
+            'cabanas_tinas_masajes_otras',   # cabaña+tina+masaje con otro nº de noches
+        ]
         months_list_desc = list(reversed(months_list_asc))
         data = []
         for (y, m, _fd, _ld) in months_list_desc:
             combos_block = {}
             total_count = 0
             total_revenue = 0.0
+            # Los 8 buckets originales SON el total (mutuamente excluyentes) — el desglose
+            # por noches se agrega DESPUÉS sin sumarlo de nuevo (evita doble conteo).
             for combo_key in COMBO_KEYS_FAMILY:
                 stat = buckets.get((y, m, combo_key), {'count_reservas': 0, 'revenue': 0.0})
                 combos_block[combo_key] = {
@@ -2276,6 +2315,12 @@ def bookings_family_combinations(request):
                 }
                 total_count += stat['count_reservas']
                 total_revenue += stat['revenue']
+            for sub_key in SUB_COMBO_KEYS_NOCHES:
+                stat = buckets.get((y, m, sub_key), {'count_reservas': 0, 'revenue': 0.0})
+                combos_block[sub_key] = {
+                    'count_reservas': stat['count_reservas'],
+                    'revenue': round(stat['revenue'], 2),
+                }
             data.append({
                 'month': f'{y:04d}-{m:02d}',
                 'month_label': f'{MES_LABELS_ES[m - 1]} {y}',
