@@ -186,6 +186,7 @@ def venta_reserva_list(request):
     servicio_id = request.GET.get('servicio')
     fecha_inicio_str = request.GET.get('fecha_inicio')
     fecha_fin_str = request.GET.get('fecha_fin')
+    programa_filtro = request.GET.get('programa')  # H-058: ritual/refugio/pausa/aguas_calientes/otros
 
     # If fecha_inicio or fecha_fin are not provided, set them to today's date
     if not fecha_inicio_str:
@@ -228,21 +229,54 @@ def venta_reserva_list(request):
     # Remove duplicates if joins create duplicates
     qs = qs.distinct()
 
-    # Calculate total in the date range from the filtered queryset
+    # H-058: clasificar CADA reserva del queryset en su programa (Ritual/Refugio/Pausa/
+    # Noche de Aguas Calientes/Otros) — mira TODOS sus servicios, sin importar el filtro
+    # de categoría/servicio de arriba (ese filtro decide QUÉ reservas aparecen, no qué
+    # cuenta para la clasificación). Mismo criterio que el dashboard de estadísticas.
+    from ..api_aremko_cli import clasificar_ventareservas_por_programa, PROGRAMA_LABELS
+    programa_por_id = clasificar_ventareservas_por_programa(qs.values_list('id', flat=True))
+
+    if programa_filtro:
+        ids_programa = [vid for vid, prog in programa_por_id.items() if prog == programa_filtro]
+        qs = qs.filter(id__in=ids_programa)
+
+    # Calculate total in the date range from the filtered queryset (antes de paginar)
     total_en_rango = qs.aggregate(total=Sum('total'))['total'] or 0
+
+    # Paginación (H-058): un rango de varias semanas puede traer cientos de filas.
+    paginator = Paginator(qs, 50)
+    page = request.GET.get('page')
+    venta_reservas_paginadas = paginator.get_page(page)
+
+    # Etiqueta legible del programa + monto por línea de servicio (H-058), solo para las
+    # filas de la página actual (evita calcularlo para reservas que no se van a mostrar).
+    programa_labels_dict = dict(PROGRAMA_LABELS)
+    for venta in venta_reservas_paginadas:
+        venta.programa_nombre = programa_labels_dict.get(
+            programa_por_id.get(venta.id, 'otros'), 'Otros',
+        )
+        for rs in venta.reservaservicios.all():
+            precio_unit = rs.precio_unitario_venta
+            if precio_unit is None:
+                precio_unit = rs.servicio.precio_base if rs.servicio else 0
+            rs.monto_calculado = (precio_unit or 0) * (rs.cantidad_personas or 1)
 
     # Get categories and services for the filter form
     categorias_servicio = CategoriaServicio.objects.all()
     servicios = Servicio.objects.all()
 
     context = {
-        'venta_reservas': qs,
+        'venta_reservas': venta_reservas_paginadas,
+        'is_paginated': paginator.num_pages > 1,
+        'page_obj': venta_reservas_paginadas,
         'categorias_servicio': categorias_servicio,
         'servicios': servicios,
         'fecha_inicio': fecha_inicio_str,
         'fecha_fin': fecha_fin_str,
         'categoria_servicio_id': categoria_servicio_id,
         'servicio_id': servicio_id,
+        'programa_filtro': programa_filtro,
+        'programas_disponibles': PROGRAMA_LABELS,
         'total_en_rango': total_en_rango,
     }
 

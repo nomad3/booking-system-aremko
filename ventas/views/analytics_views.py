@@ -14,6 +14,7 @@ from decimal import Decimal
 import json
 
 from ..models import VentaReserva, ReservaServicio, ReservaProducto, Pago, Servicio, Producto, CategoriaServicio
+from ..api_aremko_cli import calcular_reservas_por_programa_semanal
 
 
 @staff_member_required
@@ -512,6 +513,18 @@ def dashboard_ventas(request):
         }
 
         # ====================================================================
+        # 9. RESERVAS POR PROGRAMA — ÚLTIMAS 8 SEMANAS
+        # ====================================================================
+        # A propósito usa un criterio DISTINTO al resto de este dashboard (que filtra
+        # estado_pago='pagado' y agrupa por fecha_reserva): reusa calcular_reservas_por_
+        # programa_semanal, que replica EXACTAMENTE el criterio de
+        # bookings_family_combinations_range (agrupa por fecha_creacion, excluye SOLO
+        # estado_pago='cancelado') para que estos números CALCEN con el reporte diario que
+        # ya recibe Jorge por email (armado por aremko-cli con ese mismo endpoint). No
+        # depende del filtro de año/mes de arriba — siempre son las últimas 8 semanas.
+        reservas_por_programa_semanal = calcular_reservas_por_programa_semanal(weeks=8)
+
+        # ====================================================================
         # CONTEXT
         # ====================================================================
         context = {
@@ -524,6 +537,7 @@ def dashboard_ventas(request):
             'ventas_por_forma_pago': ventas_por_forma_pago,
             'chart_data_json': json.dumps(chart_data),
             'comparativa_yoy': comparativa_yoy,  # Comparativa año vs año
+            'reservas_por_programa_semanal': reservas_por_programa_semanal,
 
             # Filtros actuales
             'year': year,

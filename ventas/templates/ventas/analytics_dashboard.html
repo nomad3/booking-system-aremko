@@ -697,6 +697,54 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Reservas por Programa — últimas 8 semanas (H-058) -->
+        <div class="chart-card full-width">
+            <h3>📆 Reservas por Programa — últimas 8 semanas</h3>
+            <p style="color:#777; font-size:0.85em; margin-top:-8px;">
+                Agrupado por fecha de creación de la reserva (no depende del filtro de año/mes
+                de arriba) — mismo criterio que el reporte diario de aremko-cli, para que los
+                números calcen. Cada reserva cae en un solo programa.
+                {% if reservas_por_programa_semanal.semanas_rango %}
+                Semana {{ reservas_por_programa_semanal.semanas_labels|first }} a
+                {{ reservas_por_programa_semanal.semanas_labels|last }}.
+                {% endif %}
+            </p>
+            {% with fecha_inicio_prog=reservas_por_programa_semanal.semanas_rango.0.inicio ultima_semana=reservas_por_programa_semanal.semanas_rango|last %}
+            {% for programa in reservas_por_programa_semanal.programas %}
+            <h4 style="margin-top: 24px; margin-bottom: 8px;">
+                {{ programa.nombre }}
+                <a href="{% url 'venta_reserva_list' %}?programa={{ programa.clave }}&fecha_inicio={{ fecha_inicio_prog }}&fecha_fin={{ ultima_semana.fin }}"
+                   style="font-size: 0.6em; font-weight: 400;">
+                    ver detalle →
+                </a>
+            </h4>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Semana</th>
+                        <th>Reservas</th>
+                        <th>Ingresos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for semana in programa.semanas %}
+                    <tr>
+                        <td>{{ semana.label }}</td>
+                        <td>{{ semana.count }}</td>
+                        <td>${{ semana.revenue|floatformat:0|intcomma }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr style="font-weight: 600; background: #f8f9fa;">
+                        <td>Total {{ reservas_por_programa_semanal.semanas_labels|length }} sem.</td>
+                        <td>{{ programa.total_count }}</td>
+                        <td>${{ programa.total_revenue|floatformat:0|intcomma }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            {% endfor %}
+            {% endwith %}
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

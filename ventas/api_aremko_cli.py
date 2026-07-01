@@ -2591,6 +2591,192 @@ def bookings_family_combinations_range(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+# Programas con nombre propio (mismo criterio de clasificación que ya consume aremko-cli
+# vía bookings_family_combinations_range — H-053/H-054/H-055). Orden = orden de despliegue.
+PROGRAMA_LABELS = [
+    ('ritual', '🌙 Ritual del Río (1 noche)'),
+    ('refugio', '🌿 Refugio Aremko (2 noches)'),
+    ('pausa', '🍃 Pausa junto al río'),
+    ('aguas_calientes', '💧 Noche de Aguas Calientes'),
+    ('otros', 'Otros'),
+]
+
+
+def _programa_de_combo(combo, noches_cabana_count):
+    """Mapea la combo key de _classify_family_combo (+ nº de noches distintas de cabaña)
+    a uno de los 4 programas con nombre, o 'otros'. Mismo criterio que aremko-cli."""
+    if combo == 'cabanas_tinas_masajes':
+        if noches_cabana_count == 1:
+            return 'ritual'
+        if noches_cabana_count == 2:
+            return 'refugio'
+        return 'otros'
+    if combo == 'tinas_masajes':
+        return 'pausa'
+    if combo == 'cabanas_tinas' and noches_cabana_count == 1:
+        return 'aguas_calientes'
+    return 'otros'
+
+
+def calcular_reservas_por_programa_semanal(weeks=8):
+    """Reservas por programa (Ritual/Refugio/Pausa/Noche de Aguas Calientes/Otros), semana
+    a semana, últimas `weeks` semanas (lunes-domingo; la última llega hasta AYER — mismo
+    criterio que `computeWeekWindows` en aremko-cli). La usa el dashboard interno de
+    estadísticas (H-058, `ventas/views/analytics_views.py`) para mostrar la MISMA
+    información que Jorge ya recibe en el reporte diario por email (armado por aremko-cli
+    con `bookings_family_combinations_range`).
+
+    A propósito agrupa por `fecha_creacion` y excluye SOLO `estado_pago='cancelado'` —igual
+    que `bookings_family_combinations_range`— para que los números CALCEN entre ambos
+    sistemas, aun cuando sea distinto al criterio (fecha_reserva + solo pagadas) que usa el
+    resto del dashboard de analytics.
+
+    Returns dict:
+        {
+          'semanas_labels': ['dd-mm', ...] (weeks elementos, más antigua primero),
+          'semanas_rango': [{'inicio': 'YYYY-MM-DD', 'fin': 'YYYY-MM-DD'}, ...],
+          'programas': [
+              {'clave': 'ritual', 'nombre': '...',
+               'semanas': [{'count': N, 'revenue': X}, ...],
+               'total_count': N, 'total_revenue': X},
+              ...
+          ]
+        }
+    """
+    hoy_local = timezone.localdate()
+    ayer = hoy_local - timedelta(days=1)
+    lunes_actual = hoy_local - timedelta(days=hoy_local.weekday())
+    semanas = []  # más antigua primero
+    for offset in range(weeks - 1, -1, -1):
+        lunes_semana = lunes_actual - timedelta(weeks=offset)
+        if offset == 0:
+            fin_semana = ayer if ayer >= lunes_semana else lunes_semana
+        else:
+            fin_semana = lunes_semana + timedelta(days=6)
+        semanas.append({
+            'inicio': lunes_semana, 'fin': fin_semana, 'label': lunes_semana.strftime('%d-%m'),
+        })
+
+    rango_inicio = semanas[0]['inicio']
+    rango_fin = semanas[-1]['fin']
+
+    reservas_data = {}  # vid -> {familias, revenue, noches_cabana, fecha_creacion}
+    servicios_qs = ReservaServicio.objects.filter(
+        venta_reserva__fecha_creacion__date__gte=rango_inicio,
+        venta_reserva__fecha_creacion__date__lte=rango_fin,
+    ).exclude(
+        venta_reserva__estado_pago='cancelado',
+    ).values(
+        'venta_reserva_id', 'venta_reserva__fecha_creacion', 'servicio__tipo_servicio',
+        'precio_unitario_venta', 'servicio__precio_base', 'cantidad_personas', 'fecha_agendamiento',
+    )
+    for row in servicios_qs:
+        vid = row['venta_reserva_id']
+        fc = row['venta_reserva__fecha_creacion']
+        if fc is None:
+            continue
+        fc_date = fc.date() if hasattr(fc, 'date') else fc
+        tipo = row['servicio__tipo_servicio'] or 'otro'
+        if tipo not in FAMILY_KEYS_OUTPUT_MONTHLY:
+            tipo = 'otro'
+        fam_plural = FAMILY_KEYS_OUTPUT_MONTHLY[tipo]
+
+        precio_unit = row['precio_unitario_venta']
+        if precio_unit is None:
+            precio_unit = row['servicio__precio_base'] or 0
+        cantidad = row['cantidad_personas'] or 1
+        rev = float(precio_unit) * cantidad
+
+        if vid not in reservas_data:
+            reservas_data[vid] = {
+                'familias': set(), 'revenue': 0.0, 'noches_cabana': set(), 'fecha_creacion': fc_date,
+            }
+        if fam_plural in ('tinas', 'masajes', 'cabanas'):
+            reservas_data[vid]['familias'].add(fam_plural)
+        if fam_plural == 'cabanas':
+            reservas_data[vid]['noches_cabana'].add(row['fecha_agendamiento'])
+        reservas_data[vid]['revenue'] += rev
+
+    tabla = {
+        clave: {
+            'nombre': nombre,
+            'semanas': [{'label': s['label'], 'count': 0, 'revenue': 0.0} for s in semanas],
+            'total_count': 0,
+            'total_revenue': 0.0,
+        }
+        for clave, nombre in PROGRAMA_LABELS
+    }
+    for _vid, d in reservas_data.items():
+        fc_date = d['fecha_creacion']
+        idx_semana = next(
+            (i for i, sem in enumerate(semanas) if sem['inicio'] <= fc_date <= sem['fin']),
+            None,
+        )
+        if idx_semana is None:
+            continue  # no debería pasar: el filtro de la query ya acota al rango de semanas
+        combo = _classify_family_combo(d['familias'])
+        programa = _programa_de_combo(combo, len(d['noches_cabana']))
+        bucket = tabla[programa]
+        bucket['semanas'][idx_semana]['count'] += 1
+        bucket['semanas'][idx_semana]['revenue'] += d['revenue']
+        bucket['total_count'] += 1
+        bucket['total_revenue'] += d['revenue']
+
+    return {
+        'semanas_labels': [s['label'] for s in semanas],
+        'semanas_rango': [
+            {'inicio': s['inicio'].isoformat(), 'fin': s['fin'].isoformat()} for s in semanas
+        ],
+        'programas': [
+            {
+                'clave': clave,
+                'nombre': tabla[clave]['nombre'],
+                'semanas': tabla[clave]['semanas'],
+                'total_count': tabla[clave]['total_count'],
+                'total_revenue': tabla[clave]['total_revenue'],
+            }
+            for clave, _nombre in PROGRAMA_LABELS
+        ],
+    }
+
+
+def clasificar_ventareservas_por_programa(venta_reserva_ids):
+    """Clasifica cada VentaReserva (por id) en su programa (Ritual/Refugio/Pausa/Noche de
+    Aguas Calientes/Otros) — mira TODOS sus servicios, sin importar ningún filtro externo
+    (categoría/servicio) que haya acotado CUÁLES reservas se están mirando. Mismo criterio
+    que `calcular_reservas_por_programa_semanal` / aremko-cli. La usa el listado
+    `venta_reserva_list` (H-058) para el filtro `?programa=` y la columna "Programa".
+
+    Args:
+        venta_reserva_ids: iterable de ids de VentaReserva (puede ser un queryset lazy).
+
+    Returns:
+        dict {venta_reserva_id: programa_key} — programa_key es una de las claves de
+        PROGRAMA_LABELS ('ritual', 'refugio', 'pausa', 'aguas_calientes', 'otros').
+    """
+    reservas_data = {}  # vid -> {'familias': set, 'noches_cabana': set}
+    servicios_qs = ReservaServicio.objects.filter(
+        venta_reserva_id__in=list(venta_reserva_ids),
+    ).values('venta_reserva_id', 'servicio__tipo_servicio', 'fecha_agendamiento')
+    for row in servicios_qs:
+        vid = row['venta_reserva_id']
+        tipo = row['servicio__tipo_servicio'] or 'otro'
+        if tipo not in FAMILY_KEYS_OUTPUT_MONTHLY:
+            tipo = 'otro'
+        fam_plural = FAMILY_KEYS_OUTPUT_MONTHLY[tipo]
+        if vid not in reservas_data:
+            reservas_data[vid] = {'familias': set(), 'noches_cabana': set()}
+        if fam_plural in ('tinas', 'masajes', 'cabanas'):
+            reservas_data[vid]['familias'].add(fam_plural)
+        if fam_plural == 'cabanas':
+            reservas_data[vid]['noches_cabana'].add(row['fecha_agendamiento'])
+
+    return {
+        vid: _programa_de_combo(_classify_family_combo(d['familias']), len(d['noches_cabana']))
+        for vid, d in reservas_data.items()
+    }
+
+
 @csrf_exempt
 @require_http_methods(["GET"])
 def cliente_ficha(request, cliente_id):

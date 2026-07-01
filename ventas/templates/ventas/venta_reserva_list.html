@@ -51,6 +51,15 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label for="programa" class="form-label">Programa:</label>
+                        <select name="programa" id="programa" class="form-select">
+                            <option value="">Todos</option>
+                            {% for clave, nombre in programas_disponibles %}
+                                <option value="{{ clave }}" {% if clave == programa_filtro %}selected{% endif %}>{{ nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     <div class="col-md-6 col-lg-2"> {# Adjusted column size #}
                         <label for="fecha_inicio" class="form-label">Fecha Inicio:</label>
                         <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control">
@@ -88,6 +97,7 @@
                             <th class="px-4 py-3">Cliente</th>
                             <th class="px-4 py-3">Fecha Reserva</th>
                             <th class="px-4 py-3">Estado</th>
+                            <th class="px-4 py-3">Programa</th>
                             <th class="px-4 py-3">Servicios</th>
                             <th class="px-4 py-3">Productos</th>
                             <th class="px-4 py-3 text-end">Total Servicios</th> {# Align right #}
@@ -104,10 +114,11 @@
                                 <td class="px-4 py-3"><a href="{% url 'venta_reserva_detail' venta.id %}">{{ venta.id }}</a></td>
                                 <td class="px-4 py-3">{{ venta.cliente.nombre }}</td>
                                 <td class="px-4 py-3">{{ venta.fecha_reserva|date:"Y-m-d H:i" }}</td>
-                                <td class="px-4 py-3">{{ venta.estado }}</td>
+                                <td class="px-4 py-3">{{ venta.estado_pago }}</td>
+                                <td class="px-4 py-3">{{ venta.programa_nombre }}</td>
                                 <td class="px-4 py-3">
                                     {% for reserva_servicio in venta.reservaservicios.all %}
-                                        {{ reserva_servicio.servicio.nombre }} (x{{ reserva_servicio.cantidad_personas }})<br>
+                                        {{ reserva_servicio.servicio.nombre }} (x{{ reserva_servicio.cantidad_personas }}) — ${{ reserva_servicio.monto_calculado|floatformat:0|intcomma }}<br>
                                     {% empty %}
                                         No hay servicios
                                     {% endfor %}
@@ -131,7 +142,7 @@
                                        title="Ver Resumen Pre-Pago">
                                         <i class="fas fa-file-alt"></i> Resumen
                                     </a>
-                                    {% if venta.estado == 'pagado' or venta.pagado > 0 %}
+                                    {% if venta.estado_pago == 'pagado' or venta.pagado > 0 %}
                                     <a href="{% url 'ventas:generar_tips_postpago' venta.id %}"
                                        class="btn btn-sm btn-success"
                                        target="_blank"
@@ -143,13 +154,32 @@
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="12" class="text-center py-4">No hay ventas/reservas que coincidan con los filtros.</td> {# Centered text #}
+                                <td colspan="13" class="text-center py-4">No hay ventas/reservas que coincidan con los filtros.</td> {# Centered text #}
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
+        {% if is_paginated %}
+        <nav aria-label="Paginación de resultados" class="mt-3">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}&categoria_servicio={{ categoria_servicio_id|default:'' }}&servicio={{ servicio_id|default:'' }}&programa={{ programa_filtro|default:'' }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}">Anterior</a>
+                </li>
+                {% endif %}
+                <li class="page-item disabled">
+                    <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                </li>
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}&categoria_servicio={{ categoria_servicio_id|default:'' }}&servicio={{ servicio_id|default:'' }}&programa={{ programa_filtro|default:'' }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}">Siguiente</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
