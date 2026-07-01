@@ -101,7 +101,8 @@ def _termino_relativo(expr_norm):
 def resolver_fecha(expresion_cliente):
     """Resuelve fecha de forma DETERMINÍSTICA (sin dejar al LLM calcular día de semana).
 
-    Acepta: "el sábado", "25 de junio", "el 25", "25", "próximo sábado", "este domingo", etc.
+    Acepta: "el sábado", "25 de junio", "el 25", "25", "próximo sábado", "este domingo",
+    "sábado 11", "el sábado 11 de julio", etc.
     Devuelve: {
         'fecha_iso': '2026-06-25' (YYYY-MM-DD),
         'dia_semana': 'jueves' (minúscula),
@@ -111,6 +112,16 @@ def resolver_fecha(expresion_cliente):
     }
 
     Si hay inconsistencia (cliente dice "domingo 25" pero el 25 es lunes) → ambiguo=True.
+
+    BUGFIX (2026-07): antes, "nombre de día + número" (ej. "sábado 11") hacía match en el
+    PATRÓN 1 (nombre de día) y el número se ignoraba por completo — devolvía el PRÓXIMO
+    sábado desde HOY, sin importar el "11". Si "hoy" no caía en la semana exacta del 11, la
+    fecha resuelta era OTRO sábado, sin ningún error/ambiguo que lo delatara. Esto hizo que
+    Luna confirmara cabañas "disponibles" para una fecha equivocada (riesgo real de
+    sobreventa — caso real: "sábado 11" resolvió al sábado 4 en vez del 11). Ahora, si hay
+    nombre de día Y número cerca uno del otro, el NÚMERO manda (es lo más específico que
+    dio el cliente); si se contradicen (ej. "sábado 12" pero el 12 es domingo), se devuelve
+    ambiguo para que Luna re-pregunte, igual que ya hacía con "mañana domingo".
     """
     from django.utils import timezone as tz
     from datetime import timedelta
@@ -124,12 +135,44 @@ def resolver_fecha(expresion_cliente):
         return {'error': 'expresión vacía', 'ambiguo': True}
     expr_norm = _sin_acentos(expresion)  # match insensible a tildes ("sabado" = "sábado")
 
+    def _mes_explicito():
+        """Nombre de mes en TODA la expresión (no da falsos positivos, a diferencia de
+        un número suelto), o None si el cliente no mencionó uno."""
+        for mes_nombre, num_mes in MESES_ES.items():
+            if _sin_acentos(mes_nombre) in expr_norm:
+                return num_mes
+        return None
+
+    def _fecha_desde_numero(texto_numero):
+        """Busca un número de día-del-mes en `texto_numero`, asumiendo el mes explícito
+        si lo hay o si no el mes actual (rueda al próximo año si el día ya pasó este mes).
+        Devuelve (fecha, None) si hay número válido, (None, error) si el día no existe en
+        el mes, o (None, None) si no hay número en `texto_numero`."""
+        match_numero = re.search(r'\b(\d{1,2})\b', texto_numero)
+        if not match_numero:
+            return None, None
+        dia_numero = int(match_numero.group(1))
+        mes_numero = _mes_explicito() or hoy.month
+        try:
+            año = hoy.year if mes_numero >= hoy.month else hoy.year + 1
+            fecha = datetime(año, mes_numero, dia_numero).date()
+            if fecha < hoy:
+                fecha = datetime(hoy.year + 1, mes_numero, dia_numero).date()
+            return fecha, None
+        except ValueError:
+            return None, f'fecha inválida (día {dia_numero} en mes {mes_numero})'
+
     # Término relativo (hoy/mañana/pasado mañana), excluyendo "la mañana" (parte del día).
     rel = _termino_relativo(expr_norm)
 
-    # PATRÓN 1: Nombre de día ("sábado", "el sábado", "próximo sábado", "este domingo").
+    # PATRÓN 1: Nombre de día ("sábado", "el sábado", "próximo sábado", "este domingo",
+    # "sábado 11"). Si trae ADEMÁS un número de día del mes CERCA del nombre del día, el
+    # número manda (ver bugfix arriba) — se busca en una ventana alrededor del nombre del
+    # día, NO en todo el mensaje, para no confundirlo con "2 personas" o "1 noche" dichos
+    # en otra parte de la frase.
     for i, dia_nombre in enumerate(DIAS_SEMANA_ES):
-        if _sin_acentos(dia_nombre) in expr_norm:
+        m_dia = re.search(_sin_acentos(dia_nombre), expr_norm)
+        if m_dia:
             if rel is not None:
                 # Vino día + término relativo ("mañana domingo", "hoy domingo"): MANDA el
                 # relativo y el nombre de día es chequeo de consistencia.
@@ -149,10 +192,60 @@ def resolver_fecha(expresion_cliente):
                     }
                 fecha = fecha_rel  # coinciden (ej. "mañana lunes" y mañana ES lunes)
             else:
-                dias_adelante = (i - hoy_numero) % 7
-                if dias_adelante == 0:
-                    dias_adelante = 7  # "sábado" = próximo sábado, no hoy
-                fecha = hoy + timedelta(days=dias_adelante)
+                # Ventana asimétrica: poco ANTES del nombre del día (evita "2 personas...
+                # sábado"), harto DESPUÉS (cubre "sábado 11", "sábado, 11 de julio").
+                ventana_ini = max(0, m_dia.start() - 4)
+                ventana_fin = min(len(expr_norm), m_dia.end() + 20)
+                m_num = re.search(r'\b(\d{1,2})\b', expr_norm[ventana_ini:ventana_fin])
+                if m_num is None:
+                    dias_adelante = (i - hoy_numero) % 7
+                    if dias_adelante == 0:
+                        dias_adelante = 7  # "sábado" (sin número cerca) = próximo sábado, no hoy
+                    fecha = hoy + timedelta(days=dias_adelante)
+                else:
+                    dia_numero = int(m_num.group(1))
+                    mes_explicito = _mes_explicito()
+                    if mes_explicito is not None:
+                        candidatos_mes = [mes_explicito]
+                    else:
+                        # Sin mes explícito: probar el actual y el siguiente — cubre cruzar
+                        # de fin de mes (ej. "sábado 11" dicho en junio para un 11 de julio).
+                        candidatos_mes = [hoy.month, (hoy.month % 12) + 1]
+
+                    fecha_ok = None
+                    for mes_p in candidatos_mes:
+                        año_p = hoy.year if mes_p >= hoy.month else hoy.year + 1
+                        try:
+                            cand = datetime(año_p, mes_p, dia_numero).date()
+                        except ValueError:
+                            continue
+                        if cand < hoy:
+                            continue
+                        if cand.weekday() == i:
+                            fecha_ok = cand
+                            break
+
+                    if fecha_ok is not None:
+                        fecha = fecha_ok  # coincide día+número (ej. "sábado 11" y el 11 ES sábado) → manda el número
+                    else:
+                        # Contradicción real (ej. "sábado 12" pero el 12 es domingo, ni este
+                        # mes ni el siguiente calza): NO adivinar, mostrar las dos lecturas.
+                        mes_ref = candidatos_mes[0]
+                        try:
+                            fecha_lit = datetime(hoy.year, mes_ref, dia_numero).date()
+                        except ValueError:
+                            return {'error': f'fecha contradictoria (día {dia_numero} inválido)', 'ambiguo': True}
+                        prox = (i - hoy_numero) % 7 or 7
+                        fecha_dia_nombre = hoy + timedelta(days=prox)
+                        return {
+                            'fecha_iso': None,
+                            'ambiguo': True,
+                            'error': (f'fecha contradictoria: dijiste "{DIAS_SEMANA_ES[i]}" pero el {dia_numero} '
+                                      f'({fecha_lit.strftime("%d-%m")}) es {DIAS_SEMANA_ES[fecha_lit.weekday()]}. '
+                                      f'Pregúntale al cliente qué prefiere: el {dia_numero} '
+                                      f'({DIAS_SEMANA_ES[fecha_lit.weekday()]}) o el {DIAS_SEMANA_ES[i]} '
+                                      f'{fecha_dia_nombre.strftime("%d-%m")}.'),
+                        }
             return {
                 'fecha_iso': fecha.isoformat(),
                 'dia_semana': DIAS_SEMANA_ES[fecha.weekday()],
@@ -173,35 +266,18 @@ def resolver_fecha(expresion_cliente):
             'error': None,
         }
 
-    # PATRÓN 2: Número de día ("25", "el 25", "25 de junio")
-    match_numero = re.search(r'\b(\d{1,2})\b', expr_norm)
-    if match_numero:
-        dia_numero = int(match_numero.group(1))
-
-        # Si hay mes en la expresión, usarlo; si no, asumir mes actual
-        mes_numero = hoy.month
-        for mes_nombre, num_mes in MESES_ES.items():
-            if _sin_acentos(mes_nombre) in expr_norm:
-                mes_numero = num_mes
-                break
-
-        try:
-            año = hoy.year if mes_numero >= hoy.month else hoy.year + 1
-            fecha = datetime(año, mes_numero, dia_numero).date()
-
-            # Validar que no esté en el pasado
-            if fecha < hoy:
-                fecha = datetime(hoy.year + 1, mes_numero, dia_numero).date()
-
-            return {
-                'fecha_iso': fecha.isoformat(),
-                'dia_semana': DIAS_SEMANA_ES[fecha.weekday()],
-                'dia_numero': fecha.weekday(),
-                'ambiguo': False,
-                'error': None,
-            }
-        except ValueError:
-            return {'error': f'fecha inválida (día {dia_numero} en mes {mes_numero})', 'ambiguo': True}
+    # PATRÓN 2: Número de día ("25", "el 25", "25 de junio") — sin nombre de día en la frase.
+    fecha_num, error_num = _fecha_desde_numero(expr_norm)
+    if fecha_num is not None:
+        return {
+            'fecha_iso': fecha_num.isoformat(),
+            'dia_semana': DIAS_SEMANA_ES[fecha_num.weekday()],
+            'dia_numero': fecha_num.weekday(),
+            'ambiguo': False,
+            'error': None,
+        }
+    if error_num:
+        return {'error': error_num, 'ambiguo': True}
 
     # Fallback: no se pudo resolver
     return {'error': f'no se pudo resolver la fecha: "{expresion_cliente}"', 'ambiguo': True}

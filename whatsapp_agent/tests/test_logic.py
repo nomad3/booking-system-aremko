@@ -8,8 +8,9 @@ Correr desde la raíz del repo:
 """
 
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
-from whatsapp_agent import aprendizaje, ausencia, escalation, grounding, packs, prompt
+from whatsapp_agent import aprendizaje, ausencia, availability, escalation, grounding, packs, prompt
 
 
 def test_formatear_precio():
@@ -358,6 +359,45 @@ def test_elegir_tina_mas_tarde():
     assert hora == '18:00' and tina['nombre'] == 'Barata'
     # Sin tinas → None.
     assert packs.elegir_tina_mas_tarde([]) == (None, None)
+
+
+def test_resolver_fecha_dia_y_numero():
+    """Regresión: "sábado 11" NO debe ignorar el 11 (bug real reportado por Jorge: en una
+    conversación de Instagram, Luna ofreció Cabaña Arrayan/Laurel para "sábado 11" pero la
+    Matriz de Disponibilidad real mostraba ambas OCUPADAS ese día — porque resolver_fecha
+    ignoraba el "11" y devolvía el PRÓXIMO sábado desde "hoy" en su lugar).
+
+    hoy = domingo 2026-06-28. "próximo sábado" desde ahí sería 2026-07-04, pero el
+    cliente pidió el 11 explícitamente → el número debe ganar.
+    """
+    with patch('django.utils.timezone.now', return_value=datetime(2026, 6, 28, 10, 0, 0)), \
+         patch('django.utils.timezone.localtime', return_value=datetime(2026, 6, 28, 10, 0, 0)):
+        r = availability.resolver_fecha('el sábado 11 hasta el domingo')
+        assert r['ambiguo'] is False, r
+        assert r['fecha_iso'] == '2026-07-11', r
+        assert r['dia_semana'] == 'sábado', r
+
+        # Contradicción real: el 12 de julio 2026 es domingo, no sábado → debe pedir aclarar.
+        r2 = availability.resolver_fecha('sábado 12')
+        assert r2['ambiguo'] is True, r2
+
+        # Un conteo de personas lejos del nombre del día NO debe confundirse con el día del mes.
+        r3 = availability.resolver_fecha('quiero 2 personas el sábado por favor')
+        assert r3['ambiguo'] is False, r3
+        assert r3['fecha_iso'] == '2026-07-04', r3  # sin número cerca de "sábado" → próximo sábado
+
+        # "sábado" a secas sigue igual que antes (sin regresión).
+        r4 = availability.resolver_fecha('sábado')
+        assert r4['fecha_iso'] == '2026-07-04', r4
+
+        # Mismo mes, con nombre de mes explícito ("11 de julio") también debe funcionar.
+        r5 = availability.resolver_fecha('el sábado 11 de julio')
+        assert r5['fecha_iso'] == '2026-07-11', r5
+
+        # Contradicción con mes EXPLÍCITO (el 12 de julio es domingo, no sábado): no debe
+        # buscar en otros meses — debe pedir aclarar directamente.
+        r6 = availability.resolver_fecha('sábado 12 de julio')
+        assert r6['ambiguo'] is True, r6
 
 
 def _run():
