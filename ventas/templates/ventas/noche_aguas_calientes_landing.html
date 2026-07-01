@@ -69,11 +69,11 @@
 
   <section class="rr-section rr-hero">
     <div class="rr-photo">
-      {% if config.foto_hero %}
-        <img src="{{ config.foto_hero|cuadrada:800 }}" alt="Tina caliente humeante junto al río, de noche">
+      {% if config.foto_acto3 %}
+        <img src="{{ config.foto_acto3|cuadrada:800 }}" alt="Despertando con desayuno en la cabaña Torre">
       {% else %}
-        <span style="font-size:30px">♨️</span>
-        <span>Foto: tina caliente humeante junto al río, de noche</span>
+        <span style="font-size:30px">🌙</span>
+        <span>Foto: despertando con desayuno en la cabaña Torre</span>
       {% endif %}
     </div>
     <span class="rr-badge">🌙 Llega de noche, descansa a tu ritmo</span>
@@ -94,7 +94,7 @@
         <div class="rr-act-n">♨️</div><div class="rr-act-t">Tina caliente privada</div>
         <p>Agua caliente junto al río, la noche que llegan.</p></div>
       <div class="rr-card">
-        {% if config.foto_acto3 %}<img class="rr-act-img" src="{{ config.foto_acto3|cuadrada }}" alt="Cabaña boutique con desayuno">{% endif %}
+        {% if foto_cabana_boutique %}<img class="rr-act-img" src="{{ foto_cabana_boutique|cuadrada }}" alt="Cabaña boutique con desayuno">{% endif %}
         <div class="rr-act-n">🏡</div><div class="rr-act-t">Cabaña boutique</div>
         <p>Para dos, con desayuno incluido a la mañana siguiente.</p></div>
     </div>

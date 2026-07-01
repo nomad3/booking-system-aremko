@@ -869,6 +869,17 @@ def noche_aguas_calientes_landing_view(request):
     except Exception:
         config = None
 
+    # Foto de la cabaña boutique (Jorge 2026-07-01: la foto de arriba pasa a ser la de la
+    # cabaña Torre —persona en la cama, con desayuno— y la tarjeta "cabaña boutique" necesita
+    # OTRA foto, de una cabaña estándar. `RitualRioLandingConfig` (compartido con Ritual/Pausa)
+    # no tiene un campo propio para esto, así que se hardcodea acá la foto real ya publicada
+    # de Cabaña Tepa (misma que se ve en /alojamientos/) — evita tocar el config compartido y
+    # así no afecta las otras landings. Si se quiere hacer editable desde el admin más
+    # adelante, se agrega un campo dedicado (migración chica).
+    FOTO_CABANA_BOUTIQUE = (
+        'https://res.cloudinary.com/dtuncr1pi/image/upload/v1/servicios/Cabana_Tepa_en_aremko_yhia6s'
+    )
+
     # "Desde $X" real: en vez de recalcular precios a mano (frágil — precio_base es POR
     # PERSONA, hay reglas de capacidad, exclusión de complementarios H-011, etc.), se REUSA
     # `disponibilidad_pack_cabana_tina` — la MISMA función que usa Luna hoy para cotizar esta
@@ -902,6 +913,7 @@ def noche_aguas_calientes_landing_view(request):
         'config': config,
         'resenas': resenas,
         'precio_desde': precio_desde,
+        'foto_cabana_boutique': FOTO_CABANA_BOUTIQUE,
     })
 
 
