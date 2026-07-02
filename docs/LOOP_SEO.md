@@ -177,4 +177,14 @@ Incorporar la grafía que la gente busca ("tinajas" con J) y "termas" para captu
 - (Actual: "Guía práctica de tinas calientes en Puerto Varas: temperatura, tiempo,
   ritual, aerotermia + paneles solares, río Pescado al lado y horarios hasta medianoche.")
 
-_Estado: pendiente de revisión de Jorge. Ninguna se aplicó — el loop no edita la BD._
+_Estado: revisado con Jorge en sesión interactiva (2026-07-02)._
+
+#### Acciones aplicadas (sesión interactiva, 2026-07-02)
+
+- ✅ **REC 2 APLICADA** — Jorge actualizó `SEOContent` → Masajes en el admin con
+  el `meta_title` (58 char) y `meta_description` (151 char) propuestos.
+  Verificado live en `https://www.aremko.cl/masajes/` (title + description
+  renderizando los textos nuevos). Baseline a batir: 543 imp/sem, CTR 2.9%,
+  pos 5.77 — el próximo ciclo debe comparar CTR de `/masajes/` contra esto.
+- ⏳ REC 3 (meta blog de tinas) y REC 1 (post termas): pendientes, en cola en
+  esta misma sesión.
