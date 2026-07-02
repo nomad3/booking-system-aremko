@@ -3235,6 +3235,101 @@ def clientes_taxonomia_cohort(request):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+def seo_snapshots(request):
+    """
+    Últimos N snapshots semanales de GA4 + Search Console, para el loop de mejora
+    continua de SEO (H-057, sesión dedicada de Django que corre local con `/loop`).
+
+    Solo LECTURA de lo que ya guarda `snapshot_weekly_traffic` (cron lunes 9am) en
+    `GA4Snapshot`/`SearchConsoleSnapshot` — no genera nada nuevo. Público, SIN auth
+    (mismo criterio que `bookings_family_combinations_range`, H-053: el loop corre en
+    una máquina sin `AUTOMATION_API_KEY` disponible, y el dato — tráfico agregado — no
+    es sensible).
+
+    Query params (opcionales):
+        weeks: int, default 8. Cuántos snapshots más recientes traer de cada modelo.
+
+    Response 200 (más antiguo primero; si hay menos de `weeks` guardados, devuelve
+    los que haya, sin error):
+        {
+          "weeks_requested": 8,
+          "ga4": [
+            {"week_start": "2026-06-15", "sessions": N, "total_users": N,
+             "new_users": N, "engaged_sessions": N, "avg_session_duration": F,
+             "screen_page_views": N, "conversions": N,
+             "reservation_started": N, "reservation_completed": N,
+             "whatsapp_clicks": N, "phone_clicks": N, "cta_blog_clicks": N},
+            ...
+          ],
+          "gsc": [
+            {"week_start": "2026-06-15", "clicks": N, "impressions": N,
+             "ctr": F, "position": F,
+             "top_queries": [{"query": "...", "clicks": N, "impressions": N,
+                               "ctr": F, "position": F}, ...],
+             "top_pages": [{"page": "...", "clicks": N, "impressions": N,
+                             "ctr": F, "position": F}, ...]},
+            ...
+          ]
+        }
+    """
+    try:
+        from .models import GA4Snapshot, SearchConsoleSnapshot
+
+        try:
+            weeks = int(request.GET.get('weeks', 8))
+        except (TypeError, ValueError):
+            weeks = 8
+        if weeks < 1:
+            weeks = 8
+
+        ga4_qs = GA4Snapshot.objects.order_by('-fecha_snapshot', '-created_at')[:weeks]
+        ga4 = [
+            {
+                'week_start': s.fecha_snapshot.isoformat(),
+                'sessions': s.sessions,
+                'total_users': s.total_users,
+                'new_users': s.new_users,
+                'engaged_sessions': s.engaged_sessions,
+                'avg_session_duration': s.avg_session_duration,
+                'screen_page_views': s.screen_page_views,
+                'conversions': s.conversions,
+                'reservation_started': s.reservation_started,
+                'reservation_completed': s.reservation_completed,
+                'whatsapp_clicks': s.whatsapp_clicks,
+                'phone_clicks': s.phone_clicks,
+                'cta_blog_clicks': s.cta_blog_clicks,
+            }
+            for s in reversed(ga4_qs)  # más antiguo primero
+        ]
+
+        gsc_qs = SearchConsoleSnapshot.objects.order_by('-fecha_snapshot', '-created_at')[:weeks]
+        gsc = []
+        for s in reversed(gsc_qs):  # más antiguo primero
+            datos = s.datos or {}
+            gsc.append({
+                'week_start': s.fecha_snapshot.isoformat(),
+                'clicks': s.clicks,
+                'impressions': s.impressions,
+                'ctr': s.ctr,
+                'position': s.position,
+                'top_queries': (datos.get('top_queries') or {}).get('last_7d', []),
+                'top_pages': datos.get('top_pages', []),
+            })
+
+        logger.info(f"aremko-cli: seo_snapshots weeks={weeks} ga4={len(ga4)} gsc={len(gsc)}")
+        return JsonResponse({
+            'weeks_requested': weeks,
+            'ga4': ga4,
+            'gsc': gsc,
+        })
+
+    except Exception as e:
+        logger.error(f"Error in seo_snapshots: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
 def health_check(request):
     """
     Health check para verificar que la API está funcionando

@@ -370,6 +370,7 @@ urlpatterns = [
     path('api/aremko-cli/bookings/detalle/', api_aremko_cli.bookings_detalle, name='aremko_cli_bookings_detalle'),
     path('api/aremko-cli/bookings/detalle-productos/', api_aremko_cli.bookings_detalle_productos, name='aremko_cli_bookings_detalle_productos'),
     path('api/aremko-cli/operating-context/', api_aremko_cli.operating_context, name='aremko_cli_operating_context'),
+    path('api/aremko-cli/seo-snapshots/', api_aremko_cli.seo_snapshots, name='aremko_cli_seo_snapshots'),  # H-057: loop de mejora continua SEO
 
     # === Cotización formal para empresas (documento HTML imprimible) ===
     path('cotizacion/<int:numero>/', cotizacion_view.cotizacion_formal_view, name='cotizacion_formal'),
