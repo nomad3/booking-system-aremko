@@ -191,4 +191,20 @@ _Estado: revisado con Jorge en sesión interactiva (2026-07-02)._
   "tinajas" (con J) y "termas". Verificado live. Baseline a batir: 298 imp,
   CTR ~0.34%, pos 6.41; y `tinajas en puerto varas` en pos 11.59 (página 2) —
   el próximo ciclo debe revisar si esa query sube de página y si el CTR mejora.
-- ⏳ REC 1 (post termas): pendiente, en cola en esta misma sesión.
+- ✅ **REC 1 APLICADA** — BlogPost `termas-puerto-varas` creado y publicado por
+  Jorge en el admin (cluster TINAS, keyword_root `termas puerto varas`).
+  El borrador se ajustó en revisión con Jorge respecto a lo propuesto:
+  - Título más corto (56 char) porque el template agrega " · Aremko Spa
+    Boutique" (+22) al `<title>`.
+  - Datos corregidos por Jorge: son **tinas artesanales** (no "tinajas de
+    madera nativa"), a **20 minutos** del centro (no 5), agua a **38-39°**
+    (no 40°) con **garantía: a 37° o menos la tina es gratis** (quedó como
+    bullet destacado — diferenciador único).
+  - CTA final quedó "Reserva tu tinaja junto al río" → `/tinas/` (200 OK).
+  Verificado live: 200, title/meta/4 H2/CTA renderizando y presente en
+  `sitemap.xml`. Baseline a batir: `termas puerto varas` pos 4.83 (90 imp),
+  `termas en puerto varas` pos 7.44 (63 imp) — hoy caen en la home; el próximo
+  ciclo debe revisar si el post nuevo empieza a capturar esas queries y si
+  aparece en top_pages.
+
+**Ciclo 1 cerrado: 3/3 recomendaciones aplicadas el mismo día (2026-07-02).**
