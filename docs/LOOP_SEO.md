@@ -186,5 +186,9 @@ _Estado: revisado con Jorge en sesión interactiva (2026-07-02)._
   Verificado live en `https://www.aremko.cl/masajes/` (title + description
   renderizando los textos nuevos). Baseline a batir: 543 imp/sem, CTR 2.9%,
   pos 5.77 — el próximo ciclo debe comparar CTR de `/masajes/` contra esto.
-- ⏳ REC 3 (meta blog de tinas) y REC 1 (post termas): pendientes, en cola en
-  esta misma sesión.
+- ✅ **REC 3 APLICADA** — Jorge actualizó el `meta_description` (158 char) del
+  BlogPost `/blog/tinas-calientes-puerto-varas/` en el admin, incorporando
+  "tinajas" (con J) y "termas". Verificado live. Baseline a batir: 298 imp,
+  CTR ~0.34%, pos 6.41; y `tinajas en puerto varas` en pos 11.59 (página 2) —
+  el próximo ciclo debe revisar si esa query sube de página y si el CTR mejora.
+- ⏳ REC 1 (post termas): pendiente, en cola en esta misma sesión.
