@@ -219,6 +219,7 @@ INSTALLED_APPS = [
     'costos_web.apps.CostosWebConfig',  # Tablero de costos de servicios web (solo superusuarios, app aislada drift-safe)
     'personal_operativo.apps.PersonalOperativoConfig',  # Whitelist de staff para Luna Interna (H-037, app aislada drift-safe)
     'conciliacion.apps.ConciliacionConfig',  # Conciliación bancaria para AgentProvision (AP-001 Tier-2, app aislada drift-safe)
+    'aremko_cli_sync.apps.AremkoCliSyncConfig',  # Snapshot gasto Ads por programa desde aremko-cli (H-058, app aislada drift-safe)
 
     # Aplicaciones de terceros
     'rest_framework',

@@ -61,6 +61,7 @@ urlpatterns = [
     path('analytics/dashboard-operativo/', analytics_views.dashboard_operativo, name='analytics_dashboard_operativo'),
     path('analytics/dashboard-giftcards/', analytics_views.dashboard_giftcards, name='analytics_dashboard_giftcards'),
     path('analytics/export-csv/', analytics_views.exportar_estadisticas_csv, name='analytics_export_csv'),
+    path('analytics/actualizar-gasto-ads/', analytics_views.actualizar_gasto_ads_aremko_cli, name='actualizar_gasto_ads_aremko_cli'),  # H-058 Parte C (sin cron, a demanda)
     # Calendario Matriz Views
     # TEMPORAL: Usando vista simplificada para debug
     path('calendario-matriz/', calendario_matriz_view.calendario_matriz_view, name='calendario_matriz'),

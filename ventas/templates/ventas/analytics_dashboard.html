@@ -466,6 +466,15 @@
 
     <!-- CONTENT -->
     <div class="stats-container">
+        {% if messages %}
+        <div style="margin-bottom: 16px;">
+            {% for message in messages %}
+            <div style="background:#e0f2fe; color:#075985; border:1px solid #7dd3fc; border-radius:8px; padding:12px 16px;">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
         <!-- Header -->
         <div class="stats-header">
             <h1>💰 Dashboard de Ventas</h1>
@@ -700,8 +709,16 @@
 
         <!-- Reservas por Programa — últimas 8 semanas (H-058) -->
         <div class="chart-card full-width">
-            <h3>📆 Reservas por Programa — últimas 8 semanas</h3>
-            <p style="color:#777; font-size:0.85em; margin-top:-8px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+                <h3 style="margin:0;">📆 Reservas por Programa — últimas 8 semanas</h3>
+                <form method="post" action="{% url 'ventas:actualizar_gasto_ads_aremko_cli' %}" style="margin:0;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-filter" style="border:none; cursor:pointer;">
+                        🔄 Actualizar gasto en Ads
+                    </button>
+                </form>
+            </div>
+            <p style="color:#777; font-size:0.85em; margin-top:4px;">
                 Agrupado por fecha de creación de la reserva (no depende del filtro de año/mes
                 de arriba) — mismo criterio que el reporte diario de aremko-cli, para que los
                 números calcen. Cada reserva cae en un solo programa.
@@ -709,12 +726,22 @@
                 Semana {{ reservas_por_programa_semanal.semanas_labels|first }} a
                 {{ reservas_por_programa_semanal.semanas_labels|last }}.
                 {% endif %}
+                <br>
+                {% if aremko_cli_snapshot %}
+                    Gasto en Ads: última actualización {{ aremko_cli_snapshot.fetched_at|date:"d-m-Y H:i" }}
+                    {% if not aremko_cli_snapshot.success %}
+                        <span style="color:#b91c1c;">(falló: {{ aremko_cli_snapshot.error_message }})</span>
+                    {% endif %}
+                {% else %}
+                    Gasto en Ads: todavía no se ha sincronizado — usa el botón "Actualizar gasto en Ads".
+                {% endif %}
+                No aplica todavía a Noche de Aguas Calientes (aremko-cli aún no la mapea).
             </p>
             {% with fecha_inicio_prog=reservas_por_programa_semanal.semanas_rango.0.inicio ultima_semana=reservas_por_programa_semanal.semanas_rango|last %}
             {% for programa in reservas_por_programa_semanal.programas %}
             <h4 style="margin-top: 24px; margin-bottom: 8px;">
                 {{ programa.nombre }}
-                <a href="{% url 'venta_reserva_list' %}?programa={{ programa.clave }}&fecha_inicio={{ fecha_inicio_prog }}&fecha_fin={{ ultima_semana.fin }}"
+                <a href="{% url 'ventas:venta_reserva_list' %}?programa={{ programa.clave }}&fecha_inicio={{ fecha_inicio_prog }}&fecha_fin={{ ultima_semana.fin }}"
                    style="font-size: 0.6em; font-weight: 400;">
                     ver detalle →
                 </a>
@@ -725,6 +752,14 @@
                         <th>Semana</th>
                         <th>Reservas</th>
                         <th>Ingresos</th>
+                        {% if programa.ads_google.disponible %}
+                        <th>Gasto Google</th>
+                        <th>{{ programa.ads_google.activity_label }}</th>
+                        {% endif %}
+                        {% if programa.ads_meta.disponible %}
+                        <th>Gasto Meta</th>
+                        <th>{{ programa.ads_meta.activity_label }}</th>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -733,12 +768,28 @@
                         <td>{{ semana.label }}</td>
                         <td>{{ semana.count }}</td>
                         <td>${{ semana.revenue|floatformat:0|intcomma }}</td>
+                        {% if programa.ads_google.disponible %}
+                        <td>{% if semana.spend_google is not None %}${{ semana.spend_google|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                        <td>{{ semana.activity_google|default:"—" }}</td>
+                        {% endif %}
+                        {% if programa.ads_meta.disponible %}
+                        <td>{% if semana.spend_meta is not None %}${{ semana.spend_meta|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                        <td>{{ semana.activity_meta|default:"—" }}</td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                     <tr style="font-weight: 600; background: #f8f9fa;">
                         <td>Total {{ reservas_por_programa_semanal.semanas_labels|length }} sem.</td>
                         <td>{{ programa.total_count }}</td>
                         <td>${{ programa.total_revenue|floatformat:0|intcomma }}</td>
+                        {% if programa.ads_google.disponible %}
+                        <td>${{ programa.ads_google.total_spend|floatformat:0|intcomma }}</td>
+                        <td>{{ programa.ads_google.total_activity }}</td>
+                        {% endif %}
+                        {% if programa.ads_meta.disponible %}
+                        <td>${{ programa.ads_meta.total_spend|floatformat:0|intcomma }}</td>
+                        <td>{{ programa.ads_meta.total_activity }}</td>
+                        {% endif %}
                     </tr>
                 </tbody>
             </table>

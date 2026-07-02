@@ -17,6 +17,96 @@ from ..models import VentaReserva, ReservaServicio, ReservaProducto, Pago, Servi
 from ..api_aremko_cli import calcular_reservas_por_programa_semanal
 
 
+def _enriquecer_programas_con_ads(reservas_por_programa_semanal):
+    """H-058 Parte C: agrega gasto Google/Meta Ads a cada programa, leyendo el
+    ÚLTIMO WeeklyBriefSnapshot ya sincronizado (aremko_cli_sync, app aislada
+    drift-safe). Empareja por el `label` de semana ('dd-mm'), no por índice, por si
+    alguna vez las ventanas de 8 semanas no calzaran exactamente 1:1.
+
+    Escribe `spend_google`/`activity_google`/`spend_meta`/`activity_meta` DIRECTO en
+    cada dict de `programa['semanas']` (None si no hay dato esa semana) — así el
+    template solo necesita UN `{% for semana in programa.semanas %}`, sin iterar dos
+    listas en paralelo. Además agrega `programa['ads_google']`/`['ads_meta']` con el
+    resumen (nombre de campaña, etiqueta de la métrica de actividad, y totales) o
+    `{'disponible': False}` si no hay snapshot o aremko-cli no mapea ese programa
+    (hoy solo ritual/refugio/pausa, no aguas_calientes).
+
+    Devuelve el snapshot (o None) para mostrar en el template cuándo fue la última
+    actualización / si falló.
+    """
+    from aremko_cli_sync.models import WeeklyBriefSnapshot
+
+    snapshot = WeeklyBriefSnapshot.objects.order_by('-fetched_at').first()
+
+    for programa in reservas_por_programa_semanal['programas']:
+        clave = programa['clave']
+        for fuente_attr, prefijo in (('google_ads', 'google'), ('meta_ads', 'meta')):
+            bloque = None
+            if snapshot is not None:
+                bloque = (getattr(snapshot, fuente_attr, None) or {}).get(clave)
+            por_label = {s.get('label'): s for s in (bloque or {}).get('weekly', [])}
+
+            total_spend, total_activity = 0, 0
+            for semana in programa['semanas']:
+                datos = por_label.get(semana['label'])
+                semana[f'spend_{prefijo}'] = datos.get('spend') if datos else None
+                semana[f'activity_{prefijo}'] = datos.get('activity') if datos else None
+                if datos:
+                    total_spend += datos.get('spend') or 0
+                    total_activity += datos.get('activity') or 0
+
+            programa[f'ads_{prefijo}'] = {
+                'disponible': bloque is not None,
+                'campaign_name': (bloque or {}).get('campaign_name'),
+                'activity_label': (bloque or {}).get('activity_label') or 'Actividad',
+                'total_spend': total_spend,
+                'total_activity': total_activity,
+            }
+
+    return snapshot
+
+
+@staff_member_required
+def actualizar_gasto_ads_aremko_cli(request):
+    """H-058 Parte C: dispara a demanda (SIN cron — decisión de Jorge 2026-07-01) la
+    sincronización del gasto en Ads por programa desde aremko-cli. El fetch real
+    tarda ~60s (aremko-cli llama en vivo a Google Ads + Meta Ads + Django), así que
+    corre en un thread de background para no bloquear el único worker Gunicorn del
+    sitio durante ese minuto — mismo patrón que `cron_snapshot_weekly_traffic`
+    (ventas/views/api_views.py).
+
+    POST /ventas/analytics/actualizar-gasto-ads/ → guarda un WeeklyBriefSnapshot
+    nuevo y redirige de vuelta al dashboard con un aviso.
+    """
+    from threading import Thread
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    if request.method != 'POST':
+        return redirect('ventas:analytics_dashboard_ventas')
+
+    def _run_sync_en_background():
+        import logging
+        from io import StringIO
+        from django.core.management import call_command
+        log = logging.getLogger(__name__)
+        output = StringIO()
+        try:
+            call_command('sync_aremko_cli_weekly_brief', stdout=output, stderr=output)
+            log.info('Sync aremko-cli (gasto Ads por programa) completado:\n%s', output.getvalue()[-2000:])
+        except Exception as exc:  # noqa: BLE001 — fire-and-forget, no debe tumbar el thread
+            log.exception('Error en sync aremko-cli (gasto Ads por programa): %s', exc)
+
+    Thread(target=_run_sync_en_background, daemon=True).start()
+
+    messages.info(
+        request,
+        'Actualizando gasto en Ads desde aremko-cli… tarda ~1 minuto. '
+        'Refresca esta página en un rato para ver los números nuevos.',
+    )
+    return redirect('ventas:analytics_dashboard_ventas')
+
+
 @staff_member_required
 def dashboard_ventas(request):
     """
@@ -524,6 +614,13 @@ def dashboard_ventas(request):
         # depende del filtro de año/mes de arriba — siempre son las últimas 8 semanas.
         reservas_por_programa_semanal = calcular_reservas_por_programa_semanal(weeks=8)
 
+        # H-058 (Parte C): gasto en Ads (Google+Meta) por programa, leído del ÚLTIMO
+        # snapshot ya sincronizado — NUNCA se llama a aremko-cli en vivo acá (tarda
+        # ~60s, bloquearía el único worker Gunicorn del sitio). El snapshot se
+        # actualiza a demanda con el botón "Actualizar gasto en Ads" (sin cron,
+        # decisión de Jorge 2026-07-01).
+        aremko_cli_snapshot = _enriquecer_programas_con_ads(reservas_por_programa_semanal)
+
         # ====================================================================
         # CONTEXT
         # ====================================================================
@@ -538,6 +635,7 @@ def dashboard_ventas(request):
             'chart_data_json': json.dumps(chart_data),
             'comparativa_yoy': comparativa_yoy,  # Comparativa año vs año
             'reservas_por_programa_semanal': reservas_por_programa_semanal,
+            'aremko_cli_snapshot': aremko_cli_snapshot,
 
             # Filtros actuales
             'year': year,
