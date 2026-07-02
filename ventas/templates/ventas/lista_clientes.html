@@ -21,10 +21,10 @@
         </div>
         <button type="submit" class="btn btn-modern btn-primary-modern mb-2">Buscar</button> {# Use modern button #}
         <div class="mb-3">
-            <a href="{% url 'exportar_clientes_excel' %}" class="btn btn-modern btn-success-modern"> {# Use modern button #}
+            <a href="{% url 'ventas:exportar_clientes_excel' %}" class="btn btn-modern btn-success-modern"> {# Use modern button #}
                 <i class="fas fa-file-excel"></i> Exportar a Excel
             </a>
-            <a href="{% url 'importar_clientes_excel' %}" class="btn btn-modern btn-warning-modern"> {# Use modern button (warning for import?) #}
+            <a href="{% url 'ventas:importar_clientes_excel' %}" class="btn btn-modern btn-warning-modern"> {# Use modern button (warning for import?) #}
                 <i class="fas fa-upload"></i> Importar desde Excel
             </a>
         </div>

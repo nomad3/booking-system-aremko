@@ -111,7 +111,7 @@
                     <tbody>
                         {% for venta in venta_reservas %}
                             <tr>
-                                <td class="px-4 py-3"><a href="{% url 'venta_reserva_detail' venta.id %}">{{ venta.id }}</a></td>
+                                <td class="px-4 py-3"><a href="{% url 'ventas:venta_reserva_detail' venta.id %}">{{ venta.id }}</a></td>
                                 <td class="px-4 py-3">{{ venta.cliente.nombre }}</td>
                                 <td class="px-4 py-3">{{ venta.fecha_reserva|date:"Y-m-d H:i" }}</td>
                                 <td class="px-4 py-3">{{ venta.estado_pago }}</td>

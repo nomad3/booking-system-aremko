@@ -106,7 +106,7 @@
                                 <td class="px-4 py-3 text-end">${{ detalle.precio_unitario|intcomma }}</td> {# Align right & humanize #}
                                 <td class="px-4 py-3 text-end fw-bold text-primary">${{ detalle.subtotal|intcomma }}</td> {# Use subtotal field & humanize #}
                                 <td class="px-4 py-3">
-                                    <a href="{% url 'detalle_compra_detail' detalle.id %}" class="btn btn-sm btn-modern btn-secondary-modern"> {# Use modern button #}
+                                    <a href="{% url 'ventas:detalle_compra_detail' detalle.id %}" class="btn btn-sm btn-modern btn-secondary-modern"> {# Use modern button #}
                                         <i class="fas fa-eye me-1"></i>Ver
                                     </a>
                                 </td>
@@ -124,7 +124,7 @@
 
     <!-- Back Button -->
     <div class="text-center mt-4">
-        <a href="{% url 'inicio_sistema' %}" class="btn btn-modern btn-secondary-modern"> {# Use modern button #}
+        <a href="{% url 'ventas:inicio_sistema' %}" class="btn btn-modern btn-secondary-modern"> {# Use modern button #}
             <i class="fas fa-arrow-left me-2"></i>Volver al Inicio
         </a>
     </div>

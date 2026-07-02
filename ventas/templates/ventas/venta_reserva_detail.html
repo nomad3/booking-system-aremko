@@ -132,7 +132,7 @@
 
     <!-- Back Button -->
     <div class="text-center mt-4">
-        <a href="{% url 'venta_reserva_list' %}" class="btn btn-modern btn-secondary-modern"> {# Use modern button #}
+        <a href="{% url 'ventas:venta_reserva_list' %}" class="btn btn-modern btn-secondary-modern"> {# Use modern button #}
             <i class="fas fa-arrow-left me-2"></i>Volver a la lista
         </a>
          <a href="{% url 'admin:ventas_ventareserva_change' venta.id %}" class="btn btn-modern btn-primary-modern ms-2"> {# Use modern button #}

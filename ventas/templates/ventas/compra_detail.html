@@ -80,7 +80,7 @@
 
     <!-- Action Buttons -->
     <div class="text-center mt-4">
-        <a href="{% url 'compra_list' %}" class="btn btn-modern btn-secondary-modern me-2"> {# Use modern button #}
+        <a href="{% url 'ventas:compra_list' %}" class="btn btn-modern btn-secondary-modern me-2"> {# Use modern button #}
             <i class="fas fa-arrow-left me-2"></i>Volver a la Lista
         </a>
         <a href="{% url 'admin:ventas_compra_change' compra.id %}" class="btn btn-modern btn-primary-modern"> {# Use modern button #}

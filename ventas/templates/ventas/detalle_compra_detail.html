@@ -97,7 +97,7 @@
                                 <td class="px-4 py-3 text-end fw-bold text-primary">${{ detalle.subtotal|intcomma }}</td> {# Use subtotal field & humanize #}
                                 <td class="px-4 py-3">
                                     {% if detalle.id != detalle_actual.id %}
-                                        <a href="{% url 'detalle_compra_detail' detalle.id %}" class="btn btn-sm btn-modern btn-secondary-modern"> {# Use modern button #}
+                                        <a href="{% url 'ventas:detalle_compra_detail' detalle.id %}" class="btn btn-sm btn-modern btn-secondary-modern"> {# Use modern button #}
                                             <i class="fas fa-eye me-1"></i>Ver
                                         </a>
                                     {% else %}
@@ -118,10 +118,10 @@
 
     <!-- Action Buttons -->
     <div class="text-center mt-4">
-        <a href="{% url 'detalle_compra_list' %}" class="btn btn-modern btn-secondary-modern me-2"> {# Use modern button #}
+        <a href="{% url 'ventas:detalle_compra_list' %}" class="btn btn-modern btn-secondary-modern me-2"> {# Use modern button #}
             <i class="fas fa-arrow-left me-2"></i>Volver a la Lista
         </a>
-        <a href="{% url 'compra_detail' compra.id %}" class="btn btn-modern btn-primary-modern"> {# Use modern button #}
+        <a href="{% url 'ventas:compra_detail' compra.id %}" class="btn btn-modern btn-primary-modern"> {# Use modern button #}
             <i class="fas fa-shopping-basket me-2"></i>Ver Compra Completa
         </a>
     </div>
