@@ -42,8 +42,13 @@ class Command(BaseCommand):
             etiqueta = programa or '(sin filtro de programa)'
             self.stdout.write(f'\n--- Probando {etiqueta}: {url} ---')
             try:
-                resp = client.get(url, HTTP_HOST='www.aremko.cl')
-                self.stdout.write(self.style.SUCCESS(f'  OK, status={resp.status_code}'))
+                # secure=True evita el 301 de SecurityMiddleware (SECURE_SSL_REDIRECT);
+                # follow=True sigue cualquier otro redirect hasta la respuesta final.
+                resp = client.get(url, HTTP_HOST='www.aremko.cl', secure=True, follow=True)
+                self.stdout.write(self.style.SUCCESS(
+                    f'  OK, status={resp.status_code}'
+                    + (f' (via {[r[0] for r in resp.redirect_chain]})' if resp.redirect_chain else '')
+                ))
             except Exception:  # noqa: BLE001 — queremos VER el traceback completo, no ocultarlo
                 self.stdout.write(self.style.ERROR(f'  FALLÓ con {etiqueta}:'))
                 self.stdout.write(traceback.format_exc())
