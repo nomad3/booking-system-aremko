@@ -301,7 +301,7 @@ def test_pack_horarios():
 
 
 def test_candidatos_opcion_encuentra_todas_las_alternativas():
-    """Regresión H-058: antes, `_componer_opcion` devolvía la PRIMERA tina+masaje que
+    """Regresión H-059: antes, `_componer_opcion` devolvía la PRIMERA tina+masaje que
     encajaba y nunca seguía buscando — Luna le dijo a un cliente real que 2 opciones eran
     "las últimas disponibles" cuando en realidad había 6 (caso real: domingo 2026-07-05,
     verificado a mano contra datos de producción con `diagnosticar_pausa_mas_tarde`).
@@ -365,7 +365,7 @@ def test_candidatos_opcion_encuentra_todas_las_alternativas():
     assert mejor_con['tina']['hora'] == '11:30'
     assert mejor_con == candidatos_con[0]
 
-    # mas_tarde=True (H-058, Parte C): disponibilidad_pack_tina_masaje elige candidatos[-1]
+    # mas_tarde=True (H-059, Parte C): disponibilidad_pack_tina_masaje elige candidatos[-1]
     # en vez de candidatos[0] — la MÁS TARDE de cada grupo, para responder bien "¿más tarde?".
     # Se verifica acá contra la lista ya probada arriba (misma fuente de verdad); el wiring
     # completo de disponibilidad_pack_tina_masaje se valida en prod con datos reales (Task #25).

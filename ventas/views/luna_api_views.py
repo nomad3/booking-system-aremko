@@ -1591,7 +1591,7 @@ def limpiar_conversacion_endpoint(request):
 
 
 # ============================================================================
-# ALTERNATIVAS DE HORARIO — PAUSA (TINA+MASAJE) — H-058
+# ALTERNATIVAS DE HORARIO — PAUSA (TINA+MASAJE) — H-059
 # ============================================================================
 
 @api_view(['GET'])
@@ -1599,7 +1599,7 @@ def limpiar_conversacion_endpoint(request):
 def pausa_alternativas(request):
     """
     Todas las alternativas de horario válidas del pack Pausa (tina+masaje) para una fecha
-    dada — para el botón "buscar otro horario" de la bandeja (H-058): cada alternativa ya
+    dada — para el botón "buscar otro horario" de la bandeja (H-059): cada alternativa ya
     trae un texto listo para pegar en el borrador, ordenadas de más temprano a más tardío.
 
     Antes, la tool que usa Luna solo mostraba 2 opciones (la más temprana de cada tipo de

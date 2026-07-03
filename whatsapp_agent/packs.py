@@ -160,7 +160,7 @@ def _candidatos_opcion(tinas_grupo, etiqueta, f, personas, agendados, masaje_por
                        union_slots, masaje_generico, buffer_max=None):
     """Junta TODOS los candidatos válidos (tina+horario + masaje+horario) de un grupo de
     tinas (con o sin hidromasaje) — a diferencia de la versión anterior, NO se queda con el
-    primero que encaje (H-058: eso hacía que "más tarde" nunca encontrara alternativas
+    primero que encaje (H-059: eso hacía que "más tarde" nunca encontrara alternativas
     tardías que sí existían). Ordenados por hora de tina ascendente (más temprano primero).
 
     Para cada tina del grupo busca el masaje de SU pack (para que aplique el descuento) y, si
@@ -261,11 +261,11 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2, buffer_max=BUFFER_CIUDAD_
     Es el caso CIUDAD (sin alojamiento): `buffer_max` (min) acota la espera entre tina y
     masaje para no dejar al cliente esperando en el lugar; los huéspedes van por el Ritual.
 
-    Si `todas=True` (H-058), además de `opciones` agrega `alternativas`: TODAS las
+    Si `todas=True` (H-059), además de `opciones` agrega `alternativas`: TODAS las
     combinaciones tina+masaje válidas ese día (ambos grupos mezclados), ordenadas de más
     temprano a más tardío — para navegar horarios uno por uno (botón "buscar más tarde").
 
-    Si `mas_tarde=True` (H-058), `opciones` trae la alternativa MÁS TARDE de cada grupo (la
+    Si `mas_tarde=True` (H-059), `opciones` trae la alternativa MÁS TARDE de cada grupo (la
     última cronológicamente) en vez de la más temprana — para cuando el cliente ya vio una
     cotización y pregunta "¿y más tarde?". Si solo existe 1 alternativa por grupo, devuelve
     esa misma (es la única, no hay engaño posible: el llamador debe avisar que no hay otra).
