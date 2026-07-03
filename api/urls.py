@@ -35,6 +35,8 @@ urlpatterns = [
     path('luna/reservas/descartar/', luna_api_views.descartar_propuesta_endpoint, name='luna-descartar-propuesta'),
     path('luna/reservas/create/', luna_api_views.crear_reserva, name='luna-crear-reserva'),
     path('luna/reservas/<int:reserva_id>/servicios/', luna_api_views.agregar_servicios_reserva, name='luna-agregar-servicios'),
+    # H-060: Luna busca las reservas existentes de un cliente (para agregar algo a una)
+    path('luna/reservas/buscar/', luna_api_views.buscar_reservas_cliente, name='luna-buscar-reservas'),
 
     # Botón "buscar otro horario" en la bandeja (H-059): todas las alternativas de Pausa
     path('luna/pausa/alternativas/', luna_api_views.pausa_alternativas, name='luna-pausa-alternativas'),

@@ -17,7 +17,7 @@ from django.utils import timezone
 from django.db import transaction
 
 from whatsapp_agent.models import PropuestaReserva
-from ventas.models import Servicio
+from ventas.models import Servicio, VentaReserva
 
 logger = logging.getLogger(__name__)
 
@@ -454,3 +454,165 @@ def editar_propuesta(propuesta_id, servicios_data, productos_data=None):
         'servicios_count': len(servicios_info),
         'productos_count': len(productos_info),
     }
+
+
+def preparar_adicion_a_reserva(canal, external_id, reserva_id, servicios_data=None,
+                               productos_data=None, idempotency_key=None):
+    """GATE DE DEBORAH para agregar servicios/productos a una VentaReserva YA CREADA
+    (H-060) — mismo patrón que preparar_reserva(), pero en vez de crear una reserva
+    nueva al aprobarse, la propuesta trae `reserva_existente_id` seteado y
+    crear_reserva() (ventas/views/luna_api_views.py) la resuelve agregando a esa
+    reserva en vez de crear una nueva.
+
+    A diferencia de preparar_reserva, NO valida disponibilidad acá (se re-valida recién
+    al aprobar) — mismo criterio que preparar_reserva ya usa hoy: la propuesta no
+    bloquea cupo.
+
+    Nota sobre el total mostrado: es SOLO el delta de lo que se está agregando (no el
+    total completo de la reserva) — si el ítem nuevo combinado con lo que YA tiene la
+    reserva activa un descuento de pack que un cálculo aislado no detecta, el total
+    FINAL que se aplica al aprobar SÍ mira todos los servicios de la reserva juntos
+    (ver ventas/services/reserva_addition_service.py); el preview acá puede quedar un
+    poco conservador en ese caso puntual — Deborah lo revisa antes de aprobar de todos
+    modos (Gate de Deborah).
+
+    Devuelve el mismo shape que preparar_reserva: {success, propuesta_id, resumen_texto,
+    total, reserva_id} o {success: False, error, mensaje}.
+    """
+    servicios_data = servicios_data or []
+    productos_data = productos_data or []
+
+    try:
+        try:
+            VentaReserva.objects.get(id=reserva_id)
+        except VentaReserva.DoesNotExist:
+            return {'success': False, 'error': 'reserva_not_found',
+                    'mensaje': f'Reserva {reserva_id} no existe'}
+
+        if not servicios_data and not productos_data:
+            return {'success': False, 'error': 'validation_error',
+                    'mensaje': 'Debe incluir al menos un servicio o producto'}
+
+        # Idempotencia (mismo criterio que preparar_reserva).
+        if idempotency_key:
+            try:
+                propuesta = PropuestaReserva.objects.get(idempotency_key=idempotency_key)
+                if propuesta.esta_vigente():
+                    logger.info(f'[Luna] Propuesta de adición duplicada (idempotent): {idempotency_key[:16]}')
+                    return {
+                        'success': True,
+                        'propuesta_id': propuesta.propuesta_id,
+                        'resumen_texto': propuesta.resumen_texto,
+                        'total': int(propuesta.total),
+                        'reserva_id': reserva_id,
+                        'duplicada': True,
+                    }
+            except PropuestaReserva.DoesNotExist:
+                pass
+
+        with transaction.atomic():
+            try:
+                servicios_info, productos_info, descuento_pack, total_delta, resumen_texto = \
+                    recalcular_propuesta(servicios_data, productos_data)
+            except _PropuestaCalcError as e:
+                return {'success': False, 'error': e.error, 'mensaje': e.mensaje}
+
+            payload = {
+                # cliente_data NO hace falta re-recolectarlo: el cliente ya existe (la
+                # reserva a la que se agrega ya lo tiene). Campo cliente_data del modelo
+                # queda {} (NOT NULL, no se usa en este flujo).
+                'reserva_existente_id': reserva_id,
+                'servicios': servicios_data,
+                'productos': productos_data,
+            }
+            propuesta_id = str(uuid.uuid4())
+            resumen_completo = f'AGREGAR a Reserva RES-{reserva_id}:\n{resumen_texto}'
+            propuesta = PropuestaReserva.objects.create(
+                propuesta_id=propuesta_id,
+                idempotency_key=idempotency_key or '',
+                canal=canal,
+                external_id=external_id,
+                payload=payload,
+                cliente_data={},
+                servicios=servicios_data,
+                total=int(total_delta),
+                resumen_texto=resumen_completo,
+                estado='pendiente',
+                reserva_existente_id=reserva_id,
+                expires_at=timezone.now() + timedelta(hours=24),
+            )
+
+            logger.info(
+                f'[Luna] Propuesta de adición {propuesta_id[:8]} preparada para {external_id} '
+                f'→ reserva {reserva_id}: {len(servicios_info)} servicio(s), '
+                f'{len(productos_info)} producto(s), ${int(total_delta):,}'
+            )
+
+            return {
+                'success': True,
+                'propuesta_id': propuesta_id,
+                'resumen_texto': resumen_completo,
+                'total': int(total_delta),
+                'reserva_id': reserva_id,
+            }
+
+    except Exception as e:
+        logger.exception(f'Error en preparar_adicion_a_reserva: {str(e)}')
+        return {
+            'success': False,
+            'error': 'internal_error',
+            'mensaje': f'Error al preparar la adición: {str(e)[:100]}',
+        }
+
+
+def buscar_reservas_elegibles(telefono):
+    """Reservas ELEGIBLES de un cliente por teléfono, para agregar un servicio/producto
+    (H-060). Fuente única para el endpoint HTTP (ventas/views/luna_api_views.py::
+    buscar_reservas_cliente) y la tool de Luna (whatsapp_agent/agent.py) — evita
+    duplicar el query entre ambos, mismo criterio que verificar_cliente reusa
+    ClienteService en vez de pegarle a su propio endpoint.
+
+    Usa whatsapp_agent.reservas_existentes (lógica pura) para elegibilidad + resumen.
+    Devuelve lista de dicts con 'fecha_principal' como date (NO serializado a string) —
+    el caller HTTP lo serializa a isoformat; el tool de Luna la usa tal cual.
+
+    [] si no hay cliente o no tiene reservas elegibles (estado normal, no un error).
+    """
+    from django.utils import timezone as _tz
+    from ventas.services.cliente_service import ClienteService
+    from whatsapp_agent.reservas_existentes import filtrar_reservas_elegibles
+
+    try:
+        cliente, _normalizado = ClienteService.buscar_cliente_por_telefono(telefono)
+    except Exception:  # noqa: BLE001 — un teléfono raro no debe tumbar la búsqueda
+        logger.exception('[Luna] buscar_reservas_elegibles: error normalizando teléfono')
+        cliente = None
+
+    if cliente is None:
+        return []
+
+    ventas = (cliente.ventareserva_set
+              .all()
+              .prefetch_related('reservaservicios__servicio', 'reservaproductos__producto'))
+
+    reservas_raw = []
+    for venta in ventas:
+        items = []
+        fechas_servicios = []
+        for rs in venta.reservaservicios.all():
+            fecha = rs.fecha_agendamiento
+            if fecha:
+                fechas_servicios.append(fecha)
+            items.append({'tipo': 'servicio', 'nombre': rs.servicio.nombre, 'fecha': fecha})
+        for rp in venta.reservaproductos.all():
+            items.append({'tipo': 'producto', 'nombre': rp.producto.nombre, 'fecha': None})
+        reservas_raw.append({
+            'reserva_id': venta.id,
+            'numero': f'RES-{venta.id}',
+            'estado_pago': venta.estado_pago,
+            'total': float(venta.total or 0),
+            'fechas_servicios': fechas_servicios,
+            'items': items,
+        })
+
+    return filtrar_reservas_elegibles(reservas_raw, _tz.localdate())

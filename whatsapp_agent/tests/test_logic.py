@@ -10,7 +10,9 @@ Correr desde la raíz del repo:
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
-from whatsapp_agent import aprendizaje, ausencia, availability, escalation, grounding, packs, prompt
+from whatsapp_agent import (
+    aprendizaje, ausencia, availability, escalation, grounding, packs, prompt, reservas_existentes,
+)
 
 
 def test_formatear_precio():
@@ -473,6 +475,67 @@ def test_resolver_fecha_dia_y_numero():
         # buscar en otros meses — debe pedir aclarar directamente.
         r6 = availability.resolver_fecha('sábado 12 de julio')
         assert r6['ambiguo'] is True, r6
+
+
+def test_es_reserva_elegible():
+    hoy = datetime(2026, 7, 3).date()
+
+    # Cancelada -> NUNCA elegible, aunque la fecha sea futura.
+    cancelada = {'estado_pago': 'cancelado', 'fechas_servicios': [datetime(2026, 7, 10).date()]}
+    assert reservas_existentes.es_reserva_elegible(cancelada, hoy) is False
+
+    # Fecha pasada fuera del margen de gracia (1 día) -> NO elegible.
+    pasada = {'estado_pago': 'pagado', 'fechas_servicios': [datetime(2026, 6, 20).date()]}
+    assert reservas_existentes.es_reserva_elegible(pasada, hoy) is False
+
+    # Fecha de ayer (dentro del margen de gracia) -> elegible.
+    ayer = {'estado_pago': 'pagado', 'fechas_servicios': [datetime(2026, 7, 2).date()]}
+    assert reservas_existentes.es_reserva_elegible(ayer, hoy) is True
+
+    # Mezcla de fechas pasadas y futuras -> elegible por la futura (no se descarta entera).
+    mixta = {'estado_pago': 'parcial',
+             'fechas_servicios': [datetime(2026, 6, 1).date(), datetime(2026, 7, 15).date()]}
+    assert reservas_existentes.es_reserva_elegible(mixta, hoy) is True
+
+    # Sin fechas de servicio (ej. reserva solo de productos) -> elegible por default.
+    sin_fechas = {'estado_pago': 'pendiente', 'fechas_servicios': []}
+    assert reservas_existentes.es_reserva_elegible(sin_fechas, hoy) is True
+
+
+def test_resumen_corto_reserva():
+    con_fecha = {'items': [
+        {'tipo': 'servicio', 'nombre': 'Tina Hidromasaje Llaima', 'fecha': datetime(2026, 7, 4).date()},
+        {'tipo': 'servicio', 'nombre': 'Masaje Relajación', 'fecha': datetime(2026, 7, 4).date()},
+    ]}
+    assert (reservas_existentes.resumen_corto_reserva(con_fecha)
+            == 'Tina Hidromasaje Llaima + Masaje Relajación (04-07-2026)')
+
+    solo_producto = {'items': [{'tipo': 'producto', 'nombre': 'Tabla de quesos', 'fecha': None}]}
+    assert reservas_existentes.resumen_corto_reserva(solo_producto) == 'Tabla de quesos'
+
+    vacia = {'items': []}
+    assert reservas_existentes.resumen_corto_reserva(vacia) == 'Reserva'
+
+
+def test_filtrar_reservas_elegibles():
+    hoy = datetime(2026, 7, 3).date()
+    reservas = [
+        {'reserva_id': 1, 'estado_pago': 'cancelado', 'fechas_servicios': [datetime(2026, 7, 10).date()],
+         'items': [{'tipo': 'servicio', 'nombre': 'X', 'fecha': datetime(2026, 7, 10).date()}]},
+        {'reserva_id': 2, 'estado_pago': 'pagado', 'fechas_servicios': [datetime(2026, 7, 10).date()],
+         'items': [{'tipo': 'servicio', 'nombre': 'Tina A', 'fecha': datetime(2026, 7, 10).date()}]},
+        {'reserva_id': 3, 'estado_pago': 'parcial', 'fechas_servicios': [datetime(2026, 7, 4).date()],
+         'items': [{'tipo': 'servicio', 'nombre': 'Tina B', 'fecha': datetime(2026, 7, 4).date()}]},
+        {'reserva_id': 4, 'estado_pago': 'pendiente', 'fechas_servicios': [],
+         'items': [{'tipo': 'producto', 'nombre': 'Jugo', 'fecha': None}]},
+    ]
+    out = reservas_existentes.filtrar_reservas_elegibles(reservas, hoy)
+    ids = [r['reserva_id'] for r in out]
+    # 1 (cancelada) queda afuera; 3 (04-07) antes que 2 (10-07); la sin fecha (4) al final.
+    assert ids == [3, 2, 4], ids
+    assert out[0]['fecha_principal'] == datetime(2026, 7, 4).date()
+    assert out[0]['resumen_corto'] == 'Tina B (04-07-2026)'
+    assert out[-1]['fecha_principal'] is None
 
 
 def _run():

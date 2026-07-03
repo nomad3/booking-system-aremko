@@ -466,6 +466,79 @@ _TOOLS = [{
             'required': ['programa'],
         },
     },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'buscar_reservas_cliente',
+        'description': (
+            'Busca las reservas EXISTENTES de este cliente (H-060). Úsala cuando el cliente '
+            'dice algo como "quiero agregar X a mi reserva", "ya reservé pero quiero sumar Y", '
+            'o menciona una reserva que ya hizo. Devuelve una lista corta de sus reservas '
+            'elegibles (no canceladas, con fecha vigente o reciente). Si hay UNA sola, seguí '
+            'directo con esa (no hace falta preguntar cuál). Si hay VARIAS, preguntale al '
+            'cliente cuál es mencionando fecha/resumen de cada una (ej. "¿es la del 4 de julio '
+            'con la Tina Llaima, o la del 10 de julio?"), NUNCA el reserva_id interno. Si no '
+            'tiene ninguna, avisale que no encontraste una reserva activa a su nombre.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'telefono': {'type': 'string', 'description': 'Teléfono del cliente (en WhatsApp se usa el de la conversación; omitir salvo en Instagram/Messenger)'},
+            },
+            'required': [],
+        },
+    },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'agregar_servicio_a_reserva_existente',
+        'description': (
+            'GATE DE DEBORAH (H-060): propone AGREGAR un servicio a una reserva YA CREADA '
+            '(identificada antes con buscar_reservas_cliente) — la reserva puede ya estar '
+            'pagada o parcial. NO modifica la reserva directamente: crea una propuesta que '
+            'Deborah debe aprobar, igual que una reserva nueva. Llamala cuando el cliente '
+            'confirma que quiere sumar un servicio a una reserva existente. Devuelve '
+            'propuesta_id (interno, NUNCA lo menciones al cliente) + mensaje. Cuando '
+            'success=true, respondé al cliente con el campo `mensaje` TAL CUAL (verbatim); '
+            'NO digas que ya quedó agregado — todavía es una propuesta pendiente de revisión.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'reserva_id': {'type': 'integer', 'description': 'ID de la reserva existente (de buscar_reservas_cliente). REQUERIDO.'},
+                'servicio_id': {'type': 'integer', 'description': 'ID del servicio a agregar'},
+                'nombre_servicio': {'type': 'string', 'description': 'Nombre EXACTO del servicio que dijo el cliente (ej. "Llaima"), para confirmar el id correcto'},
+                'fecha': {'type': 'string', 'description': 'PASÁ EL TEXTO LITERAL del cliente ("mañana", "el sábado"); NO calcules el día, la herramienta lo resuelve. REQUERIDO.'},
+                'hora': {'type': 'string', 'description': 'Hora HH:MM. REQUERIDO.'},
+                'cantidad_personas': {'type': 'integer', 'description': 'Cantidad de personas. REQUERIDO (no asumas 1).'},
+            },
+            'required': ['reserva_id', 'fecha', 'hora', 'cantidad_personas'],
+        },
+    },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'agregar_producto_a_reserva_existente',
+        'description': (
+            'GATE DE DEBORAH (H-060): propone AGREGAR un producto (tabla de quesos, jugo, '
+            'etc.) a una reserva YA CREADA (identificada antes con buscar_reservas_cliente). '
+            'NO modifica la reserva directamente: crea una propuesta que Deborah debe aprobar. '
+            'Llamala cuando el cliente confirma que quiere sumar un producto a una reserva '
+            'existente. Devuelve propuesta_id (interno, NUNCA lo menciones al cliente) + '
+            'mensaje. Cuando success=true, respondé al cliente con el campo `mensaje` TAL '
+            'CUAL; NO digas que ya quedó agregado — todavía es una propuesta pendiente.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'reserva_id': {'type': 'integer', 'description': 'ID de la reserva existente (de buscar_reservas_cliente). REQUERIDO.'},
+                'nombre_producto': {'type': 'string', 'description': 'Nombre EXACTO del producto del catálogo (ej. "Tabla Mixta de Quesos y Jamones"). REQUERIDO.'},
+                'producto_id': {'type': 'integer', 'description': 'ID del producto (opcional; normalmente no lo tenés, pasá nombre_producto)'},
+                'cantidad': {'type': 'integer', 'description': 'Cantidad a agregar (default 1)'},
+            },
+            'required': ['reserva_id', 'nombre_producto'],
+        },
+    },
 }]
 
 
@@ -1403,6 +1476,139 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool enviar_ficha_experiencia falló: %s', exc)
                 return {'error': f'no se pudo obtener la ficha: {str(exc)[:100]}'}
+        if name == 'buscar_reservas_cliente':
+            # H-060: descubrimiento de reservas existentes (solo lectura)
+            from .reserva_service import buscar_reservas_elegibles
+            try:
+                args = args or {}
+                telefono = (args.get('telefono') or '').strip()
+                if not telefono and canal == 'whatsapp':
+                    telefono = external_id
+                if not telefono:
+                    return {'success': False, 'error': 'telefono_requerido',
+                            'mensaje': 'Teléfono es requerido'}
+                elegibles = buscar_reservas_elegibles(telefono)
+                reservas = [{
+                    'reserva_id': r['reserva_id'],
+                    'numero': r['numero'],
+                    'fecha_principal': r['fecha_principal'].isoformat() if r['fecha_principal'] else None,
+                    'resumen_corto': r['resumen_corto'],
+                    'estado_pago': r['estado_pago'],
+                    'total': r['total'],
+                } for r in elegibles]
+                return {'success': True, 'reservas': reservas}
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool buscar_reservas_cliente falló: %s', exc)
+                return {'success': False, 'error': 'internal_error',
+                        'mensaje': f'Error buscando reservas: {str(exc)[:100]}'}
+        if name == 'agregar_servicio_a_reserva_existente':
+            # H-060: GATE DE DEBORAH — propone (no aplica) agregar un servicio a una
+            # reserva ya creada. Mismo patrón de resolución por nombre/validación de
+            # hora que agregar_servicio_carrito.
+            from .reserva_service import preparar_adicion_a_reserva
+            from .availability import validar_hora_es_slot
+            try:
+                args = args or {}
+                reserva_id = args.get('reserva_id')
+                if not reserva_id:
+                    return {'success': False, 'error': 'falta_reserva_id',
+                            'mensaje': 'Falta el ID de la reserva; llamá primero buscar_reservas_cliente.'}
+                servicio_id = args.get('servicio_id')
+                nombre_servicio = (args.get('nombre_servicio') or '').strip()
+                if nombre_servicio:
+                    from ventas.models import Servicio
+                    from .availability import TIPOS_PRINCIPALES
+                    matches = list(Servicio.objects.filter(
+                        publicado_web=True, activo=True,
+                        tipo_servicio__in=TIPOS_PRINCIPALES,
+                        nombre__icontains=nombre_servicio,
+                    ).values_list('id', flat=True)[:2])
+                    if len(matches) == 1 and matches[0] != servicio_id:
+                        servicio_id = matches[0]
+                if not servicio_id:
+                    return {'success': False, 'error': 'servicio_no_resuelto',
+                            'mensaje': f'No encontré el servicio "{nombre_servicio}" en el catálogo.'}
+                try:
+                    cantidad = int(args.get('cantidad_personas'))
+                except (TypeError, ValueError):
+                    cantidad = 0
+                if cantidad < 1:
+                    return {'success': False, 'error': 'falta_personas',
+                            'mensaje': 'Necesito saber para cuántas personas es. Pregúntale al cliente antes. NO asumas 1.'}
+                fecha_iso = _fecha_iso(args.get('fecha'))
+                err_hora = validar_hora_es_slot(servicio_id, fecha_iso, args.get('hora'))
+                if err_hora:
+                    return {'success': False, **err_hora}
+
+                external_id = phone if phone else 'desconocido'
+                servicios_data = [{
+                    'servicio_id': servicio_id, 'fecha': fecha_iso,
+                    'hora': args.get('hora'), 'cantidad_personas': cantidad,
+                }]
+                resultado = preparar_adicion_a_reserva(
+                    canal=canal, external_id=external_id, reserva_id=reserva_id,
+                    servicios_data=servicios_data)
+                if not resultado.get('success'):
+                    return resultado
+                return {
+                    'success': True,
+                    'propuesta_id': resultado['propuesta_id'],
+                    'mensaje': (
+                        f"¡Listo! Propuse agregar esto a tu Reserva RES-{reserva_id} "
+                        f"(total adicional ${resultado['total']:,}). Te confirmamos en breve. 🌿"
+                    ),
+                }
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool agregar_servicio_a_reserva_existente falló: %s', exc)
+                return {'success': False, 'error': 'internal_error',
+                        'mensaje': f'No se pudo preparar la adición: {str(exc)[:100]}'}
+        if name == 'agregar_producto_a_reserva_existente':
+            # H-060: GATE DE DEBORAH — propone (no aplica) agregar un producto a una
+            # reserva ya creada. Mismo patrón de resolución por nombre que
+            # agregar_producto_carrito.
+            from .reserva_service import preparar_adicion_a_reserva
+            try:
+                args = args or {}
+                reserva_id = args.get('reserva_id')
+                if not reserva_id:
+                    return {'success': False, 'error': 'falta_reserva_id',
+                            'mensaje': 'Falta el ID de la reserva; llamá primero buscar_reservas_cliente.'}
+                producto_id = args.get('producto_id')
+                nombre_producto = (args.get('nombre_producto') or '').strip()
+                if nombre_producto:
+                    from ventas.models import Producto
+                    matches = list(Producto.objects.filter(
+                        publicado_web=True, cantidad_disponible__gt=0,
+                        nombre__icontains=nombre_producto,
+                    ).values_list('id', flat=True)[:2])
+                    if len(matches) == 1:
+                        producto_id = matches[0]
+                    elif len(matches) > 1:
+                        return {'success': False, 'error': 'producto_ambiguo',
+                                'mensaje': f'Hay varios productos que coinciden con "{nombre_producto}"; pedí al cliente que precise cuál.'}
+                if not producto_id:
+                    return {'success': False, 'error': 'producto_no_resuelto',
+                            'mensaje': f'No encontré el producto "{nombre_producto}" en el catálogo disponible.'}
+
+                external_id = phone if phone else 'desconocido'
+                productos_data = [{'producto_id': producto_id, 'cantidad': args.get('cantidad', 1)}]
+                resultado = preparar_adicion_a_reserva(
+                    canal=canal, external_id=external_id, reserva_id=reserva_id,
+                    productos_data=productos_data)
+                if not resultado.get('success'):
+                    return resultado
+                return {
+                    'success': True,
+                    'propuesta_id': resultado['propuesta_id'],
+                    'mensaje': (
+                        f"¡Listo! Propuse agregar esto a tu Reserva RES-{reserva_id} "
+                        f"(total adicional ${resultado['total']:,}). Te confirmamos en breve. 🌿"
+                    ),
+                }
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool agregar_producto_a_reserva_existente falló: %s', exc)
+                return {'success': False, 'error': 'internal_error',
+                        'mensaje': f'No se pudo preparar la adición: {str(exc)[:100]}'}
         return {'error': f'herramienta desconocida: {name}'}
 
     try:

@@ -164,7 +164,11 @@ def _propuesta_reserva(canal, external_id):
             'url_cotizacion': url_cotizacion(propuesta.propuesta_id),  # H-039 B1: link boutique para Deborah
             'resumen': propuesta.resumen_texto,
             'total': int(propuesta.total),
-            'servicios': servicios_info
+            'servicios': servicios_info,
+            # H-060: si viene seteado, esta propuesta AGREGA a la reserva #X (no crea una
+            # nueva) — el cajón puede usarlo para mostrar "esto se agrega a la Reserva RES-X"
+            # en vez de "esto crea una reserva nueva". null en el caso normal (reserva nueva).
+            'reserva_existente_id': propuesta.reserva_existente_id,
         }
     except Exception:  # noqa: BLE001
         logger.exception(f'Error obteniendo propuesta_reserva para {canal}/{external_id}')

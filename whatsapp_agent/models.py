@@ -283,12 +283,22 @@ class AusenciaEnviada(models.Model):
 class PropuestaReserva(models.Model):
     """Propuesta de reserva pendiente de aprobación de Deborah (H-028).
 
-    Flujo:
+    Flujo A — reserva nueva:
     1. Luna llama preparar_reserva() → valida + guarda PropuestaReserva (estado=pendiente)
     2. READ /api/inbox/conversation/ devuelve propuesta_reserva (si existe y vigente)
     3. aremko-cli muestra botón "Crear reserva"
     4. Deborah aprueba → POST /api/luna/reservas/create/?propuesta_id=X
     5. crear_reserva(propuesta_id) consume la propuesta + crea VentaReserva + marca estado=creada
+
+    Flujo B — adición a reserva YA CREADA (H-060): el cliente ya tiene una VentaReserva real
+    (quizás ya pagada) y pide sumar un servicio/producto en una conversación posterior.
+    1. Luna llama buscar_reservas_cliente() para identificar la reserva, luego
+       preparar_adicion_a_reserva() → guarda PropuestaReserva con reserva_existente_id=X
+       (estado=pendiente) — MISMO gate de Deborah, no se aplica nada todavía.
+    2/3. Igual que el Flujo A (aremko-cli muestra el mismo botón "Crear reserva").
+    4/5. Deborah aprueba → crear_reserva(propuesta_id) detecta reserva_existente_id y, en vez
+       de crear una VentaReserva nueva, AGREGA los servicios/productos a la reserva #X
+       (agregar_items_a_reserva) y deja reserva_id=reserva_existente_id (ver campo abajo).
 
     Durabilidad: tabla nueva (app aislada) sobrevive deploys/redeploys, no se pierde el cache.
     Auditoría: todas las propuestas (creadas, descartadas, expiradas) quedan en BD.
@@ -334,6 +344,16 @@ class PropuestaReserva(models.Model):
 
     # Referencia a la reserva creada (se llena cuando estado='creada')
     reserva_id = models.IntegerField(null=True, blank=True, help_text='VentaReserva.id si ya fue creada')
+
+    # H-060: si está seteado, esta propuesta NO crea una reserva nueva al aprobarse — AGREGA
+    # sus servicios/productos a la VentaReserva #X ya existente. Distinto de `reserva_id` (que
+    # es la reserva que ESTA propuesta llegó a crear, null hasta la aprobación):
+    # reserva_existente_id es un INPUT (se sabe desde que se crea la propuesta), reserva_id es
+    # un OUTPUT (se llena recién al aprobar — en el Flujo B queda igual a reserva_existente_id).
+    reserva_existente_id = models.IntegerField(
+        null=True, blank=True,
+        help_text='VentaReserva.id a la que se AGREGA (no se crea una nueva) si está seteado'
+    )
 
     # Auditoría temporal
     created_at = models.DateTimeField(auto_now_add=True)
