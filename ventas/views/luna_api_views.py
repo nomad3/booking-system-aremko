@@ -1591,6 +1591,102 @@ def limpiar_conversacion_endpoint(request):
 
 
 # ============================================================================
+# ALTERNATIVAS DE HORARIO — PAUSA (TINA+MASAJE) — H-058
+# ============================================================================
+
+@api_view(['GET'])
+@authentication_classes([LunaAPIKeyAuthentication])
+def pausa_alternativas(request):
+    """
+    Todas las alternativas de horario válidas del pack Pausa (tina+masaje) para una fecha
+    dada — para el botón "buscar otro horario" de la bandeja (H-058): cada alternativa ya
+    trae un texto listo para pegar en el borrador, ordenadas de más temprano a más tardío.
+
+    Antes, la tool que usa Luna solo mostraba 2 opciones (la más temprana de cada tipo de
+    tina) — si el cliente pedía "más tarde", no había forma de ofrecer otra sin adivinar.
+    Este endpoint expone TODAS las combinaciones posibles ese día (reusa
+    `disponibilidad_pack_tina_masaje(..., todas=True)`, mismas reglas de negocio: buffer de
+    45min para cliente sin alojamiento, sin solapar horarios, packs de descuento si aplican)
+    para que el staff navegue con un clic, sin depender de que el LLM interprete "más tarde".
+
+    GET /api/luna/pausa/alternativas/?fecha=YYYY-MM-DD&personas=N (personas default 2)
+
+    Respuesta 200:
+    {
+      "fecha": "2026-07-05", "personas": 2,
+      "alternativas": [
+        {"etiqueta": "con hidromasaje", "tina": "Tina Hidromasaje Llaima",
+         "hora_tina": "11:30", "hora_masaje": "14:15",
+         "precio_total": 140000, "precio_con_descuento": 110000, "hay_descuento": true,
+         "texto_sugerido": "Tina Hidromasaje Llaima a las 11:30 hrs y Masaje de Relajación o Descontracturante a las 14:15 hrs, por un total de $110.000 (con descuento de pack; precio normal $140.000)."},
+        ...
+      ]
+    }
+    `alternativas` viene vacía (200, no error) si ese día no hay ninguna combinación posible
+    — mismo criterio que la tool de Luna (no es un error, es información real).
+    400 si falta `fecha` o los parámetros son inválidos.
+    """
+    fecha = request.GET.get('fecha')
+    personas_raw = request.GET.get('personas', '2')
+
+    if not fecha:
+        return Response(
+            {'error': 'fecha es obligatoria (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        personas = int(personas_raw)
+    except (TypeError, ValueError):
+        return Response(
+            {'error': 'personas debe ser un número entero'}, status=status.HTTP_400_BAD_REQUEST)
+    if personas < 1:
+        return Response(
+            {'error': 'personas debe ser >= 1'}, status=status.HTTP_400_BAD_REQUEST)
+
+    from whatsapp_agent import packs
+    from whatsapp_agent.grounding import formatear_precio
+
+    try:
+        resultado = packs.disponibilidad_pack_tina_masaje(fecha, personas=personas, todas=True)
+    except Exception as e:  # noqa: BLE001 — no romper el endpoint por un error inesperado
+        logger.error(f'[Luna API] Error en pausa_alternativas: {str(e)}', exc_info=True)
+        return Response({'error': f'error interno: {str(e)[:200]}'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    if resultado.get('error'):
+        return Response({'error': resultado['error']}, status=status.HTTP_400_BAD_REQUEST)
+
+    alternativas = []
+    for alt in resultado.get('alternativas', []):
+        tina, masaje = alt['tina'], alt['masaje']
+        if alt['hay_descuento']:
+            precio_txt = (
+                f"por un total de {formatear_precio(alt['precio_con_descuento'])} "
+                f"(con descuento de pack; precio normal {formatear_precio(alt['precio_total'])})"
+            )
+        else:
+            precio_txt = f"por un total de {formatear_precio(alt['precio_total'])}"
+        texto_sugerido = (
+            f"{tina['nombre']} a las {tina['hora']} hrs y "
+            f"{masaje['nombre']} a las {masaje['hora']} hrs, {precio_txt}."
+        )
+        alternativas.append({
+            'etiqueta': alt['etiqueta'],
+            'tina': tina['nombre'],
+            'hora_tina': tina['hora'],
+            'hora_masaje': masaje['hora'],
+            'precio_total': alt['precio_total'],
+            'precio_con_descuento': alt['precio_con_descuento'],
+            'hay_descuento': alt['hay_descuento'],
+            'texto_sugerido': texto_sugerido,
+        })
+
+    return Response({
+        'fecha': resultado['fecha'],
+        'personas': resultado['personas'],
+        'alternativas': alternativas,
+    })
+
+
+# ============================================================================
 # HEALTH CHECK
 # ============================================================================
 

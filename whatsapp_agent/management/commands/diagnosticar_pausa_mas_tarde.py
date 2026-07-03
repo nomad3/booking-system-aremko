@@ -57,6 +57,20 @@ class Command(BaseCommand):
         self.stdout.write(f"  nota: {resultado.get('nota')!r}")
         self.stdout.write(f"  nota_upsell: {resultado.get('nota_upsell')!r}")
 
+        self.stdout.write(
+            f'\n=== disponibilidad_pack_tina_masaje(fecha={fecha_str}, personas={personas}, todas=True) ==='
+        )
+        resultado_todas = packs.disponibilidad_pack_tina_masaje(fecha_str, personas=personas, todas=True)
+        alternativas = resultado_todas.get('alternativas', [])
+        if not alternativas:
+            self.stdout.write('  (ninguna)')
+        for alt in alternativas:
+            self.stdout.write(
+                f"  [{alt['etiqueta']}] tina={alt['tina']['nombre']} {alt['tina']['hora']} | "
+                f"masaje={alt['masaje']['nombre']} {alt['masaje']['hora']} | "
+                f"total=${alt['precio_total']:,} | con_descuento=${alt['precio_con_descuento']:,}"
+            )
+
         # Buscar A MANO todos los combos posibles (tina, masaje) que respeten el buffer
         # de 45 min y no se solapen, para ver si hay alguno MÁS TARDE que lo que devolvió
         # la función real — sin el atajo de "la primera tina que encaje".
@@ -85,3 +99,25 @@ class Command(BaseCommand):
             self.stdout.write(f"  tina {tn} {th}  +  masaje {mn} {mh}  (gap={gap}min)")
         if not combos:
             self.stdout.write('  (ninguno)')
+
+        self.stdout.write(
+            f'\n=== Chequeo: todas={len(alternativas)} vs a-mano={len(combos)} '
+            f"-> {'COINCIDEN' if len(alternativas) == len(combos) else 'NO COINCIDEN — revisar'} ==="
+        )
+
+        self.stdout.write(
+            f'\n=== disponibilidad_pack_tina_masaje(fecha={fecha_str}, personas={personas}, mas_tarde=True) ==='
+        )
+        resultado_mas_tarde = packs.disponibilidad_pack_tina_masaje(
+            fecha_str, personas=personas, mas_tarde=True)
+        for op in resultado_mas_tarde.get('opciones', []):
+            self.stdout.write(
+                f"  [{op['etiqueta']}] tina={op['tina']['nombre']} {op['tina']['hora']} | "
+                f"masaje={op['masaje']['nombre']} {op['masaje']['hora']} | "
+                f"total=${op['precio_total']:,} | con_descuento=${op['precio_con_descuento']:,}"
+            )
+        self.stdout.write(
+            '  (comparar contra el bloque "TODOS los combos válidos" de arriba: cada línea '
+            'debe ser la ÚLTIMA hora de tina de su grupo — la más tardía, no la misma que '
+            'salió en el bloque "Resultado de disponibilidad_pack_tina_masaje" sin mas_tarde)'
+        )

@@ -126,13 +126,19 @@ _TOOLS = [{
             'la tina y el masaje YA compuestos (sin solaparse; el masaje queda cerca de los '
             'masajes ya reservados ese día) y con precio real y precio con descuento de pack '
             '(`hay_descuento`/`precio_con_descuento`). Ofrece las opciones tal cual. Requiere '
-            'fecha y personas.'
+            'fecha y personas. '
+            'Si el cliente YA recibió opciones para esa fecha y pregunta "¿más tarde?" / "¿algo '
+            'después?" / "¿no hay otro horario?", vuelve a llamar esta misma tool con '
+            'mas_tarde=true en vez de repetir la respuesta anterior o decir que no hay más — '
+            'trae la alternativa MÁS TARDE siguiente si existe (nunca inventes ni asumas que no '
+            'hay; deja que la tool te lo confirme).'
         ),
         'parameters': {
             'type': 'object',
             'properties': {
                 'fecha': {'type': 'string', 'description': 'PASÁ EL TEXTO LITERAL del cliente ("próximo lunes", "el sábado", "25 de junio"); NO calcules el día ni lo conviertas a YYYY-MM-DD, la herramienta lo resuelve.'},
                 'personas': {'type': 'integer', 'description': 'Cantidad de personas'},
+                'mas_tarde': {'type': 'boolean', 'description': 'true SOLO si el cliente ya vio opciones para esta fecha y pidió algo más tarde. Trae la siguiente alternativa cronológica (no la primera). Default false.'},
             },
             'required': ['fecha', 'personas'],
         },
@@ -803,6 +809,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 return disponibilidad_pack_tina_masaje(
                     (args or {}).get('fecha'),
                     (args or {}).get('personas', 2),
+                    mas_tarde=bool((args or {}).get('mas_tarde', False)),
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool pack falló: %s', exc)

@@ -156,17 +156,21 @@ def _gap_min(tina_ini, tina_dur, masaje_ini, masaje_dur):
     return max(masaje_ini - (tina_ini + tina_dur), tina_ini - (masaje_ini + masaje_dur))
 
 
-def _componer_opcion(tinas_grupo, etiqueta, f, personas, agendados, masaje_por_id,
-                     union_slots, masaje_generico, buffer_max=None):
-    """Compone UNA opción (tina + masaje) para un grupo de tinas (con o sin hidromasaje).
+def _candidatos_opcion(tinas_grupo, etiqueta, f, personas, agendados, masaje_por_id,
+                       union_slots, masaje_generico, buffer_max=None):
+    """Junta TODOS los candidatos válidos (tina+horario + masaje+horario) de un grupo de
+    tinas (con o sin hidromasaje) — a diferencia de la versión anterior, NO se queda con el
+    primero que encaje (H-058: eso hacía que "más tarde" nunca encontrara alternativas
+    tardías que sí existían). Ordenados por hora de tina ascendente (más temprano primero).
 
     Para cada tina del grupo busca el masaje de SU pack (para que aplique el descuento) y, si
     ese masaje tiene cupo, encaja un slot compatible (clustering, sin solapar). Si la tina no
     tiene pack o su masaje no tiene cupo, cae al masaje genérico disponible (sin descuento).
     `buffer_max` (min) acota la espera entre tina y masaje (cliente de ciudad); None = sin tope.
-    Devuelve el dict de la opción, o None si ninguna tina del grupo encaja.
+    Devuelve una lista de dicts (posiblemente vacía).
     """
     agendados_set = set(agendados)
+    candidatos = []
     for t in tinas_grupo:
         t_dur = t.get('duracion_min') or 0
         if not t.get('slots_libres'):
@@ -208,7 +212,7 @@ def _componer_opcion(tinas_grupo, etiqueta, f, personas, agendados, masaje_por_i
             descuento = _descuento_pack(t, masaje_id, masaje_nombre, masaje_pp,
                                         f, t_slot, masaje_hora, personas)
             precio_con_descuento = max(0, precio_total - descuento)
-            return {
+            candidatos.append((t_ini, {
                 'etiqueta': etiqueta,
                 'tina': {
                     'nombre': t['nombre'], 'hora': t_slot,
@@ -226,11 +230,27 @@ def _componer_opcion(tinas_grupo, etiqueta, f, personas, agendados, masaje_por_i
                 'descuento_pack': descuento,                  # 0 si no aplica
                 'precio_con_descuento': precio_con_descuento,  # lo que paga si aplica el pack
                 'hay_descuento': descuento > 0,
-            }
-    return None
+            }))
+
+    candidatos.sort(key=lambda c: c[0])  # hora de tina ascendente (más temprano primero)
+    return [c[1] for c in candidatos]
 
 
-def disponibilidad_pack_tina_masaje(fecha, personas=2, buffer_max=BUFFER_CIUDAD_MAX):
+def _componer_opcion(tinas_grupo, etiqueta, f, personas, agendados, masaje_por_id,
+                     union_slots, masaje_generico, buffer_max=None):
+    """Compone la opción MÁS TEMPRANA (tina + masaje) para un grupo de tinas (con o sin
+    hidromasaje) — comportamiento histórico, sin cambios para quien ya la usa. Para ver TODAS
+    las alternativas (ej. "más tarde") usar `_candidatos_opcion` directamente.
+    Devuelve el dict de la opción, o None si ninguna tina del grupo encaja.
+    """
+    candidatos = _candidatos_opcion(tinas_grupo, etiqueta, f, personas, agendados,
+                                    masaje_por_id, union_slots, masaje_generico,
+                                    buffer_max=buffer_max)
+    return candidatos[0] if candidatos else None
+
+
+def disponibilidad_pack_tina_masaje(fecha, personas=2, buffer_max=BUFFER_CIUDAD_MAX,
+                                    todas=False, mas_tarde=False):
     """Propone itinerarios Tina + Masaje para `fecha` y `personas`.
 
     Devuelve DOS alternativas para que el cliente elija sin una pregunta extra (Jorge):
@@ -240,6 +260,15 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2, buffer_max=BUFFER_CIUDAD_
 
     Es el caso CIUDAD (sin alojamiento): `buffer_max` (min) acota la espera entre tina y
     masaje para no dejar al cliente esperando en el lugar; los huéspedes van por el Ritual.
+
+    Si `todas=True` (H-058), además de `opciones` agrega `alternativas`: TODAS las
+    combinaciones tina+masaje válidas ese día (ambos grupos mezclados), ordenadas de más
+    temprano a más tardío — para navegar horarios uno por uno (botón "buscar más tarde").
+
+    Si `mas_tarde=True` (H-058), `opciones` trae la alternativa MÁS TARDE de cada grupo (la
+    última cronológicamente) en vez de la más temprana — para cuando el cliente ya vio una
+    cotización y pregunta "¿y más tarde?". Si solo existe 1 alternativa por grupo, devuelve
+    esa misma (es la única, no hay engaño posible: el llamador debe avisar que no hay otra).
     """
     from .availability import disponibilidad, _parse_fecha
 
@@ -274,15 +303,20 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2, buffer_max=BUFFER_CIUDAD_
     agendados = [x for x in agendados if x is not None]
 
     # 4) Dos opciones: con hidromasaje (mayor valor) y sin hidromasaje (más económica).
+    # Se calcula UNA sola vez por grupo (_candidatos_opcion) y de ahí se derivan tanto
+    # `opciones` (la más temprana, comportamiento histórico) como `alternativas` si `todas`.
     con = [t for t in tinas if _es_hidromasaje(t['nombre'])]
     sin = [t for t in tinas if not _es_hidromasaje(t['nombre'])]
     opciones = []
+    alternativas_todas = []
     for grupo, etiqueta in ((con, 'con hidromasaje'), (sin, 'sin hidromasaje')):
-        op = _componer_opcion(grupo, etiqueta, f, personas, agendados,
-                              masaje_por_id, union_slots, masaje_generico,
-                              buffer_max=buffer_max)
-        if op:
-            opciones.append(op)
+        candidatos = _candidatos_opcion(grupo, etiqueta, f, personas, agendados,
+                                        masaje_por_id, union_slots, masaje_generico,
+                                        buffer_max=buffer_max)
+        if candidatos:
+            opciones.append(candidatos[-1] if mas_tarde else candidatos[0])
+        if todas:
+            alternativas_todas.extend(candidatos)
 
     nota = ''
     if not opciones:
@@ -303,9 +337,13 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2, buffer_max=BUFFER_CIUDAD_
         nota_upsell = ('Este día queda a precio normal; el descuento de pack aplica de '
                        'domingo a jueves. Ofrece cotizar un día entre semana para que vea el ahorro.')
 
-    return {'fecha': f.isoformat(), 'personas': personas, 'opciones': opciones,
-            'nombre_experiencia': 'Pausa junto al río',  # el pack tina+masaje tiene nombre propio
-            'nota': nota, 'nota_upsell': nota_upsell}
+    resultado = {'fecha': f.isoformat(), 'personas': personas, 'opciones': opciones,
+                'nombre_experiencia': 'Pausa junto al río',  # el pack tina+masaje tiene nombre propio
+                'nota': nota, 'nota_upsell': nota_upsell}
+    if todas:
+        alternativas_todas.sort(key=lambda o: hhmm_a_min(o['tina']['hora']))
+        resultado['alternativas'] = alternativas_todas
+    return resultado
 
 
 # ---------------------------------------------------------------------------

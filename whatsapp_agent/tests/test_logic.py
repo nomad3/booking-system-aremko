@@ -300,6 +300,81 @@ def test_pack_horarios():
     assert packs.no_solapan(870, 240, 1140, 60) is True
 
 
+def test_candidatos_opcion_encuentra_todas_las_alternativas():
+    """Regresión H-058: antes, `_componer_opcion` devolvía la PRIMERA tina+masaje que
+    encajaba y nunca seguía buscando — Luna le dijo a un cliente real que 2 opciones eran
+    "las últimas disponibles" cuando en realidad había 6 (caso real: domingo 2026-07-05,
+    verificado a mano contra datos de producción con `diagnosticar_pausa_mas_tarde`).
+
+    Reproduce ese caso con datos sintéticos: 1 tina (2h) con 3 horarios libres + 1 masaje
+    (1h) con 3 horarios libres, buffer 45min → deben salir las 3 combinaciones por tina, no
+    solo la primera, en orden cronológico y con el masaje correcto para cada una.
+    """
+    tina_llaima = {
+        'servicio_id': 1, 'nombre': 'Tina Hidromasaje Llaima',
+        'duracion_min': 120, 'duracion_texto': '2 h',
+        'precio_total': 100000, 'precio_por_persona': 50000,
+        'slots_libres': ['11:30', '14:00', '16:30'],
+    }
+    tina_hornopiren = {
+        'servicio_id': 2, 'nombre': 'Tina Hornopiren',
+        'duracion_min': 120, 'duracion_texto': '2 h',
+        'precio_total': 90000, 'precio_por_persona': 45000,
+        'slots_libres': ['12:00', '14:30', '17:00'],
+    }
+    masaje_generico = {
+        'servicio_id': 99, 'nombre': 'Masaje Relajación o Descontracturante',
+        'duracion_min': 60, 'precio_por_persona': 20000,
+        'slots_libres': ['14:15', '16:45', '19:15'],
+    }
+    union_slots = sorted({packs.hhmm_a_min(s) for s in masaje_generico['slots_libres']})
+    f = datetime(2026, 7, 5).date()
+
+    # _pack_masaje_de_tina/_descuento_pack tocan BD (PackDescuento) — se mockean para que el
+    # test sea puro, igual que el resto de esta suite (sin DB).
+    with patch('whatsapp_agent.packs._pack_masaje_de_tina', return_value=None), \
+         patch('whatsapp_agent.packs._descuento_pack', return_value=0):
+        candidatos_con = packs._candidatos_opcion(
+            [tina_llaima], 'con hidromasaje', f, 2, [], {}, union_slots, masaje_generico,
+            buffer_max=45,
+        )
+        candidatos_sin = packs._candidatos_opcion(
+            [tina_hornopiren], 'sin hidromasaje', f, 2, [], {}, union_slots, masaje_generico,
+            buffer_max=45,
+        )
+        mejor_con = packs._componer_opcion(
+            [tina_llaima], 'con hidromasaje', f, 2, [], {}, union_slots, masaje_generico,
+            buffer_max=45,
+        )
+
+    # El bug: antes solo salía 1 combinación por grupo. Ahora deben salir las 3.
+    assert len(candidatos_con) == 3, candidatos_con
+    assert len(candidatos_sin) == 3, candidatos_sin
+
+    # Orden cronológico (más temprano primero) por hora de tina — no alfabético ni azar.
+    assert [c['tina']['hora'] for c in candidatos_con] == ['11:30', '14:00', '16:30']
+    assert [c['tina']['hora'] for c in candidatos_sin] == ['12:00', '14:30', '17:00']
+
+    # Cada horario de tina empareja con el masaje que de verdad calza sin solape y dentro
+    # del buffer (verificado a mano contra el caso real).
+    assert [c['masaje']['hora'] for c in candidatos_con] == ['14:15', '16:45', '19:15']
+    assert [c['masaje']['hora'] for c in candidatos_sin] == ['14:15', '16:45', '19:15']
+
+    # _componer_opcion (comportamiento histórico, lo que ya usan las llamadas existentes)
+    # sigue devolviendo SOLO la más temprana — no cambia para quien no pide "todas".
+    assert mejor_con['tina']['hora'] == '11:30'
+    assert mejor_con == candidatos_con[0]
+
+    # mas_tarde=True (H-058, Parte C): disponibilidad_pack_tina_masaje elige candidatos[-1]
+    # en vez de candidatos[0] — la MÁS TARDE de cada grupo, para responder bien "¿más tarde?".
+    # Se verifica acá contra la lista ya probada arriba (misma fuente de verdad); el wiring
+    # completo de disponibilidad_pack_tina_masaje se valida en prod con datos reales (Task #25).
+    assert candidatos_con[-1]['tina']['hora'] == '16:30'
+    assert candidatos_con[-1]['masaje']['hora'] == '19:15'
+    assert candidatos_sin[-1]['tina']['hora'] == '17:00'
+    assert candidatos_sin[-1]['masaje']['hora'] == '19:15'
+
+
 def test_ficha_experiencia():
     f = packs.ficha_experiencia('ritual')
     assert f['nombre'] == 'Ritual del Río'
