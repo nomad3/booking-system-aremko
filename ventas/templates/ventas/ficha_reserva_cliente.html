@@ -68,6 +68,15 @@
     .btn-outline{background:var(--surface);color:var(--brand);border:1.5px solid var(--brand)}
     .pago-texto{white-space:pre-wrap;font-size:13.5px;color:var(--ink);margin:0 0 12px;background:var(--bg);
       border-radius:10px;padding:12px}
+    .pago-campo{margin-bottom:10px}
+    .pago-campo:last-child{margin-bottom:0}
+    .pago-campo-label{font-size:12px;color:var(--hint);margin-bottom:3px}
+    .pago-campo-fila{display:flex;align-items:center;justify-content:space-between;gap:10px;
+      background:var(--bg);border-radius:10px;padding:10px 12px}
+    .pago-campo-valor{font-size:14px;color:var(--ink);word-break:break-word}
+    .btn-copy{flex-shrink:0;background:var(--surface);border:1px solid var(--line2);border-radius:8px;
+      min-width:36px;height:36px;font-size:15px;cursor:pointer;display:flex;align-items:center;
+      justify-content:center;padding:0 10px}
     .com-note{font-size:12px;color:var(--hint);text-align:center;margin-top:8px}
     .com-lock{background:var(--bg);border:0.5px dashed var(--line2);border-radius:10px;
       padding:14px;text-align:center;color:var(--muted);font-size:13.5px}
@@ -135,9 +144,35 @@
             <span class="chev">▾</span>
           </summary>
           <div class="acc-bd">
-            {% if datos_transferencia %}
-              <p class="pago-texto" id="datos-transferencia-texto">{{ datos_transferencia }}</p>
-              <button type="button" class="btn btn-outline" id="btn-copiar-pago" onclick="copiarDatosTransferencia()">📋 Copiar datos</button>
+            {% if pago_nombre or pago_cuenta or pago_correo %}
+              {% if datos_transferencia %}<p class="pago-texto">{{ datos_transferencia }}</p>{% endif %}
+              {% if pago_nombre %}
+                <div class="pago-campo">
+                  <div class="pago-campo-label">Nombre</div>
+                  <div class="pago-campo-fila">
+                    <span class="pago-campo-valor">{{ pago_nombre }}</span>
+                    <button type="button" class="btn-copy" onclick="copiarLink('{{ pago_nombre }}', this)">📋</button>
+                  </div>
+                </div>
+              {% endif %}
+              {% if pago_cuenta %}
+                <div class="pago-campo">
+                  <div class="pago-campo-label">Número de cuenta</div>
+                  <div class="pago-campo-fila">
+                    <span class="pago-campo-valor">{{ pago_cuenta }}</span>
+                    <button type="button" class="btn-copy" onclick="copiarLink('{{ pago_cuenta }}', this)">📋</button>
+                  </div>
+                </div>
+              {% endif %}
+              {% if pago_correo %}
+                <div class="pago-campo">
+                  <div class="pago-campo-label">Correo</div>
+                  <div class="pago-campo-fila">
+                    <span class="pago-campo-valor">{{ pago_correo }}</span>
+                    <button type="button" class="btn-copy" onclick="copiarLink('{{ pago_correo }}', this)">📋</button>
+                  </div>
+                </div>
+              {% endif %}
             {% else %}
               <p class="pago-texto">Escríbenos a ventas@aremko.cl y te enviamos los datos para transferir.</p>
             {% endif %}
@@ -234,30 +269,6 @@
         try{
           var ta = document.createElement('textarea');
           ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
-          document.body.appendChild(ta); ta.focus(); ta.select();
-          document.execCommand('copy');
-          document.body.removeChild(ta);
-          marcar(true);
-        } catch(e){ marcar(false); }
-      }
-    }
-
-    function copiarDatosTransferencia(){
-      var el = document.getElementById('datos-transferencia-texto');
-      var btn = document.getElementById('btn-copiar-pago');
-      if(!el || !btn) return;
-      var texto = el.innerText;
-      var original = btn.textContent;
-      function marcar(ok){
-        btn.textContent = ok ? '✅ ¡Copiado!' : 'No se pudo copiar, selecciona el texto';
-        setTimeout(function(){ btn.textContent = original; }, 1800);
-      }
-      if(navigator.clipboard && navigator.clipboard.writeText){
-        navigator.clipboard.writeText(texto).then(function(){ marcar(true); }, function(){ marcar(false); });
-      } else {
-        try{
-          var ta = document.createElement('textarea');
-          ta.value = texto; ta.style.position = 'fixed'; ta.style.opacity = '0';
           document.body.appendChild(ta); ta.focus(); ta.select();
           document.execCommand('copy');
           document.body.removeChild(ta);

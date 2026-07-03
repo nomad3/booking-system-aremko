@@ -4418,6 +4418,31 @@ La reserva se considerará confirmada únicamente una vez recibido el comprobant
         help_text="Información completa para pago por transferencia bancaria"
     )
 
+    # 3 campos SEPARADOS (además del texto de arriba) para los botones "copiar uno a
+    # uno" de la Ficha de Reserva: al agregar un destinatario nuevo en el banco o
+    # Mercado Pago, esos 3 datos se pegan por separado en campos distintos, no como
+    # un bloque de texto. Si cambia la cuenta, edítalos junto con datos_transferencia.
+    nombre_beneficiario = models.CharField(
+        max_length=200,
+        default="Aremko Hotel Spa Rut 76.485.192-7",
+        verbose_name="Nombre del beneficiario (para copiar)",
+        help_text="Se copia solo, tal cual, al botón 'Copiar nombre' de la Ficha de Reserva.",
+        blank=True,
+    )
+    numero_cuenta_transferencia = models.CharField(
+        max_length=200,
+        default="Mercado Pago Cta Vista 1016006859",
+        verbose_name="Número de cuenta (para copiar)",
+        help_text="Se copia solo, tal cual, al botón 'Copiar cuenta' de la Ficha de Reserva.",
+        blank=True,
+    )
+    correo_confirmacion_pago = models.EmailField(
+        default="ventas@aremko.cl",
+        verbose_name="Correo para confirmar transferencia (para copiar)",
+        help_text="Se copia solo, tal cual, al botón 'Copiar correo' de la Ficha de Reserva.",
+        blank=True,
+    )
+
     link_pago_mercadopago = models.URLField(
         default="https://link.mercadopago.cl/aremko",
         verbose_name="Link Mercado Pago",

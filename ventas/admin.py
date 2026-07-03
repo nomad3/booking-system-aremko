@@ -3359,7 +3359,11 @@ class ConfiguracionResumenAdmin(SingletonModelAdmin):
             'fields': ('encabezado',)
         }),
         ('Información de Pago', {
-            'fields': ('datos_transferencia', 'link_pago_mercadopago', 'texto_link_pago')
+            'fields': ('datos_transferencia', 'nombre_beneficiario', 'numero_cuenta_transferencia',
+                       'correo_confirmacion_pago', 'link_pago_mercadopago', 'texto_link_pago'),
+            'description': 'Los 3 campos "para copiar" alimentan los botones de copiar por separado '
+                           'en la Ficha de Reserva del cliente — deben coincidir con lo que dice '
+                           '"Datos de Transferencia" arriba si cambia la cuenta.'
         }),
         ('Cortesías y Garantías', {
             'fields': ('tina_yate_texto', 'sauna_no_disponible')

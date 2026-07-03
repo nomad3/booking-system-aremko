@@ -149,10 +149,14 @@ def ficha_reserva_cliente(request, token):
         tips_texto = ''
 
     try:
-        datos_transferencia = ConfiguracionResumen.get_solo().datos_transferencia
+        config_pago = ConfiguracionResumen.get_solo()
+        datos_transferencia = config_pago.datos_transferencia
+        pago_nombre = config_pago.nombre_beneficiario
+        pago_cuenta = config_pago.numero_cuenta_transferencia
+        pago_correo = config_pago.correo_confirmacion_pago
     except Exception:  # noqa: BLE001 — los datos de pago no deben tumbar la ficha
         logger.exception('[ficha] no se pudo obtener datos_transferencia (reserva %s)', venta.id)
-        datos_transferencia = ''
+        datos_transferencia = pago_nombre = pago_cuenta = pago_correo = ''
 
     tipos_venta = list(
         venta.reservaservicios.select_related('servicio')
@@ -178,6 +182,9 @@ def ficha_reserva_cliente(request, token):
         'saldo_str': _clp(venta.saldo_pendiente),
         'tips_texto': tips_texto,
         'datos_transferencia': datos_transferencia,
+        'pago_nombre': pago_nombre,
+        'pago_cuenta': pago_cuenta,
+        'pago_correo': pago_correo,
         'maps_url': config_tips.link_google_maps,
         'participantes_masaje': participantes_masaje,
         'comanda_bloqueada': venta.estado_reserva == 'checkout',
