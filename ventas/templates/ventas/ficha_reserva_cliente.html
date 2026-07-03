@@ -49,6 +49,7 @@
     .i-tip{background:var(--pen-bg);color:var(--pen-fg)}
     .i-com{background:var(--pag-bg);color:var(--pag-fg)}
     .i-pay{background:var(--pen-bg);color:var(--pen-fg)}
+    .i-wellness{background:var(--par-bg);color:var(--par-fg)}
     .s-tt{font-size:15px;font-weight:600}
     .s-sub{font-size:12px;color:var(--hint)}
     .chev{margin-left:auto;color:var(--hint);transition:transform .2s}
@@ -144,6 +145,31 @@
         </details>
         {% endif %}
 
+        {% if not es_cotizacion and participantes_masaje %}
+        <details>
+          <summary>
+            <span class="ic i-wellness">💆</span>
+            <span><span class="s-tt">Ficha de masaje</span><br><span class="s-sub">Cuéntanos tus preferencias antes de tu masaje</span></span>
+            <span class="chev">▾</span>
+          </summary>
+          <div class="acc-bd">
+            {% for p in participantes_masaje %}
+              <div style="{% if not forloop.first %}border-top:0.5px solid var(--line);padding-top:12px;margin-top:12px{% endif %}">
+                <div class="s-sub" style="margin-bottom:8px">
+                  {% if p.es_titular %}Tu ficha{% else %}Ficha de {{ p.nombre }}{% endif %}{% if p.completada %} · ✓ completada{% endif %}
+                </div>
+                <a class="btn{% if p.completada %} btn-outline{% endif %}" href="{{ p.url }}" target="_blank" rel="noopener">
+                  {% if p.completada %}Ver ficha{% elif p.es_titular %}Completar mi ficha{% else %}Completar su ficha{% endif %}
+                </a>
+                {% if not p.es_titular %}
+                  <button type="button" class="btn btn-outline" style="margin-top:8px" onclick="copiarLink('{{ p.url }}', this)">📋 Copiar link para enviarle</button>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </details>
+        {% endif %}
+
         {% if es_cotizacion %}
           <form method="post" action="{{ aprobar_url }}" style="margin-top:14px"
                 onsubmit="if(this.dataset.sent){return false;} this.dataset.sent='1';
@@ -195,6 +221,27 @@
     <div class="foot">Aremko Spa · Puerto Varas</div>
   </div>
   <script>
+    function copiarLink(url, btn){
+      if(!btn) return;
+      var original = btn.textContent;
+      function marcar(ok){
+        btn.textContent = ok ? '✅ ¡Copiado!' : 'No se pudo copiar';
+        setTimeout(function(){ btn.textContent = original; }, 1800);
+      }
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(url).then(function(){ marcar(true); }, function(){ marcar(false); });
+      } else {
+        try{
+          var ta = document.createElement('textarea');
+          ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.focus(); ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          marcar(true);
+        } catch(e){ marcar(false); }
+      }
+    }
+
     function copiarDatosTransferencia(){
       var el = document.getElementById('datos-transferencia-texto');
       var btn = document.getElementById('btn-copiar-pago');

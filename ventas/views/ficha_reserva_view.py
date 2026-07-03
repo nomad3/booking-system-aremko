@@ -53,6 +53,38 @@ def url_ficha_reserva(venta_id):
     return f"{base}{reverse('ventas:ficha_reserva_cliente', kwargs={'token': token_para_reserva(venta_id)})}"
 
 
+def _url_masaje_ficha(token_formulario):
+    """URL pública completa de la ficha de bienestar de UN participante de masaje
+    (mismo patrón que url_ficha_reserva; la vista 'masaje_ficha' ya existe —
+    Conexión-Masajes, whatsapp_agent no la toca)."""
+    from django.urls import reverse
+    from django.conf import settings
+    base = getattr(settings, 'COMANDA_PUBLIC_BASE_URL', 'https://www.aremko.cl')
+    return f"{base}{reverse('masaje_ficha', kwargs={'token': token_formulario})}"
+
+
+def _participantes_masaje_ficha(venta, tipos_venta):
+    """Participantes de masaje de la reserva (comprador primero, luego acompañantes),
+    con la URL de SU ficha de bienestar y si ya la completaron — para los botones
+    de la Ficha de Reserva. Lista vacía si la reserva no tiene masaje."""
+    if 'masaje' not in tipos_venta:
+        return []
+    participantes = sorted(
+        venta.participantes_masaje.all(),
+        key=lambda p: (0 if p.tipo_participante == 'comprador' else 1, p.id),
+    )
+    resultado = []
+    for p in participantes:
+        es_titular = p.tipo_participante == 'comprador'
+        resultado.append({
+            'es_titular': es_titular,
+            'nombre': p.nombre or ('Titular' if es_titular else 'Tu acompañante'),
+            'completada': bool(p.ficha_bienestar_id),
+            'url': _url_masaje_ficha(p.token_formulario),
+        })
+    return resultado
+
+
 def _venta_desde_token(token):
     """VentaReserva desde el token firmado, o Http404 si el token es inválido."""
     try:
@@ -125,6 +157,13 @@ def ficha_reserva_cliente(request, token):
     tipos_venta = list(
         venta.reservaservicios.select_related('servicio')
         .values_list('servicio__tipo_servicio', flat=True))
+
+    try:
+        participantes_masaje = _participantes_masaje_ficha(venta, tipos_venta)
+    except Exception:  # noqa: BLE001 — las fichas de masaje no deben tumbar la ficha
+        logger.exception('[ficha] no se pudieron obtener participantes de masaje (reserva %s)', venta.id)
+        participantes_masaje = []
+
     context = {
         'venta': venta,
         'numero': venta.id,
@@ -140,6 +179,7 @@ def ficha_reserva_cliente(request, token):
         'tips_texto': tips_texto,
         'datos_transferencia': datos_transferencia,
         'maps_url': config_tips.link_google_maps,
+        'participantes_masaje': participantes_masaje,
         'comanda_bloqueada': venta.estado_reserva == 'checkout',
         # endpoint que refresca el token de comanda al vuelo y redirige al menú del cliente
         'comanda_url': reverse('ventas:ficha_reserva_comanda', kwargs={'token': token}),
