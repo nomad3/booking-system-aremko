@@ -48,6 +48,7 @@
     .i-srv{background:var(--par-bg);color:var(--par-fg)}
     .i-tip{background:var(--pen-bg);color:var(--pen-fg)}
     .i-com{background:var(--pag-bg);color:var(--pag-fg)}
+    .i-pay{background:var(--pen-bg);color:var(--pen-fg)}
     .s-tt{font-size:15px;font-weight:600}
     .s-sub{font-size:12px;color:var(--hint)}
     .chev{margin-left:auto;color:var(--hint);transition:transform .2s}
@@ -63,6 +64,9 @@
     .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
       text-decoration:none;font-size:15px;font-weight:600;padding:14px;border-radius:10px;
       background:var(--brand);color:#fff;border:none;cursor:pointer}
+    .btn-outline{background:var(--surface);color:var(--brand);border:1.5px solid var(--brand)}
+    .pago-texto{white-space:pre-wrap;font-size:13.5px;color:var(--ink);margin:0 0 12px;background:var(--bg);
+      border-radius:10px;padding:12px}
     .com-note{font-size:12px;color:var(--hint);text-align:center;margin-top:8px}
     .com-lock{background:var(--bg);border:0.5px dashed var(--line2);border-radius:10px;
       padding:14px;text-align:center;color:var(--muted);font-size:13.5px}
@@ -122,6 +126,24 @@
           </div>
         </details>
 
+        {% if not es_cotizacion and saldo > 0 %}
+        <details>
+          <summary>
+            <span class="ic i-pay">🏦</span>
+            <span><span class="s-tt">Datos para transferir</span><br><span class="s-sub">Copia los datos y paga tu saldo</span></span>
+            <span class="chev">▾</span>
+          </summary>
+          <div class="acc-bd">
+            {% if datos_transferencia %}
+              <p class="pago-texto" id="datos-transferencia-texto">{{ datos_transferencia }}</p>
+              <button type="button" class="btn btn-outline" id="btn-copiar-pago" onclick="copiarDatosTransferencia()">📋 Copiar datos</button>
+            {% else %}
+              <p class="pago-texto">Escríbenos a ventas@aremko.cl y te enviamos los datos para transferir.</p>
+            {% endif %}
+          </div>
+        </details>
+        {% endif %}
+
         {% if es_cotizacion %}
           <form method="post" action="{{ aprobar_url }}" style="margin-top:14px"
                 onsubmit="if(this.dataset.sent){return false;} this.dataset.sent='1';
@@ -162,11 +184,40 @@
             {% endif %}
           </div>
         </details>
+
+        {% if maps_url %}
+          <a class="btn btn-outline" href="{{ maps_url }}" target="_blank" rel="noopener" style="margin-top:12px">📍 Ver ubicación en Google Maps</a>
+        {% endif %}
         {% endif %}
 
       </div>
     </div>
     <div class="foot">Aremko Spa · Puerto Varas</div>
   </div>
+  <script>
+    function copiarDatosTransferencia(){
+      var el = document.getElementById('datos-transferencia-texto');
+      var btn = document.getElementById('btn-copiar-pago');
+      if(!el || !btn) return;
+      var texto = el.innerText;
+      var original = btn.textContent;
+      function marcar(ok){
+        btn.textContent = ok ? '✅ ¡Copiado!' : 'No se pudo copiar, selecciona el texto';
+        setTimeout(function(){ btn.textContent = original; }, 1800);
+      }
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(texto).then(function(){ marcar(true); }, function(){ marcar(false); });
+      } else {
+        try{
+          var ta = document.createElement('textarea');
+          ta.value = texto; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.focus(); ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          marcar(true);
+        } catch(e){ marcar(false); }
+      }
+    }
+  </script>
 </body>
 </html>

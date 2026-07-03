@@ -17,7 +17,7 @@ from django.core import signing
 from django.http import Http404
 from django.shortcuts import render, redirect
 
-from ..models import VentaReserva, ConfiguracionTips
+from ..models import VentaReserva, ConfiguracionTips, ConfiguracionResumen
 from .tips_reserva_view import _generar_texto_tips
 
 logger = logging.getLogger(__name__)
@@ -109,11 +109,18 @@ def ficha_reserva_cliente(request, token):
     estado_label, estado_cls = ESTADO_PAGO_FICHA.get(
         venta.estado_pago, ('Pendiente de pago', 'pen'))
 
+    config_tips = ConfiguracionTips.get_solo()
     try:
-        tips_texto = _generar_texto_tips(venta, ConfiguracionTips.get_solo())
+        tips_texto = _generar_texto_tips(venta, config_tips)
     except Exception:  # noqa: BLE001 — los tips no deben tumbar la ficha
         logger.exception('[ficha] no se pudieron generar los tips de la reserva %s', venta.id)
         tips_texto = ''
+
+    try:
+        datos_transferencia = ConfiguracionResumen.get_solo().datos_transferencia
+    except Exception:  # noqa: BLE001 — los datos de pago no deben tumbar la ficha
+        logger.exception('[ficha] no se pudo obtener datos_transferencia (reserva %s)', venta.id)
+        datos_transferencia = ''
 
     tipos_venta = list(
         venta.reservaservicios.select_related('servicio')
@@ -131,6 +138,8 @@ def ficha_reserva_cliente(request, token):
         'saldo': int(venta.saldo_pendiente or 0),
         'saldo_str': _clp(venta.saldo_pendiente),
         'tips_texto': tips_texto,
+        'datos_transferencia': datos_transferencia,
+        'maps_url': config_tips.link_google_maps,
         'comanda_bloqueada': venta.estado_reserva == 'checkout',
         # endpoint que refresca el token de comanda al vuelo y redirige al menú del cliente
         'comanda_url': reverse('ventas:ficha_reserva_comanda', kwargs={'token': token}),
