@@ -1,0 +1,426 @@
+{% extends "ventas/base_public.html" %}
+{% load static %}
+
+{# Landing de Masajes — "Un masaje para los cinco sentidos" (docs/PROPUESTA_LANDING_MASAJES.md). #}
+{# Reemplaza el catálogo como cara de /masajes/ (la versión catálogo sigue en ?classic=1, donde #}
+{# vive el modal de reserva online — esta landing enlaza a él con ancla). Pareja-first: el 98% #}
+{# de los masajes son en pareja. INDEXABLE; conserva title/FAQ/contenido de seo_content. #}
+
+{% block title %}{% if seo_content and seo_content.meta_title %}{{ seo_content.meta_title }}{% else %}Masajes en Puerto Varas junto al río | Aremko Spa Boutique{% endif %}{% endblock %}
+
+{% block meta_description %}
+<meta name="description" content="{% if seo_content and seo_content.meta_description %}{{ seo_content.meta_description }}{% else %}Masaje en pareja en domos de madera junto al río Pescado: aroma, bosque, calor, manos expertas e infusión de hierbas. Desde $80.000 la pareja. Puerto Varas.{% endif %}">
+<meta name="robots" content="index, follow">
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
+{% endblock %}
+
+{% block extra_style %}
+<style>
+  .rr-wrap{max-width:920px;margin:0 auto;padding:0 18px;color:#2c2a27;font-family:inherit}
+  .rr-section{padding:38px 0}
+  .rr-hero{text-align:center}
+  .rr-badge{display:inline-block;background:#f6efe1;color:#8a5a1d;
+    font-size:13px;padding:6px 14px;border-radius:999px;margin:18px 0 12px;font-weight:500}
+  .rr-h1{font-size:32px;line-height:1.22;margin:6px 0 14px;font-weight:600}
+  .rr-lead{font-size:18px;line-height:1.7;color:#5f5a52;max-width:600px;margin:0 auto 26px}
+  .rr-cta{display:inline-flex;align-items:center;gap:9px;background:#0f6e56;color:#eafaf3;
+    text-decoration:none;font-size:18px;font-weight:600;padding:15px 30px;border-radius:12px}
+  .rr-cta:hover{background:#0c5b48;color:#fff}
+  .rr-cta-sec{display:inline-flex;align-items:center;gap:8px;background:transparent;color:#0f6e56;
+    border:1.5px solid #0f6e56;text-decoration:none;font-size:16px;font-weight:600;
+    padding:13px 24px;border-radius:12px;margin-left:10px}
+  .rr-cta-sec:hover{background:#eaf5f1;color:#0c5b48}
+  .rr-cta-note{font-size:14px;color:#8a7f6c;margin:12px 0 0}
+  .rr-h2{font-size:24px;text-align:center;margin:0 0 8px;font-weight:600}
+  .rr-h2-sub{font-size:16px;text-align:center;color:#8a7f6c;margin:0 0 24px}
+  .rr-card{background:#fff;border:1px solid #ece6dc;border-radius:14px;padding:22px}
+  .rr-card p{color:#5f5a52;font-size:15px;line-height:1.65;margin:0}
+  /* El circuito: recorrido vertical de 7 estaciones */
+  .cs-list{display:flex;flex-direction:column;gap:12px;max-width:640px;margin:0 auto}
+  .cs-step{display:flex;gap:16px;background:#fff;border:1px solid #ece6dc;border-radius:14px;padding:20px}
+  .cs-num{flex-shrink:0;width:44px;height:44px;border-radius:50%;background:#f4f0e9;
+    display:flex;align-items:center;justify-content:center;font-size:21px}
+  .cs-body{flex:1}
+  .cs-sense{font-size:12px;letter-spacing:.09em;color:#b08a5a;text-transform:uppercase;font-weight:600}
+  .cs-rio{float:right;font-size:12px;color:#7fa8c9;letter-spacing:.05em}
+  .cs-t{font-size:17px;font-weight:600;margin:3px 0 6px}
+  .cs-step p{color:#5f5a52;font-size:15px;line-height:1.65;margin:0}
+  .cs-video{max-width:640px;margin:14px auto 0}
+  .cs-video video{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:14px;display:block}
+  /* Infusión destacada */
+  .inf-box{max-width:640px;margin:0 auto;border:2px solid #b08a5a;border-radius:16px;
+    background:#fcf8f1;padding:28px;text-align:center}
+  .inf-k{font-size:13px;letter-spacing:.08em;color:#b08a5a;text-transform:uppercase;font-weight:600}
+  .inf-t{font-size:22px;font-weight:600;margin:6px 0 12px}
+  .inf-box p{color:#5f5a52;font-size:15.5px;line-height:1.7;margin:0}
+  .inf-herbs{margin-top:14px;font-size:14px;color:#8a7f6c}
+  /* Escalera de oferta */
+  .of-grid{display:flex;flex-direction:column;gap:14px;max-width:640px;margin:0 auto}
+  .of-card{background:#fff;border:1px solid #ece6dc;border-radius:16px;padding:24px}
+  .of-card.destacada{border:2px solid #0f6e56;background:#fcfbf8;position:relative}
+  .of-star{position:absolute;top:-13px;left:22px;background:#0f6e56;color:#fff;
+    font-size:12.5px;font-weight:600;padding:4px 12px;border-radius:999px}
+  .of-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px}
+  .of-t{font-size:19px;font-weight:600;margin:0}
+  .of-price{font-size:26px;font-weight:600;white-space:nowrap}
+  .of-price small{display:block;font-size:13px;color:#5f5a52;font-weight:400;text-align:right}
+  .of-desc{color:#5f5a52;font-size:15px;line-height:1.65;margin:10px 0 0}
+  .of-frame{background:#e4f3ee;color:#0f5b48;border-radius:10px;padding:10px 14px;
+    font-size:15px;font-weight:500;margin:14px 0 0}
+  .of-cta{margin-top:16px}
+  .of-mini{font-size:14.5px;color:#8a7f6c;text-align:center;margin:6px 0 0}
+  .of-mini a{color:#0f6e56;font-weight:600}
+  /* Técnicas */
+  .tk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+  .tk-card{background:#fff;border:1px solid #ece6dc;border-radius:14px;padding:20px;display:flex;flex-direction:column}
+  .tk-img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;margin-bottom:12px;display:block}
+  .tk-badge{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;display:inline-block;margin-bottom:8px;width:fit-content}
+  .tk-badge.online{background:#e4f3ee;color:#0f5b48}
+  .tk-badge.esp{background:#eef1f6;color:#41527a}
+  .tk-t{font-size:16.5px;font-weight:600;margin:0 0 4px}
+  .tk-precio{font-size:14px;color:#5f5a52;margin:0 0 8px}
+  .tk-card p.tk-desc{color:#5f5a52;font-size:14.5px;line-height:1.6;margin:0 0 12px;flex:1}
+  .tk-link{font-size:14.5px;font-weight:600;color:#0f6e56;text-decoration:none}
+  .tk-link:hover{text-decoration:underline}
+  /* Contraste */
+  .rr-vs{display:flex;flex-direction:column;gap:9px;max-width:640px;margin:0 auto}
+  .rr-vs-row{display:flex;gap:11px;align-items:center;background:#f4f0e9;border-radius:10px;padding:12px 16px;font-size:16px}
+  .rr-vs-win{background:#e4f3ee;color:#0f5b48}
+  /* Reseñas */
+  .rr-revs{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+  .rr-rev{background:#fff;border:1px solid #ece6dc;border-radius:14px;padding:22px}
+  .rr-rev .stars{color:#c8902a;letter-spacing:2px;margin-bottom:8px}
+  .rr-rev .q{font-style:italic;color:#5f5a52;line-height:1.6;margin:0 0 8px}
+  .rr-rev .who{font-size:14px;color:#8a7f6c}
+  /* FAQ + SEO */
+  .faq-list{max-width:720px;margin:0 auto}
+  .faq-item{border-bottom:1px solid #ece6dc;padding:14px 0}
+  .faq-q{font-size:16px;font-weight:600;margin:0 0 6px}
+  .faq-a{font-size:15px;color:#5f5a52;line-height:1.65;margin:0}
+  .seo-block{max-width:720px;margin:0 auto;color:#5f5a52;font-size:15px;line-height:1.7}
+  .seo-block h2{font-size:20px;text-align:left;margin:26px 0 10px;font-weight:600;color:#2c2a27}
+  .rr-final{text-align:center;background:#f4f0e9;border-radius:18px;padding:42px 22px}
+  @media(max-width:600px){
+    .rr-h1{font-size:26px}.rr-lead{font-size:16px}
+    .rr-cta-sec{margin-left:0;margin-top:10px}
+    .of-price{font-size:22px}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rr-wrap">
+
+  <section class="rr-section rr-hero">
+    <span class="rr-badge">🌊 Aguas calientes junto al río · Puerto Varas</span>
+    <h1 class="rr-h1">Un masaje para los cinco sentidos</h1>
+    <p class="rr-lead"><strong>Todos asocian masaje con manos. Aquí, las manos son recién el quinto paso.</strong><br>
+      En domos de madera entre bosque nativo, a metros del río Pescado: aroma, calor,
+      manos expertas, una infusión preparada por tu masajista y un mirador donde el río lo tapa todo.</p>
+    <a class="rr-cta" href="{{ whatsapp_url }}">Reserva para dos por WhatsApp</a>
+    <a class="rr-cta-sec" href="#oferta">Ver precios</a>
+    <p class="rr-cta-note">Masaje en pareja desde {{ precio_pareja_str }} · La Pausa (tina + masaje) desde {{ precio_pausa_domjue_str }} para dos</p>
+  </section>
+
+  <section class="rr-section" id="circuito">
+    <h2 class="rr-h2">El circuito de los sentidos</h2>
+    <p class="rr-h2-sub">El masaje son 50 minutos. El circuito empieza antes y termina después.</p>
+    <div class="cs-list">
+
+      <div class="cs-step">
+        <div class="cs-num">🌿</div>
+        <div class="cs-body">
+          <span class="cs-sense">1 · El olfato</span><span class="cs-rio">río 🔈</span>
+          <div class="cs-t">La recepción — el aroma que todos comentan</div>
+          <p>Entras a un edificio de madera a 23 grados y pasa siempre lo mismo: <em>“qué rico aroma”.</em>
+             Hierbas naturales en el aire, música suave. El circuito ya empezó.</p>
+        </div>
+      </div>
+
+      <div class="cs-step">
+        <div class="cs-num">🌲</div>
+        <div class="cs-body">
+          <span class="cs-sense">2 · La vista</span><span class="cs-rio">río 🔈</span>
+          <div class="cs-t">El camino a los domos</div>
+          <p>Desde la recepción caminas entre bosque nativo hasta tres domos de madera unidos.
+             No es un pasillo: es la primera parte del paseo.</p>
+        </div>
+      </div>
+
+      <div class="cs-step">
+        <div class="cs-num">🛋️</div>
+        <div class="cs-body">
+          <span class="cs-sense">3 · La pausa</span><span class="cs-rio">río 🔈</span>
+          <div class="cs-t">El domo de espera</div>
+          <p>Sillones de a dos, y una mesa entre medio. Fíjate en esa mesa:
+             cuando vuelvas, va a tener tu infusión.</p>
+        </div>
+      </div>
+
+      <div class="cs-step">
+        <div class="cs-num">🔥</div>
+        <div class="cs-body">
+          <span class="cs-sense">4 · El tacto, primera vez</span><span class="cs-rio">río 🔉</span>
+          <div class="cs-t">Domo Sol o domo Luna</div>
+          <p>Dos domos gemelos de madera nativa, a 24–25 grados: el calor te recibe antes que las manos.
+             Y si prestas atención, el río se insinúa apenas — todavía no es su momento.</p>
+        </div>
+      </div>
+
+      <div class="cs-step">
+        <div class="cs-num">👐</div>
+        <div class="cs-body">
+          <span class="cs-sense">5 · El tacto que venías a buscar</span><span class="cs-rio">río 🔉</span>
+          <div class="cs-t">Las manos</div>
+          <p>50 minutos de manos expertas, con el cuerpo tibio y la mente lejos de la ciudad.
+             Al terminar nadie te apura: te quedas en la camilla el rato que tu cuerpo pida.</p>
+        </div>
+      </div>
+
+      <div class="cs-step">
+        <div class="cs-num">🍵</div>
+        <div class="cs-body">
+          <span class="cs-sense">6 · El gusto</span><span class="cs-rio">río 🔉</span>
+          <div class="cs-t">La Infusión de la Masajista</div>
+          <p>Vuelves al domo de espera y la mesa cumplió su promesa: tu masajista preparó una
+             infusión de hierbas elegida para ti. Te quedas el tiempo que quieras.</p>
+        </div>
+      </div>
+
+      <div class="cs-step">
+        <div class="cs-num">🌊</div>
+        <div class="cs-body">
+          <span class="cs-sense">7 · El oído y la vista, el final</span><span class="cs-rio">río 🔊</span>
+          <div class="cs-t">Las pasarelas y el mirador</div>
+          <p>70 metros de pasarelas de madera entre los árboles. Con cada paso el río suena más
+             fuerte, hasta que en el mirador domina todo y la vista se abre. Si el día acompaña,
+             la infusión viaja contigo; si hace frío, la disfrutas al calor del domo — el mirador
+             sabe esperar.</p>
+        </div>
+      </div>
+
+    </div>
+    <div class="cs-video">
+      <video autoplay muted loop playsinline preload="metadata"
+             poster="https://res.cloudinary.com/dtuncr1pi/video/upload/v1/IMG_4138_web_soihdc.jpg"
+             aria-label="Mirador del Río Pescado en Aremko, Puerto Varas">
+        <source src="https://res.cloudinary.com/dtuncr1pi/video/upload/v1/IMG_4138_web_soihdc.mp4" type="video/mp4">
+      </video>
+      <p class="of-mini" style="margin-top:8px">La estación final del circuito: el Mirador del Río Pescado.</p>
+    </div>
+  </section>
+
+  <section class="rr-section">
+    <div class="inf-box">
+      <div class="inf-k">El segundo tratamiento</div>
+      <div class="inf-t">La Infusión de la Masajista</div>
+      <p>Durante 50 minutos, sus manos leyeron tu cuerpo: dónde se acumula la tensión, cómo llegaste,
+         cómo respiras. Con ese diagnóstico, tu masajista elige la hierba y la prepara ella misma
+         mientras te vistes. En los spas famosos del mundo, el té final lo sirve un bar.
+         Aquí es la segunda mitad del tratamiento: primero las manos, después la hierba.</p>
+      <p class="inf-herbs">Menta · melisa · cedrón · boldo · hierbabuena · flores pectorales · jamaica
+         — hierbas de acá y de Chile, las de toda la vida.</p>
+    </div>
+  </section>
+
+  <section class="rr-section" id="oferta">
+    <h2 class="rr-h2">Para dos</h2>
+    <p class="rr-h2-sub">Los domos Sol y Luna tienen dos camillas cada uno: el masaje en pareja es simultáneo.</p>
+    <div class="of-grid">
+
+      <div class="of-card">
+        <div class="of-top">
+          <h3 class="of-t">💆 El Masaje en Pareja</h3>
+          <div class="of-price">{{ precio_pareja_str }}<small>la pareja · {{ precio_pp_str }} c/u · 50 min</small></div>
+        </div>
+        <p class="of-desc">Mismo momento, misma sala, el bosque alrededor. Circuito completo incluido:
+           recepción, domo, La Infusión de la Masajista y el mirador.</p>
+        <div class="of-cta"><a class="rr-cta" href="{{ whatsapp_url }}">Reservar por WhatsApp</a></div>
+      </div>
+
+      <div class="of-card destacada">
+        <span class="of-star">⭐ La que eligen las parejas</span>
+        <div class="of-top">
+          <h3 class="of-t">♨️ La Pausa junto al río</h3>
+          <div class="of-price">{{ precio_pausa_domjue_str }}<small>pareja, dom–jue · {{ precio_pausa_finde_str }} vie–sáb<br>tina para dos incluida</small></div>
+        </div>
+        <p class="of-desc">Tina caliente privada para dos <strong>antes</strong> del masaje en pareja, la misma
+           tarde. El orden importa: el agua caliente ablanda la musculatura; las manos llegan más profundo.</p>
+        <div class="of-frame">Por {{ diferencia_pausa_str }} más que el masaje solo, la tarde completa (dom–jue).</div>
+        <div class="of-cta">
+          <a class="rr-cta" href="{{ whatsapp_url_pausa }}">Quiero la Pausa</a>
+          <a class="rr-cta-sec" href="/pausa-junto-al-rio/">Ver la experiencia</a>
+        </div>
+      </div>
+
+      <div class="of-card">
+        <div class="of-top">
+          <h3 class="of-t">🌙 ¿Y si se quedan?</h3>
+          <div class="of-price">{{ precio_ritual_str }}<small>desde, dom–jue</small></div>
+        </div>
+        <p class="of-desc">El <strong>Ritual del Río</strong>: cabaña boutique, tina caliente, masaje en pareja
+           y desayuno. La noche completa junto al río.
+           <a class="tk-link" href="/ritual-del-rio/">Conocer el Ritual →</a></p>
+      </div>
+
+    </div>
+    <p class="of-mini" style="margin-top:14px">¿Vienes por tu cuenta? Mismo circuito, mismos sentidos:
+       {{ precio_pp_str }} por persona.</p>
+  </section>
+
+  <section class="rr-section">
+    <h2 class="rr-h2">Elige tu técnica</h2>
+    <p class="rr-h2-sub">¿Técnicas distintas cada uno? Sí — relajación y descontracturante las dominan todas
+       nuestras masajistas; las especializadas las realizan nuestros terapeutas especialistas.</p>
+    <div class="tk-grid">
+      {% for s in masajes_online %}
+      <div class="tk-card">
+        {% if s.imagen %}<img class="tk-img" src="{{ s.imagen.url }}" alt="{{ s.nombre }} en Aremko Spa Puerto Varas">{% endif %}
+        <span class="tk-badge online">⚡ Agenda al instante</span>
+        <h3 class="tk-t">{{ s.nombre }}</h3>
+        <p class="tk-precio">{{ s.precio_str }} por persona · {{ s.duracion_str }} · IVA incluido</p>
+        {% if s.descripcion_web %}<p class="tk-desc">{{ s.descripcion_web }}</p>{% endif %}
+        <a class="tk-link" href="/masajes/?classic=1#servicios-categoria">Reservar online →</a>
+      </div>
+      {% endfor %}
+      {% for s in masajes_especializados %}
+      <div class="tk-card">
+        {% if s.imagen %}<img class="tk-img" src="{{ s.imagen.url }}" alt="{{ s.nombre }} en Aremko Spa Puerto Varas">{% endif %}
+        <span class="tk-badge esp">🤲 Con especialista</span>
+        <h3 class="tk-t">{{ s.nombre }}</h3>
+        <p class="tk-precio">{{ s.precio_str }} por persona · {{ s.duracion_str }} · IVA incluido</p>
+        {% if s.descripcion_web %}<p class="tk-desc">{{ s.descripcion_web }}</p>{% endif %}
+        <a class="tk-link" href="https://wa.me/56957902525?text=Hola%2C%20quiero%20coordinar%20una%20sesi%C3%B3n%20de%20{{ s.nombre|urlencode }}" target="_blank" rel="noopener">Coordinar por WhatsApp →</a>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="rr-section">
+    <h2 class="rr-h2">Lo que se siente</h2>
+    <div class="rr-revs">
+      {% for texto, autor in resenas %}
+      <div class="rr-rev">
+        <div class="stars">★★★★★</div>
+        <p class="q">{{ texto }}</p>
+        <p class="who">— {{ autor }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="rr-section">
+    <h2 class="rr-h2">Por qué aquí</h2>
+    <div class="rr-vs">
+      <div class="rr-vs-row">✕ &nbsp;En un spa de ciudad, el masaje termina y sales a una calle con tráfico.</div>
+      <div class="rr-vs-row">✕ &nbsp;En el campo hay paisaje — pero no manos expertas, ni sala templada, ni nadie que te espere con una infusión.</div>
+      <div class="rr-vs-row rr-vs-win">✓ &nbsp;Aquí el circuito es completo: aroma, bosque, calor, manos, hierbas y un mirador donde el río lo tapa todo. Los cinco sentidos, a 20 minutos de Puerto Varas.</div>
+    </div>
+  </section>
+
+  <section class="rr-section">
+    <h2 class="rr-h2">Preguntas frecuentes</h2>
+    <div class="faq-list">
+      {% if seo_content %}{% for faq in seo_content.get_faqs %}
+      <div class="faq-item">
+        <p class="faq-q">{{ faq.pregunta }}</p>
+        <p class="faq-a">{{ faq.respuesta }}</p>
+      </div>
+      {% endfor %}{% endif %}
+      <div class="faq-item">
+        <p class="faq-q">¿El masaje es desnudo?</p>
+        <p class="faq-a">No: el masaje se realiza en ropa interior, con el cuerpo cubierto por sabanilla
+           salvo la zona que se está trabajando. Comodidad y privacidad primero.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">¿Hay que caminar entre los espacios?</p>
+        <p class="faq-a">Sí, y es parte del circuito: pasarelas de madera que emergen entre el bosque
+           nativo conectan la recepción, los domos y el mirador del río. No es un traslado — es un paseo.</p>
+      </div>
+    </div>
+  </section>
+
+  {% if seo_content and seo_content.contenido_principal %}
+  <section class="rr-section">
+    <div class="seo-block">
+      <h2>Acerca de nuestros masajes</h2>
+      {{ seo_content.contenido_principal|linebreaks }}
+      {% if seo_content.beneficio_1_titulo %}
+      <h2>Beneficios de nuestros masajes</h2>
+      <p><strong>{{ seo_content.beneficio_1_titulo }}.</strong> {{ seo_content.beneficio_1_descripcion }}</p>
+      {% if seo_content.beneficio_2_titulo %}<p><strong>{{ seo_content.beneficio_2_titulo }}.</strong> {{ seo_content.beneficio_2_descripcion }}</p>{% endif %}
+      {% if seo_content.beneficio_3_titulo %}<p><strong>{{ seo_content.beneficio_3_titulo }}.</strong> {{ seo_content.beneficio_3_descripcion }}</p>{% endif %}
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="rr-section">
+    <div class="rr-final">
+      <h2 style="margin:0 0 8px;font-size:26px;font-weight:600">Reserva su masaje para dos 👇</h2>
+      <p style="font-size:17px;color:#5f5a52;margin:0 0 22px">Coordinamos fecha y hora por WhatsApp. Te respondemos en menos de 2 horas (horario comercial).</p>
+      <a class="rr-cta" href="{{ whatsapp_url }}">Reserva por WhatsApp</a>
+      <p class="rr-cta-note">Aguas calientes junto al río · Aremko Spa Boutique, Puerto Varas</p>
+    </div>
+  </section>
+
+</div>
+
+{# JSON-LD: FAQ (seo_content + 2 nuevas). Sin floats → sin riesgo de locale es-CL. #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% if seo_content %}{% for faq in seo_content.get_faqs %}
+    {"@type": "Question", "name": "{{ faq.pregunta|escapejs }}",
+     "acceptedAnswer": {"@type": "Answer", "text": "{{ faq.respuesta|escapejs }}"}},
+    {% endfor %}{% endif %}
+    {"@type": "Question", "name": "¿El masaje es desnudo?",
+     "acceptedAnswer": {"@type": "Answer", "text": "No: el masaje se realiza en ropa interior, con el cuerpo cubierto por sabanilla salvo la zona que se está trabajando."}},
+    {"@type": "Question", "name": "¿Hay que caminar entre los espacios?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Sí, y es parte del circuito: pasarelas de madera entre el bosque nativo conectan la recepción, los domos de masaje y el mirador del río Pescado."}}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+/* Mide los clics de la landing de masajes como conversión.
+   GA4: masajes_whatsapp_click / masajes_reserva_click (+ UTM). Meta Pixel: Lead. */
+(function () {
+  var p = new URLSearchParams(window.location.search);
+  var utm = {
+    campaign: p.get('utm_campaign') || '',
+    source:   p.get('utm_source')   || '',
+    medium:   p.get('utm_medium')   || ''
+  };
+  function track(evento) {
+    try {
+      if (typeof gtag === 'function') {
+        gtag('event', evento, {
+          send_to: 'G-T3K4CTD3HJ',
+          masajes_campaign: utm.campaign,
+          masajes_source: utm.source,
+          masajes_medium: utm.medium
+        });
+      }
+    } catch (e) { /* nunca bloquear la navegación */ }
+    try { if (typeof fbq === 'function') { fbq('track', 'Lead', {content_name: 'Masajes 5 Sentidos'}); } } catch (e) {}
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    var was = document.querySelectorAll('a.rr-cta, a.tk-link[href*="wa.me"]');
+    for (var i = 0; i < was.length; i++) {
+      if ((was[i].getAttribute('href') || '').indexOf('wa.me') !== -1) {
+        was[i].addEventListener('click', function () { track('masajes_whatsapp_click'); });
+      }
+    }
+    var res = document.querySelectorAll('a[href*="classic=1"]');
+    for (var j = 0; j < res.length; j++) {
+      res[j].addEventListener('click', function () { track('masajes_reserva_click'); });
+    }
+  });
+})();
+</script>
+{% endblock %}

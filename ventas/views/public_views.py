@@ -233,10 +233,82 @@ def tinas_view(request):
 
 def masajes_view(request):
     """
-    Vista para acceso directo a la categoría de Masajes
-    Redirige a la vista de categoría con ID=2 (Masajes)
+    /masajes/ — landing "Un masaje para los cinco sentidos" por defecto
+    (docs/PROPUESTA_LANDING_MASAJES.md). La versión catálogo (con el modal de
+    reserva online) sigue viva en ?classic=1; rollback = revertir este commit.
     """
-    return categoria_detail_view(request, categoria_id=2)
+    if request.GET.get('classic') == '1':
+        return categoria_detail_view(request, categoria_id=2)
+    return masajes_landing_view(request)
+
+
+def _clp_str(valor):
+    """80000 -> '$80.000' (CLP con puntos de miles)."""
+    return '$' + f'{int(valor):,}'.replace(',', '.')
+
+
+def masajes_landing_view(request):
+    """Landing de masajes "Cinco Sentidos" — pareja-first (el 98% de los masajes son
+    en pareja). Precios de la Pausa espejados de pausa_landing_view; el precio del
+    masaje sale de la BD (Servicio online de la categoría Masajes) para no quedar
+    obsoleto si cambia en el admin."""
+    try:
+        canonical_url = request.build_absolute_uri(request.path)
+    except Exception:
+        canonical_url = request.path
+
+    servicios = (Servicio.objects
+                 .filter(categoria_id=2, activo=True, publicado_web=True)
+                 .order_by('precio_base', 'nombre'))
+    masajes_online = [s for s in servicios if s.permite_reserva_web]
+    masajes_especializados = [s for s in servicios if not s.permite_reserva_web]
+    for s in masajes_online + masajes_especializados:
+        s.precio_str = _clp_str(s.precio_base or 0)
+        s.duracion_str = f'{s.duracion} min' if s.duracion else '50 min'
+
+    # Precio por persona desde la BD (masaje online); respaldo si el catálogo cambia.
+    precio_pp = int(masajes_online[0].precio_base) if masajes_online else 40000
+    precio_pareja = precio_pp * 2
+    # Pausa junto al río (pack tina+masaje pareja) — mismos valores que pausa_landing.
+    precio_pausa_domjue = 110000
+    precio_pausa_finde = 130000
+
+    seo_content = None
+    try:
+        categoria = CategoriaServicio.objects.filter(id=2).first()
+        if categoria and hasattr(categoria, 'seo_content'):
+            seo_content = categoria.seo_content
+    except Exception:
+        pass
+
+    # Reseñas REALES (TripAdvisor/Google), curadas para masajes — mismas fuentes que
+    # las landings del Ritual/Pausa.
+    resenas = [
+        ('Los masajes descontracturantes fueron increíbles, combinados con técnicas quiroprácticas.',
+         'Nicolás · TripAdvisor'),
+        ('El lugar es hermoso, rodeado de naturaleza; ideal para relajarse.',
+         'Cristina · TripAdvisor'),
+        ('Maravillosas tinas de agua caliente, temperatura perfecta, al borde del río.',
+         'Vanessa · Santiago'),
+    ]
+
+    return render(request, 'ventas/masajes_landing.html', {
+        'canonical_url': canonical_url,
+        'seo_content': seo_content,
+        'masajes_online': masajes_online,
+        'masajes_especializados': masajes_especializados,
+        'precio_pp_str': _clp_str(precio_pp),
+        'precio_pareja_str': _clp_str(precio_pareja),
+        'precio_pausa_domjue_str': _clp_str(precio_pausa_domjue),
+        'precio_pausa_finde_str': _clp_str(precio_pausa_finde),
+        'diferencia_pausa_str': _clp_str(max(0, precio_pausa_domjue - precio_pareja)),
+        'precio_ritual_str': _clp_str(210000),
+        'whatsapp_url': ('https://wa.me/56957902525?text='
+                         'Hola%2C%20quiero%20reservar%20un%20masaje%20en%20pareja'),
+        'whatsapp_url_pausa': ('https://wa.me/56957902525?text='
+                               'Hola%2C%20quiero%20reservar%20la%20Pausa%20junto%20al%20r%C3%ADo'),
+        'resenas': resenas,
+    })
 
 
 def alojamientos_view(request):
