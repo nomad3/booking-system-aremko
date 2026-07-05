@@ -2566,9 +2566,11 @@ class GiftCardExperienciaAdmin(admin.ModelAdmin):
         ('Descripciones', {
             'fields': ('descripcion', 'descripcion_giftcard')
         }),
-        ('Imagen', {
-            'fields': ('imagen',),
-            'description': 'Sube la imagen de la experiencia (recomendado: 800x600px, formato JPG/PNG)'
+        ('Imágenes (carrusel)', {
+            'fields': ('imagen', 'imagen_2', 'imagen_3'),
+            'description': 'Hasta 3 fotos → carrusel en la vitrina de GiftCards. Muestra la '
+                           'experiencia COMPLETA: ej. Pausa = tina + masaje; Ritual = cabaña + '
+                           'tina + masaje. Recomendado horizontal 16:9; se optimizan solas.'
         }),
         ('Precios', {
             'fields': ('monto_fijo', 'montos_sugeridos'),

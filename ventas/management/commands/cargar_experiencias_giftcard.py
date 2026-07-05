@@ -74,12 +74,11 @@ INSIGNIAS = [
     },
 ]
 
-# DECISIÓN RADICAL de Jorge (2026-07-05): "solo se regalan experiencias, no tinas
-# sueltas, no masajes sueltos". Se desactiva TODO lo que no sea una de las 4 insignia
-# — con la única excepción de la categoría 'valor' (GiftCard de monto libre,
-# reformulada como "Regala la libertad: ellos eligen su experiencia"; cubre el caso
-# corporativo/indeciso). Reversible: activo=False, se reactivan en el admin.
-CATEGORIAS_QUE_SOBREVIVEN = {'valor'}
+# DECISIÓN RADICAL de Jorge (2026-07-05, reforzada al ver la página): "solo se
+# regalan experiencias, no tinas sueltas, no masajes sueltos" — y la GiftCard de
+# monto libre TAMPOCO va. Se desactiva TODO lo que no sea una de las 4 insignia.
+# Reversible: activo=False, se reactivan en el admin.
+CATEGORIAS_QUE_SOBREVIVEN = set()  # nada sobrevive fuera de las 4 insignia
 
 
 class Command(BaseCommand):

@@ -3817,10 +3817,19 @@ class GiftCardExperiencia(models.Model):
         help_text="Descripción detallada para la gift card"
     )
 
-    # Imagen
+    # Imágenes (hasta 3 → carrusel en la vitrina; la experiencia compuesta —tina +
+    # masaje + cabaña— se muestra completa, no con una sola foto)
     imagen = models.ImageField(
         upload_to='giftcards/experiencias/',
-        help_text="Imagen de la experiencia (recomendado: 800x600px)"
+        help_text="Imagen principal de la experiencia (recomendado horizontal 16:9)"
+    )
+    imagen_2 = models.ImageField(
+        upload_to='giftcards/experiencias/', blank=True, null=True,
+        help_text="Segunda foto (opcional): otro componente de la experiencia (ej. el masaje)."
+    )
+    imagen_3 = models.ImageField(
+        upload_to='giftcards/experiencias/', blank=True, null=True,
+        help_text="Tercera foto (opcional): otro componente (ej. la cabaña o el desayuno)."
     )
 
     # Precios
@@ -3891,6 +3900,8 @@ class GiftCardExperiencia(models.Model):
             'descripcion': self.descripcion,
             'descripcion_giftcard': self.descripcion_giftcard,
             'imagen': self.imagen.url if self.imagen else '',
+            # Galería para el carrusel de la vitrina (1-3 fotos, sin huecos)
+            'imagenes': [f.url for f in (self.imagen, self.imagen_2, self.imagen_3) if f],
             'monto_fijo': float(self.monto_fijo) if self.monto_fijo else None,
             'montos_sugeridos': self.montos_sugeridos or []
         }

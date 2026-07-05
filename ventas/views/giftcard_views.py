@@ -54,6 +54,8 @@ def giftcard_menu(request):
         exp['precio_str'] = _clp(exp['monto_fijo']) if exp.get('monto_fijo') else ''
         exp['montos_sugeridos_str'] = [_clp(m) for m in (exp.get('montos_sugeridos') or [])]
         exp['imagen'] = _card_16x9(exp.get('imagen') or '')
+        # Galería del carrusel (1-3 fotos), todas optimizadas/recortadas a 16:9
+        exp['imagenes'] = [_card_16x9(u) for u in (exp.get('imagenes') or []) if u]
 
     if request.GET.get('classic') == '1':
         experiencias_por_categoria = {
@@ -66,18 +68,15 @@ def giftcard_menu(request):
         })
 
     # Las 4 insignia en orden fijo de escalera (ascendente de precio). Se identifican
-    # por id_experiencia (creadas por cargar_experiencias_giftcard).
+    # por id_experiencia (creadas por cargar_experiencias_giftcard). Jorge (2026-07-05):
+    # la GiftCard de monto libre TAMPOCO va — solo las 4 experiencias, nada más.
     IDS_INSIGNIA = ['pausa_junto_al_rio', 'noche_aguas_calientes', 'ritual_del_rio', 'refugio_aremko']
     por_id = {exp['id']: exp for exp in experiencias}
     experiencias_insignia = [por_id[i] for i in IDS_INSIGNIA if i in por_id]
 
-    # GiftCard de Libertad (monto libre): "ellos eligen su experiencia".
-    experiencias_valor = [exp for exp in experiencias if exp['categoria'] == 'valor']
-
     context = {
         'experiencias': experiencias,
         'experiencias_insignia': experiencias_insignia,
-        'experiencias_valor': experiencias_valor,
     }
 
     return render(request, 'ventas/giftcard_menu.html', context)

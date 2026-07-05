@@ -51,15 +51,10 @@
   .gx-dia{display:inline-block;background:#e4f3ee;color:#0f5b48;border-radius:8px;
     padding:5px 11px;font-size:13.5px;font-weight:500;margin-top:12px}
   .gx-cta{margin-top:16px}
-  /* GiftCard de Libertad */
+  /* Caja de respaldo (si la BD aún no tiene las experiencias) */
   .lib-box{max-width:680px;margin:0 auto;border:2px dashed #b08a5a;border-radius:16px;
     background:#fcf8f1;padding:26px;text-align:center}
-  .lib-k{font-size:13px;letter-spacing:.08em;color:#b08a5a;text-transform:uppercase;font-weight:600}
-  .lib-t{font-size:21px;font-weight:600;margin:6px 0 10px}
   .lib-box p{color:#5f5a52;font-size:15px;line-height:1.65;margin:0 0 14px}
-  .lib-montos{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}
-  .lib-monto{background:#fff;border:1px solid #e3d9c8;border-radius:999px;padding:6px 14px;
-    font-size:14.5px;font-weight:600;color:#6b5c45}
   /* Mockup "así se ve tu regalo" */
   .mk-wrap{max-width:420px;margin:0 auto}
   .mk-card{background:linear-gradient(160deg,#10231d,#1e4438);border-radius:18px;padding:30px 26px;
@@ -135,7 +130,29 @@
       <div class="gx-card{% if exp.id == 'ritual_del_rio' %} estrella{% endif %}">
         {% if exp.id == 'ritual_del_rio' %}<span class="gx-tag gold">⭐ El regalo estrella</span>
         {% elif exp.id == 'pausa_junto_al_rio' %}<span class="gx-tag">La más regalada</span>{% endif %}
-        {% if exp.imagen %}
+        {% if exp.imagenes|length > 1 %}
+          {# Carrusel: la experiencia compuesta se muestra completa (tina + masaje + cabaña) #}
+          <div id="gx-car-{{ exp.id }}" class="carousel slide" data-bs-ride="carousel" data-bs-interval="3500" data-bs-touch="true">
+            <div class="carousel-indicators">
+              {% for url in exp.imagenes %}
+              <button type="button" data-bs-target="#gx-car-{{ exp.id }}" data-bs-slide-to="{{ forloop.counter0 }}"{% if forloop.first %} class="active" aria-current="true"{% endif %} aria-label="Foto {{ forloop.counter }}"></button>
+              {% endfor %}
+            </div>
+            <div class="carousel-inner">
+              {% for url in exp.imagenes %}
+              <div class="carousel-item{% if forloop.first %} active{% endif %}">
+                <img class="gx-img" src="{{ url }}" alt="{{ exp.nombre }} — foto {{ forloop.counter }} — GiftCard Aremko Spa Puerto Varas" loading="lazy">
+              </div>
+              {% endfor %}
+            </div>
+            <button class="carousel-control-prev" type="button" data-bs-target="#gx-car-{{ exp.id }}" data-bs-slide="prev" aria-label="Anterior">
+              <span class="carousel-control-prev-icon" aria-hidden="true"></span><span class="visually-hidden">Anterior</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#gx-car-{{ exp.id }}" data-bs-slide="next" aria-label="Siguiente">
+              <span class="carousel-control-next-icon" aria-hidden="true"></span><span class="visually-hidden">Siguiente</span>
+            </button>
+          </div>
+        {% elif exp.imagen %}
           <img class="gx-img" src="{{ exp.imagen }}" alt="{{ exp.nombre }} — GiftCard Aremko Spa Puerto Varas">
         {% else %}
           <div class="gx-img-fallback">{% if exp.id == 'pausa_junto_al_rio' %}🍃{% elif exp.id == 'noche_aguas_calientes' %}⛲{% elif exp.id == 'ritual_del_rio' %}🌙{% else %}🌿{% endif %}</div>
@@ -158,25 +175,6 @@
       {% endfor %}
     </div>
   </section>
-
-  {% if experiencias_valor %}
-  <section class="rr-section">
-    <div class="lib-box">
-      <div class="lib-k">¿No sabes cuál elegir?</div>
-      <div class="lib-t">Regala la libertad: ellos eligen su experiencia</div>
-      <p>Una GiftCard por el monto que tú decidas — quien la recibe elige su propia
-         experiencia junto al río y agenda cuando quiera.</p>
-      {% with valor=experiencias_valor.0 %}
-      {% if valor.montos_sugeridos_str %}
-      <div class="lib-montos">
-        {% for m in valor.montos_sugeridos_str %}<span class="lib-monto">{{ m }}</span>{% endfor %}
-      </div>
-      {% endif %}
-      <a class="rr-cta" href="{% url 'ventas:giftcard_wizard' %}?exp={{ valor.id }}&skip_step1=true">Regalar libertad</a>
-      {% endwith %}
-    </div>
-  </section>
-  {% endif %}
 
   <section class="rr-section">
     <h2 class="rr-h2">Así se ve tu regalo</h2>
@@ -208,8 +206,8 @@
         <span class="oc-emoji">🌷</span><p class="oc-t">Día de la Madre</p><p class="oc-sub">Pausa junto al río</p></a>
       <a class="oc-card" href="{% url 'ventas:giftcard_wizard' %}?exp=noche_aguas_calientes&skip_step1=true">
         <span class="oc-emoji">🎂</span><p class="oc-t">Cumpleaños</p><p class="oc-sub">Noche de Aguas Calientes</p></a>
-      <a class="oc-card" href="{% url 'ventas:giftcard_wizard' %}{% if experiencias_valor %}?exp={{ experiencias_valor.0.id }}&skip_step1=true{% endif %}">
-        <span class="oc-emoji">💼</span><p class="oc-t">Regalo corporativo</p><p class="oc-sub">GiftCard de Libertad</p></a>
+      <a class="oc-card" href="{% url 'ventas:giftcard_wizard' %}?exp=ritual_del_rio&skip_step1=true">
+        <span class="oc-emoji">💼</span><p class="oc-t">Regalo corporativo</p><p class="oc-sub">Ritual del Río</p></a>
       <a class="oc-card" href="{% url 'ventas:giftcard_wizard' %}?exp=pausa_junto_al_rio&skip_step1=true">
         <span class="oc-emoji">🌿</span><p class="oc-t">Porque sí</p><p class="oc-sub">Pausa junto al río</p></a>
     </div>
