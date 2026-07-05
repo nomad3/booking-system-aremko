@@ -42,9 +42,18 @@ def giftcard_menu(request):
     def _clp(v):
         return '$' + f'{int(v):,}'.replace(',', '.')
 
+    def _card_16x9(url):
+        """Transformación Cloudinary para las cards (16:9, recorte inteligente,
+        formato/calidad auto): las fotos originales pesan 2-4MB; así se sirven en
+        ~100-200KB (mismo criterio anti-bandwidth del filtro `optimizada`)."""
+        if not url or '/upload/' not in url:
+            return url
+        return url.replace('/upload/', '/upload/c_fill,ar_16:9,g_auto,w_900,f_auto,q_auto/', 1)
+
     for exp in experiencias:
         exp['precio_str'] = _clp(exp['monto_fijo']) if exp.get('monto_fijo') else ''
         exp['montos_sugeridos_str'] = [_clp(m) for m in (exp.get('montos_sugeridos') or [])]
+        exp['imagen'] = _card_16x9(exp.get('imagen') or '')
 
     if request.GET.get('classic') == '1':
         experiencias_por_categoria = {
