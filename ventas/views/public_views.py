@@ -281,6 +281,15 @@ def masajes_landing_view(request):
     except Exception:
         pass
 
+    # Fotos/video del circuito, administrables desde el admin (singleton). Si la tabla
+    # aún no existe (migración pendiente) o está vacía, la landing funciona sin fotos.
+    config = None
+    try:
+        from ventas.models import MasajesLandingConfig
+        config = MasajesLandingConfig.get_solo()
+    except Exception:
+        pass
+
     # Reseñas REALES (TripAdvisor/Google), curadas para masajes — mismas fuentes que
     # las landings del Ritual/Pausa.
     resenas = [
@@ -295,6 +304,7 @@ def masajes_landing_view(request):
     return render(request, 'ventas/masajes_landing.html', {
         'canonical_url': canonical_url,
         'seo_content': seo_content,
+        'config': config,
         'masajes_online': masajes_online,
         'masajes_especializados': masajes_especializados,
         'precio_pp_str': _clp_str(precio_pp),

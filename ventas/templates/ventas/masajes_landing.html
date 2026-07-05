@@ -45,6 +45,11 @@
   .cs-rio{float:right;font-size:12px;color:#7fa8c9;letter-spacing:.05em}
   .cs-t{font-size:17px;font-weight:600;margin:3px 0 6px}
   .cs-step p{color:#5f5a52;font-size:15px;line-height:1.65;margin:0}
+  .cs-img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;margin:4px 0 10px;display:block}
+  .hero-video{width:100%;max-width:460px;aspect-ratio:1/1;object-fit:cover;border-radius:16px;
+    display:block;margin:0 auto 24px}
+  .inf-img{width:100%;max-width:420px;aspect-ratio:4/3;object-fit:cover;border-radius:12px;
+    display:block;margin:0 auto 18px}
   .cs-video{max-width:640px;margin:14px auto 0}
   .cs-video video{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:14px;display:block}
   /* Infusión destacada */
@@ -117,6 +122,12 @@
     <p class="rr-lead"><strong>Todos asocian masaje con manos. Aquí, las manos son recién el quinto paso.</strong><br>
       En domos de madera entre bosque nativo, a metros del río Pescado: aroma, calor,
       manos expertas, una infusión preparada por tu masajista y un mirador donde el río lo tapa todo.</p>
+    {% if config.video_hero %}
+    <video class="hero-video" autoplay muted loop playsinline preload="metadata"
+           aria-label="Recorrido del circuito de masajes en Aremko: pasarelas, domos y mirador del río Pescado">
+      <source src="{{ config.video_hero.url }}" type="video/mp4">
+    </video>
+    {% endif %}
     <a class="rr-cta" href="{{ whatsapp_url }}">Reserva para dos por WhatsApp</a>
     <a class="rr-cta-sec" href="#oferta">Ver precios</a>
     <p class="rr-cta-note">Masaje en pareja desde {{ precio_pareja_str }} · La Pausa (tina + masaje) desde {{ precio_pausa_domjue_str }} para dos</p>
@@ -132,6 +143,7 @@
         <div class="cs-body">
           <span class="cs-sense">1 · El olfato</span><span class="cs-rio">río 🔈</span>
           <div class="cs-t">La recepción — el aroma que todos comentan</div>
+          {% if config.foto_recepcion %}<img class="cs-img" src="{{ config.foto_recepcion.url }}" alt="Recepción de madera nativa de Aremko Spa, Puerto Varas">{% endif %}
           <p>Entras a un edificio de madera a 23 grados y pasa siempre lo mismo: <em>“qué rico aroma”.</em>
              Hierbas naturales en el aire, música suave. El circuito ya empezó.</p>
         </div>
@@ -142,6 +154,7 @@
         <div class="cs-body">
           <span class="cs-sense">2 · La vista</span><span class="cs-rio">río 🔈</span>
           <div class="cs-t">El camino a los domos</div>
+          {% if config.foto_camino %}<img class="cs-img" src="{{ config.foto_camino.url }}" alt="Pasarela de madera entre bosque nativo hacia los domos de masaje">{% endif %}
           <p>Desde la recepción caminas entre bosque nativo hasta tres domos de madera unidos.
              No es un pasillo: es la primera parte del paseo.</p>
         </div>
@@ -152,6 +165,7 @@
         <div class="cs-body">
           <span class="cs-sense">3 · La pausa</span><span class="cs-rio">río 🔈</span>
           <div class="cs-t">El domo de espera</div>
+          {% if config.foto_sala_espera %}<img class="cs-img" src="{{ config.foto_sala_espera.url }}" alt="Domo de espera con sillones de a dos en Aremko Spa">{% endif %}
           <p>Sillones de a dos, y una mesa entre medio. Fíjate en esa mesa:
              cuando vuelvas, va a tener tu infusión.</p>
         </div>
@@ -162,6 +176,7 @@
         <div class="cs-body">
           <span class="cs-sense">4 · El tacto, primera vez</span><span class="cs-rio">río 🔉</span>
           <div class="cs-t">Domo Sol o domo Luna</div>
+          {% if config.foto_domo_masaje %}<img class="cs-img" src="{{ config.foto_domo_masaje.url }}" alt="Interior del domo de masajes con dos camillas, madera nativa">{% endif %}
           <p>Dos domos gemelos de madera nativa, a 24–25 grados: el calor te recibe antes que las manos.
              Y si prestas atención, el río se insinúa apenas — todavía no es su momento.</p>
         </div>
@@ -172,6 +187,7 @@
         <div class="cs-body">
           <span class="cs-sense">5 · El tacto que venías a buscar</span><span class="cs-rio">río 🔉</span>
           <div class="cs-t">Las manos</div>
+          {% if config.foto_masaje_pareja %}<img class="cs-img" src="{{ config.foto_masaje_pareja.url }}" alt="Masaje en pareja simultáneo en el domo de Aremko Spa">{% endif %}
           <p>50 minutos de manos expertas, con el cuerpo tibio y la mente lejos de la ciudad.
              Al terminar nadie te apura: te quedas en la camilla el rato que tu cuerpo pida.</p>
         </div>
@@ -182,6 +198,7 @@
         <div class="cs-body">
           <span class="cs-sense">6 · El gusto</span><span class="cs-rio">río 🔉</span>
           <div class="cs-t">La Infusión de la Masajista</div>
+          {% if config.foto_infusion %}<img class="cs-img" src="{{ config.foto_infusion.url }}" alt="Infusión de hierbas naturales servida tras el masaje">{% endif %}
           <p>Vuelves al domo de espera y la mesa cumplió su promesa: tu masajista preparó una
              infusión de hierbas elegida para ti. Te quedas el tiempo que quieras.</p>
         </div>
@@ -214,6 +231,7 @@
     <div class="inf-box">
       <div class="inf-k">El segundo tratamiento</div>
       <div class="inf-t">La Infusión de la Masajista</div>
+      {% if config.foto_infusion %}<img class="inf-img" src="{{ config.foto_infusion.url }}" alt="La Infusión de la Masajista: hierbas naturales servidas en el domo de espera">{% endif %}
       <p>Durante 50 minutos, sus manos leyeron tu cuerpo: dónde se acumula la tensión, cómo llegaste,
          cómo respiras. Con ese diagnóstico, tu masajista elige la hierba y la prepara ella misma
          mientras te vistes. En los spas famosos del mundo, el té final lo sirve un bar.

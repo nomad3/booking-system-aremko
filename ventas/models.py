@@ -4629,6 +4629,55 @@ class RitualRioLandingConfig(SingletonModel):
         return "Landing Ritual del Río"
 
 
+class MasajesLandingConfig(SingletonModel):
+    """
+    Fotos/video de la landing de masajes "Un masaje para los cinco sentidos"
+    (/masajes/, docs/PROPUESTA_LANDING_MASAJES.md). Singleton editable desde el
+    admin: cada campo corresponde a UNA estación del circuito — si queda vacío,
+    la estación se muestra sin foto (solo texto), nunca rompe la página.
+    Guía de grabación: sección "Shot-list" del doc de la propuesta.
+    """
+    video_hero = models.FileField(
+        upload_to='masajes_landing/', storage=VideoMediaCloudinaryStorage(),
+        max_length=255, blank=True, null=True,
+        help_text="EL VIDEO ESTRELLA: plano secuencia del recorrido (recepción → pasarelas → "
+                  "domos → mirador), 15-25 seg ya cortado, CON el audio del río. mp4 <5MB "
+                  "(comprimir antes). Si está vacío, el hero se muestra sin video."
+    )
+    foto_recepcion = models.ImageField(
+        upload_to='masajes_landing/', blank=True, null=True,
+        help_text="Estación 1 — La recepción: el mesón de madera / el espacio que huele rico."
+    )
+    foto_camino = models.ImageField(
+        upload_to='masajes_landing/', blank=True, null=True,
+        help_text="Estación 2 — El camino a los domos: pasarela de madera entre el bosque."
+    )
+    foto_sala_espera = models.ImageField(
+        upload_to='masajes_landing/', blank=True, null=True,
+        help_text="Estación 3 — El domo de espera: los sillones de a dos con la mesa entre medio."
+    )
+    foto_domo_masaje = models.ImageField(
+        upload_to='masajes_landing/', blank=True, null=True,
+        help_text="Estación 4 — Domo Sol o Luna: las DOS camillas listas, la madera, la luz tibia."
+    )
+    foto_masaje_pareja = models.ImageField(
+        upload_to='masajes_landing/', blank=True, null=True,
+        help_text="Estación 5 — El masaje en pareja: las dos camillas en uso (manos, sin rostros)."
+    )
+    foto_infusion = models.ImageField(
+        upload_to='masajes_landing/', blank=True, null=True,
+        help_text="Estación 6 — La Infusión de la Masajista: manos sirviendo, vapor, hierbas a la "
+                  "vista. LA FOTO MÁS IMPORTANTE (también aparece en su sección propia)."
+    )
+
+    class Meta:
+        verbose_name = "Landing Masajes (5 Sentidos)"
+        verbose_name_plural = "Landing Masajes (5 Sentidos)"
+
+    def __str__(self):
+        return "Landing Masajes (5 Sentidos)"
+
+
 class ConfiguracionTips(SingletonModel):
     """
     Configuración para generar tips post-pago (enviados después del pago).

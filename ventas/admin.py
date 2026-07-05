@@ -53,6 +53,8 @@ from .models import (
     ConfiguracionTips,
     # Landing Ritual del Río (imágenes editables)
     RitualRioLandingConfig,
+    # Landing Masajes 5 Sentidos (fotos del circuito)
+    MasajesLandingConfig,
     # Sistema de Pagos a Masajistas
     PagoMasajista, DetalleServicioPago,
     # Sistema de Comandas
@@ -3408,6 +3410,27 @@ class RitualRioLandingConfigAdmin(SingletonModelAdmin):
         }),
         ('Reseña 3', {
             'fields': ('resena3_foto', 'resena3_texto', 'resena3_autor'),
+        }),
+    )
+
+
+@admin.register(MasajesLandingConfig)
+class MasajesLandingConfigAdmin(SingletonModelAdmin):
+    """Fotos/video del circuito de la landing /masajes/ (Singleton). Si un campo está
+    vacío, esa estación se muestra solo con texto — subir fotos las activa al instante."""
+    fieldsets = (
+        ('Video del hero (el plano secuencia)', {
+            'fields': ('video_hero',),
+            'description': 'Recorrido recepción → pasarelas → domos → mirador, 15-25 seg, '
+                           'CON audio del río, mp4 comprimido (<5MB). Guía completa de '
+                           'grabación en docs/PROPUESTA_LANDING_MASAJES.md (Shot-list).'
+        }),
+        ('Las estaciones del circuito', {
+            'fields': ('foto_recepcion', 'foto_camino', 'foto_sala_espera',
+                       'foto_domo_masaje', 'foto_masaje_pareja', 'foto_infusion'),
+            'description': 'Una foto por estación (cuadradas o 4:3 se ven mejor). '
+                           'La de la infusión es la más importante: también aparece '
+                           'grande en su propia sección.'
         }),
     )
 
