@@ -32,26 +32,45 @@ def giftcard_menu(request):
     Ahora lee las experiencias desde la base de datos para mostrar
     imágenes y precios actualizados en la landing page.
     """
-    # Obtener experiencias activas desde la base de datos
-    experiencias_db = GiftCardExperiencia.objects.filter(activo=True).order_by('categoria', 'orden', 'nombre')
-    
-    # Convertir a diccionarios para el template
+    # DECISIÓN RADICAL (Jorge 2026-07-05): solo se regalan EXPERIENCIAS — la página
+    # muestra las 4 insignia + la GiftCard de Libertad (monto libre). Nada de tinas
+    # sueltas ni masajes sueltos (cargar_experiencias_giftcard desactiva el resto).
+    # Fallback de emergencia: ?classic=1 → template anterior (tabs por categoría).
+    experiencias_db = GiftCardExperiencia.objects.filter(activo=True).order_by('orden', 'nombre')
     experiencias = [exp.to_dict() for exp in experiencias_db]
-    
-    # Agrupar por categoría para facilitar el renderizado en tabs
-    experiencias_por_categoria = {
-        'tinas': [exp for exp in experiencias if exp['categoria'] == 'tinas'],
-        'masajes': [exp for exp in experiencias if exp['categoria'] == 'masajes'],
-        'faciales': [exp for exp in experiencias if exp['categoria'] == 'faciales'],
-        'packs': [exp for exp in experiencias if exp['categoria'] == 'packs'],
-        'valor': [exp for exp in experiencias if exp['categoria'] == 'valor'],
-    }
-    
+
+    def _clp(v):
+        return '$' + f'{int(v):,}'.replace(',', '.')
+
+    for exp in experiencias:
+        exp['precio_str'] = _clp(exp['monto_fijo']) if exp.get('monto_fijo') else ''
+        exp['montos_sugeridos_str'] = [_clp(m) for m in (exp.get('montos_sugeridos') or [])]
+
+    if request.GET.get('classic') == '1':
+        experiencias_por_categoria = {
+            cat: [e for e in experiencias if e['categoria'] == cat]
+            for cat in ('tinas', 'masajes', 'faciales', 'packs', 'valor')
+        }
+        return render(request, 'ventas/giftcard_menu_classic.html', {
+            'experiencias': experiencias,
+            'experiencias_por_categoria': experiencias_por_categoria,
+        })
+
+    # Las 4 insignia en orden fijo de escalera (ascendente de precio). Se identifican
+    # por id_experiencia (creadas por cargar_experiencias_giftcard).
+    IDS_INSIGNIA = ['pausa_junto_al_rio', 'noche_aguas_calientes', 'ritual_del_rio', 'refugio_aremko']
+    por_id = {exp['id']: exp for exp in experiencias}
+    experiencias_insignia = [por_id[i] for i in IDS_INSIGNIA if i in por_id]
+
+    # GiftCard de Libertad (monto libre): "ellos eligen su experiencia".
+    experiencias_valor = [exp for exp in experiencias if exp['categoria'] == 'valor']
+
     context = {
         'experiencias': experiencias,
-        'experiencias_por_categoria': experiencias_por_categoria,
+        'experiencias_insignia': experiencias_insignia,
+        'experiencias_valor': experiencias_valor,
     }
-    
+
     return render(request, 'ventas/giftcard_menu.html', context)
 
 

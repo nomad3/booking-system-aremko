@@ -1,1400 +1,353 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
-{% load humanize %}
 
-{% block title %}GiftCards - Regala Experiencias de Bienestar | Aremko Spa{% endblock %}
+{# GiftCards — "Regala una experiencia junto al río" (docs/PROPUESTA_GIFTCARDS_EXPERIENCIAS.md). #}
+{# DECISIÓN RADICAL (Jorge 2026-07-05): solo se regalan EXPERIENCIAS — las 4 insignia + la      #}
+{# GiftCard de Libertad. Precio único de día de semana, válido CUALQUIER día (la GiftCard es    #}
+{# la forma más conveniente de ir un fin de semana). Versión anterior: ?classic=1.              #}
+
+{% block title %}GiftCards — Regala una experiencia junto al río | Aremko Spa Boutique{% endblock %}
+
+{% block meta_description %}
+<meta name="description" content="Regala el Ritual del Río, la Pausa junto al río o una noche en cabaña con tina caliente. GiftCards digitales con mensaje personalizado, entrega en minutos, válidas 1 año y cualquier día de la semana. Puerto Varas.">
+<meta name="robots" content="index, follow">
+{% endblock %}
 
 {% block extra_style %}
-<!-- Version: 2024-12-02-v4 - Fixed Django comment visibility issue -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
-    /* FORCED REBUILD - Timestamp: <?php echo time(); ?> */
-    :root {
-        /* Paleta de colores elegante de spa de alto nivel */
-        --spa-sage: #8B9D83;
-        /* Verde salvia suave */
-        --spa-cream: #F5F3EF;
-        /* Crema cálido */
-        --spa-taupe: #C9BEB2;
-        /* Taupe elegante */
-        --spa-charcoal: #2C2C2C;
-        /* Carbón oscuro */
-        --spa-stone: #6B6B6B;
-        /* Piedra gris */
-        --spa-gold: #B8935F;
-        /* Oro rosado */
-        --spa-white: #FFFFFF;
-        --spa-eucalyptus: #94B49F;
-        /* Eucalipto */
-        --spa-lavender: #A89DC9;
-        /* Lavanda suave */
-        --spa-terracotta: #C8A88D;
-        /* Terracota suave */
-    }
-
-    /* DEBUG: Force white backgrounds */
-    body {
-        background-color: #F5F3EF;
-    }
-
-    body {
-        font-family: 'Inter', 'Segoe UI', sans-serif;
-        color: var(--spa-charcoal);
-        background-color: var(--spa-cream);
-    }
-
-    /* Hero Section */
-    .hero-section {
-        background: linear-gradient(0deg, rgba(18,15,12,.60) 0%, rgba(18,15,12,.40) 100%),
-            url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_1600,h_780,e_brightness:-18,f_auto,q_auto/giftcards/experiencias/celebracionespeciatinaaremko_xh7grq') center/cover no-repeat,
-            linear-gradient(135deg, var(--spa-sage) 0%, var(--spa-eucalyptus) 100%);
-        color: var(--spa-white);
-        padding: 120px 0 100px;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .hero-section::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="0.05" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1248,160,1344,128,1392,112L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>');
-        background-repeat: no-repeat;
-        background-position: bottom;
-        background-size: cover;
-    }
-
-    .hero-content {
-        position: relative;
-        z-index: 1;
-    }
-
-    .hero-title {
-        font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 3.6rem;
-        font-weight: 600;
-        letter-spacing: 0;
-        margin-bottom: 1.5rem;
-        line-height: 1.15;
-        text-shadow: 0 2px 18px rgba(0,0,0,.4);
-    }
-
-    .hero-subtitle {
-        font-size: 1.3rem;
-        font-weight: 300;
-        opacity: 0.95;
-        margin-bottom: 2rem;
-    }
-
-    .hero-badges {
-        display: flex;
-        gap: 2rem;
-        justify-content: center;
-        flex-wrap: wrap;
-        margin-top: 2rem;
-    }
-
-    .hero-badge {
-        background: rgba(255, 255, 255, 0.15);
-        backdrop-filter: blur(10px);
-        padding: 0.75rem 1.5rem;
-        border-radius: 50px;
-        font-size: 0.95rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .btn-primary-spa {
-        background: var(--spa-gold);
-        border: none;
-        color: var(--spa-white);
-        padding: 1rem 3rem;
-        font-size: 1.1rem;
-        font-weight: 500;
-        border-radius: 50px;
-        transition: all 0.3s ease;
-        box-shadow: 0 10px 30px rgba(184, 147, 95, 0.3);
-        letter-spacing: 0.5px;
-    }
-
-    .btn-primary-spa:hover {
-        background: #A67F51;
-        transform: translateY(-3px);
-        box-shadow: 0 15px 40px rgba(184, 147, 95, 0.4);
-        color: var(--spa-white);
-    }
-
-    /* Section Styles */
-    .section-spa {
-        padding: 80px 0;
-    }
-
-    .section-title {
-        font-size: 2.5rem;
-        font-weight: 300;
-        color: var(--spa-charcoal);
-        margin-bottom: 1rem;
-        letter-spacing: -0.5px;
-    }
-
-    .section-subtitle {
-        font-size: 1.1rem;
-        color: var(--spa-stone);
-        font-weight: 300;
-        margin-bottom: 3rem;
-    }
-
-    /* How It Works Section */
-    .step-card {
-        background: #FFFFFF !important;
-        border-radius: 15px !important;
-        padding: 2.5rem 2rem !important;
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08) !important;
-        height: 100%;
-        transition: all 0.3s ease;
-        border-left: 5px solid var(--spa-gold) !important;
-        display: block !important;
-    }
-
-    .step-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12) !important;
-    }
-
-    .step-number {
-        background: linear-gradient(135deg, var(--spa-gold) 0%, var(--spa-terracotta) 100%) !important;
-        color: #FFFFFF !important;
-        width: 50px;
-        height: 50px;
-        border-radius: 10px !important;
-        display: flex !important;
-        align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        font-size: 1.5rem;
-        margin: 0 auto 1.5rem !important;
-        box-shadow: 0 5px 15px rgba(184, 147, 95, 0.3) !important;
-    }
-
-    .step-icon {
-        font-size: 2.5rem;
-        color: var(--spa-sage);
-        margin-bottom: 1.5rem;
-        display: block;
-        text-align: center;
-    }
-
-    .step-title {
-        font-size: 1.3rem;
-        font-weight: 600;
-        color: var(--spa-charcoal);
-        margin-bottom: 0.75rem;
-        text-align: center;
-    }
-
-    .step-description {
-        font-size: 0.95rem;
-        color: var(--spa-stone);
-        line-height: 1.6;
-        text-align: center;
-    }
-
-    /* Experience Cards */
-    .experience-tabs {
-        border-bottom: 2px solid var(--spa-taupe);
-        margin-bottom: 3rem;
-    }
-
-    .experience-tabs .nav-link {
-        color: var(--spa-stone);
-        border: none;
-        padding: 1rem 2rem;
-        font-size: 1rem;
-        font-weight: 500;
-        border-bottom: 3px solid transparent;
-        transition: all 0.3s ease;
-    }
-
-    .experience-tabs .nav-link:hover {
-        color: var(--spa-sage);
-        border-bottom-color: var(--spa-sage);
-    }
-
-    .experience-tabs .nav-link.active {
-        color: var(--spa-gold);
-        border-bottom-color: var(--spa-gold);
-        background: transparent;
-    }
-
-    .experience-card {
-        background: var(--spa-white);
-        border-radius: 15px;
-        overflow: hidden;
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
-        transition: all 0.4s ease;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .experience-card:hover {
-        transform: translateY(-10px);
-        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
-    }
-
-    .experience-image {
-        height: 200px;
-        background-size: cover;
-        background-position: center;
-        position: relative;
-    }
-
-    .experience-badge {
-        position: absolute;
-        top: 15px;
-        right: 15px;
-        background: var(--spa-gold);
-        color: var(--spa-white);
-        padding: 0.4rem 1rem;
-        border-radius: 50px;
-        font-size: 0.85rem;
-        font-weight: 600;
-    }
-
-    .experience-body {
-        padding: 1.5rem;
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .experience-title {
-        font-size: 1.3rem;
-        font-weight: 600;
-        color: var(--spa-charcoal);
-        margin-bottom: 0.75rem;
-    }
-
-    .experience-description {
-        font-size: 0.95rem;
-        color: var(--spa-stone);
-        margin-bottom: 1rem;
-        line-height: 1.6;
-        flex-grow: 1;
-    }
-
-    .experience-price {
-        font-size: 2rem;
-        font-weight: 600;
-        color: var(--spa-gold);
-        margin-bottom: 1rem;
-    }
-
-    .btn-experience {
-        background: var(--spa-sage);
-        color: var(--spa-white);
-        border: none;
-        padding: 0.75rem 1.5rem;
-        border-radius: 50px;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        width: 100%;
-    }
-
-    .btn-experience:hover {
-        background: var(--spa-eucalyptus);
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(139, 157, 131, 0.3);
-        color: var(--spa-white);
-    }
-
-    /* AI Message Section */
-    .ai-section {
-        background: linear-gradient(135deg, var(--spa-lavender) 0%, var(--spa-eucalyptus) 100%);
-        color: var(--spa-white);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .ai-section::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        right: -10%;
-        width: 500px;
-        height: 500px;
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 50%;
-    }
-
-    .message-type-card {
-        background: rgba(255, 255, 255, 0.15);
-        backdrop-filter: blur(10px);
-        border-radius: 15px;
-        padding: 1.5rem;
-        text-align: center;
-        transition: all 0.3s ease;
-        border: 2px solid transparent;
-    }
-
-    .message-type-card:hover {
-        background: rgba(255, 255, 255, 0.25);
-        border-color: rgba(255, 255, 255, 0.5);
-        transform: translateY(-5px);
-    }
-
-    .message-icon {
-        font-size: 2.5rem;
-        margin-bottom: 1rem;
-    }
-
-    .message-name {
-        font-size: 1.1rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-    }
-
-    .message-description {
-        font-size: 0.9rem;
-        opacity: 0.9;
-    }
-
-    /* Testimonials */
-    .testimonial-card {
-        background: var(--spa-white);
-        border-radius: 15px;
-        padding: 2rem;
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
-        height: 100%;
-    }
-
-    .testimonial-text {
-        font-size: 1.05rem;
-        color: var(--spa-stone);
-        font-style: italic;
-        margin-bottom: 1.5rem;
-        line-height: 1.7;
-    }
-
-    .testimonial-author {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-
-    .testimonial-avatar {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, var(--spa-sage), var(--spa-eucalyptus));
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--spa-white);
-        font-size: 1.5rem;
-        font-weight: 600;
-    }
-
-    .testimonial-info h6 {
-        margin: 0;
-        color: var(--spa-charcoal);
-        font-weight: 600;
-    }
-
-    .testimonial-info p {
-        margin: 0;
-        color: var(--spa-stone);
-        font-size: 0.9rem;
-    }
-
-    .stars {
-        color: var(--spa-gold);
-        margin-bottom: 1rem;
-    }
-
-    /* Benefits Section */
-    .benefit-card {
-        text-align: center;
-        padding: 2rem 1rem;
-    }
-
-    .benefit-icon {
-        width: 80px;
-        height: 80px;
-        background: linear-gradient(135deg, var(--spa-sage), var(--spa-eucalyptus));
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 1.5rem;
-        font-size: 2rem;
-        color: var(--spa-white);
-    }
-
-    .benefit-title {
-        font-size: 1.2rem;
-        font-weight: 600;
-        color: var(--spa-charcoal);
-        margin-bottom: 0.75rem;
-    }
-
-    .benefit-text {
-        font-size: 0.95rem;
-        color: var(--spa-stone);
-        line-height: 1.6;
-    }
-
-    /* FAQ Section */
-    .faq-accordion .accordion-item {
-        border: none;
-        margin-bottom: 1rem;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    }
-
-    .faq-accordion .accordion-button {
-        background: var(--spa-white);
-        color: var(--spa-charcoal);
-        font-weight: 500;
-        padding: 1.25rem 1.5rem;
-        font-size: 1.05rem;
-    }
-
-    .faq-accordion .accordion-button:not(.collapsed) {
-        background: var(--spa-sage);
-        color: var(--spa-white);
-    }
-
-    .faq-accordion .accordion-button:focus {
-        box-shadow: none;
-        border-color: var(--spa-sage);
-    }
-
-    .faq-accordion .accordion-body {
-        padding: 1.5rem;
-        color: var(--spa-stone);
-        line-height: 1.7;
-    }
-
-    /* Final CTA */
-    .cta-final {
-        background: linear-gradient(135deg, var(--spa-charcoal) 0%, var(--spa-stone) 100%);
-        color: var(--spa-white);
-        padding: 80px 0;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .cta-final::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        left: -10%;
-        width: 500px;
-        height: 500px;
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 50%;
-    }
-
-    /* Occasions Section */
-    .occasion-card {
-        background: var(--spa-white);
-        border-radius: 15px;
-        padding: 2rem;
-        text-align: center;
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
-        transition: all 0.3s ease;
-        height: 100%;
-    }
-
-    .occasion-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-    }
-
-    .occasion-icon {
-        font-size: 3rem;
-        margin-bottom: 1rem;
-    }
-
-    .occasion-title {
-        font-size: 1.3rem;
-        font-weight: 600;
-        color: var(--spa-charcoal);
-        margin-bottom: 0.75rem;
-    }
-
-    .occasion-product {
-        font-size: 0.95rem;
-        color: var(--spa-stone);
-        margin-bottom: 1rem;
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-        .hero-section {
-            padding: 60px 0 50px;
-        }
-
-        .hero-title {
-            font-size: 1.75rem;
-            line-height: 1.3;
-            margin-bottom: 1rem;
-        }
-
-        .hero-subtitle {
-            font-size: 0.95rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .hero-badges {
-            gap: 0.75rem;
-            flex-direction: column;
-        }
-
-        .hero-badge {
-            font-size: 0.85rem;
-            padding: 0.6rem 1rem;
-            width: 100%;
-            max-width: 280px;
-        }
-
-        .section-spa {
-            padding: 50px 0;
-        }
-
-        .section-title {
-            font-size: 1.75rem;
-        }
-
-        .section-subtitle {
-            font-size: 1rem;
-        }
-
-        .step-card {
-            padding: 1.75rem 1.25rem !important;
-            margin-bottom: 1.5rem !important;
-        }
-
-        .step-number {
-            width: 45px !important;
-            height: 45px !important;
-            font-size: 1.3rem !important;
-            margin-bottom: 1rem !important;
-        }
-
-        .step-icon {
-            font-size: 2rem !important;
-            margin-bottom: 1rem !important;
-        }
-
-        .step-title {
-            font-size: 1.1rem !important;
-        }
-
-        .step-description {
-            font-size: 0.9rem !important;
-        }
-
-        .experience-tabs .nav-link {
-            padding: 0.75rem 0.75rem;
-            font-size: 0.85rem;
-        }
-
-        .experience-card {
-            margin-bottom: 1rem;
-        }
-
-        .btn-primary-spa {
-            padding: 0.875rem 2rem;
-            font-size: 1rem;
-        }
-
-        .message-type-card {
-            padding: 1rem;
-        }
-
-        .message-icon {
-            font-size: 2rem;
-        }
-
-        .message-name {
-            font-size: 1rem;
-        }
-
-        .occasion-card,
-        .testimonial-card,
-        .benefit-card {
-            margin-bottom: 1rem;
-        }
-    }
+  .rr-wrap{max-width:920px;margin:0 auto;padding:0 18px;color:#2c2a27;font-family:inherit}
+  .rr-section{padding:38px 0}
+  .rr-hero{text-align:center}
+  .rr-badge{display:inline-block;background:#f6efe1;color:#8a5a1d;
+    font-size:13px;padding:6px 14px;border-radius:999px;margin:18px 0 12px;font-weight:500}
+  .rr-h1{font-size:32px;line-height:1.22;margin:6px 0 14px;font-weight:600}
+  .rr-lead{font-size:18px;line-height:1.7;color:#5f5a52;max-width:600px;margin:0 auto 26px}
+  .rr-cta{display:inline-flex;align-items:center;gap:9px;background:#0f6e56;color:#eafaf3;
+    text-decoration:none;font-size:18px;font-weight:600;padding:15px 30px;border-radius:12px}
+  .rr-cta:hover{background:#0c5b48;color:#fff}
+  .rr-cta-sec{display:inline-flex;align-items:center;gap:8px;background:transparent;color:#0f6e56;
+    border:1.5px solid #0f6e56;text-decoration:none;font-size:16px;font-weight:600;
+    padding:13px 24px;border-radius:12px;margin-left:10px}
+  .rr-cta-sec:hover{background:#eaf5f1;color:#0c5b48}
+  .rr-cta-note{font-size:14px;color:#8a7f6c;margin:12px 0 0}
+  .rr-h2{font-size:24px;text-align:center;margin:0 0 8px;font-weight:600}
+  .rr-h2-sub{font-size:16px;text-align:center;color:#8a7f6c;margin:0 0 24px}
+  /* Cards de experiencia (las 4 insignia) */
+  .gx-grid{display:flex;flex-direction:column;gap:18px;max-width:680px;margin:0 auto}
+  .gx-card{background:#fff;border:1px solid #ece6dc;border-radius:16px;overflow:hidden;position:relative}
+  .gx-card.estrella{border:2px solid #b08a5a}
+  .gx-tag{position:absolute;top:14px;left:14px;z-index:2;background:#0f6e56;color:#fff;
+    font-size:12.5px;font-weight:600;padding:5px 13px;border-radius:999px}
+  .gx-tag.gold{background:#b08a5a}
+  .gx-img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}
+  .gx-img-fallback{width:100%;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;
+    font-size:52px;background:linear-gradient(150deg,#eef3ee,#e2ded2)}
+  .gx-body{padding:22px}
+  .gx-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px}
+  .gx-t{font-size:20px;font-weight:600;margin:0}
+  .gx-price{font-size:26px;font-weight:600;white-space:nowrap}
+  .gx-price small{display:block;font-size:12.5px;color:#5f5a52;font-weight:400;text-align:right}
+  .gx-desc{color:#5f5a52;font-size:15px;line-height:1.65;margin:10px 0 0}
+  .gx-dia{display:inline-block;background:#e4f3ee;color:#0f5b48;border-radius:8px;
+    padding:5px 11px;font-size:13.5px;font-weight:500;margin-top:12px}
+  .gx-cta{margin-top:16px}
+  /* GiftCard de Libertad */
+  .lib-box{max-width:680px;margin:0 auto;border:2px dashed #b08a5a;border-radius:16px;
+    background:#fcf8f1;padding:26px;text-align:center}
+  .lib-k{font-size:13px;letter-spacing:.08em;color:#b08a5a;text-transform:uppercase;font-weight:600}
+  .lib-t{font-size:21px;font-weight:600;margin:6px 0 10px}
+  .lib-box p{color:#5f5a52;font-size:15px;line-height:1.65;margin:0 0 14px}
+  .lib-montos{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}
+  .lib-monto{background:#fff;border:1px solid #e3d9c8;border-radius:999px;padding:6px 14px;
+    font-size:14.5px;font-weight:600;color:#6b5c45}
+  /* Mockup "así se ve tu regalo" */
+  .mk-wrap{max-width:420px;margin:0 auto}
+  .mk-card{background:linear-gradient(160deg,#10231d,#1e4438);border-radius:18px;padding:30px 26px;
+    color:#f3efe6;text-align:center;box-shadow:0 18px 40px rgba(20,40,32,.28)}
+  .mk-logo{font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:#cdbf9d;margin-bottom:16px}
+  .mk-exp{font-size:23px;font-weight:600;margin:0 0 4px;color:#fff}
+  .mk-para{font-size:13px;color:#bcd3c8;margin:0 0 16px}
+  .mk-msg{font-size:14.5px;font-style:italic;line-height:1.65;color:#e8e2d2;border-top:1px solid rgba(255,255,255,.14);
+    border-bottom:1px solid rgba(255,255,255,.14);padding:14px 4px;margin:0 0 16px}
+  .mk-code-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9db8ab;margin-bottom:4px}
+  .mk-code{font-family:ui-monospace,Menlo,monospace;font-size:17px;letter-spacing:.14em;color:#fff;
+    filter:blur(3px);user-select:none}
+  .mk-valid{font-size:11.5px;color:#9db8ab;margin-top:14px}
+  .mk-caption{text-align:center;font-size:14.5px;color:#8a7f6c;margin-top:16px;line-height:1.6}
+  /* Ocasiones */
+  .oc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+  .oc-card{background:#fff;border:1px solid #ece6dc;border-radius:14px;padding:18px;text-align:center;
+    text-decoration:none;color:inherit;display:block;transition:border-color .15s}
+  .oc-card:hover{border-color:#0f6e56;color:inherit}
+  .oc-emoji{font-size:26px}
+  .oc-t{font-size:15.5px;font-weight:600;margin:8px 0 3px}
+  .oc-sub{font-size:13.5px;color:#8a7f6c}
+  /* IA / tonos */
+  .ia-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:640px;margin:0 auto 14px}
+  .ia-chip{background:#f4f0e9;border-radius:999px;padding:7px 14px;font-size:14px;color:#5f5a52}
+  .ia-note{text-align:center;font-size:15px;color:#5f5a52;max-width:560px;margin:0 auto}
+  /* Pasos */
+  .ps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;max-width:680px;margin:0 auto}
+  .ps-card{background:#fff;border:1px solid #ece6dc;border-radius:14px;padding:20px;text-align:center}
+  .ps-n{width:38px;height:38px;border-radius:50%;background:#0f6e56;color:#fff;font-weight:600;
+    display:flex;align-items:center;justify-content:center;margin:0 auto 10px}
+  .ps-t{font-size:15.5px;font-weight:600;margin:0 0 5px}
+  .ps-card p{font-size:14px;color:#5f5a52;line-height:1.55;margin:0}
+  /* Reseñas */
+  .rr-revs{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+  .rr-rev{background:#fff;border:1px solid #ece6dc;border-radius:14px;padding:22px}
+  .rr-rev .stars{color:#c8902a;letter-spacing:2px;margin-bottom:8px}
+  .rr-rev .q{font-style:italic;color:#5f5a52;line-height:1.6;margin:0 0 8px}
+  .rr-rev .who{font-size:14px;color:#8a7f6c}
+  /* FAQ */
+  .faq-list{max-width:720px;margin:0 auto}
+  .faq-item{border-bottom:1px solid #ece6dc;padding:14px 0}
+  .faq-q{font-size:16px;font-weight:600;margin:0 0 6px}
+  .faq-a{font-size:15px;color:#5f5a52;line-height:1.65;margin:0}
+  .rr-final{text-align:center;background:#f4f0e9;border-radius:18px;padding:42px 22px}
+  @media(max-width:600px){
+    .rr-h1{font-size:26px}.rr-lead{font-size:16px}
+    .rr-cta-sec{margin-left:0;margin-top:10px}
+    .gx-price{font-size:22px}
+  }
 </style>
 {% endblock %}
 
 {% block content %}
+<div class="rr-wrap">
 
-<!-- HERO SECTION -->
-<section class="hero-section">
-    <div class="container hero-content">
-        <div class="row justify-content-center">
-            <div class="col-lg-10 text-center">
-                <h1 class="hero-title">Regala Momentos de Bienestar Inolvidables</h1>
-                <p class="hero-subtitle">
-                    Experiencias únicas de spa en la Patagonia con mensajes personalizados por IA
-                </p>
-                <div class="mt-4">
-                    <a href="{% url 'ventas:giftcard_wizard' %}" class="btn btn-primary-spa">
-                        <i class="fas fa-gift me-2"></i>Crear Mi GiftCard
-                    </a>
-                </div>
-                <div class="hero-badges">
-                    <div class="hero-badge">
-                        <i class="fas fa-bolt"></i>
-                        <span>Entrega Digital Inmediata</span>
-                    </div>
-                    <div class="hero-badge">
-                        <i class="fas fa-calendar-alt"></i>
-                        <span>Válido por 1 Año</span>
-                    </div>
-                    <div class="hero-badge">
-                        <i class="fas fa-tag"></i>
-                        <span>Desde $50.000</span>
-                    </div>
-                </div>
-            </div>
+  <section class="rr-section rr-hero">
+    <span class="rr-badge">🎁 GiftCards Aremko · Puerto Varas</span>
+    <h1 class="rr-h1">Regala una experiencia junto al río</h1>
+    <p class="rr-lead"><strong>Momentos que no se envuelven:</strong> agua caliente, bosque nativo,
+      manos expertas y el sonido del río Pescado. Con un mensaje escrito por ti — o por nuestra IA —
+      y entrega digital en minutos.</p>
+    <a class="rr-cta" href="#experiencias">Ver las experiencias</a>
+    <a class="rr-cta-sec" href="{% url 'ventas:giftcard_wizard' %}">Crear mi GiftCard</a>
+    <p class="rr-cta-note">Válida por 1 año · Se puede usar cualquier día, incluso fin de semana · Entrega digital inmediata</p>
+  </section>
+
+  <section class="rr-section" id="experiencias">
+    <h2 class="rr-h2">Las experiencias</h2>
+    <p class="rr-h2-sub">Aquí no se regalan servicios: se regalan experiencias completas, con nombre propio.</p>
+    <div class="gx-grid">
+      {% for exp in experiencias_insignia %}
+      <div class="gx-card{% if exp.id == 'ritual_del_rio' %} estrella{% endif %}">
+        {% if exp.id == 'ritual_del_rio' %}<span class="gx-tag gold">⭐ El regalo estrella</span>
+        {% elif exp.id == 'pausa_junto_al_rio' %}<span class="gx-tag">La más regalada</span>{% endif %}
+        {% if exp.imagen %}
+          <img class="gx-img" src="{{ exp.imagen }}" alt="{{ exp.nombre }} — GiftCard Aremko Spa Puerto Varas">
+        {% else %}
+          <div class="gx-img-fallback">{% if exp.id == 'pausa_junto_al_rio' %}🍃{% elif exp.id == 'noche_aguas_calientes' %}⛲{% elif exp.id == 'ritual_del_rio' %}🌙{% else %}🌿{% endif %}</div>
+        {% endif %}
+        <div class="gx-body">
+          <div class="gx-top">
+            <h3 class="gx-t">{{ exp.nombre }}</h3>
+            <div class="gx-price">{{ exp.precio_str }}<small>precio único</small></div>
+          </div>
+          <p class="gx-desc">{{ exp.descripcion_giftcard }}</p>
+          <span class="gx-dia">✓ Válida cualquier día — incluso viernes y sábado</span>
+          <div class="gx-cta">
+            <a class="rr-cta" href="{% url 'ventas:giftcard_wizard' %}?exp={{ exp.id }}&skip_step1=true">Regalar esta experiencia</a>
+          </div>
         </div>
+      </div>
+      {% empty %}
+      <div class="lib-box"><p style="margin:0">Estamos preparando las experiencias regalables.
+        Escríbenos por WhatsApp y armamos tu regalo: <a href="https://wa.me/56957902525">+56 9 5790 2525</a></p></div>
+      {% endfor %}
     </div>
-</section>
+  </section>
 
-<!-- HOW IT WORKS SECTION -->
-<section class="section-spa" style="background: var(--spa-white);">
-    <div class="container">
-        <div class="text-center mb-5">
-            <h2 class="section-title">¿Cómo Funciona?</h2>
-            <p class="section-subtitle">Crea tu GiftCard personalizada en solo 3 simples pasos</p>
-        </div>
-        <div class="row g-4">
-            <div class="col-md-4">
-                <div class="step-card">
-                    <div class="step-number">1</div>
-                    <div class="text-center">
-                        <div class="step-icon">
-                            <i class="fas fa-spa"></i>
-                        </div>
-                    </div>
-                    <h3 class="step-title">Elige la Experiencia</h3>
-                    <p class="step-description">
-                        Selecciona entre 16 experiencias: tinas calientes, masajes, alojamientos o monto libre
-                    </p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="step-card">
-                    <div class="step-number">2</div>
-                    <div class="text-center">
-                        <div class="step-icon">
-                            <i class="fas fa-magic"></i>
-                        </div>
-                    </div>
-                    <h3 class="step-title">Personaliza el Mensaje</h3>
-                    <p class="step-description">
-                        Nuestra IA crea mensajes únicos o escribe el tuyo propio para hacer el regalo aún más especial
-                    </p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="step-card">
-                    <div class="step-number">3</div>
-                    <div class="text-center">
-                        <div class="step-icon">
-                            <i class="fas fa-paper-plane"></i>
-                        </div>
-                    </div>
-                    <h3 class="step-title">Envío Inmediato</h3>
-                    <p class="step-description">
-                        Entrega digital por email o WhatsApp. Listo para regalar en minutos
-                    </p>
-                </div>
-            </div>
-        </div>
-        <div class="text-center mt-5">
-            <a href="{% url 'ventas:giftcard_wizard' %}" class="btn btn-primary-spa">
-                Comenzar Ahora <i class="fas fa-arrow-right ms-2"></i>
-            </a>
-        </div>
+  {% if experiencias_valor %}
+  <section class="rr-section">
+    <div class="lib-box">
+      <div class="lib-k">¿No sabes cuál elegir?</div>
+      <div class="lib-t">Regala la libertad: ellos eligen su experiencia</div>
+      <p>Una GiftCard por el monto que tú decidas — quien la recibe elige su propia
+         experiencia junto al río y agenda cuando quiera.</p>
+      {% with valor=experiencias_valor.0 %}
+      {% if valor.montos_sugeridos_str %}
+      <div class="lib-montos">
+        {% for m in valor.montos_sugeridos_str %}<span class="lib-monto">{{ m }}</span>{% endfor %}
+      </div>
+      {% endif %}
+      <a class="rr-cta" href="{% url 'ventas:giftcard_wizard' %}?exp={{ valor.id }}&skip_step1=true">Regalar libertad</a>
+      {% endwith %}
     </div>
-</section>
+  </section>
+  {% endif %}
 
-<!-- EXPERIENCES CATALOG SECTION -->
-<section class="section-spa" style="background: var(--spa-cream);">
-    <div class="container">
-        <div class="text-center mb-5">
-            <h2 class="section-title">Nuestras Experiencias</h2>
-            <p class="section-subtitle">Elige el regalo perfecto para cada ocasión</p>
-        </div>
-
-        <!-- Tabs -->
-        <ul class="nav nav-tabs experience-tabs justify-content-center" id="experienceTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="tinas-tab" data-bs-toggle="tab" data-bs-target="#tinas"
-                    type="button">
-                    <i class="fas fa-hot-tub me-2"></i>Tinas Calientes
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="masajes-tab" data-bs-toggle="tab" data-bs-target="#masajes" type="button">
-                    <i class="fas fa-spa me-2"></i>Masajes
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="alojamientos-tab" data-bs-toggle="tab" data-bs-target="#alojamientos"
-                    type="button">
-                    <i class="fas fa-home me-2"></i>Alojamientos
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="libre-tab" data-bs-toggle="tab" data-bs-target="#libre" type="button">
-                    <i class="fas fa-gift me-2"></i>Monto Libre
-                </button>
-            </li>
-        </ul>
-
-        <!-- Tab Content -->
-        <div class="tab-content mt-4" id="experienceTabContent">
-
-            <!-- TINAS TAB -->
-            <div class="tab-pane fade show active" id="tinas" role="tabpanel">
-                <div class="row g-4">
-                    {% for exp in experiencias_por_categoria.tinas %}
-                    <div class="col-md-6 col-lg-4">
-                        <div class="experience-card">
-                            {% if exp.imagen %}
-                            <div class="experience-image"
-                                style="background-image: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('{{ exp.imagen }}');">
-                            </div>
-                            {% else %}
-                            <div class="experience-image"
-                                style="background: linear-gradient(135deg, var(--spa-sage), var(--spa-eucalyptus)); display: flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-hot-tub" style="font-size: 4rem; color: white; opacity: 0.5;"></i>
-                            </div>
-                            {% endif %}
-                            <div class="experience-body">
-                                <h4 class="experience-title">{{ exp.nombre }}</h4>
-                                <p class="experience-description">{{ exp.descripcion }}</p>
-                                {% if exp.monto_fijo %}
-                                <div class="experience-price">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
-                                <div class="text-muted text-center" style="font-size:0.7rem; margin-top:2px;">IVA incluido</div>
-                                {% else %}
-                                <div class="experience-price">Monto Libre</div>
-                                {% endif %}
-                                <a href="{% url 'ventas:giftcard_wizard' %}?exp={{ exp.id }}&skip_step1=true"
-                                    class="btn btn-experience">
-                                    Regalar Esta Experiencia
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="col-12 text-center py-5">
-                        <p class="text-muted">No hay experiencias de tinas disponibles en este momento.</p>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- MASAJES TAB -->
-            <div class="tab-pane fade" id="masajes" role="tabpanel">
-                <div class="row g-4">
-                    {% for exp in experiencias_por_categoria.masajes %}
-                    <div class="col-md-6 col-lg-3">
-                        <div class="experience-card">
-                            {% if exp.imagen %}
-                            <div class="experience-image"
-                                style="background-image: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('{{ exp.imagen }}');">
-                            </div>
-                            {% else %}
-                            <div class="experience-image"
-                                style="background: linear-gradient(135deg, var(--spa-sage), var(--spa-eucalyptus)); display: flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-spa" style="font-size: 4rem; color: white; opacity: 0.5;"></i>
-                            </div>
-                            {% endif %}
-                            <div class="experience-body">
-                                <h4 class="experience-title">{{ exp.nombre }}</h4>
-                                <p class="experience-description">{{ exp.descripcion }}</p>
-                                {% if exp.monto_fijo %}
-                                <div class="experience-price">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
-                                <div class="text-muted text-center" style="font-size:0.7rem; margin-top:2px;">IVA incluido</div>
-                                {% else %}
-                                <div class="experience-price">Monto Libre</div>
-                                {% endif %}
-                                <a href="{% url 'ventas:giftcard_wizard' %}?exp={{ exp.id }}&skip_step1=true"
-                                    class="btn btn-experience">
-                                    Regalar Esta Experiencia
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="col-12 text-center py-5">
-                        <p class="text-muted">No hay experiencias de masajes disponibles en este momento.</p>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- ALOJAMIENTOS TAB -->
-            <div class="tab-pane fade" id="alojamientos" role="tabpanel">
-                <div class="row g-4">
-                    {% for exp in experiencias_por_categoria.packs %}
-                    <div class="col-md-6 col-lg-4">
-                        <div class="experience-card">
-                            {% if exp.imagen %}
-                            <div class="experience-image"
-                                style="background-image: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('{{ exp.imagen }}');">
-                            </div>
-                            {% else %}
-                            <div class="experience-image"
-                                style="background: linear-gradient(135deg, var(--spa-sage), var(--spa-eucalyptus)); display: flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-home" style="font-size: 4rem; color: white; opacity: 0.5;"></i>
-                            </div>
-                            {% endif %}
-                            <div class="experience-body">
-                                <h4 class="experience-title">{{ exp.nombre }}</h4>
-                                <p class="experience-description">{{ exp.descripcion }}</p>
-                                {% if exp.monto_fijo %}
-                                <div class="experience-price">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
-                                <div class="text-muted text-center" style="font-size:0.7rem; margin-top:2px;">IVA incluido</div>
-                                {% else %}
-                                <div class="experience-price">Monto Libre</div>
-                                {% endif %}
-                                <a href="{% url 'ventas:giftcard_wizard' %}?exp={{ exp.id }}&skip_step1=true"
-                                    class="btn btn-experience">
-                                    Regalar Esta Experiencia
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="col-12 text-center py-5">
-                        <p class="text-muted">No hay experiencias de alojamiento disponibles en este momento.</p>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- MONTO LIBRE TAB -->
-            <div class="tab-pane fade" id="libre" role="tabpanel">
-                <div class="row justify-content-center">
-                    {% for exp in experiencias_por_categoria.valor %}
-                    <div class="col-lg-8">
-                        <div class="experience-card text-center p-5">
-                            <div class="mb-4">
-                                <i class="fas fa-gift" style="font-size: 4rem; color: var(--spa-gold);"></i>
-                            </div>
-                            <h3 class="experience-title mb-3">{{ exp.nombre }}</h3>
-                            <p class="experience-description mb-4">{{ exp.descripcion_giftcard }}</p>
-                            {% if exp.montos_sugeridos %}
-                            <div class="mb-4">
-                                <h5 class="mb-3" style="color: var(--spa-stone);">Montos Sugeridos:</h5>
-                                <div class="d-flex flex-wrap gap-3 justify-content-center">
-                                    {% for monto in exp.montos_sugeridos %}
-                                    <span class="badge"
-                                        style="background: {% if forloop.last %}var(--spa-gold){% else %}var(--spa-sage){% endif %}; font-size: 1rem; padding: 0.75rem 1.5rem;">${{ monto|floatformat:0|intcomma }}</span>
-                                    {% endfor %}
-                                </div>
-                                <p class="text-muted mt-3"><small>O elige el monto que prefieras</small></p>
-                            </div>
-                            {% endif %}
-                            <a href="{% url 'ventas:giftcard_wizard' %}?exp={{ exp.id }}" class="btn btn-primary-spa">
-                                Crear GiftCard de Monto Libre
-                            </a>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="col-lg-8 text-center py-5">
-                        <p class="text-muted">No hay tarjetas de valor disponibles en este momento.</p>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-        </div>
+  <section class="rr-section">
+    <h2 class="rr-h2">Así se ve tu regalo</h2>
+    <p class="rr-h2-sub">Digital, con tu mensaje y su código único — listo para reenviar por WhatsApp o imprimir.</p>
+    <div class="mk-wrap">
+      <div class="mk-card">
+        <div class="mk-logo">Aremko Spa Boutique</div>
+        <p class="mk-exp">Ritual del Río</p>
+        <p class="mk-para">para Carolina &amp; Andrés</p>
+        <p class="mk-msg">"Porque llevan un año postergando esa escapada: agua caliente,
+           bosque y cero excusas. Se lo merecen. — Con cariño, la Vale"</p>
+        <div class="mk-code-label">Tu código</div>
+        <div class="mk-code">AREM-2607-KOPV</div>
+        <div class="mk-valid">Válida por 1 año · cualquier día de la semana · aremko.cl</div>
+      </div>
+      <p class="mk-caption">El regalo llega a tu correo en minutos, con el diseño, tu dedicatoria
+         y el código. Lo reenvías por WhatsApp con un toque — o lo imprimes y lo entregas en mano.</p>
     </div>
-</section>
+  </section>
 
-<!-- AI MESSAGES SECTION -->
-<section class="section-spa ai-section">
-    <div class="container">
-        <div class="text-center mb-5" style="position: relative; z-index: 1;">
-            <h2 class="section-title" style="color: var(--spa-white);">Mensajes Únicos con Inteligencia Artificial</h2>
-            <p class="section-subtitle" style="color: rgba(255,255,255,0.9);">
-                Nuestra IA crea mensajes personalizados para cada ocasión, o escribe el tuyo propio
-            </p>
-        </div>
-        <div class="row g-3 mb-4" style="position: relative; z-index: 1;">
-            <div class="col-6 col-md-4 col-lg-3">
-                <div class="message-type-card">
-                    <div class="message-icon">💕</div>
-                    <div class="message-name">Romántico</div>
-                    <div class="message-description">Para parejas</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-4 col-lg-3">
-                <div class="message-type-card">
-                    <div class="message-icon">🎂</div>
-                    <div class="message-name">Cumpleaños</div>
-                    <div class="message-description">Celebrativo</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-4 col-lg-3">
-                <div class="message-type-card">
-                    <div class="message-icon">💍</div>
-                    <div class="message-name">Aniversario</div>
-                    <div class="message-description">Especial</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-4 col-lg-3">
-                <div class="message-type-card">
-                    <div class="message-icon">🥂</div>
-                    <div class="message-name">Celebración</div>
-                    <div class="message-description">Festivo</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-4 col-lg-3">
-                <div class="message-type-card">
-                    <div class="message-icon">🧘</div>
-                    <div class="message-name">Relajación</div>
-                    <div class="message-description">Tranquilo</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-4 col-lg-3">
-                <div class="message-type-card">
-                    <div class="message-icon">💑</div>
-                    <div class="message-name">Parejas</div>
-                    <div class="message-description">Cómplice</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-4 col-lg-3">
-                <div class="message-type-card">
-                    <div class="message-icon">🙏</div>
-                    <div class="message-name">Agradecimiento</div>
-                    <div class="message-description">Sincero</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-4 col-lg-3">
-                <div class="message-type-card">
-                    <div class="message-icon">👯</div>
-                    <div class="message-name">Amistad</div>
-                    <div class="message-description">Fraternal</div>
-                </div>
-            </div>
-            <div class="col-12 col-md-12 col-lg-12">
-                <div class="message-type-card" style="background: rgba(255,255,255,0.25);">
-                    <div class="message-icon">✍️</div>
-                    <div class="message-name">Escribir Mi Mensaje</div>
-                    <div class="message-description">Crea tu propio mensaje personalizado desde el corazón</div>
-                </div>
-            </div>
-        </div>
-        <div class="text-center" style="position: relative; z-index: 1;">
-            <p style="color: rgba(255,255,255,0.9); font-size: 1.1rem;">
-                <i class="fas fa-magic me-2"></i>
-                La IA genera 3 mensajes únicos en segundos para que elijas tu favorito
-            </p>
-        </div>
+  <section class="rr-section">
+    <h2 class="rr-h2">Regala según la ocasión</h2>
+    <div class="oc-grid">
+      <a class="oc-card" href="{% url 'ventas:giftcard_wizard' %}?exp=ritual_del_rio&skip_step1=true">
+        <span class="oc-emoji">💞</span><p class="oc-t">San Valentín</p><p class="oc-sub">Ritual del Río</p></a>
+      <a class="oc-card" href="{% url 'ventas:giftcard_wizard' %}?exp=refugio_aremko&skip_step1=true">
+        <span class="oc-emoji">💍</span><p class="oc-t">Aniversario</p><p class="oc-sub">Refugio Aremko</p></a>
+      <a class="oc-card" href="{% url 'ventas:giftcard_wizard' %}?exp=pausa_junto_al_rio&skip_step1=true">
+        <span class="oc-emoji">🌷</span><p class="oc-t">Día de la Madre</p><p class="oc-sub">Pausa junto al río</p></a>
+      <a class="oc-card" href="{% url 'ventas:giftcard_wizard' %}?exp=noche_aguas_calientes&skip_step1=true">
+        <span class="oc-emoji">🎂</span><p class="oc-t">Cumpleaños</p><p class="oc-sub">Noche de Aguas Calientes</p></a>
+      <a class="oc-card" href="{% url 'ventas:giftcard_wizard' %}{% if experiencias_valor %}?exp={{ experiencias_valor.0.id }}&skip_step1=true{% endif %}">
+        <span class="oc-emoji">💼</span><p class="oc-t">Regalo corporativo</p><p class="oc-sub">GiftCard de Libertad</p></a>
+      <a class="oc-card" href="{% url 'ventas:giftcard_wizard' %}?exp=pausa_junto_al_rio&skip_step1=true">
+        <span class="oc-emoji">🌿</span><p class="oc-t">Porque sí</p><p class="oc-sub">Pausa junto al río</p></a>
     </div>
-</section>
+  </section>
 
-<!-- OCCASIONS SECTION -->
-<section class="section-spa" style="background: var(--spa-white);">
-    <div class="container">
-        <div class="text-center mb-5">
-            <h2 class="section-title">Regala Según la Ocasión</h2>
-            <p class="section-subtitle">Te ayudamos a elegir la experiencia perfecta</p>
-        </div>
-        <div class="row g-4">
-            <div class="col-md-6 col-lg-4">
-                <div class="occasion-card">
-                    <div class="occasion-icon">💝</div>
-                    <h4 class="occasion-title">San Valentín</h4>
-                    <p class="occasion-product">Paquete Romántico Completo</p>
-                    <a href="{% url 'ventas:giftcard_wizard' %}?exp=alojamiento_romantico" class="btn btn-experience">
-                        Ver Experiencia
-                    </a>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="occasion-card">
-                    <div class="occasion-icon">👩</div>
-                    <h4 class="occasion-title">Día de la Madre</h4>
-                    <p class="occasion-product">Masaje Piedras Calientes</p>
-                    <a href="{% url 'ventas:giftcard_wizard' %}?exp=masaje_piedras" class="btn btn-experience">
-                        Ver Experiencia
-                    </a>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="occasion-card">
-                    <div class="occasion-icon">🎂</div>
-                    <h4 class="occasion-title">Cumpleaños</h4>
-                    <p class="occasion-product">Tina + Ambientación</p>
-                    <a href="{% url 'ventas:giftcard_wizard' %}?exp=tina_cumpleanos" class="btn btn-experience">
-                        Ver Experiencia
-                    </a>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="occasion-card">
-                    <div class="occasion-icon">💍</div>
-                    <h4 class="occasion-title">Aniversario</h4>
-                    <p class="occasion-product">Tina + Masajes Fin de Semana</p>
-                    <a href="{% url 'ventas:giftcard_wizard' %}?exp=tinas_masajes_finde" class="btn btn-experience">
-                        Ver Experiencia
-                    </a>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="occasion-card">
-                    <div class="occasion-icon">🏢</div>
-                    <h4 class="occasion-title">Regalo Corporativo</h4>
-                    <p class="occasion-product">Monto Libre</p>
-                    <a href="{% url 'ventas:giftcard_wizard' %}?exp=monto_libre" class="btn btn-experience">
-                        Ver Experiencia
-                    </a>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="occasion-card">
-                    <div class="occasion-icon">👨‍👩‍👧‍👦</div>
-                    <h4 class="occasion-title">Grupo de Amigos</h4>
-                    <p class="occasion-product">Pack 4 o 6 Personas</p>
-                    <a href="{% url 'ventas:giftcard_wizard' %}?exp=pack_4_personas" class="btn btn-experience">
-                        Ver Experiencia
-                    </a>
-                </div>
-            </div>
-        </div>
+  <section class="rr-section">
+    <h2 class="rr-h2">El mensaje lo escribes tú… o nuestra IA</h2>
+    <div class="ia-chips">
+      <span class="ia-chip">💕 Romántico</span><span class="ia-chip">🎂 Cumpleaños</span>
+      <span class="ia-chip">💍 Aniversario</span><span class="ia-chip">🥂 Celebración</span>
+      <span class="ia-chip">🧘 Relajación</span><span class="ia-chip">💑 Parejas</span>
+      <span class="ia-chip">🙏 Agradecimiento</span><span class="ia-chip">👯 Amistad</span>
     </div>
-</section>
+    <p class="ia-note">Eliges el tono y nuestra IA te propone <strong>3 mensajes únicos</strong> para
+       la dedicatoria — eliges tu favorito, lo ajustas o escribes el tuyo desde cero.</p>
+  </section>
 
-<!-- TESTIMONIALS SECTION -->
-<section class="section-spa" style="background: var(--spa-cream);">
-    <div class="container">
-        <div class="text-center mb-5">
-            <h2 class="section-title">Así se sentirá quien reciba tu GiftCard</h2>
-            <p class="section-subtitle">Reseñas verificadas de nuestros huéspedes en Trip.com y TripAdvisor</p>
-        </div>
-        <div class="row g-4">
-            <div class="col-md-6 col-lg-4">
-                <div class="testimonial-card">
-                    <div class="stars">
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                    </div>
-                    <p class="testimonial-text">
-                        "Hace meses no dormía tan bien y tanto."
-                    </p>
-                    <div class="testimonial-author">
-                        <div class="testimonial-avatar">CF</div>
-                        <div class="testimonial-info">
-                            <h6>CaroFR2015</h6>
-                            <p>Trip.com · Febrero 2026</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="testimonial-card">
-                    <div class="stars">
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                    </div>
-                    <p class="testimonial-text">
-                        "Espectacular, se nota la vocación que tienen, no tengo palabras para describir sus masajes."
-                    </p>
-                    <div class="testimonial-author">
-                        <div class="testimonial-avatar">KR</div>
-                        <div class="testimonial-info">
-                            <h6>Karina R</h6>
-                            <p>Trip.com · Marzo 2026</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="testimonial-card">
-                    <div class="stars">
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                    </div>
-                    <p class="testimonial-text">
-                        "Una visita maravillosa: tina con vista al río, sonidos de la naturaleza y un masaje relajante excepcional. Volvería mil veces."
-                    </p>
-                    <div class="testimonial-author">
-                        <div class="testimonial-avatar">PD</div>
-                        <div class="testimonial-info">
-                            <h6>PiaLuna D</h6>
-                            <p>TripAdvisor · Junio 2025</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <section class="rr-section">
+    <h2 class="rr-h2">Cómo funciona</h2>
+    <div class="ps-grid">
+      <div class="ps-card"><div class="ps-n">1</div><p class="ps-t">Elige la experiencia</p>
+        <p>El Ritual, la Pausa, una noche junto al río — o la libertad de que elijan ellos.</p></div>
+      <div class="ps-card"><div class="ps-n">2</div><p class="ps-t">Personaliza el mensaje</p>
+        <p>Tu dedicatoria, con ayuda de la IA si quieres. El regalo lleva tu voz.</p></div>
+      <div class="ps-card"><div class="ps-n">3</div><p class="ps-t">Llega en minutos</p>
+        <p>Digital, a tu correo: lo reenvías por WhatsApp o lo imprimes. Ellos agendan cuando quieran.</p></div>
     </div>
-</section>
+  </section>
 
-<!-- BENEFITS SECTION -->
-<section class="section-spa" style="background: var(--spa-white);">
-    <div class="container">
-        <div class="text-center mb-5">
-            <h2 class="section-title">¿Por Qué Elegir Aremko?</h2>
-            <p class="section-subtitle">Experiencias de bienestar premium en la Patagonia</p>
-        </div>
-        <div class="row g-4">
-            <div class="col-md-6 col-lg-3">
-                <div class="benefit-card">
-                    <div class="benefit-icon">
-                        <i class="fas fa-mountain"></i>
-                    </div>
-                    <h5 class="benefit-title">Ubicación Privilegiada</h5>
-                    <p class="benefit-text">Junto al Río Pescado con vistas a la naturaleza patagónica</p>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="benefit-card">
-                    <div class="benefit-icon">
-                        <i class="fas fa-user-md"></i>
-                    </div>
-                    <h5 class="benefit-title">Masajistas Profesionales</h5>
-                    <p class="benefit-text">Terapeutas con formación profesional y años de experiencia</p>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="benefit-card">
-                    <div class="benefit-icon">
-                        <i class="fas fa-calendar-check"></i>
-                    </div>
-                    <h5 class="benefit-title">Flexibilidad Total</h5>
-                    <p class="benefit-text">1 año de validez para usar cuando el destinatario prefiera</p>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="benefit-card">
-                    <div class="benefit-icon">
-                        <i class="fas fa-mobile-alt"></i>
-                    </div>
-                    <h5 class="benefit-title">Fácil de Redimir</h5>
-                    <p class="benefit-text">Reserva online o por WhatsApp en minutos</p>
-                </div>
-            </div>
-        </div>
+  <section class="rr-section">
+    <h2 class="rr-h2">Lo que dicen quienes ya vinieron</h2>
+    <div class="rr-revs">
+      <div class="rr-rev"><div class="stars">★★★★★</div>
+        <p class="q">Hace meses no dormía tan bien y tanto.</p>
+        <p class="who">— CaroFR2015 · Trip.com</p></div>
+      <div class="rr-rev"><div class="stars">★★★★★</div>
+        <p class="q">Espectacular, se nota la vocación que tienen, no tengo palabras para describir sus masajes.</p>
+        <p class="who">— Karina R · Trip.com</p></div>
+      <div class="rr-rev"><div class="stars">★★★★★</div>
+        <p class="q">Una visita maravillosa: tina con vista al río, sonidos de la naturaleza y un masaje relajante excepcional. Volvería mil veces.</p>
+        <p class="who">— PiaLuna D · TripAdvisor</p></div>
     </div>
-</section>
+  </section>
 
-<!-- FAQ SECTION -->
-<section class="section-spa" style="background: var(--spa-cream);">
-    <div class="container">
-        <div class="text-center mb-5">
-            <h2 class="section-title">Preguntas Frecuentes</h2>
-            <p class="section-subtitle">Todo lo que necesitas saber sobre nuestras GiftCards</p>
-        </div>
-        <div class="row justify-content-center">
-            <div class="col-lg-8">
-                <div class="accordion faq-accordion" id="faqAccordion">
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button" type="button" data-bs-toggle="collapse"
-                                data-bs-target="#faq1">
-                                ¿Cuánto tiempo es válida la GiftCard?
-                            </button>
-                        </h2>
-                        <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
-                            <div class="accordion-body">
-                                Todas nuestras GiftCards tienen una validez de 1 año (365 días) desde la fecha de
-                                compra. El destinatario tiene total flexibilidad para elegir cuándo quiere disfrutar su
-                                experiencia dentro de ese período.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                data-bs-target="#faq2">
-                                ¿Cómo se entrega la GiftCard?
-                            </button>
-                        </h2>
-                        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                            <div class="accordion-body">
-                                La entrega es 100% digital. Una vez completada la compra, enviamos la GiftCard
-                                inmediatamente por email al destinatario (y/o comprador). También ofrecemos la opción de
-                                envío por WhatsApp. La GiftCard incluye un diseño hermoso, el mensaje personalizado y un
-                                código único de 12 caracteres.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                data-bs-target="#faq3">
-                                ¿Puede el destinatario elegir la fecha de su experiencia?
-                            </button>
-                        </h2>
-                        <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                            <div class="accordion-body">
-                                ¡Absolutamente! El destinatario puede reservar la fecha y hora que más le acomode dentro
-                                del año de validez. Solo debe contactarnos por WhatsApp al +56 9 5790 2525 o reservar
-                                online con su código de GiftCard.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                data-bs-target="#faq4">
-                                ¿Qué pasa si no usa todo el monto de la GiftCard?
-                            </button>
-                        </h2>
-                        <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                            <div class="accordion-body">
-                                Si la GiftCard tiene un saldo mayor al costo de la experiencia elegida, el saldo
-                                restante queda disponible en la misma GiftCard para usar en futuras reservas dentro del
-                                período de validez.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                data-bs-target="#faq5">
-                                ¿Puedo cambiar la experiencia después de comprar?
-                            </button>
-                        </h2>
-                        <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                            <div class="accordion-body">
-                                Las GiftCards de "Monto Libre" permiten total flexibilidad - el destinatario elige lo
-                                que quiera. Para GiftCards de experiencias específicas, el destinatario puede usar el
-                                valor hacia otra experiencia similar. Contáctanos y te ayudamos a encontrar la mejor
-                                solución.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                data-bs-target="#faq6">
-                                ¿Cómo se redime la GiftCard?
-                            </button>
-                        </h2>
-                        <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                            <div class="accordion-body">
-                                Es muy simple: el destinatario contacta por WhatsApp al +56 9 5790 2525, proporciona su
-                                código único de GiftCard, elige fecha y hora preferida, y listo. También puede reservar
-                                directamente en nuestra web ingresando el código durante el proceso de reserva.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                data-bs-target="#faq7">
-                                ¿Puedo comprar múltiples GiftCards a la vez?
-                            </button>
-                        </h2>
-                        <div id="faq7" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                            <div class="accordion-body">
-                                ¡Sí! Puedes crear tantas GiftCards como necesites. Si necesitas comprar grandes
-                                cantidades (10+ GiftCards) para regalos corporativos o eventos, contáctanos directamente
-                                para ofrecerte condiciones especiales y soporte personalizado.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <section class="rr-section">
+    <h2 class="rr-h2">Preguntas frecuentes</h2>
+    <div class="faq-list">
+      <div class="faq-item">
+        <p class="faq-q">¿La GiftCard se puede usar el fin de semana?</p>
+        <p class="faq-a">Sí — vale cualquier día de la semana, incluso viernes y sábado, sin pagar
+           diferencia. El precio de la GiftCard es único.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">¿Cuánto tiempo es válida?</p>
+        <p class="faq-a">1 año completo desde la compra. Tienen 12 meses para vivirla, sin apuro.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">¿Cómo se entrega?</p>
+        <p class="faq-a">100% digital: llega a tu correo en minutos con el diseño, tu mensaje y un
+           código único. La reenvías por WhatsApp con un toque, o la imprimes y la entregas en mano.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">¿Quién elige la fecha de la visita?</p>
+        <p class="faq-a">Quien recibe el regalo: agenda por WhatsApp o en aremko.cl con su código,
+           el día y la hora que le acomoden.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">¿Pueden cambiarla por una experiencia mayor?</p>
+        <p class="faq-a">Sí: la GiftCard vale como parte de pago. Si quieren subir — de la Pausa al
+           Ritual, o del Ritual al Refugio — pagan solo la diferencia.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">¿Es transferible?</p>
+        <p class="faq-a">Sí. La puede usar quien ustedes quieran — el código es al portador.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">¿Y si no usan todo el monto?</p>
+        <p class="faq-a">El saldo queda disponible durante la vigencia para una próxima visita o
+           para productos en el lugar (tablas, jugos, ambientaciones).</p>
+      </div>
     </div>
-</section>
+  </section>
 
-<!-- FINAL CTA SECTION -->
-<section class="cta-final">
-    <div class="container text-center" style="position: relative; z-index: 1;">
-        <h2 class="display-4 mb-3" style="font-weight: 300;">Regala Momentos, No Objetos</h2>
-        <p class="lead mb-4" style="opacity: 0.9;">
-            Crea tu GiftCard personalizada en menos de 5 minutos
-        </p>
-        <div class="mb-4">
-            <a href="{% url 'ventas:giftcard_wizard' %}" class="btn btn-primary-spa btn-lg">
-                <i class="fas fa-gift me-2"></i>Crear Mi GiftCard Ahora
-            </a>
-        </div>
-        <div class="d-flex gap-4 justify-content-center flex-wrap" style="opacity: 0.8;">
-            <div>
-                <i class="fas fa-shield-alt me-2"></i>
-                <span>Pago Seguro</span>
-            </div>
-            <div>
-                <i class="fas fa-bolt me-2"></i>
-                <span>Entrega Inmediata</span>
-            </div>
-            <div>
-                <i class="fas fa-headset me-2"></i>
-                <span>Soporte 24/7</span>
-            </div>
-        </div>
+  <section class="rr-section">
+    <div class="rr-final">
+      <h2 style="margin:0 0 8px;font-size:26px;font-weight:600">Regala momentos, no objetos 🎁</h2>
+      <p style="font-size:17px;color:#5f5a52;margin:0 0 22px">Tu GiftCard queda lista en menos de 5 minutos.</p>
+      <a class="rr-cta" href="{% url 'ventas:giftcard_wizard' %}">Crear mi GiftCard</a>
+      <p class="rr-cta-note">¿Dudas? Escríbenos: <a href="https://wa.me/56957902525" style="color:#0f6e56">+56 9 5790 2525</a> · Aremko Spa Boutique, Puerto Varas</p>
     </div>
-</section>
+  </section>
 
+</div>
+
+{# JSON-LD FAQ (estático, sin floats — sin riesgo de locale) #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "¿La GiftCard se puede usar el fin de semana?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Sí — vale cualquier día de la semana, incluso viernes y sábado, sin pagar diferencia. El precio de la GiftCard es único."}},
+    {"@type": "Question", "name": "¿Cuánto tiempo es válida la GiftCard?",
+     "acceptedAnswer": {"@type": "Answer", "text": "1 año completo desde la compra."}},
+    {"@type": "Question", "name": "¿Cómo se entrega la GiftCard?",
+     "acceptedAnswer": {"@type": "Answer", "text": "100% digital: llega al correo en minutos con el diseño, el mensaje personalizado y un código único, lista para reenviar por WhatsApp o imprimir."}},
+    {"@type": "Question", "name": "¿Es transferible?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Sí, la puede usar quien el comprador quiera — el código es al portador."}}
+  ]
+}
+</script>
 {% endblock %}
 
 {% block extra_script %}
 <script>
-    // Smooth scroll para los enlaces internos
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-            e.preventDefault();
-            const target = document.querySelector(this.getAttribute('href'));
-            if (target) {
-                target.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
-            }
+/* Mide los clics de la página de GiftCards como conversión.
+   GA4: giftcards_regalar_click (por experiencia) / giftcards_crear_click. Meta Pixel: Lead. */
+(function () {
+  function track(evento, experiencia) {
+    try {
+      if (typeof gtag === 'function') {
+        gtag('event', evento, {
+          send_to: 'G-T3K4CTD3HJ',
+          giftcard_experiencia: experiencia || ''
         });
-    });
-
-    // Animation on scroll (opcional - solo si Bootstrap no lo maneja)
-    const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -100px 0px'
-    };
-
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.style.opacity = '1';
-                entry.target.style.transform = 'translateY(0)';
-            }
-        });
-    }, observerOptions);
-
-    document.querySelectorAll('.experience-card, .testimonial-card, .benefit-card').forEach(el => {
-        el.style.opacity = '0';
-        el.style.transform = 'translateY(20px)';
-        el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-        observer.observe(el);
-    });
+      }
+    } catch (e) { /* nunca bloquear la navegación */ }
+    try { if (typeof fbq === 'function') { fbq('track', 'Lead', {content_name: 'GiftCard ' + (experiencia || 'general')}); } } catch (e) {}
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    var links = document.querySelectorAll('a[href*="giftcards/wizard"]');
+    for (var i = 0; i < links.length; i++) {
+      links[i].addEventListener('click', function () {
+        var m = (this.getAttribute('href') || '').match(/exp=([a-z_0-9]+)/);
+        track(m ? 'giftcards_regalar_click' : 'giftcards_crear_click', m ? m[1] : '');
+      });
+    }
+  });
+})();
 </script>
 {% endblock %}
