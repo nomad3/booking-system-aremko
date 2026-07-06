@@ -50,7 +50,7 @@
         justify-content: space-between;
         align-items: center;
         position: relative;
-        margin-bottom: 10px;
+        margin-bottom: 34px; /* espacio para el nombre de cada estación */
     }
 
     .progress-step {
@@ -75,6 +75,33 @@
     .progress-step.completed {
         background-color: #4CAF50;
         color: white;
+    }
+
+    /* Nombre de cada estación bajo el círculo (4 estaciones reales) */
+    .progress-step::after {
+        content: attr(data-label);
+        position: absolute;
+        top: 46px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #999;
+        white-space: nowrap;
+    }
+
+    .progress-step.active::after {
+        color: var(--primary-color);
+    }
+
+    .progress-step.completed::after {
+        color: #4CAF50;
+    }
+
+    @media (max-width: 480px) {
+        .progress-step::after {
+            font-size: 0.6rem;
+        }
     }
 
     .progress-line {
@@ -406,44 +433,11 @@
         animation-fill-mode: both;
     }
 
-    /* Retraso escalonado para animación */
-    .category-group:nth-child(1) .experience-card:nth-child(1) {
-        animation-delay: 0.1s;
-    }
-
-    .category-group:nth-child(1) .experience-card:nth-child(2) {
-        animation-delay: 0.2s;
-    }
-
-    .category-group:nth-child(1) .experience-card:nth-child(3) {
-        animation-delay: 0.3s;
-    }
-
-    /* Colores específicos por categoría */
-    .experience-card[data-experience*="tina"] i {
-        background: linear-gradient(135deg, #2E86AB 0%, #4ECDC4 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    .experience-card[data-experience*="masaje"] i {
-        background: linear-gradient(135deg, #B8336A 0%, #E63946 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    .experience-card[data-experience*="alojamiento"] i {
-        background: linear-gradient(135deg, #2A9D8F 0%, #264653 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    .experience-card[data-experience*="celebracion"] i,
-    .experience-card[data-experience*="cumpleanos"] i {
-        background: linear-gradient(135deg, #F77F00 0%, #FCBF49 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
+    /* Retraso escalonado para animación (4 experiencias insignia) */
+    .experience-card:nth-child(1) { animation-delay: 0.1s; }
+    .experience-card:nth-child(2) { animation-delay: 0.2s; }
+    .experience-card:nth-child(3) { animation-delay: 0.3s; }
+    .experience-card:nth-child(4) { animation-delay: 0.4s; }
 
     /* Mensaje Card Styles */
     .mensaje-card {
@@ -462,79 +456,8 @@
         background-color: rgba(40, 167, 69, 0.05);
     }
 
-    /* Category Group Styles */
-    .category-group {
-        padding: 30px 0;
-        position: relative;
-    }
-
-    .category-group::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 80%;
-        height: 1px;
-        background: linear-gradient(90deg, transparent 0%, rgba(160, 82, 45, 0.2) 50%, transparent 100%);
-    }
-
-    .category-group:last-child::after {
-        display: none;
-    }
-
-    .category-title {
-        font-size: 1.8rem;
-        font-weight: 800;
-        margin-bottom: 35px;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        position: relative;
-        display: inline-block;
-        width: 100%;
-        background: linear-gradient(135deg, #5C4033 0%, #A0522D 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .category-title i {
-        font-size: 1.6rem;
-        margin-right: 12px;
-        opacity: 0.9;
-    }
-
-    /* Estilos específicos por categoría */
-    .category-group:nth-child(1) .category-title {
-        background: linear-gradient(135deg, #2E86AB 0%, #4ECDC4 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    .category-group:nth-child(2) .category-title {
-        background: linear-gradient(135deg, #B8336A 0%, #E63946 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    .category-group:nth-child(3) .category-title {
-        background: linear-gradient(135deg, #2A9D8F 0%, #264653 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    .category-group:nth-child(4) .category-title {
-        background: linear-gradient(135deg, #F77F00 0%, #FCBF49 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    /* Mobile responsiveness for categories */
+    /* Mobile responsiveness */
     @media (max-width: 768px) {
-        .category-title {
-            font-size: 1.3rem;
-        }
-
         .experience-grid {
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 15px;
@@ -563,22 +486,20 @@
         <p>Crea una GiftCard personalizada con un mensaje único</p>
     </div>
 
-    <!-- Progress Bar -->
+    <!-- Progress Bar: 4 ESTACIONES reales (las pantallas "tipo de mensaje" y
+         "mensaje IA" son una sola estación: Mensaje). Ver ESTACION_POR_PANTALLA en el JS. -->
     <div class="wizard-progress">
         <div class="progress-steps">
             <div class="progress-line">
-                <div class="progress-line-fill" id="progressFill" style="width: 14.28%;"></div>
+                <div class="progress-line-fill" id="progressFill" style="width: 0%;"></div>
             </div>
-            <div class="progress-step active" data-step="1">1</div>
-            <div class="progress-step" data-step="2">2</div>
-            <div class="progress-step" data-step="3">3</div>
-            <div class="progress-step" data-step="4">4</div>
-            <div class="progress-step" data-step="5">5</div>
-            <div class="progress-step" data-step="6">6</div>
-            <div class="progress-step" data-step="7">7</div>
+            <div class="progress-step active" data-step="1" data-label="Experiencia">1</div>
+            <div class="progress-step" data-step="2" data-label="Destinatario">2</div>
+            <div class="progress-step" data-step="3" data-label="Mensaje">3</div>
+            <div class="progress-step" data-step="4" data-label="Confirmar">4</div>
         </div>
         <div class="text-center mt-2">
-            <small class="text-muted">Paso <span id="currentStep">1</span> de 7</small>
+            <small class="text-muted">Paso <span id="currentStep">1</span> de 4</small>
         </div>
     </div>
 
@@ -589,120 +510,25 @@
             <h2 class="step-title">Elige la Experiencia</h2>
             <p class="step-subtitle">Selecciona qué experiencia quieres regalar</p>
 
-            <!-- Grupo TINAS -->
-            <div class="category-group mb-4">
-                <h3 class="category-title text-center mb-3">
-                    <i class="fas fa-hot-tub me-2"></i>TINAS
-                </h3>
-                <div class="experience-grid" id="experienceGrid">
-                    {% for exp in experiencias %}
-                    {% if exp.categoria == 'tinas' %}
-                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}"
-                        data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
-                        <!-- Debug: ID={{ exp.id }} Img={{ exp.imagen }} -->
-                        {% if exp.imagen %}
-                        <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
-                        {% else %}
-                        <i class="fas fa-hot-tub"></i>
-                        {% endif %}
-                        <h5>{{ exp.nombre }}</h5>
-                        <p>{{ exp.descripcion }}</p>
-                        <small class="text-muted" style="font-size: 0.7rem;">ID: {{ exp.id }}</small>
-                        {% if exp.monto_fijo %}
-                        <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
-                        <div class="text-muted text-center" style="font-size:0.7rem; margin-top:2px;">IVA incluido</div>
-                        {% endif %}
-                    </div>
+            <!-- Las 4 experiencias insignia (decisión radical 2026-07-05: solo se
+                 regalan experiencias completas — sin grupos por categoría) -->
+            <div class="experience-grid" id="experienceGrid">
+                {% for exp in experiencias %}
+                <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}"
+                    data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
+                    {% if exp.imagen %}
+                    <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
+                    {% else %}
+                    <i class="fas fa-gift"></i>
                     {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- Grupo MASAJES -->
-            <div class="category-group mb-4">
-                <h3 class="category-title text-center mb-3">
-                    <i class="fas fa-spa me-2"></i>MASAJES
-                </h3>
-                <div class="experience-grid">
-                    {% for exp in experiencias %}
-                    {% if exp.categoria == 'masajes' %}
-                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}"
-                        data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
-                        <!-- Debug: ID={{ exp.id }} Img={{ exp.imagen }} -->
-                        {% if exp.imagen %}
-                        <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
-                        {% else %}
-                        <i class="fas fa-spa"></i>
-                        {% endif %}
-                        <h5>{{ exp.nombre }}</h5>
-                        <p>{{ exp.descripcion }}</p>
-                        <small class="text-muted" style="font-size: 0.7rem;">ID: {{ exp.id }}</small>
-                        {% if exp.monto_fijo %}
-                        <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
-                        <div class="text-muted text-center" style="font-size:0.7rem; margin-top:2px;">IVA incluido</div>
-                        {% endif %}
-                    </div>
+                    <h5>{{ exp.nombre }}</h5>
+                    <p>{{ exp.descripcion }}</p>
+                    {% if exp.monto_fijo %}
+                    <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
+                    <div class="text-muted text-center" style="font-size:0.7rem; margin-top:2px;">IVA incluido</div>
                     {% endif %}
-                    {% endfor %}
                 </div>
-            </div>
-
-            <!-- Grupo PACKS SPA -->
-            <div class="category-group mb-4">
-                <h3 class="category-title text-center mb-3">
-                    <i class="fas fa-box-open me-2"></i>PACKS SPA
-                </h3>
-                <div class="experience-grid">
-                    {% for exp in experiencias %}
-                    {% if exp.categoria == 'packs' %}
-                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}"
-                        data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
-                        <!-- Debug: ID={{ exp.id }} Img={{ exp.imagen }} -->
-                        {% if exp.imagen %}
-                        <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
-                        {% else %}
-                        <i class="fas fa-box-open"></i>
-                        {% endif %}
-                        <h5>{{ exp.nombre }}</h5>
-                        <p>{{ exp.descripcion }}</p>
-                        <small class="text-muted" style="font-size: 0.7rem;">ID: {{ exp.id }}</small>
-                        {% if exp.monto_fijo %}
-                        <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
-                        <div class="text-muted text-center" style="font-size:0.7rem; margin-top:2px;">IVA incluido</div>
-                        {% endif %}
-                    </div>
-                    {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- Grupo ALOJAMIENTOS -->
-            <div class="category-group mb-4">
-                <h3 class="category-title text-center mb-3">
-                    <i class="fas fa-bed me-2"></i>ALOJAMIENTOS
-                </h3>
-                <div class="experience-grid">
-                    {% for exp in experiencias %}
-                    {% if exp.categoria == 'alojamientos' %}
-                    <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}"
-                        data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
-                        <!-- Debug: ID={{ exp.id }} Img={{ exp.imagen }} -->
-                        {% if exp.imagen %}
-                        <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
-                        {% else %}
-                        <i class="fas fa-bed"></i>
-                        {% endif %}
-                        <h5>{{ exp.nombre }}</h5>
-                        <p>{{ exp.descripcion }}</p>
-                        <small class="text-muted" style="font-size: 0.7rem;">ID: {{ exp.id }}</small>
-                        {% if exp.monto_fijo %}
-                        <div class="price-tag">${{ exp.monto_fijo|floatformat:0|intcomma }}</div>
-                        <div class="text-muted text-center" style="font-size:0.7rem; margin-top:2px;">IVA incluido</div>
-                        {% endif %}
-                    </div>
-                    {% endif %}
-                    {% endfor %}
-                </div>
+                {% endfor %}
             </div>
 
             <div id="amountSelection" style="display:none;">
@@ -947,128 +773,10 @@
             </div>
         </div>
 
-        <!-- STEP 6: Datos del Comprador (ELIMINADO - ahora se pide en checkout) -->
-        <div class="wizard-step d-none" id="step6">
-            <h2 class="step-title">Tus Datos</h2>
-            <p class="step-subtitle">Necesitamos tus datos para completar la compra</p>
-
-            <form id="compradorForm" class="mx-auto" style="max-width: 600px;">
-                <div class="mb-4">
-                    <label class="form-label fw-bold">Teléfono del Comprador *</label>
-                    <input type="tel" class="form-control" id="compradorTelefono" placeholder="+56 9 1234 5678"
-                        required>
-                    <small class="text-muted">Ingresa tu celular. Si ya eres cliente, autocompletaremos tus
-                        datos</small>
-                    <div id="compradorBuscando" class="d-none mt-2">
-                        <div class="spinner-border spinner-border-sm text-primary" role="status">
-                            <span class="visually-hidden">Buscando...</span>
-                        </div>
-                        <span class="ms-2 text-muted">Buscando tus datos...</span>
-                    </div>
-                    <div id="compradorEncontrado" class="d-none mt-2 alert alert-success py-2">
-                        <i class="fas fa-check-circle me-2"></i>¡Cliente encontrado! Datos autocompletados
-                    </div>
-                </div>
-
-                <div class="mb-4">
-                    <label class="form-label fw-bold">Nombre Completo *</label>
-                    <input type="text" class="form-control" id="compradorNombre" placeholder="Ej: Juan Pérez" required>
-                </div>
-
-                <div class="mb-4">
-                    <label class="form-label fw-bold">Email *</label>
-                    <input type="email" class="form-control" id="compradorEmail" placeholder="tu@email.com" required>
-                    <small class="text-muted">Enviaremos la GiftCard a este correo</small>
-                </div>
-            </form>
-
-            <!-- Botón Agregar al Carrito -->
-            <div class="text-center mt-4">
-                <button type="button" class="btn btn-warning btn-lg px-5 text-white fw-bold"
-                    id="btnAgregarAlCarritoStep6" disabled>
-                    <i class="fas fa-shopping-cart me-2"></i>
-                    Agregar al Carrito
-                </button>
-                <p class="text-muted small mt-3 mb-0">
-                    Después puedes seguir comprando o finalizar tu compra
-                </p>
-
-                <!-- Loading state -->
-                <div id="loadingCarritoStep6" class="d-none mt-4">
-                    <div class="spinner-border text-warning" role="status">
-                        <span class="visually-hidden">Agregando al carrito...</span>
-                    </div>
-                    <p class="mt-2">Agregando al carrito...</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- STEP 8: Agregar al Carrito (antes era step 6) -->
-        <div class="wizard-step" id="step8">
-            <h2 class="step-title">¡Tu GiftCard está Lista!</h2>
-            <p class="step-subtitle">Agrégala al carrito para continuar con tu compra</p>
-
-            <div class="text-center py-4">
-                <!-- Resumen de la GiftCard -->
-                <div class="card mx-auto" style="max-width: 500px;">
-                    <div class="card-body">
-                        <h5 class="card-title mb-4">
-                            <i class="fas fa-gift text-warning me-2"></i>
-                            Resumen de tu GiftCard
-                        </h5>
-
-                        <div class="text-start">
-                            <p class="mb-2">
-                                <strong>Experiencia:</strong>
-                                <span id="resumen-experiencia"></span>
-                            </p>
-                            <p class="mb-2">
-                                <strong>Para:</strong>
-                                <span id="resumen-destinatario"></span>
-                            </p>
-                            <p class="mb-2">
-                                <strong>Email destinatario:</strong>
-                                <span id="resumen-email"></span>
-                            </p>
-                            <p class="mb-2">
-                                <strong>Mensaje:</strong>
-                            </p>
-                            <p class="fst-italic text-muted small" id="resumen-mensaje"
-                                style="max-height: 100px; overflow-y: auto;">
-                            </p>
-                            <hr>
-                            <p class="mb-2">
-                                <strong>Comprador:</strong>
-                                <span id="resumen-comprador"></span>
-                            </p>
-                            <p class="mb-2">
-                                <strong>Email comprador:</strong>
-                                <span id="resumen-comprador-email"></span>
-                            </p>
-                        </div>
-
-                        <div class="mt-4">
-                            <button type="button" class="btn btn-warning btn-lg w-100 text-white fw-bold"
-                                id="btnAgregarAlCarrito">
-                                <i class="fas fa-shopping-cart me-2"></i>
-                                Agregar al Carrito
-                            </button>
-                            <p class="text-muted small mt-3 mb-0">
-                                Después puedes seguir comprando o finalizar tu compra
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Loading state -->
-                <div id="loadingCarrito" class="d-none mt-4">
-                    <div class="spinner-border text-warning" role="status">
-                        <span class="visually-hidden">Agregando al carrito...</span>
-                    </div>
-                    <p class="mt-2">Agregando al carrito...</p>
-                </div>
-            </div>
-        </div>
+        <!-- Pantallas "Tus Datos" (step6) y "¡Tu GiftCard está Lista!" (step8)
+             ELIMINADAS 2026-07-06: eran inalcanzables — el flujo real termina en la
+             Vista Previa (pantalla 5), cuyo botón agrega al carrito directo; los
+             datos del comprador se piden en el checkout. -->
 
         <!-- Navigation Buttons -->
         <div class="wizard-navigation">
@@ -1127,9 +835,13 @@
         destinatario: {},
         tipoMensaje: null,
         detalleEspecial: '',
-        mensajeSeleccionado: null,
-        comprador: {}  // Nuevo: datos del comprador
+        mensajeSeleccionado: null
     };
+
+    // El wizard tiene 5 PANTALLAS internas pero 4 ESTACIONES visibles:
+    // 1 Experiencia · 2 Destinatario · 3 Mensaje (pantallas 3 y 4) · 4 Confirmar.
+    // Con "Escribir Mi Mensaje" la pantalla 4 se salta y la estación no da saltos.
+    const ESTACION_POR_PANTALLA = { 1: 1, 2: 2, 3: 3, 4: 3, 5: 4 };
 
     // Datos de experiencias (desde el backend - JSON serializado correctamente)
     const experiencias = {{ experiencias_json|safe }};
@@ -1532,19 +1244,21 @@
         // Mostrar paso actual
         document.getElementById(`step${currentStep}`).classList.add('active');
 
-        // Actualizar progress bar
+        // Actualizar progress bar por ESTACIÓN (4 reales): las pantallas 3 y 4
+        // (tipo de mensaje + mensaje IA) son la misma estación "Mensaje".
+        const estacion = ESTACION_POR_PANTALLA[currentStep] || 1;
         document.querySelectorAll('.progress-step').forEach((step, index) => {
             step.classList.remove('active', 'completed');
-            if (index + 1 < currentStep) {
+            if (index + 1 < estacion) {
                 step.classList.add('completed');
-            } else if (index + 1 === currentStep) {
+            } else if (index + 1 === estacion) {
                 step.classList.add('active');
             }
         });
 
-        const progressPercentage = ((currentStep - 1) / 4) * 100;  // 5 pasos - 1 = 4
+        const progressPercentage = ((estacion - 1) / 3) * 100;  // 4 estaciones - 1
         document.getElementById('progressFill').style.width = `${progressPercentage}%`;
-        document.getElementById('currentStep').textContent = currentStep;
+        document.getElementById('currentStep').textContent = estacion;
 
         // Mostrar/ocultar botón anterior
         document.getElementById('prevBtn').style.display = currentStep > 1 ? 'block' : 'none';
@@ -1936,150 +1650,9 @@
         console.log('✅ Preview actualizado');
     }
 
-    // Función para actualizar el resumen en Step 6
-    function actualizarResumenStep6() {
-        // Obtener la descripción detallada de la experiencia
-        let expDescripcion = 'Experiencia Aremko Spa';
-        try {
-            const exp = experiencias.find(e => e.id === wizardData.experiencia);
-            expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
-        } catch (error) {
-            console.error('Error al buscar experiencia:', error);
-        }
-
-        document.getElementById('resumen-experiencia').textContent = expDescripcion;
-        document.getElementById('resumen-destinatario').textContent = wizardData.destinatario.nombre;
-        document.getElementById('resumen-email').textContent = wizardData.destinatario.email;
-        document.getElementById('resumen-mensaje').textContent = wizardData.mensajeSeleccionado;
-    }
-
-    // Función para actualizar el resumen en Step 8 (resumen final con comprador)
-    function actualizarResumenStep8() {
-        // Obtener la descripción detallada de la experiencia
-        let expDescripcion = 'Experiencia Aremko Spa';
-        try {
-            const exp = experiencias.find(e => e.id === wizardData.experiencia);
-            expDescripcion = exp ? exp.descripcion_giftcard : 'Experiencia Aremko Spa';
-        } catch (error) {
-            console.error('Error al buscar experiencia:', error);
-        }
-
-        document.getElementById('resumen-experiencia').textContent = expDescripcion;
-        document.getElementById('resumen-destinatario').textContent = wizardData.destinatario.nombre;
-        document.getElementById('resumen-email').textContent = wizardData.destinatario.email;
-        document.getElementById('resumen-mensaje').textContent = wizardData.mensajeSeleccionado;
-        document.getElementById('resumen-comprador').textContent = wizardData.comprador.nombre;
-        document.getElementById('resumen-comprador-email').textContent = wizardData.comprador.email;
-    }
-
-    // Event listener para el botón "Agregar al Carrito"
-    document.getElementById('btnAgregarAlCarrito').addEventListener('click', async function () {
-        const btn = this;
-        const loadingDiv = document.getElementById('loadingCarrito');
-
-        try {
-            // Mostrar loading
-            btn.disabled = true;
-            loadingDiv.classList.remove('d-none');
-
-            // Usar el nombre guardado de la experiencia
-            const expNombre = wizardData.experienciaNombre || 'Experiencia Aremko';
-            console.log('🏷️ Nombre de experiencia guardado:', expNombre);
-
-            // Preparar datos para enviar
-            const giftcardData = {
-                experiencia_id: wizardData.experiencia,
-                experiencia_nombre: expNombre,
-                precio: wizardData.monto,
-                destinatario_nombre: wizardData.destinatario.nombre,
-                destinatario_email: wizardData.destinatario.email,
-                destinatario_telefono: wizardData.destinatario.telefono || '',
-                tipo_mensaje: wizardData.tipoMensaje,
-                mensaje_seleccionado: wizardData.mensajeSeleccionado
-            };
-
-            console.log('📤 Enviando GiftCard al carrito:', giftcardData);
-
-            // Enviar al backend
-            const response = await fetch('/ventas/api/giftcard/agregar-al-carrito/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(giftcardData)
-            });
-
-            console.log('📡 Response status:', response.status);
-
-            // Verificar si la respuesta fue exitosa
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ Error del servidor:', errorText);
-                throw new Error(`Error del servidor (${response.status}): ${errorText}`);
-            }
-
-            const data = await response.json();
-            console.log('📥 Response data:', data);
-
-            if (data.success) {
-                console.log('✅ GiftCard agregada al carrito:', data);
-
-                // Actualizar contador del carrito en navbar (si existe)
-                const cartCount = document.getElementById('cartCount');
-                if (cartCount) {
-                    cartCount.textContent = data.cart_count;
-                }
-
-                // Mostrar mensaje de éxito
-                alert(`🎉 ¡GiftCard agregada al carrito!\n\nCódigo: ${data.codigo}\n\n¿Deseas ir al carrito o seguir comprando?`);
-
-                // Redirigir al carrito
-                window.location.href = data.redirect_url;
-            } else {
-                throw new Error(data.error || 'Error al agregar al carrito');
-            }
-
-        } catch (error) {
-            console.error('❌ Error completo:', error);
-            alert('Error al agregar la GiftCard al carrito: ' + error.message);
-
-            // Restaurar botón
-            btn.disabled = false;
-            loadingDiv.classList.add('d-none');
-        }
-    });
-
-    // Event listener para el botón "Agregar al Carrito" en Step 5
-    // NOTA: Este listener se registra dinámicamente en updateWizardUI() cuando currentStep === 5
-    // Ver líneas ~1290-1369 para la implementación
-
-    // Modificar nextStep() para actualizar preview/resumen cuando llega a step 5, 6, o 8
-    const originalNextStep = nextStep;
-    nextStep = function () {
-        const currentStep = wizardData.paso;
-
-        // Llamar función original
-        originalNextStep();
-
-        // Si llegamos a step 5, actualizar preview
-        if (wizardData.paso === 5) {
-            actualizarPreviewStep5();
-        }
-
-        // Si llegamos a step 6 (preview de GiftCard), actualizar preview
-        if (wizardData.paso === 6) {
-            actualizarPreviewStep5(); // Reutilizar la misma función de preview
-        }
-
-        // Si llegamos a step 8 (resumen final), actualizar resumen completo
-        if (wizardData.paso === 8) {
-            actualizarResumenStep8();
-        }
-    };
-
-    // ============================================
-    // STEP 6 ELIMINADO - Datos del comprador ahora se piden en checkout
-    // ============================================
+    // JS de las pantallas step6/step8 ELIMINADO 2026-07-06 (eran inalcanzables).
+    // El botón real "Agregar al Carrito" vive en la Vista Previa (pantalla 5) y su
+    // listener se registra en updateWizardUI(); nextStep() ya actualiza el preview.
 
     // Inicializar
     updateNextButton();

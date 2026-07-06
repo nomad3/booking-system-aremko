@@ -213,3 +213,27 @@ Nadie pierde, Aremko vende productos extra, y el copy es honesto.
   (por id_experiencia conocido) separadas del resto; sin migraciones.
 - Sin cambios de modelo en Fase 1. (Fase 2.1 sí: campo fecha_envio_programada —
   migración a mano como siempre.)
+
+---
+
+## Ciclo REAL de compra (establecido 2026-07-06 — fix del enredo "7 pasos")
+
+El wizard mostraba 7 estaciones pero solo 5 pantallas existían (2 eran inalcanzables).
+Quedó **claramente establecido en 4 ESTACIONES**:
+
+| Estación | Pantalla(s) | Qué pasa |
+|---|---|---|
+| 1. Experiencia | Vitrina `/ventas/giftcards/` (o pantalla 1 del wizard) | Elige una de las 4 insignia → botón manda al wizard con `?exp=...&skip_step1=true` (estación 1 queda ✓) |
+| 2. Destinatario | Pantalla 2 | Nombre, relación, email (y teléfono opcional) |
+| 3. Mensaje | Pantallas 3 y 4 | Elige el tono → IA genera 3 opciones (con "Escribir Mi Mensaje" la pantalla 4 se salta; la estación no salta) |
+| 4. Confirmar | Pantalla 5 | Vista previa → "Agregar al Carrito" |
+
+**Después del wizard** (fuera de las estaciones): checkout del carrito pide los datos
+del COMPRADOR + pago → el pago dispara el signal que crea la GiftCard real (código
+definitivo) + PDF + email.
+
+Limpieza hecha en el fix:
+- Indicador 7 → 4 estaciones con nombre (Experiencia · Destinatario · Mensaje · Confirmar); mapping `ESTACION_POR_PANTALLA` en el template.
+- Eliminadas las pantallas muertas step6 ("Tus Datos") y step8 ("¡Lista!") + ~330 líneas de HTML/JS inalcanzable.
+- Paso 1 sin grupos de categorías huérfanos (TINAS/MASAJES/ALOJAMIENTOS) — un solo grid con las 4 insignia, sin el "ID:" de debug, imagen optimizada 4:3.
+- Vistas huérfanas eliminadas: `crear_giftcard` (legacy pre-carrito, sin ruta) y `buscar_cliente_por_telefono` (servía al step6 muerto; exponía datos de cliente sin auth) + su URL.

@@ -242,11 +242,10 @@ urlpatterns = [
     # === END MENSAJES WHATSAPP IA ===
 
     # === GIFTCARD WIZARD ===
-    path('giftcards/', giftcard_views.giftcard_menu, name='giftcard_menu'),  # Página de inicio con 3 opciones
+    path('giftcards/', giftcard_views.giftcard_menu, name='giftcard_menu'),  # Vitrina: las 4 experiencias insignia
     path('giftcards/wizard/', giftcard_views.giftcard_wizard, name='giftcard_wizard'),  # Wizard de personalización
     path('api/giftcard/generar-mensajes/', giftcard_views.generar_mensajes_ai, name='generar_mensajes_ai'),
     path('api/giftcard/regenerar-mensaje/', giftcard_views.regenerar_mensaje_ai, name='regenerar_mensaje_ai'),
-    path('api/giftcard/buscar-cliente/', giftcard_views.buscar_cliente_por_telefono, name='buscar_cliente_telefono'),
     path('api/giftcard/agregar-al-carrito/', giftcard_views.agregar_giftcard_al_carrito, name='agregar_giftcard_al_carrito'),
     # Vistas móviles para GiftCards
     path('giftcard/<str:codigo>/view/', giftcard_views.giftcard_mobile_view, name='giftcard_mobile_view'),

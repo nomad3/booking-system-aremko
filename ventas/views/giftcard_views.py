@@ -21,35 +21,32 @@ from ..services.cliente_service import ClienteService
 logger = logging.getLogger(__name__)
 
 
+def _card_optim(url):
+    """Transformación Cloudinary para las cards (vitrina Y wizard): recorte 4:3
+    (más VERTICAL que 16:9 — así no se pierde la altura de los domos/cabañas,
+    Jorge 2026-07-06), encuadre inteligente + formato/calidad auto. Las fotos
+    originales pesan 2-4MB; así se sirven en ~100-200KB (mismo criterio
+    anti-bandwidth de `optimizada`)."""
+    if not url or '/upload/' not in url:
+        return url
+    return url.replace('/upload/', '/upload/c_fill,ar_4:3,g_auto,w_800,f_auto,q_auto/', 1)
+
+
 @require_http_methods(["GET"])
 def giftcard_menu(request):
     """
-    Página de inicio de GiftCards con 3 opciones:
-    1. Comprar y Personalizar 1 GiftCard (activo)
-    2. Comprar Varias GiftCards (próximamente)
-    3. GiftCards para Empresas (próximamente)
-    
-    Ahora lee las experiencias desde la base de datos para mostrar
-    imágenes y precios actualizados en la landing page.
+    Vitrina de GiftCards: las 4 experiencias insignia con carrusel de fotos.
+    El botón "Regalar esta experiencia" manda al wizard con ?exp=...&skip_step1=true.
     """
-    # DECISIÓN RADICAL (Jorge 2026-07-05): solo se regalan EXPERIENCIAS — la página
-    # muestra las 4 insignia + la GiftCard de Libertad (monto libre). Nada de tinas
-    # sueltas ni masajes sueltos (cargar_experiencias_giftcard desactiva el resto).
+    # DECISIÓN RADICAL (Jorge 2026-07-05): solo se regalan EXPERIENCIAS — las 4
+    # insignia, nada más. Ni tinas sueltas, ni masajes sueltos, ni monto libre
+    # (cargar_experiencias_giftcard desactiva el resto).
     # Fallback de emergencia: ?classic=1 → template anterior (tabs por categoría).
     experiencias_db = GiftCardExperiencia.objects.filter(activo=True).order_by('orden', 'nombre')
     experiencias = [exp.to_dict() for exp in experiencias_db]
 
     def _clp(v):
         return '$' + f'{int(v):,}'.replace(',', '.')
-
-    def _card_optim(url):
-        """Transformación Cloudinary para las cards: recorte 4:3 (más VERTICAL que
-        16:9 — así no se pierde la altura de los domos/cabañas, Jorge 2026-07-06),
-        encuadre inteligente + formato/calidad auto. Las fotos originales pesan 2-4MB;
-        así se sirven en ~100-200KB (mismo criterio anti-bandwidth de `optimizada`)."""
-        if not url or '/upload/' not in url:
-            return url
-        return url.replace('/upload/', '/upload/c_fill,ar_4:3,g_auto,w_800,f_auto,q_auto/', 1)
 
     for exp in experiencias:
         exp['precio_str'] = _clp(exp['monto_fijo']) if exp.get('monto_fijo') else ''
@@ -244,122 +241,9 @@ def regenerar_mensaje_ai(request):
         }, status=500)
 
 
-@csrf_exempt
-@require_http_methods(["POST"])
-def crear_giftcard(request):
-    """
-    Endpoint para crear una GiftCard personalizada con mensaje IA
-
-    POST /api/giftcard/crear/
-
-    Body JSON:
-    {
-        "monto_inicial": 50000,
-        "dias_validez": 180,
-        "comprador_nombre": "Juan Pérez",
-        "comprador_email": "juan@example.com",
-        "comprador_telefono": "+56912345678",
-        "destinatario_nombre": "María",
-        "destinatario_email": "maria@example.com",  // Opcional
-        "destinatario_telefono": "+56987654321",  // Opcional
-        "destinatario_relacion": "esposa",
-        "detalle_especial": "Celebrando 10 años juntos",  // Opcional
-        "tipo_mensaje": "aniversario",
-        "mensaje_personalizado": "Mensaje seleccionado...",
-        "mensaje_alternativas": ["Mensaje 1", "Mensaje 2", "Mensaje 3"],
-        "servicio_asociado": "tinas"  // Opcional
-    }
-
-    Response:
-    {
-        "success": true,
-        "giftcard_id": 123,
-        "codigo": "GIFT-ABC123",
-        "monto_inicial": 50000,
-        "fecha_vencimiento": "2025-05-15",
-        "estado": "por_cobrar"
-    }
-    """
-    try:
-        # Parsear body JSON
-        data = json.loads(request.body)
-
-        # Validar campos requeridos mínimos
-        monto_inicial = data.get('monto_inicial')
-        comprador_nombre = data.get('comprador_nombre')
-        destinatario_nombre = data.get('destinatario_nombre')
-        tipo_mensaje = data.get('tipo_mensaje')
-        mensaje_personalizado = data.get('mensaje_personalizado')
-
-        if not all([monto_inicial, comprador_nombre, destinatario_nombre, tipo_mensaje, mensaje_personalizado]):
-            return JsonResponse({
-                'success': False,
-                'error': 'Campos requeridos: monto_inicial, comprador_nombre, destinatario_nombre, tipo_mensaje, mensaje_personalizado'
-            }, status=400)
-
-        # Validar monto
-        try:
-            monto_decimal = Decimal(str(monto_inicial))
-            if monto_decimal <= 0:
-                raise ValueError("El monto debe ser mayor a 0")
-        except (ValueError, TypeError) as e:
-            return JsonResponse({
-                'success': False,
-                'error': f'Monto inválido: {str(e)}'
-            }, status=400)
-
-        # Días de validez (default 180 días)
-        dias_validez = int(data.get('dias_validez', 180))
-
-        # Calcular fecha de vencimiento
-        fecha_vencimiento = timezone.now().date() + timezone.timedelta(days=dias_validez)
-
-        # Crear GiftCard
-        giftcard = GiftCard.objects.create(
-            monto_inicial=monto_decimal,
-            monto_disponible=monto_decimal,
-            fecha_emision=timezone.now().date(),
-            fecha_vencimiento=fecha_vencimiento,
-            estado='por_cobrar',  # Inicial, luego cambia a 'cobrado' tras pago
-
-            # Datos del comprador
-            comprador_nombre=comprador_nombre,
-            comprador_email=data.get('comprador_email', ''),
-            comprador_telefono=data.get('comprador_telefono', ''),
-
-            # Datos del destinatario
-            destinatario_nombre=destinatario_nombre,
-            destinatario_email=data.get('destinatario_email', ''),
-            destinatario_telefono=data.get('destinatario_telefono', ''),
-            destinatario_relacion=data.get('destinatario_relacion', ''),
-            detalle_especial=data.get('detalle_especial', ''),
-
-            # Configuración de mensaje IA
-            tipo_mensaje=tipo_mensaje,
-            mensaje_personalizado=mensaje_personalizado,
-            mensaje_alternativas=data.get('mensaje_alternativas', []),
-
-            # Servicio asociado (opcional)
-            servicio_asociado=data.get('servicio_asociado', '')
-        )
-
-        logger.info(f"GiftCard creada: {giftcard.codigo} - Monto: ${monto_decimal} - Comprador: {comprador_nombre}")
-
-        return JsonResponse({
-            'success': True,
-            'giftcard_id': giftcard.id,
-            'codigo': giftcard.codigo,
-            'monto_inicial': float(giftcard.monto_inicial),
-            'fecha_vencimiento': giftcard.fecha_vencimiento.isoformat(),
-            'estado': giftcard.estado
-        }, status=201)
-
-    except Exception as e:
-        logger.error(f"Error en crear_giftcard: {str(e)}", exc_info=True)
-        return JsonResponse({
-            'success': False,
-            'error': 'Error al crear GiftCard. Intente nuevamente.'
-        }, status=500)
+# Vista legacy `crear_giftcard` ELIMINADA 2026-07-06: era del flujo viejo pre-carrito,
+# no estaba ruteada en urls.py y nadie la llamaba. La GiftCard real se crea tras el
+# pago (signal sobre Pago) a partir de agregar_giftcard_al_carrito + checkout.
 
 
 @require_http_methods(["GET"])
@@ -425,18 +309,20 @@ def consultar_giftcard(request, codigo):
 @require_http_methods(["GET"])
 def giftcard_wizard(request):
     """
-    Página principal del wizard de compra de GiftCards
+    Wizard de creación de GiftCards — 4 ESTACIONES (5 pantallas internas):
 
-    GET /giftcards/
-    GET /giftcards/?exp=alojamiento_semana  (pre-selecciona experiencia)
+    1. Experiencia   — pantalla 1 (se salta con ?exp=...&skip_step1=true desde la vitrina)
+    2. Destinatario  — pantalla 2
+    3. Mensaje       — pantallas 3 (tipo) y 4 (elegir el generado por IA; con
+                       "Escribir Mi Mensaje" la 4 se salta)
+    4. Confirmar     — pantalla 5 (vista previa) → botón "Agregar al Carrito"
 
-    Wizard de 6 pasos:
-    1. Seleccionar experiencia/monto
-    2. Datos del destinatario
-    3. Tipo de mensaje
-    4. Generar y elegir mensaje IA
-    5. Preview de giftcard
-    6. Checkout
+    Después del wizard: checkout (datos del comprador + pago) → el pago dispara el
+    signal que crea la GiftCard real + PDF + email. Ver ESTACION_POR_PANTALLA en el
+    template (giftcard_wizard.html).
+
+    GET /ventas/giftcards/wizard/
+    GET /ventas/giftcards/wizard/?exp=ritual_del_rio&skip_step1=true  (desde la vitrina)
     """
 
     # ============================================================
@@ -460,6 +346,8 @@ def giftcard_wizard(request):
         else:
             # Mantener None que se convertirá a null en JavaScript
             exp_dict['monto_fijo'] = None
+        # Card liviana: mismo recorte 4:3 optimizado que la vitrina
+        exp_dict['imagen'] = _card_optim(exp_dict.get('imagen') or '')
         experiencias.append(exp_dict)
 
     # Si no hay experiencias en BD, fallback a array vacío
@@ -563,7 +451,7 @@ def giftcard_wizard(request):
         'tipos_mensaje': tipos_mensaje,
         'experiencia_preseleccionada': experiencia_preseleccionada,  # Nuevo: para pre-selección
         'paso_actual': 1,
-        'total_pasos': 5  # 1:Experiencia, 2:Destinatario, 3:Tipo, 4:Mensaje, 5:Preview (Comprador ahora en checkout)
+        'total_pasos': 4  # 4 ESTACIONES: Experiencia, Destinatario, Mensaje, Confirmar (ver docstring)
     }
 
     # Renderizar respuesta con headers anti-caché para Cloudflare
@@ -577,88 +465,10 @@ def giftcard_wizard(request):
     return response
 
 
-@csrf_exempt
-@require_http_methods(["POST"])
-def buscar_cliente_por_telefono(request):
-    """
-    Busca un cliente por teléfono para autocompletar datos en el wizard
-    Usa búsqueda robusta con múltiples variantes de formato
-
-    POST /ventas/api/giftcard/buscar-cliente/
-
-    Body JSON:
-    {
-        "telefono": "+56912345678"
-    }
-
-    Response:
-    {
-        "success": true,
-        "encontrado": true,
-        "cliente": {
-            "nombre": "Juan Pérez",
-            "email": "juan@example.com",
-            "telefono": "+56912345678",
-            "telefono_display": "+56 9 1234 5678",
-            "documento_identidad": "12345678-9",
-            "region_id": 10,
-            "region_nombre": "Los Lagos",
-            "comuna_id": 101,
-            "comuna_nombre": "Puerto Varas",
-            "pais": "Chile",
-            "numero_visitas": 3,
-            "gasto_total": 150000.0,
-            "datos_completos": true
-        }
-    }
-    """
-    try:
-        data = json.loads(request.body)
-        telefono_input = data.get('telefono', '').strip()
-
-        if not telefono_input:
-            return JsonResponse({
-                'success': False,
-                'error': 'Teléfono requerido'
-            }, status=400)
-
-        logger.info(f"🔍 Búsqueda robusta de cliente con teléfono: {telefono_input}")
-
-        # Usar servicio robusto de búsqueda
-        cliente, telefono_normalizado = ClienteService.buscar_cliente_por_telefono(telefono_input)
-
-        if cliente:
-            # Obtener datos completos del cliente con relaciones
-            datos_cliente = ClienteService.obtener_datos_completos_cliente(cliente)
-
-            logger.info(f"✅ Cliente encontrado: {cliente.nombre} ({cliente.email}) - Teléfono normalizado: {telefono_normalizado}")
-
-            return JsonResponse({
-                'success': True,
-                'encontrado': True,
-                'telefono_normalizado': telefono_normalizado,
-                'cliente': datos_cliente['cliente']
-            })
-        else:
-            logger.info(f"ℹ️ Cliente no encontrado con teléfono: {telefono_input}")
-            return JsonResponse({
-                'success': True,
-                'encontrado': False,
-                'telefono_normalizado': telefono_normalizado
-            })
-
-    except json.JSONDecodeError:
-        return JsonResponse({
-            'success': False,
-            'error': 'JSON inválido'
-        }, status=400)
-
-    except Exception as e:
-        logger.error(f"Error en buscar_cliente_por_telefono: {str(e)}", exc_info=True)
-        return JsonResponse({
-            'success': False,
-            'error': 'Error al buscar cliente'
-        }, status=500)
+# Vista `buscar_cliente_por_telefono` ELIMINADA 2026-07-06: servía a la pantalla
+# "Tus Datos" (step6) del wizard, muerta desde que el comprador se pide en el
+# checkout. Nadie la llamaba y exponía datos de clientes sin autenticación.
+# (ClienteService.buscar_cliente_por_telefono —el método de servicio— sigue vivo.)
 
 
 @csrf_exempt
