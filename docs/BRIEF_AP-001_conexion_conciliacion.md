@@ -82,10 +82,11 @@ El repo YA tiene una integración **Mercado Pago "Link" real** (no stub):
   debe resolver es el resto: **transferencias** que el cliente hace a la cuenta de Aremko (banco o MP
   Cuenta Vista), que llegan **sin `reserva_id`** y hoy Deborah matchea a mano. Esas NO disparan este
   webhook → su rastro es el **correo de aviso** ("Recibiste $X de [nombre]"). **→ Fuente = Gmail.**
-- ⚠️ **Bug detectado (aparte, flagueado):** el webhook hace `Pago.objects.create()` directo y **no
-  recalcula el saldo** (los signals de `Pago` retornan temprano si no es giftcard) → la reserva queda
-  `pendiente` aunque el pago MP haya llegado. Debe usar `reserva.registrar_pago(...)`. Arreglar antes
-  de activar MP Link en prod. (No bloquea AP-001.)
+- ✅ **Bug del saldo CORREGIDO (2026-07-06):** el webhook ahora usa `reserva.registrar_pago(...)`
+  (crea el `Pago` Y recalcula `pagado`/`saldo`/`estado_pago`) + guard de monto > 0. Antes hacía
+  `Pago.objects.create()` directo y la reserva quedaba `pendiente` con la plata adentro. MP Link
+  sigue INACTIVO en prod (falta `MERCADOPAGO_ACCESS_TOKEN` en settings/env) — al activarlo, este
+  camino ya queda sano.
 
 ## 8. Decisiones (estado 2026-06-30)
 1. **¿Dónde viven los movimientos bancarios?** (A) Lean: AgentProvision los tiene, Django solo recibe el pago aplicado + auditoría (recomendado para MVP). (B) Completo: Django guarda `MovimientoBancario` + `ReconciliacionLog`. → **PENDIENTE (única que falta para construir PASO 2).**

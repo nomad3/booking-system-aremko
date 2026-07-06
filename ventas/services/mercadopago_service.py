@@ -198,24 +198,28 @@ class MercadoPagoService:
             status = payment_status.get('status')
             
             if status == 'approved':
-                # Pago aprobado - crear registro de pago
+                monto = payment_status.get('transaction_amount') or 0
+                if monto <= 0:
+                    return {'success': False, 'error': 'Monto inválido en el pago aprobado'}
+
+                # Pago aprobado - registrar vía el mecanismo oficial
                 with transaction.atomic():
                     # Verificar si ya existe el pago
                     existing_payment = Pago.objects.filter(
                         venta_reserva=reserva,
                         metodo_pago='mercadopago_link',
-                        monto=payment_status.get('transaction_amount', 0)
+                        monto=monto
                     ).first()
-                    
+
                     if not existing_payment:
-                        Pago.objects.create(
-                            venta_reserva=reserva,
-                            monto=payment_status.get('transaction_amount', 0),
-                            metodo_pago='mercadopago_link',
-                            fecha_pago=timezone.now()
-                        )
+                        # registrar_pago crea el Pago Y recalcula pagado/saldo/
+                        # estado_pago. Antes se hacía Pago.objects.create() directo
+                        # y la reserva quedaba 'pendiente' con la plata adentro
+                        # (los signals de Pago no recalculan si no es giftcard).
+                        # Detectado en el brief AP-001 (§7).
+                        reserva.registrar_pago(monto, 'mercadopago_link')
                         logger.info(f"Pago Mercado Pago procesado para reserva {reserva_id}")
-                    
+
                 return {'success': True, 'message': 'Pago procesado correctamente'}
             
             elif status in ['rejected', 'cancelled']:
