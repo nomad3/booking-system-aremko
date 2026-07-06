@@ -234,3 +234,44 @@ def recon_aplicar_pago(request):
     logger.info('Conciliación aplicada: ref=%s reserva=%s monto=%s → estado=%s',
                 referencia, reserva.id, monto, reserva.estado_pago)
     return JsonResponse(_respuesta_reconciliacion(log, reserva, ya_aplicado=False))
+
+
+@csrf_exempt
+@require_http_methods(['GET', 'POST'])
+def recon_traer_pagos_mp(request):
+    """GET/POST /ventas/api/aremko-cli/recon/traer-pagos-mp/?dias=3
+
+    Conciliador F1: trae los pagos nuevos desde la API de Mercado Pago y los
+    deja en la cola del admin con su sugerencia calculada. Idempotente (los
+    mp_payment_id ya vistos se saltan) — pensado para el cron (cron-job.org)
+    cada pocas horas; el botón del admin hace exactamente lo mismo.
+    Auth: AUTOMATION_API_KEY (X-API-KEY).
+    """
+    auth = _require_api_key(request)
+    if auth:
+        return auth
+
+    from conciliacion.services_mp import traer_pagos_mp
+
+    try:
+        dias = min(max(int(request.GET.get('dias', 3)), 1), 30)
+    except (TypeError, ValueError):
+        dias = 3
+
+    try:
+        nuevos, total_api = traer_pagos_mp(dias=dias)
+    except Exception as e:
+        logger.error(f'recon_traer_pagos_mp: fallo consultando MP: {e}', exc_info=True)
+        return JsonResponse({'success': False, 'error': str(e)}, status=502)
+
+    sugeridos = sum(1 for m in nuevos if m.estado == 'sugerido')
+    logger.info(f'Conciliador F1 (cron): {len(nuevos)} nuevos de {total_api} '
+                f'({sugeridos} con sugerencia), ventana {dias}d')
+    return JsonResponse({
+        'success': True,
+        'dias': dias,
+        'total_api': total_api,
+        'nuevos': len(nuevos),
+        'con_sugerencia': sugeridos,
+        'a_revisar': len(nuevos) - sugeridos,
+    })
