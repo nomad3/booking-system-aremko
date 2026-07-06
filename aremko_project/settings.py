@@ -558,6 +558,12 @@ FLOW_STATUS_API_URL = os.getenv("FLOW_STATUS_API_URL", "https://www.flow.cl/api/
 FLOW_CONFIRMATION_URL = os.getenv("FLOW_CONFIRMATION_URL", "https://www.aremko.cl/payment/confirmation/")
 FLOW_RETURN_URL = os.getenv("FLOW_RETURN_URL", "https://www.aremko.cl/payment/return/")
 
+# Mercado Pago (Conciliador de pagos + MP Link). Token = app "link de pagos web"
+# de la cuenta MP de Aremko (panel MP Developers → Integraciones → Credenciales
+# de producción). Sin token, MP Link y el conciliador MP quedan inactivos.
+MERCADOPAGO_ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
+MERCADOPAGO_SANDBOX = os.getenv("MERCADOPAGO_SANDBOX", "false").lower() == "true"
+
 # ──────────────── Meta (Facebook) Pixel + Conversions API ────────────────
 # Pixel ID: se inyecta en templates via context processor (meta_pixel_processor).
 # CAPI token: se genera en Meta Business → Events Manager → Settings → Generate Access Token.
