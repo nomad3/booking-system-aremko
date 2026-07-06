@@ -58,7 +58,9 @@ class GiftCardAIService:
         tono = GiftCardAIService.TONOS_MENSAJE[tipo_mensaje]
 
         # Construir prompt para DeepSeek
-        prompt = f"""Genera {cantidad} frases breves (entre 25 y 50 palabras), emocionales, elegantes y memorables para una giftcard del Spa "Aremko Aguas Calientes & Spa", localizado en Puerto Varas.
+        # Jorge (2026-07-06): mensajes BREVES — antes el rango era 25-50 palabras y
+        # las cartas quedaban con párrafos; ahora 10-15 palabras, una sola idea.
+        prompt = f"""Genera {cantidad} dedicatorias BREVES (entre 10 y 15 palabras cada una, ni una más), emocionales y elegantes para una giftcard de "Aremko Spa Boutique", en Puerto Varas.
 
 Tono seleccionado: {tono}.
 
@@ -68,20 +70,18 @@ Datos del destinatario:
 - Detalle especial: {detalle if detalle else 'No especificado'}
 
 Objetivo:
-Crear mensajes únicos, cálidos, inspiradores y personales, dignos de un regalo especial. Deben sonar humanos, íntimos y auténticos. Evita clichés. Cada mensaje debe mencionar el nombre del destinatario de forma natural.
+Dedicatorias cortas como las de una tarjeta de regalo: UNA sola idea o imagen por frase, cálidas, humanas y personales. Evita clichés. Cada una debe mencionar el nombre del destinatario de forma natural.
 
-Contexto del spa (MUY IMPORTANTE - mencionar en los mensajes):
-- Ubicado en un rincón mágico de Puerto Varas
-- Junto al RUIDOSO RÍO PESCADO (NO es un lugar silencioso, el río suena fuerte)
-- En medio de un ANTIGUO BOSQUE NATIVO (naturaleza virgen, árboles centenarios)
-- Tiene TINAS CON AGUAS CALIENTES (NO son "aguas termales", son "aguas calientes")
-- Experiencias de masajes, relax y romance en la naturaleza
+Contexto del spa (para inspirar la imagen elegida):
+- Junto al río Pescado, que suena fuerte
+- En medio de un antiguo bosque nativo
+- Tinas con AGUAS CALIENTES (NO son "aguas termales")
 
 RESTRICCIONES CRÍTICAS:
-- NUNCA uses "aguas termales" → siempre di "aguas calientes"
-- SIEMPRE menciona el bosque nativo o la naturaleza
-- Menciona el río Pescado cuando sea apropiado
-- El ambiente es natural, rústico y conectado con la naturaleza
+- MÁXIMO 15 palabras por frase — cuenta las palabras antes de responder
+- UNA sola idea o imagen por frase: NO encadenes metáforas (nada de "el susurro del bosque y la fuerza del río te invitan a soltar, sentir y renacer")
+- NUNCA uses "aguas termales" → siempre "aguas calientes"
+- Menciona a lo más UN elemento del lugar (el río, el bosque O las aguas calientes)
 
 IMPORTANTE: Retorna SOLO las {cantidad} frases, una por línea, sin numeración, viñetas ni comentarios adicionales. Cada frase debe ser completa y autosuficiente."""
 
@@ -165,7 +165,9 @@ IMPORTANTE: Retorna SOLO las {cantidad} frases, una por línea, sin numeración,
         # Obtener tono
         tono = GiftCardAIService.TONOS_MENSAJE.get(tipo_mensaje, 'cálido y personal')
 
-        prompt = f"""Genera UNA frase breve (entre 25 y 50 palabras), emocional, elegante y memorable para una giftcard del Spa "Aremko Aguas Calientes & Spa", localizado en Puerto Varas.
+        # Mismo criterio de brevedad que generar_mensajes (Jorge 2026-07-06):
+        # 10-15 palabras, una sola idea — antes 25-50 y salían párrafos.
+        prompt = f"""Genera UNA dedicatoria BREVE (entre 10 y 15 palabras, ni una más), emocional y elegante para una giftcard de "Aremko Spa Boutique", en Puerto Varas.
 
 Tono: {tono}.
 
@@ -176,17 +178,16 @@ Destinatario:
 
 {contexto_previos}
 
-Contexto del spa (MUY IMPORTANTE):
-- Ubicado en un rincón mágico de Puerto Varas
-- Junto al RUIDOSO RÍO PESCADO
-- En medio de un ANTIGUO BOSQUE NATIVO
-- Tiene TINAS CON AGUAS CALIENTES (NO "aguas termales")
-- Ambiente natural, rústico y romántico
+Contexto del spa (para inspirar la imagen elegida):
+- Junto al río Pescado, que suena fuerte
+- En medio de un antiguo bosque nativo
+- Tinas con AGUAS CALIENTES (NO "aguas termales")
 
 RESTRICCIONES CRÍTICAS:
-- NUNCA uses "aguas termales" → siempre di "aguas calientes"
-- SIEMPRE menciona el bosque nativo o la naturaleza
-- Menciona el río Pescado cuando sea apropiado
+- MÁXIMO 15 palabras — cuenta las palabras antes de responder
+- UNA sola idea o imagen: NO encadenes metáforas
+- NUNCA uses "aguas termales" → siempre "aguas calientes"
+- Menciona a lo más UN elemento del lugar (el río, el bosque O las aguas calientes)
 
 IMPORTANTE:
 - Retorna SOLO la frase, sin numeración ni comentarios
