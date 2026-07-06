@@ -46,6 +46,70 @@
   `keyword_root`, `intro`, `body_md`, `cta_text`/`cta_url`. Recordar la regla
   de voz/humor obligatorio del blog (no genérico, con personalidad).
 
+## Fuente de datos externa — DataForSEO (rankings reales + competidores)
+
+> Agregado 2026-07-06. GA4/GSC dicen cómo le va a **Aremko**; GSC nunca muestra
+> quién aparece ARRIBA en Google, ni el volumen de búsqueda real de keywords
+> candidatas que Aremko todavía no rankea. DataForSEO llena ese hueco. Cuenta
+> paga por uso (dataforseo.com), fondeada por Jorge — usar con criterio de
+> costo, no automatizar sin límite.
+
+**Credenciales** (Keychain de este Mac, servicio `aremko-dataforseo`):
+```bash
+API_LOGIN=$(security find-generic-password -a 'api_login' -s 'aremko-dataforseo' -w)
+API_PASSWORD=$(security find-generic-password -a 'api_password' -s 'aremko-dataforseo' -w)
+```
+**Nunca** imprimir `$API_PASSWORD` ni pegarlo en esta bitácora ni en ningún
+commit — usarlo solo inline dentro del `curl` de la misma sesión.
+
+**Consciencia de costo (pago por uso — revisar antes de gastar):**
+- Chequeo de saldo (gratis, no gasta): `curl -s -u "${API_LOGIN}:${API_PASSWORD}" "https://api.dataforseo.com/v3/appendix/user_data"`
+- SERP rank check: ~$0.0006/keyword. La lista fija de abajo (8 keywords) =
+  **~$0.005/semana** — hacerlo cada ciclo, es trivial.
+- Backlinks summary: ~$0.02-0.05/consulta — usar **como mucho 1 vez al mes**,
+  no cada ciclo.
+- Competidores por solapamiento de keywords (`dataforseo_labs`) y volumen de
+  keywords nuevas: usar **solo cuando se está evaluando un tema de contenido
+  concreto** (p.ej. antes de proponer un BlogPost nuevo), no de forma rutinaria.
+
+**Lista fija de keywords a trackear cada ciclo** (no cambiar sin avisar a
+Jorge — la comparación semana a semana pierde sentido si la lista varía):
+`spa puerto varas`, `masajes puerto varas`, `tinajas puerto varas`, `termas
+puerto varas`, `termas en puerto varas`, `cabaña con tina caliente puerto
+varas`, `escapada romántica puerto varas`, `aremko`.
+
+**Rank check (repetir por cada keyword de la lista fija):**
+```bash
+curl -s -u "${API_LOGIN}:${API_PASSWORD}" -H "Content-Type: application/json" \
+  -d '[{"keyword":"KEYWORD_AQUI","location_name":"Chile","language_code":"es","device":"desktop","depth":20}]' \
+  "https://api.dataforseo.com/v3/serp/google/organic/live/advanced"
+```
+Extraer de `tasks[0].result[0].items` (`type == "organic"`): la posición
+(`rank_absolute`) donde aparece un `domain` que contenga "aremko", y qué
+dominios aparecen ANTES (competidores reales en esa keyword específica).
+
+**Backlinks summary (mensual, no cada ciclo):**
+```bash
+curl -s -u "${API_LOGIN}:${API_PASSWORD}" -H "Content-Type: application/json" \
+  -d '[{"target":"aremko.cl"}]' \
+  "https://api.dataforseo.com/v3/backlinks/summary/live"
+```
+
+**Competidores por solapamiento de keywords (on-demand, al evaluar contenido nuevo):**
+```bash
+curl -s -u "${API_LOGIN}:${API_PASSWORD}" -H "Content-Type: application/json" \
+  -d '{"tasks":[{"target":"aremko.cl","location_name":"Chile","language_name":"Spanish"}]}' \
+  "https://api.dataforseo.com/v3/dataforseo_labs/google/competitors_domain/live"
+```
+Nota el formato distinto (`{"tasks":[...]}` envuelto) vs. los endpoints de
+arriba (array plano `[...]`) — DataForSEO Labs usa el wrapper, SERP/Backlinks no.
+
+**Competidores reales detectados hasta ahora** (aparecen arriba de aremko.cl en
+al menos 1 keyword protegida, verificado 2026-07-06): `wyndhampettra.com`,
+`hotelbellavista.cl`, `hotelcabanadellago.cl`, `puerto-varas.dreams.cl`. Si uno
+se repite en varias keywords o sube, vale la pena revisar su backlink
+profile/contenido para entender por qué gana.
+
 ## Qué hacer en cada ciclo
 
 1. Leer la última entrada de este archivo (qué se propuso, si Jorge respondió algo).
@@ -57,7 +121,10 @@
 
    Sin auth, sin token. Aplicar la regla de arriba sobre semanas GSC en cero.
 
-3. Opcional, para ver si el tráfico orgánico se traduce en negocio real (mismo
+3. Rank check con DataForSEO sobre la lista fija de keywords (ver sección de
+   arriba) — comparar contra la posición que reporta GSC para las keywords
+   protegidas, y anotar qué dominios aparecen arriba en cada una.
+4. Opcional, para ver si el tráfico orgánico se traduce en negocio real (mismo
    criterio "no confiar solo en la plataforma" que los loops de ads, aunque acá
    el vínculo es más indirecto que en ads):
 
@@ -65,16 +132,18 @@
    curl "https://www.aremko.cl/ventas/api/aremko-cli/bookings/family-combinations-range/?date_start=<inicio semana>&date_stop=<fin semana>"
    ```
 
-4. Comparar contra la última entrada de la bitácora: ¿subió/bajó el tráfico
-   orgánico?, ¿alguna keyword protegida perdió posición?, ¿algún `top_query`
-   nuevo con volumen que no tiene contenido dedicado?
-5. Producir 1-3 recomendaciones NUEVAS y concretas — preferí propuestas
+5. Comparar contra la última entrada de la bitácora: ¿subió/bajó el tráfico
+   orgánico?, ¿alguna keyword protegida perdió posición (en GSC o en el rank
+   check de DataForSEO)?, ¿algún `top_query` nuevo con volumen que no tiene
+   contenido dedicado?, ¿algún competidor nuevo apareció arriba de Aremko?
+6. Producir 1-3 recomendaciones NUEVAS y concretas — preferí propuestas
    REDACTADAS (el meta_description exacto, el título del post, el outline)
    sobre sugerencias vagas tipo "mejorar el SEO de X".
-6. Agregar una entrada nueva al FINAL de este archivo con: fecha, snapshot
-   corto (tráfico GA4 + GSC de la semana, keywords protegidas), y las
-   recomendaciones redactadas. Commitear (solo este .md) con mensaje en español.
-7. Nivel 2 — SOLO PROPONER: no editar modelos de Django, no publicar nada. Solo
+7. Agregar una entrada nueva al FINAL de este archivo con: fecha, snapshot
+   corto (tráfico GA4 + GSC de la semana, keywords protegidas, rank check
+   DataForSEO), y las recomendaciones redactadas. Commitear (solo este .md)
+   con mensaje en español.
+8. Nivel 2 — SOLO PROPONER: no editar modelos de Django, no publicar nada. Solo
    proponer texto en la bitácora y esperar la respuesta de Jorge.
 
 ---
