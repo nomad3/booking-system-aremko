@@ -36,6 +36,9 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--dias', type=int, default=30, help='Ventana hacia atrás (default 30)')
         parser.add_argument('--max', type=int, default=50, help='Máximo de pagos a listar (default 50)')
+        parser.add_argument('--detalle', type=int, default=0,
+                            help='Sondear el DETALLE de N transferencias bancarias (GET /v1/payments/{id}): '
+                                 'qué campos trae para identificar al remitente (RUT/nombre)')
 
     def handle(self, *args, **opts):
         token = getattr(settings, 'MERCADOPAGO_ACCESS_TOKEN', None)
@@ -92,3 +95,59 @@ class Command(BaseCommand):
             '\nClave a mirar: si las transferencias a la Cuenta Vista aparecen '
             '(operation_type=money_transfer o payment_type=bank_transfer) → '
             'conciliación 100% vía API, sin Gmail.'))
+
+        # ── Sondeo de DETALLE: ¿el pago trae la identidad del remitente? ──
+        # En /payments/search las bank_transfer salen con el email de la PROPIA
+        # cuenta como "payer"; acá vemos si GET /v1/payments/{id} trae RUT/nombre
+        # del que transfirió (define si el matcher puede usar identidad o solo
+        # monto+fecha).
+        if opts['detalle']:
+            self.stdout.write('\n=== DETALLE de transferencias bancarias (identidad del remitente) ===')
+            bancarias = [p for p in resultados if p.get('payment_type_id') == 'bank_transfer'][:opts['detalle']]
+            for p in bancarias:
+                pid = p.get('id')
+                rd = requests.get(
+                    f'https://api.mercadopago.com/v1/payments/{pid}',
+                    headers={'Authorization': f'Bearer {token}'}, timeout=30,
+                )
+                self.stdout.write(f'\n--- pago {pid} · HTTP {rd.status_code} ---')
+                if rd.status_code != 200:
+                    self.stdout.write(rd.text[:200])
+                    continue
+                d = rd.json()
+                self.stdout.write(f"  descripcion: {d.get('description') or '—'}")
+                self.stdout.write(f"  external_reference: {d.get('external_reference') or '—'}")
+                self.stdout.write(
+                    f"  monto: ${int(d.get('transaction_amount') or 0):,} · "
+                    f"fecha: {(d.get('date_approved') or '')[:16]}")
+                self._dump_identidad('payer', d.get('payer'))
+                self._dump_identidad('additional_info', d.get('additional_info'))
+                self._dump_identidad('counterpart', d.get('counterpart'))
+                td = {k: v for k, v in (d.get('transaction_details') or {}).items()
+                      if v not in (None, '', 0)}
+                self.stdout.write(f'  transaction_details: {td}')
+                poi = (d.get('point_of_interaction') or {}).get('type')
+                self.stdout.write(f'  point_of_interaction: {poi}')
+                otros = sorted(k for k, v in d.items() if v not in (None, '', [], {}) and k not in (
+                    'payer', 'additional_info', 'transaction_details', 'point_of_interaction',
+                    'description', 'external_reference', 'transaction_amount', 'date_approved'))
+                self.stdout.write(f"  otros campos con datos: {', '.join(otros)}")
+
+    MASK_KEYS = ('email', 'first_name', 'last_name', 'name', 'number', 'nombre')
+
+    def _dump_identidad(self, etiqueta, d):
+        """Imprime un dict anidado enmascarando los valores de identidad."""
+        if not d:
+            self.stdout.write(f'  {etiqueta}: (vacío)')
+            return
+
+        def limpiar(x):
+            if isinstance(x, dict):
+                return {k: (_mask(v) if v and any(m in k.lower() for m in Command.MASK_KEYS)
+                            else limpiar(v))
+                        for k, v in x.items() if v not in (None, '', [], {})}
+            if isinstance(x, list):
+                return [limpiar(i) for i in x]
+            return x
+
+        self.stdout.write(f'  {etiqueta}: {limpiar(d)}')
