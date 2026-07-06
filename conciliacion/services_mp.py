@@ -16,6 +16,7 @@ Reglas de match (en orden):
   De lo contrario → estado 'revisar' (cola de Deborah).
 """
 import logging
+import re
 import unicodedata
 from datetime import timedelta
 from decimal import Decimal
@@ -34,6 +35,18 @@ VENTANA_RESERVA_DIAS = 60  # candidatas: reservas creadas hasta N días antes de
 def _sin_tildes(texto):
     return ''.join(c for c in unicodedata.normalize('NFD', texto or '')
                    if unicodedata.category(c) != 'Mn').lower()
+
+
+def ids_en_glosa(glosa):
+    """Números de 2-6 dígitos mencionados en la glosa (posibles IDs de reserva).
+
+    Función pura. Los clientes a veces escriben "Reserva 6195" o "R 6203" al
+    transferir (visto en datos reales del sondeo 2026-07-06). Los falsos
+    positivos (fechas, referencias largas) se filtran después contra las
+    reservas PENDIENTES de la ventana — un número suelto solo matchea si
+    existe esa reserva con saldo.
+    """
+    return [int(n) for n in re.findall(r'\d{2,6}', glosa or '')]
 
 
 def nombre_en_glosa(nombre_cliente, glosa):
@@ -143,6 +156,18 @@ def matchear_movimiento(mov):
                                fecha_creacion__lte=mov.fecha + timedelta(days=1))
                        .select_related('cliente'))
 
+    # Regla 1.5: número de reserva escrito en la glosa ("Reserva 6195", "R 6203")
+    # — señal más fuerte que el monto; solo cuenta si esa reserva está PENDIENTE
+    # en la ventana (así "43" o un año en la glosa no matchean reservas viejas).
+    ids_glosa = set(ids_en_glosa(mov.glosa))
+    if ids_glosa:
+        por_id = [r for r in candidatas_base if r.id in ids_glosa]
+        if len(por_id) == 1:
+            mov.sugerencia = por_id[0]
+            mov.sugerencia_motivo = 'número de reserva en la glosa'
+            mov.estado = 'sugerido'
+            return mov
+
     por_regla = [
         ('saldo exacto', [r for r in candidatas_base if Decimal(r.saldo_pendiente or 0) == mov.monto]),
         ('total exacto', [r for r in candidatas_base if Decimal(r.total or 0) == mov.monto and r.estado_pago == 'pendiente']),
@@ -184,6 +209,15 @@ def aplicar_movimiento(mov, reserva, actor='admin'):
     referencia = mov.transaction_id or f'mp_{mov.mp_payment_id}'
     if ReconciliacionLog.objects.filter(referencia=referencia).exists():
         return False, f'Ya aplicado antes (referencia {referencia})'
+
+    # Candado anti-duplicado: si la reserva ya no tiene saldo, este pago
+    # probablemente ya fue registrado A MANO (caso típico de la primera tanda
+    # histórica) — o alguien aplicó otro movimiento a la misma reserva recién.
+    reserva.refresh_from_db()
+    saldo = Decimal(reserva.saldo_pendiente or 0)
+    if saldo <= 0:
+        return False, (f'Reserva #{reserva.id} ya no tiene saldo pendiente — '
+                       f'este pago probablemente ya está registrado. Usa "Ignorar".')
 
     metodo = 'transferencia' if 'bank_transfer' in mov.tipo else 'mercadopago'
     with transaction.atomic():
