@@ -190,8 +190,40 @@ def ficha_reserva_cliente(request, token):
         'comanda_bloqueada': venta.estado_reserva == 'checkout',
         # endpoint que refresca el token de comanda al vuelo y redirige al menú del cliente
         'comanda_url': reverse('ventas:ficha_reserva_comanda', kwargs={'token': token}),
+        # pago online del saldo (MP Checkout Pro, hasta 12 cuotas) — Fase 2, 2026-07-06
+        'pagar_url': reverse('ventas:ficha_reserva_pagar', kwargs={'token': token}),
     }
     return render(request, 'ventas/ficha_reserva_cliente.html', context)
+
+
+def ficha_reserva_pagar(request, token):
+    """El cliente paga su saldo online desde la ficha (MP Checkout Pro, cuotas).
+
+    Crea la preferencia al momento del clic (cobra el SALDO vigente, no un
+    monto congelado — si Deborah registró un abono entremedio, el link sale
+    por lo que realmente falta) y redirige al checkout de Mercado Pago. El
+    webhook registra el pago solo (external_reference = reserva). Si no hay
+    saldo o MP falla, el cliente vuelve a la ficha — nunca a un error.
+    """
+    venta = _venta_desde_token(token)
+    saldo = float(venta.saldo_pendiente or 0)
+    if saldo <= 0:
+        return redirect('ventas:ficha_reserva_cliente', token=token)
+
+    from ..services.mercadopago_service import mercadopago_service
+    resultado = mercadopago_service.create_payment_link(
+        reserva_id=venta.id,
+        amount=saldo,
+        description=f'Reserva Aremko #{venta.id}',
+        customer_email=(venta.cliente.email or '') if venta.cliente else '',
+        customer_name=(venta.cliente.nombre or '') if venta.cliente else '',
+    )
+    if resultado.get('success') and resultado.get('payment_link'):
+        return redirect(resultado['payment_link'])
+
+    logger.error('[ficha] no se pudo crear link MP para reserva %s: %s',
+                 venta.id, resultado.get('error'))
+    return redirect('ventas:ficha_reserva_cliente', token=token)
 
 
 def _obtener_o_crear_comanda(venta):
