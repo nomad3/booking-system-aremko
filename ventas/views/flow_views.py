@@ -274,38 +274,22 @@ def flow_confirmation(request):
                     print(f"Meta CAPI Purchase fallo (no critico): {capi_err}")
 
                 # Enviar GiftCards si las hay (solo si la materializacion fue exitosa)
-                from ..models import GiftCard, GiftCardExperiencia
+                from ..models import GiftCard
                 from ..services.giftcard_pdf_service import GiftCardPDFService
                 giftcards = GiftCard.objects.filter(
                     venta_reserva=materializada,
                     estado='por_cobrar',
                 )
-                if giftcards.exists():
-                    print(f"Enviando email de {giftcards.count()} GiftCard(s) para venta {materializada.id}")
+                # Materializar ANTES del update: el queryset es lazy y filtra por
+                # estado='por_cobrar' — iterarlo después del update devuelve vacío
+                # (bug preexistente: el email de Flow salía sin giftcards).
+                giftcards_lista = list(giftcards)
+                if giftcards_lista:
+                    print(f"Enviando email de {len(giftcards_lista)} GiftCard(s) para venta {materializada.id}")
                     giftcards.update(estado='cobrado')
-                    giftcards_data = []
-                    for gc in giftcards:
-                        imagen_url = ''
-                        try:
-                            if gc.servicio_asociado:
-                                experiencia = GiftCardExperiencia.objects.filter(
-                                    id_experiencia=gc.servicio_asociado, activo=True
-                                ).first()
-                                if experiencia and experiencia.imagen:
-                                    from django.conf import settings
-                                    imagen_url = f"{settings.MEDIA_URL}{experiencia.imagen}"
-                        except Exception:
-                            pass
-                        giftcards_data.append({
-                            'codigo': gc.codigo,
-                            'experiencia_nombre': f'Experiencia Aremko (${int(gc.monto_inicial):,})',
-                            'experiencia_imagen_url': imagen_url,
-                            'destinatario_nombre': gc.destinatario_nombre or 'Destinatario',
-                            'mensaje_seleccionado': gc.mensaje_personalizado or 'Disfruta de una experiencia inolvidable en Aremko Spa',
-                            'precio': gc.monto_inicial,
-                            'fecha_emision': gc.fecha_emision,
-                            'fecha_vencimiento': gc.fecha_vencimiento,
-                        })
+                    # Datos de la carta desde la fuente única (antes acá se ponía
+                    # "Experiencia Aremko ($X)" hardcodeado y la foto con URL rota).
+                    giftcards_data = [GiftCardPDFService.datos_carta(gc) for gc in giftcards_lista]
                     GiftCardPDFService.enviar_giftcard_por_email(
                         comprador_email=materializada.cliente.email,
                         comprador_nombre=materializada.cliente.nombre,

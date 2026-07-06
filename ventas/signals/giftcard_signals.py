@@ -16,33 +16,17 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.mail import EmailMessage
 from django.conf import settings
-from ..models import Pago, GiftCard, GiftCardExperiencia
+from ..models import Pago, GiftCard
 from ..services.giftcard_pdf_service import GiftCardPDFService
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def obtener_descripcion_experiencia(servicio_asociado):
-    """
-    Mapea el ID del servicio asociado con su descripción completa para GiftCards
-
-    Args:
-        servicio_asociado (str): ID del servicio (ej: 'tinas', 'masajes', etc.)
-
-    Returns:
-        str: Descripción completa de la experiencia
-    """
-    experiencias = {
-        'tinas': 'Tinas calientes para dos personas en tinas con o sin hidromasaje junto al Río Pescado',
-        'masajes': 'Masajes para dos en domos de Bienestar en medio del antiguo bosque nativo de Aremko, junto al Río Pescado',
-        'cabanas': 'Alojamiento para dos en cabaña de maderas nativas, en medio del antiguo bosque nativo, junto al Río Pescado',
-        'alojamiento_tinas': 'Alojamiento para dos en cabaña de maderas nativas + tinas calientes con o sin hidromasaje, en medio del antiguo bosque nativo junto al Río Pescado',
-        'celebracion': 'Alojamiento para dos en cabaña de maderas nativas + tinas calientes con ambientación romántica (velas y botella de espumante) + desayuno, en medio del antiguo bosque nativo junto al Río Pescado',
-        'monto_libre': 'Vale por el monto indicado para usar en cualquier experiencia de Aremko Spa'
-    }
-
-    return experiencias.get(servicio_asociado, 'Experiencia Aremko Spa')
+# El mapeo de experiencia (nombre/descripción/foto) vive ahora en
+# GiftCardPDFService.datos_carta() — fuente única para carta, email y descarga.
+# Antes acá había un dict hardcodeado con IDs viejos ('tinas', 'masajes'...) que
+# no conocía las experiencias insignia → la carta salía "Experiencia Aremko Spa".
 
 
 @receiver(post_save, sender=Pago)
@@ -109,42 +93,9 @@ def enviar_email_giftcards(venta_reserva, giftcards):
         logger.error(f"No se puede enviar GiftCards: comprador de VentaReserva #{venta_reserva.id} no tiene email")
         return
 
-    # Preparar datos de las GiftCards para el servicio
-    giftcards_data = []
-    for giftcard in giftcards:
-        # Intentar obtener la imagen y descripción de la experiencia desde la BD
-        imagen_url = ''
-        experiencia_descripcion = None
-        try:
-            if giftcard.servicio_asociado:
-                experiencia = GiftCardExperiencia.objects.filter(
-                    id_experiencia=giftcard.servicio_asociado,
-                    activo=True
-                ).first()
-
-                if experiencia:
-                    if experiencia.imagen:
-                        # Construir URL completa de la imagen
-                        from django.conf import settings
-                        imagen_url = f"{settings.MEDIA_URL}{experiencia.imagen}"
-                        logger.info(f"Imagen encontrada para {giftcard.servicio_asociado}: {imagen_url}")
-                    # Obtener la descripción de la experiencia
-                    experiencia_descripcion = experiencia.descripcion
-        except Exception as e:
-            logger.warning(f"No se pudo obtener imagen para servicio {giftcard.servicio_asociado}: {e}")
-
-        giftcard_data = {
-            'codigo': giftcard.codigo,
-            'experiencia_nombre': obtener_descripcion_experiencia(giftcard.servicio_asociado),
-            'experiencia_descripcion': experiencia_descripcion,
-            'experiencia_imagen_url': imagen_url,
-            'destinatario_nombre': giftcard.destinatario_nombre,
-            'mensaje_seleccionado': giftcard.mensaje_personalizado or 'Un regalo especial para ti',
-            'precio': int(giftcard.monto_inicial),
-            'fecha_emision': giftcard.fecha_emision,
-            'fecha_vencimiento': giftcard.fecha_vencimiento,
-        }
-        giftcards_data.append(giftcard_data)
+    # Datos de la carta desde la fuente única (nombre/descripción/foto reales de
+    # la experiencia en BD, con fallback legado para giftcards antiguas).
+    giftcards_data = [GiftCardPDFService.datos_carta(gc) for gc in giftcards]
 
     # Usar el servicio de GiftCardPDFService para enviar el email con HTML
     try:

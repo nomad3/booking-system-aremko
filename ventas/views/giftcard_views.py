@@ -608,13 +608,13 @@ def giftcard_mobile_view(request, codigo):
         dias_restantes = (giftcard.fecha_vencimiento - hoy).days if giftcard.fecha_vencimiento else 0
         esta_vencida = dias_restantes < 0
 
-        # Obtener información de la experiencia si existe
+        # Obtener información de la experiencia si existe (SIN filtrar activo:
+        # una giftcard vendida vive 1 año y su experiencia puede salir del catálogo)
         experiencia_info = None
         if giftcard.servicio_asociado:
             try:
                 experiencia = GiftCardExperiencia.objects.get(
-                    id_experiencia=giftcard.servicio_asociado,
-                    activo=True
+                    id_experiencia=giftcard.servicio_asociado
                 )
                 experiencia_info = {
                     'nombre': experiencia.nombre,
@@ -696,33 +696,8 @@ def giftcard_download_pdf(request, codigo):
         # Buscar la GiftCard
         giftcard = GiftCard.objects.get(codigo=codigo)
 
-        # Obtener información de la experiencia
-        experiencia_imagen_url = None
-        experiencia_nombre = giftcard.servicio_asociado.replace('_', ' ').title() if giftcard.servicio_asociado else 'Experiencia Aremko'
-        experiencia_descripcion = None
-
-        if giftcard.servicio_asociado:
-            try:
-                experiencia = GiftCardExperiencia.objects.get(id_experiencia=giftcard.servicio_asociado)
-                if experiencia.imagen:
-                    experiencia_imagen_url = request.build_absolute_uri(experiencia.imagen.url)
-                experiencia_nombre = experiencia.nombre
-                experiencia_descripcion = experiencia.descripcion
-            except GiftCardExperiencia.DoesNotExist:
-                pass
-
-        # Preparar datos para el PDF
-        giftcard_data = {
-            'codigo': giftcard.codigo,
-            'experiencia_nombre': experiencia_nombre,
-            'experiencia_descripcion': experiencia_descripcion,
-            'experiencia_imagen_url': experiencia_imagen_url,
-            'destinatario_nombre': giftcard.destinatario_nombre or 'Invitado Especial',
-            'mensaje_seleccionado': giftcard.mensaje_personalizado or f"Te regalo esta experiencia única en Aremko Spa para que disfrutes de un momento de relajación y bienestar en medio de la naturaleza de Puerto Varas.",
-            'precio': giftcard.monto_inicial,
-            'fecha_emision': giftcard.fecha_emision,
-            'fecha_vencimiento': giftcard.fecha_vencimiento,
-        }
+        # Datos de la carta desde la fuente única (nombre/descripción/foto reales)
+        giftcard_data = GiftCardPDFService.datos_carta(giftcard)
 
         # Generar PDF en formato móvil
         pdf_bytes = GiftCardPDFService.generar_pdf_giftcard(giftcard_data, formato='mobile')

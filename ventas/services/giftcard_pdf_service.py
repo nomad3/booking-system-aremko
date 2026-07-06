@@ -27,6 +27,76 @@ class GiftCardPDFService:
     Servicio para generar PDFs de GiftCards y enviar por email al comprador
     """
 
+    # Nombres/descripciones para GiftCards ANTIGUAS (vendidas antes del catálogo
+    # GiftCardExperiencia en BD, cuando servicio_asociado era una categoría).
+    # Las giftcards viven 1 año: este mapa no se puede borrar hasta ~2027.
+    EXPERIENCIAS_LEGADO = {
+        'tinas': ('Tinas Calientes junto al Río',
+                  'Tinas calientes para dos personas, con o sin hidromasaje, junto al Río Pescado.'),
+        'masajes': ('Masajes para Dos',
+                    'Masajes para dos en domos de bienestar, en medio del antiguo bosque nativo junto al Río Pescado.'),
+        'cabanas': ('Alojamiento para Dos',
+                    'Alojamiento para dos en cabaña de maderas nativas, en medio del bosque nativo junto al Río Pescado.'),
+        'alojamiento_tinas': ('Cabaña + Tinas Calientes',
+                              'Alojamiento para dos en cabaña de maderas nativas + tinas calientes, junto al Río Pescado.'),
+        'celebracion': ('Celebración Romántica',
+                        'Cabaña + tinas calientes con ambientación romántica (velas y espumante) + desayuno.'),
+        'monto_libre': ('GiftCard Aremko',
+                        'Vale por el monto indicado, para usar en cualquier experiencia de Aremko Spa Boutique.'),
+    }
+
+    @staticmethod
+    def datos_carta(giftcard):
+        """Fuente ÚNICA de los datos que se imprimen en la carta del regalo
+        (PDF adjunto, email y descarga). Antes había 4 implementaciones distintas
+        (signal, Flow, descarga, vista móvil) y por eso la carta llegaba con
+        "Experiencia Aremko Spa" genérico y sin foto.
+
+        Resuelve nombre/descripción/foto desde GiftCardExperiencia por
+        id_experiencia SIN filtrar activo (una giftcard vendida vive 1 año y su
+        carta debe seguir mostrando la experiencia aunque el catálogo cambie);
+        fallback al mapa EXPERIENCIAS_LEGADO para las vendidas antes del catálogo.
+        """
+        from ..models import GiftCardExperiencia
+
+        sid = giftcard.servicio_asociado or ''
+        nombre, descripcion, foto = None, None, ''
+
+        if sid:
+            exp = GiftCardExperiencia.objects.filter(id_experiencia=sid).first()
+            if exp:
+                nombre = exp.nombre
+                descripcion = exp.descripcion_giftcard or exp.descripcion
+                if exp.imagen:
+                    try:
+                        foto = exp.imagen.url or ''
+                    except Exception:
+                        foto = ''
+            elif sid in GiftCardPDFService.EXPERIENCIAS_LEGADO:
+                nombre, descripcion = GiftCardPDFService.EXPERIENCIAS_LEGADO[sid]
+
+        if not nombre:
+            nombre = 'Experiencia Aremko Spa'
+
+        # Foto liviana para la carta: recorte 4:3 + calidad auto, SIN f_auto
+        # (WeasyPrint descarga sin header Accept → forzamos que siga siendo JPG).
+        if foto.startswith('http') and '/upload/' in foto:
+            foto = foto.replace('/upload/', '/upload/c_fill,ar_4:3,g_auto,w_800,q_auto/', 1)
+        elif not foto.startswith('http'):
+            foto = ''
+
+        return {
+            'codigo': giftcard.codigo,
+            'experiencia_nombre': nombre,
+            'experiencia_descripcion': descripcion,
+            'experiencia_imagen_url': foto,
+            'destinatario_nombre': giftcard.destinatario_nombre or 'Invitado Especial',
+            'mensaje_seleccionado': giftcard.mensaje_personalizado or 'Un regalo especial para ti',
+            'precio': giftcard.monto_inicial,
+            'fecha_emision': giftcard.fecha_emision,
+            'fecha_vencimiento': giftcard.fecha_vencimiento,
+        }
+
     @staticmethod
     def generar_html_giftcard(giftcard_data):
         """
@@ -338,13 +408,14 @@ class GiftCardPDFService:
     @staticmethod
     def generar_html_giftcard_mobile(giftcard_data):
         """
-        Genera el HTML de la GiftCard optimizado para móvil (5.5 x 9.8 pulgadas)
+        Carta del regalo en diseño BOUTIQUE (5.5 x 9.8 pulgadas) — el mismo que
+        promete la vitrina /ventas/giftcards/ (mockup mk-card): verde bosque,
+        nombre de la experiencia como título, dedicatoria en cursiva y el
+        beneficio "válida cualquier día" visible. Rediseño 2026-07-06; el diseño
+        amarillo anterior no coincidía con la marca boutique.
 
-        Args:
-            giftcard_data (dict): Datos de la GiftCard
-
-        Returns:
-            str: HTML renderizado para móvil
+        OJO WeasyPrint: sin emojis (el server no tiene fuente de emojis → tofu),
+        sin f_auto en fotos (descarga sin Accept → JPG seguro).
         """
 
         # Obtener URL de la imagen si existe
@@ -356,14 +427,13 @@ class GiftCardPDFService:
         imagen_html = ''
         if tiene_imagen:
             imagen_html = f'''
-        <div class="imagen-experiencia-mobile">
-            <img src="{imagen_url}" alt="" class="experiencia-img-mobile">
+        <div class="foto-experiencia">
+            <img src="{imagen_url}" alt="" class="foto-img">
         </div>
         '''
 
-        # Formatear el precio con separador de miles
-        precio = giftcard_data.get('precio', 0)
-        precio_formateado = f"${precio:,.0f}".replace(',', '.')
+        descripcion = (giftcard_data.get('experiencia_descripcion') or '').strip()
+        descripcion_html = f'<div class="exp-desc">{descripcion}</div>' if descripcion else ''
 
         html_template = f"""
 <!DOCTYPE html>
@@ -372,308 +442,219 @@ class GiftCardPDFService:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        /* Reset y configuración base para móvil */
+        /* Carta boutique — reset base para móvil/PDF */
         * {{
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }}
 
-        /* Configuración de página para 5.5 x 9.8 pulgadas */
         @page {{
             size: 5.5in 9.8in;
             margin: 0.15in;
         }}
 
         body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: linear-gradient(180deg, #f8f4e6 0%, #ffffff 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            background: #ffffff;
             width: 5.2in;
             height: 9.5in;
-            font-size: 13pt;
-            line-height: 1.2;
+            font-size: 12pt;
+            line-height: 1.35;
             page-break-inside: avoid;
             page-break-after: avoid;
         }}
 
-        .giftcard-mobile {{
+        /* La carta: verde bosque, mismos tonos del mockup de la vitrina (mk-card) */
+        .carta {{
             width: 100%;
             height: 100%;
             display: flex;
             flex-direction: column;
-            padding: 0.1in;
-            position: relative;
+            background: linear-gradient(160deg, #10231d 0%, #1e4438 100%);
+            border-radius: 18px;
+            padding: 0.3in 0.28in 0.22in;
+            color: #f3efe6;
+            text-align: center;
             overflow: hidden;
-            page-break-inside: avoid;
         }}
 
-        /* Header compacto */
-        .header-mobile {{
-            text-align: center;
-            padding: 0.15in 0;
-            background: white;
-            border-radius: 12px;
-            margin-bottom: 0.1in;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-        }}
-
-        .logo-mobile {{
-            color: #A0522D;
-            font-size: 18pt;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-            margin-bottom: 2px;
-        }}
-
-        .subtitle-mobile {{
-            color: #D2B48C;
-            font-size: 10pt;
-            font-weight: 600;
-        }}
-
-        /* Sección Para */
-        .recipient-section {{
-            background: white;
-            border-radius: 12px;
-            padding: 0.15in;
-            margin-bottom: 0.1in;
-            text-align: center;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-        }}
-
-        .para-label {{
-            color: #A0522D;
-            font-size: 9pt;
-            font-weight: 600;
+        .marca {{
+            font-size: 11pt;
+            letter-spacing: 4px;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 4px;
+            color: #cdbf9d;
+            font-weight: 600;
         }}
 
-        .recipient-name {{
-            color: #5C4033;
-            font-size: 20pt;
+        .tipo {{
+            font-size: 8.5pt;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #9db8ab;
+            margin-top: 3px;
+        }}
+
+        .exp-nombre {{
+            font-size: 21pt;
             font-weight: 700;
-            line-height: 1.0;
+            color: #ffffff;
+            line-height: 1.15;
+            margin-top: 0.16in;
         }}
 
-        /* Imagen optimizada para móvil */
-        .imagen-experiencia-mobile {{
+        .exp-para {{
+            font-size: 12pt;
+            color: #bcd3c8;
+            margin-top: 4px;
+        }}
+
+        .foto-experiencia {{
             width: 100%;
-            height: 2.0in;
+            height: 1.85in;
             border-radius: 12px;
             overflow: hidden;
-            margin-bottom: 0.1in;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+            margin-top: 0.14in;
         }}
 
-        .experiencia-img-mobile {{
+        .foto-img {{
             width: 100%;
             height: 100%;
             object-fit: cover;
             display: block;
         }}
 
-        /* Mensaje personalizado */
-        .message-section {{
-            background: white;
-            border-left: 4px solid #ffc107;
-            border-radius: 10px;
-            padding: 0.12in;
-            margin-bottom: 0.1in;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-        }}
-
-        .message-text {{
-            color: #5C4033;
+        .dedicatoria {{
             font-style: italic;
-            font-size: 13pt;
-            line-height: 1.4;
-            text-align: left;
-        }}
-
-        /* Código destacado */
-        .code-section {{
-            background: linear-gradient(135deg, #ffc107 0%, #ffdb4d 100%);
-            border-radius: 12px;
-            padding: 0.18in;
-            margin-bottom: 0.1in;
-            text-align: center;
-            box-shadow: 0 3px 10px rgba(255,193,7,0.25);
+            font-size: 12pt;
+            line-height: 1.55;
+            color: #e8e2d2;
+            border-top: 1px solid rgba(255, 255, 255, 0.16);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+            padding: 0.13in 0.05in;
+            margin-top: 0.15in;
         }}
 
         .code-label {{
-            color: white;
-            font-size: 9pt;
-            font-weight: 600;
+            font-size: 8.5pt;
+            letter-spacing: 2px;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 6px;
+            color: #9db8ab;
+            margin-top: 0.16in;
         }}
 
         .code-value {{
-            background: white;
-            color: #5C4033;
-            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-family: 'SF Mono', Menlo, Monaco, 'Courier New', monospace;
             font-size: 18pt;
-            font-weight: 800;
-            letter-spacing: 2px;
-            padding: 10px;
-            border-radius: 10px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(205, 191, 157, 0.45);
+            border-radius: 12px;
+            padding: 0.11in 0.08in;
+            margin-top: 6px;
             word-break: break-all;
         }}
 
-        /* Detalles en grid */
-        .details-grid {{
-            display: flex;
-            gap: 0.08in;
-            margin-bottom: 0.1in;
-        }}
-
-        .detail-item {{
-            flex: 1;
-            background: white;
-            border-radius: 10px;
-            padding: 0.12in;
-            text-align: center;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-        }}
-
-        .detail-label {{
-            color: #A0522D;
-            font-size: 8pt;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 3px;
-        }}
-
-        .detail-value {{
-            color: #5C4033;
-            font-size: 12pt;
-            font-weight: 700;
-            line-height: 1.1;
-        }}
-
-        /* WhatsApp CTA */
-        .whatsapp-section {{
-            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
-            border-radius: 12px;
-            padding: 0.15in;
-            margin-bottom: 0.1in;
-            text-align: center;
-            color: white;
-            box-shadow: 0 3px 10px rgba(37,211,102,0.25);
-        }}
-
-        .whatsapp-title {{
+        .beneficio {{
             font-size: 10pt;
             font-weight: 600;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            color: #cdbf9d;
+            margin-top: 0.13in;
         }}
 
-        .whatsapp-number {{
-            font-size: 16pt;
-            font-weight: 800;
-            margin-bottom: 4px;
-        }}
-
-        .whatsapp-note {{
+        .validez {{
             font-size: 9pt;
-            opacity: 0.95;
+            color: #9db8ab;
+            margin-top: 2px;
         }}
 
-        /* Footer minimalista */
-        .footer-mobile {{
-            text-align: center;
-            padding: 0.1in 0.05in;
-            color: #999;
-            font-size: 8pt;
+        .exp-desc {{
+            font-size: 9.5pt;
+            line-height: 1.5;
+            color: #bcd3c8;
+            margin-top: 0.12in;
+            padding: 0 0.06in;
+        }}
+
+        .whatsapp {{
+            background: rgba(37, 211, 102, 0.12);
+            border: 1px solid rgba(37, 211, 102, 0.45);
+            border-radius: 12px;
+            padding: 0.12in;
+            margin-top: 0.15in;
+        }}
+
+        .ws-label {{
+            font-size: 8.5pt;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #7fe0a8;
+            font-weight: 600;
+        }}
+
+        .ws-numero {{
+            font-size: 15pt;
+            font-weight: 800;
+            color: #ffffff;
+            margin-top: 2px;
+        }}
+
+        .ws-nota {{
+            font-size: 8.5pt;
+            color: #bcd3c8;
+            margin-top: 2px;
+        }}
+
+        .footer {{
             margin-top: auto;
-            line-height: 1.2;
+            padding-top: 0.12in;
         }}
 
-        /* Decoración */
-        .decoration-corner {{
-            position: absolute;
-            width: 80px;
-            height: 80px;
-            opacity: 0.1;
+        .footer-lema {{
+            font-size: 9.5pt;
+            font-style: italic;
+            color: #cdbf9d;
         }}
 
-        .decoration-top-left {{
-            top: 0;
-            left: 0;
-            background: radial-gradient(circle at top left, #ffc107 0%, transparent 70%);
-        }}
-
-        .decoration-bottom-right {{
-            bottom: 0;
-            right: 0;
-            background: radial-gradient(circle at bottom right, #25D366 0%, transparent 70%);
+        .footer-datos {{
+            font-size: 8pt;
+            color: #8fa89b;
+            margin-top: 3px;
+            line-height: 1.4;
         }}
     </style>
 </head>
 <body>
-    <div class="giftcard-mobile">
-        <!-- Decoraciones -->
-        <div class="decoration-corner decoration-top-left"></div>
-        <div class="decoration-corner decoration-bottom-right"></div>
+    <div class="carta">
+        <div class="marca">Aremko Spa Boutique</div>
+        <div class="tipo">Certificado de Regalo</div>
 
-        <!-- Header -->
-        <div class="header-mobile">
-            <div class="logo-mobile">AREMKO SPA</div>
-            <div class="subtitle-mobile">🎁 Certificado de Regalo 🎁</div>
-        </div>
+        <div class="exp-nombre">{giftcard_data['experiencia_nombre']}</div>
+        <div class="exp-para">para {giftcard_data['destinatario_nombre']}</div>
 
-        <!-- Destinatario -->
-        <div class="recipient-section">
-            <div class="para-label">Para</div>
-            <div class="recipient-name">{giftcard_data['destinatario_nombre']}</div>
-        </div>
-
-        <!-- Experiencia -->
-        <div class="detail-item" style="margin-bottom: 0.1in;">
-            <div class="detail-label">Experiencia</div>
-            <div class="detail-value" style="font-size: 11pt;">{giftcard_data['experiencia_nombre']}</div>
-            {f'<div style="font-size: 12pt; color: #5C4033; margin-top: 6px; line-height: 1.4;">{giftcard_data["experiencia_descripcion"].strip()}</div>' if giftcard_data.get('experiencia_descripcion') and giftcard_data['experiencia_descripcion'].strip() else ''}
-        </div>
-
-        <!-- Imagen si existe -->
         {imagen_html}
 
-        <!-- Mensaje -->
-        <div class="message-section">
-            <div class="message-text">"{giftcard_data['mensaje_seleccionado']}"</div>
+        <div class="dedicatoria">"{giftcard_data['mensaje_seleccionado']}"</div>
+
+        <div class="code-label">Tu código</div>
+        <div class="code-value">{giftcard_data['codigo']}</div>
+
+        <div class="beneficio">Válida cualquier día de la semana — incluso viernes y sábado</div>
+        <div class="validez">Hasta el {giftcard_data['fecha_vencimiento'].strftime('%d/%m/%Y')}</div>
+
+        {descripcion_html}
+
+        <div class="whatsapp">
+            <div class="ws-label">Reserva por WhatsApp</div>
+            <div class="ws-numero">+56 9 5790 2525</div>
+            <div class="ws-nota">Menciona tu código al reservar</div>
         </div>
 
-        <!-- Código destacado -->
-        <div class="code-section">
-            <div class="code-label">Tu Código</div>
-            <div class="code-value">{giftcard_data['codigo']}</div>
-        </div>
-
-        <!-- Válido hasta (centrado, sin grid) -->
-        <div class="detail-item" style="margin-bottom: 0.1in;">
-            <div class="detail-label">Válido hasta</div>
-            <div class="detail-value">{giftcard_data['fecha_vencimiento'].strftime('%d/%m/%Y')}</div>
-        </div>
-
-        <!-- WhatsApp CTA -->
-        <div class="whatsapp-section">
-            <div class="whatsapp-title">📱 Reserva por WhatsApp</div>
-            <div class="whatsapp-number">+56 9 5790 2525</div>
-            <div class="whatsapp-note">Menciona tu código al reservar</div>
-        </div>
-
-        <!-- Footer -->
-        <div class="footer-mobile">
-            www.aremko.cl | Puerto Varas<br>
-            Emitido: {giftcard_data['fecha_emision'].strftime('%d/%m/%Y')}
+        <div class="footer">
+            <div class="footer-lema">Aguas calientes junto al río</div>
+            <div class="footer-datos">www.aremko.cl · Puerto Varas · Emitido: {giftcard_data['fecha_emision'].strftime('%d/%m/%Y')}</div>
         </div>
     </div>
 </body>
@@ -928,13 +909,14 @@ class GiftCardPDFService:
     <style>
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }}
         .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-        .header {{ background: linear-gradient(135deg, #A0522D 0%, #8B4513 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }}
-        .logo {{ font-size: 28px; font-weight: 800; margin-bottom: 10px; }}
+        .header {{ background: linear-gradient(160deg, #10231d 0%, #1e4438 100%); color: #f3efe6; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }}
+        .logo {{ font-size: 22px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; color: #cdbf9d; margin-bottom: 6px; }}
+        .lema {{ font-size: 13px; font-style: italic; color: #9db8ab; margin-bottom: 12px; }}
         .content {{ background: white; padding: 30px; border: 1px solid #e0e0e0; border-radius: 0 0 10px 10px; }}
         .greeting {{ font-size: 18px; color: #5C4033; margin-bottom: 20px; }}
         .gift-list {{ background: #f8f4e6; padding: 20px; border-radius: 8px; margin: 20px 0; }}
-        .gift-item {{ background: white; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #ffc107; }}
-        .code {{ font-family: monospace; font-size: 16px; font-weight: bold; color: #A0522D; }}
+        .gift-item {{ background: white; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #cdbf9d; }}
+        .code {{ font-family: monospace; font-size: 16px; font-weight: bold; color: #1e4438; letter-spacing: 1px; }}
         .btn-container {{ text-align: center; margin: 30px 0; }}
         .btn {{ display: inline-block; padding: 15px 30px; margin: 10px; text-decoration: none; border-radius: 25px; font-weight: 600; }}
         .btn-primary {{ background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); color: white; }}
@@ -952,8 +934,9 @@ class GiftCardPDFService:
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">AREMKO SPA</div>
-            <div>🎁 {'Tus GiftCards están listas' if es_multiple else 'Tu GiftCard está lista'} 🎁</div>
+            <div class="logo">Aremko Spa Boutique</div>
+            <div class="lema">Aguas calientes junto al río</div>
+            <div>🎁 {'Tus GiftCards están listas' if es_multiple else 'Tu GiftCard está lista'}</div>
         </div>
 
         <div class="content">
@@ -995,7 +978,8 @@ class GiftCardPDFService:
                     <li>Abrir el PDF adjunto (puedes imprimirlo o enviarlo digitalmente)</li>
                     <li>Contactar por WhatsApp al <strong>+56 9 5790 2525</strong></li>
                     <li>Mencionar el código al momento de reservar</li>
-                    <li>Válido hasta la fecha indicada en cada certificado</li>
+                    <li><strong>Válida cualquier día de la semana — incluso viernes y sábado</strong></li>
+                    <li>Vigencia hasta la fecha indicada en cada certificado</li>
                 </ul>
             </div>
 
@@ -1005,10 +989,10 @@ class GiftCardPDFService:
         </div>
 
         <div class="footer">
-            <strong>AREMKO Aguas Calientes & Spa</strong><br>
+            <strong>Aremko Spa Boutique</strong> · Aguas calientes junto al río<br>
             Puerto Varas, Chile<br>
             📱 WhatsApp: +56 9 5790 2525<br>
-            🌐 <a href="https://www.aremko.cl" style="color: #A0522D;">www.aremko.cl</a><br><br>
+            🌐 <a href="https://www.aremko.cl" style="color: #1e4438;">www.aremko.cl</a><br><br>
             <small>Este email fue enviado porque realizaste una compra de GiftCard en nuestro spa.</small>
         </div>
     </div>
@@ -1032,9 +1016,11 @@ INSTRUCCIONES DE CANJE:
 ✅ Mencionar el código al momento de reservar
 ✅ Válido hasta la fecha indicada en cada certificado
 
-¡Gracias por regalar momentos inolvidables en nuestro spa!
+Recuerda: la GiftCard es válida cualquier día de la semana — incluso viernes y sábado.
 
-AREMKO Aguas Calientes & Spa
+¡Gracias por regalar momentos inolvidables junto al río!
+
+Aremko Spa Boutique — Aguas calientes junto al río
 Puerto Varas, Chile
 WhatsApp: +56 9 5790 2525
 www.aremko.cl
