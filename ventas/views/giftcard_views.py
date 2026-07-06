@@ -42,20 +42,21 @@ def giftcard_menu(request):
     def _clp(v):
         return '$' + f'{int(v):,}'.replace(',', '.')
 
-    def _card_16x9(url):
-        """Transformación Cloudinary para las cards (16:9, recorte inteligente,
-        formato/calidad auto): las fotos originales pesan 2-4MB; así se sirven en
-        ~100-200KB (mismo criterio anti-bandwidth del filtro `optimizada`)."""
+    def _card_optim(url):
+        """Transformación Cloudinary para las cards: recorte 4:3 (más VERTICAL que
+        16:9 — así no se pierde la altura de los domos/cabañas, Jorge 2026-07-06),
+        encuadre inteligente + formato/calidad auto. Las fotos originales pesan 2-4MB;
+        así se sirven en ~100-200KB (mismo criterio anti-bandwidth de `optimizada`)."""
         if not url or '/upload/' not in url:
             return url
-        return url.replace('/upload/', '/upload/c_fill,ar_16:9,g_auto,w_900,f_auto,q_auto/', 1)
+        return url.replace('/upload/', '/upload/c_fill,ar_4:3,g_auto,w_800,f_auto,q_auto/', 1)
 
     for exp in experiencias:
         exp['precio_str'] = _clp(exp['monto_fijo']) if exp.get('monto_fijo') else ''
         exp['montos_sugeridos_str'] = [_clp(m) for m in (exp.get('montos_sugeridos') or [])]
-        exp['imagen'] = _card_16x9(exp.get('imagen') or '')
-        # Galería del carrusel (1-3 fotos), todas optimizadas/recortadas a 16:9
-        exp['imagenes'] = [_card_16x9(u) for u in (exp.get('imagenes') or []) if u]
+        exp['imagen'] = _card_optim(exp.get('imagen') or '')
+        # Galería del carrusel (1-3 fotos), todas optimizadas/recortadas a 4:3
+        exp['imagenes'] = [_card_optim(u) for u in (exp.get('imagenes') or []) if u]
 
     if request.GET.get('classic') == '1':
         experiencias_por_categoria = {
