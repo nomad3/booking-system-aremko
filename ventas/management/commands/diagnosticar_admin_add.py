@@ -33,8 +33,12 @@ class Command(BaseCommand):
         url = opts['url']
         self.stdout.write(f'GET {url} como {su.username}...')
         try:
-            r = client.get(url, HTTP_HOST='www.aremko.cl')
+            # secure=True: simular https — con http el middleware SSL responde
+            # 301 antes de llegar a la vista (primer intento dio eso).
+            r = client.get(url, HTTP_HOST='www.aremko.cl', secure=True)
             self.stdout.write(self.style.SUCCESS(f'HTTP {r.status_code}'))
+            if 300 <= r.status_code < 400:
+                self.stdout.write(f"→ redirige a: {r.get('Location', '?')}")
             if r.status_code >= 400:
                 self.stdout.write(r.content[:800].decode('utf-8', 'replace'))
         except Exception:
