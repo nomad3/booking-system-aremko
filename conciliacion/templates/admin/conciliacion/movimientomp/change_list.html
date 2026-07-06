@@ -1,0 +1,9 @@
+{% extends "admin/change_list.html" %}
+{% block object-tools-items %}
+    <li>
+        <a class="addlink" href="traer/" title="Consulta la API de Mercado Pago y trae los pagos nuevos (idempotente)">
+            ⬇ Traer pagos de MP (14 días)
+        </a>
+    </li>
+    {{ block.super }}
+{% endblock %}

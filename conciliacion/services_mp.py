@@ -1,0 +1,209 @@
+# -*- coding: utf-8 -*-
+"""Conciliador F1: fetch de pagos desde la API de Mercado Pago + matcher + aplicar.
+
+Flujo (supervisado): botón admin "Traer pagos de MP" → `traer_pagos_mp()` guarda
+los pagos nuevos como MovimientoMP (idempotente por mp_payment_id) y les corre
+`matchear_movimiento()` → queda una sugerencia; Deborah confirma con 1 clic
+(`aplicar_movimiento()`, que reusa `registrar_pago` + ReconciliacionLog).
+
+Reglas de match (en orden):
+  1. external_reference = id de reserva (links generados por reserva) → directo.
+  2. UNA sola reserva pendiente/parcial con saldo_pendiente == monto.
+  3. UNA sola con total == monto (pago completo de reserva sin abonos).
+  4. UNA sola con total/2 == monto (abono 50%, común en Aremko).
+  5. Si hay varias candidatas pero la glosa contiene el nombre de UN solo
+     cliente candidato → esa.
+  De lo contrario → estado 'revisar' (cola de Deborah).
+"""
+import logging
+import unicodedata
+from datetime import timedelta
+from decimal import Decimal
+
+import requests
+from django.conf import settings
+from django.db import transaction
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+
+logger = logging.getLogger(__name__)
+
+VENTANA_RESERVA_DIAS = 60  # candidatas: reservas creadas hasta N días antes del pago
+
+
+def _sin_tildes(texto):
+    return ''.join(c for c in unicodedata.normalize('NFD', texto or '')
+                   if unicodedata.category(c) != 'Mn').lower()
+
+
+def nombre_en_glosa(nombre_cliente, glosa):
+    """True si algún token (>3 letras) del nombre del cliente aparece en la glosa.
+
+    Función pura (testeable sin BD). Compara sin tildes ni mayúsculas:
+    'Héctor Azúcar' matchea la glosa "Reserva hector azucar". (El "H?ctor" que
+    se vio en el sondeo era el encoding de la TERMINAL del Shell, no del dato.)
+    """
+    glosa_norm = _sin_tildes(glosa)
+    if not glosa_norm:
+        return False
+    tokens = [t for t in _sin_tildes(nombre_cliente).split() if len(t) > 3]
+    return any(t in glosa_norm for t in tokens)
+
+
+def traer_pagos_mp(dias=14):
+    """Consulta /v1/payments/search (approved) y guarda los nuevos MovimientoMP.
+
+    Idempotente: los mp_payment_id ya vistos se saltan. Devuelve (nuevos, total_api).
+    """
+    from .models import MovimientoMP
+
+    token = getattr(settings, 'MERCADOPAGO_ACCESS_TOKEN', None)
+    if not token:
+        raise RuntimeError('MERCADOPAGO_ACCESS_TOKEN no configurado')
+
+    desde = timezone.now() - timedelta(days=dias)
+    resultados, offset = [], 0
+    while True:
+        r = requests.get(
+            'https://api.mercadopago.com/v1/payments/search',
+            headers={'Authorization': f'Bearer {token}'},
+            params={
+                'sort': 'date_created', 'criteria': 'desc',
+                'range': 'date_created',
+                'begin_date': desde.strftime('%Y-%m-%dT%H:%M:%S.000-04:00'),
+                'end_date': timezone.now().strftime('%Y-%m-%dT%H:%M:%S.000-04:00'),
+                'status': 'approved',
+                'limit': 50, 'offset': offset,
+            },
+            timeout=30,
+        )
+        r.raise_for_status()
+        data = r.json()
+        page = data.get('results', [])
+        resultados.extend(page)
+        total_api = data.get('paging', {}).get('total', 0)
+        offset += len(page)
+        if not page or offset >= total_api or offset >= 500:
+            break
+
+    vistos = set(MovimientoMP.objects.filter(
+        mp_payment_id__in=[str(p.get('id')) for p in resultados]
+    ).values_list('mp_payment_id', flat=True))
+
+    nuevos = []
+    for p in resultados:
+        pid = str(p.get('id'))
+        if pid in vistos:
+            continue
+        monto = Decimal(str(int(p.get('transaction_amount') or 0)))
+        if monto <= 0:
+            continue
+        fecha = parse_datetime(p.get('date_approved') or p.get('date_created') or '') or timezone.now()
+        td = p.get('transaction_details') or {}
+        payer = p.get('payer') or {}
+        mov = MovimientoMP(
+            mp_payment_id=pid,
+            fecha=fecha,
+            monto=monto,
+            tipo=f"{p.get('operation_type', '')}/{p.get('payment_type_id', '')}",
+            glosa=(p.get('description') or '')[:255],
+            transaction_id=(td.get('transaction_id') or '')[:80],
+            payer_email=(payer.get('email') or '')[:254],
+            external_reference=(p.get('external_reference') or '')[:64],
+            # raw acotado: lo necesario para auditar sin guardar el JSON gigante
+            raw={k: p.get(k) for k in (
+                'id', 'status', 'operation_type', 'payment_type_id',
+                'transaction_amount', 'date_approved', 'description',
+                'external_reference') if p.get(k) is not None},
+        )
+        matchear_movimiento(mov)  # setea estado/sugerencia/motivo (no guarda)
+        mov.save()
+        nuevos.append(mov)
+
+    return nuevos, len(resultados)
+
+
+def matchear_movimiento(mov):
+    """Calcula la sugerencia para un MovimientoMP (muta el objeto, NO guarda)."""
+    from ventas.models import VentaReserva
+
+    # Regla 1: external_reference = id de reserva → match directo
+    if mov.external_reference.strip().isdigit():
+        reserva = VentaReserva.objects.filter(id=int(mov.external_reference)).first()
+        if reserva:
+            mov.sugerencia = reserva
+            mov.sugerencia_motivo = 'external_reference del link de pago'
+            mov.estado = 'sugerido'
+            return mov
+
+    desde = mov.fecha - timedelta(days=VENTANA_RESERVA_DIAS)
+    candidatas_base = (VentaReserva.objects
+                       .filter(estado_pago__in=('pendiente', 'parcial'),
+                               fecha_creacion__gte=desde,
+                               fecha_creacion__lte=mov.fecha + timedelta(days=1))
+                       .select_related('cliente'))
+
+    por_regla = [
+        ('saldo exacto', [r for r in candidatas_base if Decimal(r.saldo_pendiente or 0) == mov.monto]),
+        ('total exacto', [r for r in candidatas_base if Decimal(r.total or 0) == mov.monto and r.estado_pago == 'pendiente']),
+        ('abono 50% del total', [r for r in candidatas_base if Decimal(r.total or 0) == mov.monto * 2 and r.estado_pago == 'pendiente']),
+    ]
+
+    for motivo, candidatas in por_regla:
+        if len(candidatas) == 1:
+            mov.sugerencia = candidatas[0]
+            mov.sugerencia_motivo = motivo
+            mov.estado = 'sugerido'
+            return mov
+        if len(candidatas) > 1:
+            # Desambiguar por nombre del cliente en la glosa
+            con_nombre = [r for r in candidatas
+                          if r.cliente and nombre_en_glosa(r.cliente.nombre, mov.glosa)]
+            if len(con_nombre) == 1:
+                mov.sugerencia = con_nombre[0]
+                mov.sugerencia_motivo = f'{motivo} + nombre en la glosa'
+                mov.estado = 'sugerido'
+                return mov
+            mov.sugerencia_motivo = f'{len(candidatas)} reservas con {motivo} — elegir a mano'
+            mov.estado = 'revisar'
+            return mov
+
+    mov.sugerencia_motivo = 'sin reserva pendiente con monto compatible'
+    mov.estado = 'revisar'
+    return mov
+
+
+def aplicar_movimiento(mov, reserva, actor='admin'):
+    """Aplica un MovimientoMP a una reserva: Pago + saldo + auditoría. Idempotente.
+
+    Reusa el mecanismo limpio (`registrar_pago`) y deja ReconciliacionLog con
+    referencia = transaction_id (o mp_<id>) — el mismo movimiento no se aplica 2 veces.
+    """
+    from .models import ReconciliacionLog
+
+    referencia = mov.transaction_id or f'mp_{mov.mp_payment_id}'
+    if ReconciliacionLog.objects.filter(referencia=referencia).exists():
+        return False, f'Ya aplicado antes (referencia {referencia})'
+
+    metodo = 'transferencia' if 'bank_transfer' in mov.tipo else 'mercadopago'
+    with transaction.atomic():
+        reserva.registrar_pago(mov.monto, metodo)
+        pago = reserva.pagos.order_by('-id').first()
+        ReconciliacionLog.objects.create(
+            referencia=referencia,
+            reserva=reserva,
+            pago=pago,
+            monto=mov.monto,
+            metodo_pago=metodo,
+            origen='mp_api',
+            actor=actor,
+            fecha_movimiento=mov.fecha,
+            payload=mov.raw,
+            notas=f'Conciliador F1 · {mov.sugerencia_motivo} · glosa: {mov.glosa}'[:500],
+        )
+        mov.estado = 'aplicado'
+        mov.reserva_aplicada = reserva
+        mov.save(update_fields=['estado', 'reserva_aplicada', 'actualizado_en'])
+
+    reserva.refresh_from_db()
+    return True, f'Aplicado a reserva #{reserva.id} → estado {reserva.estado_pago}, saldo ${int(reserva.saldo_pendiente):,}'
