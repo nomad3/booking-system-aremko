@@ -140,13 +140,20 @@ def matchear_movimiento(mov):
     """Calcula la sugerencia para un MovimientoMP (muta el objeto, NO guarda)."""
     from ventas.models import VentaReserva
 
-    # Regla 1: external_reference = id de reserva → match directo
+    # Regla 1: external_reference = id de reserva → match directo.
+    # Si la reserva ya quedó sin saldo, el webhook de MP Link ya registró este
+    # pago → auto-ignorar (evita ruido en la cola). Si aún tiene saldo, el
+    # webhook falló o va atrasado → el Conciliador actúa de RESPALDO (sugerido).
     if mov.external_reference.strip().isdigit():
         reserva = VentaReserva.objects.filter(id=int(mov.external_reference)).first()
         if reserva:
             mov.sugerencia = reserva
-            mov.sugerencia_motivo = 'external_reference del link de pago'
-            mov.estado = 'sugerido'
+            if Decimal(reserva.saldo_pendiente or 0) <= 0:
+                mov.sugerencia_motivo = 'pago por link — ya registrado por el webhook'
+                mov.estado = 'ignorado'
+            else:
+                mov.sugerencia_motivo = 'external_reference del link de pago (respaldo del webhook)'
+                mov.estado = 'sugerido'
             return mov
 
     desde = mov.fecha - timedelta(days=VENTANA_RESERVA_DIAS)

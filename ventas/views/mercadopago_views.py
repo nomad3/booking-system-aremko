@@ -39,11 +39,17 @@ def create_mercadopago_payment(request):
         # Verificar que la reserva no esté ya pagada
         if reserva.estado_pago == 'pagado':
             return JsonResponse({'error': 'La reserva ya está pagada'}, status=400)
-        
+
+        # Cobrar el SALDO pendiente (no el total: una reserva con abono
+        # quedaría sobre-cobrada)
+        saldo = float(reserva.saldo_pendiente or 0)
+        if saldo <= 0:
+            return JsonResponse({'error': 'La reserva no tiene saldo pendiente'}, status=400)
+
         # Crear link de pago
         result = mercadopago_service.create_payment_link(
             reserva_id=reserva_id,
-            amount=float(reserva.total),
+            amount=saldo,
             description=f"Reserva Aremko #{reserva_id}",
             customer_email=reserva.cliente.email,
             customer_name=reserva.cliente.nombre

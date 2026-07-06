@@ -479,7 +479,45 @@ class VentaReservaAdmin(admin.ModelAdmin):
     )
     list_filter = ('estado_pago', 'estado_reserva', 'fecha_reserva')
     search_fields = ('id', 'cliente__nombre', 'cliente__telefono')
+    actions = ['generar_link_pago_mp']
     inlines = [ReservaServicioInline, ReservaProductoInline, GiftCardInline, PagoInline, ComandaInline, ParticipanteMasajeReservaInline]
+
+    @admin.action(description='💳 Generar link de pago MP (saldo · hasta 12 cuotas)')
+    def generar_link_pago_mp(self, request, queryset):
+        """Crea un link de Checkout Pro por el SALDO de la reserva. El cliente
+        paga con tarjeta (hasta 12+ cuotas), débito o saldo MP; el webhook
+        registra el pago SOLO en la reserva (external_reference = id)."""
+        from .services.mercadopago_service import mercadopago_service
+
+        if queryset.count() > 5:
+            self.message_user(request, 'Genera de a máximo 5 links por vez.', messages.WARNING)
+            return
+        for reserva in queryset.select_related('cliente'):
+            saldo = float(reserva.saldo_pendiente or 0)
+            if saldo <= 0:
+                self.message_user(
+                    request, f'Reserva #{reserva.id}: sin saldo pendiente — no necesita link.',
+                    messages.WARNING)
+                continue
+            resultado = mercadopago_service.create_payment_link(
+                reserva_id=reserva.id,
+                amount=saldo,
+                description=f'Reserva Aremko #{reserva.id}',
+                customer_email=(reserva.cliente.email or '') if reserva.cliente else '',
+                customer_name=(reserva.cliente.nombre or '') if reserva.cliente else '',
+            )
+            if resultado.get('success'):
+                link = resultado.get('payment_link')
+                self.message_user(request, format_html(
+                    'Reserva #{} · saldo ${}: <a href="{}" target="_blank" '
+                    'style="font-weight:700">{}</a> — cópialo y envíalo por WhatsApp. '
+                    'Al pagarse, el pago se registra solo en la reserva.',
+                    reserva.id, f'{int(saldo):,}'.replace(',', '.'), link, link))
+            else:
+                self.message_user(
+                    request,
+                    f'Reserva #{reserva.id}: error creando el link — {resultado.get("error")}',
+                    messages.ERROR)
     readonly_fields = (
         'id', 'total', 'pagado', 'saldo_pendiente', 'estado_pago',
         'productos_y_cantidades', 'servicios_y_cantidades',

@@ -53,7 +53,10 @@ class MercadoPagoService:
             if not self.access_token:
                 return {'success': False, 'error': 'Mercado Pago no configurado'}
             
-            # Preparar datos del pago
+            # Preparar datos del pago. OJO: las rutas de ventas viven bajo
+            # /ventas/ (la app se incluye con ese prefijo) — con las rutas sin
+            # prefijo el webhook de MP daba 404 y el pago nunca se registraba.
+            base = getattr(settings, 'BASE_URL', 'https://www.aremko.cl').rstrip('/')
             payment_data = {
                 "items": [
                     {
@@ -65,20 +68,20 @@ class MercadoPagoService:
                         "currency_id": "CLP"
                     }
                 ],
-                "payer": {
-                    "name": customer_name,
-                    "email": customer_email
-                },
                 "back_urls": {
-                    "success": f"{settings.BASE_URL}/payment/mercadopago/success/?reserva_id={reserva_id}",
-                    "failure": f"{settings.BASE_URL}/payment/mercadopago/failure/?reserva_id={reserva_id}",
-                    "pending": f"{settings.BASE_URL}/payment/mercadopago/pending/?reserva_id={reserva_id}"
+                    "success": f"{base}/ventas/payment/mercadopago/success/?reserva_id={reserva_id}",
+                    "failure": f"{base}/ventas/payment/mercadopago/failure/?reserva_id={reserva_id}",
+                    "pending": f"{base}/ventas/payment/mercadopago/pending/?reserva_id={reserva_id}"
                 },
                 "auto_return": "approved",
                 "external_reference": str(reserva_id),
-                "notification_url": f"{settings.BASE_URL}/payment/mercadopago/webhook/",
+                "notification_url": f"{base}/ventas/payment/mercadopago/webhook/",
+                "statement_descriptor": "AREMKO",
                 "additional_info": f"Reserva Aremko #{reserva_id}"
             }
+            # payer solo si hay email válido (MP rechaza emails vacíos)
+            if customer_email and '@' in customer_email:
+                payment_data["payer"] = {"name": customer_name or '', "email": customer_email}
             
             # Headers para la API
             headers = {

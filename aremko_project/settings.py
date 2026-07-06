@@ -564,6 +564,11 @@ FLOW_RETURN_URL = os.getenv("FLOW_RETURN_URL", "https://www.aremko.cl/payment/re
 MERCADOPAGO_ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 MERCADOPAGO_SANDBOX = os.getenv("MERCADOPAGO_SANDBOX", "false").lower() == "true"
 
+# Base pública del sitio (la usa mercadopago_service para back_urls/webhook).
+# No existía y create_payment_link moría en AttributeError — por eso MP Link
+# nunca llegó a usarse hasta 2026-07-06.
+BASE_URL = os.getenv("BASE_URL", "https://www.aremko.cl")
+
 # ──────────────── Meta (Facebook) Pixel + Conversions API ────────────────
 # Pixel ID: se inyecta en templates via context processor (meta_pixel_processor).
 # CAPI token: se genera en Meta Business → Events Manager → Settings → Generate Access Token.
