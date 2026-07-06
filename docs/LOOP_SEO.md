@@ -46,69 +46,52 @@
   `keyword_root`, `intro`, `body_md`, `cta_text`/`cta_url`. Recordar la regla
   de voz/humor obligatorio del blog (no genérico, con personalidad).
 
-## Fuente de datos externa — DataForSEO (rankings reales + competidores)
+## Fuente de datos externa — DataForSEO, vía aremko-cli (rankings reales + competidores)
 
-> Agregado 2026-07-06. GA4/GSC dicen cómo le va a **Aremko**; GSC nunca muestra
-> quién aparece ARRIBA en Google, ni el volumen de búsqueda real de keywords
-> candidatas que Aremko todavía no rankea. DataForSEO llena ese hueco. Cuenta
-> paga por uso (dataforseo.com), fondeada por Jorge — usar con criterio de
-> costo, no automatizar sin límite.
+> Agregado 2026-07-06, migrado a endpoints de aremko-cli el mismo día. GA4/GSC
+> dicen cómo le va a **Aremko**; nunca muestran quién aparece ARRIBA en Google.
+> DataForSEO llena ese hueco. Cuenta paga por uso (dataforseo.com), fondeada
+> por Jorge — pero ya NO se llama directo con credenciales locales: hay 3
+> endpoints en el backend de aremko-cli (Render, credenciales server-side +
+> cache 12-24h) que hacen de proxy. Igual que `seo-snapshots` de Django: sin
+> auth, sin token, sin Keychain que gestionar desde este loop.
 
-**Credenciales** (Keychain de este Mac, servicio `aremko-dataforseo`):
 ```bash
-API_LOGIN=$(security find-generic-password -a 'api_login' -s 'aremko-dataforseo' -w)
-API_PASSWORD=$(security find-generic-password -a 'api_password' -s 'aremko-dataforseo' -w)
+# Rankings (usa la lista fija de 8 keywords por defecto — ver abajo)
+curl "https://aremko-cli-backend.onrender.com/api/v1/seo/rankings"
+
+# Backlinks — mensual, no cada ciclo (el cache ya lo protege, pero no hace
+# falta pedirlo si no aporta nada nuevo esta semana)
+curl "https://aremko-cli-backend.onrender.com/api/v1/seo/backlinks"
+
+# Competidores por solapamiento de keywords — on-demand, al evaluar un tema
+# de contenido nuevo (p.ej. antes de proponer un BlogPost)
+curl "https://aremko-cli-backend.onrender.com/api/v1/seo/competitors"
 ```
-**Nunca** imprimir `$API_PASSWORD` ni pegarlo en esta bitácora ni en ningún
-commit — usarlo solo inline dentro del `curl` de la misma sesión.
 
-**Consciencia de costo (pago por uso — revisar antes de gastar):**
-- Chequeo de saldo (gratis, no gasta): `curl -s -u "${API_LOGIN}:${API_PASSWORD}" "https://api.dataforseo.com/v3/appendix/user_data"`
-- SERP rank check: ~$0.0006/keyword. La lista fija de abajo (8 keywords) =
-  **~$0.005/semana** — hacerlo cada ciclo, es trivial.
-- Backlinks summary: ~$0.02-0.05/consulta — usar **como mucho 1 vez al mes**,
-  no cada ciclo.
-- Competidores por solapamiento de keywords (`dataforseo_labs`) y volumen de
-  keywords nuevas: usar **solo cuando se está evaluando un tema de contenido
-  concreto** (p.ej. antes de proponer un BlogPost nuevo), no de forma rutinaria.
+`/rankings` devuelve, por keyword: `found` (bool), `position` (si aparece),
+`url`, y `competitors_above` (hasta 10 dominios que salen antes que aremko.cl
+en esa búsqueda — información que Search Console nunca da). El backend
+cachea 12h, así que llamarlo en cada ciclo no tiene costo adicional si ya se
+llamó ese día por otro motivo (ej. Jorge abrió el dashboard `/dashboard/jorge/seo`).
 
-**Lista fija de keywords a trackear cada ciclo** (no cambiar sin avisar a
-Jorge — la comparación semana a semana pierde sentido si la lista varía):
+**Lista fija de keywords trackeadas** (vive como default en
+`backend/internal/api/handlers/dataforseo.go` → `seoDefaultKeywords` del repo
+aremko-cli; mirror acá solo de referencia — cambiarla requiere editar ESE
+archivo Go y redeployar, no algo que el loop haga solo):
 `spa puerto varas`, `masajes puerto varas`, `tinajas puerto varas`, `termas
 puerto varas`, `termas en puerto varas`, `cabaña con tina caliente puerto
 varas`, `escapada romántica puerto varas`, `aremko`.
 
-**Rank check (repetir por cada keyword de la lista fija):**
-```bash
-curl -s -u "${API_LOGIN}:${API_PASSWORD}" -H "Content-Type: application/json" \
-  -d '[{"keyword":"KEYWORD_AQUI","location_name":"Chile","language_code":"es","device":"desktop","depth":20}]' \
-  "https://api.dataforseo.com/v3/serp/google/organic/live/advanced"
-```
-Extraer de `tasks[0].result[0].items` (`type == "organic"`): la posición
-(`rank_absolute`) donde aparece un `domain` que contenga "aremko", y qué
-dominios aparecen ANTES (competidores reales en esa keyword específica).
-
-**Backlinks summary (mensual, no cada ciclo):**
-```bash
-curl -s -u "${API_LOGIN}:${API_PASSWORD}" -H "Content-Type: application/json" \
-  -d '[{"target":"aremko.cl"}]' \
-  "https://api.dataforseo.com/v3/backlinks/summary/live"
-```
-
-**Competidores por solapamiento de keywords (on-demand, al evaluar contenido nuevo):**
-```bash
-curl -s -u "${API_LOGIN}:${API_PASSWORD}" -H "Content-Type: application/json" \
-  -d '{"tasks":[{"target":"aremko.cl","location_name":"Chile","language_name":"Spanish"}]}' \
-  "https://api.dataforseo.com/v3/dataforseo_labs/google/competitors_domain/live"
-```
-Nota el formato distinto (`{"tasks":[...]}` envuelto) vs. los endpoints de
-arriba (array plano `[...]`) — DataForSEO Labs usa el wrapper, SERP/Backlinks no.
-
 **Competidores reales detectados hasta ahora** (aparecen arriba de aremko.cl en
-al menos 1 keyword protegida, verificado 2026-07-06): `wyndhampettra.com`,
-`hotelbellavista.cl`, `hotelcabanadellago.cl`, `puerto-varas.dreams.cl`. Si uno
-se repite en varias keywords o sube, vale la pena revisar su backlink
-profile/contenido para entender por qué gana.
+al menos 1 keyword protegida, verificado 2026-07-06 con datos reales):
+`wyndhampettra.com`, `hotelbellavista.cl`, `hotelcabanadellago.cl`,
+`puerto-varas.dreams.cl`. Si uno se repite en varias keywords o sube, vale la
+pena pedir `/seo/competitors` y revisar su backlink profile para entender por
+qué gana.
+
+Hay también un dashboard visual de esto en `/dashboard/jorge/seo` (aremko-cli
+frontend) — Jorge puede revisarlo directamente sin esperar al ciclo semanal.
 
 ## Qué hacer en cada ciclo
 
@@ -121,8 +104,13 @@ profile/contenido para entender por qué gana.
 
    Sin auth, sin token. Aplicar la regla de arriba sobre semanas GSC en cero.
 
-3. Rank check con DataForSEO sobre la lista fija de keywords (ver sección de
-   arriba) — comparar contra la posición que reporta GSC para las keywords
+3. Rank check con DataForSEO vía aremko-cli (ver sección de arriba):
+
+   ```
+   curl "https://aremko-cli-backend.onrender.com/api/v1/seo/rankings"
+   ```
+
+   Comparar cada posición contra lo que reporta GSC para las keywords
    protegidas, y anotar qué dominios aparecen arriba en cada una.
 4. Opcional, para ver si el tráfico orgánico se traduce en negocio real (mismo
    criterio "no confiar solo en la plataforma" que los loops de ads, aunque acá
