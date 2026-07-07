@@ -378,3 +378,32 @@ evolucionan estas keywords en el tiempo" y no solo ver la foto del momento:**
 _Impacto en comparabilidad: cualquier rank-check de DataForSEO ANTES de que
 el fix de Go esté deployado sigue siendo "Chile" a nivel país + cálculo con
 el bug — no comparable 1:1 con los ciclos posteriores al deploy._
+
+**Cierre 2026-07-06 (mismo día): fix deployado y verificado en producción.**
+`aremko-cli` (commit `a0a999e`) y `booking-system-aremko` (commit `c1c30b8`)
+pusheados a `main`; migración `aremko_cli_sync` aplicada a mano por Jorge en
+el Shell de Render (auto-migrate off, como siempre). Primer sync real
+corrido en prod (`python manage.py sync_aremko_cli_seo_rankings`) — este es
+el **baseline correcto** (location `"Puerto Varas,Los Lagos,Chile"`,
+posición orgánica real) contra el que comparar de aquí en adelante:
+
+| Keyword | Posición orgánica | rank_absolute | URL |
+|---|---:|---:|---|
+| `aremko` (marca) | **1** ✅ | 2 | `/` |
+| `tinajas puerto varas` | **1** ✅ | 1 | `/tinas/` |
+| `cabaña con tina caliente puerto varas` | **1** ✅ | 2 | `/tinas/` |
+| `masajes puerto varas` | 3 | 6 | `/masajes/` |
+| `spa puerto varas` | 7 | 12 | `/` |
+| `termas en puerto varas` | 9 | 13 | `/` (post nuevo aún no rankea) |
+| `termas puerto varas` | 11 | 16 | `/` (post nuevo aún no rankea) |
+| `escapada romántica puerto varas` | 17 | 21 | `/alojamientos/` |
+
+Nota: `termas puerto varas`/`termas en puerto varas` siguen resolviendo a la
+home, no al post `/blog/termas-puerto-varas/` publicado el 2026-07-02 —
+esperable, Google todavía no lo indexó/rankeó para esa keyword específica
+(5 días). Revisar en el próximo ciclo si el post empieza a aparecer.
+
+**Pendiente de Jorge:** configurar el cron job semanal en cron-job.org
+(`POST /ventas/api/cron/sync-seo-rankings/`, header `X-API-KEY`) para que el
+historial se siga llenando solo — sin eso, la única fila que hay es esta del
+2026-07-06, corrida a mano.
