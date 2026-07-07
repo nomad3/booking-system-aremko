@@ -475,16 +475,24 @@ def generar_matriz_disponibilidad(fecha, categoria, servicios):
         for recurso_data in slot.values()
         if recurso_data['estado'] == 'parcial'
     )
+    bloqueados = sum(
+        1 for slot in matriz.values()
+        for recurso_data in slot.values()
+        if recurso_data['estado'] == 'bloqueado'
+    )
 
-    # Nota: ocupación parcial cuenta a medias (ej: 1 de 2 ocupado = 0.5)
+    # Nota: ocupación parcial cuenta a medias (ej: 1 de 2 ocupado = 0.5).
+    # El porcentaje se calcula sobre los slots operativos (sin los bloqueados).
     ocupacion_ponderada = ocupados + (parciales * 0.5)
+    slots_operativos = slots_validos - bloqueados
 
     resumen = {
         'total_slots': slots_validos,
         'ocupados': ocupados,
         'parciales': parciales,
-        'disponibles': slots_validos - ocupados,  # incluye parciales (aún reservables)
-        'porcentaje_ocupacion': round((ocupacion_ponderada / slots_validos * 100) if slots_validos > 0 else 0, 1)
+        'bloqueados': bloqueados,
+        'disponibles': slots_operativos - ocupados,  # incluye parciales (aún reservables)
+        'porcentaje_ocupacion': round((ocupacion_ponderada / slots_operativos * 100) if slots_operativos > 0 else 0, 1)
     }
 
     return {

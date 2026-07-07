@@ -390,6 +390,7 @@
                 <li>Total de slots: {{ resumen.total_slots }}</li>
                 <li>Ocupados (llenos): {{ resumen.ocupados }}</li>
                 <li>Parcialmente ocupados (con cupo): {{ resumen.parciales|default:0 }}</li>
+                {% if resumen.bloqueados %}<li>Fuera de servicio (bloqueados): {{ resumen.bloqueados }}</li>{% endif %}
                 <li>Disponibles: {{ resumen.disponibles }}</li>
                 <li>Porcentaje de ocupación: {{ resumen.porcentaje_ocupacion }}%</li>
             </ul>

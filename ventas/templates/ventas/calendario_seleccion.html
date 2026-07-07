@@ -67,6 +67,12 @@
             transform: scale(1.02);
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
+        .bloqueado {
+            background-color: #9b59b6;
+            color: white;
+            font-weight: bold;
+            cursor: not-allowed;
+        }
         .ocupado-pagado {
             background-color: #28a745;
             color: white;
@@ -319,6 +325,13 @@
                 transform: scale(0.98);
             }
 
+            .slot-item.bloqueado {
+                background-color: #e8d6f0;
+                border-left-color: #9b59b6;
+                color: #6c2d8a;
+                cursor: not-allowed;
+            }
+
             .slot-item.ocupado-pagado {
                 background-color: #d4edda;
                 border-left-color: #28a745;
@@ -452,6 +465,11 @@
                                 {% endif %}
                             {% elif celda.estado == 'no_aplica' %}
                                 <td class="no-aplica">-</td>
+                            {% elif celda.estado == 'bloqueado' %}
+                                <td class="bloqueado" title="Fuera de servicio: {{ celda.motivo_bloqueo|default:'Mantenimiento' }}">
+                                    🚫 Fuera de servicio<br>
+                                    <small>{{ celda.motivo_bloqueo|default:"" }}</small>
+                                </td>
                             {% else %}
                                 {# Estado disponible - puede tener reservas parciales #}
                                 {% if celda.cliente %}
@@ -541,6 +559,14 @@
                                 <div class="slot-hora">{{ slot.hora }}</div>
                                 <div class="slot-estado">No aplica</div>
                             </div>
+                        {% elif slot.estado == 'bloqueado' %}
+                            <div class="slot-item bloqueado">
+                                <div class="slot-hora">{{ slot.hora }}</div>
+                                <div class="slot-estado">
+                                    <strong>🚫 Fuera de servicio</strong>
+                                    <div class="slot-cliente">{{ slot.motivo_bloqueo|default:"" }}</div>
+                                </div>
+                            </div>
                         {% else %}
                             <div class="slot-item disponible"
                                 onclick="seleccionarServicio('{{ servicio.nombre }}', '{{ fecha_str }}', '{{ slot.hora }}')">
@@ -562,6 +588,10 @@
                 <li style="margin: 5px 0;">
                     <span style="display: inline-block; width: 20px; height: 20px; background-color: #fff3cd; border: 1px solid #ffeaa7; vertical-align: middle;"></span>
                     <strong>Amarillo:</strong> Slot disponible (click para agregar)
+                </li>
+                <li style="margin: 5px 0;">
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: #9b59b6; border: 1px solid #6c2d8a; vertical-align: middle;"></span>
+                    <strong>Morado:</strong> Servicio bloqueado (fuera de servicio, no se puede agregar)
                 </li>
                 <li style="margin: 5px 0;">
                     <span style="display: inline-block; width: 20px; height: 20px; background-color: #28a745; border: 1px solid #1e7e34; vertical-align: middle;"></span>

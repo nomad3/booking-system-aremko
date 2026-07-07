@@ -14,7 +14,9 @@ from ..models import (
     Servicio,
     CategoriaServicio,
     ReservaServicio,
-    VentaReserva
+    VentaReserva,
+    ServicioBloqueo,
+    ServicioSlotBloqueo
 )
 from .calendario_matriz_view import generar_matriz_disponibilidad
 
@@ -263,6 +265,34 @@ def agregar_servicio_a_reserva(request):
                 'success': False,
                 'error': 'Formato de fecha inválido'
             }, status=400)
+
+        # Rechazar slots fuera de servicio (misma fuente de verdad que pinta el
+        # calendario). El template ya no permite clickearlos, pero este candado
+        # cubre pestañas desactualizadas y llamadas directas al endpoint.
+        try:
+            h, m = hora_str.split(':')[:2]
+            hora_norm = f"{int(h):02d}:{int(m):02d}"
+        except (ValueError, AttributeError):
+            hora_norm = hora_str
+
+        bloqueo = ServicioBloqueo.objects.filter(
+            servicio=servicio,
+            activo=True,
+            fecha_inicio__lte=fecha,
+            fecha_fin__gte=fecha,
+        ).first() or ServicioSlotBloqueo.objects.filter(
+            servicio=servicio,
+            activo=True,
+            fecha=fecha,
+            hora_slot=hora_norm,
+        ).first()
+
+        if bloqueo:
+            return JsonResponse({
+                'success': False,
+                'error': f'"{servicio.nombre}" está fuera de servicio en ese horario '
+                         f'({bloqueo.motivo}). No se puede agregar a la reserva.'
+            }, status=409)
 
         # Obtener o crear la reserva
         if reserva_id:
