@@ -3330,6 +3330,83 @@ def seo_snapshots(request):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+def seo_rankings_history(request):
+    """
+    Historial de rank-check SEO (DataForSEO vía aremko-cli), agrupado por
+    keyword — para ver evolución de posición orgánica en el tiempo, no solo
+    la foto del momento que da `aremko-cli:/api/v1/seo/rankings` en vivo.
+
+    Solo LECTURA de lo que ya guarda `sync_aremko_cli_seo_rankings` (app
+    `aremko_cli_sync`, modelo `SEORankingSnapshot`) — no genera nada nuevo, no
+    llama en vivo a aremko-cli/DataForSEO. Público, SIN auth (mismo criterio
+    que `seo_snapshots`: dato agregado no sensible, el loop corre en una
+    máquina sin `AUTOMATION_API_KEY`).
+
+    Query params (opcionales):
+        weeks: int, default 8. Cuántas corridas más recientes traer POR keyword.
+
+    Response 200 (más antiguo primero por keyword; si una keyword nunca se
+    sincronizó, simplemente no aparece — no hay error):
+        {
+          "weeks_requested": 8,
+          "rankings": {
+            "masajes puerto varas": [
+              {"fetched_at": "2026-07-06T...", "found": true, "position": 6,
+               "rank_absolute": 8, "url": "...", "competitors_above": [...]},
+              ...
+            ],
+            ...
+          }
+        }
+    """
+    try:
+        from aremko_cli_sync.models import SEORankingSnapshot
+
+        try:
+            weeks = int(request.GET.get('weeks', 8))
+        except (TypeError, ValueError):
+            weeks = 8
+        if weeks < 1:
+            weeks = 8
+
+        keywords = (
+            SEORankingSnapshot.objects.filter(success=True)
+            .exclude(keyword='')
+            .values_list('keyword', flat=True)
+            .distinct()
+        )
+
+        rankings = {}
+        for kw in keywords:
+            qs = (
+                SEORankingSnapshot.objects.filter(keyword=kw, success=True)
+                .order_by('-fetched_at')[:weeks]
+            )
+            rankings[kw] = [
+                {
+                    'fetched_at': s.fetched_at.isoformat(),
+                    'found': s.found,
+                    'position': s.position,
+                    'rank_absolute': s.rank_absolute,
+                    'url': s.url,
+                    'competitors_above': s.competitors_above,
+                }
+                for s in reversed(qs)  # más antiguo primero
+            ]
+
+        logger.info(f"aremko-cli: seo_rankings_history weeks={weeks} keywords={len(rankings)}")
+        return JsonResponse({
+            'weeks_requested': weeks,
+            'rankings': rankings,
+        })
+
+    except Exception as e:
+        logger.error(f"Error in seo_rankings_history: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
 def health_check(request):
     """
     Health check para verificar que la API está funcionando

@@ -203,6 +203,10 @@ urlpatterns = [
     # Llamar cada lunes 09:00 hora Chile (1h antes del brief).
     path('api/cron/snapshot-weekly-traffic/', api_views.cron_snapshot_weekly_traffic, name='cron_snapshot_weekly_traffic'),
 
+    # === Cron endpoint para historial de rank-check SEO (DataForSEO vía aremko-cli) ===
+    # Llamar mismo día que snapshot-weekly-traffic (lunes), antes de que el loop de SEO despierte.
+    path('api/cron/sync-seo-rankings/', api_views.cron_sync_seo_rankings, name='cron_sync_seo_rankings'),
+
     # === API público de resumen de reviews para brief semanal ===
     # Usado por aremko-cli (backend Go) para obtener métricas de opiniones
     path('api/reviews-summary/', api_views.reviews_summary, name='reviews_summary'),
@@ -372,6 +376,7 @@ urlpatterns = [
     path('api/aremko-cli/bookings/detalle-productos/', api_aremko_cli.bookings_detalle_productos, name='aremko_cli_bookings_detalle_productos'),
     path('api/aremko-cli/operating-context/', api_aremko_cli.operating_context, name='aremko_cli_operating_context'),
     path('api/aremko-cli/seo-snapshots/', api_aremko_cli.seo_snapshots, name='aremko_cli_seo_snapshots'),  # H-057: loop de mejora continua SEO
+    path('api/aremko-cli/seo-rankings-history/', api_aremko_cli.seo_rankings_history, name='aremko_cli_seo_rankings_history'),  # H-057: historial de rank-check DataForSEO
 
     # === Cotización formal para empresas (documento HTML imprimible) ===
     path('cotizacion/<int:numero>/', cotizacion_view.cotizacion_formal_view, name='cotizacion_formal'),

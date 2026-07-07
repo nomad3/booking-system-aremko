@@ -69,11 +69,36 @@ curl "https://aremko-cli-backend.onrender.com/api/v1/seo/backlinks"
 curl "https://aremko-cli-backend.onrender.com/api/v1/seo/competitors"
 ```
 
-`/rankings` devuelve, por keyword: `found` (bool), `position` (si aparece),
-`url`, y `competitors_above` (hasta 10 dominios que salen antes que aremko.cl
-en esa búsqueda — información que Search Console nunca da). El backend
-cachea 12h, así que llamarlo en cada ciclo no tiene costo adicional si ya se
-llamó ese día por otro motivo (ej. Jorge abrió el dashboard `/dashboard/jorge/seo`).
+`/rankings` devuelve, por keyword: `found` (bool), `position` (posición
+ORGÁNICA, 1-indexed — cuenta solo resultados `type=organic`, no bloques como
+knowledge graph/imágenes/local pack), `rank_absolute` (posición absoluta en
+el SERP completo, referencia, no comparar ciclo a ciclo), `url`, y
+`competitors_above` (hasta 10 dominios orgánicos que salen antes que
+aremko.cl — información que Search Console nunca da). El backend cachea 12h,
+así que llamarlo en cada ciclo no tiene costo adicional si ya se llamó ese
+día por otro motivo (ej. Jorge abrió el dashboard `/dashboard/jorge/seo`).
+
+**⚠️ Fix aplicado 2026-07-06 (sesión interactiva) — leer antes de comparar
+contra ciclos anteriores al 2026-07-06:**
+- **Ubicación:** el default era `location_name: "Chile"` (país completo) →
+  corregido a `"Puerto Varas,Los Lagos,Chile"` (DataForSEO `location_code
+  1003309`, confirmado real vía `/v3/serp/google/locations/CL`). Los ciclos
+  antes de esta fecha comparaban contra un rank-check nacional/genérico, no
+  contra lo que ve alguien buscando desde/sobre Puerto Varas — no comparables
+  1:1 con los ciclos posteriores.
+- **Cálculo de posición:** antes usaba `rank_absolute` directo (cuenta TODOS
+  los bloques del SERP). Confirmado en producción con la keyword "aremko":
+  `rank_absolute=2` pero era el Knowledge Graph ocupando el puesto 1 —
+  aremko.cl SÍ era el #1 orgánico real. Ahora `position` cuenta solo
+  orgánicos; `rank_absolute` se guarda aparte como referencia.
+- Código: `aremko-cli/backend/internal/api/handlers/dataforseo.go` (constante
+  `seoDefaultLocationName`) y `internal/dataforseo/queries.go` (struct
+  `RankCheckResult`, función `getSingleRankCheck`).
+- **Hallazgo real (no bug) descubierto en la misma revisión:** para "spa
+  puerto varas" con ubicación correcta, Aremko **no aparece en el Local
+  Pack** (mapa de Google, 3 fichas) — lo ocupan `energiavitalpv`, Instagram y
+  `santocha.cl`. Vale la pena revisar el Google Business Profile de Aremko en
+  algún ciclo futuro (fuera del alcance de este fix).
 
 **Lista fija de keywords trackeadas** (vive como default en
 `backend/internal/api/handlers/dataforseo.go` → `seoDefaultKeywords` del repo
@@ -82,6 +107,32 @@ archivo Go y redeployar, no algo que el loop haga solo):
 `spa puerto varas`, `masajes puerto varas`, `tinajas puerto varas`, `termas
 puerto varas`, `termas en puerto varas`, `cabaña con tina caliente puerto
 varas`, `escapada romántica puerto varas`, `aremko`.
+
+### Historial persistido de rank-check (nuevo 2026-07-06)
+
+El endpoint `/rankings` de arriba solo da la foto del momento (cache 12h, se
+pierde en cada redeploy de Render) — no permite ver evolución en el tiempo.
+Para eso existe ahora, en este mismo repo Django, un historial persistido:
+
+```bash
+curl "https://www.aremko.cl/ventas/api/aremko-cli/seo-rankings-history/?weeks=8"
+```
+
+Devuelve `{"weeks_requested": N, "rankings": {"<keyword>": [{fetched_at,
+found, position, rank_absolute, url, competitors_above}, ...], ...}}`, más
+antiguo primero por keyword. Público, sin auth (mismo criterio que
+`seo-snapshots`). Es SOLO LECTURA de lo que ya guardó
+`sync_aremko_cli_seo_rankings` (app aislada `aremko_cli_sync`, modelo
+`SEORankingSnapshot`, drift-safe respecto a `ventas`) — no genera nada nuevo.
+
+**Este endpoint solo tiene datos si alguien corrió el sync.** Disparo:
+`python manage.py sync_aremko_cli_seo_rankings` (a mano), o vía el cron
+`POST /ventas/api/cron/sync-seo-rankings/` (header `X-API-KEY`) — **pendiente
+que Jorge configure el job semanal en cron-job.org** apuntando a ese
+endpoint (mismo día que `snapshot-weekly-traffic`, antes de que el loop
+despierte los lunes). Hasta que ese cron exista, el paso 3 de este ciclo debe
+seguir usando el rank-check en vivo (`/api/v1/seo/rankings`) como hoy, y
+opcionalmente consultar este historial si ya hay algo guardado.
 
 **Competidores reales detectados hasta ahora** (aparecen arriba de aremko.cl en
 al menos 1 keyword protegida, verificado 2026-07-06 con datos reales):
@@ -108,10 +159,14 @@ frontend) — Jorge puede revisarlo directamente sin esperar al ciclo semanal.
 
    ```
    curl "https://aremko-cli-backend.onrender.com/api/v1/seo/rankings"
+   curl "https://www.aremko.cl/ventas/api/aremko-cli/seo-rankings-history/?weeks=8"
    ```
 
    Comparar cada posición contra lo que reporta GSC para las keywords
-   protegidas, y anotar qué dominios aparecen arriba en cada una.
+   protegidas, y anotar qué dominios aparecen arriba en cada una. Usar el
+   historial (segundo curl) para ver tendencia real semana a semana en vez
+   de solo la foto del momento — puede venir vacío o corto si el cron de
+   sync todavía no está configurado (ver sección de arriba).
 4. Opcional, para ver si el tráfico orgánico se traduce en negocio real (mismo
    criterio "no confiar solo en la plataforma" que los loops de ads, aunque acá
    el vínculo es más indirecto que en ads):
@@ -265,3 +320,61 @@ _Estado: revisado con Jorge en sesión interactiva (2026-07-02)._
   aparece en top_pages.
 
 **Ciclo 1 cerrado: 3/3 recomendaciones aplicadas el mismo día (2026-07-02).**
+
+---
+
+### Infraestructura — fix de DataForSEO + historial persistido (2026-07-06, sesión interactiva)
+
+Jorge conectó DataForSEO a `aremko-cli` y encontró los resultados "malos" a
+simple vista (comparado contra GSC). Diagnóstico + fix, sin esperar al ciclo
+semanal porque afecta la fuente de datos de TODOS los ciclos futuros:
+
+**Diagnóstico (confirmado con pruebas reales contra la API de DataForSEO, no
+solo lectura de código):**
+1. `location_name: "Chile"` (país) en vez de Puerto Varas específico — traía
+   competidores/posiciones genéricas de todo el país.
+2. Bug de cálculo: `position` usaba `rank_absolute` (cuenta TODOS los bloques
+   del SERP — knowledge graph, imágenes, local pack, etc.), no solo
+   orgánicos. Confirmado con "aremko": `rank_absolute=2` pero era el
+   Knowledge Graph en el puesto 1 — aremko.cl SÍ era el #1 orgánico real.
+3. Hallazgo real (no bug): Aremko no aparece en el Local Pack de Google Maps
+   para "spa puerto varas" (si la ubicación es correcta) — a revisar en un
+   ciclo futuro.
+
+**Fix aplicado (repo `aremko-cli`, backend Go):**
+- `backend/internal/api/handlers/dataforseo.go`: `seoDefaultLocationName` →
+  `"Puerto Varas,Los Lagos,Chile"`.
+- `backend/internal/dataforseo/queries.go`: `RankCheckResult.Position` ahora
+  cuenta solo items `type=="organic"`; se agregó `RankAbsolute` como campo de
+  referencia separado.
+- Validado con `go build ./...`, `go vet` (limpio en los archivos tocados;
+  el único warning de `go vet ./...` es preexistente en `internal/ai`, no
+  relacionado) y `gofmt`. Sin tests que romper (no hay tests en esos paquetes).
+- **Pendiente: Jorge debe confirmar el push de `aremko-cli` a `main`** (Render
+  auto-deploya) — no se pusheó en esta sesión, solo se dejó listo localmente.
+
+**Historial persistido nuevo (repo Django, este repo), para responder "cómo
+evolucionan estas keywords en el tiempo" y no solo ver la foto del momento:**
+- Modelo `SEORankingSnapshot` en app aislada `aremko_cli_sync` (drift-safe,
+  mismo patrón que `WeeklyBriefSnapshot` — NO se tocó `ventas/models.py`,
+  evita el drift AR-034 pendiente). Migración `aremko_cli_sync/migrations/
+  0002_seorankingsnapshot.py`, generada y aplicada limpia en local (Docker).
+- Management command `sync_aremko_cli_seo_rankings`: llama
+  `aremko-cli:/api/v1/seo/rankings` y guarda 1 fila por keyword. Probado en
+  vivo contra el aremko-cli real (áun con el bug viejo desplegado — location
+  "Chile", sin `rank_absolute` — porque el fix de Go no se ha pusheado).
+- Endpoint de lectura `GET /ventas/api/aremko-cli/seo-rankings-history/?weeks=8`
+  (`ventas/api_aremko_cli.py`, función `seo_rankings_history`), público sin
+  auth, mismo criterio que `seo-snapshots`. Probado end-to-end en local: 200,
+  agrupado por keyword, más antiguo primero.
+- Endpoint cron `POST /ventas/api/cron/sync-seo-rankings/` (X-API-KEY) para
+  disparar el sync semanalmente — **pendiente que Jorge configure el job en
+  cron-job.org** (mismo día que `snapshot-weekly-traffic`, antes de que el
+  loop despierte los lunes). Sin ese cron, el historial no se llena solo.
+- **Pendiente: Jorge debe confirmar el push de este repo a `main`** (incluye
+  migración nueva — Render no corre `migrate` automático, hay que correrlo a
+  mano desde el Shell de Render tras el deploy, igual que siempre).
+
+_Impacto en comparabilidad: cualquier rank-check de DataForSEO ANTES de que
+el fix de Go esté deployado sigue siendo "Chile" a nivel país + cálculo con
+el bug — no comparable 1:1 con los ciclos posteriores al deploy._

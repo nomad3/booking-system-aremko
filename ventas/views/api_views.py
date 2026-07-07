@@ -761,6 +761,59 @@ def cron_snapshot_weekly_traffic(request):
     })
 
 
+def _run_sync_seo_rankings_background():
+    """Helper para correr sync_aremko_cli_seo_rankings en thread.
+
+    Mismo patrón fire-and-forget que _run_snapshot_weekly_traffic_background
+    (respeta el timeout 30s de cron-job.org plan free; el rank-check real
+    puede tardar más porque aremko-cli llama a DataForSEO 1 vez por keyword).
+    """
+    import logging
+    from io import StringIO
+    from django.core.management import call_command
+    log = logging.getLogger(__name__)
+
+    output = StringIO()
+    try:
+        call_command('sync_aremko_cli_seo_rankings', stdout=output, stderr=output)
+        log.info('Sync SEO rankings (aremko-cli) completado:\n%s', output.getvalue()[-3000:])
+    except Exception as e:
+        log.exception('Error en sync SEO rankings (aremko-cli): %s', e)
+
+
+@csrf_exempt
+@api_view(['POST', 'GET'])
+@permission_classes([AllowAny])
+def cron_sync_seo_rankings(request):
+    """
+    Endpoint para que cron-job.org dispare la sincronización histórica de
+    rank-check SEO (DataForSEO vía aremko-cli) — guarda 1 fila por keyword
+    en `aremko_cli_sync.SEORankingSnapshot` para poder ver evolución en el
+    tiempo (no solo la foto del momento del endpoint en vivo).
+
+    Schedule sugerido: mismo día que snapshot_weekly_traffic (lunes), después
+    de las 9am, para que el loop de SEO (docs/LOOP_SEO.md) tenga historial
+    fresco al despertar.
+
+    Auth: header X-API-KEY con AUTOMATION_API_KEY.
+    Async (fire-and-forget) para evitar timeout 30s de cron-job.org plan free.
+    """
+    if not is_valid_api_key(request):
+        return Response(
+            {"error": "Authentication required. Set X-API-KEY header."},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    from threading import Thread
+    thread = Thread(target=_run_sync_seo_rankings_background, daemon=True)
+    thread.start()
+
+    return Response({
+        "success": True,
+        "message": "Sync de rankings SEO (aremko-cli) iniciado en background.",
+    })
+
+
 def _run_survey_analysis_background():
     """Helper para correr analyze_surveys_weekly en thread, sin bloquear el response.
 
