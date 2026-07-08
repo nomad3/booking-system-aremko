@@ -57,7 +57,7 @@
 > auth, sin token, sin Keychain que gestionar desde este loop.
 
 ```bash
-# Rankings (usa la lista fija de 8 keywords por defecto — ver abajo)
+# Rankings (usa la lista fija de 9 keywords por defecto — ver abajo)
 curl "https://aremko-cli-backend.onrender.com/api/v1/seo/rankings"
 
 # Backlinks — mensual, no cada ciclo (el cache ya lo protege, pero no hace
@@ -106,7 +106,10 @@ aremko-cli; mirror acá solo de referencia — cambiarla requiere editar ESE
 archivo Go y redeployar, no algo que el loop haga solo):
 `spa puerto varas`, `masajes puerto varas`, `tinajas puerto varas`, `termas
 puerto varas`, `termas en puerto varas`, `cabaña con tina caliente puerto
-varas`, `escapada romántica puerto varas`, `aremko`.
+varas`, `escapada romántica puerto varas`, `spa cerca de puerto varas`,
+`aremko`. (9 keywords desde 2026-07-08 — se agregó `spa cerca de puerto
+varas` tras descubrir que Aremko ya rankea #3 ahí, ver sección de
+competidores abajo.)
 
 ### Historial persistido de rank-check (nuevo 2026-07-06)
 
@@ -132,12 +135,13 @@ criterio que `seo-snapshots`). Es SOLO LECTURA de lo que ya guardó
 configurado por Jorge en cron-job.org**, lunes 09:10 hora Chile (10 min
 después de `snapshot-weekly-traffic`, antes de que despierte el loop). Cada
 corrida ahora sincroniza Aremko + los 3 competidores de la sección de abajo
-(32 filas por corrida: 4 dominios × 8 keywords).
+(36 filas por corrida: 4 dominios × 9 keywords, desde que se agregó "spa
+cerca de puerto varas" — antes eran 32 con 8 keywords).
 
 ### Competidores trackeados (nuevo 2026-07-08)
 
 Además de Aremko, `sync_aremko_cli_seo_rankings` corre el MISMO rank-check
-(las mismas 8 keywords protegidas) contra 3 competidores directos —
+(las mismas 9 keywords protegidas) contra 3 competidores directos —
 confirmados 2026-07-08 tras analizar un video tutorial de Semrush One sobre
 SEO+AEO. Lista editable en `DEFAULT_TARGETS` del management command (agregar
 uno nuevo no requiere tocar aremko-cli ni cron-job.org, el endpoint
