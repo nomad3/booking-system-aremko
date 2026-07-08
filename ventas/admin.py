@@ -3171,7 +3171,9 @@ class HomepageConfigAdmin(SingletonModelAdmin):
     """Admin para configuración global del Homepage (Singleton)"""
     fieldsets = (
         ('Hero Section', {
-            'fields': ('hero_title', 'hero_subtitle', 'hero_cta_text', 'hero_cta_link', 'hero_background_image')
+            'fields': ('hero_title', 'hero_subtitle', 'hero_cta_text', 'hero_cta_link', 'hero_background_image', 'hero_video'),
+            'description': 'El "Hero video" se reproduce de fondo en la portada (autoplay, silenciado, en loop). '
+                           'La "Imagen de fondo" queda de respaldo mientras el video carga o si no hay video.'
         }),
         ('Sección Filosofía', {
             'fields': ('philosophy_title', 'philosophy_text_1', 'philosophy_text_2', 'philosophy_cta_text', 'philosophy_image')

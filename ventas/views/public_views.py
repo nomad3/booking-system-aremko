@@ -20,6 +20,7 @@ def homepage_view(request):
 
     # --- Fetch Homepage Config ---
     hero_image_url = None
+    hero_video_url = None       # Video de fondo del hero (portada boutique)
     philosophy_image_url = None # Add variable for philosophy image
     gallery_image_1_url = None  # Add variable for gallery image 1
     gallery_image_2_url = None  # Add variable for gallery image 2
@@ -47,6 +48,9 @@ def homepage_view(request):
         # Get hero image URL
         if config.hero_background_image:
             hero_image_url = config.hero_background_image.url
+        # Get hero video URL (portada boutique)
+        if config.hero_video:
+            hero_video_url = config.hero_video.url
         # Get philosophy image URL
         if config.philosophy_image:
             philosophy_image_url = config.philosophy_image.url
@@ -76,6 +80,14 @@ def homepage_view(request):
     except HomepageConfig.DoesNotExist:
         # Handle case where the config hasn't been created yet
         pass
+    except Exception as e:
+        # Red de seguridad para la ventana de deploy: si una columna recién
+        # agregada (ej. hero_video) aún no existe en la BD porque el migrate no
+        # ha corrido, NO tumbar la portada (hot-path) — seguir con los defaults
+        # y sin video hasta que se aplique la migración.
+        import logging
+        logging.getLogger(__name__).warning(
+            f"HomepageConfig no disponible, usando defaults: {e}")
     # --- End Fetch Homepage Config ---
 
     # Canonical URL for SEO (build safely)
@@ -136,6 +148,7 @@ def homepage_view(request):
         'categorias': categorias,
         'cart': cart,
         'hero_image_url': hero_image_url,
+        'hero_video_url': hero_video_url,             # Video de fondo del hero (portada)
         'philosophy_image_url': philosophy_image_url, # Add philosophy URL to context
         'gallery_image_1_url': gallery_image_1_url,   # Add gallery 1 URL to context
         'gallery_image_2_url': gallery_image_2_url,   # Add gallery 2 URL to context

@@ -234,6 +234,7 @@ main.py-4{padding:0 !important;background:#f3ede3}
 .ar-hero-photo{position:absolute;inset:0;
   background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_1600,h_900,e_brightness:-30,f_auto,q_auto/servicios/Tina_Tronador_en_aremko_avsqbj') center/cover no-repeat,
    linear-gradient(180deg,#7d5a33,#39473b)}
+.ar-hero-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .ar-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(18,15,12,.80) 0%,rgba(18,15,12,.44) 50%,rgba(18,15,12,.54) 100%)}
 .ar-hero-tx{position:relative;z-index:2;width:100%;max-width:1080px;margin:0 auto;padding:54px 44px 56px}
 .ar-badge{display:inline-block;background:rgba(255,250,240,.92);color:var(--badgetx);font-size:12px;font-weight:600;padding:6px 14px;border-radius:30px;margin-bottom:16px}
@@ -293,6 +294,13 @@ main.py-4{padding:0 !important;background:#f3ede3}
 
   <section class="ar-hero">
     <div class="ar-hero-photo" role="img" aria-label="Tina caliente humeante junto al Río Pescado en Aremko Spa, Puerto Varas"></div>
+    {% if hero_video_url %}
+    <video class="ar-hero-video" autoplay muted loop playsinline preload="metadata"
+           poster="https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_1600,h_900,e_brightness:-30,f_auto,q_auto/servicios/Tina_Tronador_en_aremko_avsqbj"
+           aria-hidden="true">
+      <source src="{{ hero_video_url }}" type="video/mp4">
+    </video>
+    {% endif %}
     <div class="ar-hero-tx">
       <span class="ar-badge">Spa boutique · Puerto Varas</span>
       <h1>Aguas calientes junto al río</h1>

@@ -1931,6 +1931,17 @@ class HomepageConfig(SingletonModel):
         null=True,
         help_text="Imagen de fondo para la sección principal (hero)."
     )
+    hero_video = models.FileField(
+        upload_to='homepage/',
+        storage=VideoMediaCloudinaryStorage(),
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="VIDEO DE PORTADA: se reproduce de fondo en el hero de la home "
+                  "(autoplay, silenciado, en loop). La imagen de fondo de arriba queda "
+                  "de respaldo mientras el video carga o si está vacío. mp4 <5MB "
+                  "(comprimir antes). Ideal 15-25 seg con loop natural."
+    )
     philosophy_image = models.ImageField(
         upload_to='homepage/',
         blank=True,
