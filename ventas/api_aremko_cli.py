@@ -3333,8 +3333,9 @@ def seo_snapshots(request):
 def seo_rankings_history(request):
     """
     Historial de rank-check SEO (DataForSEO vía aremko-cli), agrupado por
-    keyword — para ver evolución de posición orgánica en el tiempo, no solo
-    la foto del momento que da `aremko-cli:/api/v1/seo/rankings` en vivo.
+    dominio y luego por keyword — para ver evolución de posición orgánica en
+    el tiempo (Aremko Y competidores directos), no solo la foto del momento
+    que da `aremko-cli:/api/v1/seo/rankings` en vivo.
 
     Solo LECTURA de lo que ya guarda `sync_aremko_cli_seo_rankings` (app
     `aremko_cli_sync`, modelo `SEORankingSnapshot`) — no genera nada nuevo, no
@@ -3343,18 +3344,27 @@ def seo_rankings_history(request):
     máquina sin `AUTOMATION_API_KEY`).
 
     Query params (opcionales):
-        weeks: int, default 8. Cuántas corridas más recientes traer POR keyword.
+        weeks: int, default 8. Cuántas corridas más recientes traer POR
+            (dominio, keyword).
+        targets: coma-separado, ej. "aremko.cl,cancagua.cl". Default: todos
+            los dominios con datos guardados (ver DEFAULT_TARGETS en
+            sync_aremko_cli_seo_rankings.py para la lista que trackea el cron).
 
-    Response 200 (más antiguo primero por keyword; si una keyword nunca se
-    sincronizó, simplemente no aparece — no hay error):
+    Response 200 (más antiguo primero por keyword; si un (dominio, keyword)
+    nunca se sincronizó, simplemente no aparece — no hay error):
         {
           "weeks_requested": 8,
+          "targets": ["aremko.cl", "cancagua.cl", ...],
           "rankings": {
-            "masajes puerto varas": [
-              {"fetched_at": "2026-07-06T...", "found": true, "position": 6,
-               "rank_absolute": 8, "url": "...", "competitors_above": [...]},
+            "aremko.cl": {
+              "masajes puerto varas": [
+                {"fetched_at": "2026-07-06T...", "found": true, "position": 6,
+                 "rank_absolute": 8, "url": "...", "competitors_above": [...]},
+                ...
+              ],
               ...
-            ],
+            },
+            "cancagua.cl": { ... },
             ...
           }
         }
@@ -3369,34 +3379,57 @@ def seo_rankings_history(request):
         if weeks < 1:
             weeks = 8
 
-        keywords = (
-            SEORankingSnapshot.objects.filter(success=True)
-            .exclude(keyword='')
-            .values_list('keyword', flat=True)
-            .distinct()
-        )
+        # OJO: SEORankingSnapshot.Meta.ordering = ['-fetched_at'] por defecto.
+        # .distinct() sobre .values_list(un_campo) SIN limpiar antes ese orden
+        # arrastra fetched_at al DISTINCT (gotcha de Django+Postgres) y termina
+        # devolviendo una fila "distinta" por cada fetched_at en vez de una por
+        # valor real — .order_by() vacío lo limpia. Confirmado con datos reales
+        # multi-dominio 2026-07-08 (sin el fix, "targets" salía con el mismo
+        # dominio repetido N veces).
+        targets_param = (request.GET.get('targets') or '').strip()
+        if targets_param:
+            targets = [t.strip() for t in targets_param.split(',') if t.strip()]
+        else:
+            targets = list(
+                SEORankingSnapshot.objects.filter(success=True)
+                .exclude(target_domain='')
+                .order_by()
+                .values_list('target_domain', flat=True)
+                .distinct()
+            )
 
         rankings = {}
-        for kw in keywords:
-            qs = (
-                SEORankingSnapshot.objects.filter(keyword=kw, success=True)
-                .order_by('-fetched_at')[:weeks]
+        for target in targets:
+            keywords = (
+                SEORankingSnapshot.objects.filter(success=True, target_domain=target)
+                .exclude(keyword='')
+                .order_by()
+                .values_list('keyword', flat=True)
+                .distinct()
             )
-            rankings[kw] = [
-                {
-                    'fetched_at': s.fetched_at.isoformat(),
-                    'found': s.found,
-                    'position': s.position,
-                    'rank_absolute': s.rank_absolute,
-                    'url': s.url,
-                    'competitors_above': s.competitors_above,
-                }
-                for s in reversed(qs)  # más antiguo primero
-            ]
+            by_keyword = {}
+            for kw in keywords:
+                qs = (
+                    SEORankingSnapshot.objects.filter(keyword=kw, target_domain=target, success=True)
+                    .order_by('-fetched_at')[:weeks]
+                )
+                by_keyword[kw] = [
+                    {
+                        'fetched_at': s.fetched_at.isoformat(),
+                        'found': s.found,
+                        'position': s.position,
+                        'rank_absolute': s.rank_absolute,
+                        'url': s.url,
+                        'competitors_above': s.competitors_above,
+                    }
+                    for s in reversed(qs)  # más antiguo primero
+                ]
+            rankings[target] = by_keyword
 
-        logger.info(f"aremko-cli: seo_rankings_history weeks={weeks} keywords={len(rankings)}")
+        logger.info(f"aremko-cli: seo_rankings_history weeks={weeks} targets={targets}")
         return JsonResponse({
             'weeks_requested': weeks,
+            'targets': targets,
             'rankings': rankings,
         })
 

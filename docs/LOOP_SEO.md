@@ -118,21 +118,88 @@ Para eso existe ahora, en este mismo repo Django, un historial persistido:
 curl "https://www.aremko.cl/ventas/api/aremko-cli/seo-rankings-history/?weeks=8"
 ```
 
-Devuelve `{"weeks_requested": N, "rankings": {"<keyword>": [{fetched_at,
-found, position, rank_absolute, url, competitors_above}, ...], ...}}`, más
-antiguo primero por keyword. Público, sin auth (mismo criterio que
-`seo-snapshots`). Es SOLO LECTURA de lo que ya guardó
+Devuelve `{"weeks_requested": N, "targets": [...], "rankings": {"<dominio>":
+{"<keyword>": [{fetched_at, found, position, rank_absolute, url,
+competitors_above}, ...], ...}, ...}}`, más antiguo primero por keyword.
+Filtrar a un solo dominio con `?targets=aremko.cl`. Público, sin auth (mismo
+criterio que `seo-snapshots`). Es SOLO LECTURA de lo que ya guardó
 `sync_aremko_cli_seo_rankings` (app aislada `aremko_cli_sync`, modelo
 `SEORankingSnapshot`, drift-safe respecto a `ventas`) — no genera nada nuevo.
 
 **Este endpoint solo tiene datos si alguien corrió el sync.** Disparo:
 `python manage.py sync_aremko_cli_seo_rankings` (a mano), o vía el cron
-`POST /ventas/api/cron/sync-seo-rankings/` (header `X-API-KEY`) — **pendiente
-que Jorge configure el job semanal en cron-job.org** apuntando a ese
-endpoint (mismo día que `snapshot-weekly-traffic`, antes de que el loop
-despierte los lunes). Hasta que ese cron exista, el paso 3 de este ciclo debe
-seguir usando el rank-check en vivo (`/api/v1/seo/rankings`) como hoy, y
-opcionalmente consultar este historial si ya hay algo guardado.
+`POST /ventas/api/cron/sync-seo-rankings/` (header `X-API-KEY`) — **cron ya
+configurado por Jorge en cron-job.org**, lunes 09:10 hora Chile (10 min
+después de `snapshot-weekly-traffic`, antes de que despierte el loop). Cada
+corrida ahora sincroniza Aremko + los 3 competidores de la sección de abajo
+(32 filas por corrida: 4 dominios × 8 keywords).
+
+### Competidores trackeados (nuevo 2026-07-08)
+
+Además de Aremko, `sync_aremko_cli_seo_rankings` corre el MISMO rank-check
+(las mismas 8 keywords protegidas) contra 3 competidores directos —
+confirmados 2026-07-08 tras analizar un video tutorial de Semrush One sobre
+SEO+AEO. Lista editable en `DEFAULT_TARGETS` del management command (agregar
+uno nuevo no requiere tocar aremko-cli ni cron-job.org, el endpoint
+`/api/v1/seo/rankings` ya acepta `?target=` para cualquier dominio):
+
+- **cancagua.cl** — Cancagua Spa & Retreat Center, biopiscinas geotermales en
+  Frutillar. El competidor más parecido al modelo de Aremko (spa boutique,
+  no termas naturales remotas).
+- **termasdelsol.com** (ojo: NO `.cl`) — Termas del Sol, 10 piscinas
+  termales volcánicas en Río Puelo, Patagonia. "Ritual Patagónico"
+  autoguiado.
+- **termascochamo.com** (ojo: sin "s", NO `termascochamos.com`) — Termas
+  Cochamo, termas naturales en Cochamó. Ya lo teníamos identificado como
+  `competitors_above` en las keywords de "termas".
+
+**Baseline comparativo 2026-07-08** (backlinks vía `/api/v1/seo/backlinks?target=`,
+rank-check vía `/api/v1/seo/rankings?target=`):
+
+| Dominio | Backlinks | Dominios referentes | Rank |
+|---|---:|---:|---:|
+| aremko.cl | 26 | 20 | 92 |
+| cancagua.cl | 117 (4.5x) | 44 (2.2x) | 134 |
+| termasdelsol.com | 271 (10x) | 192 (9.6x) | 157 |
+| termascochamo.com | 86 (3.3x) | 49 (2.4x) | 109 |
+
+Los 3 competidores superan a Aremko en autoridad de enlaces — oportunidad de
+link building a evaluar en un ciclo futuro.
+
+| Keyword | aremko.cl | cancagua.cl | termasdelsol.com | termascochamo.com |
+|---|---|---|---|---|
+| `aremko` | **1** | — | — | — |
+| `tinajas puerto varas` | **1** | — | — | — |
+| `cabaña con tina caliente puerto varas` | 2 | — | — | — |
+| `masajes puerto varas` | 3 | — | — | — |
+| `spa puerto varas` | 7 | — | — | — |
+| `termas en puerto varas` | 8 | — | 3 | **1** |
+| `termas puerto varas` | 9 | — | 3 | **1** |
+| `escapada romántica puerto varas` | 17 | — | — | — |
+
+**Hallazgo clave: Cancagua no aparece en NINGUNA de las 8 keywords
+protegidas.** No es que sea débil — compite en un espacio de keywords
+distinto (probablemente algo como "spa frutillar", "biopiscinas frutillar",
+"spa los lagos") que hoy no chequeamos. Es un punto ciego real de la lista
+fija, no una ausencia real de competencia. Termas del Sol y Termas Cochamó sí
+compiten, pero SOLO en el clúster "termas" — confirma que el post de termas
+publicado el 2026-07-02 atacó la oportunidad correcta.
+
+**Próximo paso pendiente (no implementado aún):** un "Keyword Gap" real —
+descubrir automáticamente qué keywords rankean Cancagua/Termas del Sol/Termas
+Cochamó que Aremko ni siquiera está chequeando hoy, en vez de solo comparar
+contra la lista fija de 8. Requeriría un endpoint nuevo en `aremko-cli`
+(DataForSEO Labs `domain_intersection` o similar) — evaluar si vale la pena
+antes de construirlo, o probar primero algunas keywords candidatas a mano
+(ej. "spa frutillar", "biopiscinas frutillar", "spa los lagos").
+
+También pendiente y fuera del alcance de DataForSEO: **AEO real** — si
+Aremko aparece cuando alguien le pregunta a ChatGPT/Perplexity/Gemini/AI
+Overview de Google sobre tinas o spa en Puerto Varas, comparado contra estos
+3 competidores. Hoy no hay visibilidad de esto (gap total, confirmado al
+analizar el video de Semrush — su tool "AI Visibility Overview" cubre
+exactamente esto). Evaluar en un ciclo futuro si se construye algo propio o
+se paga una herramienta dedicada.
 
 **Competidores reales detectados hasta ahora** (aparecen arriba de aremko.cl en
 al menos 1 keyword protegida, verificado 2026-07-06 con datos reales):
