@@ -245,7 +245,8 @@ main.py-4{padding:0 !important;background:#f3ede3}
 .ar-sec{padding:60px 44px}
 .ar-sec>.ar-kicker{text-align:center}
 .ar-intro{max-width:680px;margin:0 auto 6px;text-align:center;font-size:17px;color:var(--ink2)}
-.ar-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.ar-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+@media(max-width:1024px){.ar-cards{grid-template-columns:repeat(2,1fr)}}
 .ar-card{background:var(--cream);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;text-decoration:none;color:inherit}
 .ar-card-feat{box-shadow:0 8px 26px rgba(40,30,15,.12)}
 .ar-ph{position:relative;aspect-ratio:1/1}
@@ -253,6 +254,7 @@ main.py-4{padding:0 !important;background:#f3ede3}
 .ar-ph-pausa{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_700,h_700,f_auto,q_auto/ritual_rio/masajepara2_crsgck') center/cover no-repeat,linear-gradient(135deg,#d99a5b,#3f8a7d)}
 .ar-ph-ritual{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_700,h_700,f_auto,q_auto/categorias/alojamientos_hero') center/cover no-repeat,linear-gradient(135deg,#6b4a6e,#caa15c)}
 .ar-ph-refugio{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_700,h_700,f_auto,q_auto/servicios/cabana_torre_en_aremko_spa_yhvngd') center/cover no-repeat,linear-gradient(135deg,#4f7a55,#9fae74)}
+.ar-ph-noche{background:url('https://res.cloudinary.com/dtuncr1pi/image/upload/c_fill,g_auto,w_700,h_700,f_auto,q_auto/servicios/Cabana_Tepa_en_aremko_yhia6s') center/cover no-repeat,linear-gradient(135deg,#2f4a5e,#c9a15c)}
 .ar-card-b{padding:20px 20px 22px}
 .ar-card-b h3{font-size:24px;margin-bottom:6px}
 .ar-card-b .ar-muted{font-size:14.5px;min-height:42px}
@@ -315,8 +317,8 @@ main.py-4{padding:0 !important;background:#f3ede3}
   <section class="ar-sec" id="experiencias">
     <div class="ar-in">
       <p class="ar-kicker">Nuestras experiencias</p>
-      <h2 class="ar-h2">Elige tu pausa junto al río</h2>
-      <p class="ar-intro">Spa boutique en Puerto Varas: tinajas calientes privadas junto al Río Pescado, masajes en pareja y alojamiento en cabañas dentro de bosque nativo.</p>
+      <h2 class="ar-h2">Experiencia Boutique</h2>
+      <p class="ar-intro">Cuatro experiencias junto al Río Pescado, de una tarde a dos noches: tina caliente, masaje y cabaña en Puerto Varas.</p>
       <div class="ar-cards">
         <a class="ar-card" href="{% url 'pausa_landing' %}">
           <div class="ar-ph ar-ph-pausa"></div>
@@ -325,6 +327,15 @@ main.py-4{padding:0 !important;background:#f3ede3}
             <p class="ar-muted">Tina caliente + masaje en pareja, en una sola tarde. Sin quedarse a dormir.</p>
             <div class="ar-price"><strong>$110.000</strong><small>para dos · dom–jue</small></div>
             <span class="ar-link">Ver la Pausa →</span>
+          </div>
+        </a>
+        <a class="ar-card" href="{% url 'noche_aguas_calientes_landing' %}">
+          <div class="ar-ph ar-ph-noche"></div>
+          <div class="ar-card-b">
+            <h3>Noche de Aguas Calientes</h3>
+            <p class="ar-muted">Cabaña boutique + tina caliente + desayuno. Una noche sin apuro.</p>
+            <div class="ar-price"><strong>$160.000</strong><small>para dos · 1 noche</small></div>
+            <span class="ar-link">Ver la Noche →</span>
           </div>
         </a>
         <a class="ar-card ar-card-feat" href="{% url 'ritual_rio_landing' %}">
