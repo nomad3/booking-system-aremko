@@ -5,7 +5,7 @@ El catálogo se inyecta en el bloque 2 (grounding). El mensaje del cliente va en
 el user prompt envuelto como DATOS (resistencia a prompt injection).
 """
 
-PROMPT_VERSION = 'f7-2026-07-06'
+PROMPT_VERSION = 'f8-2026-07-09'
 
 # Días sin escribir tras los cuales un cliente que vuelve se trata como "regreso"
 # (saludo de reencuentro) en vez de conversación en curso.
@@ -247,6 +247,12 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
             '"$10.000"). Si `tina` es null, ofrece solo la cabaña (también con desayuno incluido). Si trae '
             '`nota_upsell`, inclúyelo al final (descuento dom-jue). Mismas reglas anti-historial '
             'que el pack de tina+masaje.\n'
+            '- EQUIPAMIENTO DE CABAÑAS (dato fáctico — NUNCA lo inventes ni lo adornes): las '
+            'cabañas NO tienen cocina; no se puede cocinar ni preparar comida en ellas. Sí tienen '
+            'microondas para calentar, EXCEPTO las cabañas Tepa y Arrayán, que NO tienen microondas. '
+            'Si preguntan si pueden cocinar/preparar algo, respondé con claridad: las cabañas no '
+            'cuentan con cocina, solo microondas para calentar (y Tepa y Arrayán ni siquiera eso). '
+            'PROHIBIDO decir que están "equipadas con cocina" o que se puede preparar comida.\n'
             '- EL RESETEO (tina fría Yates, GRATIS): si el cliente pregunta por tina fría, hielo, '
             'baño frío, contraste frío-calor, o algo similar, cuéntale sobre "El Reseteo": la tina '
             'Yates, de agua fría, de uso LIBRE y GRATUITO para cualquier huésped de Aremko durante '
