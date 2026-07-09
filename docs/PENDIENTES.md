@@ -12,10 +12,6 @@ _Última revisión: 2026-07-09_
 2. **P-02 · Fotos definitivas a carruseles GiftCards** — Reemplazar fotos provisorias
    de las 4 experiencias insignia. Hay 80 fotos optimizadas en `*/_web/` del disco
    JAguilera.
-3. **P-03 · Video hero landing masajes** — Grabar el plano secuencia del recorrido
-   (recepción → pasarelas → domos → mirador, 15–25 s, con audio del río) según la
-   shot-list de `docs/PROPUESTA_LANDING_MASAJES.md`. El clip corto que existía se
-   destinó a la portada (P-01).
 4. **P-04 · Menú/navegación limpia site-wide** — La home boutique ya tiene menú
    limpio; falta extenderlo al resto del sitio.
 5. **P-05 · Campañas Ritual + Pausa en Meta y Google** — Arrancar verificando los
