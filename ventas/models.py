@@ -1245,20 +1245,14 @@ class VentaReserva(models.Model):
 
     @property
     def total_servicios(self):
-        # Usar precio congelado si existe, sino precio actual del catálogo
-        # IMPORTANTE: Las cabañas tienen precio fijo (no se multiplican por cantidad_personas)
-        from django.db.models import Case, When, Value, IntegerField
-
+        # Usar precio congelado si existe, sino precio actual del catálogo.
+        # Precio × cantidad_personas para TODOS los tipos, incluidas cabañas: el
+        # precio_base de la cabaña es POR PERSONA y el checkout fuerza
+        # cantidad_personas=capacidad_maxima (=2). Consistente con calcular_total().
         total = self.reservaservicios.aggregate(
             total=models.Sum(
                 Coalesce(models.F('precio_unitario_venta'), models.F('servicio__precio_base')) *
-                Case(
-                    # Si es cabaña, multiplicar por 1 (precio fijo)
-                    When(servicio__tipo_servicio='cabana', then=Value(1)),
-                    # Si no es cabaña, multiplicar por cantidad_personas
-                    default=models.F('cantidad_personas'),
-                    output_field=IntegerField()
-                )
+                models.F('cantidad_personas')
             )
         )['total'] or 0
         return total

@@ -549,11 +549,9 @@ def validar_disponibilidad(request):
                 })
                 continue
 
-            # Calcular precio
-            if servicio.tipo_servicio == 'cabana':
-                precio_estimado = servicio.precio_base  # Precio fijo para cabañas
-            else:
-                precio_estimado = servicio.precio_base * cantidad_personas
+            # Calcular precio: precio_base × personas para TODOS los tipos,
+            # incluidas cabañas (precio_base de cabaña es POR PERSONA; son para 2).
+            precio_estimado = servicio.precio_base * cantidad_personas
 
             total_estimado += precio_estimado
 
@@ -868,11 +866,10 @@ def crear_reserva(request):
                 hora = servicio_data['hora']
                 cantidad_personas = servicio_data['cantidad_personas']
 
-                # Calcular precio
-                if servicio.tipo_servicio == 'cabana':
-                    precio_unitario = servicio.precio_base
-                else:
-                    precio_unitario = servicio.precio_base
+                # precio_unitario_venta = precio POR PERSONA (precio_base). El total
+                # se calcula como precio_unitario × cantidad_personas en calcular_total()
+                # — para cabañas cantidad_personas=2, dando el precio total correcto.
+                precio_unitario = servicio.precio_base
 
                 reserva_servicio = ReservaServicio.objects.create(
                     venta_reserva=venta_reserva,
