@@ -5,14 +5,10 @@ ELIMINA de la lista (git guarda la historia); los IDs `P-xx` son estables y no s
 reutilizan. Para agregar: "agrega a pendientes: …". Para cerrar: "listo el P-xx".
 Claude la revisa al inicio de sesión y en cada wrapup.
 
-_Última revisión: 2026-07-08_
+_Última revisión: 2026-07-09_
 
 ## Web y marketing
 
-1. **P-01 · Video hero de la portada** — Infra LISTA en prod (campo `hero_video`
-   en Admin → Configuración de la Homepage; la portada lo reproduce de fondo con
-   la foto de respaldo). **Solo falta que Jorge suba** `hero_masajes_web.mp4` (1.3 MB,
-   listo) por ese campo del admin y Guardar (Django lo manda a Cloudinary solo).
 2. **P-02 · Fotos definitivas a carruseles GiftCards** — Reemplazar fotos provisorias
    de las 4 experiencias insignia. Hay 80 fotos optimizadas en `*/_web/` del disco
    JAguilera.
