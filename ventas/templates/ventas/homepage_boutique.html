@@ -245,8 +245,7 @@ main.py-4{padding:0 !important;background:#f3ede3}
 .ar-sec{padding:60px 44px}
 .ar-sec>.ar-kicker{text-align:center}
 .ar-intro{max-width:680px;margin:0 auto 6px;text-align:center;font-size:17px;color:var(--ink2)}
-.ar-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
-@media(max-width:1024px){.ar-cards{grid-template-columns:repeat(2,1fr)}}
+.ar-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;max-width:920px;margin:0 auto}
 .ar-card{background:var(--cream);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;text-decoration:none;color:inherit}
 .ar-card-feat{box-shadow:0 8px 26px rgba(40,30,15,.12)}
 .ar-ph{position:relative;aspect-ratio:1/1}
@@ -316,9 +315,7 @@ main.py-4{padding:0 !important;background:#f3ede3}
 
   <section class="ar-sec" id="experiencias">
     <div class="ar-in">
-      <p class="ar-kicker">Nuestras experiencias</p>
-      <h2 class="ar-h2">Experiencia Boutique</h2>
-      <p class="ar-intro">Cuatro experiencias junto al Río Pescado, de una tarde a dos noches: tina caliente, masaje y cabaña en Puerto Varas.</p>
+      <h2 class="ar-h2">Elige tu Experiencia Boutique</h2>
       <div class="ar-cards">
         <a class="ar-card" href="{% url 'pausa_landing' %}">
           <div class="ar-ph ar-ph-pausa"></div>
