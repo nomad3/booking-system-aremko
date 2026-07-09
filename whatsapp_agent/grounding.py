@@ -73,7 +73,18 @@ def formatear_servicios(servicios):
             dur = formatear_duracion(s.get('duracion'))
             if dur:
                 partes.append(f'({dur})')
-        partes.append('— ' + formatear_precio(s.get('precio_base')) + ' por persona')
+        # Precio: las cabañas se cobran por la cabaña COMPLETA (precio_base × capacidad,
+        # que son SIEMPRE 2 personas). Mostrar el TOTAL evita que Luna liste el precio de
+        # 1 persona (bug real: mostraba "$55.000" en vez de "$110.000"). Tinas/masajes SÍ
+        # son por persona.
+        if s.get('tipo_servicio') == 'cabana':
+            cap = s.get('capacidad_maxima') or 2
+            total_cabana = int((s.get('precio_base') or 0) * cap)
+            partes.append('— ' + formatear_precio(total_cabana) +
+                          ' por noche (precio TOTAL de la cabaña para ' + str(cap) +
+                          ' personas, NO por persona)')
+        else:
+            partes.append('— ' + formatear_precio(s.get('precio_base')) + ' por persona')
         # Capacidad (dato estructurado ya en BD): clave para tinas/cabañas.
         cap = formatear_capacidad(s.get('capacidad_minima'), s.get('capacidad_maxima'))
         if cap:
