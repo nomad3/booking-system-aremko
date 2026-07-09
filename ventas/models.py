@@ -4666,6 +4666,14 @@ class MasajesLandingConfig(SingletonModel):
                   "domos → mirador), 15-25 seg ya cortado, CON el audio del río. mp4 <5MB "
                   "(comprimir antes). Si está vacío, el hero se muestra sin video."
     )
+    video_recorrido = models.FileField(
+        upload_to='masajes_landing/', storage=VideoMediaCloudinaryStorage(),
+        max_length=255, blank=True, null=True,
+        help_text="EL RECORRIDO COMPLETO: video largo del pasillo → pasarelas → mirador, "
+                  "CON audio del río, que el visitante reproduce con controles (no es de fondo). "
+                  "Se muestra en su propia sección tras el circuito. Si está vacío, esa sección "
+                  "no aparece. mp4 comprimido (idealmente <25MB para que suba sin timeout)."
+    )
     foto_recepcion = models.ImageField(
         upload_to='masajes_landing/', blank=True, null=True,
         help_text="Estación 1 — La recepción: el mesón de madera / el espacio que huele rico."

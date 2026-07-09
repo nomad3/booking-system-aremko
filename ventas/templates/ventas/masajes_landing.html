@@ -52,6 +52,8 @@
     display:block;margin:0 auto 18px}
   .cs-video{max-width:640px;margin:14px auto 0}
   .cs-video video{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:14px;display:block}
+  .rec-video{max-width:860px;margin:22px auto 0}
+  .rec-video video{width:100%;aspect-ratio:16/9;border-radius:14px;display:block;background:#10231d;box-shadow:0 10px 34px rgba(16,35,29,.22)}
   /* Infusión destacada */
   .inf-box{max-width:640px;margin:0 auto;border:2px solid #b08a5a;border-radius:16px;
     background:#fcf8f1;padding:28px;text-align:center}
@@ -226,6 +228,20 @@
       <p class="of-mini" style="margin-top:8px">La estación final del circuito: el Mirador del Río Pescado.</p>
     </div>
   </section>
+
+  {% if config.video_recorrido %}
+  <section class="rr-section">
+    <h2 class="rr-h2">El recorrido completo, sin cortes</h2>
+    <p class="rr-h2-sub">Del pasillo del spa hasta el mirador del río. Dale play y sube el volumen.</p>
+    <div class="rec-video">
+      <video controls playsinline preload="metadata"
+             poster="https://res.cloudinary.com/dtuncr1pi/video/upload/v1/IMG_4138_web_soihdc.jpg"
+             aria-label="Recorrido completo del circuito de masajes de Aremko: pasillos, pasarelas y mirador del Río Pescado en Puerto Varas">
+        <source src="{{ config.video_recorrido.url }}" type="video/mp4">
+      </video>
+    </div>
+  </section>
+  {% endif %}
 
   <section class="rr-section">
     <div class="inf-box">

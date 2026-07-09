@@ -3467,6 +3467,12 @@ class MasajesLandingConfigAdmin(SingletonModelAdmin):
                            'CON audio del río, mp4 comprimido (<5MB). Guía completa de '
                            'grabación en docs/PROPUESTA_LANDING_MASAJES.md (Shot-list).'
         }),
+        ('Video del recorrido completo (con play)', {
+            'fields': ('video_recorrido',),
+            'description': 'Video largo del recorrido (pasillo → pasarelas → mirador) que el '
+                           'visitante reproduce con controles y CON audio del río. Se muestra '
+                           'en su propia sección tras el circuito. Si está vacío, la sección no aparece.'
+        }),
         ('Las estaciones del circuito', {
             'fields': ('foto_recepcion', 'foto_camino', 'foto_sala_espera',
                        'foto_domo_masaje', 'foto_masaje_pareja', 'foto_infusion'),
