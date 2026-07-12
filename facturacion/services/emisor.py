@@ -125,10 +125,7 @@ def emitir_boleta_para_pago(pago, forzar_medio=False):
         config=config,
         folio=folio,
         fecha_emision=timezone.localdate(),
-        monto_neto=neto,
-        monto_iva=iva,
-        monto_total=int(pago.monto),
-        glosa=boleta.glosa,
+        detalles=[{'nombre': boleta.glosa, 'cantidad': 1, 'precio': int(pago.monto)}],
         cert_password=cert_password,
         tipo_dte=boleta.tipo_dte,
     )

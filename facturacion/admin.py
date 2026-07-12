@@ -53,9 +53,10 @@ class RangoFoliosAdmin(admin.ModelAdmin):
 
 @admin.register(BoletaElectronica)
 class BoletaElectronicaAdmin(admin.ModelAdmin):
-    list_display = ('__str__', 'estado_badge', 'ambiente', 'folio', 'reserva_link',
-                    'metodo_pago_col', 'monto_total', 'emitida_at', 'creada_at')
-    list_filter = ('estado', 'ambiente', 'tipo_dte')
+    list_display = ('__str__', 'estado_badge', 'ambiente', 'caso_set', 'folio',
+                    'reserva_link', 'metodo_pago_col', 'monto_total', 'track_id',
+                    'emitida_at', 'creada_at')
+    list_filter = ('estado', 'ambiente', 'tipo_dte', 'caso_set')
     search_fields = ('folio', 'venta_reserva__id', 'pago__id', 'glosa')
     date_hierarchy = 'creada_at'
     actions = ['reintentar_emision']

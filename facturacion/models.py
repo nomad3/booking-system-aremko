@@ -85,6 +85,14 @@ class ConfiguracionFacturacion(models.Model):
         max_length=12, blank=True, default='',
         help_text="RUT del dueño del certificado digital (representante legal), con guión.")
 
+    # Carátula del sobre de envío (para certificación: fecha de la postulación
+    # aceptada y resolución 0; para producción: los datos de la autorización).
+    fecha_resolucion = models.DateField(
+        null=True, blank=True,
+        help_text="Fecha de resolución que autoriza a emitir (cert: fecha de postulación).")
+    numero_resolucion = models.PositiveIntegerField(
+        default=0, help_text="Número de resolución (0 en certificación).")
+
     actualizado_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -173,11 +181,17 @@ class BoletaElectronica(models.Model):
         ('anulada', 'Anulada (nota de crédito)'),
     ]
 
+    # Nullable SOLO para las boletas del set de pruebas de certificación
+    # (no nacen de un pago real). Toda boleta operativa lleva su pago.
     pago = models.OneToOneField(
-        'ventas.Pago', on_delete=models.PROTECT, related_name='boleta_electronica')
+        'ventas.Pago', on_delete=models.PROTECT, related_name='boleta_electronica',
+        null=True, blank=True)
     venta_reserva = models.ForeignKey(
         'ventas.VentaReserva', on_delete=models.PROTECT,
         related_name='boletas_electronicas', null=True, blank=True)
+    caso_set = models.CharField(
+        max_length=12, blank=True, default='', db_index=True,
+        help_text="Solo certificación: CASO-N del set de pruebas del SII.")
 
     tipo_dte = models.PositiveSmallIntegerField(default=39)
     ambiente = models.CharField(max_length=20, default='simulado')
