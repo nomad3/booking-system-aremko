@@ -172,6 +172,9 @@ class Command(BaseCommand):
         self._bitacora("Generando sobre EnvioBoleta...")
         xmls = [b.xml_dte for b in boletas]
         sobre = simpleapi_client.generar_sobre(xmls, cert_bytes, cert_password, config)
+        # Diagnóstico: la carátula del sobre va al inicio del XML — dejarla en
+        # la bitácora permite auditar qué recibe el SII sin acceso a los logs.
+        self._bitacora("SOBRE (inicio): " + ' '.join(sobre[:1200].split()))
 
         self._bitacora("Enviando al SII (ambiente certificación)...")
         resp = simpleapi_client.enviar_sobre(sobre, cert_bytes, cert_password,
