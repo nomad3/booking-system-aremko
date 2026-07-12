@@ -38,6 +38,11 @@ PRIORITY_ORDER = [
     "pausa-junto-al-rio-puerto-varas",
     "refugio-aremko-puerto-varas",
     "noche-de-aguas-calientes-puerto-varas",
+    # Post agregado 2026-07-12: ya tenía tracción SEO orgánica real antes de
+    # escribirlo (rank-check DataForSEO: "tinas de noche puerto varas" pos 1,
+    # "spa abierto de noche puerto varas" pos 2) — prioridad alta, junto a
+    # los programas.
+    "spa-de-noche-puerto-varas",
     # Grupo B — keyword-driven (volumen real detectado vía DataForSEO)
     "masajes-cerca-de-mi-puerto-varas",
     "masajes-cerca-de-puerto-montt",
