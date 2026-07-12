@@ -221,6 +221,7 @@ INSTALLED_APPS = [
     'conciliacion.apps.ConciliacionConfig',  # Conciliación bancaria para AgentProvision (AP-001 Tier-2, app aislada drift-safe)
     'aremko_cli_sync.apps.AremkoCliSyncConfig',  # Snapshot gasto Ads por programa desde aremko-cli (H-058, app aislada drift-safe)
     'facturacion.apps.FacturacionConfig',  # Boletas electrónicas SII vía SimpleAPI (P-16, app aislada drift-safe)
+    'marketing_briefs.apps.MarketingBriefsConfig',  # Archivo de briefs semanales + anti-repetición de copy (app aislada drift-safe)
 
     # Aplicaciones de terceros
     'rest_framework',

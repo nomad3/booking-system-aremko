@@ -41,7 +41,9 @@ def _read_doc(rel_path: str) -> str:
 
 SYSTEM_PROMPT = """Eres el director de marketing y planificación comercial de Aremko Spa Boutique (Puerto Varas, Chile). Cada lunes 10 AM generas el brief semanal — el documento maestro que ordena el trabajo de toda la semana para Jorge (dueño), Daniela (manager de redes) y el equipo.
 
-NATURALEZA DEL BRIEF: el brief NO es un calendario simple. Es un análisis ejecutivo + diagnóstico cruzado de TODAS las fuentes de datos del negocio (web, redes, paid, encuestas, reviews, pipeline comercial) + planificación operativa concreta + drafts listos para copiar/pegar. Su rol: que cualquier persona del equipo Aremko que lo abra el lunes en la mañana entienda el estado del negocio y sepa exactamente qué tiene que hacer cada día.
+NATURALEZA DEL BRIEF: el brief NO es un calendario simple. Es un análisis ejecutivo + diagnóstico cruzado de TODAS las fuentes de datos del negocio (web, redes, paid, encuestas, reviews, pipeline comercial) + planificación operativa concreta + CONCEPTOS de contenido bien fundamentados. Su rol: que cualquier persona del equipo Aremko que lo abra el lunes en la mañana entienda el estado del negocio y sepa exactamente qué tiene que hacer cada día.
+
+DIVISIÓN DE TRABAJO: tú eres el ANALISTA. El copy final de las piezas (captions, guiones, emails) lo escribe una segunda pasada especializada de redacción a partir de tus conceptos. Tu trabajo en la sección conceptos_de_contenido es definir QUÉ comunicar, con QUÉ ángulo y con QUÉ dato/evidencia — no redactar el copy final. Un buen concepto es específico y accionable; un mal concepto es genérico ("promocionar las tinas").
 
 ESTRUCTURA OBLIGATORIA: el output debe empezar siempre con un RESUMEN EJECUTIVO de máximo 6-8 frases que cualquiera pueda leer en 60 segundos. Después, secciones extensas y detalladas. La regla es: corto arriba para que el dueño tome decisiones rápido, largo abajo para que el equipo operativo no necesite preguntar nada.
 
@@ -292,7 +294,7 @@ DATOS:
 
   "calendario_semanal": [
     {{"dia": "Lunes", "fecha": "DD/MM", "publicaciones": [
-      {{"canal": "GBP|Facebook|Instagram|Stories|Email|WhatsApp Broadcast", "hora": "10:30", "tipo": "post|reel|carrusel|story|email", "concepto_corto": "qué se publica", "estado": "draft listo en sección drafts"}}
+      {{"canal": "GBP|Facebook|Instagram|Stories|Email|WhatsApp Broadcast", "hora": "10:30", "tipo": "post|reel|carrusel|story|email", "concepto_corto": "qué se publica", "estado": "concepto definido en conceptos_de_contenido; el copy final lo escribe la pasada de redacción"}}
     ]}},
     {{"dia": "Martes", "fecha": "DD/MM", "publicaciones": []}},
     {{"dia": "Miércoles", "fecha": "DD/MM", "publicaciones": []}},
@@ -302,83 +304,65 @@ DATOS:
     {{"dia": "Domingo", "fecha": "DD/MM", "publicaciones": []}}
   ],
 
-  "drafts_completos": {{
+  "conceptos_de_contenido": {{
+    "_nota": "Estos conceptos alimentan una SEGUNDA pasada de redacción (un copywriter dedicado escribe el copy final). Acá NO escribas copy final: define QUÉ comunicar, POR QUÉ (dato/evidencia), y PARA QUÉ objetivo. Sé específico en el ángulo — 'promocionar tinas' es inútil; 'la garantía 38°C contada desde la frase real del cliente X' es un concepto.",
     "gbp_post": {{
       "necesario_esta_semana": true,
-      "responsable": "Daniela",
-      "tiempo_estimado": "20 min",
-      "texto": "Copy listo para pegar en Google Business Profile (max 1500 chars)",
+      "concepto": "Qué comunica este post y por qué esta semana",
+      "angulo": "El ángulo específico (honesto, con dato)",
+      "dato_o_evidencia": "El dato concreto, frase real de cliente, o hallazgo del diagnóstico que lo sostiene",
+      "experiencia_o_servicio": "Nombre EXACTO de la experiencia/servicio + su landing (ej: Ritual del Río → /ritual-del-rio/)",
       "url_cta": "URL con UTM completo",
-      "foto_sugerida": "Descripción detallada de la foto a usar y de dónde sacarla (galería propia, foto del día, etc.)"
+      "foto_sugerida": "Descripción detallada de la foto a usar y de dónde sacarla"
     }},
     "reel_martes": {{
       "necesario_esta_semana": true,
-      "responsable": "Daniela",
-      "tiempo_estimado": "1.5 horas (grabación + edición + caption)",
       "concepto": "Idea ganadora en 1 frase",
+      "angulo": "...",
+      "dato_o_evidencia": "...",
+      "experiencia_o_servicio": "...",
       "filtro_5_50": "Por qué pasa el filtro Víctor Eras (simple para 5 años + atrae a 50)",
-      "duracion_objetivo_segundos": 30,
-      "guion": [
-        {{"bloque": "gancho_5s", "texto": "Frase exacta a decir o mostrar — debe ser hookcable"}},
-        {{"bloque": "contexto_15s", "texto": "..."}},
-        {{"bloque": "moraleja_10s", "texto": "..."}},
-        {{"bloque": "solucion_5s", "texto": "..."}},
-        {{"bloque": "cta_palabra_clave", "texto": "Comenta TINAS y te paso..."}}
-      ],
-      "tomas_sugeridas": [
-        "Toma 1: descripción específica con encuadre",
-        "Toma 2: ...",
-        "Toma 3: ..."
-      ],
-      "audio_sugerido": "Sonido del río Pescado real | música de tendencia | voz en off",
-      "caption_completo": "Caption listo para pegar (max 2200 chars)",
-      "hashtags": ["#hashtag1", "#hashtag2", "#PuertoVaras", "#sur de Chile"]
+      "palabra_clave_dm": "Palabra clave para el CTA de comentarios (ej: TINAS, GARANTIA, RITUAL)",
+      "tomas_sugeridas": ["Toma 1: descripción específica con encuadre", "Toma 2: ...", "Toma 3: ..."],
+      "audio_sugerido": "Sonido del río Pescado real | música de tendencia | voz en off"
     }},
     "carrusel_miercoles": {{
       "necesario_esta_semana": true,
-      "responsable": "Daniela",
-      "tiempo_estimado": "2 horas",
       "concepto": "...",
-      "numero_de_slides": 6,
-      "slides": [
-        {{"numero": 1, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "hook"}},
-        {{"numero": 2, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "desarrollo"}}
-      ],
-      "caption_completo": "Caption del post completo (max 2200 chars)"
+      "angulo": "...",
+      "dato_o_evidencia": "...",
+      "experiencia_o_servicio": "...",
+      "estructura_sugerida": "Qué cuenta cada slide a grandes rasgos (hook → desarrollo → CTA), 5-7 slides"
     }},
     "reel_jueves": {{
       "necesario_esta_semana": true,
-      "responsable": "Daniela",
-      "tiempo_estimado": "1.5 horas",
       "concepto": "Variación del Reel del martes si pasó RI 50%, o idea nueva",
-      "guion": [],
+      "angulo": "...",
+      "dato_o_evidencia": "...",
+      "experiencia_o_servicio": "...",
+      "palabra_clave_dm": "...",
       "tomas_sugeridas": [],
-      "audio_sugerido": "",
-      "caption_completo": "",
-      "hashtags": []
+      "audio_sugerido": ""
     }},
     "stories_diarias": [
-      {{"dia": "Lunes", "concepto": "...", "tipo": "detrás de escena|datos del día|naturaleza|cliente real|recordatorio práctico|encuesta", "texto_sugerido": "..."}},
-      {{"dia": "Martes", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
-      {{"dia": "Miércoles", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
-      {{"dia": "Jueves", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
-      {{"dia": "Viernes", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
-      {{"dia": "Sábado", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
-      {{"dia": "Domingo", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}}
+      {{"dia": "Lunes", "concepto": "...", "tipo": "detrás de escena|datos del día|naturaleza|cliente real|recordatorio práctico|encuesta"}},
+      {{"dia": "Martes", "concepto": "...", "tipo": "..."}},
+      {{"dia": "Miércoles", "concepto": "...", "tipo": "..."}},
+      {{"dia": "Jueves", "concepto": "...", "tipo": "..."}},
+      {{"dia": "Viernes", "concepto": "...", "tipo": "..."}},
+      {{"dia": "Sábado", "concepto": "...", "tipo": "..."}},
+      {{"dia": "Domingo", "concepto": "...", "tipo": "..."}}
     ],
     "email_engaged": {{
       "necesario_esta_semana": true,
-      "responsable": "Jorge",
-      "tiempo_estimado": "30 min",
-      "asunto": "...",
-      "preheader": "...",
-      "cuerpo_html_resumen": "Estructura del email (no HTML completo, sino qué bloques: hero, párrafo intro, CTA, bloque secundario, footer)",
-      "cuerpo_texto_plano_completo": "Versión texto plano del email completo",
+      "concepto": "...",
+      "angulo": "...",
+      "dato_o_evidencia": "...",
+      "experiencia_o_servicio": "...",
       "segmento_destinatario": "Engaged (clic+open en últimos 90 días)|Toda la lista|Recientes 30d"
     }},
     "post_blog_si_aplica": {{
       "necesario_esta_semana": false,
-      "responsable": "Jorge con skill /blog-aremko",
       "tema_sugerido": "Si aplica, qué post del blog escribir esta semana basado en GSC top queries y huecos editoriales"
     }}
   }},
@@ -411,8 +395,8 @@ DATOS:
 REGLAS DE GENERACIÓN:
 - El RESUMEN EJECUTIVO debe ser corto. El resto puede ser todo lo extenso necesario.
 - Si Jorge definió objetivo de la semana, todo el contenido y las acciones DEBEN servir a ese objetivo. Es prioridad #1.
-- Si la frase ancla "2 días equivalen a una semana de vacaciones" no se usó la semana anterior, incluirla en algún draft.
-- Si una frase real de cliente promotor calza con el tipo de Reel, USARLA literal.
+- Si la frase ancla "2 días equivalen a una semana de vacaciones" no se usó la semana anterior, indicarla en el concepto de alguna pieza.
+- Si una frase real de cliente promotor calza con el tipo de Reel, citarla LITERAL en dato_o_evidencia del concepto (el copywriter la usará textual).
 - Si Email engaged no se justifica esta semana, poner necesario_esta_semana: false con explicación breve.
 - Si un canal/dato no está disponible, poner "(sin datos)" en el campo y NO inventar.
 - Las acciones de métricas deben ser específicas: nombrar página/query/evento concreto.
@@ -420,6 +404,289 @@ REGLAS DE GENERACIÓN:
 - Si hay paid corriendo con objective desalineado al embudo (ej: LINK_CLICKS hacia WhatsApp), MENCIONARLO en alertas y proponer cambio en acciones_paid_ads_recomendadas.
 - Cruzar datos: si GSC dice que "tinas calientes puerto varas" subió de pos 8 a pos 4 Y reviews mencionan "el sonido del río", hacer un Reel sobre tinas con audio del río — datos cruzados generan acciones específicas.
 """
+
+
+# ─── Pasada 2: copywriter dedicado ──────────────────────────────────────────
+# El análisis (pasada 1) produce CONCEPTOS; esta pasada escribe el copy final.
+# Separado a propósito: un solo LLM haciendo análisis de datos + redacción
+# creativa en el mismo disparo produce copy formulaico (el copy era lo último
+# del JSON y lo que más sufría). Acá el modelo solo escribe, con temperatura
+# más alta y con ejemplos reales de la voz Aremko.
+
+COPYWRITER_SYSTEM_PROMPT = """Eres el copywriter de Aremko Spa Boutique (Puerto Varas, Chile). Tu ÚNICO trabajo es escribir el copy final de las piezas de la semana a partir de conceptos ya definidos por el analista. No analizas datos, no propones estrategia — escribes, y escribes bien.
+
+LA VOZ AREMKO — así suena cuando está bien escrita (ejemplos REALES del blog, este es tu estándar):
+
+EJEMPLO 1 (honestidad que desarma + humor seco):
+"Si estás googleando 'termas en Puerto Varas', tengo dos noticias, y las dos las conozco de primera fuente porque tengo un spa acá mismo. La mala: termas naturales en Puerto Varas no hay — las de verdad quedan a más de una hora de auto. La buena: no necesitas manejar hasta Ralún para meterte en agua caliente con vista al sur de Chile."
+
+EJEMPLO 2 (autoironía + especificidad):
+"¿Esto es una ceremonia con velas, incienso y alguien recitando algo en voz baja? No. Nadie recita nada. Es más simple y más rico: un masaje, una tina caliente bajo las estrellas junto al río, y una cabaña donde dormir abrazados hasta que llegue el desayuno."
+
+EJEMPLO 3 (hablarle al lector como persona, no como target):
+"Si llegaste acá buscando 'tinas calientes en Puerto Varas' es porque hace tiempo tu cuerpo decidió que las sillas de oficina son enemigas. Tranquilo, esta no es la guía donde te explican que el agua caliente relaja (sí, también descubriste el fuego, felicitaciones)."
+
+QUÉ HACE QUE ESA VOZ FUNCIONE (aplícalo a TODO lo que escribas):
+- Empieza reconociendo lo que el lector realmente está pensando/buscando — no con la marca.
+- Honestidad que sorprende: admitir lo que NO somos/NO tenemos genera más confianza que cualquier superlativo.
+- Humor seco en asides, nunca chiste forzado. Un remate por párrafo como máximo.
+- Datos exactos siempre: $210.000, 38-39°C, 20 minutos, 5 parejas — nunca "precios convenientes" ni "cerca de todo".
+- Frases cortas. Párrafos de 2-3 líneas. Cero relleno.
+
+REGLAS DURAS:
+- Español latinoamericano ("tú puedes", NUNCA voseo argentino).
+- PROHIBIDO: "experiencia única", "magia", "momentos inolvidables", "lujo inigualable", "conecta con tu esencia", emojis en exceso (máx 1-2 por pieza, 0 en GBP).
+- Cada pieza nombra la experiencia/servicio por su NOMBRE EXACTO y usa la URL con UTM que trae el concepto.
+- Si el concepto trae una frase real de cliente, úsala LITERAL y entre comillas — pesa más que cualquier copy tuyo.
+- Reels: estructura Víctor Eras (gancho 4-7s contracorriente · contexto · moraleja · solución · CTA con palabra clave "Comenta X y te..."). El gancho NUNCA empieza con el nombre de la marca.
+- ANTI-REPETICIÓN: si te doy ganchos/frases usadas en semanas anteriores, NO los repitas ni los parafrasees — encuentra un ángulo de entrada distinto.
+- Cada pieza incluye responsable y tiempo estimado de producción.
+
+FORMATO DE OUTPUT: JSON estricto, sin markdown ni texto adicional, con la estructura EXACTA que especifica el user prompt."""
+
+
+def build_copywriter_prompt(
+    conceptos: dict,
+    playbook: str,
+    objetivo_semana: Optional[dict],
+    frases_clientes: list,
+    blog_post_hoy: Optional[dict],
+    ganchos_previos: list,
+    semana_inicio,
+    semana_fin,
+) -> str:
+    """Arma el user prompt de la pasada de redacción (pasada 2)."""
+    return f"""Escribe el copy final de las piezas de la semana del {semana_inicio.strftime('%d %b %Y')} al {semana_fin.strftime('%d %b %Y')}.
+
+=== OBJETIVO DE LA SEMANA (todo el copy debe servirle) ===
+{objetivo_semana['objetivo'] if objetivo_semana else '(sin objetivo definido — guiarse por los conceptos)'}
+
+=== CONCEPTOS DEFINIDOS POR EL ANALISTA (tu materia prima — respeta el ángulo y el dato de cada uno) ===
+{json.dumps(conceptos, indent=2, ensure_ascii=False)}
+
+=== PLAYBOOK (oferta vigente, precios, frases ancla, hashtags, UTMs) ===
+{playbook[:20000]}
+
+=== FRASES REALES DE CLIENTES PROMOTORES (usar literal cuando calcen) ===
+{json.dumps(frases_clientes[:15], indent=2, ensure_ascii=False)}
+
+=== POST DEL BLOG PUBLICADO HOY (amplificarlo en GBP y reciclar su ángulo en 1 pieza más) ===
+{json.dumps(blog_post_hoy, indent=2, ensure_ascii=False) if blog_post_hoy else '(ninguno publicado hoy)'}
+
+=== GANCHOS/FRASES YA USADOS EN SEMANAS ANTERIORES (PROHIBIDO repetirlos o parafrasearlos) ===
+{json.dumps(ganchos_previos, indent=2, ensure_ascii=False) if ganchos_previos else '(sin historial todavía — primera semana con archivo)'}
+
+Devuelve SOLO este JSON:
+
+{{
+  "gbp_post": {{
+    "necesario_esta_semana": true,
+    "responsable": "Daniela",
+    "tiempo_estimado": "20 min",
+    "texto": "Copy listo para pegar en Google Business Profile (max 1500 chars, sin emojis)",
+    "url_cta": "URL con UTM completo (del concepto)",
+    "foto_sugerida": "Del concepto, refinada si aporta"
+  }},
+  "reel_martes": {{
+    "necesario_esta_semana": true,
+    "responsable": "Daniela",
+    "tiempo_estimado": "1.5 horas (grabación + edición + caption)",
+    "concepto": "La idea en 1 frase (del concepto del analista)",
+    "filtro_5_50": "Por qué pasa el filtro",
+    "duracion_objetivo_segundos": 30,
+    "guion": [
+      {{"bloque": "gancho_5s", "texto": "Frase EXACTA a decir o mostrar"}},
+      {{"bloque": "contexto_15s", "texto": "..."}},
+      {{"bloque": "moraleja_10s", "texto": "..."}},
+      {{"bloque": "solucion_5s", "texto": "..."}},
+      {{"bloque": "cta_palabra_clave", "texto": "Comenta X y te..."}}
+    ],
+    "tomas_sugeridas": ["..."],
+    "audio_sugerido": "...",
+    "caption_completo": "Caption listo para pegar (max 2200 chars)",
+    "hashtags": ["#...", "#..."]
+  }},
+  "carrusel_miercoles": {{
+    "necesario_esta_semana": true,
+    "responsable": "Daniela",
+    "tiempo_estimado": "2 horas",
+    "concepto": "...",
+    "numero_de_slides": 6,
+    "slides": [
+      {{"numero": 1, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "hook"}},
+      {{"numero": 2, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "desarrollo"}}
+    ],
+    "caption_completo": "Caption completo (max 2200 chars)"
+  }},
+  "reel_jueves": {{
+    "necesario_esta_semana": true,
+    "responsable": "Daniela",
+    "tiempo_estimado": "1.5 horas",
+    "concepto": "...",
+    "guion": [
+      {{"bloque": "gancho_5s", "texto": "..."}},
+      {{"bloque": "contexto_15s", "texto": "..."}},
+      {{"bloque": "moraleja_10s", "texto": "..."}},
+      {{"bloque": "solucion_5s", "texto": "..."}},
+      {{"bloque": "cta_palabra_clave", "texto": "..."}}
+    ],
+    "tomas_sugeridas": ["..."],
+    "audio_sugerido": "...",
+    "caption_completo": "...",
+    "hashtags": ["#..."]
+  }},
+  "stories_diarias": [
+    {{"dia": "Lunes", "concepto": "...", "tipo": "...", "texto_sugerido": "Texto exacto del sticker/overlay"}},
+    {{"dia": "Martes", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
+    {{"dia": "Miércoles", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
+    {{"dia": "Jueves", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
+    {{"dia": "Viernes", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
+    {{"dia": "Sábado", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
+    {{"dia": "Domingo", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}}
+  ],
+  "email_engaged": {{
+    "necesario_esta_semana": true,
+    "responsable": "Jorge",
+    "tiempo_estimado": "30 min",
+    "asunto": "Asunto que se ganaría el open en una bandeja llena",
+    "preheader": "...",
+    "cuerpo_html_resumen": "Qué bloques lleva: hero, párrafo intro, CTA, bloque secundario, footer",
+    "cuerpo_texto_plano_completo": "Versión texto plano del email COMPLETO, en voz Aremko",
+    "segmento_destinatario": "Del concepto"
+  }},
+  "post_blog_si_aplica": {{
+    "necesario_esta_semana": false,
+    "responsable": "Jorge",
+    "tema_sugerido": "Del concepto del analista, tal cual"
+  }}
+}}
+
+REGLAS FINALES:
+- Si un concepto viene con necesario_esta_semana: false, respétalo (copia el false y explica brevemente en el campo de texto).
+- El gancho de cada Reel se escribe DOS veces mentalmente y se entrega la mejor versión — es el 80% del resultado.
+- Relee tu output contra los 3 ejemplos de voz antes de entregar: si suena a agencia de marketing y no a dueño de spa que escribe bien, reescríbelo."""
+
+
+def call_llm_copywriter(
+    conceptos: dict,
+    playbook: str,
+    objetivo_semana: Optional[dict],
+    frases_clientes: list,
+    blog_post_hoy: Optional[dict],
+    ganchos_previos: list,
+    semana_inicio,
+    semana_fin,
+    model: Optional[str] = None,
+) -> dict:
+    """Pasada 2: escribe el copy final a partir de los conceptos de la pasada 1."""
+    from openai import OpenAI
+
+    api_key = getattr(settings, 'OPENROUTER_API_KEY', '')
+    base_url = getattr(settings, 'OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
+    if not api_key:
+        raise ValueError('OPENROUTER_API_KEY no configurada')
+
+    model = model or getattr(settings, 'MARKETING_BRIEF_COPY_LLM_MODEL', None) \
+        or getattr(settings, 'MARKETING_BRIEF_LLM_MODEL', 'anthropic/claude-sonnet-4.6')
+
+    user_prompt = build_copywriter_prompt(
+        conceptos=conceptos,
+        playbook=playbook,
+        objetivo_semana=objetivo_semana,
+        frases_clientes=frases_clientes,
+        blog_post_hoy=blog_post_hoy,
+        ganchos_previos=ganchos_previos,
+        semana_inicio=semana_inicio,
+        semana_fin=semana_fin,
+    )
+
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    logger.info(f'Llamando a {model} para pasada de redacción (copywriter)')
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {'role': 'system', 'content': COPYWRITER_SYSTEM_PROMPT},
+            {'role': 'user', 'content': user_prompt},
+        ],
+        temperature=0.85,  # redacción creativa — más alta que la pasada de análisis
+        max_tokens=16000,
+        response_format={'type': 'json_object'},
+    )
+
+    raw = response.choices[0].message.content or ''
+    cleaned = _strip_markdown_fences(raw)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError as exc:
+        logger.error(f'Copywriter no devolvió JSON válido: {exc}. Raw[:500]: {raw[:500]}')
+        raise ValueError(f'Copywriter response no es JSON válido: {exc}')
+
+
+def extract_ganchos(drafts: dict) -> list:
+    """Extrae las frases clave del copy generado, para la anti-repetición.
+
+    Se guarda en WeeklyBriefArchive.ganchos y se le pasa al copywriter de la
+    semana siguiente como "ya usado, no repetir".
+    """
+    ganchos = []
+    try:
+        for reel_key in ('reel_martes', 'reel_jueves'):
+            guion = (drafts.get(reel_key) or {}).get('guion') or []
+            for bloque in guion:
+                if isinstance(bloque, dict) and 'gancho' in (bloque.get('bloque') or ''):
+                    texto = (bloque.get('texto') or '').strip()
+                    if texto:
+                        ganchos.append(f'{reel_key} gancho: {texto}')
+        gbp_texto = ((drafts.get('gbp_post') or {}).get('texto') or '').strip()
+        if gbp_texto:
+            ganchos.append(f'gbp primera línea: {gbp_texto.splitlines()[0][:150]}')
+        asunto = ((drafts.get('email_engaged') or {}).get('asunto') or '').strip()
+        if asunto:
+            ganchos.append(f'email asunto: {asunto}')
+        slides = (drafts.get('carrusel_miercoles') or {}).get('slides') or []
+        if slides and isinstance(slides[0], dict):
+            hook = (slides[0].get('texto_overlay') or '').strip()
+            if hook:
+                ganchos.append(f'carrusel hook: {hook}')
+    except Exception as exc:  # noqa: BLE001 — extracción best-effort, nunca rompe
+        logger.warning(f'extract_ganchos: extracción parcial ({exc})')
+    return ganchos
+
+
+def get_ganchos_previos(weeks: int = 4) -> list:
+    """Ganchos de los últimos N briefs archivados (anti-repetición).
+
+    Try/except total: si la tabla no existe todavía (migración pendiente en
+    prod), devuelve lista vacía y el brief se genera igual.
+    """
+    try:
+        from marketing_briefs.models import WeeklyBriefArchive
+        out = []
+        for archive in WeeklyBriefArchive.objects.filter(exito=True).order_by('-generated_at')[:weeks]:
+            for g in (archive.ganchos or []):
+                out.append(f'[semana {archive.semana_inicio}] {g}')
+        return out
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f'get_ganchos_previos: sin historial disponible ({exc})')
+        return []
+
+
+def archive_brief_safe(semana_inicio, brief: dict, model_analisis: str, model_copy: str) -> None:
+    """Persiste el brief generado. Nunca rompe la generación si falla."""
+    try:
+        from marketing_briefs.models import WeeklyBriefArchive
+        WeeklyBriefArchive.objects.create(
+            semana_inicio=semana_inicio,
+            model_analisis=model_analisis or '',
+            model_copy=model_copy or '',
+            brief_json=brief,
+            ganchos=extract_ganchos(brief.get('drafts_completos') or {}),
+            exito=True,
+        )
+        logger.info('Brief archivado en WeeklyBriefArchive')
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f'archive_brief_safe: no se pudo archivar el brief ({exc}) — el envío sigue igual')
 
 
 def get_frases_clientes_promotores(days: int = 30) -> list:
@@ -458,7 +725,11 @@ def get_blog_posts_recientes(limit: int = 5) -> list:
             {
                 'title': p.title,
                 'slug': p.slug,
+                'url': f'https://www.aremko.cl/blog/{p.slug}/',
                 'published_at': p.published_at.strftime('%Y-%m-%d') if p.published_at else None,
+                # Intro (recortado): le da al copywriter el ángulo y la voz del
+                # post del día para amplificarlo sin inventarle contenido.
+                'intro': (p.intro or '')[:500],
             }
             for p in qs
         ]
@@ -1538,6 +1809,54 @@ def generate_brief() -> dict:
         trends=trends,
         active_campaigns_detail=active_campaigns_detail,
         google_ads_snapshot=google_ads_snapshot,
+    )
+
+    # Pasada 2: copywriter dedicado escribe el copy final a partir de los
+    # conceptos de la pasada 1. Si falla, el brief sale con los conceptos
+    # (el renderer tolera drafts_completos vacío) y se avisa en recordatorios
+    # — mejor un brief sin drafts que ningún brief a las 10 AM.
+    conceptos = brief.get('conceptos_de_contenido') or {}
+    playbook_doc = _read_doc('docs/MARKETING_PLAYBOOK.md')
+    blog_post_hoy = None
+    hoy_str = timezone.now().date().strftime('%Y-%m-%d')
+    for p in posts:
+        if p.get('published_at') == hoy_str:
+            blog_post_hoy = p
+            break
+    ganchos_previos = get_ganchos_previos(weeks=4)
+
+    model_copy_usado = ''
+    try:
+        drafts = call_llm_copywriter(
+            conceptos=conceptos,
+            playbook=playbook_doc,
+            objetivo_semana=objetivo_semana,
+            frases_clientes=frases,
+            blog_post_hoy=blog_post_hoy,
+            ganchos_previos=ganchos_previos,
+            semana_inicio=semana_inicio,
+            semana_fin=semana_fin,
+        )
+        brief['drafts_completos'] = drafts
+        model_copy_usado = getattr(settings, 'MARKETING_BRIEF_COPY_LLM_MODEL', None) \
+            or getattr(settings, 'MARKETING_BRIEF_LLM_MODEL', 'anthropic/claude-sonnet-4.6')
+    except Exception as exc:  # noqa: BLE001 — la pasada de copy nunca tumba el brief completo
+        logger.error(f'Pasada de copywriter falló: {exc} — el brief sale con conceptos, sin drafts finales')
+        brief['drafts_completos'] = {}
+        brief.setdefault('recordatorios', [])
+        if isinstance(brief['recordatorios'], list):
+            brief['recordatorios'].insert(
+                0,
+                'ALERTA: la pasada de redacción (copywriter) falló esta semana — '
+                'los drafts finales no se generaron. Usar los conceptos_de_contenido '
+                'como guía y redactar a mano, o re-correr el brief.',
+            )
+
+    archive_brief_safe(
+        semana_inicio=semana_inicio,
+        brief=brief,
+        model_analisis=getattr(settings, 'MARKETING_BRIEF_LLM_MODEL', 'anthropic/claude-sonnet-4.6'),
+        model_copy=model_copy_usado,
     )
 
     return {
