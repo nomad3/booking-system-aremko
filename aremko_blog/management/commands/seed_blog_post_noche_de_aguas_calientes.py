@@ -37,10 +37,11 @@ CTA_URL = "/noche-de-aguas-calientes/"
 
 INTRO = (
     '"Noche de Aguas Calientes" no tiene truco en el nombre: es exactamente '
-    "eso. Llegan de tarde-noche, directo a una tina caliente junto al río, "
-    "y duermen en una cabaña boutique con desayuno incluido. Al día "
-    "siguiente deciden ustedes — algunos salen temprano, otros se quedan "
-    "hasta que quieran. Sin armar itinerario, sin pedir el día libre "
+    "eso, sin metáforas escondidas. Llegan de tarde-noche, directo a una "
+    "tina caliente junto al río, y duermen en una cabaña boutique con "
+    "desayuno incluido. Al día siguiente deciden ustedes — algunos salen "
+    "temprano a seguir el viaje, otros se quedan en la cama hasta que el "
+    "hambre gane la discusión. Sin armar itinerario, sin pedir el día libre "
     "completo, sin cargar el auto para un fin de semana entero. Desde "
     "$160.000 para dos, según cabaña y tina disponibles."
 )
@@ -50,24 +51,28 @@ BODY_MD = """\
 
 - Tina caliente privada junto al río, la noche que llegan
 - Cabaña boutique (check-in 16:00 · check-out 11:00)
-- Desayuno incluido a la mañana siguiente
+- Desayuno incluido a la mañana siguiente, para cuando por fin decidan
+  levantarse
 
 ## Por qué esta noche y no otra cosa
 
-No necesitan armar un itinerario ni pedir el día completo libre. No es
-cargar el auto para un fin de semana entero. Llegan cuando salen del
+No necesitan armar un itinerario ni pedir el día completo libre — esto no
+es una expedición, es una noche. No es cargar el auto para un fin de semana
+entero con tres mudas de ropa "por si acaso". Llegan cuando salen del
 trabajo, se meten a la tina, duermen bien — y al día siguiente deciden si
-arrancan temprano o se quedan hasta tarde.
+arrancan temprano o se quedan hasta tarde, sin que nadie los apure con el
+check-out.
 
 ## El bonus incluido
 
 El Reseteo: tina fría Yates, de uso libre, antes o después de la tina
-caliente.
+caliente. Nadie lo pide la primera vez, casi todos vuelven por él la
+segunda.
 
 ## Precio y reserva
 
 Desde $160.000 para dos, según cabaña y tina disponibles — te cotizan exacto
-por WhatsApp.
+por WhatsApp, sin vueltas.
 """
 
 FAQ_ITEMS = [

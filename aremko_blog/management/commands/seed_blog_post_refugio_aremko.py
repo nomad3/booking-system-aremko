@@ -43,41 +43,48 @@ CTA_URL = "/refugio/"
 INTRO = (
     'Si buscas "Refugio Aremko" esto es lo que ofrecemos: dos noches en la '
     "misma cabaña — la segunda es cortesía nuestra, no un descuento con "
-    "letra chica — con un masaje en pareja y dos tardes de tina caliente "
-    'con vista al bosque. Decimos que "dos días acá equivalen a una '
-    'semana" y lo respaldamos con una garantía poco común: si tu tina no '
-    "llega a 38°C, es gratis. $290.000 por los dos, experiencia completa."
+    "letra chica escondido en un asterisco — con un masaje en pareja y dos "
+    'tardes de tina caliente con vista al bosque. Decimos que "dos días '
+    'acá equivalen a una semana" y no es una frase de folleto: la '
+    "respaldamos con una garantía poco común, y poco cómoda para nosotros: "
+    "si tu tina no llega a 38°C, es gratis. $290.000 por los dos, "
+    "experiencia completa, sin sorpresas al llegar."
 )
 
 BODY_MD = """\
 ## Qué incluye
 
 - 2 noches en cabaña privada para 2 personas
-- Desayuno ambos días
-- 1 masaje en pareja (sesión simultánea)
+- Desayuno ambos días (el de la segunda mañana sabe mejor, es matemática
+  del descanso acumulado)
+- 1 masaje en pareja (sesión simultánea, nadie espera turno)
 - 2 tardes de tinas calientes con vista al bosque
-- La 2ª noche, cortesía Aremko
+- La 2ª noche, cortesía Aremko — sí, gratis de verdad, no "50% en tu
+  próxima visita"
 
 ## La garantía Aremko
 
 Si tu tina no llega a 38°C, es gratis. No es un eslogan — es la condición
-real de la reserva.
+real de la reserva, y la razón por la que revisamos el termómetro más de lo
+que revisamos el teléfono.
 
 ## Cuándo y cómo funciona
 
 Válido cualquier día durante el lanzamiento (15-jun al 15-jul-2026); desde
 el 16-jul, solo domingo a jueves. Check-in día 1, check-out día 3.
 Cancelación gratis hasta 48h antes. A 20 minutos en auto del centro de
-Puerto Varas.
+Puerto Varas — ni tan cerca que sea una excursión de tarde, ni tan lejos
+que necesiten planificarlo como si fuera Chiloé.
 
 ## Lo que dicen quienes ya vinieron
 
 4,5★ con 669 reseñas en Google, 4,4 en Tripadvisor (N°1 de Puerto Varas).
+No lo escribimos nosotros, lo escribieron ellos.
 
 ## Precio y reserva
 
 $290.000 por 2 personas, experiencia completa. Se reserva por WhatsApp o
-formulario en la web.
+formulario en la web — el que les acomode más.
 """
 
 FAQ_ITEMS = [

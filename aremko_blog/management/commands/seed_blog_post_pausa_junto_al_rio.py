@@ -37,41 +37,51 @@ CTA_URL = "/pausa-junto-al-rio/"
 
 INTRO = (
     'Si googleaste "pausa junto al río Puerto Varas" es porque no tienes un '
-    "fin de semana libre, pero sí una tarde. Buena noticia: no necesitas "
-    "más que eso. La Pausa es tina caliente privada + masaje en pareja, los "
-    "dos en una sola tarde, con el Río Pescado sonando de fondo — y se van "
-    "a dormir a su propia cama, no a la nuestra. Desde $110.000 para dos, "
-    "domingo a jueves. Si el plan es cortar la semana sin cargar el auto "
-    "para dos días, esto es exactamente eso."
+    "fin de semana libre, pero sí tienes una tarde suelta y la firme "
+    "intención de no gastarla scrolleando el celular en el sillón. Buena "
+    "noticia: no necesitas más que eso. La Pausa es tina caliente privada + "
+    "masaje en pareja, los dos en una sola tarde, con el Río Pescado sonando "
+    "de fondo — y se van a dormir a su propia cama, no a la nuestra (a menos "
+    "que quieran quedarse, en cuyo caso ya no es Pausa, es otro programa —"
+    " sigan leyendo, tenemos varios). Desde $110.000 para dos, domingo a "
+    "jueves. Si el plan es cortar la semana sin cargar el auto para dos "
+    "días, esto es exactamente eso."
 )
 
 BODY_MD = """\
 ## Qué incluye, sin letra chica
 
 - Tina caliente privada junto al río
-- Masaje en pareja (relajación o descontracturante — eligen ustedes)
-- El sonido del Río Pescado y el bosque nativo, de fondo todo el rato
+- Masaje en pareja (relajación o descontracturante — eligen ustedes, no
+  tiramos una moneda)
+- El sonido del Río Pescado y el bosque nativo, de fondo todo el rato,
+  gratis, sin playlist de por medio
 
 ## El bonus que va incluido
 
 El Reseteo: un chapuzón en Yates (nuestra tina fría, de uso libre) antes o
-después de la tina caliente. El contraste no se olvida.
+después de la tina caliente. El contraste no se olvida — y las primeras
+veces que alguien se mete grita, es normal, después agradecen.
 
 ## El rincón que casi nadie conoce
 
 Al final de la pasarela está el Mirador del Río Pescado — mesa con vista a
-los saltos de agua, café o espumante para acompañar.
+los saltos de agua, café o espumante para acompañar. Está a dos minutos de
+caminata y aun así la mayoría no llega. No sean la mayoría.
 
 ## Por qué no es lo mismo que una piscina temperada o unas termas llenas
 
-No es una piscina temperada. No son las termas llenas de gente. Es medio día
-de spa real: agua caliente privada + manos expertas, junto al río, todo
-listo cuando llegan.
+No es una piscina temperada (esas las tiene cualquier condominio). No son
+las termas llenas de gente, con fila para la ducha y alguien gritándole a
+sus hijos a tres metros. Es medio día de spa real: agua caliente privada +
+manos expertas, junto al río, todo listo cuando llegan — ustedes solo tienen
+que aparecer.
 
 ## Precio y cómo reservar
 
 $110.000 domingo a jueves, $130.000 viernes y sábado, para 2 personas. Se
-reserva por WhatsApp.
+reserva por WhatsApp — cero formularios, cero esperar un email de
+confirmación que nunca llega.
 """
 
 FAQ_ITEMS = [

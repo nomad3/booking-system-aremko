@@ -38,58 +38,69 @@ CTA_URL = "/ritual-del-rio/"
 
 INTRO = (
     'Si buscas "ritual del río Puerto Varas" probablemente ya leíste la '
-    'palabra "ritual" y pensaste: ¿esto es una ceremonia con velas e '
-    "incienso? No. Es más simple y más rico: un masaje, una tina caliente "
-    "bajo las estrellas junto al río, y una cabaña donde dormir abrazados "
-    'hasta que llegue el desayuno. Le decimos "ritual" porque tiene un '
-    "orden — tres actos, siempre en la misma secuencia, y ese orden es "
-    "justamente lo que lo hace funcionar. Solo recibimos 5 parejas por "
-    "noche, así que si sigues leyendo, probablemente ya decidiste que "
-    "quieres ser una de esas 5."
+    'palabra "ritual" y pensaste: ¿esto es una ceremonia con velas, '
+    "incienso y alguien recitando algo en voz baja? No. Nadie recita nada. "
+    "Es más simple y más rico: un masaje, una tina caliente bajo las "
+    "estrellas junto al río, y una cabaña donde dormir abrazados hasta que "
+    'llegue el desayuno. Le decimos "ritual" porque tiene un orden — tres '
+    "actos, siempre en la misma secuencia, y ese orden es justamente lo que "
+    "lo hace funcionar (nadie te manda directo a la tina con la mochila del "
+    "trabajo todavía puesta). Solo recibimos 5 parejas por noche, así que "
+    "si sigues leyendo, probablemente ya decidiste que quieres ser una de "
+    "esas 5."
 )
 
 BODY_MD = """\
 ## Los tres actos, en orden (y por qué el orden importa)
 
-No es al azar. Primero el **masaje nocturno**, para que suelten la semana
-antes de tocar el agua — llegar directo a la tina con la espalda todavía
-cargada de la oficina es desperdiciar la mitad de la experiencia. Después la
-**tina caliente**, bajo las estrellas, junto al río, mientras afuera hace 4
-grados y a ustedes no les importa. Y al final, **cabaña y desayuno**: duermen
-abrazados y despiertan con la mesa lista, sin tener que decidir nada más esa
-noche.
+No es al azar, y no es porque nos guste la palabra "ritual". Primero el
+**masaje nocturno**, para que suelten la semana antes de tocar el agua —
+llegar directo a la tina con la espalda todavía cargada de la oficina es
+como bañarse sin sacarse los zapatos: técnicamente se puede, pero para qué.
+Después la **tina caliente**, bajo las estrellas, junto al río, mientras
+afuera hace 4 grados y a ustedes, con toda honestidad, no les importa. Y al
+final, **cabaña y desayuno**: duermen abrazados y despiertan con la mesa
+lista, sin tener que decidir nada más esa noche — la única decisión pendiente
+es si se levantan o no.
 
 ## El bonus que casi nadie pide (pero debería)
 
 Se llama **El Reseteo**: antes o después de la tina caliente, un chapuzón en
 Yates, nuestra tina de agua fría, de uso libre para todos los huéspedes. El
 contraste frío-calor da un shock que no se olvida — y sienta mejor de lo que
-suena en el papel. Va incluido, gratis, y casi nadie lo pide la primera vez
-porque nadie lee la letra chica. Ahora ya la leíste.
+suena en el papel (suena a mala idea, es una gran idea). Va incluido, gratis,
+y casi nadie lo pide la primera vez porque nadie lee la letra chica. Ahora ya
+la leíste, así que no tienen excusa.
 
 ## El rincón que se pierde la mitad de los huéspedes
 
 Al final de la red de pasarelas está el Mirador del Río Pescado — la mejor
-vista de todo el spa: los saltos de agua y la isla que se forma entre las
-rocas. Hay una mesa para compartir sin apuro. Pide un café, una copa de
-espumante, jugos naturales, una pizza o una tabla. La mitad de las parejas se
-va sin haber ido nunca — no cometan ese error.
+vista de todo el spa, y la que menos gente conoce porque está literalmente al
+final del camino, donde ya nadie sigue caminando. Los saltos de agua, la isla
+que se forma entre las rocas, una mesa para compartir sin apuro. Pide un
+café, una copa de espumante, jugos naturales, una pizza o una tabla. La mitad
+de las parejas se va sin haber ido nunca — no cometan ese error, ya pagaron
+por el lugar, úsenlo entero.
 
 ## Por qué no es lo mismo que un hotel, una tina sola, o unas termas públicas
 
-Un hotel es cómodo pero impersonal — no hay río, no hay ritual, solo una
-cama. Las termas públicas tienen agua caliente, pero también tienen fila y
-cero intimidad. Una cabaña sola es solo un techo para dormir. El Ritual del
-Río es lo único en Puerto Varas que junta río, noche y todo resuelto para
-dos, en ese orden.
+Un hotel es cómodo, tiene wifi y almohadas de sobra — y es tan impersonal
+como su propio nombre suena. Las termas públicas tienen agua caliente de
+verdad, sí, también tienen fila, un altavoz anunciando algo y cero
+posibilidad de intimidad. Una cabaña sola es solo un techo para dormir, por
+bonito que sea el techo. El Ritual del Río es lo único en Puerto Varas que
+junta río, noche y todo resuelto para dos, en ese orden — no vendemos partes
+sueltas de la experiencia, la vendemos completa porque separada no funciona
+igual.
 
 ## Cuánto cuesta y cómo reservar
 
 $210.000 domingo a jueves, $240.000 viernes y sábado — para 2 personas,
 incluye masaje nocturno, tina privada, cabaña y desayuno. Se reserva por
-WhatsApp (aseguras el cupo con un abono, el resto lo coordinamos directo).
-Solo 5 parejas por noche, así que si la fecha que quieren está cerca, no la
-dejen para después.
+WhatsApp (aseguras el cupo con un abono, el resto lo coordinamos directo, sin
+formularios de 12 campos). Solo 5 parejas por noche, así que si la fecha que
+quieren está cerca, no la dejen para después — la sexta pareja se queda
+mirando desde afuera, y afuera hace 4 grados.
 """
 
 FAQ_ITEMS = [
