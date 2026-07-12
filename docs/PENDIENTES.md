@@ -34,9 +34,17 @@ _Última revisión: 2026-07-11_
 16. **P-16 · Boletas electrónicas SII automáticas** — Emisión automática vía
     SimpleAPI (plan gratis 500 consultas/mes) SOLO para pagos por transferencia y
     efectivo (~200/mes); tarjeta/links/Flow los informa el recaudador (no llevan
-    boleta). Ruta aprobada 2026-07-11. F0: contador confirma (boleta por abono,
-    transferencias a Cuenta Vista MP, giftcards, booking) + certificación "software
-    propio" en el SII + exportar certificado .pfx a Render + CAF folios tipo 39.
+    boleta). Ruta aprobada 2026-07-11. Criterios confirmados por Jorge 2026-07-11:
+    boleta por cada abono; transferencia a Cuenta Vista MP SÍ boletea, link MP no;
+    giftcard se boletea AL VENDER. F0 restante: confirmar con SII/contador que al
+    certificarse con software propio se pierde el portal gratuito (FAQ sugiere
+    sistemas EXCLUYENTES para boletas → planificar switch con fecha D, no
+    convivencia) + exportar certificado .pfx del rep. legal a Render + CAF folios
+    tipo 39. La certificación SII: set de pruebas en ambiente cert (lo ejecuta
+    Claude vía SimpleAPI, no afecta producción), V°B° 10-15 días hábiles, luego
+    declaración de cumplimiento online del rep. legal (requiere link público de
+    consulta de boletas → vista Django en aremko.cl, va en F1); autorizado desde
+    el 1° del mes en curso.
     F1: app `facturacion/` + tabla `MedioPago` con flag `genera_boleta` (siembra de
     los 21 métodos, editable en admin; pedido por Jorge para evitar dobles boleteos)
     + botón manual. F2: señal post_save(Pago) + cola (patrón conciliador) + candado
