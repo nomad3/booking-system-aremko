@@ -478,3 +478,53 @@ esperable, Google todavía no lo indexó/rankeó para esa keyword específica
 (`POST /ventas/api/cron/sync-seo-rankings/`, header `X-API-KEY`) para que el
 historial se siga llenando solo — sin eso, la única fila que hay es esta del
 2026-07-06, corrida a mano.
+
+_(Actualización 2026-07-06: Jorge configuró el cron en cron-job.org, probado
+200 OK. Se sigue llenando solo desde entonces.)_
+
+---
+
+## Loop de publicación de blog (nuevo 2026-07-12)
+
+Distinto del loop de SEO de arriba (que analiza tráfico/rankings) — este es
+el mecanismo para sostener un ritmo de publicación del blog sin que dependa
+de que alguien se siente a escribir cada semana.
+
+**Cómo funciona:** en sesión interactiva (2026-07-12) se redactaron y
+revisaron con Jorge **16 posts nuevos** — origen: gap analysis del catálogo
+real (programas sin blog dedicado, tipos de masaje del catálogo, keywords
+con volumen real detectado vía DataForSEO donde Aremko no tenía contenido,
+clusters SPA/BOUTIQUE vacíos) — y se sembraron como **BORRADOR**
+(`is_published=False`) vía 16 management commands `seed_blog_post_*` en
+`aremko_blog/management/commands/`. Cada uno idempotente por slug,
+`update_or_create`, con FAQ + schema JSON-LD.
+
+**El loop NO genera contenido nuevo.** Solo publica, uno por semana, el
+siguiente borrador de una cola ya escrita y revisada:
+
+```
+python manage.py publish_next_blog_draft            # publica el siguiente
+python manage.py publish_next_blog_draft --dry-run   # solo muestra cuál publicaría
+```
+
+Orden de la cola (`PRIORITY_ORDER` en
+`aremko_blog/management/commands/publish_next_blog_draft.py`, acordado con
+Jorge — "prioridad comercial"): 4 programas (Ritual del Río, Pausa, Refugio,
+Noche de Aguas Calientes) → 3 keyword-driven (masajes cerca de mí, masajes
+cerca de Puerto Montt, biopiscinas vs tinas) → 4 tipos de masaje (Tui-Na,
+Tailandés, Drenaje Linfático, Deportivo vs Piedras Calientes) → 5
+evergreen/soporte (Río Pescado, spa boutique, elegir programa, invierno,
+pagar en cuotas).
+
+**Disparo:** `POST /ventas/api/cron/publish-next-blog-draft/` (header
+`X-API-KEY`) — **pendiente que Jorge configure el job semanal en
+cron-job.org**, sugerido lunes 09:15 (después de `snapshot-weekly-traffic`
+09:00 y `sync-seo-rankings` 09:10). Mientras no exista ese cron, publicar a
+mano corriendo el comando en el Shell de Render, o seguir publicando
+manualmente desde el admin como antes.
+
+**Para agregar un post nuevo a la cola en el futuro:** escribir su
+`seed_blog_post_*` (mismo patrón: borrador, FAQ, grounded en datos reales,
+sin inventar precios/servicios), correrlo para crear el borrador, y sumar su
+slug a `PRIORITY_ORDER` en el lugar que corresponda — no requiere tocar el
+cron ni la lógica del comando.

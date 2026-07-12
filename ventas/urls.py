@@ -207,6 +207,10 @@ urlpatterns = [
     # Llamar mismo día que snapshot-weekly-traffic (lunes), antes de que el loop de SEO despierte.
     path('api/cron/sync-seo-rankings/', api_views.cron_sync_seo_rankings, name='cron_sync_seo_rankings'),
 
+    # === Cron endpoint para publicar el siguiente borrador del blog (cola priorizada) ===
+    # Llamar lunes 09:15, después de snapshot-weekly-traffic (09:00) y sync-seo-rankings (09:10).
+    path('api/cron/publish-next-blog-draft/', api_views.cron_publish_next_blog_draft, name='cron_publish_next_blog_draft'),
+
     # === API público de resumen de reviews para brief semanal ===
     # Usado por aremko-cli (backend Go) para obtener métricas de opiniones
     path('api/reviews-summary/', api_views.reviews_summary, name='reviews_summary'),

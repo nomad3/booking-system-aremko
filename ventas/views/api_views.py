@@ -814,6 +814,62 @@ def cron_sync_seo_rankings(request):
     })
 
 
+def _run_publish_next_blog_draft_background():
+    """Helper para correr publish_next_blog_draft en thread.
+
+    Mismo patrón fire-and-forget que los demás cron helpers. El comando es
+    rápido (solo un UPDATE en BlogPost, sin llamadas externas) pero se
+    mantiene el mismo patrón por consistencia y para no bloquear el único
+    worker Gunicorn si algo se demora.
+    """
+    import logging
+    from io import StringIO
+    from django.core.management import call_command
+    log = logging.getLogger(__name__)
+
+    output = StringIO()
+    try:
+        call_command('publish_next_blog_draft', stdout=output, stderr=output)
+        log.info('Publish next blog draft completado:\n%s', output.getvalue()[-3000:])
+    except Exception as e:
+        log.exception('Error en publish_next_blog_draft: %s', e)
+
+
+@csrf_exempt
+@api_view(['POST', 'GET'])
+@permission_classes([AllowAny])
+def cron_publish_next_blog_draft(request):
+    """
+    Endpoint para que cron-job.org dispare la publicación semanal del
+    siguiente borrador de blog en la cola priorizada (ver PRIORITY_ORDER en
+    aremko_blog/management/commands/publish_next_blog_draft.py).
+
+    Nivel 2 acotado: el comando NUNCA genera contenido nuevo — solo cambia
+    is_published de un borrador ya redactado y revisado por Jorge en sesión
+    interactiva. Publica 1 post por corrida.
+
+    Schedule sugerido: lunes 09:15 hora Chile (después de
+    snapshot-weekly-traffic 09:00 y sync-seo-rankings 09:10).
+
+    Auth: header X-API-KEY con AUTOMATION_API_KEY.
+    Async (fire-and-forget) para evitar timeout 30s de cron-job.org plan free.
+    """
+    if not is_valid_api_key(request):
+        return Response(
+            {"error": "Authentication required. Set X-API-KEY header."},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    from threading import Thread
+    thread = Thread(target=_run_publish_next_blog_draft_background, daemon=True)
+    thread.start()
+
+    return Response({
+        "success": True,
+        "message": "Publicación del siguiente borrador de blog iniciada en background.",
+    })
+
+
 def _run_survey_analysis_background():
     """Helper para correr analyze_surveys_weekly en thread, sin bloquear el response.
 
