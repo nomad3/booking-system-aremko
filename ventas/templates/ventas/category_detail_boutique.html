@@ -1007,6 +1007,13 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
                             <span class="badge-tradicional"><i class="fas fa-leaf me-1"></i>Tradicional</span>{% if "calbuco" in servicio.nombre|lower or "osorno" in servicio.nombre|lower %}<span class="badge-grupo-4"><i class="fas fa-users me-1"></i>Grupo 4+ · 4h</span>{% endif %}{% if "yates" in servicio.nombre|lower %}<span class="badge-reseteo"><i class="fas fa-snowflake me-1"></i>El Reseteo</span>{% endif %}
                             <h3 class="card-title h5">{{ servicio.nombre }}</h3>
                             {% if disp.hook %}<p class="cabana-hook">{{ disp.hook }}</p>{% endif %}
+                            {% if disp.detalles_extra %}
+                            <div class="cabana-chips">
+                                {% for icono, texto in disp.detalles_extra %}
+                                <span class="cabana-chip"><i class="fas {{ icono }}"></i>{{ texto }}</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                             {% if "yates" in servicio.nombre|lower %}<p class="reseteo-hook">❄️ El Reseteo: date un chapuzón de agua fría antes o después de tu tina caliente. El contraste da un shock que no se olvida — y sienta increíble.</p>{% endif %}
                             <ul class="servicio-specs">
                                 {% if not disp.hide_capacidad %}

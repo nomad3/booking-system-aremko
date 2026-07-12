@@ -92,6 +92,18 @@ def order_by_capacity(servicios):
         return list(servicios) if servicios else []
 
 
+# Datos confirmados por Jorge 2026-07-12 para las tinas grupales (Calbuco,
+# Osorno) — antes solo vivían en un post de blog, ahora también en la ficha
+# pública para que quien llega directo a /tinas/ los vea sin tener que
+# pasar por el blog.
+TINA_GRUPAL_DETALLES_EXTRA = [
+    ('fa-clock', 'Horarios: 14:30 o 19:30'),
+    ('fa-utensils', 'Trae tu comida y bebida'),
+    ('fa-wine-glass', 'Copas y hielo sin costo'),
+    ('fa-ban', 'Sin cobro de descorche'),
+]
+
+
 @register.filter
 def tina_display(servicio):
     """
@@ -105,6 +117,9 @@ def tina_display(servicio):
       - precio_total: fuerza el precio total mostrado (None = calcular precio_base × capacidad_maxima)
       - unit_note: texto bajo el precio (ej. "por niño adicional", "por tina · 5–6 personas")
       - hook: frase evocadora única por tina (AR-015, hilo narrativo volcánico)
+      - detalles_extra: lista de (icono_fontawesome, texto) para chips informativos
+        adicionales bajo el hook (ej. horarios, condiciones de uso) — reutiliza el
+        patrón visual .cabana-chips ya usado en cabañas
     """
     nombre = (getattr(servicio, 'nombre', '') or '').lower()
     overrides = {
@@ -116,6 +131,7 @@ def tina_display(servicio):
         'unit_note': None,
         'hook': None,
         'es_cortesia': False,
+        'detalles_extra': None,
     }
     if 'niño' in nombre or 'nino' in nombre:
         overrides['capacidad_texto'] = '1 niño adicional'
@@ -158,6 +174,7 @@ def tina_display(servicio):
             'El Fuji chileno: cono perfecto coronado de nieve. '
             'La foto postal del sur, en tu tina privada.'
         )
+        overrides['detalles_extra'] = TINA_GRUPAL_DETALLES_EXTRA
     elif 'calbuco' in nombre:
         overrides['capacidad_texto'] = '4 personas'
         overrides['duracion_texto'] = '4 horas de uso exclusivo · grupo 4+'
@@ -166,6 +183,7 @@ def tina_display(servicio):
             'El gigante que rugió en 2015 con pluma visible a 400km. '
             'Tina grupal para celebrar en grande.'
         )
+        overrides['detalles_extra'] = TINA_GRUPAL_DETALLES_EXTRA
     elif 'tronador' in nombre:
         overrides['hook'] = (
             'Tres cumbres entre Chile y Argentina coronadas de '
