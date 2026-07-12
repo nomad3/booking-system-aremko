@@ -37,8 +37,10 @@ _Última revisión: 2026-07-11_
     boleta). Ruta aprobada 2026-07-11. F0: contador confirma (boleta por abono,
     transferencias a Cuenta Vista MP, giftcards, booking) + certificación "software
     propio" en el SII + exportar certificado .pfx a Render + CAF folios tipo 39.
-    F1: app `facturacion/` + botón manual. F2: señal post_save(Pago) + cola (patrón
-    conciliador). F3: notas de crédito + cuadratura mensual.
+    F1: app `facturacion/` + tabla `MedioPago` con flag `genera_boleta` (siembra de
+    los 21 métodos, editable en admin; pedido por Jorge para evitar dobles boleteos)
+    + botón manual. F2: señal post_save(Pago) + cola (patrón conciliador) + candado
+    1-a-1 boleta↔pago. F3: notas de crédito + cuadratura mensual.
 
 ## Infraestructura y Luna
 
