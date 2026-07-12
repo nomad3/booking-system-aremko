@@ -54,7 +54,9 @@ REGLAS DE PRODUCCIÓN DE COPY:
 - Voz Aremko: honesta, específica, sin marketing inflado
 - Español latinoamericano (NUNCA voseo argentino: usar "tú", "puedes", "quieres", no "vos podés")
 - NUNCA usar "experiencia única", "magia", "momentos inolvidables" en mayúscula
-- Frases ancla a usar cuando aplique: "2 días aquí equivalen a una semana de vacaciones", "no usamos leña", "37°C o menos = gratis", "a metros del río Pescado"
+- Frases ancla a usar cuando aplique: "2 días aquí equivalen a una semana de vacaciones", "no usamos leña", "37°C o menos = gratis", "a metros del río Pescado", "solo 5 parejas por noche", "hasta medianoche", "4 horas de tina al precio de 2", "trae tu espumante — las copas y el hielo los ponemos nosotros"
+- OFERTA VIGENTE (ver detalle en el playbook, sección 3): el corazón comercial son las 4 EXPERIENCIAS con nombre propio (Ritual del Río = insignia, Pausa junto al Río, Refugio Aremko, Noche de Aguas Calientes) y las TINAS GRUPALES Calbuco/Osorno para celebraciones. Nombrarlas SIEMPRE por su nombre y linkear su landing. NUNCA usar el lenguaje viejo "pack 3-en-1" en copy público.
+- TEMPORADA: identificar en el calendario Chile la temporada vigente de la semana (ej. vacaciones de invierno en julio, Fiestas Patrias en septiembre) y tematizar al menos 1 pieza de contenido de la semana con ese ángulo estacional.
 - Para Reels: estructura 5 partes (gancho 4-7s · contexto · moraleja · solución · CTA con palabra clave)
 - Citar texto real del cliente cuando esté disponible (mejor que copy inventado)
 - UTMs siempre en links: el playbook tiene la convención
@@ -101,7 +103,7 @@ def build_user_prompt(
 {(f"Semana del {objetivo_semana['semana_inicio']} (vigencia: {'semana actual' if objetivo_semana.get('es_de_semana_actual') else 'semana anterior — Jorge no lo actualizó'}):" + chr(10) + chr(10) + objetivo_semana['objetivo']) if objetivo_semana else '(Jorge NO definió objetivo para esta semana — usar diagnóstico cruzado para inferir prioridades, mencionar la falta del objetivo en la sección de recordatorios)'}
 
 === PLAYBOOK MAESTRO (tu fuente de verdad inviolable) ===
-{playbook[:10000]}
+{playbook[:20000]}
 
 === CADENCIA OPERATIVA (qué se publica cada día) ===
 {recurring_tasks[:3500]}
@@ -123,7 +125,7 @@ INSTRUCCIONES PARA ANALIZAR:
 - Compara ultima_semana vs semana_anterior usando los % en tendencia_7d_vs_anterior. Si cae >20% en algún indicador clave, mencionarlo en alerta crítica.
 - Mira por_categoria del último mes para entender la mezcla del negocio (% Tinas vs Masajes vs Alojamientos vs Productos).
 - Si en metodos_pago_analisis.cambios_detectados hay un canal NUEVO (ej: "Flow aparece esta semana, 0 en las 3 previas"), MENCIONARLO explícitamente como hallazgo importante. Es información operativa de transición.
-- packs_ultima_semana muestra cuántas reservas son de 1 solo servicio vs 2+. El pack premium 3-en-1 (tina + masaje + alojamiento) es el producto estrella del playbook — si hay 0 esta semana, es alerta. Si crece, comunicarlo.
+- packs_ultima_semana muestra cuántas reservas son de 1 solo servicio vs 2+. Las EXPERIENCIAS con nombre (Ritual del Río, Pausa junto al Río, Refugio, Noche de Aguas Calientes — ver playbook sección 3.1) son el corazón comercial: en la BD aparecen como reservas de 2+ servicios (tina+masaje±alojamiento). Si hay 0 reservas multi-servicio esta semana, es alerta. Si crecen, comunicarlo nombrando la experiencia, no "pack".
 - combinaciones_top revela qué packs están comprando los clientes naturalmente (ej: "Tinas + Productos: 12 reservas"). Esto debe guiar el contenido de la semana.
 - tasa_recurrencia_ultima_semana_pct: si >30% es retención sólida; si <10% el negocio depende de adquisición.
 - top_recurrentes son los clientes más leales de los últimos 30 días — útiles para email engaged personalizado o campañas WhatsApp directas.
@@ -137,7 +139,13 @@ INSTRUCCIONES PARA ANALIZAR:
 DATOS:
 {json.dumps(pipeline_reservas, indent=2, ensure_ascii=False, default=str) if pipeline_reservas else '(no disponible)'}
 
-=== BLOG POSTS RECIENTES (no repetir temas, sí reciclar conceptos) ===
+=== BLOG POSTS RECIENTES ===
+INSTRUCCIÓN: cada lunes a las 09:15 (45 min antes de este brief) un cron publica
+automáticamente un post nuevo del blog. El post con published_at de HOY es el
+RECIÉN PUBLICADO: es materia prima obligatoria de la semana — el GBP del lunes
+debe amplificarlo, y al menos una pieza más (carrusel o stories) debe reciclar
+su ángulo con link + UTM. Los posts más antiguos de esta lista: no repetir sus
+temas como si fueran nuevos, pero sí se pueden reciclar conceptos.
 {json.dumps(blog_posts_recientes, indent=2, ensure_ascii=False, default=str)}
 
 === GA4 (sitio web aremko.cl) — ÚLTIMOS 7 DÍAS vs 7 ANTERIORES + ATRIBUCIÓN 28D ===

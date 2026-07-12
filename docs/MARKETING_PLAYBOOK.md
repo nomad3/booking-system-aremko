@@ -1,6 +1,13 @@
 # Marketing Playbook — Aremko Spa Boutique
 
-**Versión:** v1.0 · **Fecha:** 2026-05-01 · **Próxima revisión:** primer lunes de cada mes
+**Versión:** v2.0 · **Fecha:** 2026-07-12 · **Próxima revisión:** primer lunes de cada mes
+
+> **Qué cambió en v2.0 (relanzamiento):** catálogo real de EXPERIENCIAS con
+> nombre propio (Ritual del Río, Pausa junto al Río, Refugio, Noche de Aguas
+> Calientes) reemplaza al "pack 3-en-1" genérico; tinas grupales Calbuco/Osorno
+> con sus condiciones únicas (4h al precio de 2, sin descorche); catálogo
+> completo de 6 masajes (incluye Tui-Na y Tailandés nuevos); concepto boutique
+> articulado como diferencial #1; frases ancla nuevas; hashtags de celebración.
 
 Este es el manual operativo del marketing de Aremko. Lo lee el agente programado de los lunes para generar drafts coherentes. Si las reglas cambian, se edita acá y la siguiente semana ya aplica.
 
@@ -63,8 +70,11 @@ Aremko **NO usa ManyChat** ni servicios pagos similares (Chatfuel, MobileMonkey,
 - "No usamos leña"
 - "Garantía 38°C"
 - "A metros del río Pescado"
-- "Solo 5 cabañas"
+- "Solo 5 cabañas" / "Solo 5 parejas por noche" (Ritual del Río)
 - "Hasta medianoche"
+- "4 horas de tina al precio de 2" (tinas grupales)
+- "Trae tu espumante — las copas y el hielo los ponemos nosotros" (tinas grupales, sin descorche)
+- "La noche de tres actos" (Ritual del Río: masaje → tina → cabaña)
 
 ### Frases que NO usamos
 - ~~"Experiencia única"~~ → "Experiencia 3 en 1: masaje + tina + cabaña"
@@ -84,12 +94,13 @@ Aremko **NO usa ManyChat** ni servicios pagos similares (Chatfuel, MobileMonkey,
 - **Ticket**: $190-250k (paquete completo)
 - **Canal de descubrimiento**: Instagram, Google "spa Puerto Varas", recomendación
 
-### Persona 2: La grupa de amigas / celebración (20%)
-- 28-50 años, mujeres
-- Cumpleaños, despedida soltera, reunión de amigas
-- **Dolor**: encontrar algo "memorable" para celebrar
-- **Trigger**: ambientaciones temáticas, fotos potables, comodidad de grupo
-- **Ticket**: $150-200k
+### Persona 2: El grupo de amigas / celebración (20%)
+- 28-50 años, mujeres (también after office mixto, dos parejas amigas, familias con hijos grandes)
+- Cumpleaños, despedida de soltera, junta de amigas, after office
+- **Dolor**: encontrar algo "memorable" para celebrar que no sea otra mesa de restaurante
+- **Trigger**: ambientaciones temáticas, fotos potables, comodidad de grupo, y las condiciones únicas de la tina grupal: traen su propia comida y bebida SIN cobro de descorche (copas y cubeta de hielo prestadas gratis)
+- **Producto asignado**: **Tina grupal Calbuco (4 pers, $100k) u Osorno (5-6 pers, $125k)** — 4 horas de uso exclusivo al precio de 2 tinas normales de 2 horas. Horarios: 14:30 o 19:30. Complemento natural: decoraciones de celebración ($38-78k).
+- **Ticket**: $100-200k (tina grupal sola o con decoración/productos)
 
 ### Persona 3: Turista internacional / nacional fuera de zona (10%)
 - 30-60 años, viaja a Puerto Varas/Chiloé
@@ -102,27 +113,69 @@ Aremko **NO usa ManyChat** ni servicios pagos similares (Chatfuel, MobileMonkey,
 
 ## 3. Servicios y oferta
 
-| Servicio | Precio referencia | Margen aprox |
-|---|---|---|
-| Masaje 50 min | $40-45k/persona | Alto (mano de obra propia) |
-| Tina caliente 2h | $25-30k/persona | Alto (energía solar) |
-| Cabaña/noche (2 pers.) | $90-100k | Medio |
-| **Pack completo (premium)** | $190-250k | **El más rentable** |
+### 3.1 EXPERIENCIAS con nombre propio (el corazón comercial — comunicarlas SIEMPRE por su nombre)
 
-**Foco comercial**: vender el **pack completo** como propuesta principal. Servicios sueltos son entrada o complemento.
+| Experiencia | Qué incluye | Precio (2 pers) | Landing | Para quién |
+|---|---|---|---|---|
+| **Ritual del Río** (insignia) | Masaje nocturno + tina bajo las estrellas + cabaña + desayuno. "La noche de tres actos". Solo 5 parejas por noche. | $210k dom-jue / $240k vie-sáb | `/ritual-del-rio/` | Pareja en burnout, noche completa |
+| **Pausa junto al Río** | Tina caliente privada + masaje en pareja, en una sola tarde. Sin alojamiento. | $110k dom-jue / $130k vie-sáb | `/pausa-junto-al-rio/` | After-work, sin quedarse a dormir |
+| **Refugio Aremko** | 2 noches en cabaña (la 2ª de CORTESÍA) + masaje en pareja + 2 tardes de tina + desayunos. | $290k | `/refugio/` | Pausa profunda, 2 días = 1 semana |
+| **Noche de Aguas Calientes** | Tina + cabaña boutique + desayuno. SIN masaje. Llegan de tarde-noche, cero itinerario. | desde $160k | `/noche-de-aguas-calientes/` | Escapada simple, post-trabajo |
+
+**Regla de oro**: NUNCA volver al lenguaje "pack 3-en-1" genérico — cada experiencia tiene nombre, precio y landing propia. El copy siempre nombra la experiencia y linkea su landing con UTM.
+
+### 3.2 Tinas grupales (producto estrella para Persona 2 — celebraciones)
+
+| Tina | Capacidad | Duración | Precio |
+|---|---|---|---|
+| **Calbuco** | 4 personas | **4 horas** de uso exclusivo | $100.000 |
+| **Osorno** | 5-6 personas | **4 horas** de uso exclusivo | $125.000 |
+
+- **El gancho**: 4 horas al precio de 2 tinas normales de 2 horas (2 tinas de 2 pers × 2h = $100-120k por la mitad del tiempo).
+- **Las condiciones que nadie más da**: traen su propia comida y bebida sin cobro; copas y cubeta con hielo prestadas gratis; **sin cobro de descorche**.
+- **Horarios**: 14:30 o 19:30.
+- **Ocasiones**: cumpleaños, after office, junta de amigas, despedida de soltera, dos parejas, familia con hijos grandes.
+
+### 3.3 Catálogo de masajes (6 tipos, 50 min c/u)
+
+| Masaje | Precio | Nota |
+|---|---|---|
+| Relajación o Descontracturante | $40k | El único con reserva web directa; el que se recomienda a primerizos |
+| Masaje Tailandés (NUEVO) | $40k | Estiramiento asistido, con ropa cómoda, sin aceite |
+| Masaje Tui-Na (NUEVO) | $45k | Técnica china, presión en puntos específicos, con ropa liviana |
+| Deportivo | $45k | Recuperación física real |
+| Piedras Calientes | $45k | Calor + presión |
+| Drenaje Linfático | $45k | Suave, circulatorio — NO es para contracturas |
+
+Los 5 sin reserva web directa se coordinan por WhatsApp. Tui-Na y Tailandés son NUEVOS: comunicarlos como novedad.
+
+### 3.4 Servicios base
+
+| Servicio | Precio referencia |
+|---|---|
+| Tina hidromasaje 2h (2 pers) | $60k por tina |
+| Tina tradicional 2h (2 pers) | $50k por tina |
+| Niño adicional en tina | $10k (ángulo familia en vacaciones) |
+| Cabaña/noche (2 pers.) | $90-100k |
+| Decoraciones celebración | $38-78k (complemento de tina) |
+
+**Foco comercial**: vender EXPERIENCIAS con nombre (3.1) como propuesta principal y TINAS GRUPALES (3.2) para celebraciones. Servicios base sueltos son entrada o complemento.
 
 ---
 
 ## 4. Diferenciales (priorizados — usar en TODO copy)
 
-1. **Experiencia 3-en-1**: masaje + tina + cabaña en un solo lugar — DIFERENCIAL ÚNICO
-2. **No usamos leña**: 48 paneles solares + aerotermia
-3. **Garantía 38°C**: si no, te lo compensamos (solo Aremko)
-4. **Junto al Río Pescado**: único río que suena 365 días al año
-5. **20 min del centro de Puerto Varas**: ventaja vs Alma Lemu (1h)
-6. **Tina fría Yates**: contraste frío/caliente — solo Aremko
-7. **Ambientaciones celebración**: cumpleaños temáticos — solo Aremko
-8. **Masajistas con nombre**: Sandra, Carolina, Diane (clientes las recuerdan)
+1. **Boutique de verdad, no de nombre**: capacidad limitada A PROPÓSITO (solo 5 cabañas; el Ritual del Río recibe solo 5 parejas por noche). Tinas privadas, no piscinas compartidas. Equipo que hace una sola cosa. "Boutique" = la unidad de experiencia es tuya, no de un grupo de desconocidos.
+2. **Experiencias con nombre propio**: Ritual del Río, Pausa, Refugio, Noche de Aguas Calientes — masaje + tina + cabaña resueltos en un solo lugar, cada una con su landing. DIFERENCIAL ÚNICO en Puerto Varas.
+3. **Abierto hasta medianoche + alojamiento**: el único spa de naturaleza de la zona que funciona de noche Y te deja quedarte a dormir (la mayoría cierra ~22:00 y es visita de día).
+4. **Tinas grupales 4h al precio de 2**: Calbuco/Osorno para 4-6 personas, sin cobro de descorche, copas y hielo gratis — solo Aremko.
+5. **No usamos leña**: 48 paneles solares + aerotermia
+6. **Garantía 38°C**: si no, te lo compensamos (solo Aremko)
+7. **Junto al Río Pescado**: único río que suena 365 días al año
+8. **20 min del centro de Puerto Varas**: ventaja vs Alma Lemu (1h)
+9. **Tina fría Yates ("El Reseteo")**: contraste frío/caliente — solo Aremko
+10. **Ambientaciones celebración**: cumpleaños temáticos — solo Aremko
+11. **Masajistas con nombre**: Sandra, Carolina, Diana y Paul (los clientes los recuerdan)
 
 ---
 
@@ -130,7 +183,7 @@ Aremko **NO usa ManyChat** ni servicios pagos similares (Chatfuel, MobileMonkey,
 
 | Canal | Frecuencia | Audiencia | Notas |
 |---|---|---|---|
-| **Blog** | 1 post/semana | Búsqueda orgánica | Lunes publicación |
+| **Blog** | 1 post/semana | Búsqueda orgánica | AUTOMÁTICO: lunes 09:15 el cron publica el siguiente de la cola (18 posts pre-escritos). El brief del lunes 10:00 DEBE amplificar ese post recién publicado en GBP + carrusel/stories de la semana |
 | **GBP** | 1 post/semana | Búsqueda local | Lunes-martes |
 | **Instagram Reels** | 2/semana (mar + jue) | Top funnel | Framework Víctor Eras |
 | **Instagram Stories** | 1-2/día | Audiencia existente | Detrás de escena |
@@ -176,6 +229,8 @@ Formato: `?utm_source=X&utm_medium=Y&utm_campaign=Z`
 - Masajes: #MasajesPuertoVaras #SpaParejas
 - Naturaleza: #RioPescado #SurDeChile #BosqueNativo
 - Sustentabilidad: #SpaSustentable #EnergiaSolar #Aerotermia
+- Celebraciones/grupos: #DespedidaDeSoltera #CumpleañosPuertoVaras #PanoramaConAmigas #AfterOffice
+- Experiencias: #RitualDelRio #EscapadaRomantica #PanoramaPuertoVaras
 
 **Regla**: máximo 5 hashtags por post (Víctor Eras: específicos > genéricos).
 
