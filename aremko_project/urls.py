@@ -171,6 +171,9 @@ urlpatterns = [
     # Aremko · Blog editorial (app aislada — portable si DPV se separa después)
     path('blog/', include('aremko_blog.urls', namespace='aremko_blog')),
 
+    # Verificación pública de boletas electrónicas (P-16, requisito declaración SII)
+    path('boletas/', include('facturacion.urls', namespace='facturacion')),
+
     # SEO endpoints
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
     path('robots.txt', TemplateView.as_view(template_name='seo/robots.txt', content_type='text/plain'), name='robots_txt'),

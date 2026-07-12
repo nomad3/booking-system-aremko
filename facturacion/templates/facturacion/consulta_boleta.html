@@ -1,0 +1,92 @@
+{% load humanize %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Verificación de boletas — Aremko Spa Boutique</title>
+<style>
+  :root{--verde:#10231d;--verde2:#1e4438;--dorado:#cdbf9d;--crema:#faf7f1}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Georgia,'Times New Roman',serif;background:var(--crema);color:var(--verde);
+       min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{background:#fff;border:1px solid #e5ddca;border-radius:14px;max-width:520px;width:100%;
+        padding:36px 32px;box-shadow:0 10px 30px rgba(16,35,29,.08)}
+  .kicker{font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:.22em;
+          text-transform:uppercase;color:var(--verde2);margin-bottom:6px}
+  h1{font-size:26px;font-weight:normal;margin-bottom:18px}
+  p.lead{font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#4a5a52;margin-bottom:22px;line-height:1.55}
+  form{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:8px}
+  label{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:var(--verde2);display:block;margin-bottom:4px}
+  input{width:100%;padding:10px 12px;border:1px solid #d8cfb8;border-radius:8px;font-size:15px;
+        font-family:Arial,Helvetica,sans-serif;background:var(--crema)}
+  button{align-self:end;padding:10px 18px;background:var(--verde2);color:#fff;border:0;border-radius:8px;
+         font-family:Arial,Helvetica,sans-serif;font-size:14px;cursor:pointer}
+  button:hover{background:var(--verde)}
+  .resultado{margin-top:22px;border-top:1px solid #ece5d3;padding-top:20px}
+  .ok{color:#1e7d32}.no{color:#c62828}
+  table{width:100%;font-family:Arial,Helvetica,sans-serif;font-size:14px;border-collapse:collapse;margin-top:10px}
+  td{padding:7px 0;border-bottom:1px solid #f0ead9}
+  td:first-child{color:#6b7a72;width:45%}
+  .pill{display:inline-block;padding:3px 12px;border-radius:12px;font-size:12px;
+        font-family:Arial,Helvetica,sans-serif;color:#fff}
+  .footer{margin-top:26px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8a958e;
+          letter-spacing:.06em;text-align:center}
+  @media(max-width:520px){form{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="kicker">Aremko Spa Boutique · Puerto Varas</div>
+  <h1>Verificación de boletas electrónicas</h1>
+  <p class="lead">Ingresa el folio y el monto total de tu boleta para verificar su emisión,
+     o usa el enlace directo que recibiste junto a tu comprobante.</p>
+
+  {% if not por_token %}
+  <form method="get" action="">
+    <div>
+      <label for="folio">Folio</label>
+      <input id="folio" name="folio" inputmode="numeric" value="{{ folio|default:'' }}" placeholder="Ej: 1024">
+    </div>
+    <div>
+      <label for="monto">Monto total (CLP)</label>
+      <input id="monto" name="monto" inputmode="numeric" value="{{ monto|default:'' }}" placeholder="Ej: 110000">
+    </div>
+    <button type="submit">Verificar</button>
+  </form>
+  {% endif %}
+
+  {% if buscado %}
+  <div class="resultado">
+    {% if boleta %}
+      <p class="ok" style="font-family:Arial,sans-serif;font-size:15px">✔ Boleta encontrada</p>
+      <table>
+        <tr><td>Tipo de documento</td><td>Boleta electrónica ({{ boleta.tipo_dte }})</td></tr>
+        <tr><td>Folio</td><td>{{ boleta.folio|default:"— (en proceso)" }}</td></tr>
+        <tr><td>Fecha de emisión</td><td>{{ boleta.emitida_at|date:"d/m/Y H:i"|default:"—" }}</td></tr>
+        <tr><td>Detalle</td><td>{{ boleta.glosa }}</td></tr>
+        <tr><td>Monto neto</td><td>${{ boleta.monto_neto|floatformat:0|intcomma }}</td></tr>
+        <tr><td>IVA (19%)</td><td>${{ boleta.monto_iva|floatformat:0|intcomma }}</td></tr>
+        <tr><td><b>Monto total</b></td><td><b>${{ boleta.monto_total|floatformat:0|intcomma }}</b></td></tr>
+        <tr><td>Estado</td><td>
+          {% if boleta.estado == 'simulada' %}
+            <span class="pill" style="background:#616161">Simulada — sin valor tributario</span>
+          {% elif boleta.estado == 'rechazada' %}
+            <span class="pill" style="background:#c62828">{{ boleta.get_estado_display }}</span>
+          {% else %}
+            <span class="pill" style="background:#1e7d32">{{ boleta.get_estado_display }}</span>
+          {% endif %}
+        </td></tr>
+      </table>
+    {% else %}
+      <p class="no" style="font-family:Arial,sans-serif;font-size:15px">✖ No encontramos una boleta con esos datos.</p>
+      <p class="lead" style="margin-top:8px">Revisa el folio y el monto exacto (sin puntos).
+         Si la duda persiste, escríbenos a reservas — con gusto la verificamos por ti.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="footer">AREMKO SPA BOUTIQUE · AGUAS CALIENTES JUNTO AL RÍO · WWW.AREMKO.CL</div>
+</div>
+</body>
+</html>

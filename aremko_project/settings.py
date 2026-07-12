@@ -220,6 +220,7 @@ INSTALLED_APPS = [
     'personal_operativo.apps.PersonalOperativoConfig',  # Whitelist de staff para Luna Interna (H-037, app aislada drift-safe)
     'conciliacion.apps.ConciliacionConfig',  # Conciliación bancaria para AgentProvision (AP-001 Tier-2, app aislada drift-safe)
     'aremko_cli_sync.apps.AremkoCliSyncConfig',  # Snapshot gasto Ads por programa desde aremko-cli (H-058, app aislada drift-safe)
+    'facturacion.apps.FacturacionConfig',  # Boletas electrónicas SII vía SimpleAPI (P-16, app aislada drift-safe)
 
     # Aplicaciones de terceros
     'rest_framework',

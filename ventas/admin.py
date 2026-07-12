@@ -1650,6 +1650,16 @@ class ServicioAdmin(admin.ModelAdmin):
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
     list_display = ('venta_reserva', 'monto', 'metodo_pago', 'fecha_pago')
+    actions = ['emitir_boleta_electronica']
+
+    @admin.action(description='Emitir boleta electrónica (P-16)')
+    def emitir_boleta_electronica(self, request, queryset):
+        # Import lazy: la app facturacion es aislada y opcional respecto de ventas.
+        from facturacion.services.emisor import emitir_boleta_para_pago
+        for pago in queryset.select_related('venta_reserva'):
+            boleta, mensaje = emitir_boleta_para_pago(pago)
+            prefijo = f"Pago #{pago.pk} (${pago.monto:,.0f} {pago.metodo_pago})".replace(',', '.')
+            self.message_user(request, f"{prefijo}: {mensaje}")
 
     def save_model(self, request, obj, form, change):
         if not obj.usuario:
