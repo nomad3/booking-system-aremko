@@ -32,6 +32,8 @@ _Última revisión: 2026-07-11_
 10. **P-10 · Reserva de prueba #6221** — Anular/reembolsar desde el panel MP los
     $2.500 reales del test de cuotas, para no ensuciar métricas.
 16. **P-16 · Boletas electrónicas SII automáticas** — **F1 DESPLEGADA 2026-07-11**
+    (criterio giftcard aclarado: la venta de giftcard es un producto más — boletea
+    según el medio de pago de la compra; el canje nunca boletea)
     (app `facturacion/` en ambiente simulado: MedioPago con switch genera_boleta,
     emisor idempotente vía SimpleAPI, acción "Emitir boleta" en Pagos, página
     pública /boletas/consulta/, diagnóstico --smoke). Detalle y runbook completo:

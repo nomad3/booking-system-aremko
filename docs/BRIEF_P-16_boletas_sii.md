@@ -9,8 +9,9 @@ SimpleAPI + certificado + certificación SII (runbook abajo)._
   transferencia directa a la **Cuenta Vista de Mercado Pago**.
 - **NO generan boleta**: tarjeta (SumUp), Webpay, Flow, **links de pago MP** — el
   recaudador informa al SII y el voucher reemplaza la boleta (F29).
-- **GiftCard**: se boletea **al venderla** (por el pago con que se compró);
-  el canje no boletea.
+- **GiftCard**: la venta NO boletea por sí misma — es un producto más (como una
+  tabla de quesos): boletea o no **según el medio con que se pagó** esa compra.
+  El **canje** (`metodo_pago='giftcard'`) nunca boletea.
 - **Una boleta por cada pago** (en servicios el IVA se devenga al percibir).
 - `booking` queda fuera (lo gestiona el contador aparte).
 - Volumen esperado: **~200 boletas/mes**.

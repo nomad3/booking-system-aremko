@@ -8,7 +8,9 @@ Alcance tributario (confirmado por Jorge 2026-07-11):
 - Solo generan boleta los pagos por transferencia/efectivo (incluida la
   transferencia directa a la Cuenta Vista de Mercado Pago). Tarjeta, links de
   pago y Flow los informa el recaudador al SII (el voucher reemplaza la boleta).
-- La giftcard se boletea al VENDERLA (el pago de esa venta), no al canjearla.
+- La venta de una giftcard NO boletea por sí misma: es un producto más (como
+  una tabla de quesos) — boletea o no según el MEDIO con que se pagó esa
+  compra. El canje (metodo_pago='giftcard') nunca boletea.
 - Una boleta por cada pago (el IVA en servicios se devenga al percibir).
 
 Los secretos NUNCA van en estos modelos: SIMPLEAPI_API_KEY, SII_CERT_B64 y

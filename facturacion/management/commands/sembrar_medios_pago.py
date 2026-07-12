@@ -5,9 +5,10 @@ Criterio confirmado por Jorge (2026-07-11):
 - GENERAN boleta: efectivo y toda transferencia a cuentas propias (bancos,
   Mach, Copec, y la Cuenta Vista de Mercado Pago).
 - NO generan: tarjeta (SumUp), Webpay, Flow, links de Mercado Pago (el
-  recaudador informa al SII: voucher = boleta), descuento y giftcard (el canje
-  no boletea; la VENTA de la giftcard boletea por el pago con que se compró),
-  y booking (lo gestiona el contador aparte).
+  recaudador informa al SII: voucher = boleta), descuento y giftcard (el CANJE
+  nunca boletea; la VENTA de una giftcard es un producto más — boletea o no
+  según el medio con que se pagó, como una tabla de quesos), y booking (lo
+  gestiona el contador aparte).
 
 Idempotente: NO pisa el switch genera_boleta de medios ya existentes (los
 ajustes hechos en el admin se respetan). Solo crea los que falten.
@@ -41,9 +42,17 @@ NOTAS = {
     'webpay': 'El operador informa al SII.',
     'tarjeta': 'SumUp informa al SII.',
     'descuento': 'No es plata real.',
-    'giftcard': 'El canje no boletea; la giftcard se boleteó al venderse.',
+    'giftcard': 'Canje: nunca boletea. La VENTA de una giftcard es un producto más: '
+                'boletea según el medio con que se pagó (Jorge 2026-07-11).',
     'booking': 'Lo gestiona el contador aparte.',
     'mercadopagoaremko': 'Transferencia directa a Cuenta Vista MP → boletea (Jorge 2026-07-11).',
+}
+
+
+# Textos de siembras anteriores: si la nota actual calza EXACTO con uno de
+# estos, se refresca al texto vigente. Una nota editada a mano jamás se pisa.
+NOTAS_OBSOLETAS = {
+    'giftcard': ['El canje no boletea; la giftcard se boleteó al venderse.'],
 }
 
 
@@ -53,7 +62,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         creados, existentes = 0, 0
         for codigo, nombre in Pago.METODOS_PAGO:
-            _, created = MedioPago.objects.get_or_create(
+            obj, created = MedioPago.objects.get_or_create(
                 codigo=codigo,
                 defaults={
                     'nombre': nombre,
@@ -61,6 +70,10 @@ class Command(BaseCommand):
                     'nota': NOTAS.get(codigo, ''),
                 },
             )
+            if not created and obj.nota in NOTAS_OBSOLETAS.get(codigo, []):
+                obj.nota = NOTAS.get(codigo, '')
+                obj.save(update_fields=['nota', 'actualizado_at'])
+                self.stdout.write(f"nota refrescada: {codigo}")
             creados += int(created)
             existentes += int(not created)
         total_on = MedioPago.objects.filter(genera_boleta=True).count()
