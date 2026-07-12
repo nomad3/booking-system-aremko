@@ -1859,6 +1859,14 @@ def generate_brief() -> dict:
         model_copy=model_copy_usado,
     )
 
+    # Explotar el brief en la cola de publicaciones de la semana (asistente
+    # community manager). Best-effort: nunca tumba la generación.
+    try:
+        from marketing_briefs.services import explode_brief_to_publicaciones
+        explode_brief_to_publicaciones(semana_inicio, brief)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f'explode_brief_to_publicaciones falló ({exc}) — el brief sigue igual')
+
     return {
         'semana_inicio': semana_inicio,
         'semana_fin': semana_fin,

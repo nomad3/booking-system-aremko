@@ -174,6 +174,9 @@ urlpatterns = [
     # Verificación pública de boletas electrónicas (P-16, requisito declaración SII)
     path('boletas/', include('facturacion.urls', namespace='facturacion')),
 
+    # Cola de publicaciones de la semana para aremko-cli (asistente community manager)
+    path('marketing/', include('marketing_briefs.urls', namespace='marketing_briefs')),
+
     # SEO endpoints
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
     path('robots.txt', TemplateView.as_view(template_name='seo/robots.txt', content_type='text/plain'), name='robots_txt'),

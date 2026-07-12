@@ -57,3 +57,76 @@ class WeeklyBriefArchive(models.Model):
     def __str__(self):
         estado = 'OK' if self.exito else 'ERROR'
         return f'Brief {self.semana_inicio} ({estado})'
+
+
+class PublicacionPlanificada(models.Model):
+    """Una pieza de contenido concreta de la semana, con workflow de producción.
+
+    Se genera automáticamente "explotando" el brief semanal (una fila por
+    Reel/carrusel/story/GBP/email) para que Angélica (community manager)
+    tenga una cola de trabajo clara: qué producir, con qué copy, en qué
+    orden — y para poder colgarle métricas por publicación después.
+
+    Fase 1 (2026-07-12): cola de trabajo + estados.
+    Fase 2: material subido + revisión IA.
+    Fase 3: métricas por publicación → decisiones Meta Ads.
+    """
+
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('en_produccion', 'En producción'),
+        ('lista', 'Lista para publicar'),
+        ('publicada', 'Publicada'),
+        ('no_aplica', 'No aplica esta semana'),
+    ]
+
+    semana_inicio = models.DateField(db_index=True, help_text='Lunes de la semana del brief.')
+    dia = models.DateField(db_index=True, help_text='Día planificado de publicación.')
+    canal = models.CharField(max_length=40, help_text='Instagram | Instagram Stories | GBP | Email | Facebook')
+    tipo = models.CharField(max_length=20, help_text='reel | carrusel | story | post | email')
+    pieza_key = models.CharField(
+        max_length=40,
+        help_text='Clave de la pieza en el brief (gbp_post, reel_martes, story_lunes, ...). Única por semana.',
+    )
+    titulo = models.CharField(max_length=300, blank=True, default='', help_text='Concepto corto de la pieza.')
+    copy_json = models.JSONField(
+        default=dict, blank=True,
+        help_text='La pieza completa del brief (guion, caption, hashtags, etc.) lista para usar.',
+    )
+    responsable = models.CharField(max_length=60, blank=True, default='')
+    tiempo_estimado = models.CharField(max_length=60, blank=True, default='')
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente', db_index=True)
+    material_urls = models.JSONField(
+        default=list, blank=True,
+        help_text='URLs del material subido por Angélica (fotos/videos en Cloudinary). Fase 2.',
+    )
+    notas_revision = models.TextField(
+        blank=True, default='',
+        help_text='Feedback del revisor IA sobre el material subido. Fase 2.',
+    )
+    published_url = models.CharField(
+        max_length=500, blank=True, default='',
+        help_text='Link del post ya publicado (para colgarle métricas). Fase 3.',
+    )
+    metricas = models.JSONField(
+        default=dict, blank=True,
+        help_text='Métricas de la publicación, actualizadas semanalmente. Fase 3.',
+    )
+    notas = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'marketing_briefs_publicacionplanificada'
+        verbose_name = 'Publicación planificada'
+        verbose_name_plural = 'Publicaciones planificadas'
+        ordering = ['dia', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['semana_inicio', 'pieza_key'],
+                name='uniq_publicacion_semana_pieza',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.dia} · {self.canal}/{self.tipo} · {self.get_estado_display()}'
