@@ -46,12 +46,14 @@ _Última revisión: 2026-07-11_
     CASO-4, unidad Kg en CASO-5, referencia SET/CASO-N obligatoria).
     El SII CONFIRMÓ la exclusividad: al AUTORIZARSE se pierde el sistema
     gratuito (solo al final; antes del switch: respaldar documentos del portal
-    + OK del contador). Siguiente (Claude, sesión técnica): CAF de
-    certificación + extender builder (multi-línea, exentos, UnidadMedida,
-    Referencias) + command `ejecutar_set_pruebas` + sobre/envío al SII cert +
-    declarar avance. Luego muestras impresas → declaración de cumplimiento
-    (Jorge) → switch producción. F2 (cola automática) y F3 (notas de crédito)
-    después del switch.
+    + OK del contador). **CERTIFICACIÓN 2026-07-12 PM**: CAF cert 1-50 cargado
+    vía API + las 5 BOLETAS DEL SET TIMBRADAS (folios 1-5, exento y Kg OK).
+    Pendiente SOLO el envío del sobre: SII cert responde 500 (4 intentos,
+    sábado; reintento nocturno programado; comando idempotente
+    `ejecutar_set_pruebas` reutiliza lo timbrado). Bitácora en admin (caso
+    __LOG__). Si persiste → soporte SimpleAPI. Después: declarar avance +
+    muestras impresas → declaración de cumplimiento (Jorge) → switch
+    producción. F2 (cola automática) y F3 (notas de crédito) tras el switch.
     F1: app `facturacion/` + tabla `MedioPago` con flag `genera_boleta` (siembra de
     los 21 métodos, editable en admin; pedido por Jorge para evitar dobles boleteos)
     + botón manual. F2: señal post_save(Pago) + cola (patrón conciliador) + candado

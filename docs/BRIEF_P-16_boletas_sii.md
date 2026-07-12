@@ -1,7 +1,21 @@
 # BRIEF P-16 · Boletas electrónicas SII automáticas (SimpleAPI)
 
-_Estado al 2026-07-11 — F1 desplegada en ambiente **simulado**. Pendiente: cuenta
-SimpleAPI + certificado + certificación SII (runbook abajo)._
+_Estado al 2026-07-12 (noche) — **CERTIFICACIÓN EN CURSO**: postulación SII
+aceptada, credenciales verificadas, CAF cert 1-50 cargado, y las **5 boletas
+del set TIMBRADAS** (folios 1-5, incluye caso exento y unidad Kg, referencias
+SET/CASO-N). ÚNICO pendiente: el **envío del sobre EnvioBoleta** — el SII cert
+responde `500 Internal Server Error` en `/api/v1/envio/enviar` de SimpleAPI
+(4 intentos, sábado PM; reintento nocturno programado). El comando
+`ejecutar_set_pruebas` es idempotente: reutiliza las boletas timbradas y solo
+reintenta el envío. Bitácora completa de cada corrida en el admin: Boletas →
+caso `__LOG__`. Si persiste el lunes → contactar soporte SimpleAPI
+(contacto@simpleapi.cl, +56 9 7555 3937) citando el JSON del error.
+Comandos clave: `configurar_emisor` (datos oficiales, sin args),
+`solicitar_caf [--cantidad N] [--produccion]`, `ejecutar_set_pruebas
+[--solo-generar] [--regenerar]`.
+⚠️ Lección Render: jobs con `shell -c` complejos salen 0 SIN ejecutar; deploy
+live se verifica por COMMIT (`render deploys list`), no por URL.
+F1 (operación diaria) sigue en ambiente **simulado**, sin cambios._
 
 ## Contexto y alcance tributario (confirmado por Jorge 2026-07-11)
 
