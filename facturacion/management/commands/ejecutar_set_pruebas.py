@@ -108,6 +108,14 @@ class Command(BaseCommand):
                 # El CAF debe ser el MISMO rango del que salió el folio.
                 xml = simpleapi_client.generar_boleta(documento, cert_bytes, rango.caf_xml)
             except simpleapi_client.SimpleAPIError as exc:
+                # Persistir el error para diagnóstico (los logs del job no son
+                # consultables por CLI): queda visible en el admin de boletas.
+                neto, iva, total = _totales(detalles)
+                BoletaElectronica.objects.create(
+                    pago=None, tipo_dte=39, ambiente='certificacion', folio=folio,
+                    monto_total=total, monto_neto=neto, monto_iva=iva,
+                    glosa=f"SET SII {caso}", caso_set=caso, estado='error',
+                    error_mensaje=str(exc)[:2000])
                 raise CommandError(f"{caso}: error al generar — {exc}")
 
             neto, iva, total = _totales(detalles)
