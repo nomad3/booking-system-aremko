@@ -20,6 +20,8 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--smoke', action='store_true',
                             help='Prueba de emisión simulada con rollback (no persiste).')
+        parser.add_argument('--exigir-credenciales', action='store_true',
+                            help='Termina con error (exit 1) si falta API key, certificado o clave.')
 
     def handle(self, *args, **options):
         tablas = sorted(t for t in connection.introspection.table_names()
@@ -41,6 +43,18 @@ class Command(BaseCommand):
             f"Credenciales: API_KEY={'SÍ' if os.environ.get('SIMPLEAPI_API_KEY') else 'NO'} | "
             f"CERT={'SÍ (' + str(len(cert)) + ' bytes)' if cert else 'NO'} | "
             f"CLAVE={'SÍ' if pwd else 'NO'}")
+        if options['exigir_credenciales']:
+            from django.core.management.base import CommandError
+            faltan = []
+            if not os.environ.get('SIMPLEAPI_API_KEY'):
+                faltan.append('SIMPLEAPI_API_KEY')
+            if not cert:
+                faltan.append('SII_CERT_B64')
+            if not pwd:
+                faltan.append('SII_CERT_PASSWORD')
+            if faltan:
+                raise CommandError(f"Faltan credenciales: {', '.join(faltan)}")
+            self.stdout.write(self.style.SUCCESS("Credenciales completas."))
         on = MedioPago.objects.filter(genera_boleta=True).count()
         off = MedioPago.objects.filter(genera_boleta=False).count()
         self.stdout.write(f"Medios de pago: {on} boletean / {off} no boletean "
