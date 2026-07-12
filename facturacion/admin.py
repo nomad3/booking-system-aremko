@@ -30,6 +30,11 @@ class ConfiguracionFacturacionAdmin(admin.ModelAdmin):
             'fields': ('rut_emisor', 'razon_social', 'giro_boleta', 'direccion',
                        'comuna', 'indicador_servicio', 'rut_firmante'),
         }),
+        ('Resolución SII (carátula del sobre de envío)', {
+            'fields': ('fecha_resolucion', 'numero_resolucion'),
+            'description': "Certificación: fecha de la postulación aceptada y número 0. "
+                           "Producción: los datos de la autorización definitiva.",
+        }),
     )
 
     def has_add_permission(self, request):
