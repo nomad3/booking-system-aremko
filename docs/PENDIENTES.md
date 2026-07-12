@@ -37,12 +37,21 @@ _Última revisión: 2026-07-11_
     (app `facturacion/` en ambiente simulado: MedioPago con switch genera_boleta,
     emisor idempotente vía SimpleAPI, acción "Emitir boleta" en Pagos, página
     pública /boletas/consulta/, diagnóstico --smoke). Detalle y runbook completo:
-    `docs/BRIEF_P-16_boletas_sii.md`. Siguiente — pasos de Jorge: (1) cuenta
-    gratis simpleapi.cl → API key a Render `SIMPLEAPI_API_KEY`; (2) certificado
-    .pfx → `SII_CERT_B64` + `SII_CERT_PASSWORD`; (3) solicitar set de pruebas de
-    boleta en sii.cl; (4) contador confirma exclusividad portal gratuito ↔
-    software propio. Luego Claude: certificación en ambiente cert + F2
-    (emisión automática con cola) + F3 (notas de crédito).
+    `docs/BRIEF_P-16_boletas_sii.md`. **Pasos de Jorge COMPLETADOS 2026-07-12**:
+    API key SimpleAPI ✓, certificado .pfx en Render ✓ (verificado con
+    `--exigir-credenciales`), certificado instalado en Llavero ✓, POSTULACIÓN
+    ACEPTADA en el SII (solo Boleta Electrónica afecta; software "AREMKO BOOKING
+    SYSTEM") ✓, set de pruebas descargado ✓ (5 casos —
+    `docs/certificacion_sii/Set_Prueba_BE.txt`; multi-ítem, ítem exento en
+    CASO-4, unidad Kg en CASO-5, referencia SET/CASO-N obligatoria).
+    El SII CONFIRMÓ la exclusividad: al AUTORIZARSE se pierde el sistema
+    gratuito (solo al final; antes del switch: respaldar documentos del portal
+    + OK del contador). Siguiente (Claude, sesión técnica): CAF de
+    certificación + extender builder (multi-línea, exentos, UnidadMedida,
+    Referencias) + command `ejecutar_set_pruebas` + sobre/envío al SII cert +
+    declarar avance. Luego muestras impresas → declaración de cumplimiento
+    (Jorge) → switch producción. F2 (cola automática) y F3 (notas de crédito)
+    después del switch.
     F1: app `facturacion/` + tabla `MedioPago` con flag `genera_boleta` (siembra de
     los 21 métodos, editable en admin; pedido por Jorge para evitar dobles boleteos)
     + botón manual. F2: señal post_save(Pago) + cola (patrón conciliador) + candado
