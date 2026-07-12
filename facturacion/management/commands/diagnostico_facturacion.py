@@ -32,6 +32,15 @@ class Command(BaseCommand):
         config = ConfiguracionFacturacion.get()
         self.stdout.write(f"Ambiente: {config.ambiente} | emisión automática: "
                           f"{'ON' if config.emision_automatica else 'OFF'}")
+
+        # Credenciales del entorno (solo presencia/tamaño, jamás valores)
+        import os
+        from facturacion.services.simpleapi_client import obtener_certificado
+        cert, pwd = obtener_certificado()
+        self.stdout.write(
+            f"Credenciales: API_KEY={'SÍ' if os.environ.get('SIMPLEAPI_API_KEY') else 'NO'} | "
+            f"CERT={'SÍ (' + str(len(cert)) + ' bytes)' if cert else 'NO'} | "
+            f"CLAVE={'SÍ' if pwd else 'NO'}")
         on = MedioPago.objects.filter(genera_boleta=True).count()
         off = MedioPago.objects.filter(genera_boleta=False).count()
         self.stdout.write(f"Medios de pago: {on} boletean / {off} no boletean "
