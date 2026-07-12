@@ -68,7 +68,44 @@ class Command(BaseCommand):
                             help='Vuelve a timbrar casos ya generados (usa folios nuevos).')
 
     def handle(self, *args, **options):
+        """Envuelve la corrida en una bitácora persistida en BD: los logs de los
+        jobs de Render no son consultables por CLI, así que CADA corrida deja
+        su registro completo en una BoletaElectronica caso_set='__LOG__'
+        (visible en el admin, error_mensaje=bitácora)."""
+        import traceback
+        self._log = []
+        try:
+            self._correr(options)
+        except BaseException as exc:
+            self._log.append(f"EXCEPCION: {exc}")
+            self._log.append(traceback.format_exc()[-1500:])
+            self._guardar_bitacora(fallo=True)
+            raise
+        self._guardar_bitacora(fallo=False)
+
+    def _bitacora(self, mensaje):
+        self._log.append(str(mensaje))
+        self.stdout.write(str(mensaje))
+
+    def _guardar_bitacora(self, fallo):
+        try:
+            BoletaElectronica.objects.update_or_create(
+                caso_set='__LOG__',
+                defaults={'pago': None, 'tipo_dte': 39, 'ambiente': 'certificacion',
+                          'monto_total': 0, 'monto_neto': 0, 'monto_iva': 0,
+                          'glosa': 'BITACORA ejecutar_set_pruebas',
+                          'estado': 'error' if fallo else 'simulada',
+                          'error_mensaje': '\n'.join(self._log)[-8000:]})
+        except Exception:
+            pass  # la bitácora jamás debe tapar el error real
+
+    def _correr(self, options):
         config = ConfiguracionFacturacion.get()
+        self._bitacora(f"CONFIG: rut_emisor={config.rut_emisor!r} firmante={config.rut_firmante!r} "
+                       f"razon={config.razon_social!r} giro_len={len(config.giro_boleta)} "
+                       f"dir={config.direccion!r} resol={config.fecha_resolucion} "
+                       f"nro={config.numero_resolucion}")
+        self._bitacora(f"CREDS: {simpleapi_client.credenciales_listas()}")
         if not simpleapi_client.credenciales_listas():
             raise CommandError("Faltan credenciales en el entorno.")
         if not (config.rut_emisor and config.rut_firmante and config.razon_social
@@ -86,7 +123,7 @@ class Command(BaseCommand):
                          .filter(caso_set=caso, ambiente='certificacion')
                          .exclude(estado='error').first())
             if existente and existente.xml_dte and not options['regenerar']:
-                self.stdout.write(f"{caso}: ya generado (folio {existente.folio}) — se reutiliza.")
+                self._bitacora(f"{caso}: ya generado (folio {existente.folio}) — se reutiliza.")
                 boletas.append(existente)
                 continue
 
@@ -125,19 +162,18 @@ class Command(BaseCommand):
                 glosa=f"SET SII {caso}", caso_set=caso, estado='generada',
                 xml_dte=xml, emitida_at=timezone.now())
             boletas.append(boleta)
-            self.stdout.write(self.style.SUCCESS(
-                f"{caso}: boleta timbrada folio {folio} (total ${total:,})".replace(',', '.')))
+            self._bitacora(f"{caso}: boleta timbrada folio {folio} (total ${total:,})".replace(',', '.'))
             time.sleep(0.5)  # rate limit 3/s
 
         if options['solo_generar']:
-            self.stdout.write("Solo generación — no se envió el sobre (--solo-generar).")
+            self._bitacora("Solo generación — no se envió el sobre (--solo-generar).")
             return
 
-        self.stdout.write("Generando sobre EnvioBoleta...")
+        self._bitacora("Generando sobre EnvioBoleta...")
         xmls = [b.xml_dte for b in boletas]
         sobre = simpleapi_client.generar_sobre(xmls, cert_bytes, cert_password, config)
 
-        self.stdout.write("Enviando al SII (ambiente certificación)...")
+        self._bitacora("Enviando al SII (ambiente certificación)...")
         resp = simpleapi_client.enviar_sobre(sobre, cert_bytes, cert_password,
                                              config, ambiente_num=0, tipo=2)
         track = str(resp.get('trackId', '') or '')
@@ -151,7 +187,6 @@ class Command(BaseCommand):
             boleta.save(update_fields=['track_id', 'estado', 'error_mensaje',
                                        'actualizada_at'])
 
-        estilo = self.style.SUCCESS if ok else self.style.ERROR
-        self.stdout.write(estilo(
+        self._bitacora(
             f"Envío {'OK' if ok else 'FALLÓ'} — trackId={track} estado={estado} "
-            f"glosa={resp.get('glosa', '')} errores={resp.get('errores')}"))
+            f"glosa={resp.get('glosa', '')} errores={resp.get('errores')}")
