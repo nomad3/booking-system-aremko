@@ -5,7 +5,7 @@ ELIMINA de la lista (git guarda la historia); los IDs `P-xx` son estables y no s
 reutilizan. Para agregar: "agrega a pendientes: …". Para cerrar: "listo el P-xx".
 Claude la revisa al inicio de sesión y en cada wrapup.
 
-_Última revisión: 2026-07-09_
+_Última revisión: 2026-07-11_
 
 ## Web y marketing
 
@@ -31,6 +31,14 @@ _Última revisión: 2026-07-09_
    carrito público migra a Mercado Pago (cuotas también en la web).
 10. **P-10 · Reserva de prueba #6221** — Anular/reembolsar desde el panel MP los
     $2.500 reales del test de cuotas, para no ensuciar métricas.
+16. **P-16 · Boletas electrónicas SII automáticas** — Emisión automática vía
+    SimpleAPI (plan gratis 500 consultas/mes) SOLO para pagos por transferencia y
+    efectivo (~200/mes); tarjeta/links/Flow los informa el recaudador (no llevan
+    boleta). Ruta aprobada 2026-07-11. F0: contador confirma (boleta por abono,
+    transferencias a Cuenta Vista MP, giftcards, booking) + certificación "software
+    propio" en el SII + exportar certificado .pfx a Render + CAF folios tipo 39.
+    F1: app `facturacion/` + botón manual. F2: señal post_save(Pago) + cola (patrón
+    conciliador). F3: notas de crédito + cuadratura mensual.
 
 ## Infraestructura y Luna
 
