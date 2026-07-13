@@ -81,11 +81,6 @@ _Última revisión: 2026-07-13_
 > multi-tenant desde ya (los destinos GBP/IG y la ficha ya salen de constantes
 > aisladas, pensadas para mover a config del tenant). Ver `[[project_datamatic_hospitality_modulos]]`.
 
-17. **P-17 · Revisión por slide en carruseles** — Extender la revisión-por-segmento
-    (hoy solo stories: cada Historia con su foto+veredicto) a los carruseles: cada
-    slide con su propia foto y revisión de correspondencia foto↔texto del slide.
-    Mismo mecanismo `segmentos` ya construido para historias; falta poblar segmentos
-    desde `slides` del brief y renderizar el uploader por slide.
 18. **P-18 · Revisión de reels / videos** — Hoy los reels quedan fuera de la Fase 2
     (solo imágenes). Revisar video: extraer fotogramas clave y evaluar contra el
     guion (gancho en los primeros segundos, tomas sugeridas, coherencia con el copy).
