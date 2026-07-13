@@ -43,6 +43,35 @@ def _split_historias(texto: str) -> list:
     return segmentos
 
 
+def _segmentos_de_slides(slides) -> list:
+    """Un segmento por slide del carrusel (cada slide su foto + revisión). []
+    si es menos de 2 slides. El texto del segmento es el overlay + la imagen
+    sugerida, para que la IA evalúe correspondencia foto↔slide."""
+    if not isinstance(slides, list) or len(slides) < 2:
+        return []
+    segmentos = []
+    for i, s in enumerate(slides, start=1):
+        if not isinstance(s, dict):
+            continue
+        numero = s.get('numero') or i
+        texto = (s.get('texto_overlay') or '').strip()
+        img = (s.get('imagen_sugerida') or '').strip()
+        if img:
+            texto = (texto + f'\n📷 Imagen sugerida: {img}').strip()
+        segmentos.append({
+            'indice': i,
+            'titulo': f'Slide {numero}',
+            'texto': texto,
+            'material_urls': [],
+            'material_meta': [],
+            'revision_veredicto': 'sin_revisar',
+            'revision_json': [],
+            'revision_resumen': '',
+            'revision_at': None,
+        })
+    return segmentos
+
+
 def _merge_segmentos(nuevos: list, viejos: list) -> list:
     """Al re-explotar, conserva foto/revisión ya subidas (por índice); solo
     refresca titulo/texto desde el brief. El trabajo de Angélica no se pisa."""
@@ -163,9 +192,11 @@ def explode_brief_to_publicaciones(semana_inicio, brief: dict) -> int:
         pieza = drafts.get(pieza_key)
         if isinstance(pieza, dict) and pieza:
             dia_nombre = DIAS_SEMANA[offset]
+            # Carrusel: un segmento por slide (cada slide su foto + revisión).
+            segs = _segmentos_de_slides(pieza.get('slides')) if tipo == 'carrusel' else None
             _upsert(
                 pieza_key, canal, tipo, semana_inicio + timedelta(days=offset),
-                pieza, responsable, _hora_de(pieza, dia_nombre, tipo),
+                pieza, responsable, _hora_de(pieza, dia_nombre, tipo), segmentos=segs,
             )
 
     stories = drafts.get('stories_diarias') or []

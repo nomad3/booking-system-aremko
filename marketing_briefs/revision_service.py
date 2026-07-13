@@ -183,14 +183,17 @@ def revisar_segmento(publicacion, indice: int) -> dict:
     if not image_urls:
         return {"veredicto": "sin_revisar", "resumen": "No hay material para revisar.", "correcciones": []}
 
+    titulo_seg = seg.get('titulo') or f'#{indice}'
     copy_seg = {
-        'historia': seg.get('titulo') or f'Historia {indice}',
-        'texto_de_esta_historia': seg.get('texto') or '',
-        '_nota': 'Revisa SOLO esta historia: si la foto corresponde a lo que dice este texto, formato de historia (vertical 9:16), y calidad.',
+        'segmento': titulo_seg,
+        'texto_de_este_segmento': seg.get('texto') or '',
+        '_nota': f'Revisa SOLO este segmento ({titulo_seg}): si la foto corresponde a lo que '
+                 'dice este texto, el formato correcto para el canal (usa las dimensiones reales) '
+                 'y la calidad. No la juzgues contra otros segmentos.',
     }
     r = _run_review(
         copy_seg, image_urls, seg.get('material_meta') or [],
-        f"{publicacion.titulo or publicacion.pieza_key} · {seg.get('titulo') or ''}",
+        f"{publicacion.titulo or publicacion.pieza_key} · {titulo_seg}",
         publicacion.canal, publicacion.tipo,
     )
     seg['revision_veredicto'] = r['veredicto']
