@@ -6,6 +6,7 @@ server-side en el backend Go de aremko-cli, nunca en el navegador).
 
 import json
 import logging
+import uuid
 from datetime import date, timedelta
 
 from django.conf import settings
@@ -16,6 +17,10 @@ from django.views.decorators.http import require_http_methods
 from .models import PublicacionPlanificada
 
 logger = logging.getLogger(__name__)
+
+# Extensiones de imagen aceptadas en la Fase 2 (fotos/carruseles/historias).
+_EXT_IMAGEN = {'.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'}
+_MAX_BYTES = 16 * 1024 * 1024  # 16 MB por archivo, mismo tope que la bandeja.
 
 ESTADOS_VALIDOS = {choice[0] for choice in PublicacionPlanificada.ESTADO_CHOICES}
 
@@ -40,6 +45,10 @@ def _serialize(p: PublicacionPlanificada) -> dict:
         'tiempo_estimado': p.tiempo_estimado,
         'estado': p.estado,
         'material_urls': p.material_urls,
+        'revision_veredicto': p.revision_veredicto,
+        'revision_resumen': p.revision_resumen,
+        'revision_json': p.revision_json,
+        'revision_at': p.revision_at.isoformat() if p.revision_at else None,
         'notas_revision': p.notas_revision,
         'published_url': p.published_url,
         'metricas': p.metricas,
@@ -124,4 +133,85 @@ def publicacion_actualizar(request, pub_id: int):
 
     pub.save(update_fields=cambios + ['updated_at'])
     logger.info(f'publicacion_actualizar: #{pub_id} campos {cambios}')
+    return JsonResponse({'success': True, 'publicacion': _serialize(pub)})
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def publicacion_detalle(request, pub_id: int):
+    """Devuelve una publicación (para polling del estado de revisión)."""
+    if not _api_key_ok(request):
+        return JsonResponse({'error': 'X-API-KEY inválida o ausente'}, status=401)
+    pub = PublicacionPlanificada.objects.filter(id=pub_id).first()
+    if pub is None:
+        return JsonResponse({'error': f'Publicación {pub_id} no existe'}, status=404)
+    return JsonResponse({'success': True, 'publicacion': _serialize(pub)})
+
+
+def _run_revision_background(pub_id: int):
+    """Corre la revisión IA en un thread (la llamada al modelo tarda más que
+    el timeout del cliente HTTP del backend Go — por eso va fire-and-forget y
+    Angélica ve el resultado por polling)."""
+    try:
+        from .revision_service import revisar_material
+        pub = PublicacionPlanificada.objects.filter(id=pub_id).first()
+        if pub is not None:
+            revisar_material(pub)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f'_run_revision_background #{pub_id}: {exc}', exc_info=True)
+        try:
+            PublicacionPlanificada.objects.filter(id=pub_id).update(revision_veredicto='sin_revisar')
+        except Exception:  # noqa: BLE001
+            pass
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def publicacion_material(request, pub_id: int):
+    """Recibe fotos (multipart, campo 'files'), las sube a Cloudinary, y dispara
+    la revisión IA en background. Responde de inmediato con estado 'revisando'.
+    """
+    if not _api_key_ok(request):
+        return JsonResponse({'error': 'X-API-KEY inválida o ausente'}, status=401)
+
+    pub = PublicacionPlanificada.objects.filter(id=pub_id).first()
+    if pub is None:
+        return JsonResponse({'error': f'Publicación {pub_id} no existe'}, status=404)
+
+    archivos = request.FILES.getlist('files') or request.FILES.getlist('file')
+    if not archivos:
+        return JsonResponse({'error': 'No se recibió ningún archivo (campo "files")'}, status=400)
+
+    try:
+        from cloudinary_storage.storage import MediaCloudinaryStorage
+        storage = MediaCloudinaryStorage()
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f'publicacion_material: storage Cloudinary no disponible ({exc})')
+        return JsonResponse({'error': 'Almacenamiento de imágenes no disponible'}, status=503)
+
+    urls = list(pub.material_urls or [])
+    for f in archivos:
+        ext = ('.' + f.name.rsplit('.', 1)[-1].lower()) if '.' in f.name else ''
+        if ext not in _EXT_IMAGEN:
+            return JsonResponse(
+                {'error': f'Formato no soportado: {f.name}. Solo imágenes ({", ".join(sorted(_EXT_IMAGEN))}).'},
+                status=400,
+            )
+        if f.size and f.size > _MAX_BYTES:
+            return JsonResponse({'error': f'{f.name} supera el máximo de 16 MB.'}, status=400)
+        nombre = f'publicaciones/{pub.semana_inicio.isoformat()}/{uuid.uuid4().hex}{ext}'
+        try:
+            guardado = storage.save(nombre, f)
+            urls.append(storage.url(guardado))
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f'publicacion_material: falló subir {f.name} ({exc})')
+            return JsonResponse({'error': f'No se pudo subir {f.name}'}, status=502)
+
+    pub.material_urls = urls
+    pub.revision_veredicto = 'revisando'
+    pub.save(update_fields=['material_urls', 'revision_veredicto', 'updated_at'])
+
+    from threading import Thread
+    Thread(target=_run_revision_background, args=(pub.id,), daemon=True).start()
+
     return JsonResponse({'success': True, 'publicacion': _serialize(pub)})

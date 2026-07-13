@@ -537,6 +537,13 @@ SURVEY_ANALYSIS_RECIPIENT_EMAIL = os.getenv(
 MARKETING_BRIEF_LLM_MODEL = os.getenv(
     "MARKETING_BRIEF_LLM_MODEL", "anthropic/claude-sonnet-4.6"
 )
+# Modelo de la pasada de redacción (copywriter) del brief. Default: el mismo del análisis.
+MARKETING_BRIEF_COPY_LLM_MODEL = os.getenv("MARKETING_BRIEF_COPY_LLM_MODEL", "")
+# Modelo con visión para revisar el material del community manager (Fase 2).
+# Gemini flash: buena visión, barato. Vía OpenRouter (mismo camino que el brief).
+MARKETING_REVISION_LLM_MODEL = os.getenv(
+    "MARKETING_REVISION_LLM_MODEL", "google/gemini-2.5-flash"
+)
 MARKETING_BRIEF_RECIPIENT_EMAIL = os.getenv(
     "MARKETING_BRIEF_RECIPIENT_EMAIL", "aremkospa@gmail.com"
 )

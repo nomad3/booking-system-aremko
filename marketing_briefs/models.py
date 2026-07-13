@@ -98,11 +98,31 @@ class PublicacionPlanificada(models.Model):
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente', db_index=True)
     material_urls = models.JSONField(
         default=list, blank=True,
-        help_text='URLs del material subido por Angélica (fotos/videos en Cloudinary). Fase 2.',
+        help_text='URLs del material subido por Angélica (fotos/carruseles en Cloudinary).',
     )
+    REVISION_CHOICES = [
+        ('sin_revisar', 'Sin revisar'),
+        ('revisando', 'Revisando…'),
+        ('con_observaciones', 'Con observaciones'),
+        ('aprobado', 'Aprobado'),
+    ]
+    revision_veredicto = models.CharField(
+        max_length=20, choices=REVISION_CHOICES, default='sin_revisar', db_index=True,
+        help_text='Resultado de la última revisión IA del material subido.',
+    )
+    revision_json = models.JSONField(
+        default=list, blank=True,
+        help_text='Correcciones estructuradas de la última revisión IA '
+                  '(lista de {aspecto, severidad, encontrado, correccion}).',
+    )
+    revision_resumen = models.TextField(
+        blank=True, default='',
+        help_text='Veredicto en 1-2 frases del revisor IA.',
+    )
+    revision_at = models.DateTimeField(null=True, blank=True)
     notas_revision = models.TextField(
         blank=True, default='',
-        help_text='Feedback del revisor IA sobre el material subido. Fase 2.',
+        help_text='(Legado / notas libres de revisión.)',
     )
     published_url = models.CharField(
         max_length=500, blank=True, default='',
