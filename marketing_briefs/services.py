@@ -7,9 +7,55 @@ nunca se pisa por una regeneración del brief.
 """
 
 import logging
+import re
 from datetime import timedelta
 
 logger = logging.getLogger(__name__)
+
+# El copywriter mete Story 1 y Story 2 en un mismo texto (separadas por "|").
+# En Instagram son historias distintas → se parten en segmentos, cada uno con
+# su propia foto y revisión. Mismo criterio que el split del frontend.
+_STORY_SPLIT = re.compile(r'\s*\|?\s*(?=STORY\s*\d)', re.IGNORECASE)
+_STORY_PREFIX = re.compile(r'^STORY\s*\d\s*[—\-]\s*', re.IGNORECASE)
+
+
+def _split_historias(texto: str) -> list:
+    """Parte 'STORY 1 — … | STORY 2 — …' en segmentos limpios. Devuelve [] si
+    no hay 2+ historias (una pieza de una sola imagen no lleva segmentos)."""
+    if not texto:
+        return []
+    partes = [p.strip() for p in _STORY_SPLIT.split(texto) if p and p.strip()]
+    if len(partes) <= 1:
+        return []
+    segmentos = []
+    for i, p in enumerate(partes, start=1):
+        segmentos.append({
+            'indice': i,
+            'titulo': f'Historia {i}',
+            'texto': _STORY_PREFIX.sub('', p).strip(),
+            'material_urls': [],
+            'material_meta': [],
+            'revision_veredicto': 'sin_revisar',
+            'revision_json': [],
+            'revision_resumen': '',
+            'revision_at': None,
+        })
+    return segmentos
+
+
+def _merge_segmentos(nuevos: list, viejos: list) -> list:
+    """Al re-explotar, conserva foto/revisión ya subidas (por índice); solo
+    refresca titulo/texto desde el brief. El trabajo de Angélica no se pisa."""
+    by_idx = {s.get('indice'): s for s in (viejos or []) if isinstance(s, dict)}
+    for seg in nuevos:
+        old = by_idx.get(seg['indice'])
+        if not old:
+            continue
+        for k in ('material_urls', 'material_meta', 'revision_veredicto',
+                  'revision_json', 'revision_resumen', 'revision_at'):
+            if old.get(k):
+                seg[k] = old[k]
+    return nuevos
 
 # Día de la semana (offset desde el lunes) por pieza fija del brief.
 PIEZAS_FIJAS = [
@@ -73,7 +119,7 @@ def explode_brief_to_publicaciones(semana_inicio, brief: dict) -> int:
     def _hora_de(pieza, dia_nombre, tipo):
         return (pieza.get('hora') or hora_lookup.get((dia_nombre.lower(), tipo.lower()), '') or '')[:5]
 
-    def _upsert(pieza_key, canal, tipo, dia, pieza, responsable, hora):
+    def _upsert(pieza_key, canal, tipo, dia, pieza, responsable, hora, segmentos=None):
         nonlocal procesadas
         try:
             existente = PublicacionPlanificada.objects.filter(
@@ -94,6 +140,7 @@ def explode_brief_to_publicaciones(semana_inicio, brief: dict) -> int:
                     responsable=pieza.get('responsable') or responsable,
                     tiempo_estimado=pieza.get('tiempo_estimado') or '',
                     estado=estado_inicial,
+                    segmentos=segmentos or [],
                 )
                 procesadas += 1
             elif existente.estado in ('pendiente', 'no_aplica'):
@@ -105,6 +152,8 @@ def explode_brief_to_publicaciones(semana_inicio, brief: dict) -> int:
                 existente.responsable = pieza.get('responsable') or responsable
                 existente.tiempo_estimado = pieza.get('tiempo_estimado') or ''
                 existente.estado = estado_inicial
+                # Preserva fotos/revisión ya subidas por historia (por índice).
+                existente.segmentos = _merge_segmentos(segmentos, existente.segmentos) if segmentos else []
                 existente.save()
                 procesadas += 1
         except Exception as exc:  # noqa: BLE001 — una pieza mala no frena el resto
@@ -128,6 +177,7 @@ def explode_brief_to_publicaciones(semana_inicio, brief: dict) -> int:
             offset = DIAS_SEMANA.index(dia_nombre)
         except ValueError:
             continue
+        texto_story = story.get('texto_sugerido') or story.get('caption_completo') or ''
         _upsert(
             f'story_{dia_nombre.lower()}',
             'Instagram Stories',
@@ -136,6 +186,7 @@ def explode_brief_to_publicaciones(semana_inicio, brief: dict) -> int:
             story,
             'Angélica',
             _hora_de(story, dia_nombre, 'story'),
+            segmentos=_split_historias(texto_story),
         )
 
     logger.info(f'explode_brief: {procesadas} publicaciones creadas/actualizadas para {semana_inicio}')

@@ -111,6 +111,14 @@ class PublicacionPlanificada(models.Model):
                   '{url, width, height, ratio, orientacion}. Medido al subir para que '
                   'el chequeo de formato (9:16, 4:5, 1:1) sea exacto, no "a ojo" del modelo.',
     )
+    segmentos = models.JSONField(
+        default=list, blank=True,
+        help_text='Sub-piezas visuales con revisión propia (Historia 1, Historia 2, …). '
+                  'Solo para stories: cada segmento son 2+ historias distintas, cada una '
+                  'con su foto y su veredicto. Cada item: {indice, titulo, texto, '
+                  'material_urls, material_meta, revision_veredicto, revision_json, '
+                  'revision_resumen, revision_at}. Vacío en piezas de una sola imagen.',
+    )
     REVISION_CHOICES = [
         ('sin_revisar', 'Sin revisar'),
         ('revisando', 'Revisando…'),

@@ -90,6 +90,7 @@ def _serialize(p: PublicacionPlanificada) -> dict:
         'estado': p.estado,
         'material_urls': p.material_urls,
         'material_meta': p.material_meta,
+        'segmentos': p.segmentos,
         'revision_veredicto': p.revision_veredicto,
         'revision_resumen': p.revision_resumen,
         'revision_json': p.revision_json,
@@ -193,21 +194,44 @@ def publicacion_detalle(request, pub_id: int):
     return JsonResponse({'success': True, 'publicacion': _serialize(pub)})
 
 
-def _run_revision_background(pub_id: int):
+def _run_revision_background(pub_id: int, indice=None):
     """Corre la revisión IA en un thread (la llamada al modelo tarda más que
     el timeout del cliente HTTP del backend Go — por eso va fire-and-forget y
-    Angélica ve el resultado por polling)."""
+    Angélica ve el resultado por polling). Si `indice` viene, revisa esa
+    historia (segmento) contra su propio texto; si no, la publicación entera."""
     try:
-        from .revision_service import revisar_material
+        from .revision_service import revisar_material, revisar_segmento
         pub = PublicacionPlanificada.objects.filter(id=pub_id).first()
-        if pub is not None:
+        if pub is None:
+            return
+        if indice is not None:
+            revisar_segmento(pub, indice)
+        else:
             revisar_material(pub)
     except Exception as exc:  # noqa: BLE001
-        logger.error(f'_run_revision_background #{pub_id}: {exc}', exc_info=True)
+        logger.error(f'_run_revision_background #{pub_id} seg={indice}: {exc}', exc_info=True)
         try:
-            PublicacionPlanificada.objects.filter(id=pub_id).update(revision_veredicto='sin_revisar')
+            _marcar_segmento_sin_revisar(pub_id, indice)
         except Exception:  # noqa: BLE001
             pass
+
+
+def _marcar_segmento_sin_revisar(pub_id, indice):
+    """Deja el veredicto en 'sin_revisar' si la revisión reventó, a nivel
+    publicación o del segmento que corresponda."""
+    pub = PublicacionPlanificada.objects.filter(id=pub_id).first()
+    if pub is None:
+        return
+    if indice is None:
+        pub.revision_veredicto = 'sin_revisar'
+        pub.save(update_fields=['revision_veredicto', 'updated_at'])
+        return
+    segmentos = pub.segmentos or []
+    for s in segmentos:
+        if isinstance(s, dict) and s.get('indice') == indice:
+            s['revision_veredicto'] = 'sin_revisar'
+    pub.segmentos = segmentos
+    pub.save(update_fields=['segmentos', 'updated_at'])
 
 
 @csrf_exempt
@@ -223,6 +247,20 @@ def publicacion_material(request, pub_id: int):
     if pub is None:
         return JsonResponse({'error': f'Publicación {pub_id} no existe'}, status=404)
 
+    # Índice de historia (segmento) opcional. Si viene, la foto y su revisión
+    # van a ESA historia; si no, a la publicación entera (piezas de 1 imagen).
+    indice = None
+    seg = None
+    seg_raw = (request.POST.get('segmento') or '').strip()
+    if seg_raw:
+        try:
+            indice = int(seg_raw)
+        except ValueError:
+            return JsonResponse({'error': 'segmento inválido'}, status=400)
+        seg = next((s for s in (pub.segmentos or []) if isinstance(s, dict) and s.get('indice') == indice), None)
+        if seg is None:
+            return JsonResponse({'error': f'La publicación no tiene la historia {indice}'}, status=400)
+
     archivos = request.FILES.getlist('files') or request.FILES.getlist('file')
     if not archivos:
         return JsonResponse({'error': 'No se recibió ningún archivo (campo "files")'}, status=400)
@@ -234,8 +272,7 @@ def publicacion_material(request, pub_id: int):
         logger.error(f'publicacion_material: storage Cloudinary no disponible ({exc})')
         return JsonResponse({'error': 'Almacenamiento de imágenes no disponible'}, status=503)
 
-    urls = list(pub.material_urls or [])
-    meta = list(pub.material_meta or [])
+    nuevas_urls, nuevas_meta = [], []
     for f in archivos:
         ext = ('.' + f.name.rsplit('.', 1)[-1].lower()) if '.' in f.name else ''
         if ext not in _EXT_IMAGEN:
@@ -254,15 +291,23 @@ def publicacion_material(request, pub_id: int):
         except Exception as exc:  # noqa: BLE001
             logger.error(f'publicacion_material: falló subir {f.name} ({exc})')
             return JsonResponse({'error': f'No se pudo subir {f.name}'}, status=502)
-        urls.append(url)
-        meta.append({'url': url, **dims})
+        nuevas_urls.append(url)
+        nuevas_meta.append({'url': url, **dims})
 
-    pub.material_urls = urls
-    pub.material_meta = meta
-    pub.revision_veredicto = 'revisando'
-    pub.save(update_fields=['material_urls', 'material_meta', 'revision_veredicto', 'updated_at'])
+    if seg is not None:
+        # Foto y revisión de ESTA historia.
+        seg['material_urls'] = list(seg.get('material_urls') or []) + nuevas_urls
+        seg['material_meta'] = list(seg.get('material_meta') or []) + nuevas_meta
+        seg['revision_veredicto'] = 'revisando'
+        pub.segmentos = pub.segmentos  # ya mutado in-place; explícito para claridad
+        pub.save(update_fields=['segmentos', 'updated_at'])
+    else:
+        pub.material_urls = list(pub.material_urls or []) + nuevas_urls
+        pub.material_meta = list(pub.material_meta or []) + nuevas_meta
+        pub.revision_veredicto = 'revisando'
+        pub.save(update_fields=['material_urls', 'material_meta', 'revision_veredicto', 'updated_at'])
 
     from threading import Thread
-    Thread(target=_run_revision_background, args=(pub.id,), daemon=True).start()
+    Thread(target=_run_revision_background, args=(pub.id, indice), daemon=True).start()
 
     return JsonResponse({'success': True, 'publicacion': _serialize(pub)})

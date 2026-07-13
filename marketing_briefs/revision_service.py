@@ -104,16 +104,11 @@ def _build_user_content(copy_json: dict, image_urls: list, titulo: str, canal: s
     return content
 
 
-def revisar_material(publicacion) -> dict:
-    """Revisa las imágenes ya subidas de una publicación. Devuelve el dict de
-    revisión y actualiza la publicación (revision_*). Best-effort.
-    """
-    from django.utils import timezone
+def _run_review(copy_para_revisar, image_urls, material_meta, titulo, canal, tipo) -> dict:
+    """Llama al modelo con visión y devuelve {veredicto, resumen, correcciones}.
+    Best-effort: cualquier fallo devuelve un veredicto 'sin_revisar'. No persiste
+    nada — el caller decide dónde guardar (publicación o segmento)."""
     from openai import OpenAI
-
-    image_urls = [u for u in (publicacion.material_urls or []) if isinstance(u, str) and u.startswith('http')]
-    if not image_urls:
-        return {"veredicto": "sin_revisar", "resumen": "No hay material para revisar.", "correcciones": []}
 
     api_key = getattr(settings, 'OPENROUTER_API_KEY', '')
     base_url = getattr(settings, 'OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
@@ -125,15 +120,10 @@ def revisar_material(publicacion) -> dict:
     model = getattr(settings, 'MARKETING_REVISION_LLM_MODEL', 'google/gemini-2.5-pro')
 
     if not api_key:
-        logger.warning('revisar_material: OPENROUTER_API_KEY no configurada')
-        _guardar(publicacion, 'sin_revisar', 'Revisión no disponible (falta configuración).', [], timezone)
-        return {"veredicto": "sin_revisar", "resumen": "Revisión no disponible.", "correcciones": []}
+        logger.warning('_run_review: OPENROUTER_API_KEY no configurada')
+        return {"veredicto": "sin_revisar", "resumen": "Revisión no disponible (falta configuración).", "correcciones": []}
 
-    content = _build_user_content(
-        publicacion.copy_json or {}, image_urls,
-        publicacion.titulo or publicacion.pieza_key, publicacion.canal, publicacion.tipo,
-        material_meta=publicacion.material_meta or [],
-    )
+    content = _build_user_content(copy_para_revisar, image_urls, titulo, canal, tipo, material_meta=material_meta or [])
 
     try:
         client = OpenAI(api_key=api_key, base_url=base_url)
@@ -151,20 +141,65 @@ def revisar_material(publicacion) -> dict:
         cleaned = raw.strip().removeprefix('```json').removeprefix('```').removesuffix('```').strip()
         data = json.loads(cleaned)
     except Exception as exc:  # noqa: BLE001 — la revisión nunca rompe la subida
-        logger.error(f'revisar_material: falló la revisión IA ({exc})')
-        _guardar(publicacion, 'sin_revisar',
-                 'No se pudo completar la revisión automática. Puedes publicar igual o volver a intentar.',
-                 [], timezone)
-        return {"veredicto": "sin_revisar", "resumen": "Error en la revisión.", "correcciones": []}
+        logger.error(f'_run_review: falló la revisión IA ({exc})')
+        return {"veredicto": "sin_revisar",
+                "resumen": "No se pudo completar la revisión automática. Puedes publicar igual o volver a intentar.",
+                "correcciones": []}
 
     veredicto = data.get('veredicto') or 'con_observaciones'
     if veredicto not in ('aprobado', 'con_observaciones'):
         veredicto = 'con_observaciones'
-    correcciones = data.get('correcciones') or []
-    resumen = data.get('resumen') or ''
+    return {"veredicto": veredicto, "resumen": data.get('resumen') or '', "correcciones": data.get('correcciones') or []}
 
-    _guardar(publicacion, veredicto, resumen, correcciones, timezone)
-    return {"veredicto": veredicto, "resumen": resumen, "correcciones": correcciones}
+
+def revisar_material(publicacion) -> dict:
+    """Revisa las imágenes ya subidas de una publicación (nivel publicación,
+    piezas de una sola imagen). Persiste en revision_*. Best-effort."""
+    from django.utils import timezone
+
+    image_urls = [u for u in (publicacion.material_urls or []) if isinstance(u, str) and u.startswith('http')]
+    if not image_urls:
+        return {"veredicto": "sin_revisar", "resumen": "No hay material para revisar.", "correcciones": []}
+
+    r = _run_review(
+        publicacion.copy_json or {}, image_urls, publicacion.material_meta or [],
+        publicacion.titulo or publicacion.pieza_key, publicacion.canal, publicacion.tipo,
+    )
+    _guardar(publicacion, r['veredicto'], r['resumen'], r['correcciones'], timezone)
+    return r
+
+
+def revisar_segmento(publicacion, indice: int) -> dict:
+    """Revisa la foto de UNA historia contra el texto de ESA historia (evalúa
+    correspondencia foto↔contenido de ese segmento). Persiste en el segmento."""
+    from django.utils import timezone
+
+    segmentos = publicacion.segmentos or []
+    seg = next((s for s in segmentos if isinstance(s, dict) and s.get('indice') == indice), None)
+    if seg is None:
+        return {"veredicto": "sin_revisar", "resumen": "Segmento no encontrado.", "correcciones": []}
+
+    image_urls = [u for u in (seg.get('material_urls') or []) if isinstance(u, str) and u.startswith('http')]
+    if not image_urls:
+        return {"veredicto": "sin_revisar", "resumen": "No hay material para revisar.", "correcciones": []}
+
+    copy_seg = {
+        'historia': seg.get('titulo') or f'Historia {indice}',
+        'texto_de_esta_historia': seg.get('texto') or '',
+        '_nota': 'Revisa SOLO esta historia: si la foto corresponde a lo que dice este texto, formato de historia (vertical 9:16), y calidad.',
+    }
+    r = _run_review(
+        copy_seg, image_urls, seg.get('material_meta') or [],
+        f"{publicacion.titulo or publicacion.pieza_key} · {seg.get('titulo') or ''}",
+        publicacion.canal, publicacion.tipo,
+    )
+    seg['revision_veredicto'] = r['veredicto']
+    seg['revision_resumen'] = r['resumen']
+    seg['revision_json'] = r['correcciones']
+    seg['revision_at'] = timezone.now().isoformat()
+    publicacion.segmentos = segmentos
+    publicacion.save(update_fields=['segmentos', 'updated_at'])
+    return r
 
 
 def _guardar(publicacion, veredicto, resumen, correcciones, timezone):
