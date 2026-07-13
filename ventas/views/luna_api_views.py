@@ -1764,6 +1764,68 @@ def pausa_alternativas(request):
     })
 
 
+@api_view(['GET'])
+@authentication_classes([LunaAPIKeyAuthentication])
+def experiencias_alternativas(request):
+    """Alternativas de horario de CUALQUIER experiencia (H-061) — generaliza el
+    botón de la bandeja de Pausa (H-059) a los demás casos.
+
+    GET /api/luna/experiencias/alternativas/?tipo=<tipo>&fecha=YYYY-MM-DD&personas=N
+
+      tipo (obligatorio): pausa | tina_sola | masaje_solo | noche_aguas_calientes
+                          (ritual | refugio → Fase 2, aún no disponibles → 400)
+      fecha (obligatorio, YYYY-MM-DD; también acepta expresiones NL)
+      personas (opcional, default 2, entero ≥ 1). Para masaje: N personas = N masajes.
+
+    Respuesta 200 (shape unificado, mismo espíritu que Pausa):
+    {
+      "tipo": "tina_sola", "fecha": "2026-07-14", "personas": 2,
+      "nombre_experiencia": "Tina",
+      "alternativas": [
+        {"titulo": "Tina Hidromasaje Llaima · 18:00",
+         "precio_total": 60000, "precio_con_descuento": 60000, "hay_descuento": false,
+         "texto_sugerido": "Tina ... a las 18:00 hrs para 2 personas, $60.000.",
+         "itinerario": [{"servicio": "Tina ...", "hora": "18:00"}]}
+      ]
+    }
+    `alternativas` vacía (200, no error) si ese día no hay nada. 400 si falta tipo/fecha,
+    tipo inválido o de Fase 2, o parámetros mal formados.
+    """
+    tipo = request.GET.get('tipo')
+    fecha = request.GET.get('fecha')
+    personas_raw = request.GET.get('personas', '2')
+
+    if not tipo:
+        return Response(
+            {'error': 'tipo es obligatorio (pausa|tina_sola|masaje_solo|noche_aguas_calientes)'},
+            status=status.HTTP_400_BAD_REQUEST)
+    if not fecha:
+        return Response(
+            {'error': 'fecha es obligatoria (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        personas = int(personas_raw)
+    except (TypeError, ValueError):
+        return Response(
+            {'error': 'personas debe ser un número entero'}, status=status.HTTP_400_BAD_REQUEST)
+    if personas < 1:
+        return Response(
+            {'error': 'personas debe ser >= 1'}, status=status.HTTP_400_BAD_REQUEST)
+
+    from whatsapp_agent import alternativas as alt_mod
+
+    try:
+        resultado = alt_mod.construir_alternativas(tipo, fecha, personas)
+    except Exception as e:  # noqa: BLE001 — no romper el endpoint por un error inesperado
+        logger.error(f'[Luna API] Error en experiencias_alternativas: {str(e)}', exc_info=True)
+        return Response({'error': f'error interno: {str(e)[:200]}'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    if resultado.get('error'):
+        return Response({'error': resultado['error']}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(resultado)
+
+
 # ============================================================================
 # HEALTH CHECK
 # ============================================================================

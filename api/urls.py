@@ -40,6 +40,9 @@ urlpatterns = [
 
     # Botón "buscar otro horario" en la bandeja (H-059): todas las alternativas de Pausa
     path('luna/pausa/alternativas/', luna_api_views.pausa_alternativas, name='luna-pausa-alternativas'),
+    # H-061: generalización del botón a los otros tipos (tina_sola, masaje_solo,
+    # noche_aguas_calientes; ritual/refugio en Fase 2). Un solo endpoint con ?tipo=
+    path('luna/experiencias/alternativas/', luna_api_views.experiencias_alternativas, name='luna-experiencias-alternativas'),
 
     # Admin endpoints (testing/debug)
     path('luna/admin/limpiar-conversacion/', luna_api_views.limpiar_conversacion_endpoint, name='luna-limpiar-conversacion'),

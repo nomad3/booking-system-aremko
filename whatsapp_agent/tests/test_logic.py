@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from whatsapp_agent import (
-    aprendizaje, ausencia, availability, escalation, grounding, packs, prompt, reservas_existentes,
+    alternativas, aprendizaje, ausencia, availability, escalation, grounding, packs, prompt,
+    reservas_existentes,
 )
 
 
@@ -536,6 +537,89 @@ def test_filtrar_reservas_elegibles():
     assert out[0]['fecha_principal'] == datetime(2026, 7, 4).date()
     assert out[0]['resumen_corto'] == 'Tina B (04-07-2026)'
     assert out[-1]['fecha_principal'] is None
+
+
+def test_alternativas_tipo_invalido():
+    """H-061: tipo desconocido y tipos de Fase 2 devuelven error (no revientan)."""
+    r = alternativas.construir_alternativas('xxx', '2026-07-14', 2)
+    assert r.get('error') and 'inválido' in r['error'], r
+    r2 = alternativas.construir_alternativas('ritual', '2026-07-14', 2)
+    assert r2.get('error') and 'Fase 2' in r2['error'], r2
+    r3 = alternativas.construir_alternativas('refugio', '2026-07-14', 2)
+    assert r3.get('error') and 'Fase 2' in r3['error'], r3
+
+
+def test_alternativas_tina_sola_shape():
+    """tina_sola: cada (tina, slot) es una alternativa; precio_total tal cual, sin descuento."""
+    fake = {'fecha': '2026-07-14', 'servicios': [
+        {'nombre': 'Tina Hidromasaje Llaima', 'precio_total': 60000, 'precio_por_persona': 30000,
+         'slots_libres': ['18:00', '16:00']},
+        {'nombre': 'Tina Hornopiren', 'precio_total': 50000, 'precio_por_persona': 25000,
+         'slots_libres': ['20:00']},
+    ]}
+    with patch('whatsapp_agent.alternativas.disponibilidad', return_value=fake):
+        r = alternativas.construir_alternativas('tina_sola', '2026-07-14', 2)
+    assert r['tipo'] == 'tina_sola' and r['nombre_experiencia'] == 'Tina', r
+    alts = r['alternativas']
+    assert len(alts) == 3, alts
+    # ordenadas por hora ascendente
+    horas = [a['itinerario'][0]['hora'] for a in alts]
+    assert horas == ['16:00', '18:00', '20:00'], horas
+    a0 = alts[0]
+    assert a0['precio_total'] == 60000 and a0['precio_con_descuento'] == 60000
+    assert a0['hay_descuento'] is False
+    assert '16:00' in a0['texto_sugerido'] and '2 personas' in a0['texto_sugerido']
+    assert a0['titulo'] == 'Tina Hidromasaje Llaima · 16:00'
+
+
+def test_alternativas_masaje_solo_precio_por_personas():
+    """masaje_solo: precio = precio_por_persona × personas (1 pers=1 masaje, 2=2 masajes)."""
+    fake = {'fecha': '2026-07-14', 'servicios': [
+        {'nombre': 'Masaje Relajación', 'precio_total': 30000, 'precio_por_persona': 30000,
+         'slots_libres': ['17:00']},
+    ]}
+    with patch('whatsapp_agent.alternativas.disponibilidad', return_value=fake):
+        r1 = alternativas.construir_alternativas('masaje_solo', '2026-07-14', 1)
+        r2 = alternativas.construir_alternativas('masaje_solo', '2026-07-14', 2)
+    assert r1['alternativas'][0]['precio_total'] == 30000, r1
+    assert '1 masaje ' in r1['alternativas'][0]['texto_sugerido'], r1['alternativas'][0]
+    # 2 personas → 2 masajes → doble precio
+    assert r2['alternativas'][0]['precio_total'] == 60000, r2
+    assert '2 masajes' in r2['alternativas'][0]['texto_sugerido'], r2['alternativas'][0]
+
+
+def test_alternativas_noche_aguas_calientes_shape():
+    """noche_aguas_calientes: usa disponibilidad_pack_cabana_tina; desayuno incluido en el texto."""
+    fake = {'fecha': '2026-07-14', 'personas': 2, 'opciones': [
+        {'cabana': {'nombre': 'Cabaña Tepa', 'hora_check_in': '16:00', 'precio_total': 110000},
+         'tina': {'nombre': 'Tina Llaima', 'hora': '18:00', 'precio_total': 50000},
+         'precio_total': 160000, 'precio_con_descuento': 160000, 'hay_descuento': False},
+    ]}
+    with patch('whatsapp_agent.packs.disponibilidad_pack_cabana_tina', return_value=fake):
+        r = alternativas.construir_alternativas('noche_aguas_calientes', '2026-07-14', 2)
+    assert r['nombre_experiencia'] == 'Noche de Aguas Calientes'
+    a = r['alternativas'][0]
+    assert a['precio_total'] == 160000
+    assert 'desayuno incluido' in a['texto_sugerido']
+    assert len(a['itinerario']) == 2  # cabaña + tina
+    assert a['itinerario'][0]['servicio'] == 'Cabaña Tepa'
+
+
+def test_alternativas_pausa_adapter():
+    """pausa: adapta disponibilidad_pack_tina_masaje(todas=True) al shape unificado."""
+    fake = {'fecha': '2026-07-14', 'personas': 2, 'alternativas': [
+        {'etiqueta': 'con hidromasaje',
+         'tina': {'nombre': 'Tina Llaima', 'hora': '11:30'},
+         'masaje': {'nombre': 'Masaje Relajación', 'hora': '14:15'},
+         'precio_total': 140000, 'precio_con_descuento': 110000, 'hay_descuento': True},
+    ]}
+    with patch('whatsapp_agent.packs.disponibilidad_pack_tina_masaje', return_value=fake):
+        r = alternativas.construir_alternativas('pausa', '2026-07-14', 2)
+    a = r['alternativas'][0]
+    assert a['precio_total'] == 140000 and a['precio_con_descuento'] == 110000
+    assert a['hay_descuento'] is True
+    assert 'con descuento de pack' in a['texto_sugerido']
+    assert len(a['itinerario']) == 2  # tina + masaje
 
 
 def _run():
