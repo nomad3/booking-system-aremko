@@ -24,10 +24,10 @@ logger = logging.getLogger(__name__)
 REVISION_SYSTEM_PROMPT = """Eres el revisor de contenido de Aremko Spa Boutique (Puerto Varas, Chile). Angélica, la community manager, te sube el material (foto o imágenes de un carrusel/historia) que preparó para una publicación, junto con el copy que debe acompañarla. Tu trabajo es revisarlo contra el manual de marca y devolverle correcciones CONCRETAS y accionables, como un director creativo que la quiere ayudar a publicar algo bueno — no elogios vacíos.
 
 QUÉ REVISAR (checklist Aremko):
-1. FORMATO SEGÚN EL CANAL (revísalo SIEMPRE, es de lo más importante): el contexto te dice el canal y tipo de la pieza.
-   - "story" (Instagram Stories): DEBE ser VERTICAL, proporción 9:16 (1080×1920). Si la foto es horizontal o cuadrada, publicada como historia saldría con bandas o recortada — es una corrección CRÍTICA. Dile que la reencuadre o tome/elija una vertical.
+1. FORMATO SEGÚN EL CANAL (revísalo SIEMPRE, es de lo más importante): el contexto te dice el canal y tipo de la pieza. Te doy las DIMENSIONES REALES de cada foto (ancho×alto en px, medidas al subir) — ÚSALAS, son exactas; NO estimes la proporción a ojo.
+   - "story" (Instagram Stories): DEBE ser VERTICAL, proporción 9:16 (1080×1920 aprox). Si las dimensiones reales dan horizontal o cuadrada, publicada como historia saldría con bandas o recortada — es una corrección CRÍTICA. Dile que la reencuadre o tome/elija una vertical.
    - "carrusel" o "post" (feed de Instagram): idealmente CUADRADA (1:1) o VERTICAL (4:5, 1080×1350). Una horizontal 16:9 se ve chica en el feed.
-   - Si no puedes deducir la proporción con certeza, dilo como observación, no inventes.
+   - Si para alguna imagen dice "dimensiones no disponibles", ahí sí evalúa con cautela y dilo como observación, no como crítica tajante.
 2. Espacio para el texto que va encima: esta pieza lleva un texto sobrepuesto (viene en el copy, campo texto_sugerido o caption). ¿Hay una zona despejada y de contraste suficiente en la foto para poner ese texto y que se lea? Si el texto caería sobre una zona cargada o clara donde no se leería, márcalo y sugiere dónde ubicarlo.
 3. Gancho visual: ¿la imagen atrae en el primer vistazo? ¿lo más potente está a la vista o escondido? Una foto que abre con el logo o algo genérico "hace scrollear".
 4. Texto legible: si la imagen ya lleva texto sobrepuesto, ¿se lee bien sobre el fondo? (texto claro sobre zonas claras = ilegible).
@@ -59,7 +59,25 @@ FORMATO DE SALIDA: JSON estricto, sin markdown, con esta forma EXACTA:
 Si no hay nada que corregir, "correcciones" es una lista vacía y "veredicto" es "aprobado"."""
 
 
-def _build_user_content(copy_json: dict, image_urls: list, titulo: str, canal: str, tipo: str) -> list:
+def _describir_formatos(image_urls: list, material_meta: list) -> str:
+    """Texto con las dimensiones REALES de cada foto (medidas al subir, no a
+    ojo). Para que el chequeo de formato del modelo sea exacto."""
+    by_url = {m.get('url'): m for m in (material_meta or []) if isinstance(m, dict)}
+    lineas = []
+    for i, u in enumerate(image_urls, start=1):
+        m = by_url.get(u) or {}
+        w, h = m.get('width'), m.get('height')
+        if w and h:
+            ratio = m.get('ratio') or f'{w / h:.2f}'
+            orient = m.get('orientacion') or ''
+            lineas.append(f'- Imagen {i}: {w}×{h} px → {orient} ({ratio}).')
+        else:
+            lineas.append(f'- Imagen {i}: dimensiones no disponibles (evalúa el formato a ojo con cautela).')
+    return '\n'.join(lineas)
+
+
+def _build_user_content(copy_json: dict, image_urls: list, titulo: str, canal: str,
+                        tipo: str, material_meta: list = None) -> list:
     """Arma el content multimodal: texto del contexto + las imágenes."""
     contexto = {
         "pieza": titulo,
@@ -74,6 +92,9 @@ def _build_user_content(copy_json: dict, image_urls: list, titulo: str, canal: s
                 "Revisa el material que subió Angélica para esta publicación. "
                 "Contexto y copy de la pieza:\n\n"
                 + json.dumps(contexto, ensure_ascii=False, indent=2)
+                + "\n\nDIMENSIONES REALES de cada foto (medidas al subir — usa ESTO para el "
+                  "chequeo de formato, NO lo estimes a ojo):\n"
+                + _describir_formatos(image_urls, material_meta)
                 + f"\n\nSe adjuntan {len(image_urls)} imagen(es). Devuelve el JSON de revisión."
             ),
         }
@@ -96,7 +117,12 @@ def revisar_material(publicacion) -> dict:
 
     api_key = getattr(settings, 'OPENROUTER_API_KEY', '')
     base_url = getattr(settings, 'OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
-    model = getattr(settings, 'MARKETING_REVISION_LLM_MODEL', 'google/gemini-2.5-flash')
+    # Modelo de MÁXIMA calidad visual, dedicado SOLO a esta revisión (no lo
+    # comparte con el brief ni con Luna). Gemini 2.5 Pro es el más fuerte en
+    # razonamiento espacial/composición vía OpenRouter; el costo a ~10-20
+    # fotos/semana es de centavos. Override por env si algún día se quiere
+    # cambiar sin tocar código.
+    model = getattr(settings, 'MARKETING_REVISION_LLM_MODEL', 'google/gemini-2.5-pro')
 
     if not api_key:
         logger.warning('revisar_material: OPENROUTER_API_KEY no configurada')
@@ -106,6 +132,7 @@ def revisar_material(publicacion) -> dict:
     content = _build_user_content(
         publicacion.copy_json or {}, image_urls,
         publicacion.titulo or publicacion.pieza_key, publicacion.canal, publicacion.tipo,
+        material_meta=publicacion.material_meta or [],
     )
 
     try:

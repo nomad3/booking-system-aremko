@@ -100,6 +100,12 @@ class PublicacionPlanificada(models.Model):
         default=list, blank=True,
         help_text='URLs del material subido por Angélica (fotos/carruseles en Cloudinary).',
     )
+    material_meta = models.JSONField(
+        default=list, blank=True,
+        help_text='Dimensiones reales por foto (lista alineada a material_urls): '
+                  '{url, width, height, ratio, orientacion}. Medido al subir para que '
+                  'el chequeo de formato (9:16, 4:5, 1:1) sea exacto, no "a ojo" del modelo.',
+    )
     REVISION_CHOICES = [
         ('sin_revisar', 'Sin revisar'),
         ('revisando', 'Revisando…'),

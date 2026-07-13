@@ -25,6 +25,49 @@ _MAX_BYTES = 16 * 1024 * 1024  # 16 MB por archivo, mismo tope que la bandeja.
 ESTADOS_VALIDOS = {choice[0] for choice in PublicacionPlanificada.ESTADO_CHOICES}
 
 
+def _ratio_label(w: int, h: int) -> tuple:
+    """Devuelve (ratio_str, orientacion) a partir del ancho×alto REAL de la
+    foto. Esto hace que el chequeo de formato (historia 9:16, feed 4:5/1:1)
+    sea exacto y no dependa de que el modelo lo estime a ojo."""
+    if not w or not h:
+        return '', ''
+    r = w / h
+    if abs(r - 9 / 16) < 0.06:      # 0.5625
+        return '9:16', 'vertical'
+    if abs(r - 4 / 5) < 0.06:       # 0.80
+        return '4:5', 'vertical'
+    if abs(r - 1) < 0.06:
+        return '1:1', 'cuadrada'
+    if abs(r - 16 / 9) < 0.12:      # 1.78
+        return '16:9', 'horizontal'
+    if r < 0.95:
+        return f'{r:.2f}', 'vertical'
+    if r > 1.05:
+        return f'{r:.2f}', 'horizontal'
+    return f'{r:.2f}', 'cuadrada'
+
+
+def _medir_imagen(f) -> dict:
+    """Lee ancho×alto de un archivo subido sin consumir el stream (best-effort).
+    HEIC/HEIF u otros formatos que Pillow no abra devuelven dict vacío — el
+    flujo sigue igual, solo se pierde el chequeo de proporción de esa foto."""
+    try:
+        from PIL import Image
+        f.seek(0)
+        with Image.open(f) as img:
+            w, h = img.size
+        ratio, orientacion = _ratio_label(w, h)
+        return {'width': int(w), 'height': int(h), 'ratio': ratio, 'orientacion': orientacion}
+    except Exception as exc:  # noqa: BLE001 — nunca bloquea la subida
+        logger.info(f'_medir_imagen: no se pudo medir ({exc})')
+        return {}
+    finally:
+        try:
+            f.seek(0)
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def _api_key_ok(request) -> bool:
     expected = getattr(settings, 'AUTOMATION_API_KEY', '') or ''
     provided = request.headers.get('X-API-KEY', '')
@@ -45,6 +88,7 @@ def _serialize(p: PublicacionPlanificada) -> dict:
         'tiempo_estimado': p.tiempo_estimado,
         'estado': p.estado,
         'material_urls': p.material_urls,
+        'material_meta': p.material_meta,
         'revision_veredicto': p.revision_veredicto,
         'revision_resumen': p.revision_resumen,
         'revision_json': p.revision_json,
@@ -190,6 +234,7 @@ def publicacion_material(request, pub_id: int):
         return JsonResponse({'error': 'Almacenamiento de imágenes no disponible'}, status=503)
 
     urls = list(pub.material_urls or [])
+    meta = list(pub.material_meta or [])
     for f in archivos:
         ext = ('.' + f.name.rsplit('.', 1)[-1].lower()) if '.' in f.name else ''
         if ext not in _EXT_IMAGEN:
@@ -199,17 +244,22 @@ def publicacion_material(request, pub_id: int):
             )
         if f.size and f.size > _MAX_BYTES:
             return JsonResponse({'error': f'{f.name} supera el máximo de 16 MB.'}, status=400)
+        # Medir ancho×alto ANTES de subir (mientras el archivo está en memoria).
+        dims = _medir_imagen(f)
         nombre = f'publicaciones/{pub.semana_inicio.isoformat()}/{uuid.uuid4().hex}{ext}'
         try:
             guardado = storage.save(nombre, f)
-            urls.append(storage.url(guardado))
+            url = storage.url(guardado)
         except Exception as exc:  # noqa: BLE001
             logger.error(f'publicacion_material: falló subir {f.name} ({exc})')
             return JsonResponse({'error': f'No se pudo subir {f.name}'}, status=502)
+        urls.append(url)
+        meta.append({'url': url, **dims})
 
     pub.material_urls = urls
+    pub.material_meta = meta
     pub.revision_veredicto = 'revisando'
-    pub.save(update_fields=['material_urls', 'revision_veredicto', 'updated_at'])
+    pub.save(update_fields=['material_urls', 'material_meta', 'revision_veredicto', 'updated_at'])
 
     from threading import Thread
     Thread(target=_run_revision_background, args=(pub.id,), daemon=True).start()
