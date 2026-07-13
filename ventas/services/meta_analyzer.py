@@ -73,7 +73,7 @@ Tu tarea: genera un análisis JSON ejecutivo con esta estructura EXACTA:
   "acciones_recomendadas_esta_semana": [
     {
       "accion": "Acción concreta 1",
-      "responsable_sugerido": "Jorge | Daniela | Equipo",
+      "responsable_sugerido": "Jorge | Angélica | Equipo",
       "esfuerzo": "bajo | medio | alto",
       "impacto_esperado": "1 frase",
       "metrica_a_revisar_proxima_semana": "Métrica específica para validar si funcionó"

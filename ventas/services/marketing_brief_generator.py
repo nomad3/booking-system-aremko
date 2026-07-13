@@ -39,7 +39,7 @@ def _read_doc(rel_path: str) -> str:
         return ''
 
 
-SYSTEM_PROMPT = """Eres el director de marketing y planificación comercial de Aremko Spa Boutique (Puerto Varas, Chile). Cada lunes 10 AM generas el brief semanal — el documento maestro que ordena el trabajo de toda la semana para Jorge (dueño), Daniela (manager de redes) y el equipo.
+SYSTEM_PROMPT = """Eres el director de marketing y planificación comercial de Aremko Spa Boutique (Puerto Varas, Chile). Cada lunes 10 AM generas el brief semanal — el documento maestro que ordena el trabajo de toda la semana para Jorge (dueño), Angélica (manager de redes) y el equipo.
 
 NATURALEZA DEL BRIEF: el brief NO es un calendario simple. Es un análisis ejecutivo + diagnóstico cruzado de TODAS las fuentes de datos del negocio (web, redes, paid, encuestas, reviews, pipeline comercial) + planificación operativa concreta + CONCEPTOS de contenido bien fundamentados. Su rol: que cualquier persona del equipo Aremko que lo abra el lunes en la mañana entienda el estado del negocio y sepa exactamente qué tiene que hacer cada día.
 
@@ -62,7 +62,7 @@ REGLAS DE PRODUCCIÓN DE COPY:
 - Para Reels: estructura 5 partes (gancho 4-7s · contexto · moraleja · solución · CTA con palabra clave)
 - Citar texto real del cliente cuando esté disponible (mejor que copy inventado)
 - UTMs siempre en links: el playbook tiene la convención
-- Cada draft debe tener estimación de tiempo de producción (ej: "30 min Daniela") y responsable
+- Cada draft debe tener estimación de tiempo de producción (ej: "30 min Angélica") y responsable
 
 ANÁLISIS CRUZADO REQUERIDO:
 - Cruzar siempre Voz del Cliente (encuestas + reviews) con datos de tráfico web (GA4) y redes (Meta) para identificar gaps específicos
@@ -372,7 +372,7 @@ DATOS:
   ],
 
   "acciones_paid_ads_recomendadas": [
-    {{"accion": "Pausar campaña X|Crear nueva con objective Y|Cambiar segmentación de Z", "responsable": "Jorge|Daniela", "esfuerzo": "bajo|medio|alto", "razon": "Datos concretos del snapshot Meta", "metrica_a_mover": "..."}}
+    {{"accion": "Pausar campaña X|Crear nueva con objective Y|Cambiar segmentación de Z", "responsable": "Jorge|Angélica", "esfuerzo": "bajo|medio|alto", "razon": "Datos concretos del snapshot Meta", "metrica_a_mover": "..."}}
   ],
 
   "alertas_operativas_no_marketing": [
@@ -481,7 +481,7 @@ Devuelve SOLO este JSON:
 {{
   "gbp_post": {{
     "necesario_esta_semana": true,
-    "responsable": "Daniela",
+    "responsable": "Angélica",
     "tiempo_estimado": "20 min",
     "texto": "Copy listo para pegar en Google Business Profile (max 1500 chars, sin emojis)",
     "url_cta": "URL con UTM completo (del concepto)",
@@ -489,7 +489,7 @@ Devuelve SOLO este JSON:
   }},
   "reel_martes": {{
     "necesario_esta_semana": true,
-    "responsable": "Daniela",
+    "responsable": "Angélica",
     "tiempo_estimado": "1.5 horas (grabación + edición + caption)",
     "concepto": "La idea en 1 frase (del concepto del analista)",
     "filtro_5_50": "Por qué pasa el filtro",
@@ -508,7 +508,7 @@ Devuelve SOLO este JSON:
   }},
   "carrusel_miercoles": {{
     "necesario_esta_semana": true,
-    "responsable": "Daniela",
+    "responsable": "Angélica",
     "tiempo_estimado": "2 horas",
     "concepto": "...",
     "numero_de_slides": 6,
@@ -520,7 +520,7 @@ Devuelve SOLO este JSON:
   }},
   "reel_jueves": {{
     "necesario_esta_semana": true,
-    "responsable": "Daniela",
+    "responsable": "Angélica",
     "tiempo_estimado": "1.5 horas",
     "concepto": "...",
     "guion": [

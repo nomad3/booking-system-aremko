@@ -14,11 +14,11 @@ logger = logging.getLogger(__name__)
 # Día de la semana (offset desde el lunes) por pieza fija del brief.
 PIEZAS_FIJAS = [
     # (pieza_key, canal, tipo, offset_dias, responsable_default)
-    ('gbp_post', 'GBP', 'post', 0, 'Daniela'),
-    ('reel_martes', 'Instagram', 'reel', 1, 'Daniela'),
-    ('carrusel_miercoles', 'Instagram', 'carrusel', 2, 'Daniela'),
+    ('gbp_post', 'GBP', 'post', 0, 'Angélica'),
+    ('reel_martes', 'Instagram', 'reel', 1, 'Angélica'),
+    ('carrusel_miercoles', 'Instagram', 'carrusel', 2, 'Angélica'),
     ('email_engaged', 'Email', 'email', 2, 'Jorge'),
-    ('reel_jueves', 'Instagram', 'reel', 3, 'Daniela'),
+    ('reel_jueves', 'Instagram', 'reel', 3, 'Angélica'),
 ]
 
 DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
@@ -103,7 +103,7 @@ def explode_brief_to_publicaciones(semana_inicio, brief: dict) -> int:
             'story',
             semana_inicio + timedelta(days=offset),
             story,
-            'Daniela',
+            'Angélica',
         )
 
     logger.info(f'explode_brief: {procesadas} publicaciones creadas/actualizadas para {semana_inicio}')

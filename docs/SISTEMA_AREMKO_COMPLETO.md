@@ -748,7 +748,7 @@ Detallado en 1.4 y 2.2. Resumen: 100% cobertura de conversiones, dedup automáti
 `meta_analyzer.py` corre paralelo al snapshot Meta. Procesa el JSON crudo y produce:
 - Alertas: campañas con CPM creciendo >50% en 7 días, posts con engagement <5%, gastos sin retorno.
 - Oportunidades: posts virales (engagement >15% del promedio) replicables, audiencias con CTR alto.
-- Acciones recomendadas con responsable asignado (Jorge / Daniela).
+- Acciones recomendadas con responsable asignado (Jorge / Angélica).
 
 ### Análisis IA de encuestas (VoC)
 
