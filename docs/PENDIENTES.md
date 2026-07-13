@@ -5,7 +5,7 @@ ELIMINA de la lista (git guarda la historia); los IDs `P-xx` son estables y no s
 reutilizan. Para agregar: "agrega a pendientes: …". Para cerrar: "listo el P-xx".
 Claude la revisa al inicio de sesión y en cada wrapup.
 
-_Última revisión: 2026-07-11_
+_Última revisión: 2026-07-13_
 
 ## Web y marketing
 
@@ -72,3 +72,21 @@ _Última revisión: 2026-07-11_
     ($75.000 para 3 personas) en el admin.
 15. **P-15 · WhatsApp Cloud API / Meta** — Destrabar App Review (decidir App propio
     vs BSP) y rotar el APP_SECRET de la bandeja de Instagram.
+
+## Asistente de Publicaciones (community manager)
+
+> Este módulo (cola semanal + revisión IA de material + publicar en un clic) se
+> está perfilando como **producto vendible por sí mismo** — encaja con el M17
+> "Asistente de Publicaciones" del catálogo Datamatic Hospitality. Diseñar
+> multi-tenant desde ya (los destinos GBP/IG y la ficha ya salen de constantes
+> aisladas, pensadas para mover a config del tenant). Ver `[[project_datamatic_hospitality_modulos]]`.
+
+17. **P-17 · Revisión por slide en carruseles** — Extender la revisión-por-segmento
+    (hoy solo stories: cada Historia con su foto+veredicto) a los carruseles: cada
+    slide con su propia foto y revisión de correspondencia foto↔texto del slide.
+    Mismo mecanismo `segmentos` ya construido para historias; falta poblar segmentos
+    desde `slides` del brief y renderizar el uploader por slide.
+18. **P-18 · Revisión de reels / videos** — Hoy los reels quedan fuera de la Fase 2
+    (solo imágenes). Revisar video: extraer fotogramas clave y evaluar contra el
+    guion (gancho en los primeros segundos, tomas sugeridas, coherencia con el copy).
+    Fase posterior — más compleja (extracción + varios frames por reel).
