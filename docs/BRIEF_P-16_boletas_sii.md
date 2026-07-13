@@ -1,21 +1,56 @@
 # BRIEF P-16 · Boletas electrónicas SII automáticas (SimpleAPI)
 
-_Estado al 2026-07-12 (noche) — **CERTIFICACIÓN EN CURSO**: postulación SII
+_Estado al 2026-07-13 (domingo) — **CERTIFICACIÓN EN CURSO**: postulación SII
 aceptada, credenciales verificadas, CAF cert 1-50 cargado, y las **5 boletas
 del set TIMBRADAS** (folios 1-5, incluye caso exento y unidad Kg, referencias
-SET/CASO-N). ÚNICO pendiente: el **envío del sobre EnvioBoleta** — el SII cert
-responde `500 Internal Server Error` en `/api/v1/envio/enviar` de SimpleAPI
-(4 intentos, sábado PM; reintento nocturno programado). El comando
-`ejecutar_set_pruebas` es idempotente: reutiliza las boletas timbradas y solo
-reintenta el envío. Bitácora completa de cada corrida en el admin: Boletas →
-caso `__LOG__`. Si persiste el lunes → contactar soporte SimpleAPI
-(contacto@simpleapi.cl, +56 9 7555 3937) citando el JSON del error.
+SET/CASO-N; sobre EnvioBoleta bien formado — verificado en la bitácora, carátula
+RutEmisor/RutEnvia/RutReceptor 60803000-K/FchResol 2026-07-12/NroResol 0/NroDTE 5
+todo correcto). ÚNICO pendiente: el **envío del sobre** — el paso
+`/api/v1/envio/enviar` de SimpleAPI devuelve `500` del SII (7 intentos entre
+sábado PM y domingo PM, idénticos).
+
+**Diagnóstico afinado 2026-07-13**: la API de boletas del SII **NO está caída**
+— `apicert.sii.cl/recursos/v1/boleta.electronica.semilla` responde HTTP 200
+(cert y prod). Por lo tanto el 500 en la recepción del envío se debe a una de
+dos causas: (a) MÁS PROBABLE — la habilitación de *recepción* de boletas de la
+empresa aún se está propagando en el backend del SII (postulación fue el
+sábado; suele tardar hasta un día hábil → debería resolverse solo el lunes); o
+(b) ruteo de boletas-cert de SimpleAPI apuntando a un endpoint viejo (necesita
+su soporte). El comando `ejecutar_set_pruebas` es idempotente: reutiliza las
+boletas timbradas y solo reintenta el envío. Bitácora completa de cada corrida
+en el admin: Boletas → caso `__LOG__`.
+
+**Reintento programado: lunes AM** (mejor momento: propagación completa +
+soporte SimpleAPI disponible si falla). Si el lunes sigue 500 → correo a
+soporte SimpleAPI (contacto@simpleapi.cl, +56 9 7555 3937) con la evidencia:
+sobre válido + SII API arriba (semilla 200) + envío 500. Borrador del correo
+al final de este brief.
+
 Comandos clave: `configurar_emisor` (datos oficiales, sin args),
 `solicitar_caf [--cantidad N] [--produccion]`, `ejecutar_set_pruebas
 [--solo-generar] [--regenerar]`.
 ⚠️ Lección Render: jobs con `shell -c` complejos salen 0 SIN ejecutar; deploy
 live se verifica por COMMIT (`render deploys list`), no por URL.
 F1 (operación diaria) sigue en ambiente **simulado**, sin cambios._
+
+---
+
+## Borrador correo a soporte SimpleAPI (si el lunes persiste el 500)
+
+> **Asunto:** Error 500 del SII al enviar EnvioBoleta en certificación (v1/envio/enviar, Tipo 2, Ambiente 0)
+>
+> Hola. Certificando boleta electrónica para AREMKO HOTEL SPA (RUT 76485192-7,
+> firmante/certificado 7604892-4, postulación aceptada 12-07-2026). Con su API:
+> generamos folios CAF tipo 39 cert (OK), timbramos las 5 boletas del set (OK), y
+> generamos el sobre EnvioBOLETA (bien formado). Pero
+> `POST /api/v1/envio/enviar` con `{"Tipo":2,"Ambiente":0}`
+> responde HTTP 400 con cuerpo:
+> `{"estado":"ERROR","errores":"The remote server returned an error: (500) Internal Server Error.","trackId":-999999,"rutEnvia":null}`
+> — idéntico en 7 intentos entre el 12 y 13 de julio. Verificamos que la API de
+> boletas del SII está operativa (`apicert.sii.cl/.../boleta.electronica.semilla`
+> responde 200). ¿Es un problema conocido de recepción de boletas en cert, un
+> tema de habilitación de la empresa que deba propagar, o algo del ruteo por su
+> parte? Gracias.
 
 ## Contexto y alcance tributario (confirmado por Jorge 2026-07-11)
 
