@@ -79,6 +79,7 @@ def _serialize(p: PublicacionPlanificada) -> dict:
         'id': p.id,
         'semana_inicio': p.semana_inicio.isoformat(),
         'dia': p.dia.isoformat(),
+        'hora_sugerida': p.hora_sugerida,
         'canal': p.canal,
         'tipo': p.tipo,
         'pieza_key': p.pieza_key,

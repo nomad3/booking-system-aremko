@@ -82,6 +82,11 @@ class PublicacionPlanificada(models.Model):
 
     semana_inicio = models.DateField(db_index=True, help_text='Lunes de la semana del brief.')
     dia = models.DateField(db_index=True, help_text='Día planificado de publicación.')
+    hora_sugerida = models.CharField(
+        max_length=5, blank=True, default='',
+        help_text='Mejor hora para publicar (HH:MM), tomada del calendario del brief. '
+                  'Sugerencia de alcance, no una obligación.',
+    )
     canal = models.CharField(max_length=40, help_text='Instagram | Instagram Stories | GBP | Email | Facebook')
     tipo = models.CharField(max_length=20, help_text='reel | carrusel | story | post | email')
     pieza_key = models.CharField(
