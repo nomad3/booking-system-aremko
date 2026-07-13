@@ -540,13 +540,61 @@ def test_filtrar_reservas_elegibles():
 
 
 def test_alternativas_tipo_invalido():
-    """H-061: tipo desconocido y tipos de Fase 2 devuelven error (no revientan)."""
+    """H-061: tipo desconocido devuelve error (no revienta)."""
     r = alternativas.construir_alternativas('xxx', '2026-07-14', 2)
     assert r.get('error') and 'inválido' in r['error'], r
-    r2 = alternativas.construir_alternativas('ritual', '2026-07-14', 2)
-    assert r2.get('error') and 'Fase 2' in r2['error'], r2
-    r3 = alternativas.construir_alternativas('refugio', '2026-07-14', 2)
-    assert r3.get('error') and 'Fase 2' in r3['error'], r3
+
+
+def test_alternativas_ritual_varia_slot_masaje():
+    """Fase 2: Ritual precio FIJO; cada slot del Programa libre es una alternativa (mismo
+    cabaña+tina, varía la hora del masaje)."""
+    base = {'fecha': '2026-07-16', 'disponible': True, 'personas': 2, 'precio_total': 210000,
+            'es_domjue': True,
+            'itinerario': {'cabana': {'nombre': 'Cabaña Tepa', 'hora_check_in': '16:00'},
+                           'tina': {'nombre': 'Tina Llaima', 'hora': '18:00'},
+                           'masaje': {'nombre': 'Masaje Relajación', 'hora': '15:30'},
+                           'desayuno': 'Desayuno'}}
+    masajes = {'servicios': [{'nombre': 'Masaje Relajación',
+                              'slots_libres': ['15:30', '18:00', '20:30', '13:00']}]}  # 13:00 no es del programa
+    with patch('whatsapp_agent.packs.disponibilidad_ritual', return_value=base), \
+         patch('whatsapp_agent.alternativas.disponibilidad', return_value=masajes):
+        r = alternativas.construir_alternativas('ritual', '2026-07-16', 2)
+    alts = r['alternativas']
+    assert len(alts) == 3, alts  # solo 3 del programa (13:00 se descarta)
+    assert all(a['precio_total'] == 210000 and a['precio_con_descuento'] == 210000 for a in alts)
+    assert all(a['hay_descuento'] is False for a in alts)
+    horas_masaje = [a['itinerario'][2]['hora'] for a in alts]  # masaje = 3a línea
+    assert horas_masaje == ['15:30', '18:00', '20:30'], horas_masaje
+    assert 'promoción domingo a jueves' in alts[0]['texto_sugerido']
+
+
+def test_alternativas_refugio_dos_noches():
+    """Fase 2: Refugio $290k plano, 2 tinas (una por noche) + masaje primera noche variando slot."""
+    base = {'fecha': '2026-07-16', 'fecha_salida': '2026-07-18', 'disponible': True,
+            'personas': 2, 'noches': 2, 'precio_total': 290000,
+            'itinerario': {'cabana': {'nombre': 'Cabaña Tepa', 'hora_check_in': '16:00'},
+                           'tina': {'nombre': 'Tina Llaima', 'hora': '18:00'},
+                           'tina2': {'nombre': 'Tina Osorno', 'hora': '19:00'},
+                           'masaje': {'nombre': 'Masaje Relajación', 'hora': '15:30'},
+                           'desayuno': 'Desayuno'}}
+    masajes = {'servicios': [{'nombre': 'Masaje Relajación', 'slots_libres': ['18:00', '21:45']}]}
+    with patch('whatsapp_agent.packs.disponibilidad_refugio', return_value=base), \
+         patch('whatsapp_agent.alternativas.disponibilidad', return_value=masajes):
+        r = alternativas.construir_alternativas('refugio', '2026-07-16', 2)
+    alts = r['alternativas']
+    assert len(alts) == 2, alts  # 18:00 y 21:45 (ambos del programa)
+    assert all(a['precio_total'] == 290000 for a in alts)
+    a0 = alts[0]
+    assert len(a0['itinerario']) == 4  # cabaña + tina1 + tina2 + masaje
+    assert '2 noches' in a0['texto_sugerido'] and 'salida 2026-07-18' in a0['texto_sugerido']
+
+
+def test_alternativas_ritual_no_disponible():
+    """Ritual sin disponibilidad → alternativas vacías (200, no error)."""
+    base = {'fecha': '2026-07-16', 'disponible': False, 'nota': 'no hay cabañas'}
+    with patch('whatsapp_agent.packs.disponibilidad_ritual', return_value=base):
+        r = alternativas.construir_alternativas('ritual', '2026-07-16', 2)
+    assert r.get('alternativas') == [] and not r.get('error'), r
 
 
 def test_alternativas_tina_sola_shape():

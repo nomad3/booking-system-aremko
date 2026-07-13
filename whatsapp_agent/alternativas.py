@@ -6,9 +6,13 @@ Generaliza el endpoint de Pausa (H-059) a los otros casos. El botón de la bande
 concretas, cada una con un `texto_sugerido` listo para pegar en el borrador — sin
 depender de que Luna interprete "¿más tarde?".
 
-FASE 1 (este archivo): pausa, tina_sola, masaje_solo, noche_aguas_calientes.
-FASE 2 (pendiente): ritual, refugio (necesitan variar los 4 slots de masaje del
-Programa + la restricción de misma cabaña 2 noches).
+FASE 1: pausa, tina_sola, masaje_solo, noche_aguas_calientes.
+FASE 2 (2026-07-13): ritual, refugio. Ambos tienen precio FIJO (Ritual $210k
+dom-jue / $240k vie-sáb; Refugio $290k plano) e itinerario armado por
+packs.disponibilidad_ritual/refugio; la dimensión "horario" que varía es el
+SLOT DE MASAJE (uno de los 4 del Programa 15:30/18:00/20:30/21:45 que esté
+libre) — cada slot libre es una alternativa, con la misma cabaña+tina y el
+mismo precio. Refugio: masaje solo la primera noche.
 
 Shape unificado de cada alternativa:
   {
@@ -27,10 +31,12 @@ Nota de negocio (confirmada por Jorge 2026-07-06):
   Programa Ritual/Refugio.
 - Tina: se consulta con las personas reales (la tina debe tener cupo para el grupo).
 """
-from .availability import disponibilidad
+from .availability import disponibilidad, _parse_fecha, MASAJE_SLOTS_PROGRAMA_MIN
 from .grounding import formatear_precio
 from . import packs
 
+# Fase 1 (simples) + Fase 2 (ritual/refugio). Se conservan los subgrupos como
+# referencia histórica; TODOS pasan por _BUILDERS.
 TIPOS_FASE1 = ('pausa', 'tina_sola', 'masaje_solo', 'noche_aguas_calientes')
 TIPOS_FASE2 = ('ritual', 'refugio')
 TIPOS_VALIDOS = TIPOS_FASE1 + TIPOS_FASE2
@@ -168,11 +174,88 @@ def _pausa(fecha, personas):
     return {'fecha': res.get('fecha'), 'alternativas': alts[:MAX_ALTERNATIVAS]}
 
 
+# ---------------------------------------------------------------------------
+# ritual / refugio (Fase 2): precio fijo, varía el slot de masaje del Programa
+# ---------------------------------------------------------------------------
+
+def _slots_masaje_programa_libres(f, personas=2):
+    """Horas de los 4 slots del Programa (15:30/18:00/20:30/21:45) LIBRES para
+    masaje de `personas` ese día, ordenadas. Reusa la misma disponibilidad que
+    usa el Ritual/Refugio (incluir_slots_programa=True)."""
+    masajes = disponibilidad(f, personas, 'masaje', limite=None,
+                             incluir_slots_programa=True).get('servicios', [])
+    libres = set()
+    for m in masajes:
+        for s in (m.get('slots_libres') or []):
+            mn = packs.hhmm_a_min(s)
+            if mn in MASAJE_SLOTS_PROGRAMA_MIN:
+                libres.add(mn)
+    return [packs.min_a_hhmm(x) for x in sorted(libres)]
+
+
+def _ritual(fecha, personas):
+    base = packs.disponibilidad_ritual(fecha)
+    if base.get('error'):
+        return {'error': base['error']}
+    if not base.get('disponible'):
+        return {'fecha': base.get('fecha'), 'alternativas': []}
+    itin = base['itinerario']
+    cab, tina, masaje = itin['cabana'], itin['tina'], itin['masaje']
+    precio = int(base['precio_total'])
+    promo = ' (precio promoción domingo a jueves)' if base.get('es_domjue') else ''
+    f = _parse_fecha(base['fecha'])
+    slots = _slots_masaje_programa_libres(f, 2) or [masaje['hora']]
+    alts = []
+    for hora_masaje in slots:
+        texto = (f"Ritual del Río en {cab['nombre']} (check-in {cab['hora_check_in']}): "
+                 f"tina {tina['nombre']} a las {tina['hora']} hrs y masaje a las {hora_masaje} hrs, "
+                 f"desayuno incluido, {formatear_precio(precio)} para dos{promo}.")
+        alts.append(_alt(
+            titulo=f"Ritual · masaje {hora_masaje}",
+            precio_total=precio, precio_con_descuento=precio, hay_descuento=False,
+            texto_sugerido=texto,
+            itinerario=[{'servicio': cab['nombre'], 'hora': cab['hora_check_in']},
+                        {'servicio': tina['nombre'], 'hora': tina['hora']},
+                        {'servicio': masaje['nombre'], 'hora': hora_masaje}]))
+    return {'fecha': base['fecha'], 'alternativas': alts}
+
+
+def _refugio(fecha, personas):
+    base = packs.disponibilidad_refugio(fecha)
+    if base.get('error'):
+        return {'error': base['error']}
+    if not base.get('disponible'):
+        return {'fecha': base.get('fecha'), 'alternativas': []}
+    itin = base['itinerario']
+    cab, tina1, tina2, masaje = itin['cabana'], itin['tina'], itin['tina2'], itin['masaje']
+    precio = int(base['precio_total'])
+    f = _parse_fecha(base['fecha'])
+    slots = _slots_masaje_programa_libres(f, 2) or [masaje['hora']]  # masaje = primera noche
+    alts = []
+    for hora_masaje in slots:
+        texto = (f"Refugio Aremko: 2 noches en {cab['nombre']} (llegada {base['fecha']}, "
+                 f"salida {base.get('fecha_salida')}). Tina cada día "
+                 f"(noche 1 {tina1['nombre']} {tina1['hora']} hrs, noche 2 {tina2['nombre']} "
+                 f"{tina2['hora']} hrs), masaje la primera noche a las {hora_masaje} hrs, "
+                 f"desayuno incluido ambas mañanas, {formatear_precio(precio)} para dos.")
+        alts.append(_alt(
+            titulo=f"Refugio · masaje {hora_masaje}",
+            precio_total=precio, precio_con_descuento=precio, hay_descuento=False,
+            texto_sugerido=texto,
+            itinerario=[{'servicio': f"{cab['nombre']} (2 noches)", 'hora': cab['hora_check_in']},
+                        {'servicio': f"{tina1['nombre']} (noche 1)", 'hora': tina1['hora']},
+                        {'servicio': f"{tina2['nombre']} (noche 2)", 'hora': tina2['hora']},
+                        {'servicio': masaje['nombre'], 'hora': hora_masaje}]))
+    return {'fecha': base['fecha'], 'alternativas': alts}
+
+
 _BUILDERS = {
     'pausa': _pausa,
     'tina_sola': _tina_sola,
     'masaje_solo': _masaje_solo,
     'noche_aguas_calientes': _noche_aguas_calientes,
+    'ritual': _ritual,
+    'refugio': _refugio,
 }
 
 
@@ -182,11 +265,9 @@ def construir_alternativas(tipo, fecha, personas):
     {'tipo', 'fecha', 'personas', 'nombre_experiencia', 'alternativas': [...]}
     """
     tipo = (tipo or '').strip().lower()
-    if tipo in TIPOS_FASE2:
-        return {'error': f"el tipo '{tipo}' aún no está disponible (Fase 2)"}
     builder = _BUILDERS.get(tipo)
     if builder is None:
-        return {'error': f"tipo inválido: '{tipo}'. Válidos: {', '.join(TIPOS_FASE1)}"}
+        return {'error': f"tipo inválido: '{tipo}'. Válidos: {', '.join(TIPOS_VALIDOS)}"}
     res = builder(fecha, personas)
     if res.get('error'):
         return {'error': res['error']}

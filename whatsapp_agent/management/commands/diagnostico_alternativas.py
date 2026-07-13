@@ -23,7 +23,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         fecha, personas = options['fecha'], options['personas']
         self.stdout.write(f"Alternativas para {fecha}, {personas} personas:\n")
-        for tipo in alternativas.TIPOS_FASE1:
+        for tipo in alternativas.TIPOS_VALIDOS:
             res = alternativas.construir_alternativas(tipo, fecha, personas)
             if res.get('error'):
                 self.stdout.write(self.style.WARNING(f"  {tipo}: ERROR — {res['error']}"))
@@ -34,8 +34,3 @@ class Command(BaseCommand):
             if alts:
                 a = alts[0]
                 self.stdout.write(f"      ej: {a['titulo']} — {a['texto_sugerido']}")
-        # Fase 2 debe rechazarse limpio
-        for tipo in alternativas.TIPOS_FASE2:
-            res = alternativas.construir_alternativas(tipo, fecha, personas)
-            estado = 'rechaza OK' if res.get('error') else 'NO rechaza (revisar!)'
-            self.stdout.write(f"  {tipo} (Fase 2): {estado}")

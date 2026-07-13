@@ -1773,9 +1773,10 @@ def experiencias_alternativas(request):
     GET /api/luna/experiencias/alternativas/?tipo=<tipo>&fecha=YYYY-MM-DD&personas=N
 
       tipo (obligatorio): pausa | tina_sola | masaje_solo | noche_aguas_calientes
-                          (ritual | refugio → Fase 2, aún no disponibles → 400)
+                          | ritual | refugio
       fecha (obligatorio, YYYY-MM-DD; también acepta expresiones NL)
       personas (opcional, default 2, entero ≥ 1). Para masaje: N personas = N masajes.
+                Ritual/Refugio/Noche son siempre para 2 (se ignora personas).
 
     Respuesta 200 (shape unificado, mismo espíritu que Pausa):
     {
