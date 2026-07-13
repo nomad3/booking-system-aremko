@@ -41,9 +41,9 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_RECIPIENTS = [
-    'aremkospa@gmail.com',
-    'abonosaremko@gmail.com',
-    'atoloza1970@gmail.com',
+    'aremkospa@gmail.com',    # cuenta principal Aremko
+    'abonosaremko@gmail.com',  # cuenta abonos
+    'atoloza1970@gmail.com',   # Angélica Toloza (community manager, dueña)
 ]
 
 
