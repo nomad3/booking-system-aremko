@@ -1742,6 +1742,60 @@ def call_llm(
     return brief
 
 
+def diagnostico_conexiones(
+    *, ga4_snapshot=None, gsc_snapshot=None, meta_snapshot=None,
+    google_ads_snapshot=None, reviews_resumen=None, objetivo_semana=None,
+    pipeline_reservas=None,
+) -> list:
+    """Estado de cada fuente de datos del brief: qué conectó, qué no, y qué
+    variable de entorno falta para conectarla.
+
+    Se muestra al final del reporte semanal para ir cableando las integraciones
+    una a una: si una fuente dice 'falta_credencial', lista el nombre EXACTO de
+    la(s) env var(s) que hay que setear en Render. No hace llamadas de red — solo
+    inspecciona credenciales presentes y si esta corrida trajo datos.
+    """
+    import os
+    from django.conf import settings
+
+    def _falta(*nombres):
+        """Nombres de esas variables que están ausentes (settings o env)."""
+        return [n for n in nombres if not (getattr(settings, n, None) or os.environ.get(n))]
+
+    def _falta_todas(*nombres):
+        """Credenciales alternativas: 'falta' solo si NINGUNA está presente."""
+        if any(getattr(settings, n, None) or os.environ.get(n) for n in nombres):
+            return []
+        return list(nombres)
+
+    def _estado(fuente, snapshot, vars_faltantes):
+        if vars_faltantes:
+            estado = 'falta_credencial'
+        elif snapshot:
+            estado = 'ok'
+        else:
+            estado = 'sin_datos'  # credenciales OK pero la API no devolvió nada (error/conectividad)
+        return {'fuente': fuente, 'estado': estado, 'vars_faltantes': vars_faltantes}
+
+    def _estado_interno(fuente, dato):
+        # Fuentes de BD: no llevan credenciales, solo hay dato o no.
+        return {'fuente': fuente, 'estado': 'ok' if dato else 'sin_datos', 'vars_faltantes': []}
+
+    sa = ('GOOGLE_SERVICE_ACCOUNT_JSON', 'GOOGLE_SERVICE_ACCOUNT_FILE')  # una u otra
+    return [
+        _estado('Google Analytics 4', ga4_snapshot, _falta_todas(*sa) + _falta('GA4_PROPERTY_ID')),
+        _estado('Google Search Console', gsc_snapshot, _falta_todas(*sa) + _falta('GSC_SITE_URL')),
+        _estado('Meta Ads (Facebook/Instagram)', meta_snapshot, _falta('META_SYSTEM_USER_TOKEN')),
+        _estado('Google Ads', google_ads_snapshot, _falta(
+            'GOOGLE_ADS_DEVELOPER_TOKEN', 'GOOGLE_ADS_CLIENT_ID',
+            'GOOGLE_ADS_CLIENT_SECRET', 'GOOGLE_ADS_REFRESH_TOKEN',
+        )),
+        _estado_interno('Reseñas (voz del cliente)', reviews_resumen),
+        _estado_interno('Pipeline de reservas', pipeline_reservas),
+        _estado_interno('Objetivo de la semana (admin)', objetivo_semana),
+    ]
+
+
 def generate_brief() -> dict:
     """Punto de entrada: genera el brief de la semana actual.
 
@@ -1861,6 +1915,15 @@ def generate_brief() -> dict:
                 'los drafts finales no se generaron. Usar los conceptos_de_contenido '
                 'como guía y redactar a mano, o re-correr el brief.',
             )
+
+    # Estado de conexiones: qué fuente conectó y qué env var falta. Se guarda en
+    # el brief para que viaje al reporte (sección final) y quede archivado.
+    brief['_diagnostico_conexiones'] = diagnostico_conexiones(
+        ga4_snapshot=ga4_snapshot, gsc_snapshot=gsc_snapshot,
+        meta_snapshot=meta_snapshot, google_ads_snapshot=google_ads_snapshot,
+        reviews_resumen=reviews_resumen, objetivo_semana=objetivo_semana,
+        pipeline_reservas=pipeline_reservas,
+    )
 
     archive_brief_safe(
         semana_inicio=semana_inicio,

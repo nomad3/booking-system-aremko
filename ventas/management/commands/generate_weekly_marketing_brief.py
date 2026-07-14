@@ -136,6 +136,18 @@ class Command(BaseCommand):
                     )
 
         brief = result['brief']
+
+        # Estado de conexiones (qué fuente conectó y qué env var falta).
+        conexiones = brief.get('_diagnostico_conexiones') or []
+        if conexiones:
+            self.stdout.write('\n🔗 ESTADO DE CONEXIONES:')
+            for c in conexiones:
+                icono = {'ok': '✅', 'falta_credencial': '🔌', 'sin_datos': '⚠️'}.get(c['estado'], '•')
+                extra = ''
+                if c.get('vars_faltantes'):
+                    extra = f'  → faltan: {", ".join(c["vars_faltantes"])}'
+                self.stdout.write(f'   {icono} {c["fuente"]}: {c["estado"]}{extra}')
+
         markdown = render_brief_to_markdown(brief, result['semana_inicio'], result['semana_fin'])
 
         if opts['dry_run']:

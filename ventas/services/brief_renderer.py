@@ -314,6 +314,34 @@ def render_brief_to_markdown(brief: dict, semana_inicio: date, semana_fin: date)
         lines.extend(_bullet(rec))
         lines.append('')
 
+    # === Estado de conexiones ===
+    # Qué fuente de datos conectó y qué falta para conectar el resto.
+    conexiones = brief.get('_diagnostico_conexiones') or []
+    if conexiones:
+        _ICONO = {'ok': '✅', 'falta_credencial': '🔌', 'sin_datos': '⚠️'}
+        _ETIQUETA = {
+            'ok': 'Conectado',
+            'falta_credencial': 'Falta credencial',
+            'sin_datos': 'Sin datos (revisar conexión)',
+        }
+        lines.append('## 🔗 Estado de conexiones')
+        lines.append('')
+        lines.append('_Qué fuentes alimentaron este brief y qué falta para conectar el resto._')
+        lines.append('')
+        for c in conexiones:
+            icono = _ICONO.get(c['estado'], '•')
+            etiqueta = _ETIQUETA.get(c['estado'], c['estado'])
+            linea = f'- {icono} **{c["fuente"]}** — {etiqueta}'
+            if c.get('vars_faltantes'):
+                linea += f' · faltan en Render: `{"`, `".join(c["vars_faltantes"])}`'
+            lines.append(linea)
+        pendientes = [c for c in conexiones if c['estado'] != 'ok']
+        if pendientes:
+            lines.append('')
+            lines.append(f'> {len(pendientes)} de {len(conexiones)} fuentes aún sin conectar. '
+                         'Setear las variables que faltan en Render enciende cada fuente sin cambiar código.')
+        lines.append('')
+
     return '\n'.join(lines)
 
 
