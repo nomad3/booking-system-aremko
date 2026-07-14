@@ -44,7 +44,9 @@ logger = logging.getLogger(__name__)
 # API config
 # ============================================================================
 
-GOOGLE_ADS_API_VERSION = "v17"
+# Google retira cada versión de la API a ~1 año. Configurable por env var para
+# subirla sin redeploy cuando la actual quede obsoleta (síntoma: 404 HTML al llamar).
+GOOGLE_ADS_API_VERSION = os.environ.get("GOOGLE_ADS_API_VERSION", "v21")
 GOOGLE_ADS_API_BASE = f"https://googleads.googleapis.com/{GOOGLE_ADS_API_VERSION}"
 OAUTH_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 
