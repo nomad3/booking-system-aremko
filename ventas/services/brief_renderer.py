@@ -318,10 +318,11 @@ def render_brief_to_markdown(brief: dict, semana_inicio: date, semana_fin: date)
     # Qué fuente de datos conectó y qué falta para conectar el resto.
     conexiones = brief.get('_diagnostico_conexiones') or []
     if conexiones:
-        _ICONO = {'ok': '✅', 'falta_credencial': '🔌', 'sin_datos': '⚠️'}
+        _ICONO = {'ok': '✅', 'falta_credencial': '🔌', 'error': '❌', 'sin_datos': '⚠️'}
         _ETIQUETA = {
             'ok': 'Conectado',
             'falta_credencial': 'Falta credencial',
+            'error': 'Error de conexión (revisar token/permiso)',
             'sin_datos': 'Sin datos (revisar conexión)',
         }
         lines.append('## 🔗 Estado de conexiones')

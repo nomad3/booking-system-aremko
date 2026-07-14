@@ -142,7 +142,7 @@ class Command(BaseCommand):
         if conexiones:
             self.stdout.write('\n🔗 ESTADO DE CONEXIONES:')
             for c in conexiones:
-                icono = {'ok': '✅', 'falta_credencial': '🔌', 'sin_datos': '⚠️'}.get(c['estado'], '•')
+                icono = {'ok': '✅', 'falta_credencial': '🔌', 'error': '❌', 'sin_datos': '⚠️'}.get(c['estado'], '•')
                 extra = ''
                 if c.get('vars_faltantes'):
                     extra = f'  → faltan: {", ".join(c["vars_faltantes"])}'

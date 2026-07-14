@@ -1769,12 +1769,17 @@ def diagnostico_conexiones(
         return list(nombres)
 
     def _estado(fuente, snapshot, vars_faltantes):
+        # Un snapshot dict con 'errors' no vacío = respondió pero la auth/API falló
+        # (ej: refresh_token inválido → 400). No es 'ok' aunque el objeto no sea None.
+        con_errores = isinstance(snapshot, dict) and bool(snapshot.get('errors'))
         if vars_faltantes:
             estado = 'falta_credencial'
-        elif snapshot:
+        elif snapshot and not con_errores:
             estado = 'ok'
+        elif con_errores:
+            estado = 'error'  # credenciales presentes pero la conexión falló (revisar token/permiso)
         else:
-            estado = 'sin_datos'  # credenciales OK pero la API no devolvió nada (error/conectividad)
+            estado = 'sin_datos'  # credenciales OK pero la API no devolvió nada
         return {'fuente': fuente, 'estado': estado, 'vars_faltantes': vars_faltantes}
 
     def _estado_interno(fuente, dato):
