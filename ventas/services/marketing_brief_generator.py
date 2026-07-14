@@ -345,13 +345,17 @@ DATOS:
       "audio_sugerido": ""
     }},
     "stories_diarias": [
-      {{"dia": "Lunes", "concepto": "...", "tipo": "detrás de escena|datos del día|naturaleza|cliente real|recordatorio práctico|encuesta"}},
-      {{"dia": "Martes", "concepto": "...", "tipo": "..."}},
-      {{"dia": "Miércoles", "concepto": "...", "tipo": "..."}},
-      {{"dia": "Jueves", "concepto": "...", "tipo": "..."}},
-      {{"dia": "Viernes", "concepto": "...", "tipo": "..."}},
-      {{"dia": "Sábado", "concepto": "...", "tipo": "..."}},
-      {{"dia": "Domingo", "concepto": "...", "tipo": "..."}}
+      {{"dia": "Lunes", "historias": [
+        {{"concepto": "...", "tipo": "detrás de escena|datos del día|naturaleza|cliente real|recordatorio práctico|encuesta"}},
+        {{"concepto": "...", "tipo": "..."}},
+        {{"concepto": "...", "tipo": "..."}}
+      ]}},
+      {{"dia": "Martes",    "historias": [{{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}]}},
+      {{"dia": "Miércoles", "historias": [{{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}]}},
+      {{"dia": "Jueves",    "historias": [{{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}]}},
+      {{"dia": "Viernes",   "historias": [{{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}]}},
+      {{"dia": "Sábado",    "historias": [{{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}]}},
+      {{"dia": "Domingo",   "historias": [{{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}, {{"concepto": "...", "tipo": "..."}}]}}
     ],
     "email_engaged": {{
       "necesario_esta_semana": true,
@@ -393,6 +397,7 @@ DATOS:
 }}
 
 REGLAS DE GENERACIÓN:
+- HISTORIAS POR DÍA (obligatorio, conteo exacto): Lunes, Martes, Miércoles, Jueves y Domingo = 3 historias cada uno; Viernes y Sábado = 4 historias cada uno. Cada historia con concepto propio y distinto (nada de rellenar con variaciones de la misma idea). Los 7 días van siempre presentes en stories_diarias.
 - El RESUMEN EJECUTIVO debe ser corto. El resto puede ser todo lo extenso necesario.
 - Si Jorge definió objetivo de la semana, todo el contenido y las acciones DEBEN servir a ese objetivo. Es prioridad #1.
 - Si la frase ancla "2 días equivalen a una semana de vacaciones" no se usó la semana anterior, indicarla en el concepto de alguna pieza.
@@ -440,6 +445,7 @@ REGLAS DURAS:
 - Si el concepto trae una frase real de cliente, úsala LITERAL y entre comillas — pesa más que cualquier copy tuyo.
 - Reels: estructura Víctor Eras (gancho 4-7s contracorriente · contexto · moraleja · solución · CTA con palabra clave "Comenta X y te..."). El gancho NUNCA empieza con el nombre de la marca.
 - ANTI-REPETICIÓN: si te doy ganchos/frases usadas en semanas anteriores, NO los repitas ni los parafrasees — encuentra un ángulo de entrada distinto.
+- HISTORIAS POR DÍA (conteo exacto, respeta el que trae el analista): Lun/Mar/Mié/Jue/Dom = 3 historias; Vie/Sáb = 4 historias. Escribe el texto_sugerido de CADA historia por separado (cada una es un frame independiente de Instagram, con su propia foto). No amontones varias historias en un solo texto.
 - Cada pieza incluye responsable y tiempo estimado de producción.
 
 FORMATO DE OUTPUT: JSON estricto, sin markdown ni texto adicional, con la estructura EXACTA que especifica el user prompt."""
@@ -536,13 +542,17 @@ Devuelve SOLO este JSON:
     "hashtags": ["#..."]
   }},
   "stories_diarias": [
-    {{"dia": "Lunes", "concepto": "...", "tipo": "...", "texto_sugerido": "Texto exacto del sticker/overlay"}},
-    {{"dia": "Martes", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
-    {{"dia": "Miércoles", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
-    {{"dia": "Jueves", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
-    {{"dia": "Viernes", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
-    {{"dia": "Sábado", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
-    {{"dia": "Domingo", "concepto": "...", "tipo": "...", "texto_sugerido": "..."}}
+    {{"dia": "Lunes", "historias": [
+      {{"concepto": "...", "tipo": "...", "texto_sugerido": "Texto exacto del sticker/overlay de ESTA historia"}},
+      {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
+      {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}
+    ]}},
+    {{"dia": "Martes",    "historias": [{{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}]}},
+    {{"dia": "Miércoles", "historias": [{{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}]}},
+    {{"dia": "Jueves",    "historias": [{{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}]}},
+    {{"dia": "Viernes",   "historias": [{{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}]}},
+    {{"dia": "Sábado",    "historias": [{{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}]}},
+    {{"dia": "Domingo",   "historias": [{{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}, {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}]}}
   ],
   "email_engaged": {{
     "necesario_esta_semana": true,

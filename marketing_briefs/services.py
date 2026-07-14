@@ -72,6 +72,32 @@ def _segmentos_de_slides(slides) -> list:
     return segmentos
 
 
+def _segmentos_de_historias(historias) -> list:
+    """Un segmento por historia del día (cada una su foto + revisión). Formato
+    nuevo: el día trae una lista `historias` explícita (3 o 4 según el día), en
+    vez de amontonar 'STORY 1 | STORY 2' en un solo texto. El texto del segmento
+    es el texto_sugerido (fallback: concepto)."""
+    if not isinstance(historias, list) or not historias:
+        return []
+    segmentos = []
+    for i, h in enumerate(historias, start=1):
+        if not isinstance(h, dict):
+            continue
+        texto = (h.get('texto_sugerido') or h.get('texto') or h.get('concepto') or '').strip()
+        segmentos.append({
+            'indice': i,
+            'titulo': f'Historia {i}',
+            'texto': texto,
+            'material_urls': [],
+            'material_meta': [],
+            'revision_veredicto': 'sin_revisar',
+            'revision_json': [],
+            'revision_resumen': '',
+            'revision_at': None,
+        })
+    return segmentos
+
+
 def _merge_segmentos(nuevos: list, viejos: list) -> list:
     """Al re-explotar, conserva foto/revisión ya subidas (por índice); solo
     refresca titulo/texto desde el brief. El trabajo de Angélica no se pisa."""
@@ -104,6 +130,16 @@ def _titulo_de(pieza: dict) -> str:
         val = (pieza.get(key) or '').strip()
         if val:
             return val.splitlines()[0][:290]
+    # Formato nuevo de historias del día: resumen desde los conceptos.
+    historias = pieza.get('historias')
+    if isinstance(historias, list) and historias:
+        conceptos = [
+            (h.get('concepto') or h.get('texto_sugerido') or '').strip().splitlines()[0]
+            for h in historias if isinstance(h, dict)
+        ]
+        conceptos = [c for c in conceptos if c]
+        if conceptos:
+            return f'{len(conceptos)} historias: ' + ' · '.join(conceptos)[:280]
     return ''
 
 
@@ -208,7 +244,14 @@ def explode_brief_to_publicaciones(semana_inicio, brief: dict) -> int:
             offset = DIAS_SEMANA.index(dia_nombre)
         except ValueError:
             continue
-        texto_story = story.get('texto_sugerido') or story.get('caption_completo') or ''
+        # Formato nuevo: el día trae una lista `historias` (3 o 4). Formato viejo:
+        # un solo texto_sugerido que amontona 'STORY 1 | STORY 2'. Soporta ambos.
+        historias = story.get('historias')
+        if isinstance(historias, list) and historias:
+            segs = _segmentos_de_historias(historias)
+        else:
+            texto_story = story.get('texto_sugerido') or story.get('caption_completo') or ''
+            segs = _split_historias(texto_story)
         _upsert(
             f'story_{dia_nombre.lower()}',
             'Instagram Stories',
@@ -217,7 +260,7 @@ def explode_brief_to_publicaciones(semana_inicio, brief: dict) -> int:
             story,
             'Angélica',
             _hora_de(story, dia_nombre, 'story'),
-            segmentos=_split_historias(texto_story),
+            segmentos=segs,
         )
 
     logger.info(f'explode_brief: {procesadas} publicaciones creadas/actualizadas para {semana_inicio}')

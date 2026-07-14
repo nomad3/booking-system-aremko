@@ -215,13 +215,21 @@ def render_brief_to_markdown(brief: dict, semana_inicio: date, semana_fin: date)
         if reel_j.get('necesario_esta_semana'):
             _render_reel(lines, reel_j, 'Reel jueves')
 
-        # Stories diarias
+        # Stories diarias. Formato nuevo: cada día trae una lista `historias`
+        # (3 o 4). Formato viejo: una sola historia por día en el propio dict.
         stories = drafts.get('stories_diarias', [])
         if stories:
             lines.append('### Stories diarias')
             lines.append('')
             for s in stories:
-                lines.append(f'- **{s.get("dia", "?")}** [{s.get("tipo", "")}]: {s.get("concepto", "")} — *texto: {s.get("texto_sugerido", "")}*')
+                dia = s.get('dia', '?')
+                historias = s.get('historias')
+                if isinstance(historias, list) and historias:
+                    lines.append(f'- **{dia}** ({len(historias)} historias):')
+                    for i, h in enumerate(historias, start=1):
+                        lines.append(f'  {i}. [{h.get("tipo", "")}] {h.get("concepto", "")} — *texto: {h.get("texto_sugerido", "")}*')
+                else:
+                    lines.append(f'- **{dia}** [{s.get("tipo", "")}]: {s.get("concepto", "")} — *texto: {s.get("texto_sugerido", "")}*')
             lines.append('')
 
         # Email engaged
