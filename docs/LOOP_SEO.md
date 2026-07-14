@@ -484,6 +484,145 @@ _(Actualización 2026-07-06: Jorge configuró el cron en cron-job.org, probado
 
 ---
 
+### Ciclo 2 — 2026-07-14 (segunda corrida del loop)
+
+**Snapshot GA4 (historial real, últimas 4 semanas — sesiones TOTALES, todos los canales):**
+
+| Semana | Sesiones | Conv | Engagement | Dur.media | WhatsApp clk |
+|--------|---------:|-----:|-----------:|----------:|-------------:|
+| 06-22  | 1079 | 53 | 52% | 185s | 52 |
+| 06-29  | 805  | 72 | 61% | 237s | 69 |
+| 07-06  | 896  | 87 | 65% | 192s | 85 |
+| **07-13** | **1099** | **121** | **54%** | **200s** | **120** |
+
+- Semana 07-13 = **la mejor de la serie en conversiones (121, máx.)** y WhatsApp
+  clicks (120, máx.), con sesiones al alza (896→1099, +23%). El engagement bajó
+  de 65% a 54% — típico de un mix con algo más de tráfico de campaña/pago que
+  diluye el % aunque suba el volumen absoluto de conversiones. Señal de salud:
+  buena, tráfico creciendo y convirtiendo.
+
+**Snapshot GSC (2 semanas completas comparables — dato confiable desde 07-02):**
+
+| Semana | Clicks | Impresiones | CTR | Pos media |
+|--------|-------:|------------:|-----:|----------:|
+| 07-06  | 195 | 2530 | 7.71% | 5.96 |
+| **07-13** | **322** | **2876** | **11.2%** | **6.07** |
+
+- **Mejor semana de clicks y CTR de toda la serie** (+65% clicks vs semana
+  previa, +14% impresiones). Posición media estable ~6. El crecimiento es real,
+  no un hueco de permiso.
+
+**Keywords protegidas — GSC (semana 07-13) + rank-check DataForSEO (foto Puerto Varas) + tendencia persistida (07-07→07-13):**
+
+| Keyword | GSC pos (clk/imp) | DataForSEO pos | Tendencia rank |
+|---|---|---:|---|
+| `aremko` (marca) | 1.44 (82/178) | **1** | 1→1 ✅ |
+| `aremko spa` | 1.0 (29/62) | — | domina ✅ |
+| `tinajas puerto varas` (con J) | 1.66 (7/90) | **1** | 1→1 ✅ (GSC mejoró 2.86→1.66) |
+| `cabaña con tina caliente puerto varas` | — | **1** | 1→1 ✅ |
+| `masajes puerto varas` | 2.93 (12/90) | 3 | 3→3 ✅ (imp casi ×2: 42→90) |
+| `spa cerca de puerto varas` | — | 3 | nuevo tracking ✅ (→/masajes/) |
+| `spa puerto varas` | fuera del top GSC | 7 | 7→7→7→7 ⚠️ **ESTANCADA 3 sem** |
+| `termas puerto varas` | 3.84 (5/111) | 9 (oscila, hoy fuera top10) | 11→9 (mejora lenta, cluster duro) |
+| `termas en puerto varas` | 8.92 (2/106) | 9 | 9→8 |
+| `escapada romántica puerto varas` | — | 16 | 17→16→16→14 (sube lento, pág.2) |
+
+- **Marca + tinajas + cabaña-con-tina + masajes: sólidas en top 3.** ✅
+- **`spa puerto varas` es la única keyword protegida no-romance estancada: pos 7
+  tres semanas seguidas** (DataForSEO), bloqueada por hoteles (wyndhampettra,
+  dreams, hotelbellavista, cabañadellago) + Instagram. En GSC ni aparece la
+  cabeza exacta entre las top queries — solo branded + masajes.
+
+**Queries nuevas/notables sin contenido dedicado o mal capturadas:**
+
+1. **`termas cerca de puerto montt` — NUEVA esta semana:** pos 5.85, 4 clk /
+   27 imp, **CTR 14.8%**. Demanda geo de termas desde Puerto Montt. El post de
+   Pto Montt en la cola de blog es de MASAJES (`masajes-cerca-de-puerto-montt`),
+   no cubre termas/tinas.
+2. **`termas en puerto varas` — 106 imp** (la query no-marca de termas más
+   grande), pero pos 8.92 / CTR 1.89%. El post `/blog/termas-puerto-varas/` ya
+   quedó **indexado** (261 imp) pero rankea pos **9.45 con CTR 0.38%** — no
+   captura los clicks todavía; además compite con el home (pos ~3.84 en GSC) por
+   la misma intención (posible canibalización).
+3. **Cluster `cabañas con tinaja(s) puerto varas` creciendo:** `cabañas con
+   tinajas puerto varas` pos 9.11 (27 imp, era 8.54) + `cabañas con tinaja en
+   puerto varas` pos 10.27 (15 imp). Aremko gana el SINGULAR "cabaña con tina
+   caliente" (DataForSEO pos 1) pero las variantes plurales con grafía "tinaja(s)"
+   caen a página 1-bottom/2. `/alojamientos/` tiene 533 imp/sem (pos 7.21) con
+   meta genérica sin la grafía "tinaja".
+
+**Reservas de la semana (contexto, 07-06..07-13):** 54 reservas / **$6.42M**.
+Combo estrella cabaña+tina+masaje (3-en-1): 12 reservas / $2.93M. La demanda
+orgánica sí está traduciendo a negocio. ✅
+
+**Estado de la cola de blog (loop de publicación 2026-07-12):** ya se publicaron
+`ritual-del-rio` + `pausa-junto-al-rio` (2 de 4 programas); `refugio` + `noche`
+pendientes. El único post del cluster SPA (`que-es-spa-boutique-aremko`,
+keyword `spa boutique puerto varas`) está en la **posición 15/18** de la cola →
+a 1/semana no se publica hasta **~octubre**.
+
+---
+
+#### Recomendaciones NUEVAS (Nivel 2 — SOLO PROPUESTA, aplica Jorge)
+
+**REC 1 — `spa puerto varas` estancada 3 semanas: adelantar el post de SPA en la cola y apuntarlo también al head term.**
+Es la única keyword protegida no-romance sin mover (pos 7), el cluster SPA no
+tiene NINGUNA URL viva, y el único post SPA de la cola no sale hasta ~octubre.
+Palancas concretas (código + admin, las aplica Jorge):
+
+- **Reordenar `PRIORITY_ORDER`** en
+  `aremko_blog/management/commands/publish_next_blog_draft.py`: mover
+  `que-es-spa-boutique-aremko` de la posición 15 a la **posición 5** (justo
+  después de los 4 programas), para que la cola lo publique en ~3 semanas y no
+  en octubre. Es 1 línea; la propongo como texto, no la edito.
+- Al publicarlo, **ampliar su `keyword_root`** de `spa boutique puerto varas`
+  (long-tail) a cubrir también `spa puerto varas` (head): agregar un H2 tipo
+  *"Spa en Puerto Varas: qué esperar"* e **enlaces internos** desde `/masajes/`
+  y el footer del home con ancla exacta **"spa en Puerto Varas"** → el post.
+- Señal a favor: `/masajes/` ya rankea **#3 en "spa cerca de puerto varas"**
+  (DataForSEO) — Google ya asocia Aremko con "spa", falta empujar la cabeza
+  exacta. Nota realista: es un head term con hoteles + IG arriba; un post + link
+  interno es un empujón, no garantía de top 3 — medir en 2-3 ciclos.
+
+**REC 2 — Ampliar el post de termas (ya indexado) para capturar `termas cerca de puerto montt` y consolidar el cluster.**
+El post `/blog/termas-puerto-varas/` ya rankea (261 imp) pero pos 9.45 / CTR
+0.38%. En vez de crear contenido nuevo, **sumarle una sección** que ataque la
+query geo nueva con la URL que YA existe (`BlogPost` → `body_md` + FAQ):
+
+- H2 nuevo: **"¿Termas cerca de Puerto Montt?"**
+  Cuerpo propuesto (misma voz honesta del post): *"Si buscás termas cerca de
+  Puerto Montt, la respuesta honesta es la misma que en Puerto Varas: no hay
+  termas naturales a la vuelta de la esquina. Pero Aremko queda a solo 20
+  minutos de Puerto Montt por la ruta 5 — tinas artesanales de agua caliente a
+  38-39° junto al río Pescado, abiertas hasta medianoche. Para muchos desde
+  Puerto Montt es el plan de tarde más cercano que de verdad se siente como unas
+  termas (y con garantía: a 37° o menos, la tina es gratis)."*
+- Item FAQ nuevo (para el schema JSON-LD del post): *P: "¿Hay termas cerca de
+  Puerto Montt?" — R: "No hay termas naturales inmediatas a Puerto Montt; las
+  más cercanas quedan a 1½–2 h. La alternativa más cercana son las tinas de agua
+  caliente de Aremko en Puerto Varas, a 20 min por la ruta 5."*
+- **Consolidar canibalización:** hoy el home (pos ~3.84) y el post (pos 9.45)
+  compiten por "termas puerto varas". Enlazar internamente desde las menciones
+  de "termas" del home hacia el post, para concentrar la señal en una sola URL.
+
+**REC 3 — Reescribir el meta_description de Alojamientos (`SEOContent` → Alojamientos) para el cluster "cabañas con tinaja(s)".**
+Query plural creciendo (pos 9-11, ~42 imp/sem) que Aremko no captura pese a
+ganar el singular. La meta actual no trae la grafía "tinaja" (con J) que la
+gente busca:
+
+- **Actual (147):** "Cabañas privadas con tina caliente y vista al lago en
+  Puerto Varas. Escapada romántica perfecta con spa, desayuno y servicios
+  premium. ¡Reserva ahora!"
+- **Propuesta (153/160):** **"Cabañas con tina caliente (tinaja) en Puerto
+  Varas, junto al río Pescado. Alojamiento privado con spa, desayuno y tinas
+  hasta medianoche. Reserva online."**
+  (Incorpora la grafía "tinaja", "junto al río Pescado" y "hasta medianoche" —
+  diferenciadores reales — sin perder "cabañas con tina caliente".)
+
+_Estado: propuestas dejadas por el loop; pendiente revisión/aplicación de Jorge._
+
+---
+
 ## Loop de publicación de blog (nuevo 2026-07-12)
 
 Distinto del loop de SEO de arriba (que analiza tráfico/rankings) — este es
