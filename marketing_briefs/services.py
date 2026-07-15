@@ -124,6 +124,45 @@ PIEZAS_FIJAS = [
 
 DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
+# Reels que además se publican en TikTok: MISMO video que su gemelo de Instagram
+# (guion/tomas/audio idénticos), pero con caption y hashtags nativos tomados del
+# objeto anidado "tiktok" del copy. Se explotan como filas de cola separadas.
+REELS_TIKTOK = [
+    # (pieza_key_tiktok, pieza_key_instagram, offset_dias)
+    ('reel_martes_tiktok', 'reel_martes', 1),
+    ('reel_jueves_tiktok', 'reel_jueves', 3),
+]
+
+# Recordatorio operativo para quien publica en TikTok (viaja en el copy_json).
+_NOTA_TIKTOK = (
+    'Subir a TikTok el archivo de video ORIGINAL exportado limpio (sin marca de '
+    'agua de Instagram). No descargues el Reel ya publicado para resubirlo: el '
+    'watermark de otra plataforma penaliza el alcance en TikTok.'
+)
+
+
+def _derivar_pieza_tiktok(pieza_key: str, hermano_ig: dict) -> dict:
+    """Arma la pieza de TikTok desde su gemelo de Instagram (es el MISMO video).
+
+    guion/tomas/audio se copian tal cual del hermano; caption y hashtags salen
+    del objeto anidado `tiktok` del copy. Si el copywriter no lo escribió, cae al
+    caption de Instagram (el video igual debe salir) y deja un warning. No muta el
+    dict original del hermano.
+    """
+    derivada = dict(hermano_ig)  # copia superficial: no tocamos el hermano IG
+    tiktok = derivada.pop('tiktok', None)
+    if isinstance(tiktok, dict) and (tiktok.get('caption_completo') or tiktok.get('hashtags')):
+        derivada['caption_completo'] = tiktok.get('caption_completo') or hermano_ig.get('caption_completo', '')
+        derivada['hashtags'] = tiktok.get('hashtags') or hermano_ig.get('hashtags', [])
+    else:
+        logger.warning(
+            f'explode_brief: {pieza_key} sin objeto tiktok en el copy — '
+            'usando caption de Instagram como respaldo'
+        )
+        # caption_completo/hashtags ya vienen copiados del hermano IG
+    derivada['nota_publicacion'] = _NOTA_TIKTOK
+    return derivada
+
 
 def _titulo_de(pieza: dict) -> str:
     for key in ('concepto', 'asunto', 'texto', 'tema_sugerido'):
@@ -234,6 +273,19 @@ def explode_brief_to_publicaciones(semana_inicio, brief: dict) -> int:
                 pieza_key, canal, tipo, semana_inicio + timedelta(days=offset),
                 pieza, responsable, _hora_de(pieza, dia_nombre, tipo), segmentos=segs,
             )
+
+    # Cross-post a TikTok: mismo video del Reel de Instagram, caption/hashtags
+    # nativos. Se deriva del gemelo IG (mismo día y hora) como fila aparte.
+    for pieza_key, hermano_key, offset in REELS_TIKTOK:
+        hermano = drafts.get(hermano_key)
+        if not (isinstance(hermano, dict) and hermano):
+            continue
+        dia_nombre = DIAS_SEMANA[offset]
+        _upsert(
+            pieza_key, 'TikTok', 'reel', semana_inicio + timedelta(days=offset),
+            _derivar_pieza_tiktok(pieza_key, hermano), 'Angélica',
+            _hora_de(hermano, dia_nombre, 'reel'),
+        )
 
     stories = drafts.get('stories_diarias') or []
     for story in stories:

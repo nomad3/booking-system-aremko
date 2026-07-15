@@ -510,7 +510,11 @@ Devuelve SOLO este JSON:
     "tomas_sugeridas": ["..."],
     "audio_sugerido": "...",
     "caption_completo": "Caption listo para pegar (max 2200 chars)",
-    "hashtags": ["#...", "#..."]
+    "hashtags": ["#...", "#..."],
+    "tiktok": {{
+      "caption_completo": "MISMO video, caption nativo de TikTok: más corto y directo que el de Instagram, tono conversacional, puede abrir con una pregunta a la audiencia (max 2200 chars)",
+      "hashtags": ["#...", "#..."]
+    }}
   }},
   "carrusel_miercoles": {{
     "necesario_esta_semana": true,
@@ -539,7 +543,11 @@ Devuelve SOLO este JSON:
     "tomas_sugeridas": ["..."],
     "audio_sugerido": "...",
     "caption_completo": "...",
-    "hashtags": ["#..."]
+    "hashtags": ["#..."],
+    "tiktok": {{
+      "caption_completo": "MISMO video, caption nativo de TikTok (más corto/directo que Instagram, tono conversacional, puede abrir con una pregunta)",
+      "hashtags": ["#..."]
+    }}
   }},
   "stories_diarias": [
     {{"dia": "Lunes", "historias": [
@@ -574,6 +582,7 @@ Devuelve SOLO este JSON:
 REGLAS FINALES:
 - Si un concepto viene con necesario_esta_semana: false, respétalo (copia el false y explica brevemente en el campo de texto).
 - El gancho de cada Reel se escribe DOS veces mentalmente y se entrega la mejor versión — es el 80% del resultado.
+- Cada Reel (reel_martes, reel_jueves) lleva un objeto anidado "tiktok" con SOLO caption y hashtags para el MISMO video subido a TikTok. El video es idéntico (mismo guion/tomas/audio): NO los repitas ahí. El caption de TikTok es más corto y nativo que el de Instagram (nada de narrativa larga; una pregunta directa a la audiencia funciona). Los hashtags de TikTok son propios del ecosistema — 1-2 amplios de descubrimiento + 3-4 de nicho/local (spa, Puerto Varas, turismo, bienestar) — y NUNCA los mismos de Instagram. La voz Aremko no cambia: es adaptación de formato de plataforma, no de personalidad de marca.
 - Relee tu output contra los 3 ejemplos de voz antes de entregar: si suena a agencia de marketing y no a dueño de spa que escribe bien, reescríbelo."""
 
 
