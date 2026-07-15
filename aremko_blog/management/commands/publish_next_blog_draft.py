@@ -38,6 +38,11 @@ PRIORITY_ORDER = [
     "pausa-junto-al-rio-puerto-varas",
     "refugio-aremko-puerto-varas",
     "noche-de-aguas-calientes-puerto-varas",
+    # Adelantado en Ciclo 2 del loop SEO (2026-07-14): "spa puerto varas" es una
+    # keyword protegida estancada en pos 7 (3 semanas seguidas) y el cluster SPA
+    # no tiene ninguna URL viva. Este post (retargeteado al head "spa puerto
+    # varas") sube desde el fondo de la cola para publicarse junto a los programas.
+    "que-es-spa-boutique-aremko",
     # Post agregado 2026-07-12: ya tenía tracción SEO orgánica real antes de
     # escribirlo (rank-check DataForSEO: "tinas de noche puerto varas" pos 1,
     # "spa abierto de noche puerto varas" pos 2) — prioridad alta, junto a
@@ -57,7 +62,6 @@ PRIORITY_ORDER = [
     "masaje-deportivo-vs-piedras-calientes-puerto-varas",
     # Grupo C/E — evergreen + soporte
     "rio-pescado-aremko-puerto-varas",
-    "que-es-spa-boutique-aremko",
     "elegir-programa-aremko-segun-tiempo",
     "aremko-invierno-puerto-varas",
     "pagar-reserva-aremko-cuotas-mercado-pago",

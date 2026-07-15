@@ -7,7 +7,10 @@ evergreen de posicionamiento de marca, redactado en sesión interactiva
 Ritual del Río, cabañas privadas, equipo titular).
 
 Target SEO:
-- Keyword root: "spa boutique puerto varas"
+- Keyword root: "spa puerto varas" (head term — retargeteado en Ciclo 2 del
+  loop SEO 2026-07-14; antes "spa boutique puerto varas"). Es keyword protegida
+  estancada en pos 7; este post (con un H2 que lidera con la frase exacta) +
+  enlaces internos buscan empujar la cabeza de búsqueda.
 - Cluster: SPA (antes vacío)
 
 Uso:
@@ -26,11 +29,10 @@ from aremko_blog.models import BlogCluster, BlogPost
 
 SLUG = "que-es-spa-boutique-aremko"
 TITLE = 'Qué significa "spa boutique" en Aremko (y en qué se diferencia de un spa de hotel)'
-KEYWORD_ROOT = "spa boutique puerto varas"
+KEYWORD_ROOT = "spa puerto varas"
 META_DESCRIPTION = (
-    "Qué significa \"spa boutique\" en Aremko: capacidad limitada, "
-    "cabañas privadas y equipo especializado — la diferencia real con un "
-    "spa de hotel."
+    "Spa en Puerto Varas: qué es un spa boutique y en qué se diferencia del "
+    "spa de un hotel. Tinas junto al río, masajes y ritual privado en Aremko."
 )
 CLUSTER = BlogCluster.SPA
 CTA_TEXT = "Conoce la experiencia Aremko"
@@ -48,6 +50,15 @@ INTRO = (
 )
 
 BODY_MD = """\
+## Spa en Puerto Varas: qué esperar
+
+Si buscás un spa en Puerto Varas, lo que encontrás en Aremko no es un
+circuito de piscinas con pulsera de colores. Es un spa boutique junto al río
+Pescado: tinas de agua caliente a 38-39° al aire libre, masajes con un equipo
+titular (no rotativo) y programas privados que combinan tina, masaje y
+descanso. Abierto hasta medianoche, a 20 minutos del centro. Menos gente, más
+río, y que la tarde sea de ustedes.
+
 ## Capacidad limitada, a propósito
 
 No es falta de espacio, es la decisión: menos gente al mismo tiempo
@@ -80,6 +91,15 @@ FAQ_ITEMS = [
         "answer": (
             "Depende del programa — por ejemplo, el Ritual del Río "
             "recibe solo 5 parejas por noche, a propósito."
+        ),
+    },
+    {
+        "question": "¿Dónde hay un spa en Puerto Varas?",
+        "answer": (
+            "Aremko es un spa boutique en Puerto Varas, junto al río "
+            "Pescado, a 20 minutos del centro: tinas de agua caliente a "
+            "38-39°, masajes con equipo titular y programas privados, "
+            "abierto hasta medianoche."
         ),
     },
 ]
