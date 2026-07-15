@@ -4,7 +4,7 @@ from solo.admin import SingletonModelAdmin
 from django import forms
 
 logger = logging.getLogger(__name__)
-from django.db import models
+from django.db import models, transaction
 from .forms import PagoInlineForm, PagoInlineFormSet, VentaReservaAdminForm
 from django.forms import DateTimeInput
 from datetime import date, datetime, timedelta  # Importa date, datetime, y timedelta
@@ -585,15 +585,25 @@ class VentaReservaAdmin(admin.ModelAdmin):
         # First save the object without checking for usuario
         super().save_model(request, obj, form, change)
 
-        # Then create the movement record
+        # Then create the movement record — defensivo: el registro de auditoría
+        # NUNCA debe voltear el guardado de la reserva. Va en su propio savepoint
+        # para no envenenar la transacción del admin si el INSERT falla (hipo de
+        # BD, drift de columna, etc.); el error queda logueado (visible en Render).
         if not change:  # Only for new instances
-            MovimientoCliente.objects.create(
-                cliente=obj.cliente,
-                tipo_movimiento='Venta',
-                comentarios=f'Venta/Reserva #{obj.id}',
-                usuario=request.user,
-                venta_reserva=obj
-            )
+            try:
+                with transaction.atomic():
+                    MovimientoCliente.objects.create(
+                        cliente=obj.cliente,
+                        tipo_movimiento='Venta',
+                        comentarios=f'Venta/Reserva #{obj.id}',
+                        usuario=request.user,
+                        venta_reserva=obj
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "No se registró el MovimientoCliente de la reserva #%s (no crítico): %s",
+                    obj.id, exc,
+                )
 
     # Eliminar con registro de movimiento
     def delete_model(self, request, obj):

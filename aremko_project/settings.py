@@ -503,6 +503,14 @@ LOGGING = {
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': True,
         },
+        # Tracebacks de 500 al stdout (Render los captura). Sin esto, con
+        # DEBUG=False Django no emite el traceback y quedamos a ciegas ante
+        # un error 500 (fue justo lo que pasó al depurar el 500 del admin).
+        'django.request': {
+            'handlers': ['console', 'file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
     },
 }
 
