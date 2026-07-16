@@ -11,6 +11,10 @@ from django.test import TestCase
 
 from marketing_briefs import services
 from marketing_briefs.models import PublicacionPlanificada
+from ventas.services.marketing_brief_generator import (
+    _incorporar_estilo_imagen,
+    ESTILO_IMAGEN_AREMKO,
+)
 
 
 def _reel_ig(**over):
@@ -121,3 +125,56 @@ class ExplodeTikTokTests(TestCase):
                 semana_inicio=self.LUNES, pieza_key='reel_jueves_tiktok',
             ).exists()
         )
+
+
+class PromptImagenIATests(TestCase):
+    """H-064: el prompt de edición de imagen debe llegar por-slide/por-historia
+    (los helpers de segmentos hardcodean sus claves y lo perderían) y la línea de
+    estilo boutique se sella determinísticamente, una sola vez."""
+
+    def test_segmentos_slides_llevan_prompt_imagen(self):
+        slides = [
+            {'numero': 1, 'imagen_sugerida': 'tina', 'texto_overlay': 'A',
+             'prompt_imagen_ia': 'acerca el encuadre a la tina'},
+            {'numero': 2, 'imagen_sugerida': 'río', 'texto_overlay': 'B',
+             'prompt_imagen_ia': 'sube el contraste del agua'},
+        ]
+        segs = services._segmentos_de_slides(slides)
+        self.assertEqual([s['prompt_imagen_ia'] for s in segs],
+                         ['acerca el encuadre a la tina', 'sube el contraste del agua'])
+
+    def test_segmentos_historias_prompt_solo_en_foto(self):
+        historias = [
+            {'concepto': 'x', 'tipo': 'foto', 'texto_sugerido': 'A',
+             'prompt_imagen_ia': 'recorta al centro'},
+            {'concepto': 'y', 'tipo': 'encuesta', 'texto_sugerido': 'B'},  # sin foto
+        ]
+        segs = services._segmentos_de_historias(historias)
+        self.assertEqual(segs[0]['prompt_imagen_ia'], 'recorta al centro')
+        self.assertEqual(segs[1]['prompt_imagen_ia'], '')  # historia sin foto → vacío
+
+    def test_estilo_se_sella_una_vez_y_verbatim(self):
+        drafts = {
+            'gbp_post': {'prompt_imagen_ia': 'ajusta la luz cálida'},
+            'carrusel_miercoles': {'slides': [
+                {'prompt_imagen_ia': 'encuadre a la tina'},
+                {'texto_overlay': 'slide sin foto'},  # sin prompt
+            ]},
+            'stories_diarias': [
+                {'dia': 'Lunes', 'historias': [
+                    {'tipo': 'foto', 'prompt_imagen_ia': 'centra el río'},
+                    {'tipo': 'encuesta'},  # sin prompt
+                ]},
+            ],
+        }
+        _incorporar_estilo_imagen(drafts)
+        gbp = drafts['gbp_post']['prompt_imagen_ia']
+        self.assertIn('ajusta la luz cálida', gbp)
+        self.assertTrue(gbp.endswith(ESTILO_IMAGEN_AREMKO))
+        self.assertEqual(gbp.count('Estética boutique íntima'), 1)  # una sola vez
+        slides = drafts['carrusel_miercoles']['slides']
+        self.assertTrue(slides[0]['prompt_imagen_ia'].endswith(ESTILO_IMAGEN_AREMKO))
+        self.assertNotIn('prompt_imagen_ia', slides[1])  # sin foto → no se inventa
+        historias = drafts['stories_diarias'][0]['historias']
+        self.assertTrue(historias[0]['prompt_imagen_ia'].endswith(ESTILO_IMAGEN_AREMKO))
+        self.assertNotIn('prompt_imagen_ia', historias[1])

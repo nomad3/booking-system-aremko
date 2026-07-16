@@ -491,7 +491,8 @@ Devuelve SOLO este JSON:
     "tiempo_estimado": "20 min",
     "texto": "Copy listo para pegar en Google Business Profile (max 1500 chars, sin emojis)",
     "url_cta": "URL con UTM completo (del concepto)",
-    "foto_sugerida": "Del concepto, refinada si aporta"
+    "foto_sugerida": "Del concepto, refinada si aporta",
+    "prompt_imagen_ia": "Instrucción de edición de la foto real que suba Angélica (ver REGLA PROMPT DE IMAGEN). Escribe SOLO la parte de escena; NO incluyas la línea de estilo, el sistema la agrega."
   }},
   "reel_martes": {{
     "necesario_esta_semana": true,
@@ -523,8 +524,8 @@ Devuelve SOLO este JSON:
     "concepto": "...",
     "numero_de_slides": 6,
     "slides": [
-      {{"numero": 1, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "hook"}},
-      {{"numero": 2, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "desarrollo"}}
+      {{"numero": 1, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "hook", "prompt_imagen_ia": "Edición de la foto de ESTE slide (solo escena; ver REGLA PROMPT DE IMAGEN)"}},
+      {{"numero": 2, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "desarrollo", "prompt_imagen_ia": "..."}}
     ],
     "caption_completo": "Caption completo (max 2200 chars)"
   }},
@@ -551,7 +552,7 @@ Devuelve SOLO este JSON:
   }},
   "stories_diarias": [
     {{"dia": "Lunes", "historias": [
-      {{"concepto": "...", "tipo": "...", "texto_sugerido": "Texto exacto del sticker/overlay de ESTA historia"}},
+      {{"concepto": "...", "tipo": "foto", "texto_sugerido": "Texto exacto del sticker/overlay de ESTA historia", "prompt_imagen_ia": "SOLO si la historia es una foto real: edición de escena (ver REGLA PROMPT DE IMAGEN). OMITIR el campo en encuestas, quiz, preguntas o stickers interactivos"}},
       {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
       {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}
     ]}},
@@ -583,7 +584,43 @@ REGLAS FINALES:
 - Si un concepto viene con necesario_esta_semana: false, respétalo (copia el false y explica brevemente en el campo de texto).
 - El gancho de cada Reel se escribe DOS veces mentalmente y se entrega la mejor versión — es el 80% del resultado.
 - Cada Reel (reel_martes, reel_jueves) lleva un objeto anidado "tiktok" con SOLO caption y hashtags para el MISMO video subido a TikTok. El video es idéntico (mismo guion/tomas/audio): NO los repitas ahí. El caption de TikTok es más corto y nativo que el de Instagram (nada de narrativa larga; una pregunta directa a la audiencia funciona). Los hashtags de TikTok son propios del ecosistema — 1-2 amplios de descubrimiento + 3-4 de nicho/local (spa, Puerto Varas, turismo, bienestar) — y NUNCA los mismos de Instagram. La voz Aremko no cambia: es adaptación de formato de plataforma, no de personalidad de marca.
+- REGLA PROMPT DE IMAGEN: el campo "prompt_imagen_ia" (en gbp_post, en cada slide del carrusel, y en las historias que sean FOTO real) es el prompt para que una IA de edición (Higgsfield/Nano Banana/etc.) retoque la foto real que sube Angélica. Escribe SOLO la instrucción de ESCENA — qué ajustar de esa foto puntual para que calce con la pieza (encuadre, foco, ajuste de luz o color, recorte, énfasis). NO escribas la línea de estilo de marca: el sistema la agrega sola y verbatim al final, no la repitas ni la parafrasees. Regla dura de edición honesta: es EDITAR una foto real, no generar una imagen — nunca pidas agregar personas, objetos, texto ni elementos que no estén en la foto original, ni inventar el lugar. En las historias, incluí "prompt_imagen_ia" SOLO cuando la historia es una foto; omití el campo por completo en encuestas, quiz, preguntas o stickers interactivos.
 - Relee tu output contra los 3 ejemplos de voz antes de entregar: si suena a agencia de marketing y no a dueño de spa que escribe bien, reescríbelo."""
+
+
+# Línea de estilo boutique fija (aprobada por Jorge). Se sella al final de CADA
+# prompt_imagen_ia — el LLM escribe solo la escena, el sistema garantiza el estilo.
+ESTILO_IMAGEN_AREMKO = (
+    "Estética boutique íntima de Aremko Spa: paleta verde y dorado, luz cálida y "
+    "natural, ambiente de spa junto al río discreto y de lujo silencioso. Edita la "
+    "foto real que se sube tal cual es — no agregues personas, objetos ni elementos "
+    "que no estén en la imagen original, no inventes la escena ni el lugar."
+)
+
+
+def _incorporar_estilo_imagen(drafts: dict) -> None:
+    """Pega ESTILO_IMAGEN_AREMKO al final de cada `prompt_imagen_ia` del brief,
+    exactamente una vez y verbatim. Determinístico: el LLM escribe solo la escena y
+    acá se sella el estilo, así el perfil de marca no depende de que el modelo copie
+    bien la línea. Muta `drafts` in-place; ignora piezas sin prompt de imagen."""
+    def _sellar(d):
+        if not isinstance(d, dict):
+            return
+        escena = (d.get('prompt_imagen_ia') or '').strip()
+        if escena:
+            d['prompt_imagen_ia'] = f"{escena}\n\n{ESTILO_IMAGEN_AREMKO}"
+
+    if not isinstance(drafts, dict):
+        return
+    _sellar(drafts.get('gbp_post'))
+    carrusel = drafts.get('carrusel_miercoles')
+    if isinstance(carrusel, dict):
+        for s in carrusel.get('slides') or []:
+            _sellar(s)
+    for dia in drafts.get('stories_diarias') or []:
+        if isinstance(dia, dict):
+            for h in dia.get('historias') or []:
+                _sellar(h)
 
 
 def call_llm_copywriter(
@@ -636,10 +673,12 @@ def call_llm_copywriter(
     raw = response.choices[0].message.content or ''
     cleaned = _strip_markdown_fences(raw)
     try:
-        return json.loads(cleaned)
+        drafts = json.loads(cleaned)
     except json.JSONDecodeError as exc:
         logger.error(f'Copywriter no devolvió JSON válido: {exc}. Raw[:500]: {raw[:500]}')
         raise ValueError(f'Copywriter response no es JSON válido: {exc}')
+    _incorporar_estilo_imagen(drafts)  # sella la línea de estilo boutique en cada prompt_imagen_ia
+    return drafts
 
 
 def extract_ganchos(drafts: dict) -> list:
