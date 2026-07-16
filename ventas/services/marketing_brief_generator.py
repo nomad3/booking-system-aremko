@@ -508,7 +508,11 @@ Devuelve SOLO este JSON:
       {{"bloque": "solucion_5s", "texto": "..."}},
       {{"bloque": "cta_palabra_clave", "texto": "Comenta X y te..."}}
     ],
-    "tomas_sugeridas": ["..."],
+    "tomas_sugeridas": [
+      {{"descripcion": "Clip 1 — GANCHO: escena de apertura (primeros 3s, lo más importante)", "prompt_video_ia": "Prompt image-to-video para animar una foto real de ESTA escena — solo escena; ver REGLA PROMPT DE VIDEO"}},
+      {{"descripcion": "Clip 2 — DESARROLLO: escena del cuerpo del reel", "prompt_video_ia": "..."}},
+      {{"descripcion": "Clip 3 — CIERRE: escena final / CTA", "prompt_video_ia": "..."}}
+    ],
     "audio_sugerido": "...",
     "caption_completo": "Caption listo para pegar (max 2200 chars)",
     "hashtags": ["#...", "#..."],
@@ -541,7 +545,11 @@ Devuelve SOLO este JSON:
       {{"bloque": "solucion_5s", "texto": "..."}},
       {{"bloque": "cta_palabra_clave", "texto": "..."}}
     ],
-    "tomas_sugeridas": ["..."],
+    "tomas_sugeridas": [
+      {{"descripcion": "Clip 1 — GANCHO: escena de apertura (primeros 3s, lo más importante)", "prompt_video_ia": "Prompt image-to-video para animar una foto real de ESTA escena — solo escena; ver REGLA PROMPT DE VIDEO"}},
+      {{"descripcion": "Clip 2 — DESARROLLO: escena del cuerpo del reel", "prompt_video_ia": "..."}},
+      {{"descripcion": "Clip 3 — CIERRE: escena final / CTA", "prompt_video_ia": "..."}}
+    ],
     "audio_sugerido": "...",
     "caption_completo": "...",
     "hashtags": ["#..."],
@@ -585,6 +593,7 @@ REGLAS FINALES:
 - El gancho de cada Reel se escribe DOS veces mentalmente y se entrega la mejor versión — es el 80% del resultado.
 - Cada Reel (reel_martes, reel_jueves) lleva un objeto anidado "tiktok" con SOLO caption y hashtags para el MISMO video subido a TikTok. El video es idéntico (mismo guion/tomas/audio): NO los repitas ahí. El caption de TikTok es más corto y nativo que el de Instagram (nada de narrativa larga; una pregunta directa a la audiencia funciona). Los hashtags de TikTok son propios del ecosistema — 1-2 amplios de descubrimiento + 3-4 de nicho/local (spa, Puerto Varas, turismo, bienestar) — y NUNCA los mismos de Instagram. La voz Aremko no cambia: es adaptación de formato de plataforma, no de personalidad de marca.
 - REGLA PROMPT DE IMAGEN: el campo "prompt_imagen_ia" (en gbp_post, en cada slide del carrusel, y en las historias que sean FOTO real) es el prompt para que una IA de edición (Higgsfield/Nano Banana/etc.) retoque la foto real que sube Angélica. Escribe SOLO la instrucción de ESCENA — qué ajustar de esa foto puntual para que calce con la pieza (encuadre, foco, ajuste de luz o color, recorte, énfasis). NO escribas la línea de estilo de marca: el sistema la agrega sola y verbatim al final, no la repitas ni la parafrasees. Regla dura de edición honesta: es EDITAR una foto real, no generar una imagen — nunca pidas agregar personas, objetos, texto ni elementos que no estén en la foto original, ni inventar el lugar. En las historias, incluí "prompt_imagen_ia" SOLO cuando la historia es una foto; omití el campo por completo en encuestas, quiz, preguntas o stickers interactivos.
+- REGLA PROMPT DE VIDEO: en cada Reel, "tomas_sugeridas" son EXACTAMENTE 3 objetos que mapean los 3 momentos del reel — (1) GANCHO/apertura, (2) DESARROLLO, (3) CIERRE/CTA — en ese orden. Cada uno lleva "descripcion" (qué muestra esa toma, en 1 frase) y "prompt_video_ia" (el prompt para que una IA image-to-video, ej. Higgsfield, ANIME una foto real de esa escena, para cuando Angélica no filme esa toma). El prompt describe SOLO la escena y un movimiento concreto y sutil de CÁMARA (paneo lento, acercamiento, tilt) y/o de elementos que YA están en la foto (el vapor que sube, el agua que corre, la lluvia) — NUNCA agregar personas, objetos, texto ni elementos nuevos, ni inventar una escena sintética; es animar una foto real, no generar un video de cero. Ajusta la duración sugerida al bloque del guion que corresponde. NO escribas la línea de estilo de video: el sistema la sella sola.
 - Relee tu output contra los 3 ejemplos de voz antes de entregar: si suena a agencia de marketing y no a dueño de spa que escribe bien, reescríbelo."""
 
 
@@ -621,6 +630,38 @@ def _incorporar_estilo_imagen(drafts: dict) -> None:
         if isinstance(dia, dict):
             for h in dia.get('historias') or []:
                 _sellar(h)
+
+
+# Variante de video de la línea de estilo (aprobada por Jorge). Se sella al final
+# de CADA prompt_video_ia — el LLM escribe solo la escena + el movimiento, el
+# sistema garantiza el límite de "animar foto real, no generar de cero".
+ESTILO_VIDEO_AREMKO = (
+    "Estética boutique íntima de Aremko Spa: paleta verde y dorado, luz cálida y "
+    "natural, spa junto al río discreto y de lujo silencioso. Anima la foto real "
+    "tal cual es: solo movimiento de cámara (paneo/acercamiento lento) y de "
+    "elementos que ya están en la imagen (vapor, agua, lluvia). No agregues "
+    "personas, objetos ni elementos nuevos, no inventes la escena ni el lugar."
+)
+
+
+def _incorporar_estilo_video(drafts: dict) -> None:
+    """Pega ESTILO_VIDEO_AREMKO al final de cada `prompt_video_ia` de las tomas de
+    los reels, verbatim y una sola vez. Determinístico, igual que el de imagen.
+    Tolera el shape viejo (tomas como strings): a esas no les hace nada."""
+    def _sellar_toma(t):
+        if not isinstance(t, dict):
+            return  # shape viejo (string) — sin prompt que sellar
+        escena = (t.get('prompt_video_ia') or '').strip()
+        if escena:
+            t['prompt_video_ia'] = f"{escena}\n\n{ESTILO_VIDEO_AREMKO}"
+
+    if not isinstance(drafts, dict):
+        return
+    for reel_key in ('reel_martes', 'reel_jueves'):
+        reel = drafts.get(reel_key)
+        if isinstance(reel, dict):
+            for t in reel.get('tomas_sugeridas') or []:
+                _sellar_toma(t)
 
 
 def call_llm_copywriter(
@@ -678,6 +719,7 @@ def call_llm_copywriter(
         logger.error(f'Copywriter no devolvió JSON válido: {exc}. Raw[:500]: {raw[:500]}')
         raise ValueError(f'Copywriter response no es JSON válido: {exc}')
     _incorporar_estilo_imagen(drafts)  # sella la línea de estilo boutique en cada prompt_imagen_ia
+    _incorporar_estilo_video(drafts)   # ídem para cada prompt_video_ia de las tomas de reels
     return drafts
 
 

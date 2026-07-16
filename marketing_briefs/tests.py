@@ -14,6 +14,8 @@ from marketing_briefs.models import PublicacionPlanificada
 from ventas.services.marketing_brief_generator import (
     _incorporar_estilo_imagen,
     ESTILO_IMAGEN_AREMKO,
+    _incorporar_estilo_video,
+    ESTILO_VIDEO_AREMKO,
 )
 
 
@@ -178,3 +180,52 @@ class PromptImagenIATests(TestCase):
         historias = drafts['stories_diarias'][0]['historias']
         self.assertTrue(historias[0]['prompt_imagen_ia'].endswith(ESTILO_IMAGEN_AREMKO))
         self.assertNotIn('prompt_imagen_ia', historias[1])
+
+
+class PromptVideoIATests(TestCase):
+    """H-066: cada reel lleva 3 tomas {descripcion, prompt_video_ia} que deben
+    llegar como segmentos (por clip) y con el estilo de video sellado. Ambos lados
+    toleran el shape viejo de tomas como strings (briefs archivados)."""
+
+    def test_segmentos_de_tomas_shape_nuevo(self):
+        tomas = [
+            {'descripcion': 'Clip 1 gancho', 'prompt_video_ia': 'paneo lento sobre la tina'},
+            {'descripcion': 'Clip 2 cuerpo', 'prompt_video_ia': 'acercamiento al vapor'},
+            {'descripcion': 'Clip 3 cierre', 'prompt_video_ia': 'el río corriendo'},
+        ]
+        segs = services._segmentos_de_tomas(tomas)
+        self.assertEqual(len(segs), 3)
+        self.assertEqual(segs[0]['titulo'], 'Clip 1')
+        self.assertEqual(segs[0]['texto'], 'Clip 1 gancho')
+        self.assertEqual(segs[0]['prompt_video_ia'], 'paneo lento sobre la tina')
+        self.assertEqual(segs[2]['prompt_video_ia'], 'el río corriendo')
+
+    def test_segmentos_de_tomas_tolera_shape_viejo(self):
+        segs = services._segmentos_de_tomas(['Toma 1: la tina', 'Toma 2: el río'])
+        self.assertEqual(len(segs), 2)
+        self.assertEqual(segs[0]['texto'], 'Toma 1: la tina')
+        self.assertEqual(segs[0]['prompt_video_ia'], '')  # string viejo → sin prompt
+
+    def test_estilo_video_se_sella_una_vez_y_tolera_strings(self):
+        drafts = {
+            'reel_martes': {'tomas_sugeridas': [
+                {'descripcion': 'x', 'prompt_video_ia': 'paneo lento'},
+                {'descripcion': 'y'},        # sin prompt
+                'toma vieja string',         # shape viejo
+            ]},
+            'reel_jueves': {'tomas_sugeridas': [
+                {'descripcion': 'z', 'prompt_video_ia': 'acercamiento'},
+            ]},
+        }
+        _incorporar_estilo_video(drafts)
+        t0 = drafts['reel_martes']['tomas_sugeridas'][0]['prompt_video_ia']
+        self.assertIn('paneo lento', t0)
+        self.assertTrue(t0.endswith(ESTILO_VIDEO_AREMKO))
+        self.assertEqual(t0.count('Estética boutique íntima'), 1)  # sellado una sola vez
+        # toma sin prompt → no se inventa; string vieja → intacta (no crashea)
+        self.assertNotIn('prompt_video_ia', drafts['reel_martes']['tomas_sugeridas'][1])
+        self.assertEqual(drafts['reel_martes']['tomas_sugeridas'][2], 'toma vieja string')
+        # reel_jueves también sellado
+        self.assertTrue(
+            drafts['reel_jueves']['tomas_sugeridas'][0]['prompt_video_ia'].endswith(ESTILO_VIDEO_AREMKO)
+        )

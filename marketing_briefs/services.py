@@ -100,6 +100,36 @@ def _segmentos_de_historias(historias) -> list:
     return segmentos
 
 
+def _segmentos_de_tomas(tomas) -> list:
+    """Un segmento por toma del reel (H-066): cada clip lleva su `prompt_video_ia`
+    (para animar una foto real con IA) + su material/revisión propios. Tolera el
+    shape nuevo ({descripcion, prompt_video_ia}) y el viejo (string suelto, de
+    briefs archivados). [] si no hay tomas."""
+    if not isinstance(tomas, list) or not tomas:
+        return []
+    segmentos = []
+    for i, t in enumerate(tomas, start=1):
+        if isinstance(t, dict):
+            texto = (t.get('descripcion') or '').strip()
+            prompt_v = (t.get('prompt_video_ia') or '').strip()
+        else:
+            texto = str(t).strip()
+            prompt_v = ''
+        segmentos.append({
+            'indice': i,
+            'titulo': f'Clip {i}',
+            'texto': texto,
+            'prompt_video_ia': prompt_v,
+            'material_urls': [],
+            'material_meta': [],
+            'revision_veredicto': 'sin_revisar',
+            'revision_json': [],
+            'revision_resumen': '',
+            'revision_at': None,
+        })
+    return segmentos
+
+
 def _merge_segmentos(nuevos: list, viejos: list) -> list:
     """Al re-explotar, conserva foto/revisión ya subidas (por índice); solo
     refresca titulo/texto desde el brief. El trabajo de Angélica no se pisa."""
@@ -269,8 +299,14 @@ def explode_brief_to_publicaciones(semana_inicio, brief: dict) -> int:
         pieza = drafts.get(pieza_key)
         if isinstance(pieza, dict) and pieza:
             dia_nombre = DIAS_SEMANA[offset]
-            # Carrusel: un segmento por slide (cada slide su foto + revisión).
-            segs = _segmentos_de_slides(pieza.get('slides')) if tipo == 'carrusel' else None
+            # Carrusel: un segmento por slide (foto + revisión). Reel: un segmento
+            # por toma/clip (prompt de video + revisión, H-066).
+            if tipo == 'carrusel':
+                segs = _segmentos_de_slides(pieza.get('slides'))
+            elif tipo == 'reel':
+                segs = _segmentos_de_tomas(pieza.get('tomas_sugeridas'))
+            else:
+                segs = None
             _upsert(
                 pieza_key, canal, tipo, semana_inicio + timedelta(days=offset),
                 pieza, responsable, _hora_de(pieza, dia_nombre, tipo), segmentos=segs,
@@ -287,6 +323,7 @@ def explode_brief_to_publicaciones(semana_inicio, brief: dict) -> int:
             pieza_key, 'TikTok', 'reel', semana_inicio + timedelta(days=offset),
             _derivar_pieza_tiktok(pieza_key, hermano), 'Angélica',
             _hora_de(hermano, dia_nombre, 'reel'),
+            segmentos=_segmentos_de_tomas(hermano.get('tomas_sugeridas')),
         )
 
     stories = drafts.get('stories_diarias') or []

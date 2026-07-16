@@ -366,9 +366,18 @@ def _render_reel(lines: list, reel: dict, titulo: str):
             lines.append(f'- **{b.get("bloque", "?")}**: {b.get("texto", "")}')
         lines.append('')
 
-    if reel.get('tomas_sugeridas'):
+    tomas = reel.get('tomas_sugeridas')
+    if tomas:
         lines.append('**Tomas sugeridas**:')
-        lines.extend(_bullet(reel['tomas_sugeridas']))
+        for t in tomas:
+            # H-066: toma pasó a {descripcion, prompt_video_ia}; tolera el shape viejo (string).
+            if isinstance(t, dict):
+                lines.append(f'- {t.get("descripcion", "")}')
+                prompt_v = (t.get('prompt_video_ia') or '').strip()
+                if prompt_v:
+                    lines.append(f'  - 🎬 Prompt video IA: {prompt_v}')
+            else:
+                lines.append(f'- {t}')
         lines.append('')
 
     if reel.get('audio_sugerido'):
