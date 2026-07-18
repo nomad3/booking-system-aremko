@@ -23,6 +23,7 @@ from ..models import (
     VentaReserva,
 )
 from ..signals import validar_disponibilidad_admin
+from whatsapp_agent.prompt import nombre_presentable
 
 
 class SlotUnavailableError(Exception):
@@ -98,7 +99,9 @@ def _crear_cliente_destinatario(giftcard_item):
                     tel = '+' + tel
             cliente_destinatario, _created = Cliente.objects.get_or_create(
                 telefono=tel,
-                defaults={'nombre': destinatario_nombre, 'email': destinatario_email},
+                # Gate H-067: nombre con basura → '' (se corrige a mano después).
+                defaults={'nombre': nombre_presentable(destinatario_nombre or ''),
+                          'email': destinatario_email},
             )
             return cliente_destinatario
 

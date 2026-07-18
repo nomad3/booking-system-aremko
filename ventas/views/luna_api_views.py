@@ -32,6 +32,7 @@ from ventas.models import (
     Producto, ReservaProducto, Comanda, DetalleComanda
 )
 from whatsapp_agent.models import PropuestaReserva
+from whatsapp_agent.prompt import nombre_presentable
 from ventas.services.cliente_service import ClienteService
 from ventas.services.pack_descuento_service import PackDescuentoService
 
@@ -809,7 +810,9 @@ def crear_reserva(request):
             cliente, created = Cliente.objects.get_or_create(
                 telefono=telefono_normalizado,
                 defaults={
-                    'nombre': cliente_data.get('nombre', ''),
+                    # Gate H-067: un pushname con basura no se guarda como nombre
+                    # ('' para que el lápiz de la bandeja lo corrija a mano).
+                    'nombre': nombre_presentable(cliente_data.get('nombre', '')),
                     'email': cliente_data.get('email', ''),
                     'documento_identidad': cliente_data.get('documento_identidad', ''),
                     'region_id': cliente_data.get('region_id'),
@@ -833,7 +836,11 @@ def crear_reserva(request):
 
             # Actualizar datos si el cliente ya existía
             if not created:
-                cliente.nombre = cliente_data.get('nombre', cliente.nombre)
+                # Gate H-067: solo pisar el nombre si el nuevo es presentable —
+                # nunca guardar un pushname con basura sobre lo existente.
+                nombre_nuevo = nombre_presentable(cliente_data.get('nombre', ''))
+                if nombre_nuevo:
+                    cliente.nombre = nombre_nuevo
                 cliente.email = cliente_data.get('email', cliente.email) or cliente.email
                 if cliente_data.get('documento_identidad'):
                     cliente.documento_identidad = cliente_data.get('documento_identidad')

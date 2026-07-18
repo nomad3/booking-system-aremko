@@ -6,6 +6,7 @@ Incluye búsqueda inteligente por teléfono con múltiples variantes
 
 import logging
 from django.db.models import Q
+from whatsapp_agent.prompt import nombre_presentable
 from ..models import Cliente
 from .phone_service import PhoneService
 
@@ -185,6 +186,10 @@ class ClienteService:
                 for campo, valor in datos_cliente.items():
                     if campo == 'telefono':
                         valor = telefono_normalizado
+                    if campo == 'nombre':
+                        # Gate H-067: no pisar el nombre con basura (pushname
+                        # con emojis/símbolos) — se conserva el existente.
+                        valor = nombre_presentable(valor or '') or cliente_existente.nombre
                     if hasattr(cliente_existente, campo) and valor is not None:
                         setattr(cliente_existente, campo, valor)
 
@@ -195,6 +200,9 @@ class ClienteService:
             else:
                 # Crear nuevo cliente
                 datos_cliente['telefono'] = telefono_normalizado
+                if 'nombre' in datos_cliente:
+                    # Gate H-067: basura → '' (el lápiz de la bandeja corrige).
+                    datos_cliente['nombre'] = nombre_presentable(datos_cliente.get('nombre') or '')
                 cliente_nuevo = Cliente.objects.create(**datos_cliente)
                 logger.info(f"Cliente creado: {cliente_nuevo.nombre} ({telefono_normalizado})")
                 return cliente_nuevo, True, []

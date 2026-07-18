@@ -49,7 +49,9 @@ def _obtener_datos_cliente_por_phone(phone):
 
         return {
             'id': cliente.id,
-            'nombre': cliente.nombre if cliente.nombre else None,
+            # Gate H-067: un nombre basura (pushname con emojis/símbolos) no se
+            # expone al modelo — se trata como "sin nombre".
+            'nombre': prompt_mod.nombre_presentable(cliente.nombre or '') or None,
             'email': cliente.email if cliente.email else None,
             'documento_identidad': cliente.documento_identidad if cliente.documento_identidad else None,
             'comuna_id': cliente.comuna_id if cliente.comuna_id else None,
@@ -932,9 +934,12 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     telefono_normalizado = None
 
                 if cliente:
-                    # Cliente existe: devolver datos + campos faltantes
+                    # Cliente existe: devolver datos + campos faltantes. El nombre
+                    # pasa por el gate H-067: un nombre basura (pushname con
+                    # emojis/símbolos) se trata como "sin nombre" → Luna lo pide.
+                    nombre_ok = prompt_mod.nombre_presentable(cliente.nombre or '')
                     faltan = []
-                    if not cliente.nombre or len(cliente.nombre.strip()) < 3:
+                    if not nombre_ok:
                         faltan.append('nombre')
                     if not cliente.email:
                         faltan.append('email')
@@ -946,7 +951,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     return {
                         'existe': True,
                         'cliente_id': cliente.id,
-                        'nombre': cliente.nombre,
+                        'nombre': nombre_ok or None,
                         'email': cliente.email,
                         'documento_identidad': cliente.documento_identidad,
                         'region': cliente.region.nombre if cliente.region else None,

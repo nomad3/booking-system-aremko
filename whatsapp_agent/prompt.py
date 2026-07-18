@@ -18,21 +18,53 @@ _NOMBRES_INVALIDOS = {
 }
 
 
-def saneo_nombre(raw):
-    """Extrae un nombre de pila usable de `raw` (cliente.nombre o perfil de WhatsApp).
+def nombre_presentable(raw):
+    """Nombre COMPLETO usable tal cual, o '' si el original trae basura (H-067).
 
-    Toma el primer token, deja solo letras (descarta emojis, dígitos, símbolos) y lo
-    capitaliza. Devuelve '' si no parece un nombre real (muy corto o placeholder),
-    para caer a un saludo sin nombre.
+    Criterio de Jorge: si el string trae signos ajenos a un nombre real (emojis,
+    @, dígitos, símbolos), NO se usa nada — nada de rescatar letras sueltas
+    ("L@mirn@dri@@🥰😍" → '', no "Lmirndri"). Acepta solo letras unicode
+    (tildes/ñ), espacios y .'- con al menos 2 letras ("María-José" y "O'Higgins"
+    pasan). Gate único: saludo de Luna, tool verificar_cliente y guardado de
+    Cliente.nombre desde flujos automáticos.
     """
-    raw = (raw or '').strip()
+    raw = ' '.join((raw or '').split())  # colapsa espacios
     if not raw:
         return ''
-    token = raw.split()[0]
-    limpio = ''.join(ch for ch in token if ch.isalpha())
-    if len(limpio) < 2 or limpio.lower() in _NOMBRES_INVALIDOS:
+    letras = 0
+    for ch in raw:
+        if ch.isalpha():
+            letras += 1
+        elif ch not in " .'-":
+            return ''
+    if letras < 2 or raw.lower() in _NOMBRES_INVALIDOS:
         return ''
-    return limpio[:1].upper() + limpio[1:].lower()
+    return raw
+
+
+def saneo_nombre(raw):
+    """Extrae un nombre de PILA usable de `raw` (cliente.nombre o perfil de WhatsApp).
+
+    Pasa primero por nombre_presentable (H-067): un string con símbolos raros no
+    aporta nombre — se saluda sin nombre, sin rescatar letras. Del nombre limpio
+    toma el primer token y lo capitaliza respetando guiones y apóstrofes
+    ("maría-josé" → "María-José", "o'higgins" → "O'Higgins"). Devuelve '' si no
+    parece un nombre real (muy corto o placeholder).
+    """
+    completo = nombre_presentable(raw)
+    if not completo:
+        return ''
+    token = completo.split()[0].strip(".'-")
+    if sum(1 for c in token if c.isalpha()) < 2 or token.lower() in _NOMBRES_INVALIDOS:
+        return ''
+
+    def _cap(seg):
+        return seg[:1].upper() + seg[1:].lower() if seg else seg
+
+    return '-'.join(
+        "'".join(_cap(p) for p in parte.split("'"))
+        for parte in token.split('-')
+    )
 
 
 def clasificar_saludo(hay_previos, dias_desde_ultimo):

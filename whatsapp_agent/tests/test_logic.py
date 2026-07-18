@@ -184,11 +184,33 @@ def test_build_system_prompt_con_descubrimiento():
     assert sp.index('# 3. REGLAS') < sp.index('# 3b. DESCUBRIMIENTO') < sp.index('# 4. CUÁNDO DERIVAR')
 
 
+def test_nombre_presentable():
+    """Gate H-067: basura en el nombre → sin nombre (no se rescatan letras)."""
+    # Caso real 2026-07-18: pushname de WhatsApp usado como nombre.
+    assert prompt.nombre_presentable('L@mirn@dri@@🥰😍') == ''
+    assert prompt.nombre_presentable('María-José') == 'María-José'
+    assert prompt.nombre_presentable("O'Higgins") == "O'Higgins"
+    assert prompt.nombre_presentable('Juan Pablo Soto') == 'Juan Pablo Soto'
+    assert prompt.nombre_presentable('  Ana   María ') == 'Ana María'  # colapsa espacios
+    assert prompt.nombre_presentable('Sra. Fernanda') == 'Sra. Fernanda'
+    assert prompt.nombre_presentable('Juan123') == ''      # dígitos → basura
+    assert prompt.nombre_presentable('🥰') == ''
+    assert prompt.nombre_presentable('Cliente') == ''      # placeholder
+    assert prompt.nombre_presentable('J') == ''            # <2 letras
+    assert prompt.nombre_presentable('') == ''
+    assert prompt.nombre_presentable(None) == ''
+
+
 def test_saneo_nombre():
     assert prompt.saneo_nombre('Jorge Aguilera') == 'Jorge'
     assert prompt.saneo_nombre('JORGE') == 'Jorge'
-    assert prompt.saneo_nombre('Jorgito🔥') == 'Jorgito'   # emoji fuera
+    # H-067: la basura invalida el nombre COMPLETO — ya no se rescatan letras
+    # ('Jorgito🔥' antes devolvía 'Jorgito'; ese rescate producía nombres basura).
+    assert prompt.saneo_nombre('Jorgito🔥') == ''
+    assert prompt.saneo_nombre('L@mirn@dri@@🥰😍') == ''    # caso real 2026-07-18
     assert prompt.saneo_nombre('  maría josé ') == 'María'
+    assert prompt.saneo_nombre("maría-josé") == 'María-José'
+    assert prompt.saneo_nombre("o'higgins") == "O'Higgins"
     assert prompt.saneo_nombre('🔥🔥') == ''               # solo emojis → sin nombre
     assert prompt.saneo_nombre('') == ''
     assert prompt.saneo_nombre(None) == ''
