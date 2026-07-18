@@ -12,7 +12,7 @@ from django.utils import timezone
 from datetime import datetime, time, timedelta
 from collections import defaultdict
 import json
-from ..models import ReservaServicio, ReservaProducto, VentaReserva, Comanda
+from ..models import ReservaServicio, ReservaProducto, VentaReserva, Comanda, DetalleComanda
 
 
 # ---------------------------------------------------------------------------
@@ -354,6 +354,24 @@ def agenda_operativa(request):
             # Determinar si el servicio actual es de desayuno
             es_servicio_desayuno = servicio.servicio and 'desayuno' in servicio.servicio.nombre.lower()
 
+            # Estado de preparación por producto: cruza con las comandas de la
+            # reserva (la fuente de verdad del flujo cocina). Si hay varias
+            # comandas con el mismo producto, gana la más reciente. Sin comanda
+            # → 'pendiente' (nadie lo ha preparado).
+            estado_por_producto = {}
+            detalles_comanda = DetalleComanda.objects.filter(
+                comanda__venta_reserva=servicio.venta_reserva,
+            ).exclude(
+                # borrador/pendiente_pago/pago_fallido son carritos WhatsApp sin
+                # concretar; cancelada no se prepara.
+                comanda__estado__in=('cancelada', 'borrador', 'pendiente_pago', 'pago_fallido'),
+            ).select_related('comanda').order_by('comanda__fecha_solicitud')
+            for det in detalles_comanda:
+                est = det.comanda.estado
+                if est == 'pago_confirmado':
+                    est = 'pendiente'  # pagada por el cliente pero aún sin preparar
+                estado_por_producto[det.producto_id] = est  # la más reciente pisa
+
             # Obtener productos de la reserva que NO sean descuentos
             # y que no hayan sido entregados en días anteriores
             productos = ReservaProducto.objects.filter(
@@ -402,7 +420,10 @@ def agenda_operativa(request):
                             # NO mostrar productos de desayuno (ya se entregaron en la mañana)
                             continue
 
-                        # Si pasó todos los filtros, agregar el producto
+                        # Si pasó todos los filtros, agregar el producto con su
+                        # estado de preparación (para el badge en el template).
+                        producto.estado_comanda = estado_por_producto.get(
+                            producto.producto_id, 'pendiente')
                         productos_a_entregar.append(producto)
                 except Exception:
                     # En caso de error, no incluir el producto

@@ -150,8 +150,33 @@ class ReservaServicioInline(admin.TabularInline):
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
     extra = 1
-    fields = ['producto', 'cantidad', 'fecha_entrega', 'mostrar_valor_unitario', 'mostrar_valor_total']
-    readonly_fields = ['mostrar_valor_unitario', 'mostrar_valor_total']
+    fields = ['producto', 'cantidad', 'fecha_entrega', 'mostrar_valor_unitario', 'mostrar_valor_total', 'estado_comanda']
+    readonly_fields = ['mostrar_valor_unitario', 'mostrar_valor_total', 'estado_comanda']
+
+    def estado_comanda(self, obj):
+        """Estado de preparación según la comanda de cocina que contiene este
+        producto (la más reciente). El estado se cambia en la comanda (inline de
+        abajo o panel cocina), no acá — esto es solo lectura para evitar dobles
+        preparaciones."""
+        if not obj or not obj.pk or not obj.producto_id:
+            return '—'
+        det = (
+            DetalleComanda.objects
+            .filter(comanda__venta_reserva_id=obj.venta_reserva_id, producto_id=obj.producto_id)
+            .exclude(comanda__estado__in=('cancelada', 'borrador', 'pendiente_pago', 'pago_fallido'))
+            .select_related('comanda')
+            .order_by('-comanda__fecha_solicitud')
+            .first()
+        )
+        if det is None:
+            return '🟠 Pendiente (sin comanda)'
+        return {
+            'pendiente': '🟠 Pendiente',
+            'pago_confirmado': '🟠 Pendiente',
+            'procesando': '🔵 En proceso',
+            'entregada': '🟢 Entregado',
+        }.get(det.comanda.estado, det.comanda.get_estado_display())
+    estado_comanda.short_description = 'Estado'
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "producto":
@@ -604,6 +629,82 @@ class VentaReservaAdmin(admin.ModelAdmin):
                     "No se registró el MovimientoCliente de la reserva #%s (no crítico): %s",
                     obj.id, exc,
                 )
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        # Productos agregados por el admin entran al flujo de cocina: si ninguna
+        # comanda de la reserva los cubre, se crea una en Pendiente. Así la agenda
+        # operativa y el panel de cocina los ven con estado (evita pedidos
+        # invisibles y dobles preparaciones). Defensivo: nunca rompe el guardado.
+        try:
+            with transaction.atomic():
+                self._asegurar_comanda_de_productos(request, form.instance)
+        except Exception as exc:
+            logger.warning(
+                "No se creó la comanda automática de la reserva #%s (no crítico): %s",
+                getattr(form.instance, 'pk', None), exc,
+            )
+
+    def _asegurar_comanda_de_productos(self, request, venta):
+        if not venta or not venta.pk:
+            return
+        # Editar una reserva ya pasada no debe crear comandas (histórico).
+        ultimo = venta.reservaservicios.order_by('-fecha_agendamiento').first()
+        if ultimo and ultimo.fecha_agendamiento and ultimo.fecha_agendamiento < timezone.localdate():
+            return
+        cubiertos = set(
+            DetalleComanda.objects
+            .filter(comanda__venta_reserva=venta)
+            .exclude(comanda__estado='cancelada')
+            .values_list('producto_id', flat=True)
+        )
+        faltantes = []
+        for rp in venta.reservaproductos.select_related('producto'):
+            p = rp.producto
+            if not p or rp.producto_id in cubiertos:
+                continue
+            nombre = str(p.nombre or '').strip().lower()
+            es_descuento = (
+                'descuento' in nombre or 'dto' in nombre
+                or nombre.startswith('-') or float(p.precio_base or 0) < 0
+            )
+            if es_descuento:
+                continue  # los descuentos no se preparan en cocina
+            faltantes.append(rp)
+        if not faltantes:
+            return
+
+        # Fecha objetivo: el primer servicio agendado de la reserva (si hay).
+        objetivo = None
+        primero = venta.reservaservicios.order_by('fecha_agendamiento', 'hora_inicio').first()
+        if primero and primero.fecha_agendamiento:
+            try:
+                objetivo = timezone.make_aware(datetime.strptime(
+                    f"{primero.fecha_agendamiento} {primero.hora_inicio or '12:00'}",
+                    '%Y-%m-%d %H:%M'))
+            except (ValueError, TypeError):
+                objetivo = None
+
+        comanda = Comanda.objects.create(
+            venta_reserva=venta,
+            estado='pendiente',
+            usuario_solicita=request.user if request.user.is_authenticated else None,
+            fecha_entrega_objetivo=objetivo,
+            notas_generales='[Admin] Comanda creada automáticamente por productos de la reserva',
+        )
+        for rp in faltantes:
+            DetalleComanda.objects.create(
+                comanda=comanda,
+                producto=rp.producto,
+                cantidad=rp.cantidad,
+                precio_unitario=rp.precio_unitario_venta or rp.producto.precio_base or 0,
+            )
+        self.message_user(
+            request,
+            f'📦 Comanda #{comanda.id} creada automáticamente (Pendiente) con '
+            f'{len(faltantes)} producto(s) para cocina.',
+            messages.INFO,
+        )
 
     # Eliminar con registro de movimiento
     def delete_model(self, request, obj):
