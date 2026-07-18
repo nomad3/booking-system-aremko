@@ -651,11 +651,16 @@ class VentaReservaAdmin(admin.ModelAdmin):
         # Editar una reserva ya pasada no debe crear comandas (histórico).
         ultimo = venta.reservaservicios.order_by('-fecha_agendamiento').first()
         if ultimo and ultimo.fecha_agendamiento and ultimo.fecha_agendamiento < timezone.localdate():
+            logger.info("Comanda auto: reserva #%s omitida (último servicio %s ya pasó)",
+                        venta.pk, ultimo.fecha_agendamiento)
             return
+        # Solo comandas REALES de cocina cubren productos — los carritos WhatsApp
+        # sin concretar (borrador/pendiente_pago/pago_fallido) y las canceladas
+        # no cuentan (mismo criterio que la columna estado_comanda del inline).
         cubiertos = set(
             DetalleComanda.objects
             .filter(comanda__venta_reserva=venta)
-            .exclude(comanda__estado='cancelada')
+            .exclude(comanda__estado__in=('cancelada', 'borrador', 'pendiente_pago', 'pago_fallido'))
             .values_list('producto_id', flat=True)
         )
         faltantes = []
@@ -672,6 +677,10 @@ class VentaReservaAdmin(admin.ModelAdmin):
                 continue  # los descuentos no se preparan en cocina
             faltantes.append(rp)
         if not faltantes:
+            logger.info(
+                "Comanda auto: reserva #%s sin productos por cubrir (cubiertos por comanda: %s)",
+                venta.pk, sorted(cubiertos) or 'ninguno — la reserva no tiene productos de cocina',
+            )
             return
 
         # Fecha objetivo: el primer servicio agendado de la reserva (si hay).
@@ -699,6 +708,8 @@ class VentaReservaAdmin(admin.ModelAdmin):
                 cantidad=rp.cantidad,
                 precio_unitario=rp.precio_unitario_venta or rp.producto.precio_base or 0,
             )
+        logger.info("Comanda auto: creada #%s para reserva #%s con %s producto(s)",
+                    comanda.id, venta.pk, len(faltantes))
         self.message_user(
             request,
             f'📦 Comanda #{comanda.id} creada automáticamente (Pendiente) con '
