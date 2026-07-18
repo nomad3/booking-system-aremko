@@ -1152,12 +1152,13 @@
                         {% if producto.estado_comanda == 'entregada' %}
                         <span class="producto-estado estado-entregado">✔ Entregado</span>
                         {% else %}
+                        {# Clases (no ids): el mismo producto aparece en varias tarjetas de su reserva #}
                         {% if producto.estado_comanda == 'procesando' %}
-                        <span class="producto-estado estado-procesando" id="prod-estado-{{ producto.id }}">⏳ En proceso</span>
+                        <span class="producto-estado estado-procesando prod-estado-{{ producto.id }}">⏳ En proceso</span>
                         {% else %}
-                        <span class="producto-estado estado-pendiente" id="prod-estado-{{ producto.id }}">Pendiente</span>
+                        <span class="producto-estado estado-pendiente prod-estado-{{ producto.id }}">Pendiente</span>
                         {% endif %}
-                        <button type="button" class="producto-btn-entregar"
+                        <button type="button" class="producto-btn-entregar" data-rp-id="{{ producto.id }}"
                                 onclick="marcarProductoEntregado({{ producto.id }}, this)">✓ Entregar</button>
                         {% endif %}
                     </div>
@@ -1276,12 +1277,14 @@ function marcarProductoEntregado(rpId, btn) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.success) {
-            var badge = document.getElementById('prod-estado-' + rpId);
-            if (badge) {
-                badge.className = 'producto-estado estado-entregado';
-                badge.textContent = '✔ Entregado';
-            }
-            btn.remove();
+            // El mismo producto aparece en todas las tarjetas de su reserva:
+            // actualizar TODAS las apariciones, no solo la clickeada.
+            document.querySelectorAll('.prod-estado-' + rpId).forEach(function(b) {
+                b.className = 'producto-estado estado-entregado';
+                b.textContent = '✔ Entregado';
+            });
+            document.querySelectorAll('.producto-btn-entregar[data-rp-id="' + rpId + '"]')
+                .forEach(function(x) { x.remove(); });
         } else {
             alert('Error: ' + (data.error || 'No se pudo marcar entregado'));
             btn.textContent = label;

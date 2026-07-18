@@ -316,34 +316,12 @@ def agenda_operativa(request):
             servicio__nombre__icontains='descuento'
         ).select_related('servicio').order_by('hora_inicio')
 
-        # Identificar qué tipos de servicios hay en la reserva
-        tiene_tina = any(s.servicio and s.servicio.tipo_servicio == 'tina' for s in servicios_del_dia)
-        tiene_cabana = any(s.servicio and s.servicio.tipo_servicio == 'cabana' for s in servicios_del_dia)
-        tiene_masaje = any(s.servicio and s.servicio.tipo_servicio == 'masaje' for s in servicios_del_dia)
-
-        mostrar_productos_aqui = False
-
-        # Determinar si este servicio debe mostrar los productos
-        if tiene_tina:
-            # Si hay tinas, mostrar productos con el primer servicio de tina
-            primer_servicio_tina = servicios_del_dia.filter(servicio__tipo_servicio='tina').first()
-            if primer_servicio_tina and primer_servicio_tina.id == servicio.id:
-                mostrar_productos_aqui = True
-        elif tiene_cabana:
-            # Si no hay tinas pero hay cabañas, mostrar con la primera cabaña
-            primer_servicio_cabana = servicios_del_dia.filter(servicio__tipo_servicio='cabana').first()
-            if primer_servicio_cabana and primer_servicio_cabana.id == servicio.id:
-                mostrar_productos_aqui = True
-        elif tiene_masaje:
-            # Solo si únicamente hay masajes, mostrar con el primer masaje
-            primer_servicio_masaje = servicios_del_dia.filter(servicio__tipo_servicio='masaje').first()
-            if primer_servicio_masaje and primer_servicio_masaje.id == servicio.id:
-                mostrar_productos_aqui = True
-        else:
-            # Para otros tipos de servicio, mostrar con el primero
-            primer_servicio = servicios_del_dia.first()
-            if primer_servicio and primer_servicio.id == servicio.id:
-                mostrar_productos_aqui = True
+        # Los productos se muestran en TODAS las tarjetas de la reserva (decisión
+        # Jorge 2026-07-18): máxima visibilidad — el badge de estado + el botón
+        # "✓ Entregar" evitan la doble preparación. (Regla anterior: solo en la
+        # primera tina/cabaña/masaje; los productos quedaban escondidos si la
+        # tina era tarde, ej. cabaña 16:00 con tina 22:00.)
+        mostrar_productos_aqui = True
 
         # Solo procesar productos si este servicio debe mostrarlos
         if mostrar_productos_aqui:
@@ -600,13 +578,14 @@ def agenda_operativa(request):
     bloques_con_items = [h for h in agenda_ordenada if 'items' in h]
 
     total_servicios = sum(len(h['items']) for h in bloques_con_items) if bloques_con_items else 0
-    # Sumar las CANTIDADES de productos, no solo contar los ítems
-    total_productos = sum(
-        producto.cantidad
-        for h in bloques_con_items
-        for item in h.get('items', [])
-        for producto in item.get('productos', [])
-    ) if bloques_con_items else 0
+    # Sumar las CANTIDADES de productos SIN duplicar: el mismo producto aparece
+    # en todas las tarjetas de su reserva, pero se cuenta una sola vez.
+    productos_unicos = {}
+    for h in bloques_con_items:
+        for item in h.get('items', []):
+            for producto in item.get('productos', []):
+                productos_unicos[producto.id] = producto.cantidad
+    total_productos = sum(productos_unicos.values()) if productos_unicos else 0
     # Contar servicios en curso
     servicios_en_curso = sum(
         1 for h in bloques_con_items
