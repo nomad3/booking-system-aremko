@@ -193,6 +193,19 @@
         color: #2e7d32;
         border: 1px solid #81c784;
     }
+    .producto-btn-entregar {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 10px;
+        border-radius: 10px;
+        border: 1px solid #2e7d32;
+        background: white;
+        color: #2e7d32;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .producto-btn-entregar:hover { background: #e8f5e9; }
+    .producto-btn-entregar:disabled { opacity: .6; cursor: default; }
 
     .btn-actualizar {
         background: #2196F3;
@@ -1138,10 +1151,14 @@
                         <span>{{ producto.producto.nombre }}</span>
                         {% if producto.estado_comanda == 'entregada' %}
                         <span class="producto-estado estado-entregado">✔ Entregado</span>
-                        {% elif producto.estado_comanda == 'procesando' %}
-                        <span class="producto-estado estado-procesando">⏳ En proceso</span>
                         {% else %}
-                        <span class="producto-estado estado-pendiente">Pendiente</span>
+                        {% if producto.estado_comanda == 'procesando' %}
+                        <span class="producto-estado estado-procesando" id="prod-estado-{{ producto.id }}">⏳ En proceso</span>
+                        {% else %}
+                        <span class="producto-estado estado-pendiente" id="prod-estado-{{ producto.id }}">Pendiente</span>
+                        {% endif %}
+                        <button type="button" class="producto-btn-entregar"
+                                onclick="marcarProductoEntregado({{ producto.id }}, this)">✓ Entregar</button>
                         {% endif %}
                     </div>
                     {% endfor %}
@@ -1237,6 +1254,44 @@ function cambiarEstadoComanda(comandaId, nuevoEstado, btn) {
         alert('Error de conexión');
         btn.textContent = label;
         btn.classList.remove('comanda-btn-disabled');
+    });
+}
+
+// === Marcar producto entregado (1 click, H agenda) ===
+// Crea la comanda si falta (ya entregada) o marca entregada la que lo cubre.
+function marcarProductoEntregado(rpId, btn) {
+    var label = btn.textContent;
+    btn.textContent = '⏳...';
+    btn.disabled = true;
+
+    fetch('{% url "ventas:producto_marcar_entregado_api" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ reserva_producto_id: rpId })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            var badge = document.getElementById('prod-estado-' + rpId);
+            if (badge) {
+                badge.className = 'producto-estado estado-entregado';
+                badge.textContent = '✔ Entregado';
+            }
+            btn.remove();
+        } else {
+            alert('Error: ' + (data.error || 'No se pudo marcar entregado'));
+            btn.textContent = label;
+            btn.disabled = false;
+        }
+    })
+    .catch(function(e) {
+        alert('Error de conexión');
+        btn.textContent = label;
+        btn.disabled = false;
     });
 }
 

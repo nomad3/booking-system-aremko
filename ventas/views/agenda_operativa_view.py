@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.db.models import Q, Min
+from django.db import transaction
 from django.utils import timezone
 from datetime import datetime, time, timedelta
 from collections import defaultdict
@@ -886,5 +887,62 @@ def comanda_cambiar_estado_api(request):
 
     except Comanda.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Comanda no encontrada'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@staff_required
+@require_http_methods(["POST"])
+def producto_marcar_entregado_api(request):
+    """1-click desde la agenda: marca ENTREGADO un producto de una reserva.
+
+    Si una comanda real de cocina ya contiene el producto, ESA comanda pasa a
+    'entregada' (con sus timestamps, igual que comanda_cambiar_estado_api). Si
+    ninguna lo cubre, se crea una comanda directamente en 'entregada' con ese
+    producto. Idempotente: si ya estaba entregada, responde success sin tocar.
+    Body JSON: { reserva_producto_id: int }
+    """
+    try:
+        data = json.loads(request.body)
+        rp = (ReservaProducto.objects
+              .select_related('venta_reserva', 'producto')
+              .get(id=data.get('reserva_producto_id')))
+    except (ValueError, TypeError, ReservaProducto.DoesNotExist):
+        return JsonResponse({'success': False, 'error': 'Producto de reserva no encontrado'}, status=404)
+
+    try:
+        with transaction.atomic():
+            det = (
+                DetalleComanda.objects
+                .filter(comanda__venta_reserva_id=rp.venta_reserva_id, producto_id=rp.producto_id)
+                .exclude(comanda__estado__in=('cancelada', 'borrador', 'pendiente_pago', 'pago_fallido'))
+                .select_related('comanda')
+                .order_by('-comanda__fecha_solicitud')
+                .first()
+            )
+            if det:
+                comanda = det.comanda
+                if comanda.estado != 'entregada':
+                    comanda.estado = 'entregada'
+                    comanda.fecha_entrega = timezone.now()
+                    if not comanda.usuario_procesa:
+                        comanda.usuario_procesa = request.user
+                    comanda.save()  # save() propaga fecha_entrega a ReservaProducto
+            else:
+                comanda = Comanda.objects.create(
+                    venta_reserva=rp.venta_reserva,
+                    estado='entregada',
+                    usuario_solicita=request.user,
+                    usuario_procesa=request.user,
+                    fecha_entrega=timezone.now(),
+                    notas_generales='[Agenda] Marcado entregado con 1 click',
+                )
+                DetalleComanda.objects.create(
+                    comanda=comanda,
+                    producto=rp.producto,
+                    cantidad=rp.cantidad,
+                    precio_unitario=rp.precio_unitario_venta or rp.producto.precio_base or 0,
+                )
+        return JsonResponse({'success': True, 'comanda_id': comanda.id, 'estado': 'entregada'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
