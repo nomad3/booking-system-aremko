@@ -6,6 +6,7 @@ server-side en el backend Go de aremko-cli, nunca en el navegador).
 
 import json
 import logging
+import os
 import uuid
 from datetime import date, timedelta
 
@@ -21,6 +22,12 @@ logger = logging.getLogger(__name__)
 # Extensiones de imagen aceptadas en la Fase 2 (fotos/carruseles/historias).
 _EXT_IMAGEN = {'.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'}
 _MAX_BYTES = 16 * 1024 * 1024  # 16 MB por archivo, mismo tope que la bandeja.
+
+# Video (H-065 / H-066 F2): micro-clips por segmento de reel o el reel completo.
+# El tope queda bajo el body máximo del proxy Go de aremko-cli (110 MB); el
+# contrato recomienda <40 MB (clips H.264 reales pesan 5-20 MB).
+_EXT_VIDEO = {'.mp4', '.mov'}
+_MAX_BYTES_VIDEO = 100 * 1024 * 1024
 
 ESTADOS_VALIDOS = {choice[0] for choice in PublicacionPlanificada.ESTADO_CHOICES}
 
@@ -66,6 +73,56 @@ def _medir_imagen(f) -> dict:
             f.seek(0)
         except Exception:  # noqa: BLE001
             pass
+
+
+def _subir_video_cloudinary(f, nombre: str) -> dict:
+    """Sube un video a Cloudinary (chunked, resource_type video) y devuelve el
+    item de material_meta: {url, tipo:'video', width, height, ratio, orientacion,
+    duration, bytes, format}. Es el equivalente video de `_medir_imagen`: la
+    metadata (duración, dimensiones) viene en la respuesta del upload, sin
+    descargar ni procesar nada. Si un campo de metadata falta, el item sale
+    igual con lo que haya. Lanza excepción solo si la subida misma falla."""
+    import cloudinary
+    import cloudinary.uploader
+
+    # cloudinary_storage suele dejar el SDK configurado; si no, mismas env vars
+    # que usa settings para armar CLOUDINARY_STORAGE.
+    if not cloudinary.config().cloud_name:
+        cloudinary.config(
+            cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+            api_key=os.getenv('CLOUDINARY_API_KEY'),
+            api_secret=os.getenv('CLOUDINARY_API_SECRET'),
+            secure=True,
+        )
+
+    try:
+        f.seek(0)
+    except Exception:  # noqa: BLE001
+        pass
+    resp = cloudinary.uploader.upload_large(
+        f,
+        resource_type='video',
+        public_id=nombre.rsplit('.', 1)[0],  # Cloudinary agrega la extensión según el format
+        chunk_size=20 * 1024 * 1024,
+    )
+
+    item = {'url': resp.get('secure_url') or resp.get('url') or '', 'tipo': 'video'}
+    w, h = resp.get('width'), resp.get('height')
+    if w and h:
+        ratio, orientacion = _ratio_label(w, h)
+        item.update({'width': int(w), 'height': int(h), 'ratio': ratio, 'orientacion': orientacion})
+    if resp.get('duration') is not None:
+        try:
+            item['duration'] = round(float(resp['duration']), 1)
+        except (TypeError, ValueError):
+            pass
+    if resp.get('bytes'):
+        item['bytes'] = int(resp['bytes'])
+    if resp.get('format'):
+        item['format'] = resp['format']
+    if not item['url']:
+        raise ValueError('Cloudinary no devolvió URL del video subido')
+    return item
 
 
 def _api_key_ok(request) -> bool:
@@ -247,8 +304,10 @@ def _marcar_segmento_sin_revisar(pub_id, indice):
 @csrf_exempt
 @require_http_methods(['POST'])
 def publicacion_material(request, pub_id: int):
-    """Recibe fotos (multipart, campo 'files'), las sube a Cloudinary, y dispara
-    la revisión IA en background. Responde de inmediato con estado 'revisando'.
+    """Recibe fotos o video (multipart, campo 'files'), los sube a Cloudinary, y
+    dispara la revisión IA en background. Responde de inmediato con estado
+    'revisando'. Video (.mp4/.mov) solo en piezas tipo 'reel' (H-065/H-066 F2):
+    con `segmento=<indice>` es el micro-clip de esa toma; sin él, el reel entero.
     """
     if not _api_key_ok(request):
         return JsonResponse({'error': 'X-API-KEY inválida o ausente'}, status=401)
@@ -285,9 +344,29 @@ def publicacion_material(request, pub_id: int):
     nuevas_urls, nuevas_meta = [], []
     for f in archivos:
         ext = ('.' + f.name.rsplit('.', 1)[-1].lower()) if '.' in f.name else ''
+        if ext in _EXT_VIDEO:
+            # Rama video (H-065/H-066 F2). La revisión posterior deriva los
+            # fotogramas por URL (so_<seg> + .jpg), sin ffmpeg.
+            if pub.tipo != 'reel':
+                return JsonResponse(
+                    {'error': f'{f.name}: el video solo se acepta en reels (esta pieza es "{pub.tipo}").'},
+                    status=400,
+                )
+            if f.size and f.size > _MAX_BYTES_VIDEO:
+                return JsonResponse({'error': f'{f.name} supera el máximo de 100 MB para video.'}, status=400)
+            nombre = f'publicaciones/{pub.semana_inicio.isoformat()}/{uuid.uuid4().hex}{ext}'
+            try:
+                item = _subir_video_cloudinary(f, nombre)
+            except Exception as exc:  # noqa: BLE001
+                logger.error(f'publicacion_material: falló subir video {f.name} ({exc})')
+                return JsonResponse({'error': f'No se pudo subir {f.name}'}, status=502)
+            nuevas_urls.append(item['url'])
+            nuevas_meta.append(item)
+            continue
         if ext not in _EXT_IMAGEN:
             return JsonResponse(
-                {'error': f'Formato no soportado: {f.name}. Solo imágenes ({", ".join(sorted(_EXT_IMAGEN))}).'},
+                {'error': f'Formato no soportado: {f.name}. Imágenes ({", ".join(sorted(_EXT_IMAGEN))}) '
+                          f'o video en reels ({", ".join(sorted(_EXT_VIDEO))}).'},
                 status=400,
             )
         if f.size and f.size > _MAX_BYTES:

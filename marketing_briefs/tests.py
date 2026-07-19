@@ -297,3 +297,191 @@ class PromptVideoIATests(TestCase):
         self.assertTrue(
             drafts['reel_jueves']['tomas_sugeridas'][0]['prompt_video_ia'].endswith(ESTILO_VIDEO_AREMKO)
         )
+
+
+class FramesVideoTests(TestCase):
+    """Helpers puros de H-065/H-066 F2: derivar fotogramas de un video de
+    Cloudinary por transformación URL (so_<seg> + .jpg), sin ffmpeg."""
+
+    URL = 'https://res.cloudinary.com/dtuncr1pi/video/upload/v1/publicaciones/2026-07-20/ab12.mp4'
+
+    def test_es_video_url(self):
+        from marketing_briefs.revision_service import _es_video_url
+        self.assertTrue(_es_video_url(self.URL))
+        self.assertTrue(_es_video_url(self.URL.replace('.mp4', '.MOV')))
+        self.assertTrue(_es_video_url(self.URL + '?x=1'))
+        self.assertFalse(_es_video_url(self.URL.replace('.mp4', '.jpg')))
+        self.assertFalse(_es_video_url(None))
+        self.assertFalse(_es_video_url(42))
+
+    def test_offsets_clip_corto(self):
+        from marketing_briefs.revision_service import _offsets_para
+        # Clip de 8s: inicio, arranque del movimiento, mitad y cierre.
+        self.assertEqual(_offsets_para(8, 'clip'), [0, 1, 4, 7.5])
+        # Clip de 3s: la mitad y el cierre no se duplican con el resto.
+        offsets = _offsets_para(3, 'clip')
+        self.assertEqual(offsets, sorted(set(offsets)))
+        self.assertLessEqual(len(offsets), 5)
+        self.assertEqual(offsets[0], 0)
+
+    def test_offsets_reel_completo(self):
+        from marketing_briefs.revision_service import _offsets_para
+        offsets = _offsets_para(32, 'reel')
+        # Ventana del gancho densa + muestreo + el cierre (CTA) SIEMPRE incluido.
+        self.assertEqual(offsets[:3], [0, 1, 3])
+        self.assertEqual(offsets[-1], 31.5)
+        self.assertLessEqual(len(offsets), 10)
+        # Reel largo (90s): se recorta al tope pero el último fotograma queda.
+        largos = _offsets_para(90, 'reel')
+        self.assertLessEqual(len(largos), 10)
+        self.assertEqual(largos[-1], 89.5)
+
+    def test_offsets_sin_duracion(self):
+        from marketing_briefs.revision_service import _offsets_para
+        self.assertEqual(_offsets_para(None, 'clip'), [0, 1])
+        self.assertEqual(_offsets_para('basura', 'reel'), [0, 1, 3])
+
+    def test_urls_frames(self):
+        from marketing_briefs.revision_service import _urls_frames_video
+        urls, offsets = _urls_frames_video(self.URL, 8, 'clip')
+        self.assertEqual(len(urls), len(offsets))
+        primera = urls[0]
+        # so_ + w_720 + q_auto insertados UNA vez, extensión cambiada a .jpg.
+        self.assertIn('/upload/so_0,w_720,q_auto/', primera)
+        self.assertEqual(primera.count('/upload/'), 1)
+        self.assertTrue(primera.endswith('/publicaciones/2026-07-20/ab12.jpg'))
+        self.assertNotIn('.mp4', primera)
+        # Offsets con decimales se formatean limpios (7.5, no 7.50).
+        self.assertIn('/upload/so_7.5,w_720,q_auto/', urls[-1])
+
+    def test_urls_frames_no_cloudinary(self):
+        from marketing_briefs.revision_service import _urls_frames_video
+        self.assertEqual(_urls_frames_video('https://otro.com/video.mp4', 8), ([], []))
+        self.assertEqual(_urls_frames_video('', 8), ([], []))
+
+    def test_describir_video(self):
+        from marketing_briefs.revision_service import _describir_video
+        meta = {'width': 1080, 'height': 1920, 'ratio': '9:16',
+                'orientacion': 'vertical', 'duration': 8.3}
+        txt = _describir_video(meta, [0, 1, 4, 7.8])
+        self.assertIn('1080×1920', txt)
+        self.assertIn('vertical', txt)
+        self.assertIn('8.3 segundos', txt)
+        self.assertIn('0, 1, 4, 7.8', txt)
+        # Sin metadata: lo dice con cautela en vez de inventar.
+        self.assertIn('no disponibles', _describir_video({}, []))
+
+    def test_ratio_label_video_vertical(self):
+        from marketing_briefs.api_views import _ratio_label
+        self.assertEqual(_ratio_label(1080, 1920), ('9:16', 'vertical'))
+        self.assertEqual(_ratio_label(1920, 1080), ('16:9', 'horizontal'))
+
+
+class RevisarSegmentoVideoTests(TestCase):
+    """La rama video de revisar_segmento (H-066 F2): con un clip subido usa el
+    prompt de reels y los fotogramas; con fotos sigue la rama de siempre."""
+
+    LUNES = date(2026, 7, 20)
+    VIDEO = 'https://res.cloudinary.com/dtuncr1pi/video/upload/v1/publicaciones/2026-07-20/clip1.mp4'
+    FOTO = 'https://res.cloudinary.com/dtuncr1pi/image/upload/v1/publicaciones/2026-07-20/foto1.jpg'
+
+    def _pub_reel(self, material_urls, material_meta):
+        return PublicacionPlanificada.objects.create(
+            semana_inicio=self.LUNES, dia=self.LUNES, canal='Instagram', tipo='reel',
+            pieza_key='reel_martes', titulo='Reel tina al atardecer',
+            copy_json={'duracion_objetivo_segundos': 30,
+                       'guion': [{'bloque': 'gancho_5s', 'texto': 'Mira esto'}]},
+            segmentos=[{
+                'indice': 1, 'titulo': 'Clip 1',
+                'texto': 'Clip 1 — GANCHO: la tina humeando',
+                'prompt_video_ia': 'Anima la foto con paneo lento',
+                'material_urls': material_urls, 'material_meta': material_meta,
+                'revision_veredicto': 'revisando', 'revision_json': [],
+                'revision_resumen': '', 'revision_at': None,
+            }],
+        )
+
+    def test_rama_video_usa_prompt_de_reels_y_persiste(self):
+        from unittest.mock import patch
+        from marketing_briefs import revision_service
+
+        pub = self._pub_reel(
+            [self.VIDEO],
+            [{'url': self.VIDEO, 'tipo': 'video', 'width': 1080, 'height': 1920,
+              'ratio': '9:16', 'orientacion': 'vertical', 'duration': 8.0}],
+        )
+        capturado = {}
+
+        def fake_chat(system_prompt, content):
+            capturado['system'] = system_prompt
+            capturado['content'] = content
+            return {'veredicto': 'aprobado', 'resumen': 'Clip impecable.', 'correcciones': []}
+
+        with patch.object(revision_service, '_chat_vision', side_effect=fake_chat):
+            r = revision_service.revisar_segmento(pub, 1)
+
+        self.assertEqual(r['veredicto'], 'aprobado')
+        self.assertIs(capturado['system'], revision_service.REVISION_VIDEO_SYSTEM_PROMPT)
+        texto = capturado['content'][0]['text']
+        # El contexto lleva lo distintivo de F2: la toma y su prompt generador.
+        self.assertIn('Anima la foto con paneo lento', texto)
+        self.assertIn('GANCHO: la tina humeando', texto)
+        # Las imágenes adjuntas son FOTOGRAMAS derivados, no el .mp4.
+        adjuntas = [c['image_url']['url'] for c in capturado['content'][1:]]
+        self.assertTrue(adjuntas)
+        self.assertTrue(all(u.endswith('.jpg') and 'so_' in u for u in adjuntas))
+        # Persistió en el segmento.
+        pub.refresh_from_db()
+        seg = pub.segmentos[0]
+        self.assertEqual(seg['revision_veredicto'], 'aprobado')
+        self.assertEqual(seg['revision_resumen'], 'Clip impecable.')
+        self.assertTrue(seg['revision_at'])
+
+    def test_rama_foto_sigue_intacta(self):
+        from unittest.mock import patch
+        from marketing_briefs import revision_service
+
+        pub = self._pub_reel(
+            [self.FOTO],
+            [{'url': self.FOTO, 'width': 1080, 'height': 1920, 'ratio': '9:16',
+              'orientacion': 'vertical'}],
+        )
+        capturado = {}
+
+        def fake_chat(system_prompt, content):
+            capturado['system'] = system_prompt
+            capturado['content'] = content
+            return {'veredicto': 'con_observaciones', 'resumen': 'Ajusta el encuadre.',
+                    'correcciones': [{'aspecto': 'encuadre', 'severidad': 'importante',
+                                      'encontrado': 'x', 'correccion': 'y'}]}
+
+        with patch.object(revision_service, '_chat_vision', side_effect=fake_chat):
+            r = revision_service.revisar_segmento(pub, 1)
+
+        self.assertEqual(r['veredicto'], 'con_observaciones')
+        self.assertIs(capturado['system'], revision_service.REVISION_SYSTEM_PROMPT)
+        # La foto viaja tal cual (sin transformación de fotogramas).
+        adjuntas = [c['image_url']['url'] for c in capturado['content'][1:]]
+        self.assertEqual(adjuntas, [self.FOTO])
+        pub.refresh_from_db()
+        self.assertEqual(pub.segmentos[0]['revision_veredicto'], 'con_observaciones')
+
+    def test_video_vigente_manda_sobre_fotos_previas(self):
+        from unittest.mock import patch
+        from marketing_briefs import revision_service
+
+        # Historia real: primero subió una foto de referencia, después el clip.
+        pub = self._pub_reel(
+            [self.FOTO, self.VIDEO],
+            [{'url': self.FOTO, 'width': 1080, 'height': 1920},
+             {'url': self.VIDEO, 'tipo': 'video', 'duration': 5.0}],
+        )
+        capturado = {}
+
+        def fake_chat(system_prompt, content):
+            capturado['system'] = system_prompt
+            return {'veredicto': 'aprobado', 'resumen': '', 'correcciones': []}
+
+        with patch.object(revision_service, '_chat_vision', side_effect=fake_chat):
+            revision_service.revisar_segmento(pub, 1)
+        self.assertIs(capturado['system'], revision_service.REVISION_VIDEO_SYSTEM_PROMPT)
