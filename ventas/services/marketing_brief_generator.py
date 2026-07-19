@@ -96,6 +96,7 @@ def build_user_prompt(
     trends: Optional[dict] = None,
     active_campaigns_detail: Optional[list] = None,
     google_ads_snapshot: Optional[dict] = None,
+    decisiones_semana: Optional[str] = None,
 ) -> str:
     """Construye el user prompt con toda la info contextual."""
 
@@ -103,6 +104,8 @@ def build_user_prompt(
 
 === OBJETIVO DEFINIDO POR JORGE PARA ESTA SEMANA ===
 {(f"Semana del {objetivo_semana['semana_inicio']} (vigencia: {'semana actual' if objetivo_semana.get('es_de_semana_actual') else 'semana anterior — Jorge no lo actualizó'}):" + chr(10) + chr(10) + objetivo_semana['objetivo']) if objetivo_semana else '(Jorge NO definió objetivo para esta semana — usar diagnóstico cruzado para inferir prioridades, mencionar la falta del objetivo en la sección de recordatorios)'}
+
+{decisiones_semana or ''}
 
 === PLAYBOOK MAESTRO (tu fuente de verdad inviolable) ===
 {playbook[:20000]}
@@ -1785,10 +1788,16 @@ def call_llm(
     if not playbook:
         raise ValueError('docs/MARKETING_PLAYBOOK.md no encontrado o vacío')
 
+    # H-067: bloque «Decisiones de la semana» con métricas reales por publicación
+    # (devuelve '' si la cosecha aún no trajo datos — el brief sale como siempre).
+    from marketing_briefs.decisiones import recolectar_decisiones
+    decisiones_semana = recolectar_decisiones(semana_inicio)
+
     user_prompt = build_user_prompt(
         semana_inicio=semana_inicio,
         semana_fin=semana_fin,
         playbook=playbook,
+        decisiones_semana=decisiones_semana,
         recurring_tasks=recurring_tasks,
         frases_clientes=frases_clientes,
         blog_posts_recientes=blog_posts_recientes,

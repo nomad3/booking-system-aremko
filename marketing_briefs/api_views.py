@@ -139,10 +139,11 @@ def publicaciones_semana(request):
 @csrf_exempt
 @require_http_methods(['POST'])
 def publicacion_actualizar(request, pub_id: int):
-    """Actualiza estado / notas / published_url de una publicación.
+    """Actualiza estado / notas / published_url / metricas de una publicación.
 
-    Body JSON: {"estado": "...", "published_url": "...", "notas": "..."}
-    (todos opcionales; solo se tocan los campos presentes).
+    Body JSON: {"estado": "...", "published_url": "...", "notas": "...",
+    "metricas": {...}} (todos opcionales; solo se tocan los campos presentes).
+    `metricas` es el objeto completo del contrato H-067 (REPLACE simple).
     """
     if not _api_key_ok(request):
         return JsonResponse({'error': 'X-API-KEY inválida o ausente'}, status=401)
@@ -174,8 +175,17 @@ def publicacion_actualizar(request, pub_id: int):
         pub.notas = payload.get('notas') or ''
         cambios.append('notas')
 
+    if 'metricas' in payload:
+        metricas = payload.get('metricas')
+        if not isinstance(metricas, dict):
+            return JsonResponse({'error': 'metricas debe ser un objeto JSON'}, status=400)
+        # Contrato H-067 (docs/CONTRATO_H-067_METRICAS.md): REPLACE simple — el
+        # merge del historial de snapshots ya viene hecho por la cosecha Go.
+        pub.metricas = metricas
+        cambios.append('metricas')
+
     if not cambios:
-        return JsonResponse({'error': 'Nada que actualizar (enviar estado, published_url o notas)'}, status=400)
+        return JsonResponse({'error': 'Nada que actualizar (enviar estado, published_url, notas o metricas)'}, status=400)
 
     pub.save(update_fields=cambios + ['updated_at'])
     logger.info(f'publicacion_actualizar: #{pub_id} campos {cambios}')

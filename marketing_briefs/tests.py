@@ -5,11 +5,12 @@ caption/hashtags nativos tomados del objeto anidado `tiktok` del copy. Estos
 tests cubren el helper puro (`_derivar_pieza_tiktok`) y el `explode` completo
 (que crea las filas de PublicacionPlanificada contra una DB de test).
 """
-from datetime import date
+from datetime import date, timedelta
 
 from django.test import TestCase
 
 from marketing_briefs import services
+from marketing_briefs.decisiones import caption_sin_editar, recolectar_decisiones
 from marketing_briefs.models import PublicacionPlanificada
 from ventas.services.marketing_brief_generator import (
     _incorporar_estilo_imagen,
@@ -180,6 +181,73 @@ class PromptImagenIATests(TestCase):
         historias = drafts['stories_diarias'][0]['historias']
         self.assertTrue(historias[0]['prompt_imagen_ia'].endswith(ESTILO_IMAGEN_AREMKO))
         self.assertNotIn('prompt_imagen_ia', historias[1])
+
+
+class CaptionSinEditarTests(TestCase):
+    """H-067: comparación TOLERANTE de captions (ratio ≥ 0.95, nunca igualdad)."""
+
+    def test_igual_y_variantes_de_espacios(self):
+        gen = "Una noche junto al río.\n\nReserva en el link."
+        self.assertTrue(caption_sin_editar(gen, gen))
+        self.assertTrue(caption_sin_editar(gen, "Una  noche junto al río. Reserva en el link."))
+
+    def test_edicion_menor_pasa_el_umbral(self):
+        gen = ("Una noche junto al río Pescado con tina caliente y bosque nativo. "
+               "Reserva por el link de la bio y llega antes de las 20:00 para el atardecer.")
+        pub = gen.replace("llega antes", "ven antes")  # retoque chico de la CM
+        self.assertTrue(caption_sin_editar(gen, pub))
+
+    def test_reescritura_cuenta_como_editado(self):
+        self.assertFalse(caption_sin_editar(
+            "Texto original largo del caption de prueba para el reel del martes",
+            "Otro texto completamente distinto que escribió la community manager",
+        ))
+
+    def test_no_evaluable_devuelve_none(self):
+        self.assertIsNone(caption_sin_editar("", "algo"))
+        self.assertIsNone(caption_sin_editar("algo", None))
+        self.assertIsNone(caption_sin_editar(None, None))
+
+
+class DecisionesSemanaTests(TestCase):
+    """H-067: bloque «Decisiones de la semana» desde métricas reales."""
+
+    LUNES = date(2026, 7, 20)
+
+    def _pub(self, semana, key, valiosa, reach, caption_pub=None, v=1):
+        caption_gen = f'Caption generado de prueba para la pieza {key} del brief semanal'
+        return PublicacionPlanificada.objects.create(
+            semana_inicio=semana, dia=semana, canal='Instagram', tipo='reel',
+            pieza_key=key, titulo=f'Pieza {key}',
+            copy_json={'caption_completo': caption_gen},
+            metricas={
+                'v': v, 'fuente': 'instagram_graph',
+                'caption_publicado': caption_pub if caption_pub is not None else caption_gen,
+                'snapshots': [{'reach': reach, 'saves': 5, 'shares': 2}],
+                'tasas': {'valiosa': valiosa, 'interaccion': 0.05},
+            },
+        )
+
+    def test_bloque_con_ranking_y_meta_metrica(self):
+        sem = self.LUNES - timedelta(weeks=1)
+        self._pub(sem, 'reel_martes', 0.05, 1000)
+        self._pub(sem, 'reel_jueves', 0.01, 500,
+                  caption_pub='Reescrito completamente distinto por la community manager hoy')
+        bloque = recolectar_decisiones(self.LUNES)
+        self.assertIn('MEJOR FUNCIONÓ', bloque)
+        self.assertIn('reel_martes', bloque)
+        self.assertIn('valiosa 5.0%', bloque)
+        self.assertIn('META-MÉTRICA', bloque)
+        self.assertIn('50%', bloque)  # 1 de 2 evaluables sin editar
+        self.assertIn('Decisiones de la semana', bloque)
+
+    def test_sin_metricas_devuelve_vacio(self):
+        self.assertEqual(recolectar_decisiones(self.LUNES), '')
+
+    def test_metricas_sin_version_se_ignoran(self):
+        sem = self.LUNES - timedelta(weeks=1)
+        self._pub(sem, 'reel_x', 0.05, 100, v=None)  # sin 'v' → aún no cosechada
+        self.assertEqual(recolectar_decisiones(self.LUNES), '')
 
 
 class PromptVideoIATests(TestCase):
