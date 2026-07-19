@@ -88,6 +88,7 @@ SEVERIDAD:
 
 REGLAS:
 - Español latinoamericano, cercano, directo (le hablas a Angélica de "tú").
+- Sé conciso: MÁXIMO 6 correcciones (las más importantes primero), y en "encontrado" y "correccion" frases de una línea.
 - Cada corrección ESPECÍFICA a lo que ves, citando el segundo del fotograma cuando aplique. "Mejorar el clip" es inútil; "en el fotograma del segundo 4 el vapor se deforma en espiral antinatural, regenera con el mismo prompt" sirve.
 - Si el clip está bien, dilo — un veredicto "aprobado" con 0 correcciones es válido y deseable.
 - Sé honesta pero alentadora. Ella hizo el trabajo; tú la ayudas a pulirlo.
@@ -249,19 +250,32 @@ def _chat_vision(system_prompt: str, content: list) -> dict:
 
     try:
         client = OpenAI(api_key=api_key, base_url=base_url)
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': content},
-            ],
-            temperature=0.4,
-            max_tokens=2000,
-            response_format={'type': 'json_object'},
-        )
-        raw = resp.choices[0].message.content or ''
-        cleaned = raw.strip().removeprefix('```json').removeprefix('```').removesuffix('```').strip()
-        data = json.loads(cleaned)
+        data = None
+        ultimo_error = None
+        # El modelo a veces devuelve JSON truncado/malformado (caso real en el
+        # diagnóstico de video 2026-07-19): un reintento único lo resuelve casi
+        # siempre; max_tokens holgado evita el truncamiento por tope.
+        for _ in range(2):
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': content},
+                ],
+                temperature=0.4,
+                max_tokens=4000,
+                response_format={'type': 'json_object'},
+            )
+            raw = resp.choices[0].message.content or ''
+            cleaned = raw.strip().removeprefix('```json').removeprefix('```').removesuffix('```').strip()
+            try:
+                data = json.loads(cleaned)
+                break
+            except json.JSONDecodeError as exc:
+                ultimo_error = exc
+                logger.warning(f'_chat_vision: JSON inválido del modelo, reintentando ({exc})')
+        if data is None:
+            raise ultimo_error
     except Exception as exc:  # noqa: BLE001 — la revisión nunca rompe la subida
         logger.error(f'_chat_vision: falló la revisión IA ({exc})')
         return {"veredicto": "sin_revisar",
