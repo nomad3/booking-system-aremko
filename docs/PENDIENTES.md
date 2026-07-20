@@ -5,7 +5,7 @@ ELIMINA de la lista (git guarda la historia); los IDs `P-xx` son estables y no s
 reutilizan. Para agregar: "agrega a pendientes: …". Para cerrar: "listo el P-xx".
 Claude la revisa al inicio de sesión y en cada wrapup.
 
-_Última revisión: 2026-07-13_
+_Última revisión: 2026-07-20_
 
 ## Web y marketing
 
@@ -81,7 +81,6 @@ _Última revisión: 2026-07-13_
 > multi-tenant desde ya (los destinos GBP/IG y la ficha ya salen de constantes
 > aisladas, pensadas para mover a config del tenant). Ver `[[project_datamatic_hospitality_modulos]]`.
 
-18. **P-18 · Revisión de reels / videos** — Hoy los reels quedan fuera de la Fase 2
-    (solo imágenes). Revisar video: extraer fotogramas clave y evaluar contra el
-    guion (gancho en los primeros segundos, tomas sugeridas, coherencia con el copy).
-    Fase posterior — más compleja (extracción + varios frames por reel).
+<!-- P-18 (revisión de reels/videos) cerrado 2026-07-19 como H-065/H-066-F2: subida
+     de video + fotogramas por URL Cloudinary + revisor IA por clip, verificado en
+     vivo. Pendiente solo el front de aremko-cli (ya tiene el contrato). -->
