@@ -619,6 +619,178 @@ gente busca:
   (Incorpora la grafía "tinaja", "junto al río Pescado" y "hasta medianoche" —
   diferenciadores reales — sin perder "cabañas con tina caliente".)
 
+_Estado (actualizado en Ciclo 3, 2026-07-20, verificado live):_
+- ✅ **REC 2 APLICADA** — el post `/blog/termas-puerto-varas/` ya menciona
+  "Puerto Montt" (4 ocurrencias en el HTML live). Baseline a batir para
+  `termas cerca de puerto montt`: pos 5.85, 4 clk / 27 imp, CTR 14.8% (07-13).
+- ✅ **REC 3 APLICADA** — el `meta_description` de `/alojamientos/` es
+  exactamente el texto propuesto ("Cabañas con tina caliente (tinaja) en
+  Puerto Varas, junto al río Pescado. Alojamiento privado con spa, desayuno y
+  tinas hasta medianoche. Reserva online."). Verificado live.
+- ⏳ **REC 1 PENDIENTE** — el post SPA sigue sin publicarse
+  (`/blog/que-es-spa-boutique-aremko/` → 404) y `spa puerto varas` sigue
+  estancada (ver Ciclo 3, se retoma con dato nuevo).
+
+---
+
+### Ciclo 3 — 2026-07-20 (tercera corrida del loop)
+
+**Titular del ciclo:** la foto de GSC muestra clics a la baja (−27% s/s), pero
+**la caída es casi 100% de MARCA** — el orgánico no-marca se mantiene sano. Dos
+señales nuevas positivas: demanda en inglés ("hot tub puerto varas") y
+`masajes puerto varas` apareciendo en **#1 orgánico** en la foto de DataForSEO.
+
+**Snapshot GA4 (historial real, últimas 4 semanas — sesiones TOTALES, todos los canales):**
+
+| Semana | Sesiones | Conv | Engagement | Dur.media | WhatsApp clk | Reservas GA4 |
+|--------|---------:|-----:|-----------:|----------:|-------------:|-------------:|
+| 06-29  | 805  | 72  | 61% | 237s | 69  | 243 |
+| 07-06  | 896  | 87  | 65% | 192s | 85  | 64  |
+| 07-13  | 1099 | 121 | 54% | 200s | 120 | 89  |
+| **07-20** | **1422** | **167** | **56%** | **178s** | **167** | **139** |
+
+- Semana 07-20 = **máximo de la serie en sesiones (1422), conversiones (167) y
+  WhatsApp clicks (167)**. Tráfico creciendo y convirtiendo. Salud GA4:
+  excelente. (`reservation_completed` de GA4 sigue ~0 — esperable: la reserva
+  se cierra por WhatsApp/Flow fuera del funnel GA4, no es una caída real.)
+
+**Snapshot GSC (semanas comparables, dato confiable desde 07-02):**
+
+| Semana | Clicks | Impresiones | CTR | Pos media |
+|--------|-------:|------------:|-----:|----------:|
+| 07-02 (parcial, jueves de alta) | 242 | 2526 | 9.58% | 6.37 |
+| 07-06  | 195 | 2530 | 7.71% | 5.96 |
+| 07-13  | 322 | 2876 | 11.2% | 6.07 |
+| **07-20** | **234** | **2922** | **8.01%** | **6.30** |
+
+- **Clicks −27% s/s (322→234), pero es un blip de MARCA, no de orgánico real.**
+  Desglose: clics de marca ~167→~87 (−80); clics NO-marca ~155→~147 (≈plano).
+  El total cayó −88 y ~80 de esos 88 son marca. Impresiones incluso subieron
+  (+1.6%). El orgánico de trabajo (tinas/masajes/termas/spa) NO retrocedió.
+- Dentro de la marca, el retroceso real a vigilar: **`aremko spa` cayó de
+  pos 1.0 (07-13) a pos 4.12 (07-20)** en GSC, y `aremko` bajó CTR 46%→20%
+  con menos impresiones de marca (178→148). Probable ruido de SERP de marca /
+  menor volumen de búsqueda esa semana; no hay pérdida de contenido detrás.
+  A confirmar el próximo lunes si `aremko spa` vuelve a pos 1.
+
+**Keywords protegidas — GSC (07-20) + rank-check DataForSEO (foto viva) + tendencia persistida (07-07→07-20):**
+
+| Keyword | GSC pos (clk/imp) | DataForSEO foto | Tendencia persistida | Estado |
+|---|---|---|---|---|
+| `aremko` (marca) | 1.22 (30/148) | **1** | 1→1→1→1→1 | ✅ sólida (menos clics, ver arriba) |
+| `aremko spa` | 4.12 (10/72) | — | — | ⚠️ **cayó de 1.0 a 4.12 en GSC — vigilar** |
+| `tinajas puerto varas` (con J) | 1.89 (6/89) | **1** | 1→1→1→1→1 | ✅ sólida |
+| `cabaña con tina caliente puerto varas` | 11.13 (variante "tinaja", 1/31) | **1** | — | ✅ #1 (singular) |
+| `masajes puerto varas` | 2.57 (8/65) | **1** ↑ (persistido 3) | 3→3→3→3→3 | ✅ **posible salto a #1 (foto viva), a confirmar** |
+| `spa cerca de puerto varas` | — | 3 | — | ✅ estable (→/masajes/) |
+| `spa puerto varas` | **7.20 (6/69), CTR 8.7%** ← NUEVO en GSC | 8 | 7→7→7→7→7 | ⚠️ **estancada pos 7-8, 4+ semanas** |
+| `termas puerto varas` | 4.90 (4/71) | 10 | 11→11→9→9→10 | oscila 9-11 (cluster duro) |
+| `termas en puerto varas` | 8.04 (5/71) | 6 ↑ | 9→8→7→8→10 | oscila 6-10 (mejora foto) |
+| `escapada romántica puerto varas` | — | fuera de rango (foto) | 17→16→16→14→16 | ⚠️ oscila 14-17, borde pág.2 |
+
+- **Marca + tinajas + cabaña-con-tina: sólidas top-1.** ✅
+- **`masajes puerto varas`: la foto viva de DataForSEO lo pone en #1 orgánico
+  (competitors_above vacío), aunque el sync persistido de las 09:10 registró 3.**
+  Volatilidad intradía o mejora muy reciente — al menos estable en 3, con
+  chance de #1. GSC lo confirma fuerte (pos 2.57). Sea 1 o 3, es la keyword
+  no-marca más sana. ✅
+- **`spa puerto varas` sigue estancada (pos 7-8, 4+ semanas)** bloqueada por
+  hoteles (wyndhampettra, dreams, hotelbellavista, cabañadellago) + Instagram +
+  ahora tripadvisor.cl. **Dato NUEVO: por primera vez aparece en las top queries
+  de GSC con clics reales (6 clk / 69 imp, CTR 8.7%, pos 7.2)** — la cabeza
+  exacta YA tiene demanda medible; falta subir de la pos 7. La URL que rankea
+  es la HOME (`/`), no un post.
+
+**Queries nuevas/notables sin contenido dedicado o mal capturadas:**
+
+1. **`hot tub puerto varas` — NUEVA (inglés):** pos 9.06, 16 imp, 1 clk (07-20);
+   histórico `hot tub chile` pos 1. Hay demanda de turistas extranjeros con la
+   grafía inglesa. `/tinas/` rankea pos 9 pero su `meta_description` NO contiene
+   "hot tub" (dice "agua termal", que además choca con el mensaje honesto de "no
+   hay termas naturales"). Oportunidad limpia y de bajo riesgo.
+2. **`termas` (genérica, sin geo) creciendo:** 38 imp, pos 7.71, 4 clk. Y el
+   SERP de `termas puerto varas` se puso MÁS competitivo: **puertovaras.org
+   entró #1** + directorios/tours nuevos arriba de Aremko (nomades.com,
+   turistour.cl, cordillera.travel). El cluster termas es cada vez más de
+   directorios; el post ya está, toca esperar indexación/autoridad.
+3. **`escapada romántica puerto varas`:** oscila 14-17 y hoy salió del rango en
+   la foto. El único contenido de romance (`/blog/escapada-romantica-sur-de-
+   chile/`) apunta a "sur de Chile", NO a "puerto varas" — la query con volumen
+   no está en su `title`/`keyword_root`. SERP dominado por OTAs (booking,
+   despegar, tripadvisor, wyndham).
+4. **Micro-cluster "piscina temperada":** `piscina temperada puerto montt`
+   (pos 6.5), `piscina puerto varas` (pos 3.38). Volumen bajo, no accionable aún.
+
+**Reservas de la semana (contexto, 07-13..07-20):** **71 reservas / $7.35M**
+(vs 54 / $6.42M el ciclo anterior). Combos: tina+masaje 19 res / $2.38M; solo
+tinas 32 / $2.19M; 3-en-1 (cabaña+tina+masaje) 6 / $1.39M. La demanda orgánica
+sigue traduciendo a negocio real, al alza. ✅
+
+---
+
+#### Recomendaciones NUEVAS (Nivel 2 — SOLO PROPUESTA, aplica Jorge)
+
+**REC 1 — Capturar la demanda en inglés "hot tub" en la meta de Tinas (`SEOContent` → Tinas), protegiendo el #1 de "tinajas puerto varas".**
+Señal nueva de este ciclo (`hot tub puerto varas` pos 9.06, 16 imp; histórico
+`hot tub chile` pos 1). De paso corrige la meta actual, que tiene doble espacio
+y dice "agua termal" (impreciso: las tinas se calientan por aerotermia + solar,
+no son termas naturales — choca con el mensaje honesto del post de termas).
+
+- **Actual (139):** "Relájate en nuestras tinas calientes al aire libre  en
+  Puerto Varas. Sesiones privadas, agua termal y ambiente romántico. ¡Reserva
+  online!"
+- **Propuesta `meta_description` (157/160):** **"Tinas y tinajas calientes (hot
+  tub) en Puerto Varas, junto al río Pescado, a 38-39°. Sesiones privadas,
+  aerotermia + solar, hasta medianoche. Reserva online."**
+  (Mantiene "tinas" + "tinajas" que ya rankean #1, agrega "hot tub", suma los
+  diferenciadores reales 38-39°/aerotermia+solar/medianoche, quita el doble
+  espacio y el impreciso "agua termal". El `meta_title` / H1 de la categoría
+  NO se toca — ahí vive la fuerza del #1 en "tinajas puerto varas".)
+
+**REC 2 — Re-apuntar el post de romance existente a "escapada romántica puerto varas" (`BlogPost` → `escapada-romantica-sur-de-chile`).**
+La query con volumen es "…puerto varas" (oscila 14-17, hoy fuera de rango), pero
+el post apunta a "sur de Chile" en su `title` y `keyword_root`. No crear nada
+nuevo: reorientar geográficamente el que ya existe (sin cambiar el slug, para no
+romper la URL — solo campos de contenido/meta):
+
+- `keyword_root`: de `escapada romántica sur de chile` → **`escapada romántica puerto varas`**
+- `meta_title` propuesto (63): **Escapada romántica en Puerto Varas: 2 días junto al río | Aremko**
+- `meta_description` propuesta (155/160): **Escapada romántica en Puerto Varas:
+  pack cabaña + tina caliente + masaje desde $190.000, junto al río Pescado, a
+  20 min del centro. Reserva tu fin de semana.**
+  (Reusa el precio $190.000 que ya está publicado — no cambiar precios acá.)
+- Agregar (si no está) un H2 con la frase exacta: **"Escapada romántica en
+  Puerto Varas: qué incluye"**.
+- Nota realista: el SERP de romance está dominado por OTAs (booking, despegar,
+  tripadvisor, wyndham) — reorientar la keyword es correcto pero es un empujón,
+  no garantía de top 10. Medir en 2-3 ciclos si sube del rango 14-17.
+
+**REC 3 — `spa puerto varas` (pendiente de Ciclo 2, con DATO NUEVO que la vuelve prioritaria): publicar el post SPA esta semana + concentrar la señal "spa" en la HOME (la URL que rankea).**
+No es repetir la REC 1 del Ciclo 2 tal cual: ahora hay evidencia de que la
+cabeza exacta YA convierte impresiones en clics (6 clk / CTR 8.7% en GSC, primera
+vez), y sabemos que la URL que rankea la cabeza es la **HOME** (`/`), no un post.
+Dos palancas concretas, ambas de bajo riesgo:
+
+- **(a) Adelantar la publicación del post SPA** (`que-es-spa-boutique-aremko`,
+  hoy 404 / borrador) — mover su slug a la posición ~5 de `PRIORITY_ORDER` en
+  `aremko_blog/management/commands/publish_next_blog_draft.py` para que salga en
+  la próxima corrida del loop de publicación, no en octubre. (1 línea; la
+  propongo como texto, no la edito.)
+- **(b) Enlace interno con ancla exacta "spa en Puerto Varas" desde `/masajes/`
+  (que ya rankea #1 en "masajes" y #3 en "spa cerca de puerto varas") hacia la
+  HOME `/`.** A diferencia del Ciclo 2 (que enlazaba al post inexistente), este
+  enlaza a la URL que HOY rankea la cabeza (pos 8), concentrando ahí la señal
+  "spa" sin depender de que el post ya exista. Google ya asocia `/masajes/` con
+  "spa" — este link traslada parte de esa asociación a la home.
+- Realista: es un head term con hoteles + IG + tripadvisor arriba; post + link
+  interno es un empujón medible en 2-3 ciclos, no un salto garantizado a top 3.
+
+**Para vigilar (no es recomendación, es alerta):** `aremko spa` cayó de pos 1.0
+a 4.12 en GSC esta semana. Es un término de marca propio — no debería estar en
+pos 4. Revisar el próximo lunes: si persiste, mirar si algún agregador/OTA se
+metió en el SERP de marca o si Google cambió el panel. Si vuelve a pos 1, era
+ruido de la semana.
+
 _Estado: propuestas dejadas por el loop; pendiente revisión/aplicación de Jorge._
 
 ---
