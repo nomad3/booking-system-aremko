@@ -503,6 +503,16 @@ LOGGING = {
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': True,
         },
+        # H-045 (2026-07-22): sin esto, TODOS los logger.info() de whatsapp_agent (incluida la
+        # defensa "override por nombre" que ya existía) se perdían en silencio en prod — un
+        # logger sin entrada acá cae al root con nivel WARNING por default de Python, así que
+        # solo logger.warning()/error() pasaban. Se notó al no poder confirmar el servicio_id
+        # real que mandó Luna en un caso de contradicción ya detectado por el guardia de H-045.
+        'whatsapp_agent': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
         # Tracebacks de 500 al stdout (Render los captura). Sin esto, con
         # DEBUG=False Django no emite el traceback y quedamos a ciegas ante
         # un error 500 (fue justo lo que pasó al depurar el 500 del admin).
