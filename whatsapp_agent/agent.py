@@ -1048,6 +1048,14 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
             from carrito_reservas.services import CarritoService
             try:
                 args = args or {}
+                # H-045 seguimiento: loguear lo que Luna realmente pidió — sin esto, cuando el
+                # add "falla" no hay forma de saber si el servicio_id que mandó era el correcto
+                # (caso real 2026-07-22: no se pudo confirmar si tomó el id equivocado o no).
+                logger.info(
+                    '[agregar_servicio_carrito] args recibidos: servicio_id=%s nombre_servicio=%s '
+                    'fecha=%s hora=%s cantidad_personas=%s',
+                    args.get('servicio_id'), args.get('nombre_servicio'), args.get('fecha'),
+                    args.get('hora'), args.get('cantidad_personas'))
                 servicio_id = args.get('servicio_id')
                 # Override determinístico: si el LLM pasó el nombre que dijo el cliente y
                 # resuelve a UN único servicio principal, usar ESE id (evita que el modelo
@@ -1079,6 +1087,9 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 from .availability import validar_hora_es_slot
                 err_hora = validar_hora_es_slot(servicio_id, args.get('fecha'), args.get('hora'))
                 if err_hora:
+                    logger.info(
+                        '[agregar_servicio_carrito] hora inválida: servicio_id=%s fecha=%s hora=%s → %s',
+                        servicio_id, args.get('fecha'), args.get('hora'), err_hora.get('mensaje'))
                     return {'success': False, **err_hora}
                 external_id = phone if phone else 'desconocido'
                 # H-043: si ya hay una propuesta vigente (cotización ya armada), sumar el SERVICIO
@@ -1091,6 +1102,10 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     fecha=_fecha_iso(args.get('fecha')), hora=args.get('hora'),
                     cantidad_personas=cantidad)
                 if actualizado is not None:
+                    logger.info(
+                        '[agregar_servicio_carrito] fusionado a propuesta vigente: servicio_id=%s → '
+                        'success=%s mensaje=%s',
+                        servicio_id, actualizado.get('success'), actualizado.get('mensaje'))
                     return actualizado
                 resultado = CarritoService.agregar_servicio(
                     canal=canal,
@@ -1100,6 +1115,9 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     hora=args.get('hora'),
                     cantidad_personas=cantidad
                 )
+                logger.info(
+                    '[agregar_servicio_carrito] servicio_id final=%s → success=%s error=%s mensaje=%s',
+                    servicio_id, resultado.get('success'), resultado.get('error'), resultado.get('mensaje'))
                 return resultado
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool agregar_servicio_carrito falló: %s', exc)
