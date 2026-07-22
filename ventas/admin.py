@@ -1589,19 +1589,22 @@ class ClienteAdmin(admin.ModelAdmin):
                 "<b>País = Chile</b> → elige la <b>Comuna</b> (la <b>Zona</b> "
                 "sur/nacional se calcula sola al guardar). "
                 "<b>País = Extranjero</b> → no se necesita comuna."
-                # 2026-07-22: la gran mayoría de los clientes son de estas 3
-                # comunas — 1 clic en vez de tener que escribir en el buscador.
-                # Sin ID hardcodeado: el JS busca por nombre vía el mismo endpoint
-                # AJAX que ya usa el autocomplete (ventas/static/admin/js/cliente_geo_toggle.js).
+                # 2026-07-22: comunas más frecuentes — 1 clic en vez de tener que
+                # escribir en el buscador. Sin ID hardcodeado: el JS busca por
+                # nombre vía el mismo endpoint AJAX que ya usa el autocomplete
+                # (ventas/static/admin/js/cliente_geo_toggle.js). Agregar una
+                # comuna nueva acá = agregarla a esta lista, nada más.
                 '<div class="aremko-comuna-rapida" style="margin-top:8px;">'
                 '<span style="margin-right:6px;">Acceso rápido:</span>'
-                '<button type="button" class="button aremko-comuna-btn" '
-                'data-comuna-nombre="Puerto Varas" style="margin-right:6px;">Puerto Varas</button>'
-                '<button type="button" class="button aremko-comuna-btn" '
-                'data-comuna-nombre="Puerto Montt" style="margin-right:6px;">Puerto Montt</button>'
-                '<button type="button" class="button aremko-comuna-btn" '
-                'data-comuna-nombre="Osorno">Osorno</button>'
-                '</div>'
+                + ''.join(
+                    '<button type="button" class="button aremko-comuna-btn" '
+                    'data-comuna-nombre="%s" style="margin-right:6px;">%s</button>' % (n, n)
+                    for n in (
+                        'Puerto Varas', 'Puerto Montt', 'Osorno',
+                        'Santiago', 'Valparaíso', 'Temuco', 'Concepción',
+                    )
+                )
+                + '</div>'
             ),
         }),
         ('Datos legacy (opcional)', {
