@@ -777,13 +777,10 @@ def _cierre_fallback_tras_tools(tool_calls_executed):
     La acción NO se pierde (el carrito ya quedó armado); solo faltó el texto → damos uno para que la
     conversación no se trabe. Devuelve '' si no hubo ninguna tool de carrito/propuesta exitosa
     (en ese caso sí corresponde escalar a humano)."""
-    def _ok(res):
-        return isinstance(res, dict) and not res.get('error') and res.get('success', True) is not False
-
     confirmo = agrego = False
     for tc in (tool_calls_executed or []):
         name, res = tc.get('name'), tc.get('result')
-        if not _ok(res):
+        if not escalation.tool_result_ok(res):
             continue
         if name in ('confirmar_reserva_carrito', 'confirmar_ritual', 'confirmar_refugio'):
             confirmo = True
@@ -1680,6 +1677,17 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     'input_tokens': tokens[0], 'output_tokens': tokens[1], 'latency_ms': tokens[2]}
         return _borrador_escala('respuesta vacía del modelo', error='empty_output',
                                 modelo=modelo, tokens=tokens)
+
+    # H-045: el texto no está vacío, pero puede contradecir una tool que sí tuvo éxito en este
+    # mismo turno (ver comentario junto a escalation.hay_contradiccion_exito_vs_texto). No se
+    # manda así.
+    if escalation.hay_contradiccion_exito_vs_texto(texto, resultado.tool_calls_executed):
+        logger.warning(
+            '[Agente WA] posible contradicción texto vs tool exitosa → escalar. Texto: %s',
+            texto[:200])
+        return _borrador_escala(
+            'posible contradicción: el texto niega algo que una tool ya confirmó exitoso',
+            modelo=modelo, tokens=tokens)
 
     return {
         'escalar': False, 'motivo': '', 'texto': texto, 'modelo': modelo, 'error': '',

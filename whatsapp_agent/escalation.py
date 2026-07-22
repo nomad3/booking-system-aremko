@@ -139,6 +139,43 @@ def _corregir_dia_semana(t):
     return _DIA_FECHA_RE.sub(_fix, t)
 
 
+# H-045 (2026-07-22): caso real — Luna agregó un masaje al carrito con ÉXITO (la tool devolvió
+# success=true, quedó en el carrito con el precio y descuento correctos) y aun así le dijo al
+# cliente "hubo un problema... no está disponible". No fue un error del sistema (el campo `error`
+# de la sugerencia quedó vacío, no corrió ningún chequeo de disponibilidad) — fue el modelo
+# perdiendo el hilo en un turno con contexto muy largo (58k tokens, varias tools encadenadas).
+# Mientras un humano revisa cada borrador esto lo detecta una lectura atenta; el día que se manden
+# solas, nadie lo agarra y se pierde una venta. Esta guardia es la versión en código de esa
+# lectura atenta: si el texto suena a fracaso PERO alguna tool que mutó el carrito/propuesta en
+# el mismo turno tuvo éxito, es una contradicción — no se manda, se escala a humano.
+TOOLS_MUTAN_CARRITO = (
+    'confirmar_reserva_carrito', 'confirmar_ritual', 'confirmar_refugio',
+    'agregar_servicio_carrito', 'agregar_producto_carrito',
+)
+_PATRON_CONTRADICCION = re.compile(
+    r'hubo un problema|no se pudo|no logr[ée]|no logramos|no fue posible|'
+    r'no est[aá] disponible|no hab[ií]a disponibilidad',
+    re.IGNORECASE,
+)
+
+
+def tool_result_ok(res):
+    """True si el resultado de una tool fue exitoso (sin error, success no-False)."""
+    return isinstance(res, dict) and not res.get('error') and res.get('success', True) is not False
+
+
+def hay_contradiccion_exito_vs_texto(texto, tool_calls_executed):
+    """True si el texto final suena a fracaso pero alguna tool que mutó el carrito/propuesta en
+    este mismo turno devolvió éxito (H-045). No identifica LA causa de la alucinación, solo evita
+    que llegue al cliente sin que un humano la vea primero."""
+    if not _PATRON_CONTRADICCION.search(texto or ''):
+        return False
+    return any(
+        tc.get('name') in TOOLS_MUTAN_CARRITO and tool_result_ok(tc.get('result'))
+        for tc in (tool_calls_executed or [])
+    )
+
+
 def sanear_salida(texto):
     """Limpia y acota el texto del modelo antes de exponerlo como borrador."""
     t = (texto or '').strip()

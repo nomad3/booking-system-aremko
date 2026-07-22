@@ -692,6 +692,59 @@ def test_alternativas_pausa_adapter():
     assert len(a['itinerario']) == 2  # tina + masaje
 
 
+def test_tool_result_ok():
+    assert escalation.tool_result_ok({'success': True}) is True
+    assert escalation.tool_result_ok({}) is True  # sin 'success' explícito y sin error -> ok
+    assert escalation.tool_result_ok({'success': False}) is False
+    assert escalation.tool_result_ok({'error': 'algo'}) is False
+    assert escalation.tool_result_ok('no es un dict') is False
+    assert escalation.tool_result_ok(None) is False
+
+
+def test_hay_contradiccion_detecta_masaje_agregado_pero_texto_dice_no_disponible():
+    """Caso real 2026-07-22: agregar_servicio_carrito devolvió éxito y el texto igual dijo
+    que el masaje no estaba disponible — debe detectarse como contradicción (H-045)."""
+    tool_calls = [{'name': 'agregar_servicio_carrito', 'result': {'success': True, 'mensaje': 'ok'}}]
+    texto = ('Lo siento, hubo un problema al intentar agregar el masaje a tu carrito. '
+             'La hora 16:45 no está disponible para el Masaje de Relajación o '
+             'Descontracturante el miércoles 29 de julio.')
+    assert escalation.hay_contradiccion_exito_vs_texto(texto, tool_calls) is True
+
+
+def test_hay_contradiccion_false_si_texto_no_tiene_lenguaje_de_fracaso():
+    tool_calls = [{'name': 'agregar_servicio_carrito', 'result': {'success': True}}]
+    texto = '¡Listo! Agregué el masaje a tu carrito. ¿Algo más?'
+    assert escalation.hay_contradiccion_exito_vs_texto(texto, tool_calls) is False
+
+
+def test_hay_contradiccion_false_si_ninguna_tool_de_carrito_tuvo_exito():
+    """El texto dice "no disponible" pero no hubo ningún add exitoso — mensaje legítimo (ej. se
+    consultó disponibilidad y de verdad no había hora), no contradicción."""
+    tool_calls = [{'name': 'consultar_disponibilidad', 'result': {'disponible': False}}]
+    texto = 'Lo siento, esa hora no está disponible. ¿Buscamos otra?'
+    assert escalation.hay_contradiccion_exito_vs_texto(texto, tool_calls) is False
+
+
+def test_hay_contradiccion_false_si_la_tool_de_carrito_fallo():
+    """Si la tool de verdad falló, decir "no se pudo" es correcto — no es contradicción."""
+    tool_calls = [{'name': 'agregar_servicio_carrito',
+                   'result': {'success': False, 'error': 'servicio_no_disponible'}}]
+    texto = 'No se pudo agregar ese servicio, no está disponible.'
+    assert escalation.hay_contradiccion_exito_vs_texto(texto, tool_calls) is False
+
+
+def test_hay_contradiccion_ignora_tools_no_relacionadas_al_carrito():
+    """Éxito en una tool que NO muta carrito/propuesta (ej. ver_carrito) no cuenta."""
+    tool_calls = [{'name': 'ver_carrito', 'result': {'success': True, 'items': []}}]
+    texto = 'Hubo un problema, no está disponible esa hora.'
+    assert escalation.hay_contradiccion_exito_vs_texto(texto, tool_calls) is False
+
+
+def test_hay_contradiccion_sin_tool_calls():
+    assert escalation.hay_contradiccion_exito_vs_texto('no está disponible', []) is False
+    assert escalation.hay_contradiccion_exito_vs_texto('no está disponible', None) is False
+
+
 def _run():
     fns = [v for k, v in sorted(globals().items()) if k.startswith('test_') and callable(v)]
     fallos = 0
