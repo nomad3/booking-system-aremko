@@ -66,3 +66,30 @@ class NormalizePhoneInternacionalTest(SimpleTestCase):
         for entrada in casos:
             with self.subTest(entrada=entrada):
                 self.assertIsNone(PhoneService.normalize_phone(entrada))
+
+
+class ValidarTelefonoLunaTest(SimpleTestCase):
+    """
+    El wrapper de Luna (validar_telefono_chileno) delega en PhoneService, así que
+    también acepta internacionales. Antes rechazaba a un turista extranjero.
+    """
+
+    def test_chileno_valido(self):
+        from ventas.views.luna_api_views import validar_telefono_chileno
+        es_valido, mensaje, norm = validar_telefono_chileno('912345678')
+        self.assertTrue(es_valido)
+        self.assertEqual(norm, '+56912345678')
+        self.assertEqual(mensaje, '')
+
+    def test_brasileno_valido(self):
+        from ventas.views.luna_api_views import validar_telefono_chileno
+        es_valido, mensaje, norm = validar_telefono_chileno('+55 11 98765-4321')
+        self.assertTrue(es_valido)
+        self.assertEqual(norm, '+5511987654321')
+
+    def test_invalido_devuelve_mensaje(self):
+        from ventas.views.luna_api_views import validar_telefono_chileno
+        es_valido, mensaje, norm = validar_telefono_chileno('123')
+        self.assertFalse(es_valido)
+        self.assertEqual(norm, '')
+        self.assertTrue(mensaje)  # hay un mensaje de error para el usuario

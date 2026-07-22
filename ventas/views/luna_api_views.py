@@ -65,10 +65,15 @@ def validar_email(email: str) -> tuple:
 
 def validar_telefono_chileno(telefono: str) -> tuple:
     """
-    Valida teléfono chileno. Acepta:
-    - +56912345678
-    - 56912345678
-    - 912345678
+    Valida y normaliza un teléfono para Luna. Acepta:
+    - Chileno: +56912345678 / 56912345678 / 912345678
+    - Internacional (turista extranjero): con + y código de país, ej. Brasil
+      +5511987654321, Argentina +5491112345678.
+
+    2026-07-22: delega en PhoneService.normalize_phone (fuente única, la misma
+    que usa el admin y el resto del sistema) en vez de una lógica chilena-only
+    duplicada — antes un turista extranjero era rechazado en el flujo de Luna.
+    (El nombre se mantiene por compatibilidad con los 3 llamadores.)
 
     Returns:
         (es_valido: bool, mensaje_error: str, telefono_normalizado: str)
@@ -76,24 +81,14 @@ def validar_telefono_chileno(telefono: str) -> tuple:
     if not telefono:
         return False, "Teléfono es requerido", ""
 
-    import re
-    # Remover espacios, guiones, paréntesis
-    telefono_limpio = re.sub(r'[\s\-\(\)]', '', telefono)
-
-    # Si empieza con +56, remover el +
-    if telefono_limpio.startswith('+56'):
-        telefono_limpio = telefono_limpio[3:]
-
-    # Si empieza con 56, remover el 56
-    if telefono_limpio.startswith('56') and len(telefono_limpio) == 11:
-        telefono_limpio = telefono_limpio[2:]
-
-    # Debe quedar 9XXXXXXXX (9 dígitos empezando con 9)
-    if not re.match(r'^9\d{8}$', telefono_limpio):
-        return False, "Teléfono debe ser formato chileno (9XXXXXXXX)", ""
-
-    # Normalizar con +56
-    telefono_normalizado = f"+56{telefono_limpio}"
+    from ..services.phone_service import PhoneService
+    telefono_normalizado = PhoneService.normalize_phone(telefono)
+    if not telefono_normalizado:
+        return False, (
+            "Teléfono inválido. Usa formato chileno (9XXXXXXXX) o, para un "
+            "número extranjero, inclúyelo con el + y el código de país "
+            "(ej. Brasil: +55 11 98765-4321)."
+        ), ""
 
     return True, "", telefono_normalizado
 
