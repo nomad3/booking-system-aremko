@@ -588,6 +588,13 @@ class VentaReservaAdmin(admin.ModelAdmin):
 
     # Guardar cambios con registro de movimiento
     def save_model(self, request, obj, form, change):
+        # H-046 (2026-07-22): alta manual nueva (Deborah agregando a mano una reserva
+        # de gift card/teléfono) y el campo quedó vacío — el form no lo exige (blank=True
+        # en el modelo). Solo aplica al CREAR (not change); si alguien edita una reserva
+        # existente y borra la fecha a propósito, no se la pisamos.
+        if not change and not obj.fecha_reserva:
+            obj.fecha_reserva = timezone.now()
+
         # Si fecha_reserva solo tiene fecha (sin hora), agregar hora actual
         if obj.fecha_reserva:
             if isinstance(obj.fecha_reserva, date) and not isinstance(obj.fecha_reserva, datetime):

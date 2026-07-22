@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.utils import timezone
 from .models import Proveedor, CategoriaProducto, Producto, VentaReserva, Cliente, Pago, ReservaProducto, CategoriaServicio, Servicio, ReservaServicio, Region, Comuna
 
 
@@ -124,6 +125,11 @@ class VentaReservaSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         productos_data = validated_data.pop('productos', [])
+        # H-046 (2026-07-22): si quien llama a este endpoint (/api/ventasreservas/) no
+        # manda fecha_reserva (o la manda null), quedaba en blanco — mismo hueco
+        # encontrado en el flujo de Luna. No pisa un valor que el caller sí haya
+        # mandado explícitamente.
+        validated_data['fecha_reserva'] = validated_data.get('fecha_reserva') or timezone.now()
         venta_reserva = VentaReserva.objects.create(**validated_data)
 
         # Procesar los productos vendidos
