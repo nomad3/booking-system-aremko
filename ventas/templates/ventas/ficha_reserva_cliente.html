@@ -85,6 +85,9 @@
     .com-note{font-size:12px;color:var(--hint);text-align:center;margin-top:8px}
     .com-lock{background:var(--bg);border:0.5px dashed var(--line2);border-radius:10px;
       padding:14px;text-align:center;color:var(--muted);font-size:13.5px}
+    .aviso-pago{background:var(--pen-bg);color:var(--pen-fg);border-radius:10px;
+      padding:12px 14px;margin-top:12px;font-size:13.5px;line-height:1.4;display:flex;gap:8px;align-items:flex-start}
+    .aviso-pago .ico{flex-shrink:0}
     .foot{text-align:center;color:var(--hint);font-size:12px;margin-top:16px}
   </style>
 </head>
@@ -110,6 +113,9 @@
             <div class="saldo">Saldo a pagar: {{ saldo_str }} · abonado {{ pagado_str }}</div>
           {% else %}
             <div class="saldo">Saldo $0</div>
+          {% endif %}
+          {% if venta.estado_pago == 'pendiente' %}
+            <div class="aviso-pago"><span class="ico">⏳</span><span>Tienes <strong>2 horas</strong> para completar tu pago. Pasado ese plazo, el sistema podría anular la reserva automáticamente.</span></div>
           {% endif %}
         {% endif %}
 
