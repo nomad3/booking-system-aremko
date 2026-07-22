@@ -1555,6 +1555,25 @@ class ClienteAdminForm(forms.ModelForm):
             # La obligatoriedad real depende del país; se valida en clean().
             self.fields['comuna'].required = False
 
+    def clean_telefono(self):
+        # 2026-07-22: sin esto, un teléfono que el normalizador rechaza (ej. un
+        # extranjero mal formateado) llegaba hasta Cliente.save(), que lanza
+        # ValidationError → 500 en el admin. Validando acá, sale como un error de
+        # campo amable. Además devuelve el número ya normalizado (idempotente con
+        # el save()), así se guarda consistente.
+        telefono = self.cleaned_data.get('telefono')
+        if not telefono:
+            return telefono
+        from .services.phone_service import PhoneService
+        normalizado = PhoneService.normalize_phone(telefono)
+        if not normalizado:
+            raise forms.ValidationError(
+                'Teléfono inválido. Usa formato chileno (9XXXXXXXX) o, para un '
+                'número extranjero, inclúyelo con el + y el código de país '
+                '(ej. Brasil: +55 11 98765-4321).'
+            )
+        return normalizado
+
     def clean(self):
         cleaned = super().clean()
         if cleaned.get('pais') == 'Chile':

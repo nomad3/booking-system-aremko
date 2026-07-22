@@ -32,8 +32,15 @@ class PhoneService:
         Args:
             phone_str: String con número de teléfono en cualquier formato
 
+        Números internacionales (turistas extranjeros: Brasil, Argentina, etc.):
+        - +5511987654321 → +5511987654321  (se respeta el + y el código de país)
+        - +54 9 11 1234-5678 → +5491112345678
+        Requisito: deben venir con el + y el código de país. Sin +, se asume
+        chileno (para no confundir un móvil chileno mal tecleado con extranjero).
+
         Returns:
-            str: Teléfono normalizado en formato +56XXXXXXXXX o None si inválido
+            str: Teléfono normalizado (+56XXXXXXXXX chileno, o +<país><número>
+                 internacional) o None si inválido
         """
         if not phone_str or str(phone_str).strip() == '':
             return None
@@ -48,6 +55,10 @@ class PhoneService:
 
         # Remover caracteres no numéricos (excepto +)
         phone_clean = re.sub(r'[^0-9+]', '', phone)
+
+        # ¿El usuario puso un + inicial? Es la señal explícita de "traigo código de
+        # país" — la usamos para aceptar números internacionales (ver CASO 5).
+        tiene_prefijo_internacional = phone_clean.startswith('+')
 
         # Remover todos los + para limpiar, luego agregarlo al inicio
         phone_digits = phone_clean.replace('+', '')
@@ -83,6 +94,17 @@ class PhoneService:
         elif len(phone_digits) == 11 and phone_digits.startswith('56') and phone_digits[2] == '9':
             result = f'+{phone_digits}'
             logger.info(f"Teléfono normalizado (11 dígitos): {phone_str} → {result}")
+            return result
+
+        # CASO 5: Número internacional (turista extranjero). El usuario puso + con
+        # un código de país que NO es Chile (Brasil +55, Argentina +54, etc.). Se
+        # respeta tal cual, validando largo E.164 (código país + número: 10-15
+        # dígitos). Antes esto caía al CASO 4 → None → Cliente.save() lanzaba
+        # ValidationError → 500 al crear un cliente extranjero.
+        elif tiene_prefijo_internacional and not phone_digits.startswith('56') \
+                and 10 <= len(phone_digits) <= 15:
+            result = f'+{phone_digits}'
+            logger.info(f"Teléfono internacional normalizado: {phone_str} → {result}")
             return result
 
         # CASO 4: Otros formatos no soportados
