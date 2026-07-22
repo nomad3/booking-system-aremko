@@ -1289,6 +1289,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
             # que confirmar_reserva_carrito, pero los servicios los arma construir_servicios_ritual.
             from .reserva_service import preparar_reserva as servicio_preparar_reserva
             from .packs import construir_servicios_ritual
+            from carrito_reservas.services import CarritoService
             try:
                 args = args or {}
                 external_id = phone if phone else '+56912345678'
@@ -1297,6 +1298,11 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 if not fecha:
                     return {'success': False, 'error': 'falta_fecha',
                             'mensaje': 'Indicá la fecha del Ritual.'}
+
+                # H-044: si el cliente ya había agregado un producto (ej. una tabla) al
+                # carrito ANTES de que existiera esta propuesta, se fusiona acá — si no,
+                # quedaba huérfano en el carrito y nunca llegaba a la cotización final.
+                productos_carrito = CarritoService.obtener_productos_pendientes(canal, external_id)
 
                 armado = construir_servicios_ritual(fecha)
                 if armado.get('error'):
@@ -1339,6 +1345,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     'documento_identidad': documento, 'region_id': region_id, 'comuna_id': comuna_id,
                 }
                 payload = {'cliente': cliente_data, 'servicios': armado['servicios'],
+                           'productos': productos_carrito,
                            'metodo_pago': 'pendiente', 'es_ritual': True}
 
                 resultado = servicio_preparar_reserva(
@@ -1350,6 +1357,11 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 if not resultado.get('success'):
                     logger.error('[confirmar_ritual] preparar_reserva falló: %s', resultado)
                     return resultado
+
+                # Ya quedaron dentro de la propuesta recién creada — limpiar del carrito
+                # para no duplicarlos si el cliente agrega algo más después.
+                if productos_carrito:
+                    CarritoService.limpiar_productos(canal, external_id)
 
                 total = resultado.get('total', 0)
                 logger.info('[confirmar_ritual] propuesta %s creada para %s ($%s, descuento $%s)',
@@ -1381,6 +1393,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
             # desayuno, clavada en $290.000. Mismo camino de cliente/propuesta que confirmar_ritual.
             from .reserva_service import preparar_reserva as servicio_preparar_reserva
             from .packs import construir_servicios_refugio
+            from carrito_reservas.services import CarritoService
             try:
                 args = args or {}
                 external_id = phone if phone else '+56912345678'
@@ -1389,6 +1402,10 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 if not fecha:
                     return {'success': False, 'error': 'falta_fecha',
                             'mensaje': 'Indicá la fecha de llegada del Refugio.'}
+
+                # H-044: mismo fix que confirmar_ritual — fusionar productos que ya
+                # estaban sueltos en el carrito antes de que existiera esta propuesta.
+                productos_carrito = CarritoService.obtener_productos_pendientes(canal, external_id)
 
                 armado = construir_servicios_refugio(fecha)
                 if armado.get('error'):
@@ -1430,6 +1447,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                     'documento_identidad': documento, 'region_id': region_id, 'comuna_id': comuna_id,
                 }
                 payload = {'cliente': cliente_data, 'servicios': armado['servicios'],
+                           'productos': productos_carrito,
                            'metodo_pago': 'pendiente', 'es_refugio': True}
 
                 resultado = servicio_preparar_reserva(
@@ -1441,6 +1459,9 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
                 if not resultado.get('success'):
                     logger.error('[confirmar_refugio] preparar_reserva falló: %s', resultado)
                     return resultado
+
+                if productos_carrito:
+                    CarritoService.limpiar_productos(canal, external_id)
 
                 total = resultado.get('total', 0)
                 logger.info('[confirmar_refugio] propuesta %s creada para %s ($%s, descuento $%s)',

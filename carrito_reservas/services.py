@@ -241,6 +241,37 @@ class CarritoService:
             }
 
     @staticmethod
+    def obtener_productos_pendientes(canal, external_id):
+        """Productos sueltos en el carrito, en el shape que espera `preparar_reserva`
+        ({'producto_id', 'cantidad'}). No muta el carrito.
+
+        Uso: Ritual/Refugio arman su propuesta AFUERA del carrito (`confirmar_ritual`,
+        `confirmar_refugio`, en whatsapp_agent/agent.py) — si el cliente ya había
+        agregado un producto (ej. una tabla de quesos) ANTES de que existiera esa
+        propuesta, quedaba huérfano en el carrito y nunca llegaba a la cotización final
+        (caso real 2026-07-21). Este helper lo trae para fusionarlo en el payload antes
+        de crear la propuesta; llamar `limpiar_productos` después de un
+        `preparar_reserva` exitoso (nunca antes: si falla, el producto debe seguir en
+        el carrito para no perderlo).
+        """
+        carrito = CarritoReserva.obtener_o_crear(canal, external_id)
+        return [
+            {'producto_id': it.get('producto_id'), 'cantidad': it.get('cantidad', 1)}
+            for it in carrito.items if it.get('tipo') == 'producto'
+        ]
+
+    @staticmethod
+    def limpiar_productos(canal, external_id):
+        """Quita del carrito los ítems tipo producto (post-fusión exitosa fuera del
+        carrito, ver `obtener_productos_pendientes`). Los servicios (si hubiera) no se
+        tocan — hoy Ritual/Refugio no dejan servicios en el carrito, pero por las dudas."""
+        carrito = CarritoReserva.obtener_o_crear(canal, external_id)
+        if any(it.get('tipo') == 'producto' for it in carrito.items):
+            carrito.items = [it for it in carrito.items if it.get('tipo') != 'producto']
+            carrito.save(update_fields=['items', 'updated_at'])
+            CarritoService._recalcular_totales(carrito)
+
+    @staticmethod
     def quitar_item(canal, external_id, indice):
         """Quita un item del carrito por índice.
 
