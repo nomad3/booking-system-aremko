@@ -853,11 +853,16 @@ def crear_reserva(request):
             logger.info(f'[Luna API] Cliente {"creado" if created else "actualizado"}: {cliente.nombre} ({cliente.telefono})')
 
             # 2. Crear VentaReserva
+            # H-046 (2026-07-22): faltaba fecha_reserva — quedaba en blanco ("-" en el listado
+            # del admin) para TODA reserva creada por este camino (aprobar cotización de Luna,
+            # el mismo que usa Deborah). Las otras rutas de creación (checkout web en
+            # reservation_service.py, api_views.py) sí la seteaban con timezone.now().
             venta_reserva = VentaReserva.objects.create(
                 cliente=cliente,
                 estado_pago=metodo_pago,
                 comentarios=f"[Luna WhatsApp] {notas}" if notas else "[Luna WhatsApp]",
-                total=0  # Se calculará después
+                total=0,  # Se calculará después
+                fecha_reserva=timezone.now(),
             )
 
             logger.info(f'[Luna API] VentaReserva creada: ID {venta_reserva.id}')
