@@ -31,48 +31,64 @@ from django.conf import settings # To get placeholder API key
 from django.utils.dateparse import parse_datetime # For parsing timestamp if provided
 from django.views.decorators.csrf import csrf_exempt
 
+# 2026-07-22 (seguridad): estos ModelViewSet heredaban el default global
+# DEFAULT_PERMISSION_CLASSES=[AllowAny] y quedaban PÚBLICOS sin token, con
+# lectura Y escritura/borrado. Confirmado en prod: /ventas/api/pagos/ devolvía
+# 932 KB sin autenticar; clientes exponía RUT/email/teléfono. No hay ningún
+# consumidor de estos endpoints en el código (ni web, ni Luna, ni aremko-cli).
+# Se cierran a IsAuthenticated. OJO: Region/Comuna (más abajo) se dejan AllowAny
+# a propósito — los usa el checkout público (checkout.html).
 class ProveedorViewSet(viewsets.ModelViewSet):
     queryset = Proveedor.objects.all()
     serializer_class = ProveedorSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class CategoriaProductoViewSet(viewsets.ModelViewSet):
     queryset = CategoriaProducto.objects.all()
     serializer_class = CategoriaProductoSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class ProductoViewSet(viewsets.ModelViewSet):
     queryset = Producto.objects.all()
     serializer_class = ProductoSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class ServicioViewSet(viewsets.ModelViewSet):
     queryset = Servicio.objects.all()
     serializer_class = ServicioSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class CategoriaServicioViewSet(viewsets.ModelViewSet):
     queryset = CategoriaServicio.objects.all()
     serializer_class = CategoriaServicioSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
     serializer_class = ClienteSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class ReservaProductoViewSet(viewsets.ModelViewSet):
     queryset = ReservaProducto.objects.all()
     serializer_class = ReservaProductoSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class ReservaServicioViewSet(viewsets.ModelViewSet):
     queryset = ReservaServicio.objects.all()
     serializer_class = ReservaServicioSerializer
+    permission_classes = [IsAuthenticated]
 
 class VentaReservaViewSet(viewsets.ModelViewSet):
     queryset = VentaReserva.objects.all()
     serializer_class = VentaReservaSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """
@@ -245,6 +261,7 @@ class VentaReservaViewSet(viewsets.ModelViewSet):
 class PagoViewSet(viewsets.ModelViewSet):
     queryset = Pago.objects.all()
     serializer_class = PagoSerializer
+    permission_classes = [IsAuthenticated]  # 2026-07-22: ver nota en ProveedorViewSet
 
     def create(self, request, *args, **kwargs):
         # Consider adding validation and ensuring user permissions if needed
