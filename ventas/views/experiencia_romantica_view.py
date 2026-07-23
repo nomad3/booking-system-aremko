@@ -56,6 +56,11 @@ def resolver_ambientacion(ocasion, color, ambientacion_servicios):
     return None
 
 
+def _clp(n):
+    """Formato chileno con punto de miles: 15000 -> '15.000'."""
+    return f"{int(n or 0):,}".replace(",", ".")
+
+
 def _ambientacion_qs():
     return Servicio.objects.filter(
         categoria__nombre__iexact='Ambientaciones', activo=True,
@@ -83,13 +88,16 @@ def experiencia_romantica_view(request):
         'nombre': t.nombre,
         'capacidad': t.capacidad_maxima,
         'total': int(t.precio_base) * t.capacidad_maxima,
+        'total_fmt': _clp(int(t.precio_base) * t.capacidad_maxima),
     } for t in tinas_qs]
 
+    precio_choco = int(chocolates.precio_base) if chocolates else 15000
     context = {
         'tinas': tinas,
         'precio_romantica': int(romantica.precio_base) if romantica else 38000,
         'precio_cumple': int(cumple.precio_base) if cumple else 78000,
-        'precio_chocolates': int(chocolates.precio_base) if chocolates else 15000,
+        'precio_chocolates': precio_choco,
+        'precio_chocolates_fmt': _clp(precio_choco),
         'tiene_chocolates': chocolates is not None,
     }
     return render(request, 'ventas/experiencia_romantica.html', context)

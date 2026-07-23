@@ -163,7 +163,7 @@
 
         <div class="paso-t">3 · Tu <b>tina</b>, fecha y hora</div>
         <select id="selTina"><option value="">Elige tu tina…</option>
-          {% for t in tinas %}<option value="{{ t.id }}" data-total="{{ t.total }}">{{ t.nombre }} · para 2 · ${{ t.total }}</option>{% endfor %}
+          {% for t in tinas %}<option value="{{ t.id }}" data-total="{{ t.total }}">{{ t.nombre }} · para 2 · ${{ t.total_fmt }}</option>{% endfor %}
         </select>
         <div class="fila">
           <input type="date" id="selFecha">
@@ -175,7 +175,7 @@
         <div class="paso-t">4 · ¿Le <b>sumas</b> algo?</div>
         <label class="check">
           <span class="lbl">Caja de chocolates<small>El toque dulce de la sorpresa</small></span>
-          <span style="display:flex; align-items:center; gap:10px;"><span style="color:var(--suave); font-size:14px;">+${{ precio_chocolates }}</span><input type="checkbox" id="chkChoco"></span>
+          <span style="display:flex; align-items:center; gap:10px;"><span style="color:var(--suave); font-size:14px;">+${{ precio_chocolates_fmt }}</span><input type="checkbox" id="chkChoco"></span>
         </label>
         {% endif %}
       </form>
