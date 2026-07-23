@@ -143,28 +143,46 @@
       <form method="post" action="{% url 'experiencia_romantica_continuar' %}" id="frm" class="card">
         {% csrf_token %}
         <input type="hidden" name="ocasion" id="f_ocasion" value="romantica">
-        <input type="hidden" name="color" id="f_color" value="rosado">
+        <input type="hidden" name="nivel"   id="f_nivel"  value="r1">
+        <input type="hidden" name="torta"   id="f_torta"  value="sin_torta">
+        <input type="hidden" name="color"   id="f_color"  value="rosado">
         <input type="hidden" name="tina_id" id="f_tina">
-        <input type="hidden" name="fecha" id="f_fecha">
-        <input type="hidden" name="hora" id="f_hora">
+        <input type="hidden" name="fecha"   id="f_fecha">
+        <input type="hidden" name="hora"    id="f_hora">
         <input type="hidden" name="chocolates" id="f_choco" value="0">
 
         <div class="paso-t">1 · ¿Qué <b>celebras</b>?</div>
         <div class="opts">
           <button type="button" class="opt foto sel" id="optRom" data-oc="romantica">Romántica<small>Casi 30 velas + entorno</small></button>
-          <button type="button" class="opt foto" id="optCum" data-oc="cumpleanos">Cumpleaños<small>Ambientación + torta</small></button>
+          <button type="button" class="opt foto" id="optCum" data-oc="cumpleanos">Cumpleaños<small>Con o sin torta</small></button>
         </div>
 
-        <div class="paso-t" id="colorLbl">2 · <b>Color</b> de la ambientación</div>
-        <div class="opts">
-          <button type="button" class="opt" data-color="azul" id="optAzul">Azul<small id="azulSub">Tono frío</small></button>
-          <button type="button" class="opt sel" data-color="rosado" id="optRosado">Rosado<small id="rosaSub">Tono cálido</small></button>
+        <!-- 2A · Románticas: nivel (no llevan color) -->
+        <div id="panelRom">
+          <div class="paso-t">2 · ¿Qué <b>incluye</b>?</div>
+          <div class="opts">
+            <button type="button" class="opt sel" data-nivel="r1" id="optR1">Clásica<small>Casi 30 velas + montaje</small></button>
+            <button type="button" class="opt" data-nivel="r2" id="optR2">Con ramo de flores<small>Suma un ramo fresco</small></button>
+          </div>
         </div>
 
-        <div class="paso-t">3 · Tu <b>tina</b>, fecha y hora</div>
-        <select id="selTina"><option value="">Elige tu tina…</option>
-          {% for t in tinas %}<option value="{{ t.id }}" data-total="{{ t.total }}">{{ t.nombre }} · para 2 · ${{ t.total_fmt }}</option>{% endfor %}
-        </select>
+        <!-- 2B · Cumpleaños: color + torta -->
+        <div id="panelCum" style="display:none;">
+          <div class="paso-t">2 · <b>Color</b> de la ambientación</div>
+          <div class="opts">
+            <button type="button" class="opt" data-color="azul" id="optAzul">Azul<small>Tono frío</small></button>
+            <button type="button" class="opt sel" data-color="rosado" id="optRosado">Rosado<small>Tono cálido</small></button>
+          </div>
+          <div class="paso-t">3 · ¿Va con <b>torta</b>?</div>
+          <div class="opts">
+            <button type="button" class="opt sel" data-torta="sin_torta" id="optSinTorta">Sin torta<small>Solo ambientación</small></button>
+            <button type="button" class="opt" data-torta="con_torta" id="optConTorta">Con torta<small>Torta incluida</small></button>
+          </div>
+          <p class="nota">La ambientación de cumpleaños se instala solo en las tinas <b>Hornopirén, Osorno y Llaima</b> (en las demás no hay espacio para montarla).</p>
+        </div>
+
+        <div class="paso-t" id="tinaLbl">3 · Tu <b>tina</b>, fecha y hora</div>
+        <select id="selTina"><option value="">Elige tu tina…</option></select>
         <div class="fila">
           <input type="date" id="selFecha">
           <select id="selHora"><option value="">Hora…</option></select>
@@ -172,13 +190,14 @@
         <div class="nota" id="notaHoras"></div>
 
         {% if tiene_chocolates %}
-        <div class="paso-t">4 · ¿Le <b>sumas</b> algo?</div>
+        <div class="paso-t" id="chocoLbl">4 · ¿Le <b>sumas</b> algo?</div>
         <label class="check">
           <span class="lbl">Caja de chocolates<small>El toque dulce de la sorpresa</small></span>
           <span style="display:flex; align-items:center; gap:10px;"><span style="color:var(--suave); font-size:14px;">+${{ precio_chocolates_fmt }}</span><input type="checkbox" id="chkChoco"></span>
         </label>
         {% endif %}
       </form>
+      {{ tinas|json_script:"tinas-data" }}
 
       <div class="sorpresa">
         <div class="ic">🤫</div>
@@ -199,9 +218,10 @@
   </div>
 
   <script>
-    var PRECIO = { romantica:{{ precio_romantica }}, cumpleanos:{{ precio_cumple }}, chocolates:{{ precio_chocolates|default:0 }} };
+    var PRECIO = { r1:{{ precio_r1 }}, r2:{{ precio_r2 }}, cumple_sin:{{ precio_cumple_sin }}, cumple_con:{{ precio_cumple_con }}, chocolates:{{ precio_chocolates|default:0 }} };
+    var TINAS = JSON.parse(document.getElementById('tinas-data').textContent);
     var HORAS_URL = "{% url 'ventas:get_available_hours' %}";
-    var estado = { ocasion:'romantica', color:'rosado', tinaTotal:0, choco:false };
+    var estado = { ocasion:'romantica', nivel:'r1', color:'rosado', torta:'sin_torta', tinaTotal:0, choco:false };
     var $ = function(id){ return document.getElementById(id); };
     var fmt = function(n){ return '$' + Math.round(n).toLocaleString('es-CL'); };
 
@@ -212,23 +232,55 @@
         b.classList.toggle('azulsel', on && attr==='data-color' && val==='azul');
       });
     }
+    function precioBase(){
+      if(estado.ocasion==='romantica') return estado.nivel==='r2' ? PRECIO.r2 : PRECIO.r1;
+      return estado.torta==='con_torta' ? PRECIO.cumple_con : PRECIO.cumple_sin;
+    }
     function recalc(){
-      var t = PRECIO[estado.ocasion] + estado.tinaTotal + (estado.choco ? PRECIO.chocolates : 0);
+      var t = precioBase() + estado.tinaTotal + (estado.choco ? PRECIO.chocolates : 0);
       $('totalTxt').textContent = fmt(t);
       $('btnCont').disabled = !($('f_tina').value && $('f_fecha').value && $('f_hora').value);
     }
+    function rellenarTinas(){
+      // Románticas → cualquier tina de pareja; cumpleaños → solo Hornopirén/Osorno/Llaima.
+      var sel=$('selTina'), oc=estado.ocasion;
+      sel.innerHTML='<option value="">Elige tu tina…</option>';
+      TINAS.forEach(function(t){
+        var ok = (oc==='cumpleanos') ? t.cumple_ok : t.romantica_ok;
+        if(!ok) return;
+        var o=document.createElement('option');
+        o.value=t.id; o.setAttribute('data-total', t.total);
+        var cap = (t.capacidad>2) ? ('hasta '+t.capacidad) : 'para 2';
+        o.textContent = t.nombre + ' · ' + cap + ' · $' + t.total_fmt;
+        sel.appendChild(o);
+      });
+      // Cambió el set: se reinicia la elección de tina y hora.
+      $('f_tina').value=''; estado.tinaTotal=0;
+      $('selHora').innerHTML='<option value="">Hora…</option>'; $('f_hora').value='';
+      $('notaHoras').textContent='';
+    }
+    function aplicarOcasion(){
+      var c = estado.ocasion==='cumpleanos';
+      $('f_ocasion').value = estado.ocasion;
+      $('panelRom').style.display = c ? 'none' : '';
+      $('panelCum').style.display = c ? '' : 'none';
+      // Cumpleaños tiene un paso extra (torta), así que la tina y los chocolates se corren.
+      $('tinaLbl').innerHTML = (c ? '4' : '3') + ' · Tu <b>tina</b>, fecha y hora';
+      var choco=$('chocoLbl'); if(choco) choco.innerHTML = (c ? '5' : '4') + ' · ¿Le <b>sumas</b> algo?';
+      rellenarTinas();
+      recalc();
+    }
     document.querySelectorAll('.opt[data-oc]').forEach(function(b){
-      b.onclick=function(){
-        estado.ocasion=b.getAttribute('data-oc'); $('f_ocasion').value=estado.ocasion; pintarSel('data-oc',estado.ocasion);
-        var c=estado.ocasion==='cumpleanos';
-        $('colorLbl').innerHTML = c ? '2 · ¿Para <b>quién</b>?' : '2 · <b>Color</b> de la ambientación';
-        $('azulSub').textContent = c ? 'Para él' : 'Tono frío';
-        $('rosaSub').textContent = c ? 'Para ella' : 'Tono cálido';
-        recalc();
-      };
+      b.onclick=function(){ estado.ocasion=b.getAttribute('data-oc'); pintarSel('data-oc',estado.ocasion); aplicarOcasion(); };
+    });
+    document.querySelectorAll('.opt[data-nivel]').forEach(function(b){
+      b.onclick=function(){ estado.nivel=b.getAttribute('data-nivel'); $('f_nivel').value=estado.nivel; pintarSel('data-nivel',estado.nivel); recalc(); };
     });
     document.querySelectorAll('.opt[data-color]').forEach(function(b){
       b.onclick=function(){ estado.color=b.getAttribute('data-color'); $('f_color').value=estado.color; pintarSel('data-color',estado.color); };
+    });
+    document.querySelectorAll('.opt[data-torta]').forEach(function(b){
+      b.onclick=function(){ estado.torta=b.getAttribute('data-torta'); $('f_torta').value=estado.torta; pintarSel('data-torta',estado.torta); recalc(); };
     });
     $('selTina').onchange=function(){
       var o=this.options[this.selectedIndex]; $('f_tina').value=this.value;
@@ -254,7 +306,7 @@
     }
     var hoy=new Date(); $('selFecha').min=hoy.toISOString().slice(0,10);
     $('btnCont').onclick=function(){ if(!$('btnCont').disabled) $('frm').submit(); };
-    recalc();
+    aplicarOcasion();  // inicializa panel + rellena tinas de la ocasión por defecto
   </script>
 </body>
 </html>

@@ -1,11 +1,14 @@
 """
 Tests del configurador de Experiencia Romántica (Fase 1, Puerta B).
 
-Cubre la lógica pura de mapeo (ocasión + color → SKU real), que es lo más
-delicado: debe elegir el SKU correcto y NUNCA confundir la Caja de chocolates
-—que vive en la misma categoría Ambientaciones— con una decoración.
+Cubre la lógica pura del mapeo de ambientaciones (taxonomía confirmada con
+Jorge/Deborah, jul-2026) y la regla de espacio de las tinas de cumpleaños:
 
-No toca la BD (SimpleTestCase con objetos simulados), inmune al drift AR-034.
+  · ROMÁNTICAS — sin color, cualquier tina. R1 (id 22) base; R2 (id 23) + ramo.
+  · CUMPLEAÑOS — color (azul/rosado) + con/sin torta; solo tinas Hornopirén/
+    Osorno/Llaima. Sin torta: 24 azul / 66 rosado. Con torta: 25 azul / 65 rosado.
+
+No toca la BD (SimpleTestCase), inmune al drift AR-034.
 
 Ejecutar:
     python manage.py test ventas.tests_experiencia_romantica
@@ -14,48 +17,58 @@ from __future__ import annotations
 
 from django.test import SimpleTestCase
 
-from ventas.views.experiencia_romantica_view import resolver_ambientacion, _norm
-
-
-class _FakeServicio:
-    def __init__(self, nombre):
-        self.nombre = nombre
-
-
-CATALOGO = [
-    _FakeServicio('Decoración Simple · Azul'),
-    _FakeServicio('Decoración Simple · Rosado'),
-    _FakeServicio('Decoración Cumpleaños con Torta · Azul'),
-    _FakeServicio('Decoración Cumpleaños con Torta · Rosado'),
-    _FakeServicio('Caja de chocolates'),
-]
+from ventas.views.experiencia_romantica_view import (
+    resolver_ambientacion_id, tina_admite_cumple, _norm,
+    ROMANTICA_IDS, CUMPLE_IDS,
+)
 
 
 class ResolverAmbientacionTest(SimpleTestCase):
 
-    def _nombre(self, ocasion, color):
-        s = resolver_ambientacion(ocasion, color, CATALOGO)
-        return s.nombre if s else None
+    def test_romantica_nivel_r1_r2(self):
+        self.assertEqual(resolver_ambientacion_id('romantica', nivel='r1'), 22)
+        self.assertEqual(resolver_ambientacion_id('romantica', nivel='r2'), 23)
 
-    def test_mapea_los_cuatro_skus(self):
-        self.assertEqual(self._nombre('romantica', 'rosado'), 'Decoración Simple · Rosado')
-        self.assertEqual(self._nombre('romantica', 'azul'), 'Decoración Simple · Azul')
-        self.assertEqual(self._nombre('cumpleanos', 'azul'), 'Decoración Cumpleaños con Torta · Azul')
-        self.assertEqual(self._nombre('cumpleanos', 'rosado'), 'Decoración Cumpleaños con Torta · Rosado')
+    def test_romantica_default_es_r1(self):
+        # Sin nivel explícito, la romántica cae a R1 (la base).
+        self.assertEqual(resolver_ambientacion_id('romantica'), 22)
 
-    def test_chocolates_nunca_es_ambientacion(self):
-        # En ningún caso el resolver debe devolver la Caja de chocolates.
-        for ocasion in ('romantica', 'cumpleanos'):
-            for color in ('azul', 'rosado', '', 'otro'):
-                s = resolver_ambientacion(ocasion, color, CATALOGO)
-                if s is not None:
-                    self.assertNotIn('chocolate', _norm(s.nombre))
+    def test_romantica_ignora_color_y_torta(self):
+        # Las románticas no tienen color: pasar color/torta no cambia el SKU.
+        self.assertEqual(
+            resolver_ambientacion_id('romantica', nivel='r2', color='azul', torta='con_torta'), 23)
 
-    def test_fallback_por_ocasion_si_falta_color(self):
-        # Catálogo sin la variante de color pedida → cae al mismo ocasión igual.
-        catalogo = [_FakeServicio('Decoración Simple · Rosado')]
-        s = resolver_ambientacion('romantica', 'azul', catalogo)
-        self.assertEqual(s.nombre, 'Decoración Simple · Rosado')
+    def test_cumple_matriz_completa(self):
+        self.assertEqual(resolver_ambientacion_id('cumpleanos', torta='sin_torta', color='azul'), 24)
+        self.assertEqual(resolver_ambientacion_id('cumpleanos', torta='sin_torta', color='rosado'), 66)
+        self.assertEqual(resolver_ambientacion_id('cumpleanos', torta='con_torta', color='azul'), 25)
+        self.assertEqual(resolver_ambientacion_id('cumpleanos', torta='con_torta', color='rosado'), 65)
 
-    def test_sin_catalogo_devuelve_none(self):
-        self.assertIsNone(resolver_ambientacion('romantica', 'rosado', []))
+    def test_cumple_default_sin_torta_rosado(self):
+        self.assertEqual(resolver_ambientacion_id('cumpleanos'), 66)
+
+    def test_ocasion_desconocida_devuelve_none(self):
+        self.assertIsNone(resolver_ambientacion_id('otra_cosa'))
+        self.assertIsNone(resolver_ambientacion_id(''))
+
+    def test_ids_no_se_solapan(self):
+        # Ningún ID de romántica coincide con uno de cumpleaños (SKUs distintos).
+        romanticas = set(ROMANTICA_IDS.values())
+        cumples = set(CUMPLE_IDS.values())
+        self.assertEqual(romanticas & cumples, set())
+
+
+class TinaAdmiteCumpleTest(SimpleTestCase):
+
+    def test_tinas_permitidas(self):
+        for nombre in ('Tina Hornopirén', 'Tina Osorno', 'Tina Llaima',
+                       'hornopiren', 'OSORNO', 'Tina  Llaima  (grupal)'):
+            self.assertTrue(tina_admite_cumple(nombre), nombre)
+
+    def test_tinas_no_permitidas(self):
+        for nombre in ('Tina Tronador', 'Tina Puntiagudo', 'Tina Puyehue',
+                       'Tina Villarrica', 'Tina Calbuco'):
+            self.assertFalse(tina_admite_cumple(nombre), nombre)
+
+    def test_norm_quita_acentos(self):
+        self.assertEqual(_norm('Hornopirén'), 'hornopiren')

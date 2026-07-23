@@ -50,10 +50,16 @@ def _servicios_visibles(venta):
 
 
 def _ocasion_de(venta):
-    """Infiere romántica vs cumpleaños desde el SKU de ambientación de la reserva."""
-    for rs in venta.reservaservicios.select_related('servicio').all():
-        n = (rs.servicio.nombre or '').lower()
-        if 'cumple' in n:
+    """
+    Infiere romántica vs cumpleaños desde el SKU de ambientación de la reserva.
+
+    Por ID, no por nombre: la ambientación de cumpleaños SIN torta se llama
+    "Decoración Simple · color" (no dice "cumple"), así que un match por texto la
+    confundiría con una romántica.
+    """
+    from .experiencia_romantica_view import CUMPLE_AMBIENTACION_IDS
+    for rs in venta.reservaservicios.all():
+        if rs.servicio_id in CUMPLE_AMBIENTACION_IDS:
             return 'cumpleanos'
     return 'romantica'
 
