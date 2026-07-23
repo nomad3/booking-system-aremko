@@ -5710,8 +5710,10 @@ class DetalleComanda(models.Model):
         return self.cantidad * self.precio_unitario
 
     def save(self, *args, **kwargs):
-        # Capturar precio actual del producto si no está definido
-        if not self.precio_unitario:
+        # Capturar precio actual del producto SOLO si no se definió (None). Comparar con
+        # `is None`, no `not` — un precio_unitario=0 explícito (producto incluido/gratis,
+        # ej. bebidas de la ambientación) es válido y no debe pisarse con el precio base.
+        if self.precio_unitario is None:
             self.precio_unitario = self.producto.precio_base
         super().save(*args, **kwargs)
 

@@ -529,8 +529,10 @@ def congelar_precio_producto(sender, instance, **kwargs):
     Si es un nuevo producto (no tiene pk) y no tiene precio_unitario_venta,
     copia el precio_base actual del producto.
     """
-    # Solo congelar precio si es nuevo y no tiene precio ya asignado
-    if not instance.pk and not instance.precio_unitario_venta:
+    # Solo congelar precio si es nuevo y NO se pasó precio (None). Ojo: comparar con
+    # `is None`, NO `not` — un precio_unitario_venta=0 explícito (producto incluido/gratis,
+    # ej. bebidas de la ambientación) es válido y NO debe pisarse con el precio base.
+    if not instance.pk and instance.precio_unitario_venta is None:
         if instance.producto:
             instance.precio_unitario_venta = instance.producto.precio_base
             logger.debug(f"Precio congelado para ReservaProducto: ${instance.precio_unitario_venta}")
