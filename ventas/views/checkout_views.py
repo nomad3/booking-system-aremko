@@ -562,12 +562,26 @@ def complete_checkout(request):
         request.session.modified = True
 
         detail_url = reverse('ventas:venta_reserva_detail', kwargs={'pk': venta.id})
+
+        # Invitación sorpresa: si la reserva tiene ambientación, ofrecerla en el modal
+        # de éxito (para el configurador romántico y el upsell de la tina).
+        invitacion_url = None
+        try:
+            if venta.reservaservicios.filter(
+                servicio__categoria__nombre__iexact='Ambientaciones'
+            ).exists():
+                from .invitacion_sorpresa_view import url_invitacion_sorpresa
+                invitacion_url = url_invitacion_sorpresa(venta.id)
+        except Exception:
+            invitacion_url = None
+
         return JsonResponse({
             'success': True,
             'message': 'Reserva creada exitosamente',
             'reserva_id': venta.id,
             'metodo_pago': metodo_pago,
             'redirect_url': detail_url,
+            'invitacion_url': invitacion_url,
             'tiene_masaje': tiene_masaje,
             'total_reserva': float(cart['total']),
         })

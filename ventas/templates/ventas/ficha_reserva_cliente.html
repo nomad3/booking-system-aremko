@@ -147,6 +147,15 @@
           </div>
         </details>
 
+        {% if invitacion_url %}
+        <div style="border:2px solid #D4537E; border-radius:14px; background:#fdf2f5; padding:16px; margin-top:14px; text-align:center;">
+          <div style="font-size:15px; color:#993556; margin-bottom:4px;">🤫 Tu sorpresa está lista</div>
+          <div style="font-size:13px; color:#7a5560; margin-bottom:12px;">Envíale esta invitación a tu pareja. No muestra la ambientación ni los precios — la sorpresa queda entre tú y nosotros.</div>
+          <a class="btn" href="{{ invitacion_url }}" target="_blank" rel="noopener" style="background:#D4537E; color:#fff;">Ver la invitación</a>
+          <button type="button" class="btn btn-outline" style="margin-top:8px" onclick="copiarLink('{{ invitacion_url }}', this)">📋 Copiar link para enviarle</button>
+        </div>
+        {% endif %}
+
         {% if not es_cotizacion and saldo > 0 %}
         <a class="btn-pagar" href="{{ pagar_url }}">
           💳 Pagar online — hasta 12 cuotas

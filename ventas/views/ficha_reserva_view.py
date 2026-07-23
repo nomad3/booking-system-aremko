@@ -168,6 +168,18 @@ def ficha_reserva_cliente(request, token):
         logger.exception('[ficha] no se pudieron obtener participantes de masaje (reserva %s)', venta.id)
         participantes_masaje = []
 
+    # Invitación sorpresa: si la reserva incluye una ambientación (categoría
+    # Ambientaciones), el comprador puede enviarle a su pareja una invitación
+    # filtrada (sin precios ni ambientación). Sirve para cualquier método de pago
+    # y para reservas creadas por Luna/Deborah — no solo el retorno de Flow.
+    invitacion_url = None
+    try:
+        if venta.reservaservicios.filter(servicio__categoria__nombre__iexact='Ambientaciones').exists():
+            from .invitacion_sorpresa_view import url_invitacion_sorpresa
+            invitacion_url = url_invitacion_sorpresa(venta.id)
+    except Exception:  # noqa: BLE001 — nunca tumbar la ficha por esto
+        invitacion_url = None
+
     context = {
         'venta': venta,
         'numero': venta.id,
@@ -192,6 +204,8 @@ def ficha_reserva_cliente(request, token):
         'comanda_url': reverse('ventas:ficha_reserva_comanda', kwargs={'token': token}),
         # pago online del saldo (MP Checkout Pro, hasta 12 cuotas) — Fase 2, 2026-07-06
         'pagar_url': reverse('ventas:ficha_reserva_pagar', kwargs={'token': token}),
+        # invitación sorpresa para la pareja (solo si la reserva tiene ambientación)
+        'invitacion_url': invitacion_url,
     }
     return render(request, 'ventas/ficha_reserva_cliente.html', context)
 

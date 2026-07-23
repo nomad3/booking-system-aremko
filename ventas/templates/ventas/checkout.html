@@ -808,7 +808,20 @@ Email para comprobante: ventas@aremko.cl</pre>
              detailButtonPlaceholder.innerHTML = '';
         }
 
-        console.log("About to show success modal. Data received:", data); 
+        // Invitación sorpresa (experiencia romántica / upsell con ambientación)
+        if (data.invitacion_url && successModalBody) {
+            const prev = successModalBody.querySelector('.invitacion-sorpresa-box');
+            if (prev) prev.remove();
+            const box = document.createElement('div');
+            box.className = 'invitacion-sorpresa-box';
+            box.style.cssText = 'border:2px solid #D4537E; border-radius:14px; background:#fdf2f5; padding:16px; margin-top:16px; text-align:center;';
+            box.innerHTML = '<div style="font-size:15px; color:#993556; margin-bottom:4px;">🤫 Tu sorpresa está lista</div>'
+              + '<div style="font-size:13px; color:#7a5560; margin-bottom:12px;">Envíale esta invitación a tu pareja — sin precios ni spoiler de la ambientación.</div>'
+              + '<a href="' + data.invitacion_url + '" target="_blank" rel="noopener" class="btn" style="background:#D4537E; color:#fff;">Ver la invitación</a>';
+            successModalBody.appendChild(box);
+        }
+
+        console.log("About to show success modal. Data received:", data);
 
         if (successModalBody) {
             const existingBankInfo = successModalBody.querySelector('.bank-transfer-instructions');
