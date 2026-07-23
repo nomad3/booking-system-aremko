@@ -420,6 +420,26 @@ def actualizar_total_al_guardar_servicio(sender, instance, created, raw, using, 
     except Exception as e:
             logger.error(f"Error updating total after ReservaServicio {instance.pk} save: {e}")
 
+@receiver(post_save, sender=ReservaServicio)
+def asegurar_bebida_ambientacion(sender, instance, created, raw, using, update_fields, **kwargs):
+    """Fase 2: al agregar una ambientación a una reserva, asegurar su bebida incluida
+    (default: 2 jugos frambuesa+arándano, $0) vía una comanda con fecha objetivo = la
+    visita, para que el stock se descuente EN LA FECHA (no al reservar). Idempotente y
+    defensivo: nunca debe voltear la creación de la reserva. Cubre todos los caminos
+    (transferencia, Flow, Luna, admin) porque cuelga del ReservaServicio."""
+    if raw or not created or not instance.venta_reserva_id:
+        return
+    try:
+        servicio = instance.servicio
+        cat = (getattr(getattr(servicio, 'categoria', None), 'nombre', '') or '').lower()
+        if cat != 'ambientaciones':
+            return
+        from ventas.services.ambientacion_bebidas import asegurar_comanda_bebida_default
+        asegurar_comanda_bebida_default(instance.venta_reserva)
+    except Exception as e:  # noqa: BLE001 — nunca tumbar la reserva por esto
+        logger.error(f"[asegurar_bebida_ambientacion] falló para ReservaServicio {instance.pk}: {e}")
+
+
 @receiver(post_save, sender=ReservaProducto) # Keep this signal for total updates
 def actualizar_total_al_guardar_producto(sender, instance, created, raw, using, update_fields, **kwargs):
     try:
