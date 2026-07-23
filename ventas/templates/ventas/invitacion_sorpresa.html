@@ -60,7 +60,7 @@
     {% if fecha_ref %}
       <div class="cuando">
         <div class="fecha">{{ fecha_ref|date:"l j \d\e F" }}</div>
-        {% if hora_ref %}<div class="hora">desde las {{ hora_ref|time:"H:i" }}</div>{% endif %}
+        {% if hora_ref %}<div class="hora">desde las {{ hora_ref }} hrs</div>{% endif %}
       </div>
     {% endif %}
 
