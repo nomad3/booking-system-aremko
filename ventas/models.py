@@ -1402,15 +1402,15 @@ class ReservaProducto(models.Model):
 
     def mostrar_valor_unitario(self):
         """Muestra el valor unitario del producto formateado."""
-        # Usar precio congelado si existe, sino usar precio actual del catálogo
-        valor = self.precio_unitario_venta if self.precio_unitario_venta else self.producto.precio_base
+        # `is not None`, no `if precio`: un precio_unitario_venta=0 (incluido/gratis)
+        # debe mostrarse como $0, no caer al precio_base del catálogo.
+        valor = self.precio_unitario_venta if self.precio_unitario_venta is not None else self.producto.precio_base
         return f"${valor:,.0f}".replace(',', '.')
     mostrar_valor_unitario.short_description = 'Valor Unitario'
 
     def mostrar_valor_total(self):
         """Muestra el valor total calculado formateado."""
-        # Usar precio congelado si existe, sino usar precio actual del catálogo
-        precio = self.precio_unitario_venta if self.precio_unitario_venta else self.producto.precio_base
+        precio = self.precio_unitario_venta if self.precio_unitario_venta is not None else self.producto.precio_base
         valor = precio * self.cantidad
         return f"${valor:,.0f}".replace(',', '.')
     mostrar_valor_total.short_description = 'Valor Total'
