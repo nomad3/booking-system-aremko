@@ -71,11 +71,12 @@ def experiencia_romantica_view(request):
     cumple = resolver_ambientacion('cumpleanos', 'rosado', ambientaciones)
     chocolates = next((s for s in ambientaciones if _norm(s.nombre) == _norm(NOMBRE_CHOCOLATES)), None)
 
-    # Tinas para 2 (las de pareja) — excluye add-ons de niño (capacidad 1).
+    # Tinas reservables como experiencia. Excluye los add-ons "Niño adicional"
+    # (que tienen capacidad_maxima alta pero NO son una tina para reservar suelta).
     tinas_qs = Servicio.objects.filter(
         tipo_servicio='tina', activo=True, publicado_web=True,
         capacidad_maxima__gte=2,
-    ).order_by('precio_base', 'nombre')
+    ).exclude(nombre__icontains='niño').exclude(nombre__icontains='nino').order_by('precio_base', 'nombre')
     # Precio mostrado = plano por capacidad_maxima (AR-014), igual que en /tinas/.
     tinas = [{
         'id': t.id,
