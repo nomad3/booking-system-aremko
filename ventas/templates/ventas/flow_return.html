@@ -64,6 +64,13 @@
                 <p><strong>Monto Pagado:</strong> ${{ venta.pagado|floatformat:0|intcomma }}</p>
                 <p>Recibirás un correo electrónico con los detalles completos.</p>
             </div>
+            {% if invitacion_url %}
+            <div class="status-details" style="border:2px solid #D4537E; border-radius:14px; background:#fdf2f5;">
+                <p style="font-size:1.05rem; color:#993556; margin-bottom:.4rem;"><strong>🤫 Tu sorpresa está lista</strong></p>
+                <p style="margin-bottom:.9rem;">Esta es la invitación para enviarle a tu pareja. No muestra la ambientación ni los precios — la sorpresa queda entre tú y nosotros.</p>
+                <a href="{{ invitacion_url }}" target="_blank" rel="noopener" class="btn" style="background:#D4537E; color:#fff; padding:12px 22px; border-radius:10px; text-decoration:none; display:inline-block; font-weight:600;">Ver la invitación</a>
+            </div>
+            {% endif %}
             <script>
                 // event_id deterministico: el webhook CAPI server-side envia el mismo,
                 // Meta deduplica automaticamente. NO cambiar el formato.

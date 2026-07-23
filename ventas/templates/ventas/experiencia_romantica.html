@@ -1,0 +1,214 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Experiencia Romántica · Sorprende a tu pareja | Aremko</title>
+  <meta name="description" content="Arma una noche romántica o de cumpleaños junto al río en Aremko. La ambientación es la sorpresa: tú y nosotros en complicidad, tu pareja recibe solo la invitación.">
+  <style>
+    :root { --tinta:#3a2a2a; --suave:#8a6f6f; --rosa:#D4537E; --rosaFuerte:#993556; --azul:#378ADD;
+      --crema:#fbf6f2; --linea:#ecd9d9; --ok:#1D9E75; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--crema); color:var(--tinta);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      -webkit-font-smoothing:antialiased; padding-bottom: 96px; }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 24px 16px; }
+    .hero { text-align:center; padding: 16px 0 8px; }
+    .eyebrow { font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--suave); margin-bottom:12px; }
+    h1 { font-family:Georgia,"Times New Roman",serif; font-size:30px; line-height:1.2; margin:0 0 10px; }
+    .hero p { color:var(--suave); font-size:16px; line-height:1.6; margin:0 auto; max-width:420px; }
+    .complice { background:#fff; border:1px solid var(--linea); border-radius:14px; padding:12px 16px;
+      font-size:13.5px; color:var(--rosaFuerte); text-align:center; margin: 20px 0 26px; line-height:1.5; }
+    .paso { margin-bottom: 26px; }
+    .paso-t { font-size:13px; letter-spacing:.04em; color:var(--suave); margin-bottom:10px; }
+    .paso-t b { color:var(--tinta); font-weight:600; }
+    .opts { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .opt { border:2px solid var(--linea); background:#fff; border-radius:14px; padding:14px; cursor:pointer;
+      text-align:left; font-size:15px; color:var(--tinta); transition:border-color .12s; }
+    .opt small { display:block; color:var(--suave); font-size:12.5px; margin-top:3px; }
+    .opt.sel { border-color:var(--rosa); }
+    .opt.sel.azulsel { border-color:var(--azul); }
+    select, input[type=date] { width:100%; padding:12px; border:1px solid var(--linea); border-radius:12px;
+      font-size:15px; background:#fff; color:var(--tinta); -webkit-appearance:none; }
+    .fila { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .check { display:flex; align-items:center; justify-content:space-between; background:#fff;
+      border:1px solid var(--linea); border-radius:14px; padding:14px; cursor:pointer; }
+    .check input { width:20px; height:20px; accent-color:var(--rosa); }
+    .check .lbl { font-size:15px; }
+    .check .lbl small { display:block; color:var(--suave); font-size:12.5px; }
+    .barra { position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--linea);
+      padding:12px 16px; }
+    .barra .in { max-width:560px; margin:0 auto; display:flex; align-items:center; gap:14px; }
+    .barra .tot { flex:1; }
+    .barra .tot small { display:block; color:var(--suave); font-size:12px; }
+    .barra .tot b { font-size:22px; }
+    .btn { background:var(--rosa); color:#fff; border:0; border-radius:12px; padding:14px 22px;
+      font-size:16px; font-weight:600; cursor:pointer; }
+    .btn:disabled { background:#d9c3c9; cursor:not-allowed; }
+    .oculto { display:none; }
+    .msg { background:#fdecef; border:1px solid #f4c0d1; color:var(--rosaFuerte); border-radius:12px;
+      padding:12px 14px; font-size:14px; margin-bottom:18px; }
+    .nota { font-size:12.5px; color:var(--suave); text-align:center; margin-top:8px; line-height:1.5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="eyebrow">Aremko · aguas calientes junto al río</div>
+      <h1>Sorprende a tu pareja</h1>
+      <p>Arma una noche junto al río. La ambientación es la sorpresa: la preparamos en complicidad contigo, y tu pareja recibe solo la invitación.</p>
+    </div>
+
+    {% if messages %}
+      {% for m in messages %}<div class="msg">{{ m }}</div>{% endfor %}
+    {% endif %}
+
+    <div class="complice">Tú y Aremko sabemos todo. Tu pareja recibe una invitación linda — sin precios, sin spoiler.</div>
+
+    <form method="post" action="{% url 'experiencia_romantica_continuar' %}" id="frm">
+      {% csrf_token %}
+      <input type="hidden" name="ocasion" id="f_ocasion" value="romantica">
+      <input type="hidden" name="color" id="f_color" value="rosado">
+      <input type="hidden" name="tina_id" id="f_tina">
+      <input type="hidden" name="fecha" id="f_fecha">
+      <input type="hidden" name="hora" id="f_hora">
+      <input type="hidden" name="chocolates" id="f_choco" value="0">
+
+      <div class="paso">
+        <div class="paso-t">1 · ¿Qué <b>celebras</b>?</div>
+        <div class="opts">
+          <button type="button" class="opt sel" data-oc="romantica">Romántica<small>Casi 30 velas + entorno</small></button>
+          <button type="button" class="opt" data-oc="cumpleanos">Cumpleaños<small>Ambientación + torta</small></button>
+        </div>
+      </div>
+
+      <div class="paso">
+        <div class="paso-t" id="colorLbl">2 · <b>Color</b> de la ambientación</div>
+        <div class="opts">
+          <button type="button" class="opt" data-color="azul" id="optAzul">Azul<small id="azulSub">Tono frío</small></button>
+          <button type="button" class="opt sel" data-color="rosado" id="optRosado">Rosado<small id="rosaSub">Tono cálido</small></button>
+        </div>
+      </div>
+
+      <div class="paso">
+        <div class="paso-t">3 · Tu <b>tina</b>, fecha y hora</div>
+        <select id="selTina">
+          <option value="">Elige tu tina…</option>
+          {% for t in tinas %}
+            <option value="{{ t.id }}" data-total="{{ t.total }}">{{ t.nombre }} · {{ t.capacidad }} pers · ${{ t.total }}</option>
+          {% endfor %}
+        </select>
+        <div class="fila" style="margin-top:10px;">
+          <input type="date" id="selFecha">
+          <select id="selHora"><option value="">Hora…</option></select>
+        </div>
+        <div class="nota" id="notaHoras"></div>
+      </div>
+
+      {% if tiene_chocolates %}
+      <div class="paso">
+        <div class="paso-t">4 · ¿Le <b>sumas</b> algo?</div>
+        <label class="check">
+          <span class="lbl">Caja de chocolates <small>El toque dulce de la sorpresa</small></span>
+          <span style="display:flex; align-items:center; gap:10px;">
+            <span style="color:var(--suave); font-size:14px;">+${{ precio_chocolates }}</span>
+            <input type="checkbox" id="chkChoco">
+          </span>
+        </label>
+      </div>
+      {% endif %}
+    </form>
+
+    <p class="nota">En el siguiente paso confirmas tus datos y pagas. Podrás sumar masaje o cabaña si quieres.</p>
+  </div>
+
+  <div class="barra">
+    <div class="in">
+      <div class="tot"><small>Total experiencia</small><b id="totalTxt">$0</b></div>
+      <button class="btn" id="btnCont" type="button" disabled>Continuar</button>
+    </div>
+  </div>
+
+  <script>
+    var PRECIO = {
+      romantica: {{ precio_romantica }},
+      cumpleanos: {{ precio_cumple }},
+      chocolates: {{ precio_chocolates|default:0 }}
+    };
+    var HORAS_URL = "{% url 'ventas:get_available_hours' %}";
+    var estado = { ocasion:'romantica', color:'rosado', tinaTotal:0, choco:false };
+    var $ = function(id){ return document.getElementById(id); };
+    var fmt = function(n){ return '$' + Math.round(n).toLocaleString('es-CL'); };
+
+    function pintarSel(grupo, attr, val){
+      document.querySelectorAll('.opt['+attr+']').forEach(function(b){
+        var on = b.getAttribute(attr) === val;
+        b.classList.toggle('sel', on);
+        b.classList.toggle('azulsel', on && attr==='data-color' && val==='azul');
+      });
+    }
+    function recalc(){
+      var t = PRECIO[estado.ocasion] + estado.tinaTotal + (estado.choco ? PRECIO.chocolates : 0);
+      $('totalTxt').textContent = fmt(t);
+      var listo = !!($('f_tina').value && $('f_fecha').value && $('f_hora').value);
+      $('btnCont').disabled = !listo;
+    }
+
+    document.querySelectorAll('.opt[data-oc]').forEach(function(b){
+      b.onclick = function(){
+        estado.ocasion = b.getAttribute('data-oc');
+        $('f_ocasion').value = estado.ocasion;
+        pintarSel('oc','data-oc',estado.ocasion);
+        var cumple = estado.ocasion === 'cumpleanos';
+        $('colorLbl').innerHTML = cumple ? '2 · ¿Para <b>quién</b>?' : '2 · <b>Color</b> de la ambientación';
+        $('azulSub').textContent = cumple ? 'Para él' : 'Tono frío';
+        $('rosaSub').textContent = cumple ? 'Para ella' : 'Tono cálido';
+        recalc();
+      };
+    });
+    document.querySelectorAll('.opt[data-color]').forEach(function(b){
+      b.onclick = function(){
+        estado.color = b.getAttribute('data-color');
+        $('f_color').value = estado.color;
+        pintarSel('color','data-color',estado.color);
+      };
+    });
+
+    $('selTina').onchange = function(){
+      var opt = this.options[this.selectedIndex];
+      $('f_tina').value = this.value;
+      estado.tinaTotal = this.value ? parseInt(opt.getAttribute('data-total'),10) : 0;
+      cargarHoras();
+      recalc();
+    };
+    $('selFecha').onchange = function(){ $('f_fecha').value = this.value; cargarHoras(); recalc(); };
+    $('selHora').onchange = function(){ $('f_hora').value = this.value; recalc(); };
+    var chk = $('chkChoco');
+    if (chk) chk.onchange = function(){ estado.choco = this.checked; $('f_choco').value = this.checked ? '1':'0'; recalc(); };
+
+    function cargarHoras(){
+      var tina = $('selTina').value, fecha = $('selFecha').value;
+      var sel = $('selHora'), nota = $('notaHoras');
+      sel.innerHTML = '<option value="">Hora…</option>'; $('f_hora').value='';
+      if (!tina || !fecha){ nota.textContent=''; return; }
+      nota.textContent = 'Buscando horarios…';
+      fetch(HORAS_URL + '?servicio_id=' + encodeURIComponent(tina) + '&fecha=' + encodeURIComponent(fecha))
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var horas = (d && d.horas_disponibles) || [];
+          if (!horas.length){ nota.textContent = 'No hay horarios para esa fecha. Prueba otro día.'; return; }
+          nota.textContent = '';
+          horas.forEach(function(h){
+            var o = document.createElement('option'); o.value = h; o.textContent = h; sel.appendChild(o);
+          });
+        })
+        .catch(function(){ nota.textContent = 'No pudimos cargar los horarios. Reintenta.'; });
+    }
+
+    var hoy = new Date(); hoy.setDate(hoy.getDate());
+    $('selFecha').min = hoy.toISOString().slice(0,10);
+    $('btnCont').onclick = function(){ if(!$('btnCont').disabled) $('frm').submit(); };
+    recalc();
+  </script>
+</body>
+</html>

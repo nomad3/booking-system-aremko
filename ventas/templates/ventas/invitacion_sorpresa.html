@@ -1,0 +1,78 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Una invitación · Aremko</title>
+  <style>
+    :root { --tinta:#3a2a2a; --suave:#8a6f6f; --rosa:#D4537E; --crema:#fbf6f2; --linea:#ecd9d9; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--crema); color:var(--tinta);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased; padding: 20px 16px 40px; }
+    .carta { max-width: 440px; margin: 0 auto; background:#fff; border:1px solid var(--linea);
+      border-radius: 20px; padding: 34px 26px; box-shadow: 0 10px 40px rgba(150,80,90,.10); }
+    .eyebrow { font-size: 11px; letter-spacing:.22em; text-transform:uppercase; color:var(--suave);
+      text-align:center; margin-bottom: 22px; }
+    .titulo { font-family: Georgia, "Times New Roman", serif; font-size: 27px; line-height:1.25;
+      text-align:center; margin: 0 0 8px; color:var(--tinta); }
+    .bajada { text-align:center; color:var(--suave); font-size: 15px; margin: 0 0 26px; line-height:1.6; }
+    .sep { width:44px; height:2px; background:var(--rosa); border:0; margin: 0 auto 24px; border-radius:2px; }
+    .rotulo { font-size: 11px; letter-spacing:.16em; text-transform:uppercase; color:var(--suave); margin-bottom: 12px; text-align:center; }
+    .items { list-style:none; margin:0 0 26px; padding:0; }
+    .items li { display:flex; align-items:center; gap:12px; padding: 11px 0; border-bottom:1px solid var(--linea); font-size: 16px; }
+    .items li:last-child { border-bottom: 0; }
+    .dot { width:8px; height:8px; border-radius:50%; background:var(--rosa); flex:0 0 auto; }
+    .cuando { text-align:center; background:var(--crema); border-radius:14px; padding: 16px; margin-bottom: 22px; }
+    .cuando .fecha { font-size: 18px; text-transform:capitalize; }
+    .cuando .hora { color:var(--suave); font-size: 14px; margin-top:2px; }
+    .hint { text-align:center; font-style:italic; color:var(--rosa); font-size: 15px; margin: 0 0 26px; line-height:1.55; }
+    .firma { text-align:center; color:var(--suave); font-size: 14px; }
+    .firma .de { color:var(--tinta); font-size:17px; margin-top:2px; }
+    .pie { text-align:center; margin-top: 28px; color:var(--suave); font-size: 12px; }
+    .pie strong { color:var(--tinta); font-weight:600; }
+  </style>
+</head>
+<body>
+  <div class="carta">
+    <div class="eyebrow">Aremko · aguas calientes junto al río</div>
+
+    {% if ocasion == 'cumpleanos' %}
+      <h1 class="titulo">Te preparé algo<br>para tu cumpleaños</h1>
+      <p class="bajada">Nos espera una escapada juntos, junto al río.</p>
+    {% else %}
+      <h1 class="titulo">Te invito a una<br>escapada a Aremko</h1>
+      <p class="bajada">Una pausa para los dos, con el agua caliente y el bosque nativo.</p>
+    {% endif %}
+
+    <hr class="sep">
+
+    {% if servicios %}
+      <div class="rotulo">Nos espera</div>
+      <ul class="items">
+        {% for s in servicios %}
+          <li><span class="dot"></span> {{ s.nombre }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {% if fecha_ref %}
+      <div class="cuando">
+        <div class="fecha">{{ fecha_ref|date:"l j \d\e F" }}</div>
+        {% if hora_ref %}<div class="hora">desde las {{ hora_ref|time:"H:i" }}</div>{% endif %}
+      </div>
+    {% endif %}
+
+    {% if hay_sorpresa %}
+      <p class="hint">…y algo más que preparé especialmente para ti.</p>
+    {% endif %}
+
+    {% if de_nombre %}
+      <div class="firma">Con cariño,<div class="de">{{ de_nombre }}</div></div>
+    {% endif %}
+
+    <div class="pie">Prepara solo tus ganas de desconectar.<br><strong>www.aremko.cl</strong></div>
+  </div>
+</body>
+</html>

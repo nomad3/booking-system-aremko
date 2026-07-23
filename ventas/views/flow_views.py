@@ -436,6 +436,22 @@ def flow_return(request):
             except VentaReserva.DoesNotExist:
                 error_message = "No se encontró la reserva asociada."
 
+    # Si la reserva incluye una ambientación (categoría Ambientaciones), ofrecemos
+    # al comprador el link de la invitación-sorpresa para enviarle a su pareja.
+    # Sirve tanto para el configurador (Puerta B) como para el upgrade (Puerta A),
+    # sin depender de flags de sesión.
+    invitacion_url = None
+    if venta is not None:
+        try:
+            tiene_ambientacion = venta.reservaservicios.filter(
+                servicio__categoria__nombre__iexact='Ambientaciones'
+            ).exists()
+            if tiene_ambientacion:
+                from .invitacion_sorpresa_view import url_invitacion_sorpresa
+                invitacion_url = url_invitacion_sorpresa(venta.id)
+        except Exception:
+            invitacion_url = None  # nunca romper la página de pago por esto
+
     context = {
         'payment_status': payment_status,
         'error_message': error_message,
@@ -443,5 +459,6 @@ def flow_return(request):
         'reserva_id': venta.id if venta else (reserva_id_qs or pending_id_qs),
         'flow_token': token,
         'pending': pending,
+        'invitacion_url': invitacion_url,
     }
     return render(request, 'ventas/flow_return.html', context)
