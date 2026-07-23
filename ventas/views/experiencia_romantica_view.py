@@ -45,6 +45,11 @@ ROMANTICA_AMBIENTACION_IDS = frozenset(ROMANTICA_IDS.values())
 # espacio físico para montarlas). Se matchea por nombre normalizado.
 CUMPLE_TINAS = ('hornopiren', 'osorno', 'llaima')
 
+# Es una experiencia PARA DOS: la tina se cobra siempre por 2 personas, aunque sea
+# una tina grupal (p.ej. Osorno se usa para el cumpleaños de a dos → 2 × precio_base,
+# no × su capacidad grupal).
+PERSONAS_EXPERIENCIA = 2
+
 # Precios de respaldo por si faltara un SKU en la BD (no deberían usarse en prod).
 FALLBACK = {'r1': 32000, 'r2': 68000, 'cumple_sin': 38000, 'cumple_con': 78000, 'choco': 16000}
 
@@ -120,8 +125,8 @@ def _tinas_configurador():
 
     tinas = []
     for t in qs:
-        # Precio mostrado = plano por capacidad_maxima (AR-014), igual que en /tinas/.
-        total = int(t.precio_base) * t.capacidad_maxima
+        # Siempre para 2: 2 × precio_base (aunque la tina sea grupal, como Osorno).
+        total = int(t.precio_base) * PERSONAS_EXPERIENCIA
         tinas.append({
             'id': t.id,
             'nombre': t.nombre,
@@ -208,8 +213,8 @@ def experiencia_romantica_submit(request):
     # Carrito nuevo, en el orden que exige la regla: tina primero.
     cart = {'servicios': [], 'total': 0}
 
-    # 1) Tina — precio plano por capacidad_maxima (AR-014).
-    cart['servicios'].append(_item_carrito(tina, fecha, hora, tina.capacidad_maxima))
+    # 1) Tina — siempre para 2 personas (experiencia de a dos, aunque sea grupal).
+    cart['servicios'].append(_item_carrito(tina, fecha, hora, PERSONAS_EXPERIENCIA))
 
     # 2) Ambientación secreta — hereda el slot de la tina.
     cart['servicios'].append(_item_carrito(ambientacion, fecha, hora, 1))

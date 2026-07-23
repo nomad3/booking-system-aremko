@@ -250,8 +250,8 @@
         if(!ok) return;
         var o=document.createElement('option');
         o.value=t.id; o.setAttribute('data-total', t.total);
-        var cap = (t.capacidad>2) ? ('hasta '+t.capacidad) : 'para 2';
-        o.textContent = t.nombre + ' · ' + cap + ' · $' + t.total_fmt;
+        // Experiencia para dos: todas las tinas se muestran "para 2" (incl. Osorno).
+        o.textContent = t.nombre + ' · para 2 · $' + t.total_fmt;
         sel.appendChild(o);
       });
       // Cambió el set: se reinicia la elección de tina y hora.
