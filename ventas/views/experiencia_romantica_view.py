@@ -24,7 +24,8 @@ from django.contrib import messages
 from django.db.models import Q
 from django.shortcuts import render, redirect
 
-from ..models import Servicio
+from ..models import Servicio, Producto
+from ..services.ambientacion_bebidas import CHOCOLATES_ID
 
 
 NOMBRE_CHOCOLATES = 'Caja de chocolates'
@@ -108,6 +109,18 @@ def _chocolates_servicio():
     ).first()
 
 
+def _stock_chocolates():
+    """Stock actual del Producto real de chocolates (Caja Chocolate, id 42); 0 si no existe."""
+    prod = Producto.objects.filter(id=CHOCOLATES_ID).only('cantidad_disponible').first()
+    return int(prod.cantidad_disponible) if prod else 0
+
+
+def chocolates_disponibles():
+    """True solo si existe la línea de cobro Y hay stock real del Producto (>0).
+    Es el guard del configurador: sin stock, los chocolates no se ofrecen ni se venden."""
+    return _chocolates_servicio() is not None and _stock_chocolates() > 0
+
+
 def _tinas_configurador():
     """
     Tinas candidatas: las de pareja (capacidad ≤ 2, sin add-ons de niño) MÁS
@@ -154,7 +167,8 @@ def experiencia_romantica_view(request):
         'precio_cumple_con': _precio(CUMPLE_IDS[('con_torta', 'rosado')], FALLBACK['cumple_con']),
         'precio_chocolates': precio_choco,
         'precio_chocolates_fmt': _clp(precio_choco),
-        'tiene_chocolates': chocolates is not None,
+        # Guard de stock: solo se ofrecen si existe la línea Y hay stock real (>0).
+        'tiene_chocolates': chocolates_disponibles(),
     }
     return render(request, 'ventas/experiencia_romantica.html', context)
 
@@ -219,11 +233,16 @@ def experiencia_romantica_submit(request):
     # 2) Ambientación secreta — hereda el slot de la tina.
     cart['servicios'].append(_item_carrito(ambientacion, fecha, hora, 1))
 
-    # 3) Chocolates (opcional) — misma categoría, mismo slot.
+    # 3) Chocolates (opcional) — solo si hay stock real (guard de stock 0).
     if quiere_chocolates:
         chocolates = _chocolates_servicio()
-        if chocolates:
+        if chocolates and _stock_chocolates() > 0:
             cart['servicios'].append(_item_carrito(chocolates, fecha, hora, 1))
+        elif chocolates:
+            messages.info(
+                request,
+                "Los chocolates se agotaron por hoy; armamos tu velada sin ellos "
+                "(puedes agregarlos después escribiéndonos).")
 
     cart['total'] = sum(i['subtotal'] for i in cart['servicios'])
 

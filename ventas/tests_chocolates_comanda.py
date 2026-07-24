@@ -10,6 +10,7 @@ from datetime import timedelta
 
 from django.db.models.signals import post_save
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from control_gestion.signals import react_to_reserva_change
@@ -24,6 +25,9 @@ from .signals.main_signals import (
 from .services.ambientacion_bebidas import (
     asegurar_comanda_chocolates, CHOCOLATES_ID, MARCA_CHOCOLATES,
     NOMBRE_SERVICIO_CHOCOLATES,
+)
+from .views.experiencia_romantica_view import (
+    chocolates_disponibles, _stock_chocolates,
 )
 
 # Sensores post_save(VentaReserva) que tocan crm_service_history (tabla ausente en
@@ -62,11 +66,12 @@ class _BaseChoco(TestCase):
             nombre='Tina Pareja', categoria=cls.cat_tinas, tipo_servicio='tina',
             precio_base=Decimal('60000'), duracion=60)
         cls.serv_amb = Servicio.objects.create(
+            id=22,  # ROMANTICA_IDS['r1'] — para que el submit resuelva la ambientación
             nombre='Ambientación romántica R1', categoria=cls.cat_amb,
-            tipo_servicio='otro', precio_base=Decimal('32000'), duracion=60)
+            tipo_servicio='otro', precio_base=Decimal('32000'), duracion=60, activo=True)
         cls.serv_choco = Servicio.objects.create(
             nombre=NOMBRE_SERVICIO_CHOCOLATES, categoria=cls.cat_amb,
-            tipo_servicio='otro', precio_base=Decimal('16000'), duracion=60)
+            tipo_servicio='otro', precio_base=Decimal('16000'), duracion=60, activo=True)
         # El Producto REAL de inventario, con el id que espera el servicio.
         cls.prod_choco = Producto.objects.create(
             id=CHOCOLATES_ID, nombre='Caja Chocolate',
@@ -184,3 +189,46 @@ class WiringSignalChocolatesTest(_BaseChoco):
                 notas_generales__icontains=MARCA_CHOCOLATES).exists())
         rp = ReservaProducto.objects.get(venta_reserva=venta, producto_id=CHOCOLATES_ID)
         self.assertIsNone(rp.fecha_entrega)
+
+
+class GuardStockChocolatesTest(_BaseChoco):
+    """Guard de stock 0: sin stock del Producto real, los chocolates ni se OFRECEN
+    (flag del GET) ni se VENDEN (submit)."""
+
+    def test_stock_refleja_producto(self):
+        self.assertEqual(_stock_chocolates(), 10)
+        Producto.objects.filter(id=CHOCOLATES_ID).update(cantidad_disponible=0)
+        self.assertEqual(_stock_chocolates(), 0)
+
+    def test_disponibles_true_con_stock(self):
+        self.assertTrue(chocolates_disponibles())
+
+    def test_no_disponibles_sin_stock(self):
+        Producto.objects.filter(id=CHOCOLATES_ID).update(cantidad_disponible=0)
+        self.assertFalse(chocolates_disponibles())
+
+    def test_no_disponibles_sin_producto(self):
+        Producto.objects.filter(id=CHOCOLATES_ID).delete()
+        self.assertEqual(_stock_chocolates(), 0)
+        self.assertFalse(chocolates_disponibles())
+
+    def _post_submit(self):
+        return self.client.post(reverse('experiencia_romantica_continuar'), {
+            'ocasion': 'romantica', 'nivel': 'r1',
+            'tina_id': self.serv_tina.id,
+            'fecha': self.fecha_visita.isoformat(), 'hora': '16:00',
+            'chocolates': '1',
+        })
+
+    def test_submit_con_stock_agrega_chocolates(self):
+        self._post_submit()
+        nombres = [s['nombre'] for s in self.client.session['cart']['servicios']]
+        self.assertIn(NOMBRE_SERVICIO_CHOCOLATES, nombres)
+
+    def test_submit_sin_stock_no_agrega_chocolates(self):
+        Producto.objects.filter(id=CHOCOLATES_ID).update(cantidad_disponible=0)
+        self._post_submit()
+        nombres = [s['nombre'] for s in self.client.session['cart']['servicios']]
+        self.assertNotIn(NOMBRE_SERVICIO_CHOCOLATES, nombres)
+        # La velada se arma igual (tina + ambientación), solo sin chocolates.
+        self.assertEqual(len(nombres), 2)
