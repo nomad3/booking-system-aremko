@@ -60,8 +60,8 @@ TRACKS = [
     {'titulo': 'C · Tinas grupales (celebraciones de grupo)', 'items': [
         {'code': 'V-13', 'titulo': 'Modo grupo en el configurador', 'estado': 'hecho',
          'nota': 'LIVE: 3ª ocasión Grupo (Calbuco 3-4, Osorno 3-5, $25.000/pers, cobra × N). Falta subir Osorno a capacidad 6 en admin'},
-        {'code': 'V-14', 'titulo': 'Despedida de soltera / soltero', 'estado': 'pendiente',
-         'nota': 'La apuesta más fuerte del track'},
+        {'code': 'V-14', 'titulo': 'Despedida de soltera / soltero', 'estado': 'hecho',
+         'nota': 'LIVE: ocasión propia en el configurador (reusa modo grupo). Ambientación temática propia (B) = mejora futura'},
         {'code': 'V-15', 'titulo': 'Cumpleaños grupal (números redondos)', 'estado': 'pendiente',
          'nota': 'Foco 30/40/50'},
         {'code': 'V-16', 'titulo': 'Escapada de amigas / Reencuentro', 'estado': 'pendiente',

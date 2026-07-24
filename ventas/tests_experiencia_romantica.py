@@ -18,8 +18,8 @@ from __future__ import annotations
 from django.test import SimpleTestCase
 
 from ventas.views.experiencia_romantica_view import (
-    resolver_ambientacion_id, tina_admite_cumple, tina_admite_grupo, _norm,
-    ROMANTICA_IDS, CUMPLE_IDS,
+    resolver_ambientacion_id, tina_admite_cumple, tina_admite_grupo,
+    es_ocasion_grupo, _norm, ROMANTICA_IDS, CUMPLE_IDS,
 )
 
 
@@ -56,6 +56,17 @@ class ResolverAmbientacionTest(SimpleTestCase):
 
     def test_grupo_default_sin_torta_rosado(self):
         self.assertEqual(resolver_ambientacion_id('grupo'), 66)
+
+    def test_despedida_reusa_ambientacion_de_cumpleanos(self):
+        # V-14: la despedida usa el mismo modo grupo → ambientación de cumpleaños.
+        self.assertEqual(resolver_ambientacion_id('despedida', torta='con_torta', color='rosado'), 65)
+        self.assertEqual(resolver_ambientacion_id('despedida'), 66)
+
+    def test_es_ocasion_grupo(self):
+        self.assertTrue(es_ocasion_grupo('grupo'))
+        self.assertTrue(es_ocasion_grupo('despedida'))
+        for oc in ('romantica', 'cumpleanos', 'x', ''):
+            self.assertFalse(es_ocasion_grupo(oc), oc)
 
     def test_ocasion_desconocida_devuelve_none(self):
         self.assertIsNone(resolver_ambientacion_id('otra_cosa'))

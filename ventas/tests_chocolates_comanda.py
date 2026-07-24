@@ -264,3 +264,16 @@ class GuardStockChocolatesTest(_BaseChoco):
         })
         self.assertEqual(resp.status_code, 302)
         self.assertNotIn('cart', self.client.session)  # error → no arma carrito
+
+    def test_submit_despedida_se_comporta_como_grupo(self):
+        # V-14: la despedida usa el modo grupo (cobra × N, ambientación de cumpleaños).
+        resp = self.client.post(reverse('experiencia_romantica_continuar'), {
+            'ocasion': 'despedida', 'color': 'rosado', 'torta': 'sin_torta',
+            'tina_id': self.serv_osorno.id, 'personas': 6,
+            'fecha': self.fecha_visita.isoformat(), 'hora': '16:00',
+        })
+        self.assertEqual(resp.status_code, 302)
+        cart = self.client.session['cart']
+        tina_line = next(s for s in cart['servicios'] if s['id'] == self.serv_osorno.id)
+        self.assertEqual(tina_line['cantidad_personas'], 6)
+        self.assertEqual(tina_line['subtotal'], 25000 * 6)

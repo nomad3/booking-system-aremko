@@ -79,11 +79,16 @@ def resolver_ambientacion_id(ocasion, nivel=None, torta=None, color=None):
     """
     if ocasion == 'romantica':
         return ROMANTICA_IDS.get((nivel or 'r1').lower())
-    if ocasion in ('cumpleanos', 'grupo'):
-        # El grupo es una celebración tipo cumpleaños: reusa la misma ambientación.
+    if ocasion in ('cumpleanos', 'grupo', 'despedida'):
+        # Grupo y despedida son celebraciones tipo cumpleaños: reusan la ambientación.
         clave = ((torta or 'sin_torta').lower(), (color or 'rosado').lower())
         return CUMPLE_IDS.get(clave)
     return None
+
+
+def es_ocasion_grupo(ocasion):
+    """True para las ocasiones que usan el modo grupo (grupo y despedida de soltera/o)."""
+    return ocasion in ('grupo', 'despedida')
 
 
 def tina_admite_cumple(nombre_tina):
@@ -238,9 +243,9 @@ def experiencia_romantica_submit(request):
             "Hornopirén, Osorno o Llaima. Elige una de esas para el cumpleaños.")
         return redirect('experiencia_romantica')
 
-    # Modo grupo: tina grupal + N personas (3 … capacidad de la tina). Cobra × N.
+    # Modo grupo (grupo o despedida): tina grupal + N personas (3 … capacidad). Cobra × N.
     personas = PERSONAS_EXPERIENCIA
-    if ocasion == 'grupo':
+    if es_ocasion_grupo(ocasion):
         if not tina_admite_grupo(tina.nombre):
             messages.error(request, "Para una celebración de grupo, elige una tina grupal (Calbuco u Osorno).")
             return redirect('experiencia_romantica')

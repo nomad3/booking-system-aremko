@@ -156,7 +156,8 @@
         <div class="opts">
           <button type="button" class="opt foto sel" id="optRom" data-oc="romantica">Romántica<small>Casi 30 velas + entorno</small></button>
           <button type="button" class="opt foto" id="optCum" data-oc="cumpleanos">Cumpleaños<small>Con o sin torta · de a dos</small></button>
-          {% if tiene_tinas_grupo %}<button type="button" class="opt foto" id="optGrupo" data-oc="grupo">Grupo<small>Celebración de 3 a 6</small></button>{% endif %}
+          {% if tiene_tinas_grupo %}<button type="button" class="opt foto" id="optGrupo" data-oc="grupo">Grupo<small>Cumpleaños de 3 a 6</small></button>
+          <button type="button" class="opt foto" id="optDespedida" data-oc="despedida">Despedida<small>De soltera/o · en grupo</small></button>{% endif %}
         </div>
 
         <!-- 2A · Románticas: nivel (no llevan color) -->
@@ -233,6 +234,7 @@
     var GRUPO_MIN = {{ grupo_min|default:3 }};
     var $ = function(id){ return document.getElementById(id); };
     var fmt = function(n){ return '$' + Math.round(n).toLocaleString('es-CL'); };
+    function esGrupo(oc){ return oc==='grupo' || oc==='despedida'; }  // ambas usan el modo grupo
 
     function pintarSel(attr, val){
       document.querySelectorAll('.opt['+attr+']').forEach(function(b){
@@ -249,7 +251,7 @@
       var t = precioBase() + estado.tinaTotal + (estado.choco ? PRECIO.chocolates : 0);
       $('totalTxt').textContent = fmt(t);
       var okBase = $('f_tina').value && $('f_fecha').value && $('f_hora').value;
-      var okPers = estado.ocasion !== 'grupo' || $('f_personas').value;  // grupo exige N
+      var okPers = !esGrupo(estado.ocasion) || $('f_personas').value;  // grupo/despedida exigen N
       $('btnCont').disabled = !(okBase && okPers);
     }
     function rellenarTinas(){
@@ -257,10 +259,10 @@
       var sel=$('selTina'), oc=estado.ocasion;
       sel.innerHTML='<option value="">Elige tu tina…</option>';
       TINAS.forEach(function(t){
-        var ok = (oc==='grupo') ? t.grupo_ok : (oc==='cumpleanos') ? t.cumple_ok : t.romantica_ok;
+        var ok = esGrupo(oc) ? t.grupo_ok : (oc==='cumpleanos') ? t.cumple_ok : t.romantica_ok;
         if(!ok) return;
         var o=document.createElement('option'); o.value=t.id;
-        if(oc==='grupo'){
+        if(esGrupo(oc)){
           o.setAttribute('data-precio-persona', t.precio_persona);
           o.setAttribute('data-cap', t.capacidad);
           o.textContent = t.nombre + ' · hasta ' + t.capacidad + ' personas · $' + t.precio_persona_fmt + ' c/u';
@@ -278,17 +280,17 @@
       $('notaHoras').textContent='';
     }
     function aplicarOcasion(){
-      var oc=estado.ocasion, esGrupo=oc==='grupo', llevaColor=(oc==='cumpleanos'||esGrupo);
+      var oc=estado.ocasion, grupo=esGrupo(oc), llevaColor=(oc==='cumpleanos'||grupo);
       $('f_ocasion').value = oc;
       $('panelRom').style.display = llevaColor ? 'none' : '';
       $('panelCum').style.display = llevaColor ? '' : 'none';
-      var nc=$('notaCumple'); if(nc) nc.style.display = esGrupo ? 'none' : '';
-      var na=$('notaGrupoAmb'); if(na) na.style.display = esGrupo ? '' : 'none';
-      $('panelPersonas').style.display = esGrupo ? '' : 'none';
-      var sb=$('sorpresaBox'); if(sb) sb.style.display = esGrupo ? 'none' : '';  // grupo NO lleva invitación secreta
-      // Numeración de pasos: románticas 3/4 · cumpleaños 4/5 · grupo 4/(personas 5)/6.
+      var nc=$('notaCumple'); if(nc) nc.style.display = grupo ? 'none' : '';
+      var na=$('notaGrupoAmb'); if(na) na.style.display = grupo ? '' : 'none';
+      $('panelPersonas').style.display = grupo ? '' : 'none';
+      var sb=$('sorpresaBox'); if(sb) sb.style.display = grupo ? 'none' : '';  // grupo/despedida NO llevan invitación secreta
+      // Numeración de pasos: románticas 3/4 · cumpleaños 4/5 · grupo/despedida 4/(personas 5)/6.
       $('tinaLbl').innerHTML = (llevaColor ? '4' : '3') + ' · Tu <b>tina</b>, fecha y hora';
-      var choco=$('chocoLbl'); if(choco) choco.innerHTML = (esGrupo ? '6' : llevaColor ? '5' : '4') + ' · ¿Le <b>sumas</b> algo?';
+      var choco=$('chocoLbl'); if(choco) choco.innerHTML = (grupo ? '6' : llevaColor ? '5' : '4') + ' · ¿Le <b>sumas</b> algo?';
       rellenarTinas();
       recalc();
     }
@@ -306,7 +308,7 @@
     });
     $('selTina').onchange=function(){
       var o=this.options[this.selectedIndex]; $('f_tina').value=this.value;
-      if(estado.ocasion==='grupo'){
+      if(esGrupo(estado.ocasion)){
         estado.precioPersona = this.value ? parseInt(o.getAttribute('data-precio-persona'),10) : 0;
         var cap = this.value ? parseInt(o.getAttribute('data-cap'),10) : 0;
         var sp=$('selPersonas'); sp.innerHTML='<option value="">¿Cuántos?…</option>';
