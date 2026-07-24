@@ -156,6 +156,74 @@
         </div>
         {% endif %}
 
+        {% if bebida_personalizable %}
+        <style>
+          .beb-opt{display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line2);
+            border-radius:10px;margin-bottom:8px;font-size:14px;color:var(--ink);cursor:pointer;background:var(--surface)}
+          .beb-opt input{accent-color:#C9A24B;width:18px;height:18px;flex-shrink:0}
+          .beb-sub{display:none;padding:2px 4px 10px 34px}
+          .beb-sub.show{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+          .beb-sub select{flex:1;min-width:130px;padding:8px;border:1px solid var(--line2);border-radius:8px;background:var(--surface);color:var(--ink);font-size:14px}
+          .beb-sub .gas{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+        </style>
+        <div style="border:2px solid #C9A24B; border-radius:14px; background:#fbf6ea; padding:16px; margin-top:14px;">
+          <div style="font-size:15px; color:#7a5c12; margin-bottom:4px; text-align:center;">🥂 Personaliza tu velada</div>
+          <div style="font-size:13px; color:#8a6f3a; margin-bottom:12px; text-align:center;">Elige la bebida que va incluida. Va de sorpresa — tu pareja no la verá en la invitación.</div>
+          {% if bebida_guardado == 'ok' %}
+          <div style="background:var(--pag-bg); color:var(--pag-fg); border-radius:10px; padding:10px; font-size:13px; text-align:center; margin-bottom:12px;">✓ Guardamos tu bebida para la velada.</div>
+          {% elif bebida_guardado == 'ya_entregada' %}
+          <div style="background:var(--par-bg); color:var(--par-fg); border-radius:10px; padding:10px; font-size:13px; text-align:center; margin-bottom:12px;">Tu bebida ya está preparada. Escríbenos si quieres cambiarla.</div>
+          {% endif %}
+          <form id="bebidaForm" method="post" action="{{ personalizar_bebida_url }}">
+            {% csrf_token %}
+            <label class="beb-opt"><input type="radio" name="bebida" value="jugos"> 🧃 2 jugos naturales</label>
+            <div class="beb-sub" data-for="jugos">
+              <select name="jugo_1" aria-label="Primer jugo">
+                <option value="frambuesa">Frambuesa</option><option value="arandano">Arándano</option><option value="melon">Melón</option>
+              </select>
+              <select name="jugo_2" aria-label="Segundo jugo">
+                <option value="frambuesa">Frambuesa</option><option value="arandano">Arándano</option><option value="melon">Melón</option>
+              </select>
+            </div>
+            <label class="beb-opt"><input type="radio" name="bebida" value="vino"> 🍷 1 vino</label>
+            <label class="beb-opt"><input type="radio" name="bebida" value="espumante"> 🥂 1 espumante</label>
+            <label class="beb-opt"><input type="radio" name="bebida" value="aguas"> 💧 2 aguas</label>
+            <div class="beb-sub" data-for="aguas">
+              <label class="gas"><input type="radio" name="agua" value="con_gas"> Con gas</label>
+              <label class="gas"><input type="radio" name="agua" value="sin_gas"> Sin gas</label>
+            </div>
+            <button type="submit" class="btn" style="background:#C9A24B; color:#fff; margin-top:6px;">Guardar mi bebida</button>
+          </form>
+        </div>
+        {{ bebida_sel|json_script:"bebida-sel" }}
+        <script>
+        (function(){
+          var form = document.getElementById('bebidaForm');
+          if(!form) return;
+          var sel = {};
+          try { sel = JSON.parse(document.getElementById('bebida-sel').textContent) || {}; } catch(e){}
+          function syncSubs(){
+            var picked = form.querySelector('input[name=bebida]:checked');
+            var t = picked ? picked.value : '';
+            form.querySelectorAll('.beb-sub').forEach(function(d){
+              d.classList.toggle('show', d.getAttribute('data-for') === t);
+            });
+          }
+          var tipo = sel.tipo || 'jugos';
+          var r = form.querySelector('input[name=bebida][value="'+tipo+'"]'); if(r) r.checked = true;
+          if(sel.jugos){
+            var s1 = form.querySelector('select[name=jugo_1]'), s2 = form.querySelector('select[name=jugo_2]');
+            if(s1 && sel.jugos[0]) s1.value = sel.jugos[0];
+            if(s2 && sel.jugos[1]) s2.value = sel.jugos[1];
+          }
+          var agua = sel.agua || 'con_gas';
+          var a = form.querySelector('input[name=agua][value="'+agua+'"]'); if(a) a.checked = true;
+          form.querySelectorAll('input[name=bebida]').forEach(function(el){ el.addEventListener('change', syncSubs); });
+          syncSubs();
+        })();
+        </script>
+        {% endif %}
+
         {% if not es_cotizacion and saldo > 0 %}
         <a class="btn-pagar" href="{{ pagar_url }}">
           💳 Pagar online — hasta 12 cuotas

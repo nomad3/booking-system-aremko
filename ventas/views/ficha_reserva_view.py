@@ -180,6 +180,18 @@ def ficha_reserva_cliente(request, token):
     except Exception:  # noqa: BLE001 — nunca tumbar la ficha por esto
         invitacion_url = None
 
+    # F2-C — "Personaliza tu velada": el comprador elige su bebida incluida (secreta,
+    # $0) desde la ficha, solo si hay ambientación y aún no se sirvió.
+    bebida_personalizable = False
+    bebida_sel = None
+    try:
+        from ..services.ambientacion_bebidas import bebida_editable, bebida_actual
+        if bebida_editable(venta):
+            bebida_personalizable = True
+            bebida_sel = bebida_actual(venta)
+    except Exception:  # noqa: BLE001 — nunca tumbar la ficha por esto
+        bebida_personalizable = False
+
     context = {
         'venta': venta,
         'numero': venta.id,
@@ -206,6 +218,11 @@ def ficha_reserva_cliente(request, token):
         'pagar_url': reverse('ventas:ficha_reserva_pagar', kwargs={'token': token}),
         # invitación sorpresa para la pareja (solo si la reserva tiene ambientación)
         'invitacion_url': invitacion_url,
+        # F2-C — "Personaliza tu velada" (bebida incluida, secreta, $0)
+        'bebida_personalizable': bebida_personalizable,
+        'bebida_sel': bebida_sel,
+        'personalizar_bebida_url': reverse('ventas:ficha_personalizar_bebida', kwargs={'token': token}),
+        'bebida_guardado': request.GET.get('bebida'),
     }
     return render(request, 'ventas/ficha_reserva_cliente.html', context)
 
@@ -238,6 +255,47 @@ def ficha_reserva_pagar(request, token):
     logger.error('[ficha] no se pudo crear link MP para reserva %s: %s',
                  venta.id, resultado.get('error'))
     return redirect('ventas:ficha_reserva_cliente', token=token)
+
+
+def _bebida_ids_desde_post(post):
+    """Mapea el form de 'Personaliza tu velada' (F2-C) a ids de Producto de bebida.
+    La validación final (lista blanca) la hace personalizar_bebida()."""
+    from ..services.ambientacion_bebidas import JUGOS, AGUAS, VINO_ID, ESPUMANTE_ID
+    tipo = (post.get('bebida') or 'jugos').strip().lower()
+    if tipo == 'vino':
+        return [VINO_ID]
+    if tipo == 'espumante':
+        return [ESPUMANTE_ID]
+    if tipo == 'aguas':
+        gas = (post.get('agua') or 'con_gas').strip().lower()
+        gas = gas if gas in AGUAS else 'con_gas'
+        return [AGUAS[gas], AGUAS[gas]]  # 2 aguas del tipo elegido
+    # jugos (default): 2 sabores de frambuesa/arándano/melón
+    j1 = (post.get('jugo_1') or 'frambuesa').strip().lower()
+    j2 = (post.get('jugo_2') or 'arandano').strip().lower()
+    j1 = j1 if j1 in JUGOS else 'frambuesa'
+    j2 = j2 if j2 in JUGOS else 'arandano'
+    return [JUGOS[j1], JUGOS[j2]]
+
+
+def ficha_personalizar_bebida(request, token):
+    """F2-C: el comprador elige/cambia su bebida incluida (secreta, $0) desde la ficha.
+
+    La bebida no se cobra (solo mueve inventario el día de la visita) y no aparece
+    en la invitación de la pareja, así que se mantiene la sorpresa. Redirige de vuelta
+    a la ficha con ?bebida=<estado> para mostrar un aviso."""
+    from django.urls import reverse
+    venta = _venta_desde_token(token)
+    if request.method != 'POST':
+        return redirect('ventas:ficha_reserva_cliente', token=token)
+    from ..services.ambientacion_bebidas import personalizar_bebida
+    try:
+        estado = personalizar_bebida(venta, _bebida_ids_desde_post(request.POST))
+    except Exception:  # noqa: BLE001 — nunca tumbar la ficha por esto
+        logger.exception('[ficha] falló personalizar bebida (reserva %s)', venta.id)
+        estado = 'error'
+    return redirect(
+        reverse('ventas:ficha_reserva_cliente', kwargs={'token': token}) + f'?bebida={estado}')
 
 
 def _obtener_o_crear_comanda(venta):

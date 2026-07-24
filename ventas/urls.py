@@ -174,6 +174,7 @@ urlpatterns = [
     path('reserva/<str:token>/', ficha_reserva_view.ficha_reserva_cliente, name='ficha_reserva_cliente'),
     path('reserva/<str:token>/comanda/', ficha_reserva_view.ficha_comanda, name='ficha_reserva_comanda'),
     path('reserva/<str:token>/pagar/', ficha_reserva_view.ficha_reserva_pagar, name='ficha_reserva_pagar'),
+    path('reserva/<str:token>/bebida/', ficha_reserva_view.ficha_personalizar_bebida, name='ficha_personalizar_bebida'),
 
     # Cotización del cliente (Fase 3) — Ficha en modo cotización + botón Aprobar.
     # Prefijo 'propuesta/' (no 'cotizacion/') para NO shadowear cotizacion/<int:numero>/ (formal).

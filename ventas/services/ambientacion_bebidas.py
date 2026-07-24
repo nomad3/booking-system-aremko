@@ -29,6 +29,12 @@ CHOCOLATES_ID = 42      # Caja Chocolate ($16.000, el único cobrado)
 # Bebida por defecto: 2 jugos (frambuesa + arándano).
 DEFAULT_BEBIDA = [JUGOS['frambuesa'], JUGOS['arandano']]
 
+# Lista blanca de productos que PUEDEN ser "la bebida incluida" — se usa para
+# validar la personalización del comprador desde su ficha (F2-C). Nunca aceptar
+# un id fuera de acá (defensa: no dejar meter cualquier producto vía POST).
+BEBIDA_PRODUCTOS_VALIDOS = frozenset(
+    list(JUGOS.values()) + list(AGUAS.values()) + [VINO_ID, ESPUMANTE_ID])
+
 NOMBRE_CAT_AMBIENTACION = 'ambientaciones'
 
 
@@ -175,3 +181,111 @@ def asegurar_comanda_chocolates(venta):
         precio_unitario_venta=0)  # fecha_entrega = NULL → no descuenta hasta la visita
     logger.info('[ambientacion_chocolates] comanda de chocolates creada para reserva %s', venta.id)
     return comanda
+
+
+# ---------------------------------------------------------------------------
+# F2-C — "Personaliza tu velada": el comprador cambia su bebida incluida desde
+# la ficha (secreta, excluyente, $0). Reemplaza el contenido de la comanda de
+# bebida por la elección, respetando la fecha de la visita. Solo ANTES de la
+# entrega (si ya se sirvió, no se toca, para no descuadrar inventario).
+# ---------------------------------------------------------------------------
+
+def _ids_bebida_validos(productos_ids):
+    """Filtra a los ids de la lista blanca de bebidas (descarta cualquier otro)."""
+    return [pid for pid in (productos_ids or []) if pid in BEBIDA_PRODUCTOS_VALIDOS]
+
+
+def personalizar_bebida(venta, productos_ids):
+    """Reemplaza la bebida incluida por la elección del comprador (ficha F2-C).
+
+    A $0, misma fecha objetivo (la visita), excluyente. Las cantidades se agregan
+    (p.ej. [125, 125] = 2 aguas con gas → una línea cantidad 2). Devuelve un estado:
+      'ok' | 'sin_ambientacion' | 'ya_entregada' | 'sin_seleccion'.
+    Defensivo: nunca debe voltear la ficha.
+    """
+    from collections import Counter
+    from ..models import Comanda, DetalleComanda, ReservaProducto, Producto
+
+    if not venta_tiene_ambientacion(venta):
+        return 'sin_ambientacion'
+
+    ids = _ids_bebida_validos(productos_ids)
+    if not ids:
+        return 'sin_seleccion'
+
+    comanda = _comanda_bebida_existente(venta)
+    if comanda is None:
+        # Aún no tiene bebida (raro, el signal la crea) → crearla con la elección.
+        c = asegurar_comanda_bebida_default(venta, productos_ids=ids)
+        return 'ok' if c is not None else 'sin_ambientacion'
+
+    # Si ya se entregó/sirvió, no tocar (evita descuadres de inventario).
+    old_ids = list(comanda.detalles.values_list('producto_id', flat=True))
+    if comanda.estado == 'entregada' or ReservaProducto.objects.filter(
+            venta_reserva=venta, producto_id__in=old_ids,
+            fecha_entrega__isnull=False).exists():
+        return 'ya_entregada'
+
+    # Reemplazar SOLO las líneas de la bebida actual (por old_ids, no toca los
+    # chocolates ni otros productos). fecha_entrega NULL → borrar no mueve stock.
+    ReservaProducto.objects.filter(
+        venta_reserva=venta, producto_id__in=old_ids, fecha_entrega__isnull=True).delete()
+    comanda.detalles.all().delete()
+
+    for pid, qty in Counter(ids).items():
+        try:
+            producto = Producto.objects.get(id=pid)
+        except Producto.DoesNotExist:
+            logger.warning('[ambientacion_bebidas] producto %s no existe al personalizar, se omite', pid)
+            continue
+        DetalleComanda.objects.create(
+            comanda=comanda, producto=producto, cantidad=qty, precio_unitario=0)
+        ReservaProducto.objects.create(
+            venta_reserva=venta, producto=producto, cantidad=qty, precio_unitario_venta=0)
+    logger.info('[ambientacion_bebidas] bebida personalizada para reserva %s: %s', venta.id, ids)
+    return 'ok'
+
+
+# Mapa inverso para preseleccionar la elección actual en la ficha (best-effort).
+def bebida_actual(venta):
+    """Devuelve la elección de bebida vigente como dict para la ficha, p.ej.
+    {'tipo': 'jugos', 'jugos': ['frambuesa', 'arandano']} o {'tipo': 'vino'}.
+    Si no se puede determinar, devuelve el default (2 jugos frambuesa+arándano)."""
+    from ..models import ReservaProducto
+    comanda = _comanda_bebida_existente(venta)
+    if comanda is None:
+        return {'tipo': 'jugos', 'jugos': ['frambuesa', 'arandano']}
+    # Expandir por cantidad para reflejar "2 aguas con gas", etc.
+    ids = []
+    for pid, qty in comanda.detalles.values_list('producto_id', 'cantidad'):
+        ids += [pid] * int(qty or 1)
+
+    inv_jugos = {v: k for k, v in JUGOS.items()}
+    inv_aguas = {v: k for k, v in AGUAS.items()}
+    if VINO_ID in ids:
+        return {'tipo': 'vino'}
+    if ESPUMANTE_ID in ids:
+        return {'tipo': 'espumante'}
+    if any(i in inv_aguas for i in ids):
+        gas = next((inv_aguas[i] for i in ids if i in inv_aguas), 'con_gas')
+        return {'tipo': 'aguas', 'agua': gas}
+    sabores = [inv_jugos[i] for i in ids if i in inv_jugos][:2]
+    while len(sabores) < 2:
+        sabores.append('frambuesa' if 'frambuesa' not in sabores else 'arandano')
+    return {'tipo': 'jugos', 'jugos': sabores}
+
+
+def bebida_editable(venta):
+    """True si la reserva tiene ambientación y su bebida AÚN no se entregó (se puede
+    personalizar desde la ficha). Post-visita ya no, para no descuadrar inventario."""
+    from ..models import ReservaProducto
+    if not venta_tiene_ambientacion(venta):
+        return False
+    comanda = _comanda_bebida_existente(venta)
+    if comanda is None:
+        return True  # aún sin bebida asignada → se puede elegir
+    if comanda.estado == 'entregada':
+        return False
+    old_ids = list(comanda.detalles.values_list('producto_id', flat=True))
+    return not ReservaProducto.objects.filter(
+        venta_reserva=venta, producto_id__in=old_ids, fecha_entrega__isnull=False).exists()
