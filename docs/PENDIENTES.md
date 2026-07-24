@@ -84,3 +84,16 @@ _Última revisión: 2026-07-20_
 <!-- P-18 (revisión de reels/videos) cerrado 2026-07-19 como H-065/H-066-F2: subida
      de video + fotogramas por URL Cloudinary + revisor IA por clip, verificado en
      vivo. Pendiente solo el front de aremko-cli (ya tiene el contrato). -->
+
+## Veladas & Celebraciones (experiencias-regalo)
+
+19. **P-19 · Plan Veladas (V-01…V-23)** — Convertir la Experiencia Romántica en un
+    negocio de experiencias-regalo que venda todo el año (aniversarios/cumpleaños
+    evergreen + bengalas estacionales), abrir **tinas grupales** (despedidas de
+    soltera/o, gender reveal reusando el color, escapadas de amigas) y el **segmento
+    empresas** (giftcards corporativas, incentivos, convenios). Backlog completo en
+    `docs/PLAN_VELADAS.md`. **Tablero interno OCULTO** (estado vivo, se actualiza a
+    medida que avanzamos): ruta `panel-veladas-09c7c72cd1/` en `aremko_project/urls.py`
+    → `ventas/views/plan_veladas_view.py` (editar `estado` de cada V-xx y desplegar).
+    Base ya construida y LIVE: configurador + invitación + taxonomía + F2-B/F2-C
+    bebidas + chocolates. Ver `[[project_aremko_experiencia_romantica]]`.

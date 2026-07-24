@@ -8,7 +8,7 @@ from django.contrib.auth import views as auth_views # Import auth views
 # Import the specific view functions needed for root URLs
 from ventas.views.public_views import unsubscribe_view, homepage_view, empresas_view, empresas_presentacion_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view, garantia_view, tarjetas_qr_reviews_view, encuesta_satisfaccion_view, encuesta_gracias_view, refugio_landing_view, refugio_submit_view, privacy_policy_view, ritual_rio_landing_view, pausa_landing_view, noche_aguas_calientes_landing_view
 from ventas.views import flow_views
-from ventas.views import experiencia_romantica_view
+from ventas.views import experiencia_romantica_view, plan_veladas_view
 from ventas.views import invitacion_sorpresa_view
 from ventas.views import masaje_views
 from ventas.views import masaje_outbox_api_views
@@ -141,6 +141,8 @@ urlpatterns = [
     # Experiencia Romántica (Puerta B): configurador sorpresa + invitación filtrada para la pareja
     path('experiencia-romantica/', experiencia_romantica_view.experiencia_romantica_view, name='experiencia_romantica'),
     path('experiencia-romantica/continuar/', experiencia_romantica_view.experiencia_romantica_submit, name='experiencia_romantica_continuar'),
+    # Tablero interno OCULTO del plan Veladas (slug no adivinable, sin login, no indexado).
+    path('panel-veladas-09c7c72cd1/', plan_veladas_view.plan_veladas_estado, name='plan_veladas_estado'),
     path('invitacion/<str:token>/', invitacion_sorpresa_view.invitacion_sorpresa_view, name='invitacion_sorpresa'),
     # Preview de la maqueta de home boutique (NOINDEX, sin link en el menú) — para revisar el rediseño
     path('preview-home-boutique/', TemplateView.as_view(template_name='ventas/preview_home_boutique.html'), name='preview_home_boutique'),
