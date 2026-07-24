@@ -724,3 +724,26 @@ def giftcard_download_pdf(request, codigo):
         return JsonResponse({
             'error': 'Error al generar el PDF'
         }, status=500)
+
+
+# Niveles de la Velada Sorpresa (V-04). Deben coincidir con VELADA_NIVELES del
+# command cargar_experiencias_giftcard (mismas claves y precios base).
+VELADA_NIVELES_CHOOSER = [
+    {'clave': 'simple', 'nombre': 'Simple',      'desc': 'Tina caliente + ambientación romántica', 'base': 82000},
+    {'clave': 'dulce',  'nombre': 'Dulce',       'desc': 'Ambientación + caja de chocolates',       'base': 98000},
+    {'clave': 'flores', 'nombre': 'con Flores',  'desc': 'Ambientación con ramo de flores',         'base': 118000},
+    {'clave': 'gran',   'nombre': 'Gran Velada', 'desc': 'Flores + chocolates, la completa',        'base': 134000},
+]
+VELADA_HIDRO_EXTRA = 10000
+
+
+def giftcard_velada_chooser(request):
+    """V-04 · Elegidor de la Velada Sorpresa: 4 niveles + toggle hidromasaje.
+    Cada opción arma el link al wizard de giftcards ya existente
+    (?exp=velada_<clave>[_hidro]&skip_step1=true)."""
+    return render(request, 'ventas/giftcard_velada.html', {
+        'niveles': VELADA_NIVELES_CHOOSER,
+        'hidro_extra': VELADA_HIDRO_EXTRA,
+        'foto': ('https://res.cloudinary.com/dtuncr1pi/image/upload/'
+                 'f_auto,q_auto,w_1000/v1/servicios/IMG_2795_ydpknt'),
+    })

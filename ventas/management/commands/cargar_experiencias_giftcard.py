@@ -74,6 +74,48 @@ INSIGNIAS = [
     },
 ]
 
+# --- V-04 · Velada Sorpresa (jul-2026) ------------------------------------
+# 4 niveles × hidromasaje (+$10.000). NO se muestran como cards sueltas en la
+# vitrina (no van en IDS_INSIGNIA de giftcard_views): se llega a ellos desde el
+# elegidor /giftcards/velada/. Foto provisional reutilizada del landing (P-44).
+IMG_VELADA = 'servicios/IMG_2795_ydpknt'
+HIDRO_EXTRA = 10000
+VELADA_NIVELES = [
+    {'clave': 'simple', 'nombre': 'Simple',      'monto': 82000,
+     'desc': 'Una tina caliente privada junto al río con una ambientación romántica montada para ustedes.'},
+    {'clave': 'dulce',  'nombre': 'Dulce',       'monto': 98000,
+     'desc': 'Tina caliente privada, ambientación romántica y una caja de chocolates para brindar.'},
+    {'clave': 'flores', 'nombre': 'con Flores',  'monto': 118000,
+     'desc': 'Tina caliente privada con una ambientación romántica y un ramo de flores.'},
+    {'clave': 'gran',   'nombre': 'Gran Velada', 'monto': 134000,
+     'desc': 'La velada completa: tina, ambientación con ramo de flores y una caja de chocolates.'},
+]
+
+
+def _build_veladas():
+    veladas = []
+    for i, n in enumerate(VELADA_NIVELES):
+        for hidro in (False, True):
+            suf = '_hidro' if hidro else ''
+            extra_nombre = ' + hidromasaje' if hidro else ''
+            extra_desc = ' Con tina de hidromasaje.' if hidro else ''
+            veladas.append({
+                'id_experiencia': f"velada_{n['clave']}{suf}",
+                'categoria': 'packs',
+                'nombre': f"Velada Sorpresa · {n['nombre']}{extra_nombre}",
+                'descripcion': f"Velada para dos junto al río · {n['nombre']}{extra_nombre}",
+                'descripcion_giftcard': (
+                    f"{n['desc']}{extra_desc} Una velada para dos junto al río, lista para "
+                    f"brindar y celebrar sin mover un dedo. Válida cualquier día."),
+                'monto_fijo': n['monto'] + (HIDRO_EXTRA if hidro else 0),
+                'orden': 10 + i * 2 + (1 if hidro else 0),
+                'imagen': IMG_VELADA,
+            })
+    return veladas
+
+
+VELADAS = _build_veladas()
+
 # DECISIÓN RADICAL de Jorge (2026-07-05, reforzada al ver la página): "solo se
 # regalan experiencias, no tinas sueltas, no masajes sueltos" — y la GiftCard de
 # monto libre TAMPOCO va. Se desactiva TODO lo que no sea una de las 4 insignia.
@@ -93,6 +135,8 @@ class Command(BaseCommand):
 
         aplicar = opts['aplicar']
         ids_insignia = [d['id_experiencia'] for d in INSIGNIAS]
+        # Los niveles de Velada también deben quedar activos (aunque no sean cards).
+        ids_mantener = ids_insignia + [d['id_experiencia'] for d in VELADAS]
 
         self.stdout.write('=== 1) Experiencias insignia (update_or_create) ===')
         for datos in INSIGNIAS:
@@ -114,11 +158,30 @@ class Command(BaseCommand):
                 accion = 'SE ACTUALIZARÍA' if existente else 'SE CREARÍA'
                 self.stdout.write(f'  → {id_exp}: {accion} — "{datos["nombre"]}" ${datos["monto_fijo"]:,}')
 
+        self.stdout.write('\n=== 1b) Niveles Velada Sorpresa (V-04, NO son cards) ===')
+        for datos in VELADAS:
+            id_exp = datos['id_experiencia']
+            existente = GiftCardExperiencia.objects.filter(id_experiencia=id_exp).first()
+            if aplicar:
+                if existente:
+                    for campo in ('categoria', 'nombre', 'descripcion', 'descripcion_giftcard',
+                                  'monto_fijo', 'orden', 'imagen'):
+                        setattr(existente, campo, datos[campo])
+                    existente.activo = True
+                    existente.save()
+                    self.stdout.write(self.style.SUCCESS(f'  ✓ {id_exp}: ACTUALIZADA ${datos["monto_fijo"]:,}'))
+                else:
+                    GiftCardExperiencia.objects.create(activo=True, **datos)
+                    self.stdout.write(self.style.SUCCESS(f'  ✓ {id_exp}: CREADA ${datos["monto_fijo"]:,}'))
+            else:
+                accion = 'SE ACTUALIZARÍA' if existente else 'SE CREARÍA'
+                self.stdout.write(f'  → {id_exp}: {accion} — "{datos["nombre"]}" ${datos["monto_fijo"]:,}')
+
         self.stdout.write('\n=== 2) RADICAL: desactivar todo lo que no sea insignia (ni monto libre) ===')
         candidatas = GiftCardExperiencia.objects.filter(activo=True)
         n_desactivadas = 0
         for exp in candidatas:
-            if exp.id_experiencia in ids_insignia:
+            if exp.id_experiencia in ids_mantener:
                 continue
             if exp.categoria in CATEGORIAS_QUE_SOBREVIVEN:
                 self.stdout.write(f'  = {exp.id_experiencia}: SE MANTIENE (monto libre) — "{exp.nombre}"')

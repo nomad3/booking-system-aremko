@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regala una Velada Sorpresa · Aremko</title>
+<style>
+  :root{--bg:#F2E8D8;--surface:#FFFDF9;--ink:#2E2A24;--muted:#7C736A;--line:#DBCDB4;
+    --green:#1e4438;--gold:#C9A24B;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;line-height:1.5;padding:16px}
+  .wrap{max-width:460px;margin:0 auto}
+  .hero{border-radius:18px;overflow:hidden;background-size:cover;background-position:center;
+    min-height:180px;display:flex;align-items:flex-end;margin-bottom:16px}
+  .hero-ov{width:100%;padding:18px;background:linear-gradient(180deg,rgba(30,18,16,.05),rgba(30,18,16,.72));color:#fff}
+  .hero-ov h1{margin:0 0 2px;font-size:23px}
+  .hero-ov p{margin:0;font-size:14px;color:#f0e6d6}
+  .niveles{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+  .nivel{display:flex;align-items:center;gap:12px;background:var(--surface);border:1.5px solid var(--line);
+    border-radius:14px;padding:13px 14px;cursor:pointer}
+  .nivel:has(input:checked){border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,162,75,.25)}
+  .nivel input{accent-color:var(--gold);width:20px;height:20px;flex-shrink:0}
+  .nivel-b{flex:1;min-width:0}
+  .nivel-t{font-weight:700;font-size:15.5px;color:var(--green)}
+  .nivel-d{font-size:13px;color:var(--muted)}
+  .nivel-p{font-weight:700;font-size:15px;color:var(--ink);white-space:nowrap}
+  .hidro{display:flex;align-items:center;justify-content:space-between;background:#F7F0E2;
+    border-radius:12px;padding:13px 15px;margin-bottom:16px;cursor:pointer}
+  .hidro small{color:var(--muted);font-weight:400}
+  .hidro input{accent-color:var(--gold);width:20px;height:20px}
+  .total{text-align:center;font-size:15px;color:var(--muted);margin-bottom:12px}
+  .total b{color:var(--green);font-size:22px;display:block;margin-top:2px}
+  .btn{display:block;text-align:center;background:var(--gold);color:#10231d;font-weight:700;
+    text-decoration:none;padding:16px;border-radius:12px;font-size:16px}
+  .nota{text-align:center;font-size:12.5px;color:var(--muted);margin-top:14px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero" style="background-image:url('{{ foto }}')">
+      <div class="hero-ov">
+        <h1>🥂 Regala una Velada Sorpresa</h1>
+        <p>Tú la defines. Quien la recibe solo elige la fecha.</p>
+      </div>
+    </div>
+
+    <form id="vf" data-wizard="{% url 'ventas:giftcard_wizard' %}">
+      <div class="niveles">
+        {% for n in niveles %}
+        <label class="nivel">
+          <input type="radio" name="nivel" value="{{ n.clave }}" data-base="{{ n.base }}"{% if forloop.first %} checked{% endif %}>
+          <div class="nivel-b">
+            <div class="nivel-t">{{ n.nombre }}</div>
+            <div class="nivel-d">{{ n.desc }}</div>
+          </div>
+          <div class="nivel-p" data-base="{{ n.base }}"></div>
+        </label>
+        {% endfor %}
+      </div>
+
+      <label class="hidro">
+        <span>💧 Con hidromasaje <small>+${{ hidro_extra }}</small></span>
+        <input type="checkbox" id="hidro">
+      </label>
+
+      <div class="total">Total del regalo<b id="total">$0</b></div>
+      <a id="continuar" class="btn" href="#">Continuar con el regalo →</a>
+      <div class="nota">Válida cualquier día · 365 días para canjear. La ambientación va de sorpresa.</div>
+    </form>
+  </div>
+
+  <script>
+  (function(){
+    var form = document.getElementById('vf');
+    var wizard = form.getAttribute('data-wizard');
+    var hidro = document.getElementById('hidro');
+    var extra = {{ hidro_extra }};
+    function clp(n){ return '$' + n.toLocaleString('es-CL'); }
+    // Precios por nivel
+    form.querySelectorAll('.nivel-p').forEach(function(el){
+      el.textContent = clp(parseInt(el.getAttribute('data-base'), 10));
+    });
+    function upd(){
+      var r = form.querySelector('input[name=nivel]:checked');
+      var base = parseInt(r.getAttribute('data-base'), 10);
+      var total = base + (hidro.checked ? extra : 0);
+      document.getElementById('total').textContent = clp(total);
+      var exp = 'velada_' + r.value + (hidro.checked ? '_hidro' : '');
+      document.getElementById('continuar').href = wizard + '?exp=' + exp + '&skip_step1=true';
+    }
+    form.querySelectorAll('input[name=nivel]').forEach(function(el){ el.addEventListener('change', upd); });
+    hidro.addEventListener('change', upd);
+    upd();
+  })();
+  </script>
+</body>
+</html>

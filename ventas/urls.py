@@ -255,6 +255,7 @@ urlpatterns = [
     # === GIFTCARD WIZARD ===
     path('giftcards/', giftcard_views.giftcard_menu, name='giftcard_menu'),  # Vitrina: las 4 experiencias insignia
     path('giftcards/wizard/', giftcard_views.giftcard_wizard, name='giftcard_wizard'),  # Wizard de personalización
+    path('giftcards/velada/', giftcard_views.giftcard_velada_chooser, name='giftcard_velada'),  # V-04 elegidor 4 niveles + hidromasaje
     path('api/giftcard/generar-mensajes/', giftcard_views.generar_mensajes_ai, name='generar_mensajes_ai'),
     path('api/giftcard/regenerar-mensaje/', giftcard_views.regenerar_mensaje_ai, name='regenerar_mensaje_ai'),
     path('api/giftcard/agregar-al-carrito/', giftcard_views.agregar_giftcard_al_carrito, name='agregar_giftcard_al_carrito'),
