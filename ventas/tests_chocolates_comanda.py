@@ -69,6 +69,15 @@ class _BaseChoco(TestCase):
             id=22,  # ROMANTICA_IDS['r1'] — para que el submit resuelva la ambientación
             nombre='Ambientación romántica R1', categoria=cls.cat_amb,
             tipo_servicio='otro', precio_base=Decimal('32000'), duracion=60, activo=True)
+        # Para el modo grupo (V-13): ambientación de cumpleaños (id 66 = sin_torta/rosado)
+        # + una tina grupal (Osorno, hasta 6, $25.000/persona).
+        cls.serv_amb_cumple = Servicio.objects.create(
+            id=66, nombre='Decoración Simple · Rosado', categoria=cls.cat_amb,
+            tipo_servicio='otro', precio_base=Decimal('38000'), duracion=60, activo=True)
+        cls.serv_osorno = Servicio.objects.create(
+            nombre='Tina Osorno', categoria=cls.cat_tinas, tipo_servicio='tina',
+            precio_base=Decimal('25000'), duracion=60, activo=True,
+            publicado_web=True, capacidad_maxima=6)
         cls.serv_choco = Servicio.objects.create(
             nombre=NOMBRE_SERVICIO_CHOCOLATES, categoria=cls.cat_amb,
             tipo_servicio='otro', precio_base=Decimal('16000'), duracion=60, activo=True)
@@ -232,3 +241,26 @@ class GuardStockChocolatesTest(_BaseChoco):
         self.assertNotIn(NOMBRE_SERVICIO_CHOCOLATES, nombres)
         # La velada se arma igual (tina + ambientación), solo sin chocolates.
         self.assertEqual(len(nombres), 2)
+
+    # -- V-13 modo grupo --------------------------------------------------
+    def test_submit_grupo_cobra_por_persona(self):
+        resp = self.client.post(reverse('experiencia_romantica_continuar'), {
+            'ocasion': 'grupo', 'color': 'rosado', 'torta': 'sin_torta',
+            'tina_id': self.serv_osorno.id, 'personas': 5,
+            'fecha': self.fecha_visita.isoformat(), 'hora': '16:00',
+        })
+        self.assertEqual(resp.status_code, 302)
+        cart = self.client.session['cart']
+        tina_line = next(s for s in cart['servicios'] if s['id'] == self.serv_osorno.id)
+        self.assertEqual(tina_line['cantidad_personas'], 5)      # N personas
+        self.assertEqual(tina_line['subtotal'], 25000 * 5)       # precio_base × N
+        self.assertIn(66, [s['id'] for s in cart['servicios']])  # ambientación de cumpleaños
+
+    def test_submit_grupo_rechaza_fuera_de_rango(self):
+        resp = self.client.post(reverse('experiencia_romantica_continuar'), {
+            'ocasion': 'grupo', 'color': 'rosado', 'torta': 'sin_torta',
+            'tina_id': self.serv_osorno.id, 'personas': 7,  # > capacidad (6)
+            'fecha': self.fecha_visita.isoformat(), 'hora': '16:00',
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertNotIn('cart', self.client.session)  # error → no arma carrito

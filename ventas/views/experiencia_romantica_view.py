@@ -46,6 +46,12 @@ ROMANTICA_AMBIENTACION_IDS = frozenset(ROMANTICA_IDS.values())
 # espacio físico para montarlas). Se matchea por nombre normalizado.
 CUMPLE_TINAS = ('hornopiren', 'osorno', 'llaima')
 
+# Modo grupo (V-13): celebración de grupo tipo cumpleaños — reusa la ambientación de
+# cumpleaños (color + con/sin torta). Tinas grupales por nombre; cada una define su
+# capacidad en el admin (mín 3). Se cobra precio_base × N personas (Osorno/Calbuco $25.000 c/u).
+GRUPO_TINAS = ('calbuco', 'osorno')
+GRUPO_MIN_PERSONAS = 3
+
 # Es una experiencia PARA DOS: la tina se cobra siempre por 2 personas, aunque sea
 # una tina grupal (p.ej. Osorno se usa para el cumpleaños de a dos → 2 × precio_base,
 # no × su capacidad grupal).
@@ -73,7 +79,8 @@ def resolver_ambientacion_id(ocasion, nivel=None, torta=None, color=None):
     """
     if ocasion == 'romantica':
         return ROMANTICA_IDS.get((nivel or 'r1').lower())
-    if ocasion == 'cumpleanos':
+    if ocasion in ('cumpleanos', 'grupo'):
+        # El grupo es una celebración tipo cumpleaños: reusa la misma ambientación.
         clave = ((torta or 'sin_torta').lower(), (color or 'rosado').lower())
         return CUMPLE_IDS.get(clave)
     return None
@@ -83,6 +90,13 @@ def tina_admite_cumple(nombre_tina):
     """True si la tina tiene espacio para una ambientación de cumpleaños."""
     n = _norm(nombre_tina)
     return any(c in n for c in CUMPLE_TINAS)
+
+
+def tina_admite_grupo(nombre_tina):
+    """True si la tina es grupal (celebración de 3+ personas). Con espacio para la
+    ambientación de cumpleaños (confirmado con Jorge: Calbuco y Osorno)."""
+    n = _norm(nombre_tina)
+    return any(g in n for g in GRUPO_TINAS)
 
 
 def _clp(n):
@@ -129,7 +143,7 @@ def _tinas_configurador():
     `cumple_ok` (solo Hornopirén/Osorno/Llaima). El front filtra según la ocasión.
     """
     filtro = Q(capacidad_maxima__lte=2)
-    for n in CUMPLE_TINAS:
+    for n in CUMPLE_TINAS + GRUPO_TINAS:
         filtro |= Q(nombre__icontains=n)
     qs = Servicio.objects.filter(
         tipo_servicio='tina', activo=True, publicado_web=True,
@@ -138,8 +152,9 @@ def _tinas_configurador():
 
     tinas = []
     for t in qs:
-        # Siempre para 2: 2 × precio_base (aunque la tina sea grupal, como Osorno).
+        # Románticas/cumpleaños: para 2 → 2 × precio_base. Grupo: precio_base × N (en el front).
         total = int(t.precio_base) * PERSONAS_EXPERIENCIA
+        precio_persona = int(t.precio_base)
         tinas.append({
             'id': t.id,
             'nombre': t.nombre,
@@ -148,6 +163,9 @@ def _tinas_configurador():
             'total_fmt': _clp(total),
             'romantica_ok': t.capacidad_maxima <= 2,
             'cumple_ok': tina_admite_cumple(t.nombre),
+            'grupo_ok': tina_admite_grupo(t.nombre),
+            'precio_persona': precio_persona,
+            'precio_persona_fmt': _clp(precio_persona),
         })
     return tinas
 
@@ -161,6 +179,8 @@ def experiencia_romantica_view(request):
     context = {
         'tinas': tinas,  # se serializa con {{ tinas|json_script }} en el template
         'tiene_tinas_cumple': any(t['cumple_ok'] for t in tinas),
+        'tiene_tinas_grupo': any(t['grupo_ok'] for t in tinas),
+        'grupo_min': GRUPO_MIN_PERSONAS,
         'precio_r1': _precio(ROMANTICA_IDS['r1'], FALLBACK['r1']),
         'precio_r2': _precio(ROMANTICA_IDS['r2'], FALLBACK['r2']),
         'precio_cumple_sin': _precio(CUMPLE_IDS[('sin_torta', 'rosado')], FALLBACK['cumple_sin']),
@@ -218,6 +238,21 @@ def experiencia_romantica_submit(request):
             "Hornopirén, Osorno o Llaima. Elige una de esas para el cumpleaños.")
         return redirect('experiencia_romantica')
 
+    # Modo grupo: tina grupal + N personas (3 … capacidad de la tina). Cobra × N.
+    personas = PERSONAS_EXPERIENCIA
+    if ocasion == 'grupo':
+        if not tina_admite_grupo(tina.nombre):
+            messages.error(request, "Para una celebración de grupo, elige una tina grupal (Calbuco u Osorno).")
+            return redirect('experiencia_romantica')
+        try:
+            personas = int(request.POST.get('personas') or 0)
+        except (TypeError, ValueError):
+            personas = 0
+        cap = int(tina.capacidad_maxima or 0)
+        if personas < GRUPO_MIN_PERSONAS or personas > cap:
+            messages.error(request, f"Para {tina.nombre}, elige entre {GRUPO_MIN_PERSONAS} y {cap} personas.")
+            return redirect('experiencia_romantica')
+
     amb_id = resolver_ambientacion_id(ocasion, nivel=nivel, torta=torta, color=color)
     ambientacion = _servicio(amb_id)
     if not ambientacion:
@@ -227,8 +262,8 @@ def experiencia_romantica_submit(request):
     # Carrito nuevo, en el orden que exige la regla: tina primero.
     cart = {'servicios': [], 'total': 0}
 
-    # 1) Tina — siempre para 2 personas (experiencia de a dos, aunque sea grupal).
-    cart['servicios'].append(_item_carrito(tina, fecha, hora, PERSONAS_EXPERIENCIA))
+    # 1) Tina — para 2 (románticas/cumpleaños) o para N (grupo): precio_base × personas.
+    cart['servicios'].append(_item_carrito(tina, fecha, hora, personas))
 
     # 2) Ambientación secreta — hereda el slot de la tina.
     cart['servicios'].append(_item_carrito(ambientacion, fecha, hora, 1))

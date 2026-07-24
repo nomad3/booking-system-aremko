@@ -58,8 +58,8 @@ TRACKS = [
          'nota': 'Ángulo de campaña sobre el mismo producto'},
     ]},
     {'titulo': 'C · Tinas grupales (celebraciones de grupo)', 'items': [
-        {'code': 'V-13', 'titulo': 'Modo grupo en el configurador', 'estado': 'pendiente',
-         'nota': 'Fundación del track. Resuelve la pregunta de Deborah'},
+        {'code': 'V-13', 'titulo': 'Modo grupo en el configurador', 'estado': 'progreso',
+         'nota': 'Live: 3ª ocasión Grupo (3-6, cumpleaños, precio × N). Verificar capacidad/precio de Calbuco y Osorno en admin'},
         {'code': 'V-14', 'titulo': 'Despedida de soltera / soltero', 'estado': 'pendiente',
          'nota': 'La apuesta más fuerte del track'},
         {'code': 'V-15', 'titulo': 'Cumpleaños grupal (números redondos)', 'estado': 'pendiente',

@@ -150,11 +150,13 @@
         <input type="hidden" name="fecha"   id="f_fecha">
         <input type="hidden" name="hora"    id="f_hora">
         <input type="hidden" name="chocolates" id="f_choco" value="0">
+        <input type="hidden" name="personas" id="f_personas" value="">
 
-        <div class="paso-t">1 · ¿Qué <b>celebras</b>?</div>
+        <div class="paso-t">1 · <b>Elige</b> tu ocasión</div>
         <div class="opts">
           <button type="button" class="opt foto sel" id="optRom" data-oc="romantica">Romántica<small>Casi 30 velas + entorno</small></button>
-          <button type="button" class="opt foto" id="optCum" data-oc="cumpleanos">Cumpleaños<small>Con o sin torta</small></button>
+          <button type="button" class="opt foto" id="optCum" data-oc="cumpleanos">Cumpleaños<small>Con o sin torta · de a dos</small></button>
+          {% if tiene_tinas_grupo %}<button type="button" class="opt foto" id="optGrupo" data-oc="grupo">Grupo<small>Celebración de 3 a 6</small></button>{% endif %}
         </div>
 
         <!-- 2A · Románticas: nivel (no llevan color) -->
@@ -178,11 +180,17 @@
             <button type="button" class="opt sel" data-torta="sin_torta" id="optSinTorta">Sin torta<small>Solo ambientación</small></button>
             <button type="button" class="opt" data-torta="con_torta" id="optConTorta">Con torta<small>Torta incluida</small></button>
           </div>
-          <p class="nota">La ambientación de cumpleaños se instala solo en las tinas <b>Hornopirén, Osorno y Llaima</b> (en las demás no hay espacio para montarla).</p>
+          <p class="nota" id="notaCumple">La ambientación de cumpleaños se instala solo en las tinas <b>Hornopirén, Osorno y Llaima</b> (en las demás no hay espacio para montarla).</p>
+          <p class="nota" id="notaGrupoAmb" style="display:none;">Para el grupo usamos la misma ambientación de cumpleaños (color + torta), en una tina grupal.</p>
         </div>
 
         <div class="paso-t" id="tinaLbl">3 · Tu <b>tina</b>, fecha y hora</div>
         <select id="selTina"><option value="">Elige tu tina…</option></select>
+        <div id="panelPersonas" style="display:none;">
+          <div class="paso-t" id="personasLbl">¿<b>Cuántos</b> son?</div>
+          <select id="selPersonas"><option value="">Elige primero tu tina…</option></select>
+          <p class="nota">El máximo depende de la tina (Calbuco hasta 4, Osorno hasta 6). Se cobra por persona.</p>
+        </div>
         <div class="fila">
           <input type="date" id="selFecha">
           <select id="selHora"><option value="">Hora…</option></select>
@@ -199,7 +207,7 @@
       </form>
       {{ tinas|json_script:"tinas-data" }}
 
-      <div class="sorpresa">
+      <div class="sorpresa" id="sorpresaBox">
         <div class="ic">🤫</div>
         <p>Tú y Aremko saben todo. Tu pareja recibe <b>solo la invitación</b> —sin precios, sin ver la ambientación—. La sorpresa se revela al llegar.</p>
       </div>
@@ -221,7 +229,8 @@
     var PRECIO = { r1:{{ precio_r1 }}, r2:{{ precio_r2 }}, cumple_sin:{{ precio_cumple_sin }}, cumple_con:{{ precio_cumple_con }}, chocolates:{{ precio_chocolates|default:0 }} };
     var TINAS = JSON.parse(document.getElementById('tinas-data').textContent);
     var HORAS_URL = "{% url 'ventas:get_available_hours' %}";
-    var estado = { ocasion:'romantica', nivel:'r1', color:'rosado', torta:'sin_torta', tinaTotal:0, choco:false };
+    var estado = { ocasion:'romantica', nivel:'r1', color:'rosado', torta:'sin_torta', tinaTotal:0, choco:false, personas:0, precioPersona:0 };
+    var GRUPO_MIN = {{ grupo_min|default:3 }};
     var $ = function(id){ return document.getElementById(id); };
     var fmt = function(n){ return '$' + Math.round(n).toLocaleString('es-CL'); };
 
@@ -239,34 +248,47 @@
     function recalc(){
       var t = precioBase() + estado.tinaTotal + (estado.choco ? PRECIO.chocolates : 0);
       $('totalTxt').textContent = fmt(t);
-      $('btnCont').disabled = !($('f_tina').value && $('f_fecha').value && $('f_hora').value);
+      var okBase = $('f_tina').value && $('f_fecha').value && $('f_hora').value;
+      var okPers = estado.ocasion !== 'grupo' || $('f_personas').value;  // grupo exige N
+      $('btnCont').disabled = !(okBase && okPers);
     }
     function rellenarTinas(){
-      // Románticas → cualquier tina de pareja; cumpleaños → solo Hornopirén/Osorno/Llaima.
+      // Románticas → tinas de pareja; cumpleaños → Hornopirén/Osorno/Llaima; grupo → grupales.
       var sel=$('selTina'), oc=estado.ocasion;
       sel.innerHTML='<option value="">Elige tu tina…</option>';
       TINAS.forEach(function(t){
-        var ok = (oc==='cumpleanos') ? t.cumple_ok : t.romantica_ok;
+        var ok = (oc==='grupo') ? t.grupo_ok : (oc==='cumpleanos') ? t.cumple_ok : t.romantica_ok;
         if(!ok) return;
-        var o=document.createElement('option');
-        o.value=t.id; o.setAttribute('data-total', t.total);
-        // Experiencia para dos: todas las tinas se muestran "para 2" (incl. Osorno).
-        o.textContent = t.nombre + ' · para 2 · $' + t.total_fmt;
+        var o=document.createElement('option'); o.value=t.id;
+        if(oc==='grupo'){
+          o.setAttribute('data-precio-persona', t.precio_persona);
+          o.setAttribute('data-cap', t.capacidad);
+          o.textContent = t.nombre + ' · hasta ' + t.capacidad + ' personas · $' + t.precio_persona_fmt + ' c/u';
+        } else {
+          o.setAttribute('data-total', t.total);
+          o.textContent = t.nombre + ' · para 2 · $' + t.total_fmt;
+        }
         sel.appendChild(o);
       });
-      // Cambió el set: se reinicia la elección de tina y hora.
-      $('f_tina').value=''; estado.tinaTotal=0;
+      // Cambió el set: se reinicia tina, personas y hora.
+      $('f_tina').value=''; estado.tinaTotal=0; estado.precioPersona=0; estado.personas=0;
+      $('f_personas').value='';
+      var sp=$('selPersonas'); if(sp) sp.innerHTML='<option value="">Elige primero tu tina…</option>';
       $('selHora').innerHTML='<option value="">Hora…</option>'; $('f_hora').value='';
       $('notaHoras').textContent='';
     }
     function aplicarOcasion(){
-      var c = estado.ocasion==='cumpleanos';
-      $('f_ocasion').value = estado.ocasion;
-      $('panelRom').style.display = c ? 'none' : '';
-      $('panelCum').style.display = c ? '' : 'none';
-      // Cumpleaños tiene un paso extra (torta), así que la tina y los chocolates se corren.
-      $('tinaLbl').innerHTML = (c ? '4' : '3') + ' · Tu <b>tina</b>, fecha y hora';
-      var choco=$('chocoLbl'); if(choco) choco.innerHTML = (c ? '5' : '4') + ' · ¿Le <b>sumas</b> algo?';
+      var oc=estado.ocasion, esGrupo=oc==='grupo', llevaColor=(oc==='cumpleanos'||esGrupo);
+      $('f_ocasion').value = oc;
+      $('panelRom').style.display = llevaColor ? 'none' : '';
+      $('panelCum').style.display = llevaColor ? '' : 'none';
+      var nc=$('notaCumple'); if(nc) nc.style.display = esGrupo ? 'none' : '';
+      var na=$('notaGrupoAmb'); if(na) na.style.display = esGrupo ? '' : 'none';
+      $('panelPersonas').style.display = esGrupo ? '' : 'none';
+      var sb=$('sorpresaBox'); if(sb) sb.style.display = esGrupo ? 'none' : '';  // grupo NO lleva invitación secreta
+      // Numeración de pasos: románticas 3/4 · cumpleaños 4/5 · grupo 4/(personas 5)/6.
+      $('tinaLbl').innerHTML = (llevaColor ? '4' : '3') + ' · Tu <b>tina</b>, fecha y hora';
+      var choco=$('chocoLbl'); if(choco) choco.innerHTML = (esGrupo ? '6' : llevaColor ? '5' : '4') + ' · ¿Le <b>sumas</b> algo?';
       rellenarTinas();
       recalc();
     }
@@ -284,7 +306,22 @@
     });
     $('selTina').onchange=function(){
       var o=this.options[this.selectedIndex]; $('f_tina').value=this.value;
-      estado.tinaTotal = this.value ? parseInt(o.getAttribute('data-total'),10) : 0; cargarHoras(); recalc();
+      if(estado.ocasion==='grupo'){
+        estado.precioPersona = this.value ? parseInt(o.getAttribute('data-precio-persona'),10) : 0;
+        var cap = this.value ? parseInt(o.getAttribute('data-cap'),10) : 0;
+        var sp=$('selPersonas'); sp.innerHTML='<option value="">¿Cuántos?…</option>';
+        for(var n=GRUPO_MIN; n<=cap; n++){ var op=document.createElement('option'); op.value=n; op.textContent=n+' personas'; sp.appendChild(op); }
+        estado.personas=0; $('f_personas').value=''; estado.tinaTotal=0;
+      } else {
+        estado.tinaTotal = this.value ? parseInt(o.getAttribute('data-total'),10) : 0;
+      }
+      cargarHoras(); recalc();
+    };
+    var selPer=$('selPersonas'); if(selPer) selPer.onchange=function(){
+      estado.personas = this.value ? parseInt(this.value,10) : 0;
+      $('f_personas').value = this.value || '';
+      estado.tinaTotal = estado.precioPersona * estado.personas;  // precio_base × N
+      recalc();
     };
     $('selFecha').onchange=function(){ $('f_fecha').value=this.value; cargarHoras(); recalc(); };
     $('selHora').onchange=function(){ $('f_hora').value=this.value; recalc(); };

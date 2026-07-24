@@ -18,7 +18,7 @@ from __future__ import annotations
 from django.test import SimpleTestCase
 
 from ventas.views.experiencia_romantica_view import (
-    resolver_ambientacion_id, tina_admite_cumple, _norm,
+    resolver_ambientacion_id, tina_admite_cumple, tina_admite_grupo, _norm,
     ROMANTICA_IDS, CUMPLE_IDS,
 )
 
@@ -47,6 +47,16 @@ class ResolverAmbientacionTest(SimpleTestCase):
     def test_cumple_default_sin_torta_rosado(self):
         self.assertEqual(resolver_ambientacion_id('cumpleanos'), 66)
 
+    def test_grupo_reusa_ambientacion_de_cumpleanos(self):
+        # El grupo (V-13) es una celebración tipo cumpleaños: mismo color+torta.
+        self.assertEqual(resolver_ambientacion_id('grupo', torta='sin_torta', color='azul'), 24)
+        self.assertEqual(resolver_ambientacion_id('grupo', torta='sin_torta', color='rosado'), 66)
+        self.assertEqual(resolver_ambientacion_id('grupo', torta='con_torta', color='azul'), 25)
+        self.assertEqual(resolver_ambientacion_id('grupo', torta='con_torta', color='rosado'), 65)
+
+    def test_grupo_default_sin_torta_rosado(self):
+        self.assertEqual(resolver_ambientacion_id('grupo'), 66)
+
     def test_ocasion_desconocida_devuelve_none(self):
         self.assertIsNone(resolver_ambientacion_id('otra_cosa'))
         self.assertIsNone(resolver_ambientacion_id(''))
@@ -72,3 +82,15 @@ class TinaAdmiteCumpleTest(SimpleTestCase):
 
     def test_norm_quita_acentos(self):
         self.assertEqual(_norm('Hornopirén'), 'hornopiren')
+
+
+class TinaAdmiteGrupoTest(SimpleTestCase):
+    """Modo grupo (V-13): solo Calbuco y Osorno son tinas grupales."""
+
+    def test_tinas_grupales(self):
+        for nombre in ('Tina Calbuco', 'CALBUCO', 'Tina Osorno', 'osorno', 'Tina Calbuco (grupo)'):
+            self.assertTrue(tina_admite_grupo(nombre), nombre)
+
+    def test_tinas_no_grupales(self):
+        for nombre in ('Tina Hornopirén', 'Tina Llaima', 'Tina Tronador', 'Tina Puyehue'):
+            self.assertFalse(tina_admite_grupo(nombre), nombre)
