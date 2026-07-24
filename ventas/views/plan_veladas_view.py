@@ -30,8 +30,8 @@ FUNDACION = [
 
 TRACKS = [
     {'titulo': 'A · Motor de venta (todo el año)', 'items': [
-        {'code': 'V-01', 'titulo': 'Always-on Meta (evergreen)', 'estado': 'pendiente',
-         'nota': 'Campaña permanente aniversario/sorpresa a la geo sur'},
+        {'code': 'V-01', 'titulo': 'Always-on: Meta frío + Mail tibio', 'estado': 'progreso',
+         'nota': 'Contenido listo (campaña Meta Sabri + cuerpo de mail a la base); por lanzar'},
         {'code': 'V-02', 'titulo': 'Always-on Google (captura)', 'estado': 'pendiente',
          'nota': 'Keywords de intención + RSA'},
         {'code': 'V-03', 'titulo': 'Referido de la invitación', 'estado': 'pendiente',
