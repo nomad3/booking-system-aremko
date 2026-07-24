@@ -99,3 +99,79 @@ def asegurar_comanda_bebida_default(venta, productos_ids=None):
     logger.info('[ambientacion_bebidas] comanda de bebida creada para reserva %s (productos %s)',
                 venta.id, ids)
     return comanda
+
+
+# ---------------------------------------------------------------------------
+# Chocolates (opcional, COBRADO) — "repunte" jul-2026 (camino seguro con Jorge).
+#
+# El cobro de los chocolates lo hace la LÍNEA DE SERVICIO del configurador
+# ("Caja de chocolates", id 90 en prod), repreciada a la par del Producto real
+# vía `manage.py repuntar_chocolates`. Esta comanda NO cobra: solo mueve el
+# INVENTARIO del Producto real (Caja Chocolate, id 42) EN LA FECHA de la visita,
+# con el mismo mecanismo que las bebidas. Así se corrige el "inventario fantasma"
+# sin tocar el checkout compartido.
+# ---------------------------------------------------------------------------
+
+# Marca en notas_generales para reconocer (e idempotentar) la comanda de chocolates.
+MARCA_CHOCOLATES = '[Ambientación · chocolates]'
+
+# Nombre del servicio con que se COBRAN los chocolates en el configurador.
+NOMBRE_SERVICIO_CHOCOLATES = 'Caja de chocolates'
+
+
+def venta_tiene_chocolates(venta):
+    """True si la reserva incluye la línea de servicio de chocolates de la ambientación."""
+    return venta.reservaservicios.filter(
+        servicio__categoria__nombre__iexact=NOMBRE_CAT_AMBIENTACION,
+        servicio__nombre__iexact=NOMBRE_SERVICIO_CHOCOLATES,
+    ).exists()
+
+
+def _comanda_chocolates_existente(venta):
+    return venta.comandas.filter(notas_generales__icontains=MARCA_CHOCOLATES).first()
+
+
+def asegurar_comanda_chocolates(venta):
+    """
+    Idempotente: si la reserva incluye la línea de chocolates (servicio) y aún no
+    tiene su comanda de inventario, crea una que descuenta el Producto real
+    (Caja Chocolate, id 42) EN LA FECHA de la visita — mismo mecanismo que las
+    bebidas (Comanda con `fecha_entrega_objetivo`; el cron marca la entrega ese
+    día y recién ahí baja el stock).
+
+    El cobro NO pasa por acá (va por la línea de servicio); esta línea de producto
+    va a $0 y solo mueve stock, por lo que NO infla el total (Coalesce respeta el 0).
+    Devuelve la Comanda (nueva o existente) o None si no aplica. Defensivo: nunca
+    debe voltear la creación de la reserva.
+    """
+    from ..models import Comanda, DetalleComanda, ReservaProducto, Producto
+
+    if not venta_tiene_chocolates(venta):
+        return None
+
+    existente = _comanda_chocolates_existente(venta)
+    if existente is not None:
+        return existente  # ya tiene su comanda — no duplicar
+
+    try:
+        producto = Producto.objects.get(id=CHOCOLATES_ID)
+    except Producto.DoesNotExist:
+        logger.warning('[ambientacion_chocolates] Producto %s (Caja Chocolate) no existe; '
+                       'no se creó la comanda de inventario para reserva %s',
+                       CHOCOLATES_ID, venta.id)
+        return None
+
+    comanda = Comanda.objects.create(
+        venta_reserva=venta,
+        estado='pendiente',
+        fecha_entrega_objetivo=_fecha_objetivo(venta),
+        notas_generales=f'{MARCA_CHOCOLATES} (cobrado en el servicio; esta línea solo mueve inventario)',
+    )
+    # Precio 0: el cobro ya está en la línea de servicio; esta línea solo mueve stock.
+    DetalleComanda.objects.create(
+        comanda=comanda, producto=producto, cantidad=1, precio_unitario=0)
+    ReservaProducto.objects.create(
+        venta_reserva=venta, producto=producto, cantidad=1,
+        precio_unitario_venta=0)  # fecha_entrega = NULL → no descuenta hasta la visita
+    logger.info('[ambientacion_chocolates] comanda de chocolates creada para reserva %s', venta.id)
+    return comanda

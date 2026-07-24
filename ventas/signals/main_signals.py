@@ -434,8 +434,13 @@ def asegurar_bebida_ambientacion(sender, instance, created, raw, using, update_f
         cat = (getattr(getattr(servicio, 'categoria', None), 'nombre', '') or '').lower()
         if cat != 'ambientaciones':
             return
-        from ventas.services.ambientacion_bebidas import asegurar_comanda_bebida_default
+        from ventas.services.ambientacion_bebidas import (
+            asegurar_comanda_bebida_default, asegurar_comanda_chocolates)
         asegurar_comanda_bebida_default(instance.venta_reserva)
+        # Si además eligió chocolates (línea de servicio), mover su inventario real
+        # (Producto id 42) EN LA FECHA de la visita. Idempotente y auto-guardado:
+        # devuelve None si la reserva no tiene la línea de chocolates.
+        asegurar_comanda_chocolates(instance.venta_reserva)
     except Exception as e:  # noqa: BLE001 — nunca tumbar la reserva por esto
         logger.error(f"[asegurar_bebida_ambientacion] falló para ReservaServicio {instance.pk}: {e}")
 
