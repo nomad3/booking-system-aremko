@@ -97,3 +97,13 @@ _Última revisión: 2026-07-20_
     → `ventas/views/plan_veladas_view.py` (editar `estado` de cada V-xx y desplegar).
     Base ya construida y LIVE: configurador + invitación + taxonomía + F2-B/F2-C
     bebidas + chocolates. Ver `[[project_aremko_experiencia_romantica]]`.
+
+20. **P-20 · La Ficha como app + upsell (F-01…F-10)** — Convertir la Ficha de Reserva
+    del cliente (`/reserva/<token>/`) en una mini-app: que la abran, la entiendan y
+    **compren más desde ahí** (tina→masaje, masaje→noche, 1 noche→2 noches). Problema =
+    adopción, no información; dos embudos (abrir / activar), hoy ciegos en aperturas.
+    Fases: **Abrir** (F-01 medir, F-02 reencuadrar mensaje "Tu Aremko", F-03 onboarding) ·
+    **Vender** (F-04 upsell contextual, F-05 sumar a un toque, F-06 medir conversión) ·
+    **Volver** (F-07 nudges Luna, F-08 QR físico) · **App** (F-09 guardar en pantalla,
+    F-10 avisos). Backlog en `docs/PLAN_FICHA.md`. Empezar por F-01 + F-02 (medir +
+    reencuadrar) antes de tocar la ficha. Ver `[[project_aremko_ficha_reserva_digital]]`.
