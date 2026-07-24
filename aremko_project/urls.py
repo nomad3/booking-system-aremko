@@ -143,6 +143,8 @@ urlpatterns = [
     path('experiencia-romantica/continuar/', experiencia_romantica_view.experiencia_romantica_submit, name='experiencia_romantica_continuar'),
     # Tablero interno OCULTO del plan Veladas (slug no adivinable, sin login, no indexado).
     path('panel-veladas-09c7c72cd1/', plan_veladas_view.plan_veladas_estado, name='plan_veladas_estado'),
+    # Guía interna para el equipo (Deborah + Angélica) — oculta, no indexada.
+    path('guia-9a6efd3b/', plan_veladas_view.guia_equipo_veladas, name='guia_equipo_veladas'),
     path('invitacion/<str:token>/', invitacion_sorpresa_view.invitacion_sorpresa_view, name='invitacion_sorpresa'),
     # Preview de la maqueta de home boutique (NOINDEX, sin link en el menú) — para revisar el rediseño
     path('preview-home-boutique/', TemplateView.as_view(template_name='ventas/preview_home_boutique.html'), name='preview_home_boutique'),

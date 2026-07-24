@@ -88,6 +88,12 @@ TRACKS = [
 _ORDEN = ['V-01', 'V-04', 'V-03', 'V-13', 'V-14', 'V-19']
 
 
+def guia_equipo_veladas(request):
+    """Guía interna para el equipo (Deborah + Angélica): qué es la Experiencia
+    Romántica / Veladas, desde el cliente y desde la venta. Oculta, noindex."""
+    return render(request, 'ventas/guia_equipo_veladas.html', {})
+
+
 def plan_veladas_estado(request):
     total = sum(len(t['items']) for t in TRACKS)
     hechos = sum(1 for t in TRACKS for i in t['items'] if i['estado'] == 'hecho')

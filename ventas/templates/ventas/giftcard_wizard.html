@@ -149,6 +149,7 @@
     }
 
     /* Experience Cards */
+    .exp-oculta { display: none !important; }  /* niveles de Velada: en el DOM (preselección) pero no en la grilla en frío */
     .experience-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -514,7 +515,10 @@
                  regalan experiencias completas — sin grupos por categoría) -->
             <div class="experience-grid" id="experienceGrid">
                 {% for exp in experiencias %}
-                <div class="experience-card exp-card" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}"
+                {# V-04: los 8 niveles de Velada van OCULTOS (exp-oculta) — siguen en el DOM
+                   para que la preselección desde el elegidor los encuentre, pero no ensucian
+                   la grilla en frío. La card visible "Velada Sorpresa" (abajo) lleva al elegidor. #}
+                <div class="experience-card exp-card{% if 'velada_' in exp.id %} exp-oculta{% endif %}" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}"
                     data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
                     {% if exp.imagen %}
                     <img src="{{ exp.imagen }}" alt="{{ exp.nombre }}">
@@ -529,6 +533,13 @@
                     {% endif %}
                 </div>
                 {% endfor %}
+                {# Card que abre el elegidor de la Velada Sorpresa (4 niveles × hidromasaje) #}
+                <a href="{% url 'ventas:giftcard_velada' %}" class="experience-card exp-card" style="text-decoration:none;">
+                    <img src="https://res.cloudinary.com/dtuncr1pi/image/upload/f_auto,q_auto,w_600/v1/servicios/IMG_2795_ydpknt" alt="Velada Sorpresa · para dos">
+                    <h5>Velada Sorpresa · para dos</h5>
+                    <p>Elige entre 4 niveles según tu presupuesto.</p>
+                    <div class="price-tag">desde $82.000</div>
+                </a>
             </div>
 
             <div id="amountSelection" style="display:none;">
