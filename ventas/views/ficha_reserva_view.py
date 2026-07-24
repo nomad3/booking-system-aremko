@@ -133,10 +133,42 @@ def _lineas_servicios(venta):
     return lineas
 
 
+# F-01 (plan Ficha): medir aperturas de la ficha. Se registra la PRIMERA apertura real
+# por reserva como un MovimientoCliente (sin migración), filtrando bots / preview de link
+# (WhatsApp, Facebook, etc.) para no inflar la métrica. La bandeja de aremko-cli puede
+# leer esto para mostrar "✓ abrió la ficha".
+_BOTS_UA = ('bot', 'crawler', 'spider', 'facebookexternalhit', 'whatsapp',
+            'preview', 'slurp', 'bingpreview', 'embedly', 'quora link', 'redditbot')
+
+
+def _registrar_apertura_ficha(request, venta):
+    """Registra (una vez por reserva) que el cliente abrió su ficha. Defensivo: nunca
+    debe tumbar la ficha ni bloquear su carga."""
+    try:
+        ua = (request.META.get('HTTP_USER_AGENT') or '').lower()
+        if not ua or any(b in ua for b in _BOTS_UA):
+            return  # sin UA o bot/preview → no cuenta como apertura del cliente
+        if not getattr(venta, 'cliente_id', None):
+            return
+        from ..models import MovimientoCliente
+        ya_abrio = MovimientoCliente.objects.filter(
+            venta_reserva=venta, tipo_movimiento='ficha_abierta').exists()
+        if ya_abrio:
+            return
+        MovimientoCliente.objects.create(
+            cliente=venta.cliente, venta_reserva=venta,
+            tipo_movimiento='ficha_abierta',
+            comentarios='El cliente abrió su ficha por primera vez (F-01).')
+    except Exception:  # noqa: BLE001 — medir nunca debe romper la ficha
+        logger.exception('[ficha] no se pudo registrar apertura (reserva %s)',
+                         getattr(venta, 'id', '?'))
+
+
 def ficha_reserva_cliente(request, token):
     """Ficha de reserva del cliente (solo lectura)."""
     from django.urls import reverse
     venta = _venta_desde_token(token)
+    _registrar_apertura_ficha(request, venta)  # F-01: medir aperturas
 
     estado_label, estado_cls = ESTADO_PAGO_FICHA.get(
         venta.estado_pago, ('Pendiente de pago', 'pen'))

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <title>Plan Veladas — Tablero interno</title>
+  <title>{{ plan_titulo|default:"Plan Veladas" }} — Tablero interno</title>
   <style>
     :root{
       --bg:#F2E8D8; --surface:#FFFDF9; --ink:#2E2A24; --muted:#7C736A; --line2:#DBCDB4;
@@ -41,11 +41,11 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>🥂 Plan Veladas & Celebraciones</h1>
+    <h1>{{ plan_h1|default:"🥂 Plan Veladas & Celebraciones" }}</h1>
     <div class="sub">Tablero interno · actualizado {{ actualizado }}</div>
 
     <div class="card">
-      <div style="font-size:13px;color:var(--muted)">Avance del plan V-xx</div>
+      <div style="font-size:13px;color:var(--muted)">Avance del plan {{ plan_id_label|default:"V-xx" }}</div>
       <div class="bar"><i style="width:{{ pct }}%"></i></div>
       <div class="counts">
         <span><b>{{ hechos }}</b>/{{ total }} listos ({{ pct }}%)</span>
@@ -87,7 +87,7 @@
     </div>
     {% endfor %}
 
-    <div class="foot">Página interna de Aremko · no indexada · detalle en docs/PLAN_VELADAS.md</div>
+    <div class="foot">Página interna de Aremko · no indexada · detalle en docs/{{ plan_doc|default:"PLAN_VELADAS.md" }}</div>
   </div>
 </body>
 </html>

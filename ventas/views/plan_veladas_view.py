@@ -94,18 +94,72 @@ def guia_equipo_veladas(request):
     return render(request, 'ventas/guia_equipo_veladas.html', {})
 
 
-def plan_veladas_estado(request):
-    total = sum(len(t['items']) for t in TRACKS)
-    hechos = sum(1 for t in TRACKS for i in t['items'] if i['estado'] == 'hecho')
-    progreso = sum(1 for t in TRACKS for i in t['items'] if i['estado'] == 'progreso')
+def _render_tablero(request, actualizado, fundacion, tracks, orden, titulo, h1, id_label, doc):
+    """Renderiza el tablero genérico (mismo template) para cualquier plan."""
+    total = sum(len(t['items']) for t in tracks)
+    hechos = sum(1 for t in tracks for i in t['items'] if i['estado'] == 'hecho')
+    progreso = sum(1 for t in tracks for i in t['items'] if i['estado'] == 'progreso')
     pct = round(100 * hechos / total) if total else 0
-    context = {
-        'actualizado': ACTUALIZADO,
-        'fundacion': FUNDACION,
-        'tracks': TRACKS,
+    return render(request, 'ventas/plan_veladas_estado.html', {
+        'actualizado': actualizado, 'fundacion': fundacion, 'tracks': tracks,
         'total': total, 'hechos': hechos, 'progreso': progreso,
-        'pendientes': total - hechos - progreso,
-        'pct': pct,
-        'orden': _ORDEN,
-    }
-    return render(request, 'ventas/plan_veladas_estado.html', context)
+        'pendientes': total - hechos - progreso, 'pct': pct, 'orden': orden,
+        'plan_titulo': titulo, 'plan_h1': h1, 'plan_id_label': id_label, 'plan_doc': doc,
+    })
+
+
+def plan_veladas_estado(request):
+    return _render_tablero(request, ACTUALIZADO, FUNDACION, TRACKS, _ORDEN,
+                           'Plan Veladas', '🥂 Plan Veladas & Celebraciones', 'V-xx', 'PLAN_VELADAS.md')
+
+
+# =========================== Tablero Ficha (F-xx) ===========================
+ACTUALIZADO_FICHA = '2026-07-24'
+
+FUNDACION_FICHA = [
+    {'code': '—', 'titulo': 'Ver la reserva + estado de pago', 'estado': 'hecho',
+     'nota': 'Servicios contratados, total y saldo'},
+    {'code': '—', 'titulo': 'Tips de la visita', 'estado': 'hecho', 'nota': 'Qué llevar, cómo llegar'},
+    {'code': '—', 'titulo': 'Comanda digital', 'estado': 'hecho', 'nota': 'Pedir bebidas / comida'},
+    {'code': '—', 'titulo': 'Pagar saldo online', 'estado': 'hecho', 'nota': 'Mercado Pago, hasta 12 cuotas'},
+    {'code': 'F2-C', 'titulo': 'Personalizar la bebida', 'estado': 'hecho', 'nota': 'Elige jugos/vino/espumante/agua'},
+    {'code': '—', 'titulo': 'Invitación sorpresa', 'estado': 'hecho', 'nota': 'Link para la pareja (si hay ambientación)'},
+]
+
+TRACKS_FICHA = [
+    {'titulo': 'Fase 1 · ABRIR (que la abran y entiendan)', 'items': [
+        {'code': 'F-01', 'titulo': 'Medir aperturas + "✓ abrió" en la bandeja', 'estado': 'progreso',
+         'nota': 'Paso 0: saber si el cuello es abrir o activar'},
+        {'code': 'F-02', 'titulo': 'Reencuadrar el mensaje → "Tu Aremko"', 'estado': 'pendiente',
+         'nota': 'De comprobante a panel de la experiencia'},
+        {'code': 'F-03', 'titulo': 'Onboarding al abrir', 'estado': 'pendiente',
+         'nota': '"¿Qué puedes hacer acá?" de 3 íconos'},
+    ]},
+    {'titulo': 'Fase 2 · VENDER (upsell)', 'items': [
+        {'code': 'F-04', 'titulo': 'Sección de upsell contextual', 'estado': 'pendiente',
+         'nota': 'tina→masaje · masaje→noche · 1→2 noches'},
+        {'code': 'F-05', 'titulo': 'Sumar a un toque', 'estado': 'pendiente',
+         'nota': 'Paga la diferencia online (reusa checkout/MP)'},
+        {'code': 'F-06', 'titulo': 'Medir conversión del upsell', 'estado': 'pendiente',
+         'nota': 'El KPI que prueba que la ficha cobra'},
+    ]},
+    {'titulo': 'Fase 3 · VOLVER (razones para reabrir)', 'items': [
+        {'code': 'F-07', 'titulo': 'Nudges por WhatsApp/Luna (3 momentos)', 'estado': 'pendiente',
+         'nota': 'Reservar / días antes / el día'},
+        {'code': 'F-08', 'titulo': 'Puente físico (QR)', 'estado': 'pendiente',
+         'nota': 'QR en recepción/cabaña → abre la ficha'},
+    ]},
+    {'titulo': 'Fase 4 · APP (que se sienta app)', 'items': [
+        {'code': 'F-09', 'titulo': 'Guardar en pantalla (PWA)', 'estado': 'pendiente',
+         'nota': 'Ícono persistente, no un link perdido'},
+        {'code': 'F-10', 'titulo': 'Recordatorios / avisos', 'estado': 'pendiente',
+         'nota': 'Reseña post-visita, próximo aniversario'},
+    ]},
+]
+
+_ORDEN_FICHA = ['F-01', 'F-02', 'F-04', 'F-05', 'F-07']
+
+
+def plan_ficha_estado(request):
+    return _render_tablero(request, ACTUALIZADO_FICHA, FUNDACION_FICHA, TRACKS_FICHA, _ORDEN_FICHA,
+                           'Plan Ficha', '📱 La Ficha como app + upsell', 'F-xx', 'PLAN_FICHA.md')
