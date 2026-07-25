@@ -42,6 +42,14 @@ sirve con `f_auto,q_auto`) y corre el etiquetado IA. **No persiste nada.**
 }
 ```
 Errores: `400` (falta archivo / formato / >16MB) · `401` · `502` (Cloudinary).
+
+> **Notas de la semilla real (2026-07-24, para la pantalla de ingesta Fase B):**
+> 1. **HEIC** (default del iPhone de Angélica) se rechaza → convertir a JPG en el
+>    cliente antes de subir (la semilla usó `sips`), o evaluar aceptar HEIC y
+>    convertir server-side en una iteración futura.
+> 2. **Masters >16 MB** se rechazan → optimizar/reducir (ej. 1600px) antes de mandar.
+> 3. `estado` solo acepta `ok|revisar|descartado` — estados internos del cliente
+>    (ej. `borrador_v2`) deben mapearse antes del POST.
 Si la IA duda o falla: draft con defaults conservadores y `estado="revisar"` (la ingesta
 no se cae por el etiquetado). Reglas duras del saneo: `personas=true` fuerza
 `permiso="revisar_derechos"` y `keeper=false`.
