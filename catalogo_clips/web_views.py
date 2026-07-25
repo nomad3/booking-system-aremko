@@ -18,6 +18,7 @@ from django.shortcuts import redirect, render
 
 from .api_views import (_validar_payload, _subir_imagen_optimizada, _orientacion,
                         _EXT_IMAGEN, _MAX_BYTES)
+from .composer import receta_normalizada, url_historia, PRESETS, POSICIONES
 from .models import Clip
 from .tagging import etiquetar_imagen
 
@@ -242,6 +243,31 @@ def ingesta_guardar(request):
     archivo_final = limpio.pop('archivo')
     clip, creado = Clip.objects.update_or_create(archivo=archivo_final, defaults=limpio)
     return redirect(f'/marketing/catalogo/{clip.id}/?guardado={"nueva" if creado else "actualizada"}')
+
+
+# ---------------------------------------------------------------------------
+# Componer historia (B2-A) — receta → URL Cloudinary. El preview ES el JPG final.
+# ---------------------------------------------------------------------------
+
+@staff_member_required
+def componer(request, clip_id):
+    clip = Clip.objects.filter(id=clip_id).first()
+    if clip is None or not clip.cloud_url:
+        raise Http404
+    p = request.GET
+    # Texto por defecto: la descripción del clip (Angélica lo reemplaza por el suyo).
+    texto = p.get('texto') if 'texto' in p else (clip.descripcion or '')
+    receta = receta_normalizada(texto, p.get('posicion'), p.get('preset'))
+    preview = url_historia(clip.cloud_url, receta)
+    return render(request, 'catalogo_clips/componer.html', {
+        'clip': clip,
+        'receta': receta,
+        'preview': preview,
+        'descarga': url_historia(clip.cloud_url, receta, attachment=True),
+        'presets': list(PRESETS.keys()),
+        'posiciones': list(POSICIONES.keys()),
+        'thumb': thumb_url(clip.cloud_url),
+    })
 
 
 @staff_member_required

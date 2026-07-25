@@ -11,6 +11,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from .api_views import _validar_payload
+from .composer import receta_normalizada, url_historia
 from .models import Clip
 from .tagging import sanear_draft, TAGGING_SYSTEM_PROMPT
 from .web_views import thumb_url
@@ -202,13 +203,14 @@ class ExploradorWebTest(TestCase):
         r = self.client.get('/marketing/catalogo/')
         self.assertContains(r, 'w_400,c_fill')  # miniatura derivada, no la master
 
-    def test_detalle_con_boton_b2_deshabilitado(self):
+    def test_detalle_con_boton_usar_en_historia_activo(self):
+        # B2-A: el botón dejó de ser placeholder — ahora linkea al compositor.
         self.client.force_login(self.staff)
         clip = Clip.objects.get(archivo='t1.jpg')
         r = self.client.get(f'/marketing/catalogo/{clip.id}/')
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'Usar en historia')
-        self.assertContains(r, 'disabled')
+        self.assertContains(r, f'/marketing/catalogo/componer/{clip.id}/')
         self.assertContains(r, 'Vapor')
 
 
@@ -293,3 +295,73 @@ class IngestaWebTest(TestCase):
         self.assertEqual(r.status_code, 200)  # re-render del form con el error
         self.assertContains(r, 'area')
         self.assertFalse(Clip.objects.filter(archivo='IMG_X.jpg').exists())
+
+
+CLOUD = 'https://res.cloudinary.com/x/image/upload/f_auto,q_auto/catalogo_clips/a.jpg'
+
+
+class ComposerTest(SimpleTestCase):
+    """B2-A: receta → URL Cloudinary (el server no pinta píxeles)."""
+
+    def test_receta_normaliza_con_lista_blanca(self):
+        r = receta_normalizada('  hola   río  ', posicion='volando', preset='neon')
+        self.assertEqual(r['texto'], 'hola río')
+        self.assertEqual(r['posicion'], 'abajo')   # default ante valor inválido
+        self.assertEqual(r['preset'], 'velo')
+
+    def test_url_compone_historia_9_16(self):
+        u = url_historia(CLOUD, receta_normalizada('Aguas calientes', 'abajo', 'velo'))
+        self.assertIn('c_fill,g_auto,w_1080,h_1920', u)
+        self.assertIn('l_text:Montserrat_58_bold_center:', u)
+        self.assertIn('g_south,y_380', u)
+        self.assertIn('co_rgb:F2E8D8', u)          # texto crema del preset velo
+        self.assertIn('letter_spacing_6', u)       # sello de marca
+        self.assertTrue(u.endswith('/f_auto,q_auto/catalogo_clips/a.jpg'))
+
+    def test_texto_va_doble_encodeado(self):
+        u = url_historia(CLOUD, receta_normalizada('río, bosque/vapor', 'centro', 'crema'))
+        self.assertIn('r%25C3%25ADo%252C%2520bosque%252Fvapor', u)  # , / y acentos escapados
+
+    def test_attachment_agrega_flag_descarga(self):
+        u = url_historia(CLOUD, receta_normalizada('Hola', 'arriba', 'velo'), attachment=True)
+        self.assertIn('fl_attachment:aremko_historia', u)
+
+    def test_sin_texto_o_url_rara_devuelve_vacio(self):
+        self.assertEqual(url_historia(CLOUD, receta_normalizada('')), '')
+        self.assertEqual(url_historia('https://otra.cosa/x.jpg', receta_normalizada('Hola')), '')
+
+
+class ComponerViewTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create_user('angelica', 'a@x.cl', 'x', is_staff=True)
+        cls.clip = Clip.objects.create(
+            archivo='t9.jpg', cloud_url=CLOUD, area='tina',
+            nombre_comercial='Llaima', descripcion='Tina humeante al atardecer')
+
+    def test_anonimo_redirige(self):
+        r = self.client.get(f'/marketing/catalogo/componer/{self.clip.id}/')
+        self.assertEqual(r.status_code, 302)
+
+    def test_default_usa_descripcion_del_clip(self):
+        self.client.force_login(self.staff)
+        r = self.client.get(f'/marketing/catalogo/componer/{self.clip.id}/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Componer historia')
+        self.assertContains(r, 'Tina humeante al atardecer')
+        self.assertContains(r, 'c_fill,g_auto,w_1080,h_1920')  # preview compuesto
+        self.assertContains(r, 'fl_attachment')                 # link de descarga
+
+    def test_texto_y_preset_de_la_query(self):
+        self.client.force_login(self.staff)
+        r = self.client.get(f'/marketing/catalogo/componer/{self.clip.id}/',
+                            {'texto': 'Noche junto al río', 'preset': 'crema', 'posicion': 'centro'})
+        self.assertContains(r, 'co_rgb:1E4438')  # preset crema
+        self.assertContains(r, 'g_center')
+
+    def test_clip_sin_cloud_url_404(self):
+        vacio = Clip.objects.create(archivo='sin.jpg', area='detalle', cloud_url='')
+        self.client.force_login(self.staff)
+        r = self.client.get(f'/marketing/catalogo/componer/{vacio.id}/')
+        self.assertEqual(r.status_code, 404)

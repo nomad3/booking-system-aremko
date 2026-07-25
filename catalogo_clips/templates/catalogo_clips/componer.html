@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Componer historia · Catálogo Aremko</title>
+<style>
+  :root{--bg:#F2E8D8;--surface:#FFFDF9;--ink:#2E2A24;--muted:#7C736A;--line:#DBCDB4;
+    --green:#1e4438;--gold:#C9A24B;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;line-height:1.5;padding:14px}
+  .wrap{max-width:980px;margin:0 auto}
+  a.volver{color:var(--green);font-weight:700;text-decoration:none;font-size:14px}
+  h1{font-size:19px;margin:8px 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+  .cols{display:grid;grid-template-columns:minmax(260px,380px) 1fr;gap:16px}
+  @media (max-width:760px){.cols{grid-template-columns:1fr}}
+  .telefono{background:#111;border-radius:26px;padding:10px;max-width:380px;margin:0 auto}
+  .telefono img{display:block;width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:18px;background:#2a2a2a}
+  .panel{background:var(--surface);border:0.5px solid var(--line);border-radius:14px;padding:16px}
+  label.f{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 3px}
+  textarea, select{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;
+    background:#fff;color:var(--ink);font-size:14px}
+  textarea{min-height:84px;resize:vertical}
+  .opts{display:flex;gap:8px;flex-wrap:wrap}
+  .opts label{display:flex;align-items:center;gap:6px;background:#F7F0E2;border-radius:999px;
+    padding:7px 13px;font-size:13.5px;cursor:pointer}
+  .btn{display:block;width:100%;margin-top:12px;padding:13px;border:0;border-radius:11px;
+    background:var(--green);color:#fff;font-weight:700;font-size:14.5px;cursor:pointer;text-align:center;text-decoration:none}
+  .btn.dorado{background:var(--gold);color:#10231d}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="volver" href="/marketing/catalogo/{{ clip.id }}/">← Volver a la foto</a>
+  <h1>📱 Componer historia</h1>
+  <div class="sub">{{ clip.nombre_comercial|default:clip.get_area_display }} · {{ clip.archivo }} — lo que ves ES el JPG final (1080×1920).</div>
+
+  <div class="cols">
+    <div>
+      <div class="telefono">
+        {% if preview %}
+        <img src="{{ preview }}" alt="Vista previa de la historia">
+        {% else %}
+        <img src="{{ thumb }}" alt="{{ clip.archivo }}" style="opacity:.6">
+        {% endif %}
+      </div>
+      {% if not receta.texto %}<p class="hint" style="text-align:center">Escribe el texto y actualiza para ver la historia.</p>{% endif %}
+    </div>
+
+    <div class="panel">
+      <form method="get">
+        <label class="f">Texto de la historia (corto y boutique — sin emojis)</label>
+        <textarea name="texto" maxlength="220" placeholder="Ej: El río suena más fuerte que todo lo demás.">{{ receta.texto }}</textarea>
+
+        <label class="f">Posición del texto</label>
+        <div class="opts">
+          {% for pos in posiciones %}
+          <label><input type="radio" name="posicion" value="{{ pos }}" {% if receta.posicion == pos %}checked{% endif %}> {{ pos|capfirst }}</label>
+          {% endfor %}
+        </div>
+
+        <label class="f">Estilo</label>
+        <div class="opts">
+          <label><input type="radio" name="preset" value="velo" {% if receta.preset == 'velo' %}checked{% endif %}> 🌙 Velo oscuro · texto crema</label>
+          <label><input type="radio" name="preset" value="crema" {% if receta.preset == 'crema' %}checked{% endif %}> 🤍 Caja crema · texto verde</label>
+        </div>
+
+        <button class="btn" type="submit">Actualizar vista previa</button>
+      </form>
+
+      {% if preview %}
+      <a class="btn dorado" href="{{ descarga }}">⬇ Descargar JPG (1080×1920)</a>
+      <div class="hint">Se descarga lista para subir a Instagram como historia. El sello "Aremko · aguas calientes junto al río" va incluido abajo.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+</body>
+</html>

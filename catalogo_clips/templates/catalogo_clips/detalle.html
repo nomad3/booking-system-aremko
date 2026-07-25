@@ -25,6 +25,7 @@
   td:first-child{color:var(--muted);white-space:nowrap;padding-right:12px}
   .btn-b2{display:block;width:100%;margin-top:14px;padding:13px;border-radius:11px;border:0;
     background:#cfc6b4;color:#7a7261;font-weight:700;font-size:14.5px;cursor:not-allowed}
+  .btn-b2.activo{background:var(--gold);color:#10231d;cursor:pointer;text-decoration:none;text-align:center}
   .nota-b2{font-size:11.5px;color:var(--muted);text-align:center;margin-top:5px}
   .admin-link{display:inline-block;margin-top:10px;font-size:13px;color:var(--green)}
   .atrib{font-size:12.5px;color:var(--muted);margin-top:8px}
@@ -44,9 +45,9 @@
         {% endfor %}
       </table>
       {% if atributos %}<div class="atrib">Atributos: {{ atributos }}</div>{% endif %}
-      {# Gancho de Fase B2 — reservado, NO implementado aún #}
-      <button class="btn-b2" type="button" disabled title="Disponible en la Fase B2">Usar en historia →</button>
-      <div class="nota-b2">Pronto: desde aquí armaremos la historia con esta foto.</div>
+      {# B2-A: componer la historia con esta foto (receta → Cloudinary) #}
+      <a class="btn-b2 activo" href="/marketing/catalogo/componer/{{ clip.id }}/">Usar en historia →</a>
+      <div class="nota-b2">Arma la historia 9:16 con esta foto: texto, posición y estilo boutique.</div>
       {% if puede_editar %}<a class="admin-link" href="/admin/catalogo_clips/clip/{{ clip.id }}/change/">✎ Editar en el admin</a>{% endif %}
     </div>
   </div>
