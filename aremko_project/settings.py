@@ -222,6 +222,7 @@ INSTALLED_APPS = [
     'aremko_cli_sync.apps.AremkoCliSyncConfig',  # Snapshot gasto Ads por programa desde aremko-cli (H-058, app aislada drift-safe)
     'facturacion.apps.FacturacionConfig',  # Boletas electrónicas SII vía SimpleAPI (P-16, app aislada drift-safe)
     'marketing_briefs.apps.MarketingBriefsConfig',  # Archivo de briefs semanales + anti-repetición de copy (app aislada drift-safe)
+    'catalogo_clips.apps.CatalogoClipsConfig',  # Catálogo de clips/fotos del M17 (H-070, app aislada drift-safe)
 
     # Aplicaciones de terceros
     'rest_framework',
