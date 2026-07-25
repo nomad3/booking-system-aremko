@@ -9,12 +9,14 @@ para consumidores externos y el auto-pick futuro (B3).
 """
 import logging
 import os
+from urllib.parse import urlencode
 
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import Http404
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
@@ -22,6 +24,7 @@ from .api_views import (_validar_payload, _subir_imagen_optimizada, _orientacion
                         _EXT_IMAGEN, _MAX_BYTES)
 from .composer import receta_normalizada, url_historia, PRESETS, POSICIONES, ANCHO, ALTO
 from .models import Clip, UsoClip
+from .seleccionar import seleccionar_clip
 from .tagging import etiquetar_imagen
 
 logger = logging.getLogger(__name__)
@@ -133,7 +136,16 @@ def explorador(request):
                                         'vapor', 'decoracion', 'keeper', 'estado', 'q', 'todas')},
         'qs_sin_page': qs_sin_page,
         'pub_contexto': _pub_contexto(p),
+        'auto_error': _AUTO_ERROR_LABEL.get(p.get('auto_error', '')),
     })
+
+
+# H-073 (Fase 2): mensajes cuando auto_generar no pudo resolver una foto sola
+# y manda de vuelta acá para que Angélica elija a mano.
+_AUTO_ERROR_LABEL = {
+    'sin_criterio': '🤖 Esta historia no trae criterio de foto (brief antiguo) — elige manualmente.',
+    'sin_foto': '🤖 No se encontró ninguna foto que calce con el criterio — elige manualmente o sube fotos de esa área.',
+}
 
 
 def _pub_contexto(params):
@@ -298,6 +310,30 @@ def _pub_y_segmento(params):
     return pub, segmento_idx, pub_id_raw, segmento_raw
 
 
+def _criterio_de_pub_segmento(pub, segmento_idx):
+    """criterio_foto (H-073): del segmento si se pidió uno en concreto; si no,
+    del copy_json de la pieza completa (piezas de 1 sola imagen, ej. gbp_post).
+    None si no hay — el llamador decide ofrecer manual en ese caso."""
+    if segmento_idx is not None:
+        seg = next((s for s in (pub.segmentos or [])
+                    if isinstance(s, dict) and s.get('indice') == segmento_idx), None)
+        cf = seg.get('criterio_foto') if seg else None
+    else:
+        cf = (pub.copy_json or {}).get('criterio_foto') if isinstance(pub.copy_json, dict) else None
+    return cf if isinstance(cf, dict) else None
+
+
+# H-073 (Fase 2): etiqueta legible del nivel de degradación del auto-pick,
+# para el banner de transparencia en el composer.
+_NIVEL_LABEL = {
+    1: 'coincidencia exacta (foto hero, nunca usada)',
+    2: 'coincidencia exacta',
+    3: 'se relajó momento/decoración',
+    4: 'foto repetida (no había ninguna fresca)',
+    5: 'tiene personas — revisar antes de publicar',
+}
+
+
 @staff_member_required
 def componer(request, clip_id):
     clip = Clip.objects.filter(id=clip_id).first()
@@ -317,6 +353,20 @@ def componer(request, clip_id):
 
     receta = receta_normalizada(texto, p.get('posicion'), p.get('preset'))
     preview = url_historia(clip.cloud_url, receta)
+
+    # H-073: si llegamos vía auto_generar, arma el banner + el link "otra foto"
+    # (misma cascada, saltándose lo ya mostrado — `excluir` viaja acumulado).
+    es_auto = p.get('auto') == '1'
+    nivel_raw = p.get('nivel', '')
+    otra_foto_url = ''
+    if es_auto and pub is not None:
+        qparts = {'pub_id': pub_id_raw}
+        if segmento_raw:
+            qparts['segmento'] = segmento_raw
+        if p.get('excluir'):
+            qparts['excluir'] = p['excluir']
+        otra_foto_url = f"{reverse('catalogo_web:auto_generar')}?{urlencode(qparts)}"
+
     return render(request, 'catalogo_clips/componer.html', {
         'clip': clip,
         'receta': receta,
@@ -330,7 +380,49 @@ def componer(request, clip_id):
         'pub_id_param': pub_id_raw,
         'segmento_param': segmento_raw,
         'error_msg': _ERRORES_ENGANCHE.get(p.get('error', '')),
+        'es_auto': es_auto,
+        'nivel_label': _NIVEL_LABEL.get(int(nivel_raw)) if nivel_raw.isdigit() else '',
+        'aviso_auto': p.get('aviso', ''),
+        'otra_foto_url': otra_foto_url,
     })
+
+
+@staff_member_required
+def auto_generar(request):
+    """H-073 (Fase 2): resuelve la foto SOLA (sin LLM) desde el criterio_foto
+    del brief y redirige al composer ya con esa foto elegida, con el banner
+    de transparencia (nivel/aviso). "Otra foto" vuelve acá con `excluir`
+    acumulado para saltarse las ya mostradas — misma cascada determinista."""
+    p = request.GET
+    pub, segmento_idx, pub_id_raw, segmento_raw = _pub_y_segmento(p)
+    if pub is None:
+        raise Http404
+    if segmento_raw and segmento_idx is None:
+        raise Http404
+
+    qs_manual = f'?pub_id={pub.id}' + (f'&segmento={segmento_idx}' if segmento_idx is not None else '')
+    destino_manual = reverse('catalogo_web:explorador')
+
+    criterio = _criterio_de_pub_segmento(pub, segmento_idx)
+    if not criterio:
+        return redirect(f'{destino_manual}{qs_manual}&auto_error=sin_criterio')
+
+    excluir_raw = (p.get('excluir') or '').strip()
+    excluir_ids = [int(x) for x in excluir_raw.split(',') if x.strip().isdigit()] if excluir_raw else []
+
+    clip, nivel, aviso = seleccionar_clip(criterio, excluir_ids=excluir_ids)
+    if clip is None:
+        return redirect(f'{destino_manual}{qs_manual}&auto_error=sin_foto')
+
+    qs_params = {'pub_id': str(pub.id), 'auto': '1', 'nivel': str(nivel)}
+    if segmento_idx is not None:
+        qs_params['segmento'] = str(segmento_idx)
+    if aviso:
+        qs_params['aviso'] = aviso
+    qs_params['excluir'] = ','.join(str(i) for i in (excluir_ids + [clip.id]))
+
+    logger.info('[H-073] auto-pick: pub=%s segmento=%s -> clip=%s nivel=%s', pub.id, segmento_idx, clip.id, nivel)
+    return redirect(f"{reverse('catalogo_web:componer', args=[clip.id])}?{urlencode(qs_params)}")
 
 
 @staff_member_required

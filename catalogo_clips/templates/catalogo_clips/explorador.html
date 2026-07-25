@@ -59,6 +59,11 @@
     <a href="{% url 'marketing_briefs:publicaciones_lista' %}">cancelar</a>
   </div>
   {% endif %}
+  {% if auto_error %}
+  <div class="banner-pub" style="border-color:var(--amber);background:#FDE8CC">
+    <span>{{ auto_error }}</span>
+  </div>
+  {% endif %}
 
   <form class="filtros" method="get">
     <select name="area">

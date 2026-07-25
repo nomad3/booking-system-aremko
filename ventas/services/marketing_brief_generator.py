@@ -495,7 +495,8 @@ Devuelve SOLO este JSON:
     "texto": "Copy listo para pegar en Google Business Profile (max 1500 chars, sin emojis)",
     "url_cta": "URL con UTM completo (del concepto)",
     "foto_sugerida": "Del concepto, refinada si aporta",
-    "prompt_imagen_ia": "Instrucción de edición de la foto real que suba Angélica (ver REGLA PROMPT DE IMAGEN). Escribe SOLO la parte de escena; NO incluyas la línea de estilo, el sistema la agrega."
+    "prompt_imagen_ia": "Instrucción de edición de la foto real que suba Angélica (ver REGLA PROMPT DE IMAGEN). Escribe SOLO la parte de escena; NO incluyas la línea de estilo, el sistema la agrega.",
+    "criterio_foto": {{"area": "tina", "nombre_comercial": "", "vapor_preferido": true, "decoracion": "sin", "momento": "indistinto"}}
   }},
   "reel_martes": {{
     "necesario_esta_semana": true,
@@ -531,8 +532,8 @@ Devuelve SOLO este JSON:
     "concepto": "...",
     "numero_de_slides": 6,
     "slides": [
-      {{"numero": 1, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "hook", "prompt_imagen_ia": "Edición de la foto de ESTE slide (solo escena; ver REGLA PROMPT DE IMAGEN)"}},
-      {{"numero": 2, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "desarrollo", "prompt_imagen_ia": "..."}}
+      {{"numero": 1, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "hook", "prompt_imagen_ia": "Edición de la foto de ESTE slide (solo escena; ver REGLA PROMPT DE IMAGEN)", "criterio_foto": {{"area": "...", "nombre_comercial": "", "vapor_preferido": false, "decoracion": "sin", "momento": "indistinto"}}}},
+      {{"numero": 2, "imagen_sugerida": "...", "texto_overlay": "...", "rol": "desarrollo", "prompt_imagen_ia": "...", "criterio_foto": {{"...": "..."}}}}
     ],
     "caption_completo": "Caption completo (max 2200 chars)"
   }},
@@ -563,7 +564,7 @@ Devuelve SOLO este JSON:
   }},
   "stories_diarias": [
     {{"dia": "Lunes", "historias": [
-      {{"concepto": "...", "tipo": "foto", "texto_sugerido": "Texto exacto del sticker/overlay de ESTA historia", "prompt_imagen_ia": "SOLO si la historia es una foto real: edición de escena (ver REGLA PROMPT DE IMAGEN). OMITIR el campo en encuestas, quiz, preguntas o stickers interactivos"}},
+      {{"concepto": "...", "tipo": "foto", "texto_sugerido": "Texto exacto del sticker/overlay de ESTA historia", "prompt_imagen_ia": "SOLO si la historia es una foto real: edición de escena (ver REGLA PROMPT DE IMAGEN). OMITIR el campo en encuestas, quiz, preguntas o stickers interactivos", "criterio_foto": {{"area": "tina", "nombre_comercial": "", "vapor_preferido": true, "decoracion": "sin", "momento": "noche"}}}},
       {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}},
       {{"concepto": "...", "tipo": "...", "texto_sugerido": "..."}}
     ]}},
@@ -596,6 +597,13 @@ REGLAS FINALES:
 - El gancho de cada Reel se escribe DOS veces mentalmente y se entrega la mejor versión — es el 80% del resultado.
 - Cada Reel (reel_martes, reel_jueves) lleva un objeto anidado "tiktok" con SOLO caption y hashtags para el MISMO video subido a TikTok. El video es idéntico (mismo guion/tomas/audio): NO los repitas ahí. El caption de TikTok es más corto y nativo que el de Instagram (nada de narrativa larga; una pregunta directa a la audiencia funciona). Los hashtags de TikTok son propios del ecosistema — 1-2 amplios de descubrimiento + 3-4 de nicho/local (spa, Puerto Varas, turismo, bienestar) — y NUNCA los mismos de Instagram. La voz Aremko no cambia: es adaptación de formato de plataforma, no de personalidad de marca.
 - REGLA PROMPT DE IMAGEN: el campo "prompt_imagen_ia" (en gbp_post, en cada slide del carrusel, y en las historias que sean FOTO real) es el prompt para que una IA de edición (Higgsfield/Nano Banana/etc.) retoque la foto real que sube Angélica. Escribe SOLO la instrucción de ESCENA — qué ajustar de esa foto puntual para que calce con la pieza (encuadre, foco, ajuste de luz o color, recorte, énfasis). NO escribas la línea de estilo de marca: el sistema la agrega sola y verbatim al final, no la repitas ni la parafrasees. Regla dura de edición honesta: es EDITAR una foto real, no generar una imagen — nunca pidas agregar personas, objetos, texto ni elementos que no estén en la foto original, ni inventar el lugar. En las historias, incluí "prompt_imagen_ia" SOLO cuando la historia es una foto; omití el campo por completo en encuestas, quiz, preguntas o stickers interactivos.
+- REGLA CRITERIO DE FOTO (H-073, selección automática — junto a "prompt_imagen_ia", en los mismos 3 lugares: gbp_post, cada slide del carrusel, y las historias que sean FOTO): "criterio_foto" es la ficha que usa el sistema para ELEGIR la foto sola, sin ninguna IA de por medio — es tu ÚNICA oportunidad de influir en qué foto sale (después de esto, la selección es 100% código). Usa EXACTAMENTE estos valores, en minúscula:
+  - "area": una de tina | masaje | cabaña | entorno | detalle | aereo | recepcion | entorno_region.
+  - "nombre_comercial": el nombre de la tina/cabaña si el concepto lo pide (ej. "Yates", "Torre"); "" si sirve cualquiera de esa área.
+  - "vapor_preferido": true si la escena pide vapor/humo visible (tinas de noche o invierno); false si no importa.
+  - "decoracion": "con" si el concepto es una ocasión decorada (cumpleaños, romántico, velada), "sin" si es contenido normal/informativo, "" si no filtra por esto.
+  - "momento": dia | atardecer | noche | indistinto.
+  Si la historia NO es una foto real (encuesta/quiz/sticker), omití "criterio_foto" igual que se omite "prompt_imagen_ia".
 - REGLA PROMPT DE VIDEO: en cada Reel, "tomas_sugeridas" son EXACTAMENTE 3 objetos que mapean los 3 momentos del reel — (1) GANCHO/apertura, (2) DESARROLLO, (3) CIERRE/CTA — en ese orden. Cada uno lleva "descripcion" (qué muestra esa toma, en 1 frase) y "prompt_video_ia" (el prompt para que una IA image-to-video, ej. Higgsfield, ANIME una foto real de esa escena, para cuando Angélica no filme esa toma). El prompt describe SOLO la escena y un movimiento concreto y sutil de CÁMARA (paneo lento, acercamiento, tilt) y/o de elementos que YA están en la foto (el vapor que sube, el agua que corre, la lluvia) — NUNCA agregar personas, objetos, texto ni elementos nuevos, ni inventar una escena sintética; es animar una foto real, no generar un video de cero. Ajusta la duración sugerida al bloque del guion que corresponde. NO escribas la línea de estilo de video: el sistema la sella sola.
 - Relee tu output contra los 3 ejemplos de voz antes de entregar: si suena a agencia de marketing y no a dueño de spa que escribe bien, reescríbelo."""
 
@@ -667,6 +675,65 @@ def _incorporar_estilo_video(drafts: dict) -> None:
                 _sellar_toma(t)
 
 
+# H-073 (Fase 2, auto-pick determinista): enums válidos de `criterio_foto`,
+# reflejo de `catalogo_clips.models.Clip` (AREAS/MOMENTOS/DECORACION). Se
+# declaran acá en vez de importar el modelo — no acopla ventas<->catalogo_clips
+# y el LLM necesita la MISMA lista en el prompt, no solo en el saneo. Si el
+# catálogo agrega un área/momento nuevo, replicar también acá.
+_CRITERIO_FOTO_AREAS = {
+    'tina', 'masaje', 'cabaña', 'entorno', 'detalle', 'aereo', 'recepcion', 'entorno_region',
+}
+_CRITERIO_FOTO_MOMENTOS = {'dia', 'atardecer', 'noche', 'indistinto'}
+_CRITERIO_FOTO_DECORACIONES = {'con', 'sin', ''}
+
+
+def _sanear_criterio_foto(cf) -> Optional[dict]:
+    """Defensa en profundidad (mismo espíritu que `tagging.sanear_draft` del
+    catálogo): el LLM propone el criterio UNA sola vez al escribir el brief;
+    acá se valida contra los enums reales antes de que quede persistido. Si
+    "area" no calza con nada válido, se descarta entero (None) — el auto-pick
+    de Fase 2 no debe adivinar ni operar sobre un criterio corrupto."""
+    if not isinstance(cf, dict):
+        return None
+    area = str(cf.get('area') or '').strip().lower()
+    if area not in _CRITERIO_FOTO_AREAS:
+        return None
+    momento = str(cf.get('momento') or 'indistinto').strip().lower()
+    if momento not in _CRITERIO_FOTO_MOMENTOS:
+        momento = 'indistinto'
+    decoracion = str(cf.get('decoracion') or '').strip().lower()
+    if decoracion not in _CRITERIO_FOTO_DECORACIONES:
+        decoracion = ''
+    return {
+        'area': area,
+        'nombre_comercial': str(cf.get('nombre_comercial') or '').strip()[:100],
+        'vapor_preferido': bool(cf.get('vapor_preferido')),
+        'decoracion': decoracion,
+        'momento': momento,
+    }
+
+
+def _sanear_criterios_foto(drafts: dict) -> None:
+    """Sanea "criterio_foto" en cada pieza con foto (H-073), mutando `drafts`
+    in-place. Recorre los mismos 3 lugares que `_incorporar_estilo_imagen`:
+    gbp_post, slides del carrusel, historias del día — mismo patrón de H-064."""
+    def _procesar(d):
+        if isinstance(d, dict) and 'criterio_foto' in d:
+            d['criterio_foto'] = _sanear_criterio_foto(d.get('criterio_foto'))
+
+    if not isinstance(drafts, dict):
+        return
+    _procesar(drafts.get('gbp_post'))
+    carrusel = drafts.get('carrusel_miercoles')
+    if isinstance(carrusel, dict):
+        for s in carrusel.get('slides') or []:
+            _procesar(s)
+    for dia in drafts.get('stories_diarias') or []:
+        if isinstance(dia, dict):
+            for h in dia.get('historias') or []:
+                _procesar(h)
+
+
 def call_llm_copywriter(
     conceptos: dict,
     playbook: str,
@@ -723,6 +790,7 @@ def call_llm_copywriter(
         raise ValueError(f'Copywriter response no es JSON válido: {exc}')
     _incorporar_estilo_imagen(drafts)  # sella la línea de estilo boutique en cada prompt_imagen_ia
     _incorporar_estilo_video(drafts)   # ídem para cada prompt_video_ia de las tomas de reels
+    _sanear_criterios_foto(drafts)     # H-073: valida/normaliza criterio_foto contra los enums reales
     return drafts
 
 

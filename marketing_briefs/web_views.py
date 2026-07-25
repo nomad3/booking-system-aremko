@@ -80,8 +80,11 @@ def publicaciones_lista(request):
                 'texto': (seg.get('texto') or '')[:160],
                 'tiene_material': bool(urls),
                 'preview': urls[0] if urls else None,
+                # H-073: solo con criterio_foto se puede ofrecer "🤖 Generar".
+                'tiene_criterio': bool(seg.get('criterio_foto')),
             })
         estado_icono, estado_label = ESTADO_LABEL.get(pub.estado, ('⚪', pub.estado))
+        copy_json = pub.copy_json if isinstance(pub.copy_json, dict) else {}
         tarjetas.append({
             'pub': pub,
             'texto_preview': _texto_preview(pub.copy_json),
@@ -90,6 +93,7 @@ def publicaciones_lista(request):
             'historias': historias,
             'estado_icono': estado_icono,
             'estado_label': estado_label,
+            'tiene_criterio': bool(copy_json.get('criterio_foto')),
         })
 
     return render(request, 'marketing_briefs/publicaciones.html', {

@@ -46,6 +46,13 @@
   {% if pub %}
   <div class="banner-pub">🗓️ Para: <b>{{ pub.dia|date:"d/m" }} · {{ pub.canal }}/{{ pub.tipo }}</b>{% if segmento_idx %} · Historia {{ segmento_idx }}{% endif %}</div>
   {% endif %}
+  {% if es_auto %}
+  <div class="banner-pub" style="border-color:var(--green)">
+    🤖 Elegida automáticamente{% if nivel_label %} — {{ nivel_label }}{% endif %}.
+    {% if aviso_auto %}<br>⚠️ {{ aviso_auto }}{% endif %}
+    {% if otra_foto_url %}<br><a href="{{ otra_foto_url }}">🔄 Otra foto</a>{% endif %}
+  </div>
+  {% endif %}
   {% if error_msg %}<div class="error">{{ error_msg }}</div>{% endif %}
 
   <div class="cols">

@@ -17,6 +17,8 @@ from ventas.services.marketing_brief_generator import (
     ESTILO_IMAGEN_AREMKO,
     _incorporar_estilo_video,
     ESTILO_VIDEO_AREMKO,
+    _sanear_criterio_foto,
+    _sanear_criterios_foto,
 )
 
 
@@ -515,3 +517,118 @@ class TextoDePublicacionTests(TestCase):
         self.assertEqual(texto_de_publicacion(pub, 1), 'Texto de la historia 1')
         self.assertEqual(texto_de_publicacion(pub, None), 'Texto de la pieza completa')
         self.assertEqual(texto_de_publicacion(pub, 99), 'Texto de la pieza completa')  # segmento inexistente → fallback
+
+
+class SanearCriterioFotoTests(TestCase):
+    """H-073 (Fase 2): defensa en profundidad — el criterio_foto que propone el
+    LLM se valida contra los enums reales de catalogo_clips.Clip antes de
+    persistirse. Sin DB (funciones puras), TestCase igual por consistencia con
+    el resto del archivo."""
+
+    def test_criterio_valido_se_normaliza(self):
+        cf = _sanear_criterio_foto({
+            'area': 'Tina', 'nombre_comercial': ' Yates ', 'vapor_preferido': True,
+            'decoracion': 'SIN', 'momento': 'Noche',
+        })
+        self.assertEqual(cf, {
+            'area': 'tina', 'nombre_comercial': 'Yates', 'vapor_preferido': True,
+            'decoracion': 'sin', 'momento': 'noche',
+        })
+
+    def test_area_invalida_descarta_todo_el_criterio(self):
+        self.assertIsNone(_sanear_criterio_foto({'area': 'piscina'}))
+        self.assertIsNone(_sanear_criterio_foto({}))
+        self.assertIsNone(_sanear_criterio_foto('tina'))  # no es dict
+        self.assertIsNone(_sanear_criterio_foto(None))
+
+    def test_momento_y_decoracion_invalidos_caen_a_default_en_vez_de_descartar(self):
+        cf = _sanear_criterio_foto({'area': 'masaje', 'momento': 'mediodia', 'decoracion': 'algo-raro'})
+        self.assertEqual(cf['momento'], 'indistinto')
+        self.assertEqual(cf['decoracion'], '')
+
+    def test_vapor_preferido_se_coacciona_a_bool(self):
+        self.assertIs(_sanear_criterio_foto({'area': 'tina', 'vapor_preferido': 'sí'})['vapor_preferido'], True)
+        self.assertIs(_sanear_criterio_foto({'area': 'tina'})['vapor_preferido'], False)
+
+    def test_nombre_comercial_se_trunca(self):
+        cf = _sanear_criterio_foto({'area': 'cabaña', 'nombre_comercial': 'x' * 500})
+        self.assertEqual(len(cf['nombre_comercial']), 100)
+
+    def test_sanear_criterios_foto_recorre_gbp_slides_e_historias(self):
+        drafts = {
+            'gbp_post': {'criterio_foto': {'area': 'ENTORNO'}},
+            'carrusel_miercoles': {'slides': [
+                {'criterio_foto': {'area': 'tina', 'momento': 'invalido'}},
+                {'texto_overlay': 'slide sin criterio'},  # sin la key: no se toca
+            ]},
+            'stories_diarias': [
+                {'dia': 'Lunes', 'historias': [
+                    {'tipo': 'foto', 'criterio_foto': {'area': 'masaje'}},
+                    {'tipo': 'encuesta'},  # sin la key: no se toca
+                    {'tipo': 'foto', 'criterio_foto': {'area': 'inexistente'}},  # inválida → None
+                ]},
+            ],
+        }
+        _sanear_criterios_foto(drafts)
+        self.assertEqual(drafts['gbp_post']['criterio_foto']['area'], 'entorno')
+        slides = drafts['carrusel_miercoles']['slides']
+        self.assertEqual(slides[0]['criterio_foto']['momento'], 'indistinto')
+        self.assertNotIn('criterio_foto', slides[1])
+        historias = drafts['stories_diarias'][0]['historias']
+        self.assertEqual(historias[0]['criterio_foto']['area'], 'masaje')
+        self.assertNotIn('criterio_foto', historias[1])
+        self.assertIsNone(historias[2]['criterio_foto'])  # área inválida → descartado, no se elimina la key
+
+    def test_sanear_criterios_foto_tolera_drafts_vacio_o_corrupto(self):
+        _sanear_criterios_foto({})   # no debe lanzar
+        _sanear_criterios_foto(None)  # tampoco
+
+
+class CriterioFotoEnSegmentosTests(TestCase):
+    """H-073: criterio_foto viaja por los mismos helpers que prompt_imagen_ia
+    (H-064) hacia los segmentos, y por copy_json para piezas de 1 sola imagen."""
+
+    def test_segmentos_slides_llevan_criterio_foto(self):
+        slides = [
+            {'numero': 1, 'prompt_imagen_ia': 'x', 'criterio_foto': {'area': 'tina'}},
+            {'numero': 2, 'texto_overlay': 'sin criterio'},
+        ]
+        segs = services._segmentos_de_slides(slides)
+        self.assertEqual(segs[0]['criterio_foto'], {'area': 'tina'})
+        self.assertIsNone(segs[1]['criterio_foto'])
+
+    def test_segmentos_historias_llevan_criterio_foto(self):
+        historias = [
+            {'tipo': 'foto', 'texto_sugerido': 'A', 'criterio_foto': {'area': 'masaje', 'momento': 'noche'}},
+            {'tipo': 'encuesta', 'texto_sugerido': 'B'},  # sin foto → sin criterio
+        ]
+        segs = services._segmentos_de_historias(historias)
+        self.assertEqual(segs[0]['criterio_foto'], {'area': 'masaje', 'momento': 'noche'})
+        self.assertIsNone(segs[1]['criterio_foto'])
+
+    def test_explode_pieza_sin_segmentos_guarda_criterio_en_copy_json(self):
+        """gbp_post (1 sola imagen, sin segmentos) hereda criterio_foto gratis
+        vía copy_json=pieza — sin tocar el explode."""
+        brief = {'drafts_completos': {
+            'gbp_post': {
+                'necesario_esta_semana': True, 'texto': 'Un post',
+                'criterio_foto': {'area': 'recepcion'},
+            },
+        }}
+        services.explode_brief_to_publicaciones(date(2026, 7, 20), brief)
+        pub = PublicacionPlanificada.objects.get(semana_inicio=date(2026, 7, 20), pieza_key='gbp_post')
+        self.assertEqual(pub.copy_json['criterio_foto'], {'area': 'recepcion'})
+
+    def test_explode_historias_guarda_criterio_por_segmento(self):
+        brief = {'drafts_completos': {
+            'stories_diarias': [
+                {'dia': 'Lunes', 'historias': [
+                    {'tipo': 'foto', 'texto_sugerido': 'Uno', 'criterio_foto': {'area': 'tina'}},
+                    {'tipo': 'foto', 'texto_sugerido': 'Dos', 'criterio_foto': {'area': 'cabaña'}},
+                ]},
+            ],
+        }}
+        services.explode_brief_to_publicaciones(date(2026, 7, 20), brief)
+        pub = PublicacionPlanificada.objects.get(semana_inicio=date(2026, 7, 20), pieza_key='story_lunes')
+        self.assertEqual(pub.segmentos[0]['criterio_foto'], {'area': 'tina'})
+        self.assertEqual(pub.segmentos[1]['criterio_foto'], {'area': 'cabaña'})

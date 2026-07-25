@@ -12,5 +12,6 @@ urlpatterns = [
     path('ingesta/guardar/', web_views.ingesta_guardar, name='ingesta_guardar'),
     path('componer/<int:clip_id>/', web_views.componer, name='componer'),
     path('componer/<int:clip_id>/enganchar/', web_views.enganchar_publicacion, name='enganchar'),
+    path('auto-generar/', web_views.auto_generar, name='auto_generar'),
     path('<int:clip_id>/', web_views.detalle, name='detalle'),
 ]

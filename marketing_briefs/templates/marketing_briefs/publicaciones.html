@@ -33,6 +33,7 @@
   .thumb{width:52px;height:65px;object-fit:cover;border-radius:8px;background:#e8dfcf}
   .btn-crear{background:var(--gold);color:#10231d;text-decoration:none;font-weight:700;
     font-size:13px;padding:9px 14px;border-radius:9px}
+  .btn-crear.auto{background:var(--green);color:#fff}
   .historias{margin-top:10px;padding-top:10px;border-top:1px solid #f0e8d8}
   .historia-row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px}
   .historia-row .h-texto{flex:1;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -77,6 +78,7 @@
         {% if h.preview %}<img class="thumb" src="{{ h.preview }}" alt="">{% endif %}
         <span class="h-texto">{{ h.titulo }}{% if h.texto %} — {{ h.texto }}{% endif %}</span>
         {% if h.tiene_material %}<span class="check">✓ lista</span>{% endif %}
+        {% if h.tiene_criterio %}<a class="btn-crear auto" href="{% url 'catalogo_web:auto_generar' %}?pub_id={{ t.pub.id }}&segmento={{ h.indice }}">🤖 Generar</a>{% endif %}
         <a class="btn-crear" href="{% url 'catalogo_web:explorador' %}?pub_id={{ t.pub.id }}&segmento={{ h.indice }}">✍️ Crear historia</a>
       </div>
       {% endfor %}
@@ -85,6 +87,7 @@
     <div class="fila">
       {% if t.material_preview %}<img class="thumb" src="{{ t.material_preview }}" alt="">{% endif %}
       {% if t.tiene_material %}<span class="check">✓ tiene material</span>{% endif %}
+      {% if t.tiene_criterio %}<a class="btn-crear auto" href="{% url 'catalogo_web:auto_generar' %}?pub_id={{ t.pub.id }}">🤖 Generar</a>{% endif %}
       <a class="btn-crear" href="{% url 'catalogo_web:explorador' %}?pub_id={{ t.pub.id }}">✍️ Crear historia</a>
     </div>
     {% endif %}

@@ -9,6 +9,7 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
+from django.utils import timezone
 
 from .api_views import _validar_payload
 from .composer import receta_normalizada, url_historia
@@ -530,3 +531,198 @@ class PublicacionesListaViewTest(TestCase):
         self.client.force_login(self.staff)
         r = self.client.get('/marketing/publicaciones/', {'enganchado': '7'})
         self.assertContains(r, 'enganchada a la publicación #7')
+
+
+from datetime import timedelta
+
+from .seleccionar import seleccionar_clip
+
+_CRITERIO_TINA_NOCHE = {
+    'area': 'tina', 'nombre_comercial': '', 'vapor_preferido': True,
+    'decoracion': 'sin', 'momento': 'noche',
+}
+
+
+class SeleccionarClipTest(TestCase):
+    """H-073 (Fase 2): cascada determinista de auto-pick — sin LLM, 100% código
+    y auditable (nivel/aviso). area/nombre_comercial/vapor_preferido son duros
+    en TODA la cascada; solo momento/decoración (3), no-repetir (4) y
+    personas (5) ceden, siempre con aviso."""
+
+    def _clip(self, **kw):
+        n = Clip.objects.count()
+        defaults = dict(archivo=f'sel-{n}.jpg', cloud_url=CLOUD, area='tina', estado='ok',
+                        vapor='sí', decoracion='sin', momento='noche', personas=False)
+        defaults.update(kw)
+        return Clip.objects.create(**defaults)
+
+    def test_nivel_1_keeper_fresca_gana(self):
+        keeper = self._clip(keeper=True)
+        clip, nivel, aviso = seleccionar_clip(_CRITERIO_TINA_NOCHE)
+        self.assertEqual(clip.id, keeper.id)
+        self.assertEqual(nivel, 1)
+        self.assertEqual(aviso, '')
+
+    def test_nivel_2_sin_exigir_keeper(self):
+        c = self._clip(keeper=False)
+        clip, nivel, aviso = seleccionar_clip(_CRITERIO_TINA_NOCHE)
+        self.assertEqual(clip.id, c.id)
+        self.assertEqual(nivel, 2)
+
+    def test_nivel_3_relaja_momento_y_decoracion(self):
+        c = self._clip(momento='dia', decoracion='con')  # no calza el criterio exacto
+        clip, nivel, aviso = seleccionar_clip(_CRITERIO_TINA_NOCHE)
+        self.assertEqual(clip.id, c.id)
+        self.assertEqual(nivel, 3)
+
+    def test_nivel_3_prefiere_keeper_como_desempate(self):
+        self._clip(momento='dia', decoracion='con', keeper=False)
+        keeper = self._clip(momento='dia', decoracion='con', keeper=True)
+        clip, nivel, aviso = seleccionar_clip(_CRITERIO_TINA_NOCHE)
+        self.assertEqual(clip.id, keeper.id)
+        self.assertEqual(nivel, 3)
+
+    def test_area_nombre_y_vapor_nunca_se_relajan(self):
+        self._clip(area='masaje')          # otra área — nunca debe salir
+        self._clip(area='tina', vapor='no')  # calza área pero no el vapor pedido
+        clip, nivel, aviso = seleccionar_clip(_CRITERIO_TINA_NOCHE)
+        self.assertIsNone(clip)
+        self.assertEqual(nivel, 6)
+
+    def test_nivel_4_permite_repetir_la_usada_hace_mas_tiempo(self):
+        hoy = timezone.now().date()
+        vieja = self._clip(ultimo_uso=hoy - timedelta(days=5))
+        self._clip(ultimo_uso=hoy - timedelta(days=1))
+        clip, nivel, aviso = seleccionar_clip(_CRITERIO_TINA_NOCHE, dias=60)
+        self.assertEqual(clip.id, vieja.id)
+        self.assertEqual(nivel, 4)
+        self.assertIn('repetida', aviso.lower())
+
+    def test_fuera_de_la_ventana_de_dias_cuenta_como_fresca(self):
+        hoy = timezone.now().date()
+        c = self._clip(keeper=True, ultimo_uso=hoy - timedelta(days=90))  # ventana default=60 → ya es fresca
+        clip, nivel, aviso = seleccionar_clip(_CRITERIO_TINA_NOCHE, dias=60)
+        self.assertEqual(clip.id, c.id)
+        self.assertEqual(nivel, 1)
+
+    def test_nivel_5_permite_personas_solo_si_se_autoriza_explicito(self):
+        con_gente = self._clip(personas=True)
+        clip, nivel, aviso = seleccionar_clip(_CRITERIO_TINA_NOCHE)  # permitir_personas=False default
+        self.assertIsNone(clip)
+        self.assertEqual(nivel, 6)
+        clip, nivel, aviso = seleccionar_clip(_CRITERIO_TINA_NOCHE, permitir_personas=True)
+        self.assertEqual(clip.id, con_gente.id)
+        self.assertEqual(nivel, 5)
+        self.assertIn('personas', aviso.lower())
+
+    def test_estado_no_ok_nunca_sale_ni_degradando_todo(self):
+        self._clip(estado='revisar')
+        self._clip(estado='descartado', personas=True)
+        clip, nivel, aviso = seleccionar_clip(_CRITERIO_TINA_NOCHE, permitir_personas=True)
+        self.assertIsNone(clip)
+        self.assertEqual(nivel, 6)
+
+    def test_excluir_ids_salta_la_ya_mostrada(self):
+        a = self._clip(keeper=True)
+        b = self._clip(keeper=True)
+        clip1, _, _ = seleccionar_clip(_CRITERIO_TINA_NOCHE)
+        clip2, _, _ = seleccionar_clip(_CRITERIO_TINA_NOCHE, excluir_ids=[clip1.id])
+        self.assertNotEqual(clip1.id, clip2.id)
+        self.assertEqual({clip1.id, clip2.id}, {a.id, b.id})
+
+    def test_nombre_comercial_filtra_por_icontains(self):
+        yates = self._clip(nombre_comercial='Tina Yates')
+        self._clip(nombre_comercial='Villarrica')
+        criterio = dict(_CRITERIO_TINA_NOCHE, nombre_comercial='Yates')
+        clip, nivel, aviso = seleccionar_clip(criterio)
+        self.assertEqual(clip.id, yates.id)
+
+    def test_criterio_invalido_devuelve_nivel_6_sin_lanzar(self):
+        clip, nivel, aviso = seleccionar_clip({'area': ''})
+        self.assertIsNone(clip)
+        self.assertEqual(nivel, 6)
+        clip, nivel, aviso = seleccionar_clip(None)
+        self.assertIsNone(clip)
+        self.assertEqual(nivel, 6)
+
+
+_CRITERIO_LIBRE = {'area': 'tina', 'nombre_comercial': '', 'vapor_preferido': False,
+                   'decoracion': '', 'momento': 'indistinto'}
+
+
+class AutoGenerarViewTest(TestCase):
+    """H-073 (Fase 2): la vista resuelve la foto sola vía seleccionar_clip y
+    redirige al composer ya armado (o manda de vuelta al explorador con
+    auto_error cuando no puede — sin criterio o sin foto disponible)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create_user('angelica5', 'a5@x.cl', 'x', is_staff=True)
+
+    def setUp(self):
+        self.client.force_login(self.staff)
+
+    def _pub_con_historia(self, criterio_foto='__omitir__'):
+        seg = {'indice': 1, 'titulo': 'Historia 1', 'texto': 'Uno', 'material_urls': [], 'material_meta': []}
+        if criterio_foto != '__omitir__':
+            seg['criterio_foto'] = criterio_foto
+        return _crear_pub(segmentos=[seg], pieza_key='story_autogen', dia=date(2026, 7, 20))
+
+    def test_anonimo_redirige_a_login(self):
+        self.client.logout()
+        r = self.client.get('/marketing/catalogo/auto-generar/', {'pub_id': 1, 'segmento': 1})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('login', r.url)
+
+    def test_pub_inexistente_404(self):
+        r = self.client.get('/marketing/catalogo/auto-generar/', {'pub_id': 999999})
+        self.assertEqual(r.status_code, 404)
+
+    def test_sin_criterio_foto_redirige_a_manual(self):
+        pub = self._pub_con_historia(criterio_foto=None)
+        r = self.client.get('/marketing/catalogo/auto-generar/', {'pub_id': pub.id, 'segmento': 1})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('auto_error=sin_criterio', r.url)
+
+    def test_sin_foto_disponible_redirige_a_manual(self):
+        pub = self._pub_con_historia(criterio_foto=_CRITERIO_LIBRE)  # sin ningún Clip creado
+        r = self.client.get('/marketing/catalogo/auto-generar/', {'pub_id': pub.id, 'segmento': 1})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('auto_error=sin_foto', r.url)
+
+    def test_encuentra_foto_y_redirige_al_composer(self):
+        clip = Clip.objects.create(archivo='ag1.jpg', cloud_url=CLOUD, area='tina', keeper=True, estado='ok')
+        pub = self._pub_con_historia(criterio_foto=_CRITERIO_LIBRE)
+        r = self.client.get('/marketing/catalogo/auto-generar/', {'pub_id': pub.id, 'segmento': 1})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn(f'/marketing/catalogo/componer/{clip.id}/', r.url)
+        self.assertIn('auto=1', r.url)
+        self.assertIn('nivel=1', r.url)
+        self.assertIn(f'excluir={clip.id}', r.url)
+
+    def test_otra_foto_salta_la_ya_mostrada(self):
+        a = Clip.objects.create(archivo='ag2.jpg', cloud_url=CLOUD, area='tina', keeper=True, estado='ok')
+        b = Clip.objects.create(archivo='ag3.jpg', cloud_url=CLOUD, area='tina', keeper=True, estado='ok')
+        pub = self._pub_con_historia(criterio_foto=_CRITERIO_LIBRE)
+        r1 = self.client.get('/marketing/catalogo/auto-generar/', {'pub_id': pub.id, 'segmento': 1})
+        primero_id = int(r1.url.split('/componer/')[1].split('/')[0])
+        r2 = self.client.get('/marketing/catalogo/auto-generar/',
+                             {'pub_id': pub.id, 'segmento': 1, 'excluir': str(primero_id)})
+        segundo_id = int(r2.url.split('/componer/')[1].split('/')[0])
+        self.assertNotEqual(primero_id, segundo_id)
+        self.assertEqual({primero_id, segundo_id}, {a.id, b.id})
+
+    def test_componer_muestra_banner_auto_nivel_y_otra_foto(self):
+        Clip.objects.create(archivo='ag4.jpg', cloud_url=CLOUD, area='tina', keeper=False, estado='ok')
+        pub = self._pub_con_historia(criterio_foto=_CRITERIO_LIBRE)
+        r = self.client.get('/marketing/catalogo/auto-generar/', {'pub_id': pub.id, 'segmento': 1}, follow=True)
+        self.assertContains(r, 'Elegida automáticamente')
+        self.assertContains(r, 'Otra foto')
+
+    def test_pieza_sin_segmentos_usa_criterio_de_copy_json(self):
+        pub = _crear_pub(segmentos=[], pieza_key='gbp_autogen', tipo='post', canal='GBP',
+                         copy_json={'texto': 'Un post', 'criterio_foto': dict(_CRITERIO_LIBRE, area='recepcion')})
+        clip = Clip.objects.create(archivo='ag5.jpg', cloud_url=CLOUD, area='recepcion', estado='ok')
+        r = self.client.get('/marketing/catalogo/auto-generar/', {'pub_id': pub.id})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn(f'/marketing/catalogo/componer/{clip.id}/', r.url)
