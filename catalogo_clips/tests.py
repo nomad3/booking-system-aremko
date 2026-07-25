@@ -15,7 +15,7 @@ from .api_views import _validar_payload
 from .composer import receta_normalizada, url_historia
 from .models import Clip
 from .tagging import sanear_draft, TAGGING_SYSTEM_PROMPT
-from .web_views import thumb_url
+from .web_views import thumb_url, _elegir_diverso
 
 KEY = 'test-key-h070'
 
@@ -532,6 +532,68 @@ class PublicacionesListaViewTest(TestCase):
         r = self.client.get('/marketing/publicaciones/', {'enganchado': '7'})
         self.assertContains(r, 'enganchada a la publicación #7')
 
+    def test_preview_de_historia_usa_la_foto_vigente_no_la_primera(self):
+        """H-074: `urls[-1]` (la última enganchada) es la vigente — mismo
+        criterio que ya usa revision_service para fotos/video. Antes de este
+        fix, re-generar una historia no se reflejaba en la miniatura."""
+        segs = [{'indice': 1, 'titulo': 'Historia 1', 'texto': 'Uno',
+                'material_urls': ['https://res.cloudinary.com/x/vieja.jpg',
+                                   'https://res.cloudinary.com/x/nueva.jpg'],
+                'material_meta': []}]
+        _crear_pub(segmentos=segs, pieza_key='story_preview_vigente', dia=date(2026, 7, 20))
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/publicaciones/', {'semana': '2026-07-20'})
+        self.assertContains(r, 'nueva.jpg')
+        self.assertNotContains(r, 'vieja.jpg')
+
+    def test_material_preview_pub_level_usa_el_vigente(self):
+        _crear_pub(segmentos=[], pieza_key='gbp_preview_vigente', tipo='post', canal='GBP',
+                  material_urls=['https://res.cloudinary.com/x/vieja2.jpg',
+                                 'https://res.cloudinary.com/x/nueva2.jpg'])
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/publicaciones/', {'semana': '2026-07-20'})
+        self.assertContains(r, 'nueva2.jpg')
+        self.assertNotContains(r, 'vieja2.jpg')
+
+    def test_pendientes_lote_cuenta_solo_con_criterio_y_sin_material(self):
+        segs = [
+            {'indice': 1, 'titulo': 'H1', 'texto': 'a', 'material_urls': [],
+             'criterio_foto': {'area': 'tina'}},                                 # cuenta
+            {'indice': 2, 'titulo': 'H2', 'texto': 'b', 'material_urls': ['x'],
+             'criterio_foto': {'area': 'tina'}},                                 # ya tiene material
+            {'indice': 3, 'titulo': 'H3', 'texto': 'c', 'material_urls': []},     # sin criterio
+        ]
+        _crear_pub(segmentos=segs, pieza_key='story_pendientes', dia=date(2026, 7, 20))
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/publicaciones/', {'semana': '2026-07-20'})
+        self.assertContains(r, '1 historia por generar')
+
+    def test_boton_lote_dice_hoy_si_coincide_con_la_fecha_actual(self):
+        # 'Generar las de hoy' por sí solo no alcanza: el atajo global de
+        # arriba usa el MISMO texto también en su versión deshabilitada.
+        # Se valida contra la URL concreta del lote (inequívoca) + que el
+        # atajo global también se haya activado (no quedó en el fallback).
+        hoy = timezone.now().date()
+        lunes_de_hoy = hoy - timedelta(days=hoy.weekday())
+        segs = [{'indice': 1, 'titulo': 'H1', 'texto': 'a', 'material_urls': [],
+                'criterio_foto': {'area': 'tina'}}]
+        pub = _crear_pub(semana_inicio=lunes_de_hoy, segmentos=segs,
+                         pieza_key='story_hoy_lote', dia=hoy)
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/publicaciones/', {'semana': lunes_de_hoy.isoformat()})
+        self.assertContains(r, f'/marketing/catalogo/lote/{pub.id}/')
+        self.assertContains(r, 'Generar las de hoy')
+        self.assertNotContains(r, 'No hay historias de hoy pendientes')  # atajo global activo, no en fallback
+
+    def test_boton_lote_dice_todas_si_no_es_hoy(self):
+        segs = [{'indice': 1, 'titulo': 'H1', 'texto': 'a', 'material_urls': [],
+                'criterio_foto': {'area': 'tina'}}]
+        pub = _crear_pub(segmentos=segs, pieza_key='story_no_hoy_lote', dia=date(2026, 7, 20))
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/publicaciones/', {'semana': '2026-07-20'})
+        self.assertContains(r, f'/marketing/catalogo/lote/{pub.id}/')
+        self.assertContains(r, 'Generar todas')
+
 
 from datetime import timedelta
 
@@ -726,3 +788,149 @@ class AutoGenerarViewTest(TestCase):
         r = self.client.get('/marketing/catalogo/auto-generar/', {'pub_id': pub.id})
         self.assertEqual(r.status_code, 302)
         self.assertIn(f'/marketing/catalogo/componer/{clip.id}/', r.url)
+
+
+class ElegirDiversoTest(TestCase):
+    """H-074 (Fase 3): diversidad de nombre_comercial dentro de un lote —
+    deseable, no obligatoria. Solo aplica a criterios genéricos
+    (nombre_comercial vacío en el criterio); si el criterio ya pide una tina
+    puntual, no hay nada que diversificar."""
+
+    def _clip(self, nombre, **kw):
+        n = Clip.objects.count()
+        defaults = dict(archivo=f'div-{n}.jpg', cloud_url=CLOUD, area='tina', estado='ok',
+                        keeper=True, nombre_comercial=nombre)
+        defaults.update(kw)
+        return Clip.objects.create(**defaults)
+
+    def test_evita_repetir_nombre_comercial_si_hay_alternativa(self):
+        villarrica = self._clip('Villarrica')
+        yates = self._clip('Yates')
+        clip1, _, _ = _elegir_diverso(_CRITERIO_LIBRE, set(), set())
+        clip2, _, _ = _elegir_diverso(_CRITERIO_LIBRE, {clip1.id}, {clip1.nombre_comercial})
+        self.assertNotEqual(clip1.nombre_comercial, clip2.nombre_comercial)
+        self.assertEqual({clip1.id, clip2.id}, {villarrica.id, yates.id})
+
+    def test_degrada_a_repetir_nombre_si_no_hay_alternativa(self):
+        villarrica = self._clip('Villarrica')
+        # "Villarrica" ya está en nombres_usados y es la ÚNICA disponible —
+        # la diversidad no puede hacer fallar el ítem: la entrega igual.
+        clip, nivel, aviso = _elegir_diverso(_CRITERIO_LIBRE, set(), {'Villarrica'})
+        self.assertEqual(clip.id, villarrica.id)
+
+    def test_criterio_con_nombre_puntual_no_diversifica(self):
+        yates = self._clip('Yates')
+        self._clip('Villarrica')  # no debería competir: el criterio pide Yates puntual
+        criterio = dict(_CRITERIO_LIBRE, nombre_comercial='Yates')
+        clip, nivel, aviso = _elegir_diverso(criterio, set(), {'Yates'})
+        self.assertEqual(clip.id, yates.id)
+
+    def test_sin_candidatas_devuelve_nivel_6(self):
+        criterio = dict(_CRITERIO_LIBRE, area='entorno_region')
+        clip, nivel, aviso = _elegir_diverso(criterio, set(), set())
+        self.assertIsNone(clip)
+        self.assertEqual(nivel, 6)
+
+
+class GenerarLoteViewTest(TestCase):
+    """H-074 (Fase 3): "⚡ Generar las de hoy" — batch de auto-pick para todas
+    las historias auto-generables de una publicación, de una sola vez."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create_user('angelica6', 'a6@x.cl', 'x', is_staff=True)
+
+    def setUp(self):
+        self.client.force_login(self.staff)
+
+    def _segmentos(self):
+        return [
+            {'indice': 1, 'titulo': 'Historia 1', 'texto': 'Uno junto al río',
+             'material_urls': [], 'material_meta': [], 'criterio_foto': dict(_CRITERIO_LIBRE)},
+            {'indice': 2, 'titulo': 'Historia 2', 'texto': 'Dos junto al río',
+             'material_urls': [], 'material_meta': [], 'criterio_foto': dict(_CRITERIO_LIBRE)},
+            {'indice': 3, 'titulo': 'Historia 3 (ya enganchada)', 'texto': 'Tres',
+             'material_urls': ['https://res.cloudinary.com/x/ya-existe.jpg'],
+             'material_meta': [{'url': 'https://res.cloudinary.com/x/ya-existe.jpg'}],
+             'criterio_foto': dict(_CRITERIO_LIBRE)},
+            {'indice': 4, 'titulo': 'Historia 4 (sin criterio)', 'texto': 'Cuatro',
+             'material_urls': [], 'material_meta': []},
+        ]
+
+    def test_genera_solo_las_auto_generables_sin_material(self):
+        Clip.objects.create(archivo='lote1.jpg', cloud_url=CLOUD, area='tina',
+                            nombre_comercial='Villarrica', keeper=True, estado='ok')
+        Clip.objects.create(archivo='lote2.jpg', cloud_url=CLOUD, area='tina',
+                            nombre_comercial='Yates', keeper=True, estado='ok')
+        pub = _crear_pub(segmentos=self._segmentos(), pieza_key='story_lote1', dia=date(2026, 7, 20))
+        r = self.client.post(f'/marketing/catalogo/lote/{pub.id}/')
+        self.assertEqual(r.status_code, 302)
+        self.assertIn(f'lote={pub.id}', r.url)
+        pub.refresh_from_db()
+        self.assertEqual(len(pub.segmentos[0]['material_urls']), 1)   # historia 1: generada
+        self.assertEqual(len(pub.segmentos[1]['material_urls']), 1)   # historia 2: generada
+        self.assertEqual(pub.segmentos[2]['material_urls'],
+                        ['https://res.cloudinary.com/x/ya-existe.jpg'])  # historia 3: intacta
+        self.assertEqual(pub.segmentos[3]['material_urls'], [])        # historia 4: sin criterio, intacta
+        self.assertEqual(pub.estado, 'lista')
+        self.assertEqual(UsoClip.objects.filter(publicacion_id=pub.id).count(), 2)
+
+    def test_no_repite_foto_dentro_del_lote(self):
+        Clip.objects.create(archivo='lote3.jpg', cloud_url=CLOUD, area='tina',
+                            nombre_comercial='Villarrica', keeper=True, estado='ok')
+        Clip.objects.create(archivo='lote4.jpg', cloud_url=CLOUD, area='tina',
+                            nombre_comercial='Yates', keeper=True, estado='ok')
+        pub = _crear_pub(segmentos=self._segmentos(), pieza_key='story_lote2', dia=date(2026, 7, 20))
+        self.client.post(f'/marketing/catalogo/lote/{pub.id}/')
+        pub.refresh_from_db()
+        clip_ids = {pub.segmentos[0]['material_meta'][0]['receta']['clip_id'],
+                   pub.segmentos[1]['material_meta'][0]['receta']['clip_id']}
+        self.assertEqual(len(clip_ids), 2)
+
+    def test_diversifica_nombre_comercial_cuando_hay_stock(self):
+        Clip.objects.create(archivo='lote5.jpg', cloud_url=CLOUD, area='tina',
+                            nombre_comercial='Villarrica', keeper=True, estado='ok')
+        Clip.objects.create(archivo='lote6.jpg', cloud_url=CLOUD, area='tina',
+                            nombre_comercial='Yates', keeper=True, estado='ok')
+        pub = _crear_pub(segmentos=self._segmentos(), pieza_key='story_lote3', dia=date(2026, 7, 20))
+        self.client.post(f'/marketing/catalogo/lote/{pub.id}/')
+        pub.refresh_from_db()
+        id1 = pub.segmentos[0]['material_meta'][0]['receta']['clip_id']
+        id2 = pub.segmentos[1]['material_meta'][0]['receta']['clip_id']
+        nombres = set(Clip.objects.filter(id__in=[id1, id2]).values_list('nombre_comercial', flat=True))
+        self.assertEqual(nombres, {'Villarrica', 'Yates'})
+
+    def test_resumen_cuenta_generadas_y_manual(self):
+        Clip.objects.create(archivo='lote7.jpg', cloud_url=CLOUD, area='tina',
+                            nombre_comercial='Villarrica', keeper=True, estado='ok')
+        pub = _crear_pub(segmentos=self._segmentos(), pieza_key='story_lote4', dia=date(2026, 7, 20))
+        r = self.client.post(f'/marketing/catalogo/lote/{pub.id}/', follow=True)
+        # Con 1 sola foto disponible: historia 1 la toma, historia 2 se queda
+        # sin candidata NUEVA (el lote no repite) + historia 4 sin criterio.
+        self.assertContains(r, 'Generé 1 historia')
+        self.assertContains(r, 'para Manual')
+
+    def test_sin_stock_de_fotos_todas_van_a_manual(self):
+        pub = _crear_pub(segmentos=self._segmentos(), pieza_key='story_lote5', dia=date(2026, 7, 20))
+        r = self.client.post(f'/marketing/catalogo/lote/{pub.id}/', follow=True)
+        pub.refresh_from_db()
+        self.assertEqual(pub.segmentos[0]['material_urls'], [])
+        self.assertEqual(pub.segmentos[1]['material_urls'], [])
+        self.assertNotEqual(pub.estado, 'lista')
+        self.assertContains(r, 'Generé 0 historias')
+
+    def test_anonimo_redirige(self):
+        self.client.logout()
+        pub = _crear_pub(segmentos=[], pieza_key='story_lote6', dia=date(2026, 7, 20))
+        r = self.client.post(f'/marketing/catalogo/lote/{pub.id}/')
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('login', r.url)
+
+    def test_get_no_permitido(self):
+        pub = _crear_pub(segmentos=[], pieza_key='story_lote7', dia=date(2026, 7, 20))
+        r = self.client.get(f'/marketing/catalogo/lote/{pub.id}/')
+        self.assertEqual(r.status_code, 405)
+
+    def test_pub_inexistente_404(self):
+        r = self.client.post('/marketing/catalogo/lote/999999/')
+        self.assertEqual(r.status_code, 404)

@@ -9,7 +9,7 @@ para consumidores externos y el auto-pick futuro (B3).
 """
 import logging
 import os
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
@@ -488,6 +488,108 @@ def enganchar_publicacion(request, clip_id):
 
     logger.info('[H-072] historia enganchada: clip=%s pub=%s segmento=%s', clip.id, pub.id, segmento_idx)
     return redirect(f'/marketing/publicaciones/?enganchado={pub.id}')
+
+
+def _elegir_diverso(criterio, excluidos_ids, nombres_usados, intentos=4):
+    """H-074 (Fase 3): dentro de un lote, intenta no repetir `nombre_comercial`
+    entre historias con el MISMO criterio genérico (deseable, no obligatorio
+    — ver BRIEF_H-074 §2). Si el criterio ya pide una tina/cabaña puntual, no
+    hay nada que diversificar. Si no logra una distinta en `intentos`, se
+    queda con la primera candidata — la diversidad nunca hace fallar el ítem."""
+    if (criterio.get('nombre_comercial') or '').strip():
+        return seleccionar_clip(criterio, excluir_ids=list(excluidos_ids))
+    probados = set(excluidos_ids)
+    primera = None
+    for _ in range(intentos):
+        clip, nivel, aviso = seleccionar_clip(criterio, excluir_ids=list(probados))
+        if clip is None:
+            # Sin más candidatas: si ya había una (aunque repita nombre), se
+            # usa esa — la diversidad nunca hace fallar el ítem. Si nunca
+            # hubo ninguna, este (None, nivel, aviso) ES el resultado real.
+            break
+        if primera is None:
+            primera = (clip, nivel, aviso)
+        if clip.nombre_comercial not in nombres_usados:
+            return clip, nivel, aviso
+        probados.add(clip.id)
+    else:
+        # Se agotaron los `intentos` sin encontrar una nombre_comercial nueva.
+        return primera
+    return primera if primera is not None else (clip, nivel, aviso)
+
+
+@staff_member_required
+@require_http_methods(['POST'])
+def generar_lote(request, pub_id):
+    """H-074 (Fase 3): batch de auto-pick para TODAS las historias
+    auto-generables (con criterio_foto, sin material aún) de una
+    publicación. Anti-repetición DURA entre ellas dentro del lote
+    (`excluir_ids` acumulado; `seleccionar_clip` ya excluye el histórico de
+    60 días) + diversidad de `nombre_comercial` deseable. Nunca toca
+    historias que YA tienen material (enganchadas a mano o por un lote
+    anterior) — esas se re-generan una por una desde el composer (Fase 2),
+    no acá. "Lista" no es "publicada": Angélica revisa después."""
+    from marketing_briefs.models import PublicacionPlanificada
+    pub = PublicacionPlanificada.objects.filter(id=pub_id).first()
+    if pub is None:
+        raise Http404
+
+    segs = pub.segmentos or []
+    generadas = con_aviso = a_manual = 0
+    excluidos, nombres_usados = set(), set()
+
+    for seg in segs:
+        if not isinstance(seg, dict) or seg.get('material_urls'):
+            continue  # ya tiene material — regla dura: el lote no la toca
+        criterio = seg.get('criterio_foto')
+        if not isinstance(criterio, dict) or not (criterio.get('area') or '').strip():
+            a_manual += 1
+            continue
+
+        clip, nivel, aviso = _elegir_diverso(criterio, excluidos, nombres_usados)
+        if clip is None:
+            a_manual += 1
+            continue
+
+        texto = (seg.get('texto') or seg.get('titulo') or '').strip()
+        receta = receta_normalizada(texto, None, None)
+        url = url_historia(clip.cloud_url, receta)
+        if not url:
+            a_manual += 1
+            continue
+
+        seg['material_urls'] = list(seg.get('material_urls') or []) + [url]
+        seg['material_meta'] = list(seg.get('material_meta') or []) + [{
+            'url': url, 'tipo': 'historia', 'width': ANCHO, 'height': ALTO,
+            'ratio': '9:16', 'orientacion': 'vertical',
+            'receta': {'texto': receta['texto'], 'posicion': receta['posicion'],
+                       'preset': receta['preset'], 'clip_id': clip.id, 'tipo': 'historia'},
+        }]
+
+        UsoClip.objects.create(clip=clip, fecha=timezone.now().date(), canal=pub.canal, publicacion_id=pub.id)
+        clip.ultimo_uso = timezone.now().date()
+        clip.save(update_fields=['ultimo_uso'])
+
+        excluidos.add(clip.id)
+        if clip.nombre_comercial:
+            nombres_usados.add(clip.nombre_comercial)
+        generadas += 1
+        if aviso:
+            con_aviso += 1
+
+    pub.segmentos = segs
+    if generadas:
+        pub.estado = 'lista'
+    pub.save()
+
+    resumen = f'Generé {generadas} historia{"s" if generadas != 1 else ""}'
+    if con_aviso:
+        resumen += f' · {con_aviso} con aviso de degradación'
+    if a_manual:
+        resumen += f' · {a_manual} para Manual'
+    logger.info('[H-074] lote pub=%s: %s generadas, %s con aviso, %s a manual',
+                pub.id, generadas, con_aviso, a_manual)
+    return redirect(f'/marketing/publicaciones/?lote={pub.id}&resumen={quote(resumen)}')
 
 
 @staff_member_required

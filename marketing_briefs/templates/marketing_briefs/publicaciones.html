@@ -34,6 +34,11 @@
   .btn-crear{background:var(--gold);color:#10231d;text-decoration:none;font-weight:700;
     font-size:13px;padding:9px 14px;border-radius:9px}
   .btn-crear.auto{background:var(--green);color:#fff}
+  .btn-lote{background:var(--green);color:#fff;border:0;font-weight:700;font-size:13px;
+    padding:9px 16px;border-radius:10px;cursor:pointer}
+  .lote-fila{margin-top:10px;padding-top:10px;border-top:1px solid #f0e8d8;
+    display:flex;align-items:center;gap:10px}
+  .lote-pendiente{font-size:12.5px;color:var(--muted)}
   .historias{margin-top:10px;padding-top:10px;border-top:1px solid #f0e8d8}
   .historia-row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px}
   .historia-row .h-texto{flex:1;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -53,10 +58,18 @@
   </div>
 
   {% if enganchado %}<div class="ok">✓ Historia enganchada a la publicación #{{ enganchado }}.</div>{% endif %}
+  {% if resumen_lote %}<div class="ok">⚡ {{ resumen_lote }}</div>{% endif %}
 
   <div class="ganchos">
-    <button type="button" disabled title="Próximamente (Fase 2)">🤖 Automática</button>
-    <button type="button" disabled title="Próximamente (Fase 3)">⚡ Generar las de hoy</button>
+    <button type="button" disabled title="Próximamente">🤖 Automática</button>
+    {% if lote_hoy_pub_id %}
+    <form method="post" action="{% url 'catalogo_web:generar_lote' lote_hoy_pub_id %}" style="display:inline">
+      {% csrf_token %}
+      <button class="btn-lote" type="submit">⚡ Generar las de hoy</button>
+    </form>
+    {% else %}
+    <button type="button" disabled title="No hay historias de hoy pendientes de auto-generar en esta semana">⚡ Generar las de hoy</button>
+    {% endif %}
   </div>
 
   {% if tarjetas %}
@@ -83,6 +96,15 @@
       </div>
       {% endfor %}
     </div>
+    {% if t.tiene_lote_disponible %}
+    <div class="lote-fila">
+      <form method="post" action="{% url 'catalogo_web:generar_lote' t.pub.id %}">
+        {% csrf_token %}
+        <button class="btn-lote" type="submit">⚡ {% if t.es_hoy %}Generar las de hoy{% else %}Generar todas{% endif %}</button>
+      </form>
+      <span class="lote-pendiente">{{ t.pendientes_lote }} historia{{ t.pendientes_lote|pluralize:"s" }} por generar</span>
+    </div>
+    {% endif %}
     {% else %}
     <div class="fila">
       {% if t.material_preview %}<img class="thumb" src="{{ t.material_preview }}" alt="">{% endif %}

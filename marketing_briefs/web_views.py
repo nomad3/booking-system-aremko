@@ -67,34 +67,56 @@ def publicaciones_lista(request):
 
     qs = PublicacionPlanificada.objects.filter(semana_inicio=lunes).order_by('dia', 'id')
 
+    hoy = date.today()
     tarjetas = []
     for pub in qs:
         historias = []
+        pendientes_lote = 0
         for seg in (pub.segmentos or []):
             if not isinstance(seg, dict):
                 continue
             urls = seg.get('material_urls') or []
+            tiene_criterio = bool(seg.get('criterio_foto'))
+            tiene_material = bool(urls)
+            if tiene_criterio and not tiene_material:
+                pendientes_lote += 1
             historias.append({
                 'indice': seg.get('indice'),
                 'titulo': seg.get('titulo') or f"Historia {seg.get('indice')}",
                 'texto': (seg.get('texto') or '')[:160],
-                'tiene_material': bool(urls),
-                'preview': urls[0] if urls else None,
+                'tiene_material': tiene_material,
+                # H-074: `urls[-1]` es la vigente (última enganchada), no la
+                # primera — mismo criterio "último = vigente" que ya usa
+                # revision_service para fotos/video. Antes de este fix, un
+                # re-generado (Fase 2 u otra vuelta del lote) no se reflejaba
+                # acá: la miniatura seguía mostrando la foto vieja.
+                'preview': urls[-1] if urls else None,
                 # H-073: solo con criterio_foto se puede ofrecer "🤖 Generar".
-                'tiene_criterio': bool(seg.get('criterio_foto')),
+                'tiene_criterio': tiene_criterio,
             })
         estado_icono, estado_label = ESTADO_LABEL.get(pub.estado, ('⚪', pub.estado))
         copy_json = pub.copy_json if isinstance(pub.copy_json, dict) else {}
+        material_urls = pub.material_urls or []
         tarjetas.append({
             'pub': pub,
             'texto_preview': _texto_preview(pub.copy_json),
-            'tiene_material': bool(pub.material_urls),
-            'material_preview': (pub.material_urls or [None])[0],
+            'tiene_material': bool(material_urls),
+            'material_preview': material_urls[-1] if material_urls else None,  # ver nota arriba (vigente=último)
             'historias': historias,
             'estado_icono': estado_icono,
             'estado_label': estado_label,
             'tiene_criterio': bool(copy_json.get('criterio_foto')),
+            # H-074: botón de lote — solo si queda algo por auto-generar en esta pieza.
+            'pendientes_lote': pendientes_lote,
+            'tiene_lote_disponible': pendientes_lote > 0,
+            'es_hoy': pub.dia == hoy,
         })
+
+    # H-074: id de la pieza de HOY con algo pendiente de auto-generar, si está
+    # visible en esta semana — es lo que activa el atajo global "las de hoy".
+    lote_hoy_pub_id = next(
+        (t['pub'].id for t in tarjetas if t['es_hoy'] and t['tiene_lote_disponible']), None,
+    )
 
     return render(request, 'marketing_briefs/publicaciones.html', {
         'tarjetas': tarjetas,
@@ -103,4 +125,6 @@ def publicaciones_lista(request):
         'semana_anterior': (lunes - timedelta(days=7)).isoformat(),
         'semana_siguiente': (lunes + timedelta(days=7)).isoformat(),
         'enganchado': p.get('enganchado', ''),
+        'resumen_lote': p.get('resumen', ''),
+        'lote_hoy_pub_id': lote_hoy_pub_id,
     })
