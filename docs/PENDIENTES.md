@@ -107,3 +107,14 @@ _Última revisión: 2026-07-20_
     **Volver** (F-07 nudges Luna, F-08 QR físico) · **App** (F-09 guardar en pantalla,
     F-10 avisos). Backlog en `docs/PLAN_FICHA.md`. Empezar por F-01 + F-02 (medir +
     reencuadrar) antes de tocar la ficha. Ver `[[project_aremko_ficha_reserva_digital]]`.
+
+21. **P-21 · Notas de producción se cuelan literales en el compositor de historias** —
+    El texto del brief a veces trae anotaciones entre corchetes (ej. "[Sticker link a
+    wa.me/…]", placeholders "[X]°C") que hoy salen TAL CUAL sobre la imagen compuesta
+    (H-073/B2-A) en vez de tratarse como instrucción para quien redacta/publica.
+    Detectado 2026-07-25 en la validación e2e de H-073 (sábado 25/07 · Historia 3).
+    Opciones a evaluar: separar en el brief texto-visible de nota-de-producción (dos
+    campos), que el compositor filtre/oculte lo que va entre corchetes antes de
+    renderizar, o dejarlo como paso manual de Angélica (editar antes de generar). NO
+    bloqueante — no toca la selección de foto, que funcionó bien. Ver `docs/HANDOFFS.md`
+    fila H-073.
