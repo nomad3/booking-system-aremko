@@ -44,8 +44,11 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>📸 Catálogo de fotos Aremko</h1>
-  <div class="sub">Material real para publicaciones — filtra y encuentra tu foto. (Solo lectura; la edición es en el admin.)</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <h1>📸 Catálogo de fotos Aremko</h1>
+    <a href="{% url 'catalogo_web:ingesta' %}" style="background:var(--gold);color:#10231d;font-weight:700;text-decoration:none;padding:10px 18px;border-radius:10px;font-size:14px">📤 Subir foto</a>
+  </div>
+  <div class="sub">Material real para publicaciones — filtra, encuentra tu foto o sube una nueva (la IA la clasifica y tú confirmas).</div>
 
   <form class="filtros" method="get">
     <select name="area">

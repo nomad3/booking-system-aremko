@@ -8,5 +8,7 @@ app_name = 'catalogo_web'
 
 urlpatterns = [
     path('', web_views.explorador, name='explorador'),
+    path('ingesta/', web_views.ingesta_web, name='ingesta'),
+    path('ingesta/guardar/', web_views.ingesta_guardar, name='ingesta_guardar'),
     path('<int:clip_id>/', web_views.detalle, name='detalle'),
 ]

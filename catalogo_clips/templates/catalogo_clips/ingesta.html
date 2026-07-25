@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Subir foto · Catálogo Aremko</title>
+<style>
+  :root{--bg:#F2E8D8;--surface:#FFFDF9;--ink:#2E2A24;--muted:#7C736A;--line:#DBCDB4;
+    --green:#1e4438;--gold:#C9A24B;--rojo:#9A3B2E;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;line-height:1.5;padding:14px}
+  .wrap{max-width:560px;margin:0 auto}
+  a.volver{color:var(--green);font-weight:700;text-decoration:none;font-size:14px}
+  h1{font-size:19px;margin:8px 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+  .panel{background:var(--surface);border:0.5px solid var(--line);border-radius:14px;padding:18px}
+  .error{background:#F2DAD7;color:var(--rojo);border-radius:10px;padding:11px 13px;font-size:13.5px;margin-bottom:12px}
+  input[type=file]{width:100%;padding:12px;border:1.5px dashed var(--line);border-radius:11px;background:#fff}
+  .btn{display:block;width:100%;margin-top:14px;padding:14px;border:0;border-radius:11px;
+    background:var(--green);color:#fff;font-weight:700;font-size:15px;cursor:pointer}
+  .btn.dorado{background:var(--gold);color:#10231d}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:10px}
+  .preview{display:block;width:100%;max-width:280px;border-radius:12px;margin:0 auto 14px}
+  .ia-tag{text-align:center;font-size:12.5px;color:var(--muted);margin-bottom:12px}
+  label.f{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 3px}
+  select, input[type=text], textarea{width:100%;padding:10px;border:1px solid var(--line);
+    border-radius:9px;background:#fff;color:var(--ink);font-size:14px}
+  .fila2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  label.chk{display:flex;align-items:center;gap:8px;font-size:14px;margin-top:10px}
+  label.chk input{width:18px;height:18px;accent-color:var(--gold)}
+  .aptos{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .aptos label{display:flex;align-items:center;gap:5px;font-size:13px;background:#F7F0E2;
+    border-radius:999px;padding:5px 11px}
+  .subiendo{display:none;text-align:center;color:var(--muted);font-size:14px;padding:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="volver" href="/marketing/catalogo/">← Catálogo</a>
+
+  {% if modo == 'subir' %}
+  <h1>📤 Subir una foto al catálogo</h1>
+  <div class="sub">Elige la foto, la IA propone la clasificación y tú la confirmas. Solo material real de Aremko.</div>
+  <div class="panel">
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <form method="post" enctype="multipart/form-data" onsubmit="document.getElementById('sube').style.display='block'; this.querySelector('.btn').disabled=true;">
+      {% csrf_token %}
+      <input type="file" name="imagen" accept="image/jpeg,image/png,image/webp" required>
+      <button class="btn" type="submit">Subir y clasificar con IA →</button>
+      <div id="sube" class="subiendo">⏳ Subiendo y mirando la foto… (unos segundos)</div>
+      <div class="hint">JPG, PNG o WEBP · máx 16 MB. Desde el iPhone se convierte sola a JPG al elegirla. La foto queda optimizada en la nube (no subas el archivo gigante si tienes una versión liviana).</div>
+    </form>
+  </div>
+
+  {% else %}
+  <h1>✅ Revisa y confirma</h1>
+  <div class="sub">La IA propuso esta clasificación — corrige lo que haga falta y guarda.</div>
+  <div class="panel">
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <img class="preview" src="{{ thumb }}" alt="{{ archivo }}">
+    <div class="ia-tag">🤖 Propuesta de la IA para <b>{{ archivo }}</b> — tú tienes la última palabra</div>
+    <form method="post" action="{% url 'catalogo_web:ingesta_guardar' %}">
+      {% csrf_token %}
+      <input type="hidden" name="archivo" value="{{ archivo }}">
+      <input type="hidden" name="cloud_url" value="{{ cloud_url }}">
+      <input type="hidden" name="orientacion" value="{{ draft.orientacion }}">
+
+      <div class="fila2">
+        <div>
+          <label class="f">Área *</label>
+          <select name="area" required>
+            <option value="">Elige…</option>
+            {% for v, lbl in areas %}<option value="{{ v }}" {% if draft.area == v %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="f">Tina / cabaña / espacio</label>
+          <input type="text" name="nombre_comercial" value="{{ draft.nombre_comercial }}" list="nombres" placeholder="Vacío si hay duda">
+          <datalist id="nombres">{% for n in nombres %}<option value="{{ n }}">{% endfor %}</datalist>
+        </div>
+      </div>
+
+      <div class="fila2">
+        <div>
+          <label class="f">Momento</label>
+          <select name="momento">{% for v, lbl in momentos %}<option value="{{ v }}" {% if draft.momento == v %}selected{% endif %}>{{ lbl }}</option>{% endfor %}</select>
+        </div>
+        <div>
+          <label class="f">Estación</label>
+          <select name="estacion">{% for v, lbl in estaciones %}<option value="{{ v }}" {% if draft.estacion == v %}selected{% endif %}>{{ lbl }}</option>{% endfor %}</select>
+        </div>
+      </div>
+
+      <div class="fila2">
+        <div>
+          <label class="f">Vapor</label>
+          <select name="vapor">{% for v, lbl in vapores %}<option value="{{ v }}" {% if draft.vapor == v %}selected{% endif %}>{{ lbl }}</option>{% endfor %}</select>
+        </div>
+        <div>
+          <label class="f">Decoración</label>
+          <select name="decoracion">
+            <option value="" {% if not draft.decoracion %}selected{% endif %}>—</option>
+            <option value="con" {% if draft.decoracion == 'con' %}selected{% endif %}>Con decoración</option>
+            <option value="sin" {% if draft.decoracion == 'sin' %}selected{% endif %}>Sin decoración</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fila2">
+        <div>
+          <label class="f">Calidad</label>
+          <select name="calidad">{% for v, lbl in calidades %}<option value="{{ v }}" {% if draft.calidad == v %}selected{% endif %}>{{ lbl }}</option>{% endfor %}</select>
+        </div>
+        <div>
+          <label class="f">Estado</label>
+          <select name="estado">
+            <option value="ok" {% if draft.estado == 'ok' %}selected{% endif %}>OK</option>
+            <option value="revisar" {% if draft.estado == 'revisar' %}selected{% endif %}>Revisar</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="f">Descripción</label>
+      <input type="text" name="descripcion" value="{{ draft.descripcion }}" maxlength="300">
+
+      <label class="f">Etiquetas (separadas por coma)</label>
+      <input type="text" name="etiquetas" value="{{ draft.etiquetas|join:', ' }}">
+
+      <label class="f">Apta para</label>
+      <div class="aptos">
+        {% for op in apto_opciones %}
+        <label><input type="checkbox" name="apto_para" value="{{ op }}" {% if op in draft.apto_para %}checked{% endif %}> {{ op }}</label>
+        {% endfor %}
+      </div>
+
+      <label class="chk"><input type="checkbox" name="keeper" value="1" {% if draft.keeper %}checked{% endif %}> ⭐ Keeper (foto hero: nítida, sin personas, distinta)</label>
+      <label class="chk"><input type="checkbox" name="personas" value="1" {% if draft.personas %}checked{% endif %}> 👤 Salen personas reconocibles (queda "revisar derechos")</label>
+      <input type="hidden" name="permiso" value="{{ draft.permiso }}">
+
+      <button class="btn dorado" type="submit">Guardar en el catálogo ✓</button>
+      <div class="hint">Si el archivo ya existía en el catálogo, se actualiza (no se duplica).</div>
+    </form>
+  </div>
+  {% endif %}
+</div>
+</body>
+</html>

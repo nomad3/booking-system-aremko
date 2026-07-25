@@ -4,8 +4,10 @@ Puros (SimpleTestCase): saneo del draft IA + validador de payload.
 Con DB (TestCase, app aislada → sin drift): upsert idempotente, GET filtros, PATCH.
 """
 import json
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from .api_views import _validar_payload
@@ -208,3 +210,86 @@ class ExploradorWebTest(TestCase):
         self.assertContains(r, 'Usar en historia')
         self.assertContains(r, 'disabled')
         self.assertContains(r, 'Vapor')
+
+
+class IngestaWebTest(TestCase):
+    """B1.5: Angélica sube la foto → IA propone → confirma → catálogo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create_user('angelica', 'a@x.cl', 'x', is_staff=True)
+
+    def _foto(self, nombre='IMG_9999.jpg'):
+        return SimpleUploadedFile(nombre, b'\xff\xd8\xff\xe0fakejpg', content_type='image/jpeg')
+
+    def test_anonimo_redirige(self):
+        r = self.client.get('/marketing/catalogo/ingesta/')
+        self.assertEqual(r.status_code, 302)
+
+    def test_get_muestra_form_subida(self):
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/catalogo/ingesta/')
+        self.assertContains(r, 'Subir una foto al catálogo')
+
+    def test_heic_da_mensaje_amable(self):
+        self.client.force_login(self.staff)
+        r = self.client.post('/marketing/catalogo/ingesta/',
+                             {'imagen': self._foto('IMG_1.heic')})
+        self.assertContains(r, 'Formato no soportado')
+        self.assertContains(r, 'iPhone')
+
+    @patch('catalogo_clips.web_views.etiquetar_imagen')
+    @patch('catalogo_clips.web_views._subir_imagen_optimizada')
+    def test_subida_muestra_draft_ia(self, mock_subir, mock_ia):
+        mock_subir.return_value = {'cloud_url': 'https://res.cloudinary.com/x/image/upload/f_auto,q_auto/catalogo_clips/z.jpg',
+                                   'width': 1440, 'height': 1080}
+        mock_ia.return_value = {'area': 'tina', 'nombre_comercial': 'Villarrica-Llaima',
+                                'momento': 'atardecer', 'estacion': 'indistinto', 'vapor': 'sí',
+                                'decoracion': 'con', 'personas': False, 'permiso': 'libre',
+                                'calidad': 'alta', 'keeper': True, 'descripcion': 'Tina humeante',
+                                'orientacion': '', 'estado': 'ok',
+                                'etiquetas': ['tina', 'vapor'], 'apto_para': ['hero']}
+        self.client.force_login(self.staff)
+        r = self.client.post('/marketing/catalogo/ingesta/', {'imagen': self._foto()})
+        self.assertContains(r, 'Revisa y confirma')
+        self.assertContains(r, 'Villarrica-Llaima')
+        self.assertContains(r, 'IMG_9999.jpg')
+        # La orientación vacía del draft se completa con las dimensiones reales.
+        self.assertContains(r, 'horizontal')
+
+    def test_guardar_crea_clip_y_redirige(self):
+        self.client.force_login(self.staff)
+        r = self.client.post('/marketing/catalogo/ingesta/guardar/', {
+            'archivo': 'IMG_9999.jpg',
+            'cloud_url': 'https://res.cloudinary.com/x/image/upload/z.jpg',
+            'area': 'tina', 'nombre_comercial': 'Llaima', 'momento': 'noche',
+            'estacion': 'indistinto', 'vapor': 'sí', 'decoracion': 'con',
+            'calidad': 'alta', 'estado': 'ok', 'descripcion': 'Tina de noche',
+            'etiquetas': 'tina, vapor, noche', 'apto_para': ['hero', 'historia'],
+            'keeper': '1', 'orientacion': 'vertical', 'permiso': 'libre',
+        })
+        self.assertEqual(r.status_code, 302)
+        clip = Clip.objects.get(archivo='IMG_9999.jpg')
+        self.assertIn(f'/marketing/catalogo/{clip.id}/', r.url)
+        self.assertEqual(clip.area, 'tina')
+        self.assertEqual(clip.etiquetas, ['tina', 'vapor', 'noche'])
+        self.assertEqual(clip.apto_para, ['hero', 'historia'])
+        self.assertTrue(clip.keeper)
+        self.assertEqual(clip.fuente, 'ingesta_web')
+
+    def test_guardar_con_personas_fuerza_revisar_derechos(self):
+        self.client.force_login(self.staff)
+        self.client.post('/marketing/catalogo/ingesta/guardar/', {
+            'archivo': 'IMG_P.jpg', 'cloud_url': 'https://x/p.jpg', 'area': 'masaje',
+            'personas': '1', 'permiso': 'libre',
+        })
+        self.assertEqual(Clip.objects.get(archivo='IMG_P.jpg').permiso, 'revisar_derechos')
+
+    def test_guardar_sin_area_reintenta_con_error(self):
+        self.client.force_login(self.staff)
+        r = self.client.post('/marketing/catalogo/ingesta/guardar/', {
+            'archivo': 'IMG_X.jpg', 'cloud_url': 'https://x/x.jpg',
+        })
+        self.assertEqual(r.status_code, 200)  # re-render del form con el error
+        self.assertContains(r, 'area')
+        self.assertFalse(Clip.objects.filter(archivo='IMG_X.jpg').exists())
