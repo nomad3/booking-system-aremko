@@ -15,11 +15,13 @@ from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import Http404
 from django.shortcuts import redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_http_methods
 
 from .api_views import (_validar_payload, _subir_imagen_optimizada, _orientacion,
                         _EXT_IMAGEN, _MAX_BYTES)
-from .composer import receta_normalizada, url_historia, PRESETS, POSICIONES
-from .models import Clip
+from .composer import receta_normalizada, url_historia, PRESETS, POSICIONES, ANCHO, ALTO
+from .models import Clip, UsoClip
 from .tagging import etiquetar_imagen
 
 logger = logging.getLogger(__name__)
@@ -111,7 +113,8 @@ def explorador(request):
                    .values_list('nombre_comercial', flat=True)
                    .distinct().order_by('nombre_comercial'))
 
-    # Querystring sin `page` para que la paginación conserve los filtros.
+    # Querystring sin `page` para que la paginación conserve los filtros
+    # (arrastra pub_id/segmento si venimos de "Crear historia" en Publicaciones).
     qd = request.GET.copy()
     qd.pop('page', None)
     qs_sin_page = qd.urlencode()
@@ -129,7 +132,24 @@ def explorador(request):
         'f': {k: p.get(k, '') for k in ('area', 'nombre_comercial', 'momento', 'estacion',
                                         'vapor', 'decoracion', 'keeper', 'estado', 'q', 'todas')},
         'qs_sin_page': qs_sin_page,
+        'pub_contexto': _pub_contexto(p),
     })
+
+
+def _pub_contexto(params):
+    """Si venimos de 'Crear historia' (H-072), arma el texto del banner
+    'Eligiendo foto para: …'. Best-effort: nunca debe romper la página."""
+    pub_id = (params.get('pub_id') or '').strip()
+    if not pub_id:
+        return None
+    try:
+        from marketing_briefs.models import PublicacionPlanificada
+        pub = PublicacionPlanificada.objects.filter(id=pub_id).only('dia', 'canal', 'tipo').first()
+    except Exception:  # noqa: BLE001
+        pub = None
+    if pub is None:
+        return None
+    return f'{pub.dia:%d/%m} · {pub.canal}/{pub.tipo}'
 
 
 # ---------------------------------------------------------------------------
@@ -249,14 +269,52 @@ def ingesta_guardar(request):
 # Componer historia (B2-A) — receta → URL Cloudinary. El preview ES el JPG final.
 # ---------------------------------------------------------------------------
 
+_ERRORES_ENGANCHE = {
+    'sin_texto': 'Falta el texto de la historia.',
+    'sin_publicacion': 'No se encontró la publicación — vuelve a "Publicaciones" e inténtalo de nuevo.',
+    'segmento_invalido': 'El número de historia no es válido.',
+    'segmento_no_existe': 'Esa historia ya no existe en la publicación (puede haber cambiado el brief).',
+}
+
+
+def _pub_y_segmento(params):
+    """Lee pub_id/segmento de la querystring → (pub, segmento_idx, pub_id_raw, segmento_raw).
+    Best-effort: nunca rompe la página (pub queda None si algo no calza)."""
+    pub_id_raw = (params.get('pub_id') or '').strip()
+    segmento_raw = (params.get('segmento') or '').strip()
+    pub = None
+    if pub_id_raw:
+        try:
+            from marketing_briefs.models import PublicacionPlanificada
+            pub = PublicacionPlanificada.objects.filter(id=pub_id_raw).first()
+        except Exception:  # noqa: BLE001
+            pub = None
+    segmento_idx = None
+    if segmento_raw:
+        try:
+            segmento_idx = int(segmento_raw)
+        except ValueError:
+            segmento_idx = None
+    return pub, segmento_idx, pub_id_raw, segmento_raw
+
+
 @staff_member_required
 def componer(request, clip_id):
     clip = Clip.objects.filter(id=clip_id).first()
     if clip is None or not clip.cloud_url:
         raise Http404
     p = request.GET
-    # Texto por defecto: la descripción del clip (Angélica lo reemplaza por el suyo).
-    texto = p.get('texto') if 'texto' in p else (clip.descripcion or '')
+    pub, segmento_idx, pub_id_raw, segmento_raw = _pub_y_segmento(p)
+
+    if 'texto' in p:
+        texto = p.get('texto')
+    elif pub is not None:
+        from marketing_briefs.web_views import texto_de_publicacion
+        texto = texto_de_publicacion(pub, segmento_idx)
+    else:
+        # Sin publicación de contexto (uso libre de B2-A): la descripción del clip.
+        texto = clip.descripcion or ''
+
     receta = receta_normalizada(texto, p.get('posicion'), p.get('preset'))
     preview = url_historia(clip.cloud_url, receta)
     return render(request, 'catalogo_clips/componer.html', {
@@ -267,7 +325,77 @@ def componer(request, clip_id):
         'presets': list(PRESETS.keys()),
         'posiciones': list(POSICIONES.keys()),
         'thumb': thumb_url(clip.cloud_url),
+        'pub': pub,
+        'segmento_idx': segmento_idx,
+        'pub_id_param': pub_id_raw,
+        'segmento_param': segmento_raw,
+        'error_msg': _ERRORES_ENGANCHE.get(p.get('error', '')),
     })
+
+
+@staff_member_required
+@require_http_methods(['POST'])
+def enganchar_publicacion(request, clip_id):
+    """H-072: guarda la historia compuesta EN la publicación (ORM directo, sin
+    re-subir — la cloud_url ya es Cloudinary) y registra el uso del clip
+    (cimiento del anti-repetición de Fase 2)."""
+    clip = Clip.objects.filter(id=clip_id).first()
+    if clip is None or not clip.cloud_url:
+        raise Http404
+    p = request.POST
+    pub_id = (p.get('pub_id') or '').strip()
+    seg_raw = (p.get('segmento') or '').strip()
+
+    def _volver(error):
+        qs = f'pub_id={pub_id}&' if pub_id else ''
+        qs += f'segmento={seg_raw}&' if seg_raw else ''
+        return redirect(f'/marketing/catalogo/componer/{clip_id}/?{qs}error={error}')
+
+    receta = receta_normalizada(p.get('texto'), p.get('posicion'), p.get('preset'))
+    url = url_historia(clip.cloud_url, receta)
+    if not url:
+        return _volver('sin_texto')
+
+    from marketing_briefs.models import PublicacionPlanificada
+    pub = PublicacionPlanificada.objects.filter(id=pub_id).first() if pub_id else None
+    if pub is None:
+        return _volver('sin_publicacion')
+
+    segmento_idx = None
+    if seg_raw:
+        try:
+            segmento_idx = int(seg_raw)
+        except ValueError:
+            return _volver('segmento_invalido')
+
+    item = {
+        'url': url, 'tipo': 'historia', 'width': ANCHO, 'height': ALTO,
+        'ratio': '9:16', 'orientacion': 'vertical',
+        # La receta completa queda guardada junto al material → se puede re-editar.
+        'receta': {'texto': receta['texto'], 'posicion': receta['posicion'],
+                   'preset': receta['preset'], 'clip_id': clip.id, 'tipo': 'historia'},
+    }
+
+    if segmento_idx is not None:
+        segs = pub.segmentos or []
+        seg = next((s for s in segs if isinstance(s, dict) and s.get('indice') == segmento_idx), None)
+        if seg is None:
+            return _volver('segmento_no_existe')
+        seg['material_urls'] = list(seg.get('material_urls') or []) + [url]
+        seg['material_meta'] = list(seg.get('material_meta') or []) + [item]
+        pub.segmentos = segs  # reasigna para marcar el JSONField como modificado
+    else:
+        pub.material_urls = list(pub.material_urls or []) + [url]
+        pub.material_meta = list(pub.material_meta or []) + [item]
+    pub.estado = 'lista'
+    pub.save()
+
+    UsoClip.objects.create(clip=clip, fecha=timezone.now().date(), canal=pub.canal, publicacion_id=pub.id)
+    clip.ultimo_uso = timezone.now().date()
+    clip.save(update_fields=['ultimo_uso'])
+
+    logger.info('[H-072] historia enganchada: clip=%s pub=%s segmento=%s', clip.id, pub.id, segmento_idx)
+    return redirect(f'/marketing/publicaciones/?enganchado={pub.id}')
 
 
 @staff_member_required
@@ -294,6 +422,14 @@ def detalle(request, clip_id):
         ('Apto para', ', '.join(clip.apto_para or []) or '—'),
         ('Nota', clip.nota or '—'),
     ]
+    # H-072: si venimos de "Crear historia" (Publicaciones), arrastrar pub_id/segmento
+    # al botón "Usar en historia" para que el composer precargue el texto del brief.
+    pub_id = (request.GET.get('pub_id') or '').strip()
+    segmento = (request.GET.get('segmento') or '').strip()
+    componer_qs = ''
+    if pub_id:
+        componer_qs = f'?pub_id={pub_id}' + (f'&segmento={segmento}' if segmento else '')
+
     return render(request, 'catalogo_clips/detalle.html', {
         'clip': clip,
         'campos': campos,
@@ -302,4 +438,6 @@ def detalle(request, clip_id):
         'puede_editar': request.user.has_perm('catalogo_clips.change_clip'),
         'atributos': clip.atributos or {},
         'guardado': request.GET.get('guardado', ''),
+        'componer_qs': componer_qs,
+        'pub_contexto': _pub_contexto(request.GET),
     })

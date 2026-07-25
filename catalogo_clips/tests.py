@@ -366,3 +366,167 @@ class ComponerViewTest(TestCase):
         self.client.force_login(self.staff)
         r = self.client.get(f'/marketing/catalogo/componer/{vacio.id}/')
         self.assertEqual(r.status_code, 404)
+
+
+# ============================================================================
+# H-072 Fase 1: puente publicación → historia + registro de uso (UsoClip)
+# ============================================================================
+from datetime import date
+
+from .models import UsoClip
+
+
+class UsoClipModelTest(TestCase):
+
+    def test_crea_uso_y_actualiza_ultimo_uso(self):
+        clip = Clip.objects.create(archivo='u1.jpg', area='tina', cloud_url=CLOUD)
+        self.assertIsNone(clip.ultimo_uso)
+        UsoClip.objects.create(clip=clip, fecha=date(2026, 7, 25), canal='Instagram Stories', publicacion_id=42)
+        clip.ultimo_uso = date(2026, 7, 25)
+        clip.save(update_fields=['ultimo_uso'])
+        clip.refresh_from_db()
+        self.assertEqual(clip.ultimo_uso, date(2026, 7, 25))
+        self.assertEqual(clip.usos.count(), 1)
+        self.assertEqual(clip.usos.first().publicacion_id, 42)
+
+    def test_publicacion_id_es_referencia_suave_sin_fk(self):
+        # No debe existir integridad referencial real — un id inexistente no falla.
+        clip = Clip.objects.create(archivo='u2.jpg', area='tina', cloud_url=CLOUD)
+        uso = UsoClip.objects.create(clip=clip, fecha=date.today(), publicacion_id=999999)
+        self.assertEqual(uso.publicacion_id, 999999)
+
+    def test_to_dict_incluye_ultimo_uso(self):
+        clip = Clip.objects.create(archivo='u3.jpg', area='tina', cloud_url=CLOUD, ultimo_uso=date(2026, 1, 1))
+        self.assertEqual(clip.to_dict()['ultimo_uso'], '2026-01-01')
+
+
+def _crear_pub(**kw):
+    """Factory mínima de PublicacionPlanificada para los tests de enganche."""
+    from marketing_briefs.models import PublicacionPlanificada
+    defaults = dict(
+        semana_inicio=date(2026, 7, 20), dia=date(2026, 7, 22),
+        canal='Instagram Stories', tipo='story', pieza_key='story_miercoles',
+        copy_json={'caption_completo': 'Una noche junto al río, sin apuro.'},
+    )
+    defaults.update(kw)
+    return PublicacionPlanificada.objects.create(**defaults)
+
+
+class EnganchePublicacionTest(TestCase):
+    """H-072: el composer engancha la historia a la publicación (ORM directo,
+    sin re-subir) + registra el uso del clip."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create_user('angelica2', 'a2@x.cl', 'x', is_staff=True)
+        cls.clip = Clip.objects.create(archivo='eng1.jpg', cloud_url=CLOUD, area='tina',
+                                       nombre_comercial='Llaima')
+
+    def _post_enganchar(self, pub, texto='Hola río', segmento=None):
+        self.client.force_login(self.staff)
+        data = {'texto': texto, 'posicion': 'abajo', 'preset': 'velo', 'pub_id': pub.id}
+        if segmento is not None:
+            data['segmento'] = segmento
+        return self.client.post(f'/marketing/catalogo/componer/{self.clip.id}/enganchar/', data)
+
+    def test_pieza_sin_segmentos_engancha_a_material_urls(self):
+        pub = _crear_pub(tipo='post', canal='GBP', pieza_key='gbp_post', segmentos=[])
+        r = self._post_enganchar(pub)
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/marketing/publicaciones/', r.url)
+        pub.refresh_from_db()
+        self.assertEqual(len(pub.material_urls), 1)
+        self.assertEqual(pub.material_meta[0]['tipo'], 'historia')
+        self.assertEqual(pub.material_meta[0]['receta']['clip_id'], self.clip.id)
+        self.assertEqual(pub.estado, 'lista')
+        self.assertEqual(UsoClip.objects.filter(clip=self.clip, publicacion_id=pub.id).count(), 1)
+        self.clip.refresh_from_db()
+        self.assertEqual(self.clip.ultimo_uso, date.today())
+
+    def test_pieza_con_segmentos_engancha_al_segmento_correcto(self):
+        segs = [
+            {'indice': 1, 'titulo': 'Historia 1', 'texto': 'Amanece', 'material_urls': [], 'material_meta': []},
+            {'indice': 2, 'titulo': 'Historia 2', 'texto': 'Atardece', 'material_urls': [], 'material_meta': []},
+        ]
+        pub = _crear_pub(segmentos=segs, pieza_key='story_jueves', dia=date(2026, 7, 23))
+        r = self._post_enganchar(pub, segmento=2)
+        self.assertEqual(r.status_code, 302)
+        pub.refresh_from_db()
+        self.assertEqual(pub.segmentos[0]['material_urls'], [])          # historia 1 intacta
+        self.assertEqual(len(pub.segmentos[1]['material_urls']), 1)      # historia 2 recibió el material
+        self.assertEqual(pub.material_urls, [])                          # NO va a nivel pub
+
+    def test_segmento_inexistente_no_rompe_y_redirige_con_error(self):
+        pub = _crear_pub(segmentos=[{'indice': 1, 'titulo': 'Historia 1', 'texto': '', 'material_urls': [], 'material_meta': []}],
+                         pieza_key='story_viernes', dia=date(2026, 7, 24))
+        r = self._post_enganchar(pub, segmento=9)
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('error=segmento_no_existe', r.url)
+        pub.refresh_from_db()
+        self.assertEqual(pub.segmentos[0]['material_urls'], [])
+        self.assertFalse(UsoClip.objects.filter(clip=self.clip).exists())
+
+    def test_publicacion_inexistente_no_rompe(self):
+        r = self._post_enganchar(_PubStub(id=999999))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('error=sin_publicacion', r.url)
+
+    def test_sin_texto_no_engancha(self):
+        pub = _crear_pub(segmentos=[], pieza_key='gbp_post2', tipo='post', canal='GBP')
+        r = self._post_enganchar(pub, texto='')
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('error=sin_texto', r.url)
+        pub.refresh_from_db()
+        self.assertEqual(pub.material_urls, [])
+
+    def test_no_reusa_uso_previo_registra_cada_vez(self):
+        pub = _crear_pub(segmentos=[], pieza_key='gbp_post3', tipo='post', canal='GBP')
+        self._post_enganchar(pub)
+        self._post_enganchar(pub)
+        self.assertEqual(UsoClip.objects.filter(clip=self.clip, publicacion_id=pub.id).count(), 2)
+
+
+class _PubStub:
+    """Objeto mínimo con `.id` para probar 'publicación inexistente' sin crear una real."""
+    def __init__(self, id):
+        self.id = id
+
+
+class PublicacionesListaViewTest(TestCase):
+    """H-072: pantalla /marketing/publicaciones/ (staff, lectura + botón Crear historia)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create_user('angelica3', 'a3@x.cl', 'x', is_staff=True)
+
+    def test_anonimo_redirige(self):
+        r = self.client.get('/marketing/publicaciones/')
+        self.assertEqual(r.status_code, 302)
+
+    def test_lista_tarjetas_de_la_semana(self):
+        pub = _crear_pub(pieza_key='gbp_post_x', tipo='post', canal='GBP', segmentos=[],
+                         copy_json={'caption_completo': 'Aguas calientes junto al río, hoy.'})
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/publicaciones/', {'semana': '2026-07-20'})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'GBP')
+        self.assertContains(r, 'Aguas calientes junto al río, hoy.')
+        self.assertContains(r, f'pub_id={pub.id}')
+        self.assertContains(r, '🤖 Automática')
+        self.assertContains(r, 'disabled')
+
+    def test_publicacion_con_historias_muestra_boton_por_segmento(self):
+        segs = [
+            {'indice': 1, 'titulo': 'Historia 1', 'texto': 'Uno', 'material_urls': [], 'material_meta': []},
+            {'indice': 2, 'titulo': 'Historia 2', 'texto': 'Dos', 'material_urls': [], 'material_meta': []},
+        ]
+        pub = _crear_pub(segmentos=segs, pieza_key='story_lunes_x', dia=date(2026, 7, 20))
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/publicaciones/', {'semana': '2026-07-20'})
+        self.assertContains(r, f'pub_id={pub.id}&segmento=1')
+        self.assertContains(r, f'pub_id={pub.id}&segmento=2')
+
+    def test_banner_confirmacion_enganche(self):
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/publicaciones/', {'enganchado': '7'})
+        self.assertContains(r, 'enganchada a la publicación #7')

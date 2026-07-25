@@ -66,6 +66,10 @@ class Clip(models.Model):
                               help_text='disco | chatgpt | ingesta_api | ...')
     nota = models.TextField(blank=True)
     origen = models.CharField(max_length=120, blank=True, help_text='Variantes / master de origen.')
+    ultimo_uso = models.DateField(
+        null=True, blank=True, db_index=True,
+        help_text='Última vez que se usó en una historia (desnormalizado; H-072). '
+                  'Lo usa el auto-pick anti-repetición de Fase 2.')
 
     # Flexibles
     etiquetas = models.JSONField(default=list, blank=True)
@@ -127,6 +131,36 @@ class Clip(models.Model):
             'etiquetas': self.etiquetas or [],
             'apto_para': self.apto_para or [],
             'atributos': self.atributos or {},
+            'ultimo_uso': self.ultimo_uso.isoformat() if self.ultimo_uso else None,
             'creado': self.creado.isoformat() if self.creado else None,
             'actualizado': self.actualizado.isoformat() if self.actualizado else None,
         }
+
+
+class UsoClip(models.Model):
+    """Registro de cada vez que un clip se usó en una historia/publicación —
+    semilla del anti-repetición (Fase 2 del roadmap M17: no repetir la misma
+    foto en ~45-60 días).
+
+    `publicacion_id` es una referencia SUAVE (PositiveIntegerField, NO ForeignKey)
+    a `marketing_briefs.PublicacionPlanificada`. catalogo_clips es una app
+    AISLADA (drift-safe, cero dependencias cruzadas de migración — decisión de
+    H-070 para esquivar el drift AR-033/AR-034); un FK real hacia otra app
+    rompería esa garantía. Se resuelve por id a mano cuando haga falta cruzarla
+    (la vista de composición sí puede importar el modelo de marketing_briefs a
+    nivel de código — eso no afecta el grafo de migraciones)."""
+    clip = models.ForeignKey(Clip, on_delete=models.CASCADE, related_name='usos')
+    fecha = models.DateField(db_index=True)
+    publicacion_id = models.PositiveIntegerField(
+        null=True, blank=True, db_index=True,
+        help_text='ID de marketing_briefs.PublicacionPlanificada (referencia suave).')
+    canal = models.CharField(max_length=40, blank=True, default='')
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Uso de clip'
+        verbose_name_plural = 'Usos de clips'
+        ordering = ['-fecha', '-id']
+
+    def __str__(self):
+        return f'{self.clip.archivo} · {self.fecha}'

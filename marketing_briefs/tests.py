@@ -485,3 +485,33 @@ class RevisarSegmentoVideoTests(TestCase):
         with patch.object(revision_service, '_chat_vision', side_effect=fake_chat):
             revision_service.revisar_segmento(pub, 1)
         self.assertIs(capturado['system'], revision_service.REVISION_VIDEO_SYSTEM_PROMPT)
+
+
+class TextoDePublicacionTests(TestCase):
+    """H-072: el helper que precarga el texto del composer desde copy_json/segmentos."""
+
+    def test_texto_preview_usa_caption_completo(self):
+        from marketing_briefs.web_views import _texto_preview
+        self.assertEqual(_texto_preview({'caption_completo': 'Hola río'}), 'Hola río')
+
+    def test_texto_preview_cae_a_guion_lista_de_dicts(self):
+        from marketing_briefs.web_views import _texto_preview
+        txt = _texto_preview({'guion': [{'texto': 'Primero'}, {'texto': 'Segundo'}, {'texto': 'Tercero'}]})
+        self.assertEqual(txt, 'Primero Segundo')  # solo las 2 primeras líneas
+
+    def test_texto_preview_vacio_si_no_hay_nada_reconocible(self):
+        from marketing_briefs.web_views import _texto_preview
+        self.assertEqual(_texto_preview({}), '')
+        self.assertEqual(_texto_preview(None), '')
+
+    def test_texto_de_publicacion_usa_segmento_si_se_pide(self):
+        from marketing_briefs.web_views import texto_de_publicacion
+        pub = PublicacionPlanificada.objects.create(
+            semana_inicio=date(2026, 7, 20), dia=date(2026, 7, 22),
+            canal='Instagram Stories', tipo='story', pieza_key='story_txt',
+            copy_json={'caption_completo': 'Texto de la pieza completa'},
+            segmentos=[{'indice': 1, 'titulo': 'Historia 1', 'texto': 'Texto de la historia 1'}],
+        )
+        self.assertEqual(texto_de_publicacion(pub, 1), 'Texto de la historia 1')
+        self.assertEqual(texto_de_publicacion(pub, None), 'Texto de la pieza completa')
+        self.assertEqual(texto_de_publicacion(pub, 99), 'Texto de la pieza completa')  # segmento inexistente → fallback

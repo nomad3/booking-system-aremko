@@ -34,6 +34,7 @@
 <body>
 <div class="wrap">
   <a class="volver" href="javascript:history.back()">← Volver al catálogo</a>
+  {% if pub_contexto %}<div style="background:#F7F0E2;border:1px solid var(--gold);border-radius:11px;padding:9px 13px;font-size:13px;margin-top:10px;">🖼️ Eligiendo foto para: <b>{{ pub_contexto }}</b></div>{% endif %}
   <div class="cols">
     <div class="foto"><img src="{{ thumb_og }}" alt="{{ clip.archivo }}"></div>
     <div class="panel">
@@ -46,7 +47,7 @@
       </table>
       {% if atributos %}<div class="atrib">Atributos: {{ atributos }}</div>{% endif %}
       {# B2-A: componer la historia con esta foto (receta → Cloudinary) #}
-      <a class="btn-b2 activo" href="/marketing/catalogo/componer/{{ clip.id }}/">Usar en historia →</a>
+      <a class="btn-b2 activo" href="/marketing/catalogo/componer/{{ clip.id }}/{{ componer_qs }}">Usar en historia →</a>
       <div class="nota-b2">Arma la historia 9:16 con esta foto: texto, posición y estilo boutique.</div>
       {% if puede_editar %}<a class="admin-link" href="/admin/catalogo_clips/clip/{{ clip.id }}/change/">✎ Editar en el admin</a>{% endif %}
     </div>

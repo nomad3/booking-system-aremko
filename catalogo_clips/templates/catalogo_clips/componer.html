@@ -30,7 +30,11 @@
   .btn{display:block;width:100%;margin-top:12px;padding:13px;border:0;border-radius:11px;
     background:var(--green);color:#fff;font-weight:700;font-size:14.5px;cursor:pointer;text-align:center;text-decoration:none}
   .btn.dorado{background:var(--gold);color:#10231d}
+  .btn.enganche{background:#1e4438;margin-top:16px}
   .hint{font-size:12px;color:var(--muted);margin-top:8px}
+  .banner-pub{background:#F7F0E2;border:1px solid var(--gold);border-radius:11px;padding:10px 14px;
+    font-size:13px;margin:10px 0}
+  .error{background:#F2DAD7;color:#9A3B2E;border-radius:10px;padding:10px 13px;font-size:13px;margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -38,6 +42,11 @@
   <a class="volver" href="/marketing/catalogo/{{ clip.id }}/">← Volver a la foto</a>
   <h1>📱 Componer historia</h1>
   <div class="sub">{{ clip.nombre_comercial|default:clip.get_area_display }} · {{ clip.archivo }} — lo que ves ES el JPG final (1080×1920).</div>
+
+  {% if pub %}
+  <div class="banner-pub">🗓️ Para: <b>{{ pub.dia|date:"d/m" }} · {{ pub.canal }}/{{ pub.tipo }}</b>{% if segmento_idx %} · Historia {{ segmento_idx }}{% endif %}</div>
+  {% endif %}
+  {% if error_msg %}<div class="error">{{ error_msg }}</div>{% endif %}
 
   <div class="cols">
     <div>
@@ -69,12 +78,27 @@
           <label><input type="radio" name="preset" value="crema" {% if receta.preset == 'crema' %}checked{% endif %}> 🤍 Caja crema · texto verde</label>
         </div>
 
+        {% if pub_id_param %}<input type="hidden" name="pub_id" value="{{ pub_id_param }}">{% endif %}
+        {% if segmento_param %}<input type="hidden" name="segmento" value="{{ segmento_param }}">{% endif %}
         <button class="btn" type="submit">Actualizar vista previa</button>
       </form>
 
       {% if preview %}
       <a class="btn dorado" href="{{ descarga }}">⬇ Descargar JPG (1080×1920)</a>
       <div class="hint">Se descarga lista para subir a Instagram como historia. El sello "Aremko · aguas calientes junto al río" va incluido abajo.</div>
+
+      {% if pub %}
+      <form method="post" action="{% url 'catalogo_web:enganchar' clip.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="texto" value="{{ receta.texto }}">
+        <input type="hidden" name="posicion" value="{{ receta.posicion }}">
+        <input type="hidden" name="preset" value="{{ receta.preset }}">
+        <input type="hidden" name="pub_id" value="{{ pub.id }}">
+        {% if segmento_idx %}<input type="hidden" name="segmento" value="{{ segmento_idx }}">{% endif %}
+        <button class="btn enganche" type="submit">✓ Enganchar a esta publicación</button>
+      </form>
+      <div class="hint">Queda guardada en la publicación (sin volver a subir) y marca la publicación como "Lista para publicar".</div>
+      {% endif %}
       {% endif %}
     </div>
   </div>

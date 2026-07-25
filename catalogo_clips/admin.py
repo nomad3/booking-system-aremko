@@ -5,7 +5,7 @@ Solo superuser: es la mesa de trabajo interna del banco de material.
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Clip
+from .models import Clip, UsoClip
 
 
 @admin.register(Clip)
@@ -54,3 +54,24 @@ class ClipAdmin(admin.ModelAdmin):
         if obj.cloud_url:
             return format_html('<img src="{}" style="max-width:420px;border-radius:10px;">', obj.cloud_url)
         return '—'
+
+
+@admin.register(UsoClip)
+class UsoClipAdmin(admin.ModelAdmin):
+    """Solo lectura: registro de uso (cimiento anti-repetición, H-072)."""
+    list_display = ('clip', 'fecha', 'canal', 'publicacion_id', 'creado')
+    list_filter = ('canal', 'fecha')
+    search_fields = ('clip__archivo', 'clip__nombre_comercial')
+    readonly_fields = ('clip', 'fecha', 'publicacion_id', 'canal', 'creado')
+
+    def has_module_permission(self, request):
+        return bool(request.user and request.user.is_superuser)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return bool(request.user and request.user.is_superuser)

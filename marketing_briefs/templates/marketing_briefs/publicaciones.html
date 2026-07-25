@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Publicaciones · Aremko</title>
+<style>
+  :root{--bg:#F2E8D8;--surface:#FFFDF9;--ink:#2E2A24;--muted:#7C736A;--line:#DBCDB4;
+    --green:#1e4438;--gold:#C9A24B;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;line-height:1.45;padding:14px}
+  .wrap{max-width:920px;margin:0 auto}
+  h1{font-size:20px;margin:0}
+  .sub{color:var(--muted);font-size:13px;margin:2px 0 12px}
+  .semanas{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:13.5px}
+  .semanas a{color:var(--green);font-weight:700;text-decoration:none;background:var(--surface);
+    border:1px solid var(--line);border-radius:9px;padding:6px 12px}
+  .semanas .actual{color:var(--muted);font-weight:400}
+  .ganchos{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .ganchos button{padding:9px 16px;border:1px solid var(--line);border-radius:10px;
+    background:#ECE4D6;color:#9a8f7d;font-size:13px;font-weight:700;cursor:not-allowed}
+  .ok{background:#E2EAD6;color:#436327;border-radius:10px;padding:10px 14px;font-size:13.5px;margin-bottom:14px}
+  .card{background:var(--surface);border:0.5px solid var(--line);border-radius:14px;
+    padding:15px;margin-bottom:12px}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
+  .dia{font-weight:700;color:var(--green);font-size:14.5px}
+  .canal{color:var(--muted);font-size:12.5px}
+  .estado{font-size:12px;background:#F7F0E2;border-radius:999px;padding:3px 10px;white-space:nowrap}
+  .texto{font-size:13.5px;color:var(--ink);margin:6px 0 10px;line-height:1.5}
+  .fila{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .thumb{width:52px;height:65px;object-fit:cover;border-radius:8px;background:#e8dfcf}
+  .btn-crear{background:var(--gold);color:#10231d;text-decoration:none;font-weight:700;
+    font-size:13px;padding:9px 14px;border-radius:9px}
+  .historias{margin-top:10px;padding-top:10px;border-top:1px solid #f0e8d8}
+  .historia-row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px}
+  .historia-row .h-texto{flex:1;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vacio{background:var(--surface);border-radius:13px;padding:26px;text-align:center;color:var(--muted)}
+  .check{color:#436327;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🗓️ Publicaciones de la semana</h1>
+  <div class="sub">Elige una pieza, arma su historia con una foto del catálogo y engánchala aquí.</div>
+
+  <div class="semanas">
+    <a href="?semana={{ semana_anterior }}">← Semana anterior</a>
+    <span class="{% if es_semana_actual %}actual{% endif %}">Semana del {{ lunes|date:"d/m/Y" }}{% if es_semana_actual %} (actual){% endif %}</span>
+    <a href="?semana={{ semana_siguiente }}">Semana siguiente →</a>
+  </div>
+
+  {% if enganchado %}<div class="ok">✓ Historia enganchada a la publicación #{{ enganchado }}.</div>{% endif %}
+
+  <div class="ganchos">
+    <button type="button" disabled title="Próximamente (Fase 2)">🤖 Automática</button>
+    <button type="button" disabled title="Próximamente (Fase 3)">⚡ Generar las de hoy</button>
+  </div>
+
+  {% if tarjetas %}
+  {% for t in tarjetas %}
+  <div class="card">
+    <div class="card-top">
+      <div>
+        <div class="dia">{{ t.pub.dia|date:"l j \d\e F" }}</div>
+        <div class="canal">{{ t.pub.canal }} · {{ t.pub.tipo }}{% if t.pub.hora_sugerida %} · {{ t.pub.hora_sugerida }}{% endif %}</div>
+      </div>
+      <span class="estado">{{ t.estado_icono }} {{ t.estado_label }}</span>
+    </div>
+    {% if t.texto_preview %}<div class="texto">{{ t.texto_preview }}</div>{% endif %}
+
+    {% if t.historias %}
+    <div class="historias">
+      {% for h in t.historias %}
+      <div class="historia-row">
+        {% if h.preview %}<img class="thumb" src="{{ h.preview }}" alt="">{% endif %}
+        <span class="h-texto">{{ h.titulo }}{% if h.texto %} — {{ h.texto }}{% endif %}</span>
+        {% if h.tiene_material %}<span class="check">✓ lista</span>{% endif %}
+        <a class="btn-crear" href="{% url 'catalogo_web:explorador' %}?pub_id={{ t.pub.id }}&segmento={{ h.indice }}">✍️ Crear historia</a>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="fila">
+      {% if t.material_preview %}<img class="thumb" src="{{ t.material_preview }}" alt="">{% endif %}
+      {% if t.tiene_material %}<span class="check">✓ tiene material</span>{% endif %}
+      <a class="btn-crear" href="{% url 'catalogo_web:explorador' %}?pub_id={{ t.pub.id }}">✍️ Crear historia</a>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="vacio">No hay publicaciones planificadas para esta semana.</div>
+  {% endif %}
+</div>
+</body>
+</html>
