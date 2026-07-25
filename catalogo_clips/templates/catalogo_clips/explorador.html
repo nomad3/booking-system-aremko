@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Catálogo de fotos · Aremko</title>
+<style>
+  :root{--bg:#F2E8D8;--surface:#FFFDF9;--ink:#2E2A24;--muted:#7C736A;--line:#DBCDB4;
+    --green:#1e4438;--gold:#C9A24B;--amber:#B45309;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;line-height:1.45;padding:14px}
+  .wrap{max-width:1200px;margin:0 auto}
+  h1{font-size:20px;margin:0}
+  .sub{color:var(--muted);font-size:13px;margin:2px 0 12px}
+  form.filtros{display:flex;flex-wrap:wrap;gap:8px;background:var(--surface);
+    border:0.5px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;align-items:center}
+  form.filtros select, form.filtros input[type=text]{padding:8px 10px;border:1px solid var(--line);
+    border-radius:9px;background:#fff;color:var(--ink);font-size:13.5px;max-width:170px}
+  form.filtros label.chk{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--muted)}
+  form.filtros button{padding:8px 16px;border:0;border-radius:9px;background:var(--green);
+    color:#fff;font-weight:700;font-size:13.5px;cursor:pointer}
+  form.filtros a.limpiar{font-size:13px;color:var(--muted)}
+  .conteo{font-size:13.5px;color:var(--muted);margin:0 0 10px}
+  .conteo b{color:var(--green);font-size:16px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+  .card{display:block;background:var(--surface);border:0.5px solid var(--line);border-radius:13px;
+    overflow:hidden;text-decoration:none;color:var(--ink);position:relative}
+  .card.revisar{border:2px solid var(--amber)}
+  .card.descartado{opacity:.45}
+  .card img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;background:#e8dfcf}
+  .card .b{padding:8px 10px}
+  .card .t{font-size:13px;font-weight:700;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .a{font-size:12px;color:var(--muted)}
+  .badges{position:absolute;top:7px;left:7px;display:flex;gap:4px;flex-wrap:wrap}
+  .bd{background:rgba(255,253,249,.92);border-radius:999px;font-size:12px;padding:1px 7px;font-weight:700}
+  .bd.rev{background:#FDE8CC;color:var(--amber);font-size:10.5px;letter-spacing:.4px}
+  .pag{display:flex;gap:10px;justify-content:center;align-items:center;margin:18px 0;font-size:14px}
+  .pag a{color:var(--green);font-weight:700;text-decoration:none;background:var(--surface);
+    border:1px solid var(--line);border-radius:9px;padding:7px 14px}
+  .vacio{background:var(--surface);border-radius:13px;padding:30px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📸 Catálogo de fotos Aremko</h1>
+  <div class="sub">Material real para publicaciones — filtra y encuentra tu foto. (Solo lectura; la edición es en el admin.)</div>
+
+  <form class="filtros" method="get">
+    <select name="area">
+      <option value="">Área (todas)</option>
+      {% for v, lbl in areas %}<option value="{{ v }}" {% if f.area == v %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+    </select>
+    <select name="nombre_comercial">
+      <option value="">Tina/cabaña (todas)</option>
+      {% for n in nombres %}<option value="{{ n }}" {% if f.nombre_comercial == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+    </select>
+    <select name="momento">
+      <option value="">Momento</option>
+      {% for v, lbl in momentos %}<option value="{{ v }}" {% if f.momento == v %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+    </select>
+    <select name="estacion">
+      <option value="">Estación</option>
+      {% for v, lbl in estaciones %}<option value="{{ v }}" {% if f.estacion == v %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+    </select>
+    <select name="vapor">
+      <option value="">Vapor</option>
+      <option value="si" {% if f.vapor == 'si' %}selected{% endif %}>Con vapor 💨</option>
+      <option value="no" {% if f.vapor == 'no' %}selected{% endif %}>Sin vapor</option>
+    </select>
+    <select name="decoracion">
+      <option value="">Decoración</option>
+      <option value="con" {% if f.decoracion == 'con' %}selected{% endif %}>Con 🎀</option>
+      <option value="sin" {% if f.decoracion == 'sin' %}selected{% endif %}>Sin</option>
+    </select>
+    <select name="estado">
+      <option value="">Estado</option>
+      {% for v, lbl in estados %}<option value="{{ v }}" {% if f.estado == v %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+    </select>
+    <label class="chk"><input type="checkbox" name="keeper" value="1" {% if f.keeper == '1' %}checked{% endif %}> ⭐ Solo keepers</label>
+    <label class="chk"><input type="checkbox" name="todas" value="1" {% if f.todas == '1' %}checked{% endif %}> ver todas</label>
+    <input type="text" name="q" value="{{ f.q }}" placeholder="Buscar (archivo, nombre, nota…)">
+    <button type="submit">Filtrar</button>
+    <a class="limpiar" href="?">Limpiar</a>
+  </form>
+
+  <p class="conteo"><b>{{ total }}</b> foto{{ total|pluralize:"s" }}{% if resumen %} · {{ resumen }}{% endif %}</p>
+
+  {% if cards %}
+  <div class="grid">
+    {% for c in cards %}
+    <a class="card{% if c.revisar %} revisar{% endif %}{% if c.descartado %} descartado{% endif %}" href="{{ c.id }}/{% if qs_sin_page %}?{{ qs_sin_page }}{% endif %}">
+      <div class="badges">
+        {% if c.keeper %}<span class="bd">⭐</span>{% endif %}
+        {% if c.vapor %}<span class="bd">💨</span>{% endif %}
+        {% if c.momento_icono %}<span class="bd">{{ c.momento_icono }}</span>{% endif %}
+        {% if c.decorada %}<span class="bd">🎀</span>{% endif %}
+        {% if c.revisar %}<span class="bd rev">REVISAR</span>{% endif %}
+      </div>
+      <img src="{{ c.thumb }}" alt="{{ c.archivo }}" loading="lazy">
+      <div class="b">
+        <div class="t">{{ c.nombre|default:c.area }}</div>
+        <div class="a">{{ c.area }}</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="vacio">No hay fotos con esos filtros. <a href="?">Ver todo el catálogo</a></div>
+  {% endif %}
+
+  {% if page.paginator.num_pages > 1 %}
+  <div class="pag">
+    {% if page.has_previous %}<a href="?{% if qs_sin_page %}{{ qs_sin_page }}&{% endif %}page={{ page.previous_page_number }}">← Anterior</a>{% endif %}
+    <span>Página {{ page.number }} de {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?{% if qs_sin_page %}{{ qs_sin_page }}&{% endif %}page={{ page.next_page_number }}">Siguiente →</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+</body>
+</html>

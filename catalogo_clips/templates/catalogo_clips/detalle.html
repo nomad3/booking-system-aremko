@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>{{ clip.archivo }} · Catálogo Aremko</title>
+<style>
+  :root{--bg:#F2E8D8;--surface:#FFFDF9;--ink:#2E2A24;--muted:#7C736A;--line:#DBCDB4;
+    --green:#1e4438;--gold:#C9A24B;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;line-height:1.5;padding:14px}
+  .wrap{max-width:980px;margin:0 auto}
+  a.volver{color:var(--green);font-weight:700;text-decoration:none;font-size:14px}
+  .cols{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-top:12px}
+  @media (max-width: 760px){.cols{grid-template-columns:1fr}}
+  .foto{background:var(--surface);border:0.5px solid var(--line);border-radius:14px;overflow:hidden}
+  .foto img{display:block;width:100%;height:auto}
+  .panel{background:var(--surface);border:0.5px solid var(--line);border-radius:14px;padding:16px}
+  h1{font-size:17px;margin:0 0 2px;color:var(--green);word-break:break-all}
+  .sub{color:var(--muted);font-size:12.5px;margin-bottom:12px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  td{padding:6px 4px;border-top:1px solid #f0e8d8;vertical-align:top}
+  td:first-child{color:var(--muted);white-space:nowrap;padding-right:12px}
+  .btn-b2{display:block;width:100%;margin-top:14px;padding:13px;border-radius:11px;border:0;
+    background:#cfc6b4;color:#7a7261;font-weight:700;font-size:14.5px;cursor:not-allowed}
+  .nota-b2{font-size:11.5px;color:var(--muted);text-align:center;margin-top:5px}
+  .admin-link{display:inline-block;margin-top:10px;font-size:13px;color:var(--green)}
+  .atrib{font-size:12.5px;color:var(--muted);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="volver" href="javascript:history.back()">← Volver al catálogo</a>
+  <div class="cols">
+    <div class="foto"><img src="{{ thumb_og }}" alt="{{ clip.archivo }}"></div>
+    <div class="panel">
+      <h1>{{ clip.nombre_comercial|default:clip.get_area_display }}</h1>
+      <div class="sub">{{ clip.archivo }} · {{ clip.tipo }}</div>
+      <table>
+        {% for etiqueta, valor in campos %}
+        <tr><td>{{ etiqueta }}</td><td>{{ valor }}</td></tr>
+        {% endfor %}
+      </table>
+      {% if atributos %}<div class="atrib">Atributos: {{ atributos }}</div>{% endif %}
+      {# Gancho de Fase B2 — reservado, NO implementado aún #}
+      <button class="btn-b2" type="button" disabled title="Disponible en la Fase B2">Usar en historia →</button>
+      <div class="nota-b2">Pronto: desde aquí armaremos la historia con esta foto.</div>
+      {% if puede_editar %}<a class="admin-link" href="/admin/catalogo_clips/clip/{{ clip.id }}/change/">✎ Editar en el admin</a>{% endif %}
+    </div>
+  </div>
+</div>
+</body>
+</html>

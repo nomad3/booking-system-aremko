@@ -190,6 +190,8 @@ urlpatterns = [
     path('marketing/', include('marketing_briefs.urls', namespace='marketing_briefs')),
     # Catálogo de Clips (H-070, M17): ingesta + CRUD por API para aremko-cli.
     path('marketing/api/catalogo/', include('catalogo_clips.urls', namespace='catalogo_clips')),
+    # Explorador web del catálogo para el CM (H-071 B1, staff-only).
+    path('marketing/catalogo/', include('catalogo_clips.web_urls', namespace='catalogo_web')),
 
     # SEO endpoints
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),

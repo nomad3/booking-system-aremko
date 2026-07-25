@@ -5,11 +5,13 @@ Con DB (TestCase, app aislada → sin drift): upsert idempotente, GET filtros, P
 """
 import json
 
+from django.contrib.auth.models import User
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from .api_views import _validar_payload
 from .models import Clip
 from .tagging import sanear_draft, TAGGING_SYSTEM_PROMPT
+from .web_views import thumb_url
 
 KEY = 'test-key-h070'
 
@@ -126,3 +128,83 @@ class EndpointsCatalogoTest(TestCase):
         clip.refresh_from_db()
         self.assertEqual(clip.estado, 'revisar')
         self.assertEqual(clip.archivo, 'c.jpg')  # la clave de upsert no se edita
+
+
+class ThumbUrlTest(SimpleTestCase):
+
+    def test_inserta_transformacion(self):
+        u = 'https://res.cloudinary.com/x/image/upload/v1/catalogo_clips/a.jpg'
+        self.assertEqual(
+            thumb_url(u),
+            'https://res.cloudinary.com/x/image/upload/w_400,c_fill,ar_4:5,q_auto,f_auto/v1/catalogo_clips/a.jpg')
+
+    def test_encadena_si_ya_hay_transformacion(self):
+        u = 'https://res.cloudinary.com/x/image/upload/f_auto,q_auto/catalogo_clips/a.jpg'
+        self.assertTrue(thumb_url(u).startswith(
+            'https://res.cloudinary.com/x/image/upload/w_400,c_fill,ar_4:5,q_auto,f_auto/f_auto,q_auto/'))
+
+    def test_url_rara_no_explota(self):
+        self.assertEqual(thumb_url(''), '')
+        self.assertEqual(thumb_url('https://otra.cosa/img.jpg'), 'https://otra.cosa/img.jpg')
+
+
+class ExploradorWebTest(TestCase):
+    """H-071 B1: el explorador exige staff (no superuser) y filtra server-side."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create_user('angelica', 'a@x.cl', 'x', is_staff=True)
+        Clip.objects.create(archivo='t1.jpg', cloud_url='https://res.cloudinary.com/x/image/upload/v1/t1.jpg',
+                            area='tina', nombre_comercial='Llaima', keeper=True, vapor='sí',
+                            momento='noche', estado='ok')
+        Clip.objects.create(archivo='c1.jpg', cloud_url='https://res.cloudinary.com/x/image/upload/v1/c1.jpg',
+                            area='cabaña', nombre_comercial='Torre', estado='ok')
+        Clip.objects.create(archivo='d1.jpg', cloud_url='https://res.cloudinary.com/x/image/upload/v1/d1.jpg',
+                            area='detalle', estado='descartado')
+
+    def test_anonimo_redirige_a_login(self):
+        r = self.client.get('/marketing/catalogo/')
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('login', r.url)
+
+    def test_staff_no_superuser_entra(self):
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/catalogo/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Catálogo de fotos')
+        # Default: la descartada NO aparece (2 visibles). Se asserta por `archivo`
+        # (alt de la card) porque los nombres salen igual en el dropdown de filtros.
+        self.assertContains(r, 't1.jpg')
+        self.assertContains(r, 'c1.jpg')
+        self.assertNotContains(r, 'd1.jpg')
+
+    def test_toggle_todas_incluye_descartadas(self):
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/catalogo/?todas=1')
+        self.assertContains(r, 'd1.jpg')
+
+    def test_filtros_area_y_keeper(self):
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/catalogo/?area=tina&keeper=1')
+        self.assertContains(r, 't1.jpg')
+        self.assertNotContains(r, 'c1.jpg')
+
+    def test_busqueda_q(self):
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/catalogo/?q=torre')
+        self.assertContains(r, 'c1.jpg')
+        self.assertNotContains(r, 't1.jpg')
+
+    def test_thumb_chico_en_grid_no_1440(self):
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/catalogo/')
+        self.assertContains(r, 'w_400,c_fill')  # miniatura derivada, no la master
+
+    def test_detalle_con_boton_b2_deshabilitado(self):
+        self.client.force_login(self.staff)
+        clip = Clip.objects.get(archivo='t1.jpg')
+        r = self.client.get(f'/marketing/catalogo/{clip.id}/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Usar en historia')
+        self.assertContains(r, 'disabled')
+        self.assertContains(r, 'Vapor')
