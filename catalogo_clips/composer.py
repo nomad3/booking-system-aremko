@@ -73,13 +73,17 @@ def url_historia(cloud_url, receta, attachment=False):
     capas = [BASE]
     if attachment:
         capas.insert(0, 'fl_attachment:aremko_historia')
-    # Texto principal: envuelve a 860px de ancho, centrado, con caja de fondo.
+    # Texto principal: envuelve a 860px (c_fit dentro de la capa) y se POSICIONA
+    # con fl_layer_apply (sintaxis Cloudinary: la capa y su colocación van en
+    # componentes separados — validado empíricamente contra el cloud real).
     capas.append(
         f"l_text:{FUENTE}_58_bold_center:{_txt(receta['texto'])},"
-        f"co_rgb:{p['texto']},b_rgb:{p['caja']},w_860,c_fit,{pos}")
-    # Sello de marca (chico, espaciado, siempre al pie de la zona segura).
+        f"co_rgb:{p['texto']},b_rgb:{p['caja']},c_fit,w_860")
+    capas.append(f'fl_layer_apply,{pos}')
+    # Sello de marca (chico; el letter_spacing va DENTRO del estilo de la fuente).
     capas.append(
-        f"l_text:{FUENTE}_26_center:{_txt(SELLO_TEXTO)},"
-        f"co_rgb:{p['sello']},letter_spacing_6,g_south,y_180")
+        f"l_text:{FUENTE}_26_letter_spacing_6_center:{_txt(SELLO_TEXTO)},"
+        f"co_rgb:{p['sello']}")
+    capas.append('fl_layer_apply,g_south,y_180')
     cadena = '/'.join(capas)
     return cloud_url.replace('/upload/', f'/upload/{cadena}/', 1)

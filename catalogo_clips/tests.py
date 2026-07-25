@@ -313,9 +313,10 @@ class ComposerTest(SimpleTestCase):
         u = url_historia(CLOUD, receta_normalizada('Aguas calientes', 'abajo', 'velo'))
         self.assertIn('c_fill,g_auto,w_1080,h_1920', u)
         self.assertIn('l_text:Montserrat_58_bold_center:', u)
-        self.assertIn('g_south,y_380', u)
-        self.assertIn('co_rgb:F2E8D8', u)          # texto crema del preset velo
-        self.assertIn('letter_spacing_6', u)       # sello de marca
+        self.assertIn('c_fit,w_860', u)                        # wrap dentro de la capa
+        self.assertIn('fl_layer_apply,g_south,y_380', u)       # colocación separada
+        self.assertIn('co_rgb:F2E8D8', u)                      # texto crema del preset velo
+        self.assertIn('Montserrat_26_letter_spacing_6_center', u)  # sello (spacing en el estilo)
         self.assertTrue(u.endswith('/f_auto,q_auto/catalogo_clips/a.jpg'))
 
     def test_texto_va_doble_encodeado(self):
