@@ -72,7 +72,13 @@ POSICIONES = {
 POSICION_DEFAULT = 'abajo'
 
 # Sello de marca, siempre abajo (dentro de la zona segura).
-SELLO_TEXTO = 'AREMKO · AGUAS CALIENTES JUNTO AL RÍO'
+# El separador es "•" (bullet, U+2022) — NO "·" (punto medio, U+00B7): Jorge
+# reportó un "signo extraño" en prod (2026-07-26) y se confirmó con fontTools
+# que Glacial Indifference NO tiene el punto medio (misma familia de huecos
+# que ¿/¡, ver más arriba) — a diferencia de esos, este separador sale en el
+# 100% de las historias, así que se corrige acá en vez de dejarlo a criterio
+# de quien redacta. El bullet SÍ existe en la fuente.
+SELLO_TEXTO = 'AREMKO • AGUAS CALIENTES JUNTO AL RÍO'
 
 
 def _txt(texto):
@@ -239,9 +245,13 @@ def url_historia(cloud_url, receta, attachment=False):
             capas.append('e_shadow:60,co_black')
         capas.append(f"fl_layer_apply,{POSICIONES[receta['posicion']]}")
     # Sello de marca (chico; el letter_spacing va DENTRO del estilo de la fuente).
+    # Sombra SIEMPRE (a diferencia del texto principal, donde solo la lleva el
+    # preset 'transparente'): Jorge notó poco contraste del sello contra fotos
+    # de tonos cálidos (madera) en los 3 presets, 2026-07-26.
     capas.append(
         f"l_text:{FUENTE}_26_letter_spacing_6_center:{_txt(SELLO_TEXTO)},"
         f"co_rgb:{p['sello']}")
+    capas.append('e_shadow:60,co_black')
     capas.append('fl_layer_apply,g_south,y_180')
     cadena = '/'.join(capas)
     return cloud_url.replace('/upload/', f'/upload/{cadena}/', 1)

@@ -415,11 +415,27 @@ class ComposerTest(SimpleTestCase):
         self.assertIn('e_shadow:60,co_black', u)
         self.assertIn('co_rgb:FFFFFF', u)
 
-    def test_preset_velo_y_crema_no_llevan_sombra(self):
+    def test_preset_velo_y_crema_texto_principal_no_lleva_sombra(self):
+        """El SELLO sí lleva sombra siempre (ver test del sello más abajo) —
+        esto verifica que la sombra NO se agregó al bloque de texto principal
+        en los presets con caja (donde ya hay contraste garantizado)."""
         u_velo = url_historia(CLOUD, receta_normalizada('Hola', 'abajo', 'velo'))
         u_crema = url_historia(CLOUD, receta_normalizada('Hola', 'abajo', 'crema'))
-        self.assertNotIn('e_shadow', u_velo)
-        self.assertNotIn('e_shadow', u_crema)
+        texto_principal_velo = u_velo.split('/l_text:GlacialIndifference-Regular.otf_26')[0]
+        texto_principal_crema = u_crema.split('/l_text:GlacialIndifference-Regular.otf_26')[0]
+        self.assertNotIn('e_shadow', texto_principal_velo)
+        self.assertNotIn('e_shadow', texto_principal_crema)
+
+    def test_sello_siempre_lleva_bullet_y_sombra(self):
+        """Jorge (2026-07-26): el punto medio "·" salía como signo roto (no
+        existe en Glacial Indifference, confirmado con fontTools) y el sello
+        se notaba poco contra fotos de tonos cálidos — en los 3 presets."""
+        for preset in ('velo', 'crema', 'transparente'):
+            u = url_historia(CLOUD, receta_normalizada('Hola', 'abajo', preset))
+            self.assertIn('AREMKO%2520%25E2%2580%25A2%2520AGUAS', u)  # "•" doble-encodeado
+            self.assertNotIn('%25C2%25B7', u)  # NO el punto medio roto
+            sello_y_despues = u.split('letter_spacing_6_center:')[1]
+            self.assertIn('e_shadow:60,co_black', sello_y_despues)
 
     def test_offsets_abajo_arriba_centro(self):
         """Fórmulas verificadas empíricamente contra Cloudinary real (curl +
