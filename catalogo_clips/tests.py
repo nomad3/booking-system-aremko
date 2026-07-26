@@ -313,11 +313,14 @@ class ComposerTest(SimpleTestCase):
     def test_url_compone_historia_9_16(self):
         u = url_historia(CLOUD, receta_normalizada('Aguas calientes', 'abajo', 'velo'))
         self.assertIn('c_fill,g_auto,w_1080,h_1920', u)
-        self.assertIn('l_text:Montserrat_58_bold_center:', u)
+        # Cormorant%20Garamond (espacio urlencodeado): fuente de marca real,
+        # verificada empíricamente contra Cloudinary — un guion_bajo en su lugar
+        # (Cormorant_Garamond) rompe el parseo de campos de Cloudinary (400).
+        self.assertIn('l_text:Cormorant%20Garamond_58_bold_center:', u)
         self.assertIn('c_fit,w_860', u)                        # wrap dentro de la capa
         self.assertIn('fl_layer_apply,g_south,y_380', u)       # colocación separada
         self.assertIn('co_rgb:F2E8D8', u)                      # texto crema del preset velo
-        self.assertIn('Montserrat_26_letter_spacing_6_center', u)  # sello (spacing en el estilo)
+        self.assertIn('Cormorant%20Garamond_26_letter_spacing_6_center', u)  # sello (spacing en el estilo)
         self.assertTrue(u.endswith('/f_auto,q_auto/catalogo_clips/a.jpg'))
 
     def test_texto_va_doble_encodeado(self):

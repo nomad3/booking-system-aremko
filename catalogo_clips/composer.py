@@ -15,9 +15,19 @@ from urllib.parse import quote
 ANCHO, ALTO = 1080, 1920
 BASE = f'c_fill,g_auto,w_{ANCHO},h_{ALTO}'
 
-# Tipografía (set estándar de Cloudinary para overlays; port-friendly: para otro
-# tenant se cambia el kit acá o se sube su fuente).
-FUENTE = 'Montserrat'
+# Tipografía de marca real de Aremko (la misma que el sitio: base_public.html,
+# homepage_boutique.html, experiencia_romantica.html, etc. — Google Font, la
+# sirve Cloudinary sin necesidad de subirla). Antes decía "Montserrat": una
+# fuente seguridad de Cloudinary, NO la de marca (Jorge, 2026-07-26 — "el tipo
+# de letra... no es la que se muestra en las historias"). Port-friendly: para
+# otro tenant se cambia acá o se sube su fuente.
+FUENTE = 'Cormorant Garamond'
+# Cloudinary usa "_" como separador de campos en l_text:<fuente>_<tamaño>_...:
+# un nombre con guion_bajo (Cormorant_Garamond) hace que confunda "Garamond"
+# con el tamaño -> 400. El espacio real (URL-encodeado a %20) SÍ sobrevive
+# como un solo campo. Verificado empíricamente contra Cloudinary real (curl +
+# inspección visual del JPG) antes de este cambio — no asumido.
+_FUENTE_URL = quote(FUENTE, safe='')
 
 # Presets boutique (Angélica ELIGE, no diseña): colores de marca Aremko.
 # 'velo'  = texto crema sobre velo oscuro cálido (para fotos luminosas/día).
@@ -77,12 +87,12 @@ def url_historia(cloud_url, receta, attachment=False):
     # con fl_layer_apply (sintaxis Cloudinary: la capa y su colocación van en
     # componentes separados — validado empíricamente contra el cloud real).
     capas.append(
-        f"l_text:{FUENTE}_58_bold_center:{_txt(receta['texto'])},"
+        f"l_text:{_FUENTE_URL}_58_bold_center:{_txt(receta['texto'])},"
         f"co_rgb:{p['texto']},b_rgb:{p['caja']},c_fit,w_860")
     capas.append(f'fl_layer_apply,{pos}')
     # Sello de marca (chico; el letter_spacing va DENTRO del estilo de la fuente).
     capas.append(
-        f"l_text:{FUENTE}_26_letter_spacing_6_center:{_txt(SELLO_TEXTO)},"
+        f"l_text:{_FUENTE_URL}_26_letter_spacing_6_center:{_txt(SELLO_TEXTO)},"
         f"co_rgb:{p['sello']}")
     capas.append('fl_layer_apply,g_south,y_180')
     cadena = '/'.join(capas)
