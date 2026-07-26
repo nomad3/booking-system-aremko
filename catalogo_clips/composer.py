@@ -26,6 +26,17 @@ BASE = f'c_fill,g_auto,w_{ANCHO},h_{ALTO}'
 # Jorge, 2026-07-26: "el tipo de letra... no es la que se muestra").
 FUENTE = 'GlacialIndifference-Regular.otf'
 
+# Sello de marca en NEGRITA real (Jorge, 2026-07-26: "poco protagonismo" del
+# sello contra fotos de tonos cálidos). Cloudinary NO sintetiza negrita sobre
+# fuentes personalizadas subidas (verificado empíricamente: el modificador
+# "_bold_" no produjo ningún cambio de píxeles contra este mismo archivo) —
+# por eso se sube un SEGUNDO recurso, el .otf Bold real de la misma familia
+# (mismo autor/licencia SIL OFL; mismo comando `subir_fuente_historias`,
+# mismo public_id CON extensión). El cuerpo del texto principal sigue en
+# FUENTE (regular) — Jorge, 2026-07-20: "peso regular, sin negrita" — el
+# Bold es SOLO para este sello fijo, no para lo que redacta el operador.
+FUENTE_SELLO = 'GlacialIndifference-Bold.otf'
+
 # LIMITACIÓN CONOCIDA (Jorge, 2026-07-26): esta fuente NO tiene los glyphs ¿
 # (U+00BF) ni ¡ (U+00A1) — se confirmó vía fontTools que es la ÚNICA versión
 # que existe (2015, Hanken Design Co., 183/188 glyphs en todos los mirrors
@@ -33,7 +44,9 @@ FUENTE = 'GlacialIndifference-Regular.otf'
 # código (ni sustitución de glyph ni aviso automático) — quien redacte la
 # historia simplemente evita el signo de apertura ¿/¡ (uso común igual en
 # redes sociales). Si aparece un ¿/¡ roto en una imagen ya compuesta, se
-# corrige el texto en el composer y se regenera.
+# corrige el texto en el composer y se regenera. El Bold (arriba) tiene el
+# MISMO hueco (verificado con fontTools al bajarlo) — esperable en la misma
+# familia, no una sorpresa.
 
 # Presets boutique (Angélica ELIGE, no diseña): colores de marca Aremko.
 # 'velo'        = texto crema sobre velo oscuro cálido (fotos luminosas/día).
@@ -245,11 +258,12 @@ def url_historia(cloud_url, receta, attachment=False):
             capas.append('e_shadow:60,co_black')
         capas.append(f"fl_layer_apply,{POSICIONES[receta['posicion']]}")
     # Sello de marca (chico; el letter_spacing va DENTRO del estilo de la fuente).
-    # Sombra SIEMPRE (a diferencia del texto principal, donde solo la lleva el
-    # preset 'transparente'): Jorge notó poco contraste del sello contra fotos
-    # de tonos cálidos (madera) en los 3 presets, 2026-07-26.
+    # En NEGRITA real (FUENTE_SELLO) + sombra SIEMPRE (a diferencia del texto
+    # principal, que va en FUENTE/regular y solo lleva sombra con el preset
+    # 'transparente'): Jorge notó poco protagonismo del sello contra fotos de
+    # tonos cálidos (madera) en los 3 presets, 2026-07-26.
     capas.append(
-        f"l_text:{FUENTE}_26_letter_spacing_6_center:{_txt(SELLO_TEXTO)},"
+        f"l_text:{FUENTE_SELLO}_26_letter_spacing_6_center:{_txt(SELLO_TEXTO)},"
         f"co_rgb:{p['sello']}")
     capas.append('e_shadow:60,co_black')
     capas.append('fl_layer_apply,g_south,y_180')

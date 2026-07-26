@@ -1,15 +1,19 @@
-"""Sube la fuente de marca (Glacial Indifference, regular) a Cloudinary como
-recurso raw/authenticated, para poder usarla en los l_text de las historias
-del compositor (catalogo_clips/composer.py).
+"""Sube las fuentes de marca (Glacial Indifference, regular y bold) a
+Cloudinary como recursos raw/authenticated, para poder usarlas en los
+l_text de las historias del compositor (catalogo_clips/composer.py).
 
-Comando de UNA SOLA VEZ. Se corre en la Shell de Render (ahí SÍ están las
-credenciales reales de Cloudinary vía CLOUDINARY_STORAGE en settings.py —
-localmente el SDK no está configurado). Seguro de re-correr (overwrite=True).
+Comando de UNA SOLA VEZ por fuente. Se corre en la Shell de Render (ahí SÍ
+están las credenciales reales de Cloudinary vía CLOUDINARY_STORAGE en
+settings.py — localmente el SDK no está configurado). Seguro de re-correr
+(overwrite=True).
 
 Decisión de marca (Jorge, 2026-07-20, ver skill local historia-aremko):
-Glacial Indifference, peso NORMAL/regular, SIN negrita. Licencia SIL Open
-Font License (libre uso comercial). Reemplaza "Montserrat" (fuente segura
-de Cloudinary usada por defecto, no la de marca real).
+Glacial Indifference. El cuerpo del texto va en peso NORMAL/regular, SIN
+negrita (reemplaza "Montserrat", fuente segura de Cloudinary usada por
+defecto, no la de marca real). El Bold se agregó el 2026-07-26 SOLO para
+el sello de marca ("AREMKO • AGUAS CALIENTES..."), que Jorge notó con poco
+protagonismo — ver composer.py::FUENTE_SELLO. Licencia SIL Open Font
+License (libre uso comercial) para ambos pesos.
 """
 import os
 import urllib.request
@@ -17,22 +21,18 @@ import urllib.error
 
 from django.core.management.base import BaseCommand
 
-FONT_PUBLIC_ID = 'GlacialIndifference-Regular'
-FONT_FILENAME = 'GlacialIndifference-Regular.otf'
+FUENTES = [
+    {'public_id': 'GlacialIndifference-Regular', 'filename': 'GlacialIndifference-Regular.otf'},
+    {'public_id': 'GlacialIndifference-Bold', 'filename': 'GlacialIndifference-Bold.otf'},
+]
 
 
 class Command(BaseCommand):
-    help = 'Sube GlacialIndifference-Regular.otf a Cloudinary (raw/authenticated) para l_text'
+    help = 'Sube GlacialIndifference-Regular.otf y -Bold.otf a Cloudinary (raw/authenticated) para l_text'
 
     def handle(self, *args, **opts):
         import cloudinary
         import cloudinary.uploader
-
-        ruta = os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'fonts', FONT_FILENAME)
-        ruta = os.path.normpath(ruta)
-        if not os.path.exists(ruta):
-            self.stdout.write(self.style.ERROR(f'No encuentro el archivo: {ruta}'))
-            return
 
         config = cloudinary.config()
         if not (config.cloud_name and config.api_key and config.api_secret):
@@ -43,6 +43,16 @@ class Command(BaseCommand):
             ))
             return
 
+        for fuente in FUENTES:
+            self._subir_una(cloudinary, config, fuente['public_id'], fuente['filename'])
+
+    def _subir_una(self, cloudinary, config, public_id, filename):
+        ruta = os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'fonts', filename)
+        ruta = os.path.normpath(ruta)
+        if not os.path.exists(ruta):
+            self.stdout.write(self.style.ERROR(f'No encuentro el archivo: {ruta}'))
+            return
+
         self.stdout.write(f'Subiendo {ruta} ({os.path.getsize(ruta):,} bytes) a Cloudinary '
                           f'(cloud={config.cloud_name})...')
         try:
@@ -50,11 +60,11 @@ class Command(BaseCommand):
                 ruta,
                 resource_type='raw',
                 type='authenticated',
-                public_id=FONT_PUBLIC_ID,
+                public_id=public_id,
                 overwrite=True,
             )
         except Exception as exc:  # noqa: BLE001 — reportar cualquier falla de la API con claridad
-            self.stdout.write(self.style.ERROR(f'❌ Falló la subida: {exc}'))
+            self.stdout.write(self.style.ERROR(f'❌ Falló la subida de {public_id}: {exc}'))
             return
 
         self.stdout.write(self.style.SUCCESS(
@@ -65,7 +75,7 @@ class Command(BaseCommand):
         # Auto-verificación: un render real con l_text usando esta fuente,
         # contra el sample.jpg que trae por defecto toda cuenta Cloudinary
         # (no depende de tener un Clip real cargado).
-        referencia_font = f'{FONT_PUBLIC_ID}.{resultado.get("format", "otf")}'
+        referencia_font = f'{public_id}.{resultado.get("format", "otf")}'
         url_prueba = (
             f'https://res.cloudinary.com/{config.cloud_name}/image/upload/'
             f'c_fill,g_auto,w_1080,h_1920/'

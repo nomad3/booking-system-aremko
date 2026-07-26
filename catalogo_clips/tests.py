@@ -336,7 +336,9 @@ class ComposerTest(SimpleTestCase):
         self.assertIn('c_fit,w_860', u)                        # wrap dentro de la capa
         self.assertIn('fl_layer_apply,g_south,y_380', u)       # colocación separada
         self.assertIn('co_rgb:F2E8D8', u)                      # texto crema del preset velo
-        self.assertIn('GlacialIndifference-Regular.otf_26_letter_spacing_6_center', u)  # sello (spacing en el estilo)
+        # Sello en NEGRITA real (Jorge, 2026-07-26: poco protagonismo) — distinto
+        # de FUENTE (regular) que usa el cuerpo del texto, arriba.
+        self.assertIn('GlacialIndifference-Bold.otf_26_letter_spacing_6_center', u)
         self.assertTrue(u.endswith('/f_auto,q_auto/catalogo_clips/a.jpg'))
 
     def test_texto_va_doble_encodeado(self):
@@ -419,21 +421,28 @@ class ComposerTest(SimpleTestCase):
         """El SELLO sí lleva sombra siempre (ver test del sello más abajo) —
         esto verifica que la sombra NO se agregó al bloque de texto principal
         en los presets con caja (donde ya hay contraste garantizado)."""
+        # Se aísla el bloque ANTES del sello por su firma tamaño+estilo (26 +
+        # letter_spacing), no por el nombre de la fuente — así el test no se
+        # rompe si el sello cambia de fuente otra vez (ya pasó una vez).
         u_velo = url_historia(CLOUD, receta_normalizada('Hola', 'abajo', 'velo'))
         u_crema = url_historia(CLOUD, receta_normalizada('Hola', 'abajo', 'crema'))
-        texto_principal_velo = u_velo.split('/l_text:GlacialIndifference-Regular.otf_26')[0]
-        texto_principal_crema = u_crema.split('/l_text:GlacialIndifference-Regular.otf_26')[0]
+        texto_principal_velo = u_velo.split('_26_letter_spacing_6_center')[0]
+        texto_principal_crema = u_crema.split('_26_letter_spacing_6_center')[0]
         self.assertNotIn('e_shadow', texto_principal_velo)
         self.assertNotIn('e_shadow', texto_principal_crema)
 
-    def test_sello_siempre_lleva_bullet_y_sombra(self):
+    def test_sello_siempre_lleva_bullet_sombra_y_negrita(self):
         """Jorge (2026-07-26): el punto medio "·" salía como signo roto (no
         existe en Glacial Indifference, confirmado con fontTools) y el sello
-        se notaba poco contra fotos de tonos cálidos — en los 3 presets."""
+        se notaba poco protagonismo contra fotos de tonos cálidos — en los 3
+        presets. Negrita real (FUENTE_SELLO) porque Cloudinary NO sintetiza
+        "_bold_" sobre fuentes personalizadas (verificado con diff de
+        píxeles: cero diferencia entre con y sin ese modificador)."""
         for preset in ('velo', 'crema', 'transparente'):
             u = url_historia(CLOUD, receta_normalizada('Hola', 'abajo', preset))
             self.assertIn('AREMKO%2520%25E2%2580%25A2%2520AGUAS', u)  # "•" doble-encodeado
             self.assertNotIn('%25C2%25B7', u)  # NO el punto medio roto
+            self.assertIn('l_text:GlacialIndifference-Bold.otf_26_letter_spacing_6_center', u)
             sello_y_despues = u.split('letter_spacing_6_center:')[1]
             self.assertIn('e_shadow:60,co_black', sello_y_despues)
 
