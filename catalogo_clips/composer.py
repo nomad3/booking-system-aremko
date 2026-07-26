@@ -26,6 +26,15 @@ BASE = f'c_fill,g_auto,w_{ANCHO},h_{ALTO}'
 # Jorge, 2026-07-26: "el tipo de letra... no es la que se muestra").
 FUENTE = 'GlacialIndifference-Regular.otf'
 
+# LIMITACIÓN CONOCIDA (Jorge, 2026-07-26): esta fuente NO tiene los glyphs ¿
+# (U+00BF) ni ¡ (U+00A1) — se confirmó vía fontTools que es la ÚNICA versión
+# que existe (2015, Hanken Design Co., 183/188 glyphs en todos los mirrors
+# revisados) y que nunca se amplió. Decisión de Jorge: NO se resuelve en
+# código (ni sustitución de glyph ni aviso automático) — quien redacte la
+# historia simplemente evita el signo de apertura ¿/¡ (uso común igual en
+# redes sociales). Si aparece un ¿/¡ roto en una imagen ya compuesta, se
+# corrige el texto en el composer y se regenera.
+
 # Presets boutique (Angélica ELIGE, no diseña): colores de marca Aremko.
 # 'velo'  = texto crema sobre velo oscuro cálido (para fotos luminosas/día).
 # 'crema' = caja crema con texto verde bosque (para fotos oscuras/noche).

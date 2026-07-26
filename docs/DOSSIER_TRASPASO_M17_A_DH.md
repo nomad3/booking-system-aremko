@@ -225,6 +225,15 @@ de arriba (con sus mismos campos) y pueden copiarse con cambios mínimos (import
    DH, el archivo `.otf` (licencia SIL Open Font License, libre uso comercial) y el mismo comando
    de subida deben portarse — o resolverse con la fuente de marca real de CADA tenant si el
    producto termina soportando marca configurable por cliente.
+8. **Glacial Indifference NO tiene los glyphs ¿ (U+00BF) ni ¡ (U+00A1).** Confirmado vía
+   fontTools (`getBestCmap()`) y corroborado cruzando 2 distribuidores independientes (misma
+   fecha 2015, mismo conteo de glyphs) — es la única versión que existe, nunca se amplió (un
+   comentario real de un usuario de hace 8 años ya se quejaba de otro hueco de glyphs sin
+   respuesta). **Decisión de Jorge (2026-07-26): no se resuelve en código** (nada de sustitución
+   de glyph ni aviso automático) — la operadora simplemente evita el signo de apertura ¿/¡ al
+   redactar. Si DH usa esta misma fuente (o cualquier fuente gratuita de un solo release),
+   verificar su cobertura de glyphs español ANTES de asumir que "es la misma marca, listo" — no
+   asumas cobertura completa de Latin-1 solo porque el idioma del diseñador es europeo.
 
 ## 6. Historial completo (los 5 handoffs, todos LIVE y con tests)
 
