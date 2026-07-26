@@ -310,6 +310,20 @@ class ComposerTest(SimpleTestCase):
         self.assertEqual(r['posicion'], 'abajo')   # default ante valor inválido
         self.assertEqual(r['preset'], 'velo')
 
+    def test_preserva_saltos_de_linea_explicitos(self):
+        """Jorge (2026-07-26): editar el texto en 2 líneas no se reflejaba —
+        `_cap` colapsaba TODO a un solo párrafo, incluidos los `\\n` a propósito."""
+        r = receta_normalizada('Línea uno\nLínea dos', 'abajo', 'velo')
+        self.assertEqual(r['texto'], 'Línea uno\nLínea dos')
+
+    def test_saltos_de_linea_limpian_espacios_repetidos_por_linea(self):
+        r = receta_normalizada('  hola   río  \n  otra   línea  ', 'abajo', 'velo')
+        self.assertEqual(r['texto'], 'hola río\notra línea')
+
+    def test_lineas_en_blanco_al_principio_o_final_se_recortan(self):
+        r = receta_normalizada('\n\nUno\nDos\n\n', 'abajo', 'velo')
+        self.assertEqual(r['texto'], 'Uno\nDos')
+
     def test_url_compone_historia_9_16(self):
         u = url_historia(CLOUD, receta_normalizada('Aguas calientes', 'abajo', 'velo'))
         self.assertIn('c_fill,g_auto,w_1080,h_1920', u)
@@ -327,6 +341,13 @@ class ComposerTest(SimpleTestCase):
     def test_texto_va_doble_encodeado(self):
         u = url_historia(CLOUD, receta_normalizada('río, bosque/vapor', 'centro', 'crema'))
         self.assertIn('r%25C3%25ADo%252C%2520bosque%252Fvapor', u)  # , / y acentos escapados
+
+    def test_salto_de_linea_doble_encodeado_en_la_url(self):
+        """Verificado contra Cloudinary real (curl + inspección visual del JPG,
+        2026-07-26): %250A entre líneas renderiza como líneas separadas — misma
+        mecánica de doble-encoding que ya usan la coma y el slash."""
+        u = url_historia(CLOUD, receta_normalizada('Uno\nDos', 'abajo', 'velo'))
+        self.assertIn('Uno%250ADos', u)
 
     def test_attachment_agrega_flag_descarga(self):
         u = url_historia(CLOUD, receta_normalizada('Hola', 'arriba', 'velo'), attachment=True)

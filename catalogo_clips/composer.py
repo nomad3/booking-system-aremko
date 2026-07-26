@@ -53,9 +53,16 @@ def _txt(texto):
 
 
 def _cap(texto, maximo=220):
-    """El texto de una historia es corto por diseño (y la URL, finita)."""
-    t = ' '.join((texto or '').split())
-    return t[:maximo]
+    """El texto de una historia es corto por diseño (y la URL, finita).
+
+    Preserva saltos de línea explícitos que la operadora haya escrito
+    (Jorge, 2026-07-26: antes `' '.join(texto.split())` colapsaba TODO —
+    incluidos los `\\n` intencionales — a un solo párrafo corrido). Solo
+    limpia espacios/tabs repetidos DENTRO de cada línea; `_txt()` ya sabe
+    encodear el salto de línea para que Cloudinary lo respete (verificado
+    empíricamente: %250A entre líneas renderiza como líneas separadas)."""
+    lineas = [' '.join(linea.split()) for linea in (texto or '').splitlines()]
+    return '\n'.join(lineas).strip()[:maximo]
 
 
 def receta_normalizada(texto, posicion=None, preset=None):
