@@ -12,7 +12,8 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from .api_views import _validar_payload
-from .composer import receta_normalizada, url_historia
+from .composer import (receta_normalizada, url_historia, lineas_normalizadas,
+                        _offsets_abajo, _offsets_arriba, _offsets_centro, TAMANOS)
 from .models import Clip
 from .tagging import sanear_draft, TAGGING_SYSTEM_PROMPT
 from .web_views import thumb_url, _elegir_diverso
@@ -357,6 +358,84 @@ class ComposerTest(SimpleTestCase):
         self.assertEqual(url_historia(CLOUD, receta_normalizada('')), '')
         self.assertEqual(url_historia('https://otra.cosa/x.jpg', receta_normalizada('Hola')), '')
 
+    # -- "3 líneas con tamaño" + preset "transparente" (Jorge, 2026-07-26) --
+
+    def test_lineas_normalizadas_descarta_vacias_y_acota_a_3(self):
+        out = lineas_normalizadas([
+            {'texto': '  Grande  ', 'tamano': 'grande'},
+            {'texto': '   '},                              # vacía tras limpiar -> descartada
+            {'texto': 'Chica', 'tamano': 'chico'},
+            {'texto': 'Sobra', 'tamano': 'normal'},         # 4ta -> ignorada (MAX_LINEAS=3)
+        ])
+        self.assertEqual(out, [
+            {'texto': 'Grande', 'tamano': 'grande'},
+            {'texto': 'Chica', 'tamano': 'chico'},
+        ])
+
+    def test_lineas_normalizadas_tamano_invalido_degrada_a_normal(self):
+        out = lineas_normalizadas([{'texto': 'Hola', 'tamano': 'gigante'}])
+        self.assertEqual(out, [{'texto': 'Hola', 'tamano': 'normal'}])
+
+    def test_lineas_normalizadas_ignora_entradas_no_dict(self):
+        self.assertEqual(lineas_normalizadas(['no es un dict', 42, None]), [])
+        self.assertEqual(lineas_normalizadas(None), [])
+
+    def test_receta_normalizada_incluye_lineas(self):
+        r = receta_normalizada('', 'abajo', 'transparente',
+                                lineas=[{'texto': 'Desde $160.000', 'tamano': 'grande'}])
+        self.assertEqual(r['lineas'], [{'texto': 'Desde $160.000', 'tamano': 'grande'}])
+        self.assertEqual(r['preset'], 'transparente')
+
+    def test_receta_sin_lineas_queda_lista_vacia(self):
+        self.assertEqual(receta_normalizada('Hola')['lineas'], [])
+
+    def test_url_con_lineas_arma_una_capa_por_linea_y_su_propio_tamano(self):
+        receta = receta_normalizada('', 'abajo', 'velo', lineas=[
+            {'texto': 'Chica arriba', 'tamano': 'chico'},
+            {'texto': 'Grande abajo', 'tamano': 'grande'},
+        ])
+        u = url_historia(CLOUD, receta)
+        self.assertIn(f'l_text:GlacialIndifference-Regular.otf_36_center:', u)  # chico=36px
+        self.assertIn(f'l_text:GlacialIndifference-Regular.otf_80_center:', u)  # grande=80px
+        # 2 capas de línea + 1 del sello = 3 fl_layer_apply en total.
+        self.assertEqual(u.count('fl_layer_apply'), 3)
+
+    def test_url_con_lineas_ignora_texto_plano_si_hay_lineas(self):
+        """Si llena AMBOS (raro, pero posible en la URL), `lineas` manda —
+        el modo clásico no debe aparecer mezclado en la misma imagen."""
+        receta = receta_normalizada('Este texto no debería usarse', 'abajo', 'velo',
+                                     lineas=[{'texto': 'Esta sí', 'tamano': 'normal'}])
+        u = url_historia(CLOUD, receta)
+        self.assertNotIn('Este%2520texto', u)
+        self.assertIn('Esta%2520s%25C3%25AD', u)
+
+    def test_preset_transparente_sin_caja_y_con_sombra(self):
+        u = url_historia(CLOUD, receta_normalizada('Hola', 'abajo', 'transparente'))
+        self.assertNotIn('b_rgb', u)  # sin caja (el sello tampoco lleva b_rgb en ningún preset)
+        self.assertIn('e_shadow:60,co_black', u)
+        self.assertIn('co_rgb:FFFFFF', u)
+
+    def test_preset_velo_y_crema_no_llevan_sombra(self):
+        u_velo = url_historia(CLOUD, receta_normalizada('Hola', 'abajo', 'velo'))
+        u_crema = url_historia(CLOUD, receta_normalizada('Hola', 'abajo', 'crema'))
+        self.assertNotIn('e_shadow', u_velo)
+        self.assertNotIn('e_shadow', u_crema)
+
+    def test_offsets_abajo_arriba_centro(self):
+        """Fórmulas verificadas empíricamente contra Cloudinary real (curl +
+        inspección visual de 3 líneas apiladas, 2026-07-26) antes de fijarlas."""
+        self.assertEqual(_offsets_abajo([100, 50, 25]), [455, 405, 380])
+        self.assertEqual(_offsets_arriba([100, 50, 25]), [300, 400, 450])
+        self.assertEqual(_offsets_centro([100, 50, 25]), [-38, 38, 75])
+
+    def test_offsets_1_sola_linea_coincide_con_posicion_clasica(self):
+        """Con 1 sola línea, el offset debe coincidir con el POSICIONES clásico
+        (380/300/0) — el modo multilínea no debe verse distinto del clásico
+        cuando solo hay 1 línea."""
+        self.assertEqual(_offsets_abajo([TAMANOS['normal'] * 1.35]), [380])
+        self.assertEqual(_offsets_arriba([TAMANOS['normal'] * 1.35]), [300])
+        self.assertEqual(_offsets_centro([TAMANOS['normal'] * 1.35]), [0])
+
 
 class ComponerViewTest(TestCase):
 
@@ -386,6 +465,24 @@ class ComponerViewTest(TestCase):
                             {'texto': 'Noche junto al río', 'preset': 'crema', 'posicion': 'centro'})
         self.assertContains(r, 'co_rgb:1E4438')  # preset crema
         self.assertContains(r, 'g_center')
+
+    def test_lineas_de_la_query_arman_preview_multilinea(self):
+        """Modo "3 líneas con tamaño" (Jorge, 2026-07-26) llega por querystring
+        (recarga de "Actualizar vista previa" o un link "Ver/Editar")."""
+        self.client.force_login(self.staff)
+        r = self.client.get(f'/marketing/catalogo/componer/{self.clip.id}/', {
+            'preset': 'transparente', 'posicion': 'abajo',
+            'linea1': 'Desde', 'linea1_tamano': 'chico',
+            'linea2': '$160.000', 'linea2_tamano': 'grande',
+        })
+        self.assertContains(r, 'l_text:GlacialIndifference-Regular.otf_36_center:Desde')
+        self.assertContains(r, 'l_text:GlacialIndifference-Regular.otf_80_center:')
+        self.assertContains(r, 'e_shadow:60,co_black')  # sombra del preset transparente
+
+    def test_preset_transparente_disponible_en_el_formulario(self):
+        self.client.force_login(self.staff)
+        r = self.client.get(f'/marketing/catalogo/componer/{self.clip.id}/')
+        self.assertContains(r, 'value="transparente"')
 
     def test_clip_sin_cloud_url_404(self):
         vacio = Clip.objects.create(archivo='sin.jpg', area='detalle', cloud_url='')
@@ -468,6 +565,24 @@ class EnganchePublicacionTest(TestCase):
         self.assertEqual(UsoClip.objects.filter(clip=self.clip, publicacion_id=pub.id).count(), 1)
         self.clip.refresh_from_db()
         self.assertEqual(self.clip.ultimo_uso, date.today())
+
+    def test_pieza_con_lineas_engancha_y_persiste_lineas_en_la_receta(self):
+        """Modo "3 líneas con tamaño" (Jorge, 2026-07-26): la receta guardada
+        debe incluir `lineas` para que "Ver/Editar" la reabra tal cual."""
+        pub = _crear_pub(tipo='post', canal='GBP', pieza_key='gbp_post_lineas', segmentos=[])
+        self.client.force_login(self.staff)
+        data = {
+            'texto': '', 'posicion': 'abajo', 'preset': 'transparente', 'pub_id': pub.id,
+            'linea1': 'Desde', 'linea1_tamano': 'chico',
+            'linea2': '$160.000', 'linea2_tamano': 'grande',
+        }
+        r = self.client.post(f'/marketing/catalogo/componer/{self.clip.id}/enganchar/', data)
+        self.assertEqual(r.status_code, 302)
+        pub.refresh_from_db()
+        self.assertEqual(pub.material_meta[0]['receta']['lineas'], [
+            {'texto': 'Desde', 'tamano': 'chico'},
+            {'texto': '$160.000', 'tamano': 'grande'},
+        ])
 
     def test_pieza_con_segmentos_engancha_al_segmento_correcto(self):
         segs = [
@@ -638,6 +753,23 @@ class PublicacionesListaViewTest(TestCase):
         self.assertContains(r, '/marketing/catalogo/componer/77/')
         self.assertContains(r, f'pub_id={pub.id}&segmento=1')
         self.assertContains(r, 'texto=R%C3%ADo')  # urlencode del texto de la receta
+
+    def test_ver_editar_con_lineas_arrastra_linea1_y_linea2_en_la_url(self):
+        """Modo "3 líneas con tamaño" (Jorge, 2026-07-26): "Ver/Editar" debe
+        reabrir el composer con las MISMAS líneas/tamaños, no solo `texto`."""
+        segs = [{'indice': 1, 'titulo': 'Historia 1', 'texto': 'Uno',
+                'material_urls': ['https://res.cloudinary.com/x/h3.jpg'],
+                'material_meta': [{'url': 'https://res.cloudinary.com/x/h3.jpg',
+                                    'receta': {'texto': '', 'posicion': 'abajo', 'preset': 'transparente',
+                                               'lineas': [{'texto': 'Desde', 'tamano': 'chico'},
+                                                          {'texto': '$160.000', 'tamano': 'grande'}],
+                                               'clip_id': 77, 'tipo': 'historia'}}]}]
+        pub = _crear_pub(segmentos=segs, pieza_key='story_vereditar_lineas', dia=date(2026, 7, 20))
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/publicaciones/', {'semana': '2026-07-20'})
+        self.assertContains(r, 'linea1=Desde')
+        self.assertContains(r, 'linea1_tamano=chico')
+        self.assertContains(r, 'linea2_tamano=grande')
 
     def test_historia_con_material_sin_receta_no_rompe_y_sin_ver_editar(self):
         """Defensivo: material sin receta (caso hipotético/legado) no debe

@@ -21,9 +21,12 @@
   .telefono img{display:block;width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:18px;background:#2a2a2a}
   .panel{background:var(--surface);border:0.5px solid var(--line);border-radius:14px;padding:16px}
   label.f{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 3px}
-  textarea, select{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;
+  textarea, select, input[type="text"]{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;
     background:#fff;color:var(--ink);font-size:14px}
   textarea{min-height:84px;resize:vertical}
+  .linea-tam{display:flex;gap:6px;margin-bottom:6px}
+  .linea-tam input[type="text"]{flex:1 1 auto;min-width:0}
+  .linea-tam select{flex:0 0 96px;width:96px}
   .opts{display:flex;gap:8px;flex-wrap:wrap}
   .opts label{display:flex;align-items:center;gap:6px;background:#F7F0E2;border-radius:999px;
     padding:7px 13px;font-size:13.5px;cursor:pointer}
@@ -73,6 +76,23 @@
         <label class="f">Texto de la historia (corto y boutique — sin emojis)</label>
         <textarea name="texto" maxlength="220" placeholder="Ej: El río suena más fuerte que todo lo demás.">{{ receta.texto }}</textarea>
 
+        <label class="f">¿Tamaños distintos por línea? (opcional — hasta 3; si llenas alguna, SE USA ESTO en vez del texto de arriba)</label>
+        {% for i in "123" %}
+        <div class="linea-tam">
+          <input type="text" name="linea{{ i }}" maxlength="50" placeholder="Línea {{ i }}"
+                 value="{% if i == '1' %}{{ receta.lineas.0.texto|default:'' }}{% elif i == '2' %}{{ receta.lineas.1.texto|default:'' }}{% else %}{{ receta.lineas.2.texto|default:'' }}{% endif %}">
+          <select name="linea{{ i }}_tamano">
+            {% for tam in tamanos %}
+            <option value="{{ tam }}"
+              {% if i == '1' and receta.lineas.0.tamano == tam %}selected
+              {% elif i == '2' and receta.lineas.1.tamano == tam %}selected
+              {% elif i == '3' and receta.lineas.2.tamano == tam %}selected
+              {% elif not receta.lineas and tam == 'normal' %}selected{% endif %}>{{ tam|capfirst }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endfor %}
+
         <label class="f">Posición del texto</label>
         <div class="opts">
           {% for pos in posiciones %}
@@ -84,6 +104,7 @@
         <div class="opts">
           <label><input type="radio" name="preset" value="velo" {% if receta.preset == 'velo' %}checked{% endif %}> 🌙 Velo oscuro · texto crema</label>
           <label><input type="radio" name="preset" value="crema" {% if receta.preset == 'crema' %}checked{% endif %}> 🤍 Caja crema · texto verde</label>
+          <label><input type="radio" name="preset" value="transparente" {% if receta.preset == 'transparente' %}checked{% endif %}> 🌤️ Transparente · sin caja</label>
         </div>
 
         {% if pub_id_param %}<input type="hidden" name="pub_id" value="{{ pub_id_param }}">{% endif %}
@@ -101,6 +122,10 @@
         <input type="hidden" name="texto" value="{{ receta.texto }}">
         <input type="hidden" name="posicion" value="{{ receta.posicion }}">
         <input type="hidden" name="preset" value="{{ receta.preset }}">
+        {% for linea in receta.lineas %}
+        <input type="hidden" name="linea{{ forloop.counter }}" value="{{ linea.texto }}">
+        <input type="hidden" name="linea{{ forloop.counter }}_tamano" value="{{ linea.tamano }}">
+        {% endfor %}
         <input type="hidden" name="pub_id" value="{{ pub.id }}">
         {% if segmento_idx %}<input type="hidden" name="segmento" value="{{ segmento_idx }}">{% endif %}
         <button class="btn enganche" type="submit">✓ Enganchar a esta publicación</button>

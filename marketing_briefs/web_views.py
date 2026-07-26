@@ -7,6 +7,7 @@ catalogo_clips.web_views.enganchar_publicacion (importa este modelo por ORM,
 sin FK entre apps — ver H-072).
 """
 from datetime import date, timedelta
+from urllib.parse import urlencode
 
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render
@@ -42,6 +43,24 @@ def _texto_preview(copy_json, maximo=180):
         if txt:
             return txt[:maximo]
     return ''
+
+
+def _qs_ver_editar(receta, pub_id, segmento=None):
+    """Querystring para reabrir en el composer una historia ya compuesta
+    (Jorge, 2026-07-26: "cómo puedo ver la Historia 1... para editarla").
+    Soporta el modo clásico (texto) Y "3 líneas con tamaño" (receta.lineas,
+    Jorge 2026-07-26) — una pieza puede haberse hecho con cualquiera de
+    los dos según cuándo se generó."""
+    if not receta:
+        return ''
+    params = {'texto': receta.get('texto', ''), 'posicion': receta.get('posicion', ''),
+              'preset': receta.get('preset', ''), 'pub_id': pub_id}
+    if segmento is not None:
+        params['segmento'] = segmento
+    for i, linea in enumerate(receta.get('lineas') or [], start=1):
+        params[f'linea{i}'] = linea.get('texto', '') if isinstance(linea, dict) else ''
+        params[f'linea{i}_tamano'] = linea.get('tamano', '') if isinstance(linea, dict) else ''
+    return urlencode(params)
 
 
 def texto_de_publicacion(pub, segmento_idx=None):
@@ -101,6 +120,7 @@ def publicaciones_lista(request):
                 # H-073: solo con criterio_foto se puede ofrecer "🤖 Generar".
                 'tiene_criterio': tiene_criterio,
                 'receta': receta_vigente,
+                'ver_editar_qs': _qs_ver_editar(receta_vigente, pub.id, seg.get('indice')),
             })
         estado_icono, estado_label = ESTADO_LABEL.get(pub.estado, ('⚪', pub.estado))
         copy_json = pub.copy_json if isinstance(pub.copy_json, dict) else {}
@@ -119,6 +139,7 @@ def publicaciones_lista(request):
             'estado_label': estado_label,
             'tiene_criterio': bool(copy_json.get('criterio_foto')),
             'receta': receta_vigente_pub,
+            'ver_editar_qs': _qs_ver_editar(receta_vigente_pub, pub.id),
             # H-074: botón de lote — solo si queda algo por auto-generar en esta pieza.
             'pendientes_lote': pendientes_lote,
             'tiene_lote_disponible': pendientes_lote > 0,

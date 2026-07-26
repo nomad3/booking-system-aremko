@@ -22,7 +22,7 @@ from django.views.decorators.http import require_http_methods
 
 from .api_views import (_validar_payload, _subir_imagen_optimizada, _orientacion,
                         _EXT_IMAGEN, _MAX_BYTES)
-from .composer import receta_normalizada, url_historia, PRESETS, POSICIONES, ANCHO, ALTO
+from .composer import receta_normalizada, url_historia, PRESETS, POSICIONES, TAMANOS, ANCHO, ALTO
 from .models import Clip, UsoClip
 from .seleccionar import seleccionar_clip
 from .tagging import etiquetar_imagen
@@ -36,6 +36,16 @@ def _hoy_chile():
     localizar, entre ~20:00 y medianoche hora Chile ya devuelve la fecha de
     MAÑANA. Usar acá en vez de `timezone.now().date()`."""
     return timezone.localtime(timezone.now()).date()
+
+
+def _lineas_desde_request(data):
+    """Lee `linea1/linea1_tamano`…`linea3/linea3_tamano` de un GET o POST
+    (modo "3 líneas con tamaño", Jorge 2026-07-26) → lista cruda para
+    `receta_normalizada` (que ya sanea texto/tamaño línea por línea)."""
+    return [
+        {'texto': data.get(f'linea{i}', ''), 'tamano': data.get(f'linea{i}_tamano', '')}
+        for i in range(1, 4)
+    ]
 
 
 # Miniatura del grid: chica y recortada 4:5 (NO servir la de 1440 en el grid).
@@ -360,7 +370,7 @@ def componer(request, clip_id):
         # Sin publicación de contexto (uso libre de B2-A): la descripción del clip.
         texto = clip.descripcion or ''
 
-    receta = receta_normalizada(texto, p.get('posicion'), p.get('preset'))
+    receta = receta_normalizada(texto, p.get('posicion'), p.get('preset'), _lineas_desde_request(p))
     preview = url_historia(clip.cloud_url, receta)
 
     # H-073: si llegamos vía auto_generar, arma el banner + el link "otra foto"
@@ -383,6 +393,7 @@ def componer(request, clip_id):
         'descarga': url_historia(clip.cloud_url, receta, attachment=True),
         'presets': list(PRESETS.keys()),
         'posiciones': list(POSICIONES.keys()),
+        'tamanos': list(TAMANOS.keys()),
         'thumb': thumb_url(clip.cloud_url),
         'pub': pub,
         'segmento_idx': segmento_idx,
@@ -452,7 +463,7 @@ def enganchar_publicacion(request, clip_id):
         qs += f'segmento={seg_raw}&' if seg_raw else ''
         return redirect(f'/marketing/catalogo/componer/{clip_id}/?{qs}error={error}')
 
-    receta = receta_normalizada(p.get('texto'), p.get('posicion'), p.get('preset'))
+    receta = receta_normalizada(p.get('texto'), p.get('posicion'), p.get('preset'), _lineas_desde_request(p))
     url = url_historia(clip.cloud_url, receta)
     if not url:
         return _volver('sin_texto')
@@ -474,7 +485,8 @@ def enganchar_publicacion(request, clip_id):
         'ratio': '9:16', 'orientacion': 'vertical',
         # La receta completa queda guardada junto al material → se puede re-editar.
         'receta': {'texto': receta['texto'], 'posicion': receta['posicion'],
-                   'preset': receta['preset'], 'clip_id': clip.id, 'tipo': 'historia'},
+                   'preset': receta['preset'], 'lineas': receta['lineas'],
+                   'clip_id': clip.id, 'tipo': 'historia'},
     }
 
     if segmento_idx is not None:
@@ -572,7 +584,8 @@ def generar_lote(request, pub_id):
             'url': url, 'tipo': 'historia', 'width': ANCHO, 'height': ALTO,
             'ratio': '9:16', 'orientacion': 'vertical',
             'receta': {'texto': receta['texto'], 'posicion': receta['posicion'],
-                       'preset': receta['preset'], 'clip_id': clip.id, 'tipo': 'historia'},
+                       'preset': receta['preset'], 'lineas': receta['lineas'],
+                       'clip_id': clip.id, 'tipo': 'historia'},
         }]
 
         UsoClip.objects.create(clip=clip, fecha=_hoy_chile(), canal=pub.canal, publicacion_id=pub.id)

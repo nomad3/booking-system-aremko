@@ -90,13 +90,13 @@
       {% for h in t.historias %}
       <div class="historia-row">
         {% if h.preview %}
-        {% if h.receta %}<a href="{% url 'catalogo_web:componer' h.receta.clip_id %}?texto={{ h.receta.texto|urlencode }}&posicion={{ h.receta.posicion }}&preset={{ h.receta.preset }}&pub_id={{ t.pub.id }}&segmento={{ h.indice }}">{% endif %}
+        {% if h.receta %}<a href="{% url 'catalogo_web:componer' h.receta.clip_id %}?{{ h.ver_editar_qs }}">{% endif %}
         <img class="thumb" src="{{ h.preview }}" alt="">
         {% if h.receta %}</a>{% endif %}
         {% endif %}
         <span class="h-texto">{{ h.titulo }}{% if h.texto %} — {{ h.texto }}{% endif %}</span>
         {% if h.tiene_material %}<span class="check">✓ lista</span>{% endif %}
-        {% if h.tiene_material and h.receta %}<a class="btn-crear" href="{% url 'catalogo_web:componer' h.receta.clip_id %}?texto={{ h.receta.texto|urlencode }}&posicion={{ h.receta.posicion }}&preset={{ h.receta.preset }}&pub_id={{ t.pub.id }}&segmento={{ h.indice }}">👁️ Ver / Editar</a>{% endif %}
+        {% if h.tiene_material and h.receta %}<a class="btn-crear" href="{% url 'catalogo_web:componer' h.receta.clip_id %}?{{ h.ver_editar_qs }}">👁️ Ver / Editar</a>{% endif %}
         {% if h.tiene_criterio %}<a class="btn-crear auto" href="{% url 'catalogo_web:auto_generar' %}?pub_id={{ t.pub.id }}&segmento={{ h.indice }}">🤖 Generar</a>{% endif %}
         <a class="btn-crear" href="{% url 'catalogo_web:explorador' %}?pub_id={{ t.pub.id }}&segmento={{ h.indice }}">✍️ Crear historia</a>
       </div>
@@ -114,12 +114,12 @@
     {% else %}
     <div class="fila">
       {% if t.material_preview %}
-      {% if t.receta %}<a href="{% url 'catalogo_web:componer' t.receta.clip_id %}?texto={{ t.receta.texto|urlencode }}&posicion={{ t.receta.posicion }}&preset={{ t.receta.preset }}&pub_id={{ t.pub.id }}">{% endif %}
+      {% if t.receta %}<a href="{% url 'catalogo_web:componer' t.receta.clip_id %}?{{ t.ver_editar_qs }}">{% endif %}
       <img class="thumb" src="{{ t.material_preview }}" alt="">
       {% if t.receta %}</a>{% endif %}
       {% endif %}
       {% if t.tiene_material %}<span class="check">✓ tiene material</span>{% endif %}
-      {% if t.tiene_material and t.receta %}<a class="btn-crear" href="{% url 'catalogo_web:componer' t.receta.clip_id %}?texto={{ t.receta.texto|urlencode }}&posicion={{ t.receta.posicion }}&preset={{ t.receta.preset }}&pub_id={{ t.pub.id }}">👁️ Ver / Editar</a>{% endif %}
+      {% if t.tiene_material and t.receta %}<a class="btn-crear" href="{% url 'catalogo_web:componer' t.receta.clip_id %}?{{ t.ver_editar_qs }}">👁️ Ver / Editar</a>{% endif %}
       {% if t.tiene_criterio %}<a class="btn-crear auto" href="{% url 'catalogo_web:auto_generar' %}?pub_id={{ t.pub.id }}">🤖 Generar</a>{% endif %}
       <a class="btn-crear" href="{% url 'catalogo_web:explorador' %}?pub_id={{ t.pub.id }}">✍️ Crear historia</a>
     </div>
