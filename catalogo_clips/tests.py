@@ -597,6 +597,48 @@ class PublicacionesListaViewTest(TestCase):
         self.assertContains(r, f'/marketing/catalogo/lote/{pub.id}/')
         self.assertContains(r, 'Generar todas')
 
+    def test_historia_con_material_muestra_ver_editar(self):
+        """Jorge (2026-07-26): una historia ya generada no tenía forma de
+        reabrirse para verla/descargarla/editarla — solo "Crear historia"
+        (que manda al explorador a elegir una foto nueva desde cero)."""
+        segs = [{'indice': 1, 'titulo': 'Historia 1', 'texto': 'Uno',
+                'material_urls': ['https://res.cloudinary.com/x/h1.jpg'],
+                'material_meta': [{'url': 'https://res.cloudinary.com/x/h1.jpg',
+                                    'receta': {'texto': 'Río sonando fuerte', 'posicion': 'abajo',
+                                               'preset': 'velo', 'clip_id': 77, 'tipo': 'historia'}}]}]
+        pub = _crear_pub(segmentos=segs, pieza_key='story_vereditar', dia=date(2026, 7, 20))
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/publicaciones/', {'semana': '2026-07-20'})
+        self.assertContains(r, '👁️ Ver / Editar')
+        self.assertContains(r, '/marketing/catalogo/componer/77/')
+        self.assertContains(r, f'pub_id={pub.id}&segmento=1')
+        self.assertContains(r, 'texto=R%C3%ADo')  # urlencode del texto de la receta
+
+    def test_historia_con_material_sin_receta_no_rompe_y_sin_ver_editar(self):
+        """Defensivo: material sin receta (caso hipotético/legado) no debe
+        romper la página ni ofrecer un link que no se puede reconstruir."""
+        segs = [{'indice': 1, 'titulo': 'Historia 1', 'texto': 'Uno',
+                'material_urls': ['https://res.cloudinary.com/x/h2.jpg'],
+                'material_meta': [{'url': 'https://res.cloudinary.com/x/h2.jpg'}]}]
+        _crear_pub(segmentos=segs, pieza_key='story_sin_receta', dia=date(2026, 7, 20))
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/publicaciones/', {'semana': '2026-07-20'})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, '✓ lista')
+        self.assertNotContains(r, '👁️ Ver / Editar')
+
+    def test_pieza_sin_segmentos_con_material_muestra_ver_editar(self):
+        pub = _crear_pub(segmentos=[], pieza_key='gbp_vereditar', tipo='post', canal='GBP',
+                         material_urls=['https://res.cloudinary.com/x/gbp.jpg'],
+                         material_meta=[{'url': 'https://res.cloudinary.com/x/gbp.jpg',
+                                         'receta': {'texto': 'Un post boutique', 'posicion': 'centro',
+                                                    'preset': 'crema', 'clip_id': 88, 'tipo': 'historia'}}])
+        self.client.force_login(self.staff)
+        r = self.client.get('/marketing/publicaciones/', {'semana': '2026-07-20'})
+        self.assertContains(r, '👁️ Ver / Editar')
+        self.assertContains(r, '/marketing/catalogo/componer/88/')
+        self.assertContains(r, f'pub_id={pub.id}')
+
 
 from datetime import timedelta
 
