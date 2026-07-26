@@ -39,6 +39,7 @@
 <body>
 <div class="wrap">
   <a class="volver" href="/marketing/catalogo/">← Catálogo</a>
+  <a href="{% url 'admin:index' %}" style="color:var(--green);font-weight:700;text-decoration:none;font-size:14px;margin-left:14px">🏠 Inicio</a>
 
   {% if modo == 'subir' %}
   <h1>📤 Subir una foto al catálogo</h1>

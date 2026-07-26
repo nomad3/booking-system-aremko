@@ -34,6 +34,7 @@
 <body>
 <div class="wrap">
   <a class="volver" href="javascript:history.back()">← Volver al catálogo</a>
+  <a href="{% url 'admin:index' %}" style="color:var(--green);font-weight:700;text-decoration:none;font-size:14px;margin-left:14px">🏠 Inicio</a>
   {% if pub_contexto %}<div style="background:#F7F0E2;border:1px solid var(--gold);border-radius:11px;padding:9px 13px;font-size:13px;margin-top:10px;">🖼️ Eligiendo foto para: <b>{{ pub_contexto }}</b></div>{% endif %}
   <div class="cols">
     <div class="foto"><img src="{{ thumb_og }}" alt="{{ clip.archivo }}"></div>

@@ -29,6 +29,15 @@ from .tagging import etiquetar_imagen
 
 logger = logging.getLogger(__name__)
 
+
+def _hoy_chile():
+    """Fecha de HOY en hora de Chile. `timezone.now()` es UTC (TIME_ZONE=
+    America/Santiago solo afecta la presentación, no `.date()` directo) — sin
+    localizar, entre ~20:00 y medianoche hora Chile ya devuelve la fecha de
+    MAÑANA. Usar acá en vez de `timezone.now().date()`."""
+    return timezone.localtime(timezone.now()).date()
+
+
 # Miniatura del grid: chica y recortada 4:5 (NO servir la de 1440 en el grid).
 THUMB_TRANSF = 'w_400,c_fill,ar_4:5,q_auto,f_auto'
 
@@ -482,8 +491,8 @@ def enganchar_publicacion(request, clip_id):
     pub.estado = 'lista'
     pub.save()
 
-    UsoClip.objects.create(clip=clip, fecha=timezone.now().date(), canal=pub.canal, publicacion_id=pub.id)
-    clip.ultimo_uso = timezone.now().date()
+    UsoClip.objects.create(clip=clip, fecha=_hoy_chile(), canal=pub.canal, publicacion_id=pub.id)
+    clip.ultimo_uso = _hoy_chile()
     clip.save(update_fields=['ultimo_uso'])
 
     logger.info('[H-072] historia enganchada: clip=%s pub=%s segmento=%s', clip.id, pub.id, segmento_idx)
@@ -566,8 +575,8 @@ def generar_lote(request, pub_id):
                        'preset': receta['preset'], 'clip_id': clip.id, 'tipo': 'historia'},
         }]
 
-        UsoClip.objects.create(clip=clip, fecha=timezone.now().date(), canal=pub.canal, publicacion_id=pub.id)
-        clip.ultimo_uso = timezone.now().date()
+        UsoClip.objects.create(clip=clip, fecha=_hoy_chile(), canal=pub.canal, publicacion_id=pub.id)
+        clip.ultimo_uso = _hoy_chile()
         clip.save(update_fields=['ultimo_uso'])
 
         excluidos.add(clip.id)

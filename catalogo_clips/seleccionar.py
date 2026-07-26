@@ -74,7 +74,10 @@ def seleccionar_clip(criterio, dias=DIAS_FRESCURA_DEFAULT, permitir_personas=Fal
     if excluir_ids:
         base_qs = base_qs.exclude(id__in=excluir_ids)
 
-    corte = timezone.now().date() - timedelta(days=dias)
+    # timezone.localtime(...).date() (NO timezone.now().date()): Django settea
+    # TIME_ZONE=America/Santiago pero timezone.now() es UTC — tomar .date() sin
+    # localizar da la fecha de MAÑANA entre ~20:00 y medianoche hora Chile.
+    corte = timezone.localtime(timezone.now()).date() - timedelta(days=dias)
     fresca = Q(ultimo_uso__isnull=True) | Q(ultimo_uso__lt=corte)
 
     # Nivel 1: criterio completo + keeper + sin personas + fresca.

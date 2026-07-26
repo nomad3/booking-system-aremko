@@ -573,7 +573,10 @@ class PublicacionesListaViewTest(TestCase):
         # arriba usa el MISMO texto también en su versión deshabilitada.
         # Se valida contra la URL concreta del lote (inequívoca) + que el
         # atajo global también se haya activado (no quedó en el fallback).
-        hoy = timezone.now().date()
+        # date.today() (NO timezone.now().date()): así compara contra la MISMA
+        # referencia que usa la vista real (publicaciones_lista::hoy) — timezone.now()
+        # es UTC y sin localizar da la fecha de mañana entre ~20:00 y medianoche Chile.
+        hoy = date.today()
         lunes_de_hoy = hoy - timedelta(days=hoy.weekday())
         segs = [{'indice': 1, 'titulo': 'H1', 'texto': 'a', 'material_urls': [],
                 'criterio_foto': {'area': 'tina'}}]
@@ -652,7 +655,7 @@ class SeleccionarClipTest(TestCase):
         self.assertEqual(nivel, 6)
 
     def test_nivel_4_permite_repetir_la_usada_hace_mas_tiempo(self):
-        hoy = timezone.now().date()
+        hoy = timezone.localtime(timezone.now()).date()  # misma referencia que usa seleccionar_clip
         vieja = self._clip(ultimo_uso=hoy - timedelta(days=5))
         self._clip(ultimo_uso=hoy - timedelta(days=1))
         clip, nivel, aviso = seleccionar_clip(_CRITERIO_TINA_NOCHE, dias=60)
@@ -661,7 +664,7 @@ class SeleccionarClipTest(TestCase):
         self.assertIn('repetida', aviso.lower())
 
     def test_fuera_de_la_ventana_de_dias_cuenta_como_fresca(self):
-        hoy = timezone.now().date()
+        hoy = timezone.localtime(timezone.now()).date()  # misma referencia que usa seleccionar_clip
         c = self._clip(keeper=True, ultimo_uso=hoy - timedelta(days=90))  # ventana default=60 → ya es fresca
         clip, nivel, aviso = seleccionar_clip(_CRITERIO_TINA_NOCHE, dias=60)
         self.assertEqual(clip.id, c.id)
