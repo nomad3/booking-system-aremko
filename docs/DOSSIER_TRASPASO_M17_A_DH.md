@@ -197,7 +197,7 @@ de arriba (con sus mismos campos) y pueden copiarse con cambios mínimos (import
    `l_text:...,w_860,c_fit,g_south,y_380` en un solo string da HTTP 400. Hay que partir la
    posición (`g_south,y_380`) en un `fl_layer_apply` propio, después de la capa de texto.
 2. **Cloudinary — `letter_spacing_N` va DENTRO del string de la fuente**
-   (`Montserrat_26_letter_spacing_6_center`), no como parámetro separado por coma.
+   (`GlacialIndifference-Regular.otf_26_letter_spacing_6_center`), no como parámetro separado por coma.
 3. **Postgres ordena NULLs AL FINAL por default en `ASC`.** Para que "nunca usado"
    (`ultimo_uso=None`) salga PRIMERO en el auto-pick (más fresco que cualquier fecha), hay que
    pedir `F('ultimo_uso').asc(nulls_first=True)` explícito — el default hace lo contrario de lo
@@ -213,6 +213,18 @@ de arriba (con sus mismos campos) y pueden copiarse con cambios mínimos (import
    cada iteración — si dos historias del mismo lote piden un criterio para el que solo existe
    1 foto, la SEGUNDA no repite esa foto (va a "Manual" en vez de repetir) — es la semántica
    correcta según el diseño acordado, no un bug.
+7. **Tipografía de marca — fuente PERSONALIZADA, no Google Font.** La fuente real de Aremko
+   para las historias es **Glacial Indifference** (peso regular, sin negrita — decisión de
+   Jorge 2026-07-20, corregida en prod 2026-07-26 tras un primer intento equivocado con
+   Montserrat y luego con Cormorant Garamond). Cloudinary NO la sirve por nombre (no es Google
+   Fonts) — hay que **subirla como recurso `raw`/`authenticated`** (management command
+   `subir_fuente_historias`, corrido una vez en Render) y referenciarla en `l_text` por su
+   `public_id` **CON extensión** (`GlacialIndifference-Regular.otf_58_center:...`). Gotcha de
+   la propia API de Cloudinary: el `public_id` de una fuente personalizada **no puede llevar
+   guion_bajo** (si el archivo tuviera `_` en el nombre, hay que renombrarlo antes de subir). En
+   DH, el archivo `.otf` (licencia SIL Open Font License, libre uso comercial) y el mismo comando
+   de subida deben portarse — o resolverse con la fuente de marca real de CADA tenant si el
+   producto termina soportando marca configurable por cliente.
 
 ## 6. Historial completo (los 5 handoffs, todos LIVE y con tests)
 
