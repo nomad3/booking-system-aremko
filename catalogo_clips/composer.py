@@ -15,19 +15,16 @@ from urllib.parse import quote
 ANCHO, ALTO = 1080, 1920
 BASE = f'c_fill,g_auto,w_{ANCHO},h_{ALTO}'
 
-# Tipografía de marca real de Aremko (la misma que el sitio: base_public.html,
-# homepage_boutique.html, experiencia_romantica.html, etc. — Google Font, la
-# sirve Cloudinary sin necesidad de subirla). Antes decía "Montserrat": una
-# fuente seguridad de Cloudinary, NO la de marca (Jorge, 2026-07-26 — "el tipo
-# de letra... no es la que se muestra en las historias"). Port-friendly: para
-# otro tenant se cambia acá o se sube su fuente.
-FUENTE = 'Cormorant Garamond'
-# Cloudinary usa "_" como separador de campos en l_text:<fuente>_<tamaño>_...:
-# un nombre con guion_bajo (Cormorant_Garamond) hace que confunda "Garamond"
-# con el tamaño -> 400. El espacio real (URL-encodeado a %20) SÍ sobrevive
-# como un solo campo. Verificado empíricamente contra Cloudinary real (curl +
-# inspección visual del JPG) antes de este cambio — no asumido.
-_FUENTE_URL = quote(FUENTE, safe='')
+# Tipografía de marca real de Aremko para las historias (decisión de Jorge,
+# 2026-07-20 — ver skill local historia-aremko/SKILL.md): "Glacial
+# Indifference", peso NORMAL/regular, SIN negrita. Licencia SIL Open Font
+# License (libre uso comercial). NO es una Google Font — Cloudinary no la
+# sirve por nombre; hay que subir el .otf como recurso raw/authenticated
+# (una sola vez: `python manage.py subir_fuente_historias`, en Render — ver
+# ese comando) y referenciarla por su public_id CON extensión. Reemplaza
+# "Montserrat" (elegida solo por ser segura en Cloudinary, no la de marca —
+# Jorge, 2026-07-26: "el tipo de letra... no es la que se muestra").
+FUENTE = 'GlacialIndifference-Regular.otf'
 
 # Presets boutique (Angélica ELIGE, no diseña): colores de marca Aremko.
 # 'velo'  = texto crema sobre velo oscuro cálido (para fotos luminosas/día).
@@ -86,13 +83,15 @@ def url_historia(cloud_url, receta, attachment=False):
     # Texto principal: envuelve a 860px (c_fit dentro de la capa) y se POSICIONA
     # con fl_layer_apply (sintaxis Cloudinary: la capa y su colocación van en
     # componentes separados — validado empíricamente contra el cloud real).
+    # Sin "_bold_": Glacial Indifference va en peso NORMAL/regular (Jorge,
+    # 2026-07-20) — Montserrat sí llevaba negrita, esta fuente no.
     capas.append(
-        f"l_text:{_FUENTE_URL}_58_bold_center:{_txt(receta['texto'])},"
+        f"l_text:{FUENTE}_58_center:{_txt(receta['texto'])},"
         f"co_rgb:{p['texto']},b_rgb:{p['caja']},c_fit,w_860")
     capas.append(f'fl_layer_apply,{pos}')
     # Sello de marca (chico; el letter_spacing va DENTRO del estilo de la fuente).
     capas.append(
-        f"l_text:{_FUENTE_URL}_26_letter_spacing_6_center:{_txt(SELLO_TEXTO)},"
+        f"l_text:{FUENTE}_26_letter_spacing_6_center:{_txt(SELLO_TEXTO)},"
         f"co_rgb:{p['sello']}")
     capas.append('fl_layer_apply,g_south,y_180')
     cadena = '/'.join(capas)
