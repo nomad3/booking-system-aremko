@@ -1603,6 +1603,60 @@ def descartar_propuesta_endpoint(request):
 
 
 # ============================================================================
+# CATÁLOGO AGREGABLE (picker "+ Agregar ítem" del cajón de cotización)
+# ============================================================================
+
+@api_view(['GET'])
+@authentication_classes([LunaAPIKeyAuthentication])
+def catalogo_agregables(request):
+    """Catálogo de ítems que se pueden AGREGAR a una cotización desde el cajón de la
+    bandeja (aremko-cli): ambientaciones (servicios de la categoría Ambientaciones)
+    + productos vendibles (Comestibles / Bebestibles: tablas, jugos, café, torta...).
+
+    GET /api/luna/catalogo-agregables/
+    Header: X-API-Key
+
+    Solo activos y con precio real (>1: excluye cortesías/insumos en $0 y los
+    centinelas en $1 tipo "Fruta"). Los precios de aquí son referencia para elegir;
+    al guardar, editar_propuesta re-lee el catálogo (fuente única de precios).
+
+    Respuesta:
+    {
+        "success": true,
+        "ambientaciones": [{"servicio_id": 22, "nombre": "Ambientación romántica R1", "precio": 32000}],
+        "productos": [{"producto_id": 3, "nombre": "Tabla Quesos", "precio": 20000, "categoria": "Comestibles"}]
+    }
+    """
+    try:
+        ambientaciones = [
+            {'servicio_id': s.id, 'nombre': s.nombre, 'precio': int(s.precio_base)}
+            for s in Servicio.objects.filter(
+                categoria__nombre__iexact='Ambientaciones',
+                activo=True,
+                precio_base__gt=1,
+            ).order_by('nombre')
+        ]
+        productos = [
+            {
+                'producto_id': p.id,
+                'nombre': p.nombre,
+                'precio': int(p.precio_base),
+                'categoria': p.categoria.nombre if p.categoria else '',
+            }
+            for p in Producto.objects.select_related('categoria').filter(
+                categoria__nombre__in=['Comestibles', 'Bebestibles'],
+                precio_base__gt=1,
+            ).order_by('categoria__nombre', 'nombre')
+        ]
+        return Response({'success': True, 'ambientaciones': ambientaciones, 'productos': productos})
+    except Exception as e:
+        logger.error(f'[Luna API] Error en catalogo_agregables: {str(e)}', exc_info=True)
+        return Response({'success': False, 'error': 'internal_error',
+                         'mensaje': 'Error al leer el catálogo agregable'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================================================
 # ADMIN: LIMPIAR CONVERSACIÓN
 # ============================================================================
 

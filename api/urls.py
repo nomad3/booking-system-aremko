@@ -44,6 +44,9 @@ urlpatterns = [
     # noche_aguas_calientes; ritual/refugio en Fase 2). Un solo endpoint con ?tipo=
     path('luna/experiencias/alternativas/', luna_api_views.experiencias_alternativas, name='luna-experiencias-alternativas'),
 
+    # Catálogo de ítems agregables a una cotización (picker del cajón, bandeja aremko-cli)
+    path('luna/catalogo-agregables/', luna_api_views.catalogo_agregables, name='luna-catalogo-agregables'),
+
     # Admin endpoints (testing/debug)
     path('luna/admin/limpiar-conversacion/', luna_api_views.limpiar_conversacion_endpoint, name='luna-limpiar-conversacion'),
 ]
