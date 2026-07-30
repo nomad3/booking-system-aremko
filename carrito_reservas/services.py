@@ -53,8 +53,17 @@ class CarritoService:
                     'mensaje': f'Servicio {servicio_id} no existe'
                 }
 
-            # Validar que está publicado y activo
-            if not servicio.publicado_web or not servicio.activo:
+            # Validar que está disponible para la venta. `publicado_web` aplica a la
+            # oferta principal (tinas/masajes/cabañas del catálogo web); las
+            # AMBIENTACIONES son complementos internos que se venden por conversación
+            # (H-079/H-080) y NO van publicadas en la web a propósito — para ellas
+            # basta `activo`. (Caso real 2026-07-29: "agrégame la R1" → la resolución
+            # por nombre funcionó pero este gate la rechazaba por publicado_web=False.)
+            es_ambientacion = bool(
+                servicio.categoria
+                and (servicio.categoria.nombre or '').strip().lower() == 'ambientaciones'
+            )
+            if not servicio.activo or (not servicio.publicado_web and not es_ambientacion):
                 return {
                     'success': False,
                     'error': 'servicio_no_disponible',
