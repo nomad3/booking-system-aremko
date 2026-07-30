@@ -121,6 +121,24 @@ class NocheAguasCalientesSitemap(Sitemap):
         return reverse(item)
 
 
+class VeladasLandingsSitemap(Sitemap):
+    """Las dos puertas del configurador de veladas (2026-07-30).
+
+    Se separaron justo para que cada una capture su intención de búsqueda: la
+    romántica ("regalo romántico pareja") y celebraciones ("cumpleaños con tina
+    puerto varas", "despedida de soltera"). Una sola URL no podía con las dos, así
+    que ambas entran al sitemap.
+    """
+    changefreq = 'weekly'
+    priority = 0.8
+
+    def items(self):
+        return ['experiencia_romantica', 'celebraciones']
+
+    def location(self, item):
+        return reverse(item)
+
+
 class CategoriaSitemap(Sitemap):
     """Sitemap dinámico para categorías de servicios individuales"""
     changefreq = 'weekly'

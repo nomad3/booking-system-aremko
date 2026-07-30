@@ -28,6 +28,7 @@ from ventas.sitemaps import (
     RitualRioLandingSitemap,
     PausaLandingSitemap,
     NocheAguasCalientesSitemap,
+    VeladasLandingsSitemap,
 )
 from aremko_blog.sitemaps import AremkoBlogIndexSitemap, AremkoBlogPostSitemap
 from django.views.generic import TemplateView
@@ -41,6 +42,7 @@ sitemaps = {
     'ritual': RitualRioLandingSitemap,
     'pausa': PausaLandingSitemap,
     'noche_aguas_calientes': NocheAguasCalientesSitemap,
+    'veladas': VeladasLandingsSitemap,
     'blog_index': AremkoBlogIndexSitemap,
     'blog_posts': AremkoBlogPostSitemap,
 }
@@ -138,8 +140,12 @@ urlpatterns = [
     path('pausa-junto-al-rio/', pausa_landing_view, name='pausa_landing'),
     # Landing INDEXABLE de "Noche de Aguas Calientes" (H-055) — cabaña 1 noche + tina, sin masaje
     path('noche-de-aguas-calientes/', noche_aguas_calientes_landing_view, name='noche_aguas_calientes_landing'),
-    # Experiencia Romántica (Puerta B): configurador sorpresa + invitación filtrada para la pareja
+    # Configurador de veladas — DOS puertas, UN motor (ver experiencia_romantica_view).
+    # Puerta 1: sorprender a la pareja (de a dos, con invitación secreta).
     path('experiencia-romantica/', experiencia_romantica_view.experiencia_romantica_view, name='experiencia_romantica'),
+    # Puerta 2: cumpleaños (de a dos o en grupo) y despedidas de soltera/o.
+    path('celebraciones/', experiencia_romantica_view.celebraciones_view, name='celebraciones'),
+    # El submit es compartido: devuelve al cliente a SU puerta si algo no valida.
     path('experiencia-romantica/continuar/', experiencia_romantica_view.experiencia_romantica_submit, name='experiencia_romantica_continuar'),
     # Tablero interno OCULTO del plan Veladas (slug no adivinable, sin login, no indexado).
     path('panel-veladas-09c7c72cd1/', plan_veladas_view.plan_veladas_estado, name='plan_veladas_estado'),

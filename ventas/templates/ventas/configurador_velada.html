@@ -1,10 +1,15 @@
 {% load static %}<!DOCTYPE html>
+{# Configurador de veladas — UN template para las DOS puertas:                    #}
+{#   /experiencia-romantica/  (modo 'romantica')                                  #}
+{#   /celebraciones/          (modo 'celebraciones')                              #}
+{# El copy entra por {{ copy }} desde la vista; el CSS/JS es compartido a         #}
+{# propósito (es la parte frágil: duplicarlo era el riesgo real de la separación).#}
 <html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Experiencia Romántica · Sorprende a tu pareja | Aremko Spa Boutique</title>
-  <meta name="description" content="Regálale una velada junto al río: tina caliente, casi 30 velas y la sorpresa lista al llegar. Tú la preparas en secreto; tu pareja solo recibe la invitación.">
+  <title>{{ copy.title }}</title>
+  <meta name="description" content="{{ copy.meta_desc }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
@@ -23,7 +28,7 @@
 
     /* HERO */
     .hero{position:relative; min-height:92vh; display:flex; align-items:flex-end;
-      background:#241a18 url('https://res.cloudinary.com/dtuncr1pi/image/upload/f_auto,q_auto,w_1400/v1/servicios/IMG_2795_ydpknt') center 30%/cover no-repeat;}
+      background:#241a18 url('https://res.cloudinary.com/dtuncr1pi/image/upload/f_auto,q_auto,w_1400/v1/{{ copy.hero_img }}') center 30%/cover no-repeat;}
     .hero::after{content:""; position:absolute; inset:0;
       background:linear-gradient(180deg, rgba(20,12,10,.15) 0%, rgba(20,12,10,.35) 45%, rgba(20,12,10,.82) 100%);}
     .hero-in{position:relative; z-index:2; width:100%; max-width:640px; margin:0 auto; padding:0 22px 46px; color:#fff;}
@@ -70,8 +75,9 @@
     .opt.foto::after{content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(30,18,16,.05), rgba(30,18,16,.72)); z-index:1;}
     .opt.foto > *{position:relative; z-index:2;}
     .opt.foto small{color:#f0e2df;}
-    #optRom::before{background-image:url('https://res.cloudinary.com/dtuncr1pi/image/upload/f_auto,q_auto,w_500/v1/servicios/IMG_2795_ydpknt');}
-    #optCum::before{background-image:url('https://res.cloudinary.com/dtuncr1pi/image/upload/f_auto,q_auto,w_500/v1/servicios/cumplea%C3%B1osdamasaremko2_kroa3j');}
+    /* Las tres ocasiones de celebración comparten foto (la romántica ya no tiene
+       selector: es su propia landing). */
+    #optCum::before, #optGrupo::before, #optDespedida::before{background-image:url('https://res.cloudinary.com/dtuncr1pi/image/upload/f_auto,q_auto,w_500/v1/servicios/cumplea%C3%B1osdamasaremko2_kroa3j');}
     select, input[type=date]{width:100%; padding:13px 14px; border:1px solid var(--linea); border-radius:13px;
       font-size:15.5px; background:#fff; color:var(--tinta); -webkit-appearance:none; appearance:none;}
     .fila{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;}
@@ -101,6 +107,11 @@
     .cierre{text-align:center; color:var(--suave); font-size:13.5px; padding:8px 0 10px; line-height:1.6;}
     .cierre b{color:var(--tinta);}
 
+    /* CRUCE ENTRE LAS DOS PUERTAS — el que llegó a la landing equivocada tiene salida */
+    .cruce{display:block; text-align:center; margin-top:22px; padding:14px 18px; text-decoration:none;
+      background:#fff; border:1px solid var(--linea); border-radius:15px; color:#6d5651; font-size:14.5px; line-height:1.5;}
+    .cruce b{color:var(--rosafuerte);}
+
     @media(min-width:560px){ .hero h1{font-size:56px;} h2.tit{font-size:40px;} }
   </style>
 </head>
@@ -109,40 +120,40 @@
   <header class="hero">
     <div class="hero-in">
       <div class="eyebrow">Aremko Spa Boutique · Puerto Varas</div>
-      <h1>Regálale una velada<br>que no va a olvidar</h1>
-      <p>Una tina caliente junto al río, casi 30 velas encendidas y la sorpresa lista cuando lleguen. Tú la preparas en secreto; tu pareja solo recibe la invitación.</p>
-      <a href="#armar" class="cta">Armar la sorpresa</a>
+      <h1>{{ copy.hero_h1|safe }}</h1>
+      <p>{{ copy.hero_p }}</p>
+      <a href="#armar" class="cta">{{ copy.hero_cta }}</a>
     </div>
   </header>
 
   <section>
     <div class="wrap">
-      <div class="kick">El gesto</div>
-      <h2 class="tit serif">Hay regalos que se abren. Este se enciende.</h2>
-      <p class="lead">No es un objeto: es una velada para los dos, junto al Río Pescado. Tú eliges cada detalle <b>en complicidad con nosotros</b>, y tu pareja recibe una invitación preciosa —sin precios, sin adelantar nada— que descubre recién al llegar.</p>
+      <div class="kick">{{ copy.kick }}</div>
+      <h2 class="tit serif">{{ copy.tit }}</h2>
+      <p class="lead">{{ copy.lead|safe }}</p>
     </div>
   </section>
 
   <section style="padding-top:0;">
     <div class="wrap">
       <div class="pasos">
-        <div class="paso"><div class="n">1</div><div><h3>Ármala a tu gusto, en secreto</h3><p>Eliges la ambientación, la tina, la fecha y la hora. Nosotros guardamos el secreto contigo.</p></div></div>
-        <div class="paso"><div class="n">2</div><div><h3>Envíale la invitación</h3><p>Una tarjeta linda para tu pareja, sin precios ni spoiler. Solo sabrá que la esperas junto al río.</p></div></div>
-        <div class="paso"><div class="n">3</div><div><h3>La sorpresa, lista al llegar</h3><p>Casi 30 velas encendidas y todo montado por nosotros antes de que crucen la puerta.</p></div></div>
+        {% for titulo, detalle in copy.pasos %}
+        <div class="paso"><div class="n">{{ forloop.counter }}</div><div><h3>{{ titulo }}</h3><p>{{ detalle }}</p></div></div>
+        {% endfor %}
       </div>
     </div>
   </section>
 
   <section class="armar" id="armar">
     <div class="wrap">
-      <div class="kick">Arma tu velada</div>
-      <h2 class="tit serif">Diseña la experiencia</h2>
+      <div class="kick">{{ copy.kick_armar }}</div>
+      <h2 class="tit serif">{{ copy.tit_armar }}</h2>
 
       {% if messages %}{% for m in messages %}<div class="msg">{{ m }}</div>{% endfor %}{% endif %}
 
       <form method="post" action="{% url 'experiencia_romantica_continuar' %}" id="frm" class="card">
         {% csrf_token %}
-        <input type="hidden" name="ocasion" id="f_ocasion" value="romantica">
+        <input type="hidden" name="ocasion" id="f_ocasion" value="{{ ocasion_default }}">
         <input type="hidden" name="nivel"   id="f_nivel"  value="r1">
         <input type="hidden" name="torta"   id="f_torta"  value="sin_torta">
         <input type="hidden" name="color"   id="f_color"  value="rosado">
@@ -152,17 +163,19 @@
         <input type="hidden" name="chocolates" id="f_choco" value="0">
         <input type="hidden" name="personas" id="f_personas" value="">
 
+        {# La romántica no dibuja este paso: tiene una sola ocasión (un paso menos). #}
+        {% if ocasiones %}
         <div class="paso-t">1 · <b>Elige</b> tu ocasión</div>
         <div class="opts">
-          <button type="button" class="opt foto sel" id="optRom" data-oc="romantica">Romántica<small>Casi 30 velas + entorno</small></button>
-          <button type="button" class="opt foto" id="optCum" data-oc="cumpleanos">Cumpleaños<small>Con o sin torta · de a dos</small></button>
-          {% if tiene_tinas_grupo %}<button type="button" class="opt foto" id="optGrupo" data-oc="grupo">Grupo<small>Cumpleaños de 3 a 6</small></button>
-          <button type="button" class="opt foto" id="optDespedida" data-oc="despedida">Despedida<small>De soltera/o · en grupo</small></button>{% endif %}
+          {% for oc in ocasiones %}
+          <button type="button" class="opt foto{% if forloop.first %} sel{% endif %}" id="{{ oc.css_id }}" data-oc="{{ oc.clave }}">{{ oc.titulo }}<small>{{ oc.sub }}</small></button>
+          {% endfor %}
         </div>
+        {% endif %}
 
         <!-- 2A · Románticas: nivel (no llevan color) -->
-        <div id="panelRom">
-          <div class="paso-t">2 · ¿Qué <b>incluye</b>?</div>
+        <div id="panelRom"{% if default_lleva_color %} style="display:none;"{% endif %}>
+          <div class="paso-t">{% if ocasiones %}2{% else %}1{% endif %} · ¿Qué <b>incluye</b>?</div>
           <div class="opts">
             <button type="button" class="opt sel" data-nivel="r1" id="optR1">Clásica<small>Casi 30 velas + montaje</small></button>
             <button type="button" class="opt" data-nivel="r2" id="optR2">Con ramo de flores<small>Suma un ramo fresco</small></button>
@@ -170,7 +183,7 @@
         </div>
 
         <!-- 2B · Cumpleaños: color + torta -->
-        <div id="panelCum" style="display:none;">
+        <div id="panelCum"{% if not default_lleva_color %} style="display:none;"{% endif %}>
           <div class="paso-t">2 · <b>Color</b> de la ambientación</div>
           <div class="opts">
             <button type="button" class="opt" data-color="azul" id="optAzul">Azul<small>Tono frío</small></button>
@@ -185,7 +198,7 @@
           <p class="nota" id="notaGrupoAmb" style="display:none;">Para el grupo usamos la misma ambientación de cumpleaños (color + torta), en una tina grupal.</p>
         </div>
 
-        <div class="paso-t" id="tinaLbl">3 · Tu <b>tina</b>, fecha y hora</div>
+        <div class="paso-t" id="tinaLbl">{{ paso_tina }} · Tu <b>tina</b>, fecha y hora</div>
         <select id="selTina"><option value="">Elige tu tina…</option></select>
         <div id="panelPersonas" style="display:none;">
           <div class="paso-t" id="personasLbl">¿<b>Cuántos</b> son?</div>
@@ -199,7 +212,7 @@
         <div class="nota" id="notaHoras"></div>
 
         {% if tiene_chocolates %}
-        <div class="paso-t" id="chocoLbl">4 · ¿Le <b>sumas</b> algo?</div>
+        <div class="paso-t" id="chocoLbl">{{ paso_choco }} · ¿Le <b>sumas</b> algo?</div>
         <label class="check">
           <span class="lbl">Caja de chocolates<small>El toque dulce de la sorpresa</small></span>
           <span style="display:flex; align-items:center; gap:10px;"><span style="color:var(--suave); font-size:14px;">+${{ precio_chocolates_fmt }}</span><input type="checkbox" id="chkChoco"></span>
@@ -208,16 +221,19 @@
       </form>
       {{ tinas|json_script:"tinas-data" }}
 
+      {# El JS lo esconde en grupo/despedida: esas no llevan invitación secreta. #}
       <div class="sorpresa" id="sorpresaBox">
         <div class="ic">🤫</div>
-        <p>Tú y Aremko saben todo. Tu pareja recibe <b>solo la invitación</b> —sin precios, sin ver la ambientación—. La sorpresa se revela al llegar.</p>
+        <p>{{ copy.sorpresa|safe }}</p>
       </div>
 
       <p class="nota" style="text-align:center; margin-top:18px;">En el siguiente paso confirmas tus datos y pagas. Podrás sumar masaje o cabaña si quieres.</p>
+
+      <a class="cruce" href="{% url copy.cruce_url %}">{{ copy.cruce_txt|safe }}</a>
     </div>
   </section>
 
-  <div class="cierre"><b>San Valentín</b> es nuestra semana más pedida. Asegura tu fecha con tiempo.</div>
+  <div class="cierre">{{ copy.cierre|safe }}</div>
 
   <div class="barra">
     <div class="in">
@@ -230,8 +246,10 @@
     var PRECIO = { r1:{{ precio_r1 }}, r2:{{ precio_r2 }}, cumple_sin:{{ precio_cumple_sin }}, cumple_con:{{ precio_cumple_con }}, chocolates:{{ precio_chocolates|default:0 }} };
     var TINAS = JSON.parse(document.getElementById('tinas-data').textContent);
     var HORAS_URL = "{% url 'ventas:get_available_hours' %}";
-    var estado = { ocasion:'romantica', nivel:'r1', color:'rosado', torta:'sin_torta', tinaTotal:0, choco:false, personas:0, precioPersona:0 };
+    var estado = { ocasion:'{{ ocasion_default }}', nivel:'r1', color:'rosado', torta:'sin_torta', tinaTotal:0, choco:false, personas:0, precioPersona:0 };
     var GRUPO_MIN = {{ grupo_min|default:3 }};
+    // Sin selector de ocasión (landing romántica) todos los pasos corren uno arriba.
+    var PASO_OFF = {% if ocasiones %}0{% else %}1{% endif %};
     var $ = function(id){ return document.getElementById(id); };
     var fmt = function(n){ return '$' + Math.round(n).toLocaleString('es-CL'); };
     function esGrupo(oc){ return oc==='grupo' || oc==='despedida'; }  // ambas usan el modo grupo
@@ -288,9 +306,10 @@
       var na=$('notaGrupoAmb'); if(na) na.style.display = grupo ? '' : 'none';
       $('panelPersonas').style.display = grupo ? '' : 'none';
       var sb=$('sorpresaBox'); if(sb) sb.style.display = grupo ? 'none' : '';  // grupo/despedida NO llevan invitación secreta
-      // Numeración de pasos: románticas 3/4 · cumpleaños 4/5 · grupo/despedida 4/(personas 5)/6.
-      $('tinaLbl').innerHTML = (llevaColor ? '4' : '3') + ' · Tu <b>tina</b>, fecha y hora';
-      var choco=$('chocoLbl'); if(choco) choco.innerHTML = (grupo ? '6' : llevaColor ? '5' : '4') + ' · ¿Le <b>sumas</b> algo?';
+      // Numeración: románticas 3/4 · cumpleaños 4/5 · grupo/despedida 4/(personas 5)/6.
+      // PASO_OFF resta 1 en la landing romántica, que no tiene selector de ocasión.
+      $('tinaLbl').innerHTML = ((llevaColor ? 4 : 3) - PASO_OFF) + ' · Tu <b>tina</b>, fecha y hora';
+      var choco=$('chocoLbl'); if(choco) choco.innerHTML = ((grupo ? 6 : llevaColor ? 5 : 4) - PASO_OFF) + ' · ¿Le <b>sumas</b> algo?';
       rellenarTinas();
       recalc();
     }

@@ -10,12 +10,12 @@ Cómo actualizar: cambiar el campo `estado` del ítem correspondiente (y opciona
 from django.shortcuts import render
 
 # Bump manual cada vez que actualizamos el tablero.
-ACTUALIZADO = '2026-07-24'
+ACTUALIZADO = '2026-07-30'
 
 # estado ∈ {'hecho', 'progreso', 'pendiente'}
 FUNDACION = [
     {'code': 'F1',   'titulo': 'Configurador + checkout', 'estado': 'hecho',
-     'nota': '/experiencia-romantica/ — la persona arma la velada de a dos'},
+     'nota': '2 puertas, 1 motor: /experiencia-romantica/ (pareja) y /celebraciones/ (cumpleaños y despedidas)'},
     {'code': 'F1',   'titulo': 'Invitación sorpresa', 'estado': 'hecho',
      'nota': 'Link para la pareja, sin precios ni ambientación'},
     {'code': 'F1',   'titulo': 'Taxonomía románticas vs cumpleaños', 'estado': 'hecho',
